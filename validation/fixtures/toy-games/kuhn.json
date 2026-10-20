@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "id": "kuhn",
+  "name": "Kuhn poker",
+  "gate": "G1",
+  "r_id": "R2.4",
+  "players": 2,
+  "deck": {
+    "ranks": ["J", "Q", "K"],
+    "suits": 1,
+    "cards": 3,
+    "private_cards_per_player": 1,
+    "public_cards": 0
+  },
+  "sources": [
+    {
+      "id": "kuhn-1950",
+      "citation": "H. W. Kuhn, A simplified two-person poker, Contributions to the Theory of Games, volume 1, Princeton University Press, 1950, pages 97 to 103. Game value and the one parameter equilibrium family.",
+      "url": null
+    },
+    {
+      "id": "04-section-6-g1",
+      "citation": "planning/04-solver-engine.md section 6, gate G1 pass rule: player 1 game value within 0.001 of minus 1/18; exploitability below 0.001.",
+      "url": null
+    }
+  ],
+  "tolerances": {
+    "game_value_abs": { "value": 0.001, "unit": "chips", "source": "04-section-6-g1" },
+    "exploitability_max": { "value": 0.001, "unit": "chips", "source": "04-section-6-g1" },
+    "frequency_points": null,
+    "curve_abs": null,
+    "curve_rel": null
+  },
+  "cases": [
+    {
+      "id": "standard",
+      "description": "Three cards J < Q < K, one to each player, both ante 1 chip, one betting round with a single bet of 1 chip and no raise. Player 0 acts first.",
+      "betting": {
+        "ante": 1,
+        "dead_pot": 2,
+        "rounds": 1,
+        "bet_sizes": [1],
+        "max_raises_per_round": 0,
+        "first_to_act": 0,
+        "unit": "chips"
+      },
+      "game_value": {
+        "player": 0,
+        "value": -0.05555555555555555,
+        "exact": "-1/18",
+        "unit": "chips",
+        "source": "kuhn-1950"
+      },
+      "strategy_facts": [
+        {
+          "id": "p0-open-bet-j",
+          "player": 0,
+          "node": "open",
+          "holding": "J",
+          "action": "bet",
+          "frequency": { "kind": "parameter", "name": "a", "min": 0, "max": 0.3333333333333333 },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p0-open-bet-q",
+          "player": 0,
+          "node": "open",
+          "holding": "Q",
+          "action": "bet",
+          "frequency": { "kind": "exact", "value": 0, "exact": "0" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p0-open-bet-k",
+          "player": 0,
+          "node": "open",
+          "holding": "K",
+          "action": "bet",
+          "frequency": { "kind": "affine", "parameter": "a", "scale": 3, "offset": 0 },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p0-facing-bet-after-check-call-j",
+          "player": 0,
+          "node": "facing_bet_after_check",
+          "holding": "J",
+          "action": "call",
+          "frequency": { "kind": "exact", "value": 0, "exact": "0" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p0-facing-bet-after-check-call-q",
+          "player": 0,
+          "node": "facing_bet_after_check",
+          "holding": "Q",
+          "action": "call",
+          "frequency": { "kind": "affine", "parameter": "a", "scale": 1, "offset": 0.3333333333333333 },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p0-facing-bet-after-check-call-k",
+          "player": 0,
+          "node": "facing_bet_after_check",
+          "holding": "K",
+          "action": "call",
+          "frequency": { "kind": "exact", "value": 1, "exact": "1" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-after-check-bet-j",
+          "player": 1,
+          "node": "after_check",
+          "holding": "J",
+          "action": "bet",
+          "frequency": { "kind": "exact", "value": 0.3333333333333333, "exact": "1/3" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-after-check-bet-q",
+          "player": 1,
+          "node": "after_check",
+          "holding": "Q",
+          "action": "bet",
+          "frequency": { "kind": "exact", "value": 0, "exact": "0" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-after-check-bet-k",
+          "player": 1,
+          "node": "after_check",
+          "holding": "K",
+          "action": "bet",
+          "frequency": { "kind": "exact", "value": 1, "exact": "1" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-facing-bet-call-j",
+          "player": 1,
+          "node": "facing_bet",
+          "holding": "J",
+          "action": "call",
+          "frequency": { "kind": "exact", "value": 0, "exact": "0" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-facing-bet-call-q",
+          "player": 1,
+          "node": "facing_bet",
+          "holding": "Q",
+          "action": "call",
+          "frequency": { "kind": "exact", "value": 0.3333333333333333, "exact": "1/3" },
+          "source": "kuhn-1950"
+        },
+        {
+          "id": "p1-facing-bet-call-k",
+          "player": 1,
+          "node": "facing_bet",
+          "holding": "K",
+          "action": "call",
+          "frequency": { "kind": "exact", "value": 1, "exact": "1" },
+          "source": "kuhn-1950"
+        }
+      ],
+      "ratio_facts": []
+    }
+  ],
+  "curve": null,
+  "notes": [
+    "Player 0 acts first. Node names: open is player 0 at the root; after_check is player 1 after player 0 checked; facing_bet is player 1 after player 0 bet; facing_bet_after_check is player 0 after a check and a bet.",
+    "The equilibrium is a one parameter family. The parameter a is player 0's bet frequency with J and may be anything in [0, 1/3]; every fact of kind affine is scale times a plus offset. A solver may land anywhere on the family, so a strategy check binds a from the solved J bet frequency first and compares the affine facts against that binding.",
+    "Gate G1 checks the game value and the exploitability only (04 section 6). The strategy facts document the equilibrium family for reports and are not part of the pass rule.",
+    "Exploitability is in chips, the ante being 1 chip, the unit the engine reports beside percent of pot. The pot at the root is 2 chips, so 0.001 chips is 0.05 percent of pot."
+  ]
+}
