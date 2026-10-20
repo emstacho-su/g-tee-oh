@@ -23,13 +23,15 @@ use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::cards::{Board, Card, Flop, Rank, Suit};
-use crate::types::ModelError;
+use crate::cards::{Board, Card, Flop, Rank, Suit, first_duplicate};
+use crate::types::{ModelError, find_by_name};
 
 /// A relabeling of the four suits: entry `i` is the suit that suit index `i` becomes
 /// (A2 section 1, the suit permutation from raw to canonical and back). The derived order
-/// compares the mappings entry by entry, which is the order `all` lists them in.
+/// compares the mappings entry by entry, which is the order `all` lists them in. Serde
+/// reads a mapping through `new`, so a stored mapping is always a bijection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "[Suit; 4]", into = "[Suit; 4]")]
 pub struct SuitPermutation([Suit; 4]);
 
 impl SuitPermutation {
@@ -46,16 +48,14 @@ impl SuitPermutation {
     ///
     /// `ModelError::InvalidSuitPermutation` when a suit appears twice.
     pub fn new(mapping: [Suit; 4]) -> Result<SuitPermutation, ModelError> {
-        for (position, suit) in mapping.iter().enumerate() {
-            if mapping[..position].contains(suit) {
-                return Err(ModelError::InvalidSuitPermutation(format!(
-                    "suit {} appears twice in {}",
-                    suit.to_char(),
-                    mapping_text(mapping)
-                )));
-            }
+        match first_duplicate(&mapping) {
+            Some(suit) => Err(ModelError::InvalidSuitPermutation(format!(
+                "suit {} appears twice in {}",
+                suit.to_char(),
+                mapping_text(mapping)
+            ))),
+            None => Ok(SuitPermutation(mapping)),
         }
-        Ok(SuitPermutation(mapping))
     }
 
     /// The image of each suit in `cdhs` order.
@@ -143,6 +143,20 @@ fn mapping_text(mapping: [Suit; 4]) -> String {
     mapping.into_iter().map(Suit::to_char).collect()
 }
 
+impl TryFrom<[Suit; 4]> for SuitPermutation {
+    type Error = ModelError;
+
+    fn try_from(mapping: [Suit; 4]) -> Result<Self, Self::Error> {
+        SuitPermutation::new(mapping)
+    }
+}
+
+impl From<SuitPermutation> for [Suit; 4] {
+    fn from(perm: SuitPermutation) -> [Suit; 4] {
+        perm.0
+    }
+}
+
 /// Sorts three relabeled cards into a flop. A permutation is a bijection on cards, so three
 /// distinct cards stay distinct and `Flop::new` cannot fail.
 fn permuted_flop(cards: [Card; 3]) -> Flop {
@@ -188,8 +202,9 @@ pub fn is_canonical_flop(flop: Flop) -> bool {
     canonical_flop(flop).0 == flop
 }
 
-/// The smallest rank gap between any two cards of a dry ace-high flop: four, so no two of
-/// its cards sit inside one five-card straight window.
+/// The smallest gap between adjacent ranks of a dry ace-high flop, high to middle and
+/// middle to low: four. The rule reads the flop top down and ignores the wheel, so
+/// `Ah7d2c` (gaps of seven and five) is dry even though ace and deuce meet in A2345.
 const DRY_MIN_GAP: u8 = 4;
 
 /// The largest spread from top to bottom rank of a low connected flop: four, one straight
@@ -205,8 +220,9 @@ const LOW_TOP_RANK: Rank = Rank::Nine;
 /// 1. `Paired`: two or three cards share a rank.
 /// 2. `Monotone`: all three cards share a suit.
 /// 3. `TwoToneBroadway`: exactly two cards share a suit and every rank is ten or higher.
-/// 4. `DryAceHigh`: ace high, three suits, and every two ranks at least four apart, so no
-///    two cards sit inside one straight window.
+/// 4. `DryAceHigh`: ace high, three suits, and each adjacent pair of ranks (high to
+///    middle, middle to low) at least four apart. The wheel is ignored, so `Ah7d2c` is
+///    dry ace high although ace and deuce connect through A2345.
 /// 5. `LowConnected`: top rank nine or lower and the top and bottom ranks at most four
 ///    apart.
 /// 6. `Other`: everything else.
@@ -293,7 +309,7 @@ impl FromStr for TextureFamily {
     /// A kebab-case name from `as_str`. A texture family is a spot-class feature (06
     /// section 2), so an unknown name is reported as `ModelError::InvalidSpotClassKey`.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        TextureFamily::ALL.into_iter().find(|family| family.as_str() == s).ok_or_else(|| {
+        find_by_name(&TextureFamily::ALL, TextureFamily::as_str, s).ok_or_else(|| {
             ModelError::InvalidSpotClassKey(
                 s.to_owned(),
                 "expected a texture family such as dry-ace-high".to_owned(),

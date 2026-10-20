@@ -4,19 +4,23 @@
 //! happens. Its grammar:
 //!
 //! ```text
-//! cfg_<table size>_<format>_<stake slug>_<depth bb>[_straddle][_ante<cbb>]
+//! cfg_<table size>_<format>[_<stake slug>]_<depth bb>[_straddle][_ante<cbb>]
 //! ```
 //!
 //! The stake slug is the label lowercased with every character outside `[a-z0-9]` removed:
-//! `1/3` becomes `13`, `2/5` becomes `25`, `NL25` becomes `nl25`. The depth is written in
-//! whole big blinds (bb) when the centi-big-blinds (cbb) divide evenly and as `<cbb>cbb`
-//! otherwise. A3's example `cfg_9_live_13_150` is 9-handed live at 1/3 with 150 bb stacks,
-//! no straddle, no ante.
+//! `1/3` becomes `13` and `2/5` becomes `25`. The slug segment is omitted when it equals
+//! the format name, so the online rows, whose stake is labelled `online`, read
+//! `cfg_6_online_100` rather than repeating the word, while the live rows keep their slug.
+//! The depth is written in whole big blinds (bb) when the centi-big-blinds (cbb) divide
+//! evenly and as `<cbb>cbb` otherwise. A3's example `cfg_9_live_13_150` is 9-handed live
+//! at 1/3 with 150 bb stacks, no straddle, no ante.
 //!
 //! The v1 catalog (R0.6, O-72): one online stake and the live stakes 1/3 and 2/5; eleven
 //! straddle-off configurations, online 6-max at 100, 150 and 200 bb and live 9-handed at
 //! each stake at 100, 150, 200 and 300 bb. The ante field exists per O-33 and is zero in
-//! every catalog row.
+//! every catalog row. The database seed, `db/migrations/20261020001100_seed_catalog.sql`,
+//! is the catalog of record until O-7 settles the online rake set, and this module mirrors
+//! it exactly (O-112): `tests/catalog_seed.rs` reads the seed and compares every row.
 //!
 //! Owner: the rake-and-buckets agent (files `rake.rs`, `buckets.rs` and `config.rs`).
 
@@ -46,8 +50,9 @@ pub const LIVE_1_3_LABEL: &str = "1/3";
 /// The label of the live 2/5 stake row.
 pub const LIVE_2_5_LABEL: &str = "2/5";
 
-/// The label of the one online stake row.
-pub const ONLINE_STAKE_LABEL: &str = "NL25";
+/// The label of the one online stake row. It equals the format name, so its slug is left
+/// out of configuration identifiers (see the module grammar).
+pub const ONLINE_STAKE_LABEL: &str = "online";
 
 /// Live 1/3 blinds in cents: $1 and $3.
 const LIVE_1_3_BLINDS_CENTS: (u32, u32) = (100, 300);
@@ -55,8 +60,9 @@ const LIVE_1_3_BLINDS_CENTS: (u32, u32) = (100, 300);
 /// Live 2/5 blinds in cents: $2 and $5.
 const LIVE_2_5_BLINDS_CENTS: (u32, u32) = (200, 500);
 
-/// Online `NL25` blinds in cents: 10 and 25.
-const ONLINE_BLINDS_CENTS: (u32, u32) = (10, 25);
+/// Online blinds in cents: 25 and 50, the seed row's placeholder until O-7 settles which
+/// online rake set defines the profile and with it the stake it is keyed at.
+const ONLINE_BLINDS_CENTS: (u32, u32) = (25, 50);
 
 /// Online catalog depths in big blinds (01 section 3).
 pub const ONLINE_DEPTHS_BB: [u32; 3] = [100, 150, 200];
@@ -118,8 +124,9 @@ impl Stake {
         }
     }
 
-    /// The one online stake row, `NL25` with blinds 10 and 25 cents and the online profile
-    /// (ADR 0014, O-7).
+    /// The one online stake row, labelled `online`, with blinds 25 and 50 cents and the
+    /// online profile (ADR 0014). The row is a placeholder that mirrors the database seed
+    /// (O-112) until O-7 settles the online rake set.
     #[must_use]
     pub fn online() -> Stake {
         let (sb_cents, bb_cents) = ONLINE_BLINDS_CENTS;
@@ -157,26 +164,28 @@ impl GameConfig {
     }
 
     /// The identifier in the grammar above. Two configurations that differ only in stake
-    /// get different identifiers because the slug is a segment (ADR 0014).
+    /// get different identifiers because the slug is a segment (ADR 0014); the segment is
+    /// omitted when the slug repeats the format name, so the online rows read
+    /// `cfg_6_online_100` (O-112).
     #[must_use]
     pub fn config_id(&self) -> ConfigId {
-        let mut segments = vec![
-            CONFIG_ID_PREFIX.to_owned(),
-            self.table_size.to_string(),
-            self.format.to_string(),
-            self.stake.slug(),
-            depth_segment(self.depth_cbb),
+        let format = self.format.to_string();
+        let slug = self.stake.slug();
+        let stake_segment = if slug == format { None } else { Some(slug) };
+        let ante = self.ante_cbb;
+        let segments = [
+            Some(CONFIG_ID_PREFIX.to_owned()),
+            Some(self.table_size.to_string()),
+            Some(format),
+            stake_segment,
+            Some(depth_segment(self.depth_cbb)),
+            self.straddle.then(|| CONFIG_ID_STRADDLE.to_owned()),
+            (ante != Cbb::ZERO).then(|| format!("{CONFIG_ID_ANTE_PREFIX}{ante}")),
         ];
-        if self.straddle {
-            segments.push(CONFIG_ID_STRADDLE.to_owned());
-        }
-        if self.ante_cbb != Cbb::ZERO {
-            let ante = self.ante_cbb;
-            segments.push(format!("{CONFIG_ID_ANTE_PREFIX}{ante}"));
-        }
+        let id = segments.into_iter().flatten().collect::<Vec<String>>().join(CONFIG_ID_SEPARATOR);
         // Every segment is digits, a lowercase name or the separator, which is exactly the
         // ConfigId alphabet, so validation cannot fail here.
-        match ConfigId::new(segments.join(CONFIG_ID_SEPARATOR)) {
+        match ConfigId::new(id) {
             Ok(id) => id,
             Err(err) => unreachable!("a config id built from validated segments: {err}"),
         }
@@ -230,13 +239,13 @@ mod tests {
         assert_eq!(Stake::new(LIVE_1_3_LABEL, 100, 300, rake), Ok(Stake::live_1_3()));
         assert_eq!(Stake::new("2/5", 200, 500, RakeModel::live(500)), Ok(Stake::live_2_5()));
         let online = Stake::online();
-        assert_eq!(Stake::new("NL25", 10, 25, online.rake), Ok(online));
+        assert_eq!(Stake::new("online", 25, 50, online.rake), Ok(online));
     }
 
     #[test]
     fn r2_2_slug_keeps_only_ascii_letters_and_digits() {
         assert_eq!(slug_of("1/3"), "13");
-        assert_eq!(slug_of("NL 25 fast"), "nl25fast");
+        assert_eq!(slug_of("NL 50 fast"), "nl50fast");
         assert_eq!(slug_of("$1-$2"), "12");
         assert_eq!(slug_of("//"), "");
     }

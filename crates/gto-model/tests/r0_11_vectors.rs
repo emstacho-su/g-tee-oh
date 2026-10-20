@@ -58,12 +58,12 @@ fn r2_1_r0_11_node_key_round_trip() {
     let keys = [
         "cfg_9_live_13_150/BB-BTN/r300.c|Ah7d2c|x.b250.c|Kh|x",
         "cfg_9_live_13_150/BB-BTN/",
-        "cfg_6_online_nl25_100/SB-BB/r250",
-        "cfg_6_online_nl25_100/BB-BTN/r250.r800.c|Kc7h2s|",
-        "cfg_6_online_nl25_100/BB-BTN/r250.c|Kc7h2s|x.b150.r450.c|9d|",
+        "cfg_6_online_100/SB-BB/r250",
+        "cfg_6_online_100/BB-BTN/r250.r800.c|Kc7h2s|",
+        "cfg_6_online_100/BB-BTN/r250.c|Kc7h2s|x.b150.r450.c|9d|",
         "cfg_9_live_25_300_straddle/UTG-CO/s200.r600.c|As9s2c|b250.c|Qs|x.x|3h|b1000.a",
-        "cfg_6_online_nl25_200/HJ-BTN/l.r500.c|TdTh4c||Ac||2c|",
-        "cfg_6_online_nl25_100/SB-BB/l.r300.f",
+        "cfg_6_online_200/HJ-BTN/l.r500.c|TdTh4c||Ac||2c|",
+        "cfg_6_online_100/SB-BB/l.r300.f",
     ];
     for text in keys {
         let parsed: NodeKey = text.parse().unwrap_or_else(|err| panic!("{text}: {err}"));

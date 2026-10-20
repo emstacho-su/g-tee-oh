@@ -146,24 +146,24 @@ fn r2_1_node_key_display_a3_example() {
 
 #[test]
 fn r2_1_node_key_root_preflop_and_first_flop_decision() {
-    let root = key("cfg_6_online_nl25_100/BB-BTN/");
+    let root = key("cfg_6_online_100/BB-BTN/");
     assert_eq!(root.preflop, Vec::<ActionToken>::new());
     assert_eq!(root.flop, None);
     assert_eq!(root.street(), Street::Preflop);
     assert_eq!(root.board(), None);
     assert_eq!(root.line(), "");
-    assert_eq!(root.to_string(), "cfg_6_online_nl25_100/BB-BTN/");
+    assert_eq!(root.to_string(), "cfg_6_online_100/BB-BTN/");
     let by_hand =
-        NodeKey::preflop(cfg("cfg_6_online_nl25_100"), pair(Position::Bb, Position::Btn), vec![]);
+        NodeKey::preflop(cfg("cfg_6_online_100"), pair(Position::Bb, Position::Btn), vec![]);
     assert_eq!(by_hand, root);
-    let open = key("cfg_6_online_nl25_100/BB-BTN/r250");
+    let open = key("cfg_6_online_100/BB-BTN/r250");
     assert_eq!(open.preflop, vec![ActionToken::Raise(Cbb(250))]);
     assert_eq!(open.street(), Street::Preflop);
-    assert_eq!(open.to_string(), "cfg_6_online_nl25_100/BB-BTN/r250");
-    let first = key("cfg_6_online_nl25_100/BB-BTN/r250.c|Ah7d2c|");
+    assert_eq!(open.to_string(), "cfg_6_online_100/BB-BTN/r250");
+    let first = key("cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|");
     assert_eq!(first.street(), Street::Flop);
     assert_eq!(first.flop.as_ref().map(|section| section.actions.len()), Some(0));
-    assert_eq!(first.to_string(), "cfg_6_online_nl25_100/BB-BTN/r250.c|Ah7d2c|");
+    assert_eq!(first.to_string(), "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|");
 }
 
 #[test]
@@ -249,12 +249,40 @@ fn r2_1_spot_class_key_vectors() {
         pair: pair(Position::Bb, Position::Btn),
     };
     assert_eq!(facing_open, expected);
-    assert_eq!(facing_open.key().as_str(), "preflop/live/150/facing-open/BB-BTN");
-    let rfi = SpotClass::classify(&online_100(), &key("cfg_6_online_nl25_100/BB-BTN/")).unwrap();
-    assert_eq!(rfi.key().to_string(), "preflop/online/100/rfi/BB-BTN");
+    assert_eq!(facing_open.key().unwrap().as_str(), "preflop/live/150/facing-open/BB-BTN");
+    let rfi = SpotClass::classify(&online_100(), &key("cfg_6_online_100/BB-BTN/")).unwrap();
+    assert_eq!(rfi.key().unwrap().to_string(), "preflop/online/100/rfi/BB-BTN");
     let three_bet =
-        SpotClass::classify(&online_100(), &key("cfg_6_online_nl25_100/SB-CO/r250.r800")).unwrap();
-    assert_eq!(three_bet.key().as_str(), "preflop/online/100/facing-3bet/SB-CO");
+        SpotClass::classify(&online_100(), &key("cfg_6_online_100/SB-CO/r250.r800")).unwrap();
+    assert_eq!(three_bet.key().unwrap().as_str(), "preflop/online/100/facing-3bet/SB-CO");
+}
+
+#[test]
+fn r2_1_spot_class_key_rejects_a_postflop_class() {
+    // A key is validated text, so a class on a street that has no classes in v1 gets an
+    // error from key() rather than text that from_key would then reject.
+    let preflop = SpotClass {
+        street: Street::Preflop,
+        format: GameFormat::Live,
+        depth_band: DepthBand::OneFifty,
+        family: ActionFamily::FacingOpen,
+        pair: pair(Position::Bb, Position::Btn),
+    };
+    assert_eq!(preflop.key().unwrap().as_str(), "preflop/live/150/facing-open/BB-BTN");
+    let postflop = SpotClass { street: Street::Flop, ..preflop };
+    assert!(matches!(postflop.key(), Err(ModelError::InvalidSpotClassKey(..))));
+}
+
+#[test]
+fn r2_1_spot_class_classify_rejects_a_key_from_another_config() {
+    // The key names its configuration, so classifying it under a different one is a
+    // mismatch that names both identifiers.
+    let live_key = key("cfg_9_live_13_150/BB-BTN/r300");
+    let expected = ModelError::ConfigMismatch {
+        config: cfg("cfg_6_online_100"),
+        key: cfg("cfg_9_live_13_150"),
+    };
+    assert_eq!(SpotClass::classify(&online_100(), &live_key), Err(expected));
 }
 
 #[test]
@@ -264,7 +292,7 @@ fn r2_1_spot_class_key_round_trip_and_rejects() {
     assert_eq!(parsed.as_str(), text);
     assert_eq!(parsed.to_string(), text);
     let class = SpotClass::from_key(&parsed).unwrap();
-    assert_eq!(class.key(), parsed);
+    assert_eq!(class.key().unwrap(), parsed);
     assert_eq!(text.parse::<SpotClassKey>().unwrap(), parsed);
     let bad = [
         "",

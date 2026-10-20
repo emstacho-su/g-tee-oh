@@ -309,16 +309,17 @@ pub fn parse_cards(s: &str) -> Result<Vec<Card>, ModelError> {
     if chars.len() % 2 != 0 {
         return Err(ModelError::InvalidCard(s.to_owned()));
     }
-    let mut cards = Vec::with_capacity(chars.len() / 2);
-    for pair in chars.chunks_exact(2) {
-        let card = Card::from_chars(pair[0], pair[1])
-            .map_err(|_| ModelError::InvalidCard(pair.iter().collect()))?;
-        if cards.contains(&card) {
-            return Err(ModelError::DuplicateCard(card.to_string()));
-        }
-        cards.push(card);
+    let cards = chars
+        .chunks_exact(2)
+        .map(|pair| {
+            Card::from_chars(pair[0], pair[1])
+                .map_err(|_| ModelError::InvalidCard(pair.iter().collect()))
+        })
+        .collect::<Result<Vec<Card>, ModelError>>()?;
+    match first_duplicate(&cards) {
+        Some(card) => Err(ModelError::DuplicateCard(card.to_string())),
+        None => Ok(cards),
     }
-    Ok(cards)
 }
 
 /// Writes cards back to back with no separator, in the order given.
@@ -333,14 +334,15 @@ fn written_order(card: Card) -> (Reverse<Rank>, Suit) {
     (Reverse(card.rank()), card.suit())
 }
 
-/// The first card that repeats an earlier one in the slice, if any. Shared with the node
-/// key, which checks the same rule over a flop, a turn and a river.
-pub(crate) fn first_duplicate(cards: &[Card]) -> Option<Card> {
-    cards
+/// The first item that repeats an earlier one in the slice, if any. One scan serves every
+/// distinctness rule in the crate: a flop's cards, a parsed card string, a node key's
+/// board and a suit permutation's mapping.
+pub(crate) fn first_duplicate<T: PartialEq + Copy>(items: &[T]) -> Option<T> {
+    items
         .iter()
         .enumerate()
-        .find(|(position, card)| cards[..*position].contains(card))
-        .map(|(_, card)| *card)
+        .find(|(position, item)| items[..*position].contains(item))
+        .map(|(_, item)| *item)
 }
 
 /// Three distinct community cards held in written order: rank descending, then suit
@@ -429,12 +431,32 @@ impl From<Flop> for [Card; 3] {
 }
 
 /// A flop with an optional turn and river. A river needs a turn, and every card is distinct.
-/// The constructors enforce both, so a `Board` in hand is always a legal deal.
+/// The constructors enforce both, so a `Board` in hand is always a legal deal; serde reads
+/// a board through `Board::new` as well, via `RawBoard`, so a stored board that breaks a
+/// rule fails at the read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "RawBoard")]
 pub struct Board {
     flop: Flop,
     turn: Option<Card>,
     river: Option<Card>,
+}
+
+/// The fields of a `Board` as serde reads them, before `Board::new` checks that a river
+/// follows a turn and that no card repeats.
+#[derive(Deserialize)]
+struct RawBoard {
+    flop: Flop,
+    turn: Option<Card>,
+    river: Option<Card>,
+}
+
+impl TryFrom<RawBoard> for Board {
+    type Error = ModelError;
+
+    fn try_from(raw: RawBoard) -> Result<Self, Self::Error> {
+        Board::new(raw.flop, raw.turn, raw.river)
+    }
 }
 
 impl Board {

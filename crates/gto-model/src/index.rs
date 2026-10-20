@@ -42,6 +42,26 @@ const OFFSUIT_START: u8 = SUITED_START + UNPAIRED_COUNT;
 /// Combos in the postflop index: 52 cards choose 2.
 const COMBO_COUNT: usize = 1326;
 
+/// The two kinds of two-rank class, the only ones `HandClass::unpaired` can build, so a
+/// pair cannot reach it by mistake.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Suitedness {
+    /// Both cards of one suit.
+    Suited,
+    /// Two different suits.
+    Offsuit,
+}
+
+impl Suitedness {
+    /// The index of the first class of this kind: `AKs` at 13 or `AKo` at 91.
+    const fn start(self) -> u8 {
+        match self {
+            Suitedness::Suited => SUITED_START,
+            Suitedness::Offsuit => OFFSUIT_START,
+        }
+    }
+}
+
 /// Whether a hand class is a pair, suited or offsuit (A3 section 1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -160,11 +180,11 @@ impl HandClass {
         if !valid {
             return Err(ModelError::InvalidHandClass(format!("{high}{low}{}", kind.suffix())));
         }
+        let (high, low) = (high.max(low), high.min(low));
         Ok(match kind {
             HandClassKind::Pair => HandClass::pair(high),
-            HandClassKind::Suited | HandClassKind::Offsuit => {
-                HandClass::unpaired(high.max(low), high.min(low), kind)
-            }
+            HandClassKind::Suited => HandClass::unpaired(high, low, Suitedness::Suited),
+            HandClassKind::Offsuit => HandClass::unpaired(high, low, Suitedness::Offsuit),
         })
     }
 
@@ -173,13 +193,10 @@ impl HandClass {
         HandClass(Rank::Ace.index() - rank.index())
     }
 
-    /// A suited or offsuit class. Requires `high > low` and a kind other than `Pair`.
-    fn unpaired(high: Rank, low: Rank, kind: HandClassKind) -> HandClass {
-        let start = match kind {
-            HandClassKind::Suited => SUITED_START,
-            HandClassKind::Pair | HandClassKind::Offsuit => OFFSUIT_START,
-        };
-        HandClass(start + unpaired_offset(high, low))
+    /// A suited or offsuit class. Requires `high > low`; the kind is a `Suitedness`, so a
+    /// pair cannot be asked for.
+    fn unpaired(high: Rank, low: Rank, suitedness: Suitedness) -> HandClass {
+        HandClass(suitedness.start() + unpaired_offset(high, low))
     }
 
     /// The (high, low, kind) row of this class.
@@ -377,12 +394,9 @@ impl ComboId {
         if low.rank() == high.rank() {
             HandClass::pair(low.rank())
         } else {
-            let kind = if low.suit() == high.suit() {
-                HandClassKind::Suited
-            } else {
-                HandClassKind::Offsuit
-            };
-            HandClass::unpaired(high.rank(), low.rank(), kind)
+            let suitedness =
+                if low.suit() == high.suit() { Suitedness::Suited } else { Suitedness::Offsuit };
+            HandClass::unpaired(high.rank(), low.rank(), suitedness)
         }
     }
 

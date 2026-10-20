@@ -8,7 +8,10 @@
 //! which is what R2.2 and criterion 11 rely on.
 //!
 //! The online profile is a placeholder until reconnaissance names the rake set (O-7): 5
-//! percent capped at 3 big blinds, no flop no drop. It is one profile, and online
+//! percent capped at 3 big blinds, with no flop no drop off, so a hand that ends preflop
+//! pays its percent. Those values mirror the database seed row (O-112), which is the
+//! catalog of record until O-7 settles; the one online stake is labelled `online` and its
+//! cap is 150 cents over a 50 cent big blind. It is one profile, and online
 //! configurations never key on a dollar cap.
 //!
 //! Arithmetic is integer throughout. A percent of the pot is `pot * percent_bp / 10_000`
@@ -37,6 +40,10 @@ pub const ONLINE_RAKE_PERCENT_BP: u16 = 500;
 /// The online profile's cap in big blinds: 3, a placeholder pending O-7.
 pub const ONLINE_CAP_BB: u32 = 3;
 
+/// Whether the online profile drops no rake preflop: false in the seed row, a placeholder
+/// pending O-7 (O-112). Live stakes are always true (ADR 0014).
+pub const ONLINE_NO_FLOP_NO_DROP: bool = false;
+
 /// Basis points in the whole pot: `percent_bp` of 10,000 is 100 percent.
 const BASIS_POINTS_PER_WHOLE: u64 = 10_000;
 
@@ -48,14 +55,23 @@ impl RakeModel {
     }
 
     /// The one online profile at a stake: `ONLINE_RAKE_PERCENT_BP` capped at
-    /// `ONLINE_CAP_BB` big blinds, expressed in cents of that stake's big blind, no flop no
-    /// drop (ADR 0014, O-7).
+    /// `ONLINE_CAP_BB` big blinds, expressed in cents of that stake's big blind, and no flop
+    /// no drop as `ONLINE_NO_FLOP_NO_DROP` (ADR 0014, O-7, O-112).
+    ///
+    /// # Panics
+    ///
+    /// When `ONLINE_CAP_BB * bb_cents` does not fit in a `u32`. The product is checked
+    /// explicitly so the panic is defined in every build profile; a big blind that large is
+    /// a caller bug rather than an input to report.
     #[must_use]
     pub const fn online_profile(bb_cents: u32) -> RakeModel {
+        let Some(cap_cents) = ONLINE_CAP_BB.checked_mul(bb_cents) else {
+            panic!("the online rake cap in cents overflowed a u32")
+        };
         RakeModel {
             percent_bp: ONLINE_RAKE_PERCENT_BP,
-            cap_cents: ONLINE_CAP_BB * bb_cents,
-            no_flop_no_drop: true,
+            cap_cents,
+            no_flop_no_drop: ONLINE_NO_FLOP_NO_DROP,
         }
     }
 
@@ -66,7 +82,8 @@ impl RakeModel {
     /// # Panics
     ///
     /// When `bb_cents` is zero: a cap in cents has no value in big blinds without a big
-    /// blind. `Stake::new` rejects a zero big blind, so a validated stake never gets here.
+    /// blind. `Stake::new` rejects a zero big blind and serde reads a stake through it
+    /// (O-111), so only a stake built as a struct literal can get here.
     #[must_use]
     pub fn cap_cbb(self, bb_cents: u32) -> Cbb {
         assert!(bb_cents > 0, "a rake cap needs a big blind above zero cents to convert to cbb");

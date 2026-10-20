@@ -21,7 +21,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::keys::NodeKey;
 use crate::tokens::ActionToken;
-use crate::types::{Cbb, GameConfig, GameFormat, ModelError, Position, PositionPair, Street};
+use crate::types::{
+    Cbb, GameConfig, GameFormat, ModelError, Position, PositionPair, Street, find_by_name,
+};
 
 /// The separator between the parts of a spot-class key.
 pub const KEY_SEPARATOR: char = '/';
@@ -127,7 +129,7 @@ impl FromStr for ActionFamily {
     /// A kebab-case name from `as_str`. The error is `ModelError::InvalidSpotClassKey`,
     /// because a family name only ever appears inside a spot-class key.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        ActionFamily::ALL.into_iter().find(|family| family.as_str() == s).ok_or_else(|| {
+        find_by_name(&ActionFamily::ALL, ActionFamily::as_str, s).ok_or_else(|| {
             let names = ActionFamily::ALL.map(ActionFamily::as_str).join(", ");
             ModelError::InvalidSpotClassKey(s.to_owned(), format!("expected a family: {names}"))
         })
@@ -203,7 +205,7 @@ impl FromStr for DepthBand {
     /// A name from `as_str`. The error is `ModelError::InvalidSpotClassKey`, because a band
     /// name only ever appears inside a spot-class key.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        DepthBand::ALL.into_iter().find(|band| band.as_str() == s).ok_or_else(|| {
+        find_by_name(&DepthBand::ALL, DepthBand::as_str, s).ok_or_else(|| {
             let names = DepthBand::ALL.map(DepthBand::as_str).join(", ");
             ModelError::InvalidSpotClassKey(s.to_owned(), format!("expected a depth band: {names}"))
         })
@@ -228,11 +230,19 @@ pub struct SpotClass {
 impl SpotClass {
     /// Classifies a node under its configuration: the street comes from the key, the
     /// format and depth band from the configuration, and the family from the preflop line.
+    /// The key names its configuration, and that must be the one given, or the format and
+    /// depth band would describe a configuration the node does not belong to.
     ///
     /// # Errors
     ///
+    /// `ModelError::ConfigMismatch` when the key names another configuration,
     /// `ModelError::PostflopSpotClass` when the node is past preflop.
     pub fn classify(config: &GameConfig, key: &NodeKey) -> Result<SpotClass, ModelError> {
+        let config_id = config.config_id();
+        if config_id != key.config_id {
+            let key = key.config_id.clone();
+            return Err(ModelError::ConfigMismatch { config: config_id, key });
+        }
         let street = key.street();
         if street != Street::Preflop {
             return Err(ModelError::PostflopSpotClass(street));
@@ -246,10 +256,15 @@ impl SpotClass {
         })
     }
 
-    /// The deterministic key for this class.
-    #[must_use]
-    pub fn key(self) -> SpotClassKey {
-        SpotClassKey(self.to_string())
+    /// The deterministic key for this class, validated as key text by `SpotClassKey::new`
+    /// so that a key in hand always parses back with `from_key`.
+    ///
+    /// # Errors
+    ///
+    /// `ModelError::InvalidSpotClassKey` when the class has no key in v1, which is any
+    /// class on a street past preflop.
+    pub fn key(self) -> Result<SpotClassKey, ModelError> {
+        SpotClassKey::new(self.to_string())
     }
 
     /// The class a key names. In v1 the street part is always `preflop`; any other street

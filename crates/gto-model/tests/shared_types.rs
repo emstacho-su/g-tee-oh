@@ -14,13 +14,30 @@ fn r2_1_cbb_is_integer_centi_big_blinds() {
     assert_eq!(Cbb::new(250).get(), 250);
     assert_eq!(Cbb(250).whole_bb(), 2);
     assert!(!Cbb(250).is_whole_bb() && Cbb(300).is_whole_bb());
-    assert_eq!(Cbb(250) + Cbb(50), Cbb(300));
-    assert_eq!(Cbb(300) - Cbb(50), Cbb(250));
+    assert_eq!(Cbb(250).checked_add(Cbb(50)), Ok(Cbb(300)));
+    assert!(Cbb(u32::MAX).checked_add(Cbb(1)).is_err());
+    assert_eq!(Cbb(300).checked_sub(Cbb(50)), Ok(Cbb(250)));
     assert_eq!(Cbb(250).to_string(), "250");
     assert_eq!(Cbb::PER_BB, 100);
     assert_eq!(Cbb::ZERO, Cbb::default());
     assert_eq!(NOISE_FLOOR_PCT_POT_X100, 20);
     assert_eq!(PREFLOP_FLOOR_FALLBACK, Cbb(2));
+}
+
+#[test]
+fn r2_1_cbb_checked_sub_rejects_underflow() {
+    // cbb are unsigned, so 50 minus 300 has no value: an error, never a wrapped u32.
+    let underflow = Cbb(50).checked_sub(Cbb(300));
+    assert_eq!(underflow, Err(ModelError::CbbOutOfRange { op: "-", left: 50, right: 300 }));
+    assert_eq!(Cbb(300).checked_sub(Cbb(300)), Ok(Cbb::ZERO));
+}
+
+#[test]
+#[should_panic(expected = "overflowed")]
+fn r2_1_cbb_from_bb_panics_past_the_u32_range() {
+    // 42,949,673 bb times 100 is above u32::MAX, and the panic is defined in every build
+    // profile rather than a release-mode wrap.
+    let _ = Cbb::from_bb(std::hint::black_box(42_949_673));
 }
 
 #[test]

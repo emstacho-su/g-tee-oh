@@ -53,7 +53,9 @@ fn r2_2_no_rake_at_a_preflop_terminal() {
     assert_eq!(stake.rake_cbb(Cbb(30_000), Street::Preflop), Cbb::ZERO);
     assert_eq!(stake.rake_cbb(Cbb(600), Street::Flop), Cbb(60));
     assert_eq!(Stake::live_2_5().rake_cbb(Cbb(600), Street::Preflop), Cbb::ZERO);
-    assert_eq!(Stake::online().rake_cbb(Cbb(600), Street::Preflop), Cbb::ZERO);
+    // The online seed row carries no flop no drop as false (a placeholder pending O-7), so
+    // its preflop terminal pays the 5 percent: 30 cbb of 600.
+    assert_eq!(Stake::online().rake_cbb(Cbb(600), Street::Preflop), Cbb(30));
     let drop_preflop = RakeModel { no_flop_no_drop: false, ..stake.rake };
     assert_eq!(drop_preflop.rake_cbb(Cbb(600), 300, Street::Preflop), Cbb(60));
 }
@@ -78,12 +80,16 @@ fn r2_2_live_rake_is_ten_percent_to_the_cap() {
 
 #[test]
 fn r2_2_online_is_one_profile() {
+    // The seed row (O-112): label online, blinds 25 and 50 cents, 5 percent capped at 150
+    // cents (3 bb), no flop no drop false, all placeholders pending O-7.
     let online = Stake::online();
-    assert_eq!(online.label, "NL25");
+    assert_eq!(online.label, "online");
+    assert_eq!((online.sb_cents, online.bb_cents), (25, 50));
+    assert_eq!(online.rake, RakeModel { percent_bp: 500, cap_cents: 150, no_flop_no_drop: false });
     assert_eq!(online.rake, RakeModel::online_profile(online.bb_cents));
     assert_eq!(online.rake_cap_cbb(), Cbb::from_bb(ONLINE_CAP_BB));
     assert_eq!(online.rake.percent_bp, ONLINE_RAKE_PERCENT_BP);
-    assert!(online.rake.no_flop_no_drop);
+    assert!(!online.rake.no_flop_no_drop);
     assert_eq!(online.rake_cbb(Cbb(1_000), Street::Flop), Cbb(50));
     assert_eq!(online.rake_cbb(Cbb(30_000), Street::Flop), Cbb(300));
     let configs = v1_configs();
@@ -99,12 +105,27 @@ fn r2_2_online_is_one_profile() {
 fn r2_2_stake_validation_and_slug() {
     assert_eq!(Stake::live_1_3().slug(), "13");
     assert_eq!(Stake::live_2_5().slug(), "25");
-    assert_eq!(Stake::online().slug(), "nl25");
+    assert_eq!(Stake::online().slug(), "online");
     let rake = RakeModel::live(500);
     assert_eq!(Stake::new("5/10", 500, 1_000, rake).unwrap().slug(), "510");
     assert!(matches!(Stake::new("", 100, 300, rake), Err(ModelError::InvalidStake(_))));
     assert!(matches!(Stake::new("1/3", 100, 0, rake), Err(ModelError::InvalidStake(_))));
     assert!(matches!(Stake::new("3/1", 300, 100, rake), Err(ModelError::InvalidStake(_))));
+}
+
+#[test]
+fn r2_2_stake_deserializes_through_new() {
+    // A stake read from JavaScript Object Notation (JSON) passes Stake::new (O-111), so a
+    // zero big blind fails at the read instead of at the first cap conversion.
+    let zero_bb = concat!(
+        r#"{"label":"1/3","sb_cents":100,"bb_cents":0,"#,
+        r#""rake":{"percent_bp":1000,"cap_cents":500,"no_flop_no_drop":true}}"#
+    );
+    let parsed = serde_json::from_str::<Stake>(zero_bb);
+    let err = parsed.expect_err("a zero big blind must not deserialize");
+    assert!(err.to_string().contains("zero big blind"), "{err}");
+    let text = serde_json::to_string(&Stake::live_1_3()).unwrap();
+    assert_eq!(serde_json::from_str::<Stake>(&text).unwrap(), Stake::live_1_3());
 }
 
 #[test]
@@ -130,9 +151,15 @@ fn r2_2_config_id_differs_between_1_3_and_2_5() {
 fn r2_2_config_id_grammar() {
     let online =
         GameConfig::new(GameFormat::Online, TableSize::SIX_MAX, Stake::online(), Cbb::from_bb(100));
-    assert_eq!(online.config_id().as_str(), "cfg_6_online_nl25_100");
+    // The stake segment is omitted when the slug repeats the format name (O-112), so the
+    // seed's online rows read cfg_6_online_100; any other online label keeps its slug.
+    assert_eq!(online.config_id().as_str(), "cfg_6_online_100");
     assert!(!online.straddle);
     assert_eq!(online.ante_cbb, Cbb::ZERO);
+    let other_label = Stake::new("NL50", 25, 50, RakeModel::online_profile(50)).unwrap();
+    let keyed_by_label =
+        GameConfig::new(GameFormat::Online, TableSize::SIX_MAX, other_label, Cbb::from_bb(100));
+    assert_eq!(keyed_by_label.config_id().as_str(), "cfg_6_online_nl50_100");
     let straddled = GameConfig { straddle: true, ..live(Stake::live_1_3(), 150) };
     assert_eq!(straddled.config_id().as_str(), "cfg_9_live_13_150_straddle");
     let ante = GameConfig { ante_cbb: Cbb(50), ..live(Stake::live_1_3(), 300) };
@@ -150,14 +177,14 @@ fn r2_2_v1_catalog_has_11_distinct_configs() {
     let ids: BTreeSet<String> =
         configs.iter().map(|config| config.config_id().to_string()).collect();
     assert_eq!(ids.len(), 11);
-    assert!(ids.contains("cfg_6_online_nl25_100"));
-    assert!(ids.contains("cfg_6_online_nl25_200"));
+    assert!(ids.contains("cfg_6_online_100"));
+    assert!(ids.contains("cfg_6_online_200"));
     assert!(ids.contains("cfg_9_live_13_100"));
     assert!(ids.contains("cfg_9_live_25_300"));
     assert!(configs.iter().all(|config| !config.straddle && config.ante_cbb == Cbb::ZERO));
     assert_eq!(configs.iter().filter(|config| config.format == GameFormat::Online).count(), 3);
     assert_eq!(configs.iter().filter(|config| config.format == GameFormat::Live).count(), 8);
-    assert_eq!(configs[0].config_id().as_str(), "cfg_6_online_nl25_100");
+    assert_eq!(configs[0].config_id().as_str(), "cfg_6_online_100");
 }
 
 #[test]

@@ -40,6 +40,20 @@ fn r2_1_suit_permutation_apply_and_inverse() {
 }
 
 #[test]
+fn r2_1_suit_permutation_deserializes_through_new() {
+    // A mapping read from JavaScript Object Notation (JSON) goes through
+    // SuitPermutation::new, so four clubs fail at the read and never reach apply_flop.
+    let four_clubs = r#"["Clubs","Clubs","Clubs","Clubs"]"#;
+    let err = serde_json::from_str::<SuitPermutation>(four_clubs).expect_err("not a bijection");
+    assert!(err.to_string().contains("appears twice"), "{err}");
+    let swap =
+        SuitPermutation::new([Suit::Diamonds, Suit::Clubs, Suit::Spades, Suit::Hearts]).unwrap();
+    let text = serde_json::to_string(&swap).unwrap();
+    assert_eq!(text, r#"["Diamonds","Clubs","Spades","Hearts"]"#);
+    assert_eq!(serde_json::from_str::<SuitPermutation>(&text).unwrap(), swap);
+}
+
+#[test]
 fn r2_1_suit_permutations_are_24() {
     let all = SuitPermutation::all();
     assert_eq!(all.len(), SuitPermutation::COUNT);

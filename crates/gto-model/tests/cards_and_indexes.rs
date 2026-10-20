@@ -148,6 +148,26 @@ fn r2_1_board_streets_and_distinct_cards() {
 }
 
 #[test]
+fn r2_1_board_deserializes_through_new() {
+    // A board read from JavaScript Object Notation (JSON) goes through Board::new, so a
+    // river without a turn and a repeated card both fail at the read. Cards serialize as
+    // their integers: 50 is Ah, 21 is 7d, 0 is 2c, 46 is Kh and 3 is 2s.
+    let no_turn = r#"{"flop":[50,21,0],"turn":null,"river":3}"#;
+    let err = serde_json::from_str::<Board>(no_turn).expect_err("a river needs a turn");
+    assert!(err.to_string().contains("a river needs a turn"), "{err}");
+    let repeated = r#"{"flop":[50,21,0],"turn":50,"river":null}"#;
+    let err = serde_json::from_str::<Board>(repeated).expect_err("a repeated card");
+    assert!(err.to_string().contains("duplicate card Ah"), "{err}");
+    let dealt = r#"{"flop":[50,21,0],"turn":46,"river":3}"#;
+    let expected =
+        Board::new("Ah7d2c".parse().unwrap(), Some(card("Kh")), Some(card("2s"))).unwrap();
+    assert_eq!(serde_json::from_str::<Board>(dealt).unwrap(), expected);
+    let text = serde_json::to_string(&expected).unwrap();
+    assert_eq!(text, dealt);
+    assert_eq!(serde_json::from_str::<Board>(&text).unwrap(), expected);
+}
+
+#[test]
 fn r2_1_class_index_order() {
     // Pairs AA to 22, then suited by high card then kicker, then offsuit (A3 section 1).
     let vectors = [

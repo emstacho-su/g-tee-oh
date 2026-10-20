@@ -142,8 +142,9 @@ proptest! {
     }
 
     /// R2.1: every flop's canonical form is in the table at the index `canonical_index`
-    /// reports, carries its class weight of 4, 12 or 24, and the table holds 1,755 entries
-    /// whose weights sum to 22,100, one per raw flop.
+    /// reports and carries its class weight of 4, 12 or 24. The table's size and total
+    /// weight are facts about the one table, not about the generated flop, so
+    /// `r2_1_canonical_table_has_1755_flops_weighing_22100` checks them once.
     #[test]
     fn r2_1_prop_flop_weights_sum_22100(raw in flop()) {
         let (canonical, _) = canonical_flop(raw);
@@ -152,7 +153,13 @@ proptest! {
         prop_assert_eq!(entry.flop, canonical);
         prop_assert_eq!(entry.weight, flop_weight(raw));
         prop_assert!([4, 12, 24].contains(&entry.weight));
-        prop_assert_eq!(canonical_flops().len(), 1_755);
-        prop_assert_eq!(total_weight(), 22_100);
     }
+}
+
+/// R2.1: the table holds 1,755 canonical flops whose weights sum to 22,100, one per raw
+/// flop (A2 section 1). Checked once here rather than on every generated case above.
+#[test]
+fn r2_1_canonical_table_has_1755_flops_weighing_22100() {
+    assert_eq!(canonical_flops().len(), 1_755);
+    assert_eq!(total_weight(), 22_100);
 }

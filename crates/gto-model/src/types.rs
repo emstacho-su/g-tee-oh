@@ -8,7 +8,6 @@
 //! pair lists the out-of-position (OOP) seat before the in-position (IP) seat (A3 section 1).
 
 use std::fmt;
-use std::ops::{Add, Sub};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -82,6 +81,14 @@ pub enum ModelError {
     /// A configuration identifier with a character outside `[a-z0-9_]`, or an empty one.
     #[error("invalid config id {0:?}: expected one or more of a-z, 0-9 and _")]
     InvalidConfigId(String),
+    /// A node key names one configuration and is classified under another.
+    #[error("node key belongs to config {key}, not {config}")]
+    ConfigMismatch {
+        /// The configuration the caller classified under.
+        config: ConfigId,
+        /// The configuration the key names.
+        key: ConfigId,
+    },
     /// A stake row that cannot exist, named in the message.
     #[error("invalid stake: {0}")]
     InvalidStake(String),
@@ -94,6 +101,17 @@ pub enum ModelError {
     /// A bucket or a rake asked for against an empty pot.
     #[error("the pot is zero, so a size has no percent of pot")]
     ZeroPot,
+    /// A cbb computation left the `u32` range: a difference below zero or a product above
+    /// `u32::MAX`. Amounts never wrap, in any build profile.
+    #[error("cbb arithmetic out of range: {left} {op} {right} does not fit in a u32")]
+    CbbOutOfRange {
+        /// The operator applied, `-` or `*`.
+        op: &'static str,
+        /// The left operand in cbb.
+        left: u32,
+        /// The right operand.
+        right: u32,
+    },
 }
 
 /// Integer centi-big-blinds. `Cbb(250)` is 2.5 big blinds (A2 section 2). Chips outside the
@@ -117,9 +135,19 @@ impl Cbb {
     }
 
     /// Whole big blinds as cbb: `Cbb::from_bb(100)` is a 100 bb stack.
+    ///
+    /// # Panics
+    ///
+    /// When `bb * 100` does not fit in a `u32`, from 42,949,673 bb upward. The product is
+    /// checked explicitly so the panic is defined in every build profile: a release build
+    /// must never wrap a depth silently, and a depth that large is a caller bug rather
+    /// than an input to report.
     #[must_use]
     pub const fn from_bb(bb: u32) -> Self {
-        Cbb(bb * Self::PER_BB)
+        match bb.checked_mul(Self::PER_BB) {
+            Some(cbb) => Cbb(cbb),
+            None => panic!("a depth in big blinds overflowed the u32 cbb range"),
+        }
     }
 
     /// The raw cbb count.
@@ -139,21 +167,33 @@ impl Cbb {
     pub const fn is_whole_bb(self) -> bool {
         self.0 % Self::PER_BB == 0
     }
-}
 
-impl Add for Cbb {
-    type Output = Cbb;
-
-    fn add(self, rhs: Cbb) -> Cbb {
-        Cbb(self.0 + rhs.0)
+    /// `self` minus `other`. Cbb are unsigned, so a difference below zero has no value and
+    /// is reported rather than wrapped; there is no `Sub` operator for that reason.
+    ///
+    /// # Errors
+    ///
+    /// `ModelError::CbbOutOfRange` when `other` is larger than `self`.
+    pub fn checked_sub(self, other: Cbb) -> Result<Cbb, ModelError> {
+        self.0.checked_sub(other.0).map(Cbb).ok_or(ModelError::CbbOutOfRange {
+            op: "-",
+            left: self.0,
+            right: other.0,
+        })
     }
-}
 
-impl Sub for Cbb {
-    type Output = Cbb;
-
-    fn sub(self, rhs: Cbb) -> Cbb {
-        Cbb(self.0 - rhs.0)
+    /// `self` plus `other`. A sum past `u32::MAX` cbb (about 43 million big blinds) is
+    /// reported rather than wrapped; there is no `Add` operator for the same reason as `Sub`.
+    ///
+    /// # Errors
+    ///
+    /// `ModelError::CbbOutOfRange` when the sum does not fit in a `u32`.
+    pub fn checked_add(self, other: Cbb) -> Result<Cbb, ModelError> {
+        self.0.checked_add(other.0).map(Cbb).ok_or(ModelError::CbbOutOfRange {
+            op: "+",
+            left: self.0,
+            right: other.0,
+        })
     }
 }
 
@@ -172,6 +212,13 @@ pub const NOISE_FLOOR_PCT_POT_X100: u32 = 20;
 
 /// The preflop floor used when a reference solution reports no accuracy: 0.02 bb (O-22).
 pub const PREFLOP_FLOOR_FALLBACK: Cbb = Cbb(2);
+
+/// The value whose name is `s`, from a table of values and the name each one writes. The
+/// name-keyed `FromStr` impls in this crate (streets, seats, formats, texture families,
+/// action families, depth bands) share it and add only their own error.
+pub(crate) fn find_by_name<T: Copy>(all: &[T], name: fn(T) -> &'static str, s: &str) -> Option<T> {
+    all.iter().copied().find(|value| name(*value) == s)
+}
 
 /// A betting street. The derived order runs preflop to river.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -235,9 +282,7 @@ impl FromStr for Street {
     type Err = ModelError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Street::ALL
-            .into_iter()
-            .find(|street| street.as_str() == s)
+        find_by_name(&Street::ALL, Street::as_str, s)
             .ok_or_else(|| ModelError::InvalidStreet(s.to_owned()))
     }
 }
@@ -364,9 +409,7 @@ impl FromStr for Position {
     type Err = ModelError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Position::ALL
-            .into_iter()
-            .find(|position| position.as_str() == s)
+        find_by_name(&Position::ALL, Position::as_str, s)
             .ok_or_else(|| ModelError::InvalidPosition(s.to_owned()))
     }
 }
@@ -563,9 +606,7 @@ impl FromStr for GameFormat {
     type Err = ModelError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        GameFormat::ALL
-            .into_iter()
-            .find(|format| format.as_str() == s)
+        find_by_name(&GameFormat::ALL, GameFormat::as_str, s)
             .ok_or_else(|| ModelError::InvalidFormat(s.to_owned()))
     }
 }
@@ -587,7 +628,14 @@ pub struct RakeModel {
 /// A stake level with its rake (02 section 4 `stake` row). Live labels read `1/3` and `2/5`;
 /// the one online row carries the online profile. Constructors for the v1 catalog live in
 /// the `config` module.
+///
+/// The fields are public so a stake is plain data, which means a struct literal bypasses
+/// the checks in `Stake::new`; callers build stakes through `Stake::new` or the catalog
+/// constructors. Serde reads a stake through `Stake::new` as well, via `RawStake` (O-111),
+/// so a stored row with a zero big blind fails at the read rather than at the first cap
+/// conversion.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "RawStake")]
 pub struct Stake {
     /// The label shown to the user, for example `1/3`.
     pub label: String,
@@ -597,6 +645,23 @@ pub struct Stake {
     pub bb_cents: u32,
     /// The rake model at this stake.
     pub rake: RakeModel,
+}
+
+/// The fields of a `Stake` as serde reads them, before `Stake::new` validates them.
+#[derive(Deserialize)]
+struct RawStake {
+    label: String,
+    sb_cents: u32,
+    bb_cents: u32,
+    rake: RakeModel,
+}
+
+impl TryFrom<RawStake> for Stake {
+    type Error = ModelError;
+
+    fn try_from(raw: RawStake) -> Result<Self, Self::Error> {
+        Stake::new(raw.label, raw.sb_cents, raw.bb_cents, raw.rake)
+    }
 }
 
 /// One solvable configuration (A2 section 2, 02 section 4 `game_config`). Ante is kept per

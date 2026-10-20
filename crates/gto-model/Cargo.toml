@@ -16,9 +16,12 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 
 # proptest drives the three R2.1 property tests: node-key round trip, suit-permutation
-# invariance of the canonical flop, and the flop weights summing to 22,100.
+# invariance of the canonical flop, and the flop weights summing to 22,100. serde_json
+# exercises the serde boundary: a stake, a board or a suit permutation read from JavaScript
+# Object Notation (JSON) must pass the same validation as its constructor.
 [dev-dependencies]
 proptest = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

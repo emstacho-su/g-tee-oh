@@ -11,9 +11,13 @@
 //! big blinds (bb) is `Cbb(250)` (A2 section 2). Keys and sizes therefore stay exact and
 //! never drift through floating point.
 //!
-//! Every value with a text form admits exactly one spelling: `Display` writes it and
-//! `FromStr` accepts only that, so parsing what was displayed gives the value back. That is
-//! what lets the library index a node key by its text (A3 section 1).
+//! Every value with a text form has one `Display` spelling, and parsing what was displayed
+//! gives the value back. Most `FromStr` impls accept only that spelling. Two are lenient
+//! about order because their input is a set of cards: `Flop::from_str` takes its three
+//! cards in any order and `ComboId::from_str` its two in either order, each sorting into
+//! the written form. Node-key text is strict regardless: `StreetSection::parse` in `keys`
+//! rejects a flop or a card spelled other than its `Display` form inside a key, so every
+//! key has exactly one text and storage can hash the key text (A3 section 1).
 //!
 //! Modules, each with the requirement identifiers (R IDs) it closes and the vault document
 //! it implements:
@@ -34,8 +38,8 @@
 //!   `SpotClass` and `SpotClassKey`, preflop only in v1.
 //! - `rake` (R2.2; ADR 0014, O-2, O-66, O-7): the rake taken from a pot and the cap in cbb,
 //!   as behaviour on `RakeModel` and `Stake`.
-//! - `config` (R2.2; ADR 0014, 01 section 3, O-72): the stake constructors, the `ConfigId`
-//!   grammar and the eleven-row v1 catalog.
+//! - `config` (R2.2; ADR 0014, 01 section 3, O-72, O-112): the stake constructors, the
+//!   `ConfigId` grammar and the eleven-row v1 catalog, mirrored from the database seed.
 //! - `buckets` (R2.3; ADR 0008, 05 section 6.4, ADR 0020): `Bucket` and the percent-of-pot
 //!   edge table.
 //!
