@@ -23,6 +23,7 @@ const CONTRACT_RECIPES = [
   'guard-history',
   'guard-paths',
   'guard-test',
+  'test-tags',
   'images',
   'docs-mirror',
   'hooks',

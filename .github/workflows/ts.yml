@@ -34,3 +34,5 @@ jobs:
         run: just ts-typecheck
       - name: Tests
         run: just ts-test
+      - name: Pending-test tags (R0.11)
+        run: just test-tags
