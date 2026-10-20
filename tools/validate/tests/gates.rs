@@ -185,7 +185,14 @@ struct SolvedCase {
 /// convergence and read the average strategy. The polar river case needs a game the
 /// vendored engine does not model yet (its games are Kuhn and AKQ).
 fn solve_case(fixture: &ToyGameFixture, case: &Case) -> SolvedCase {
-    unimplemented!("pending S13: solve {} case {} through gto-solve", fixture.id, case.id)
+    let solved =
+        validate::gates::solve_case(fixture, case).unwrap_or_else(|error| panic!("{error}"));
+    SolvedCase {
+        game_value_player_0: solved.game_value_player_0,
+        exploitability_chips: solved.exploitability_chips,
+        frequencies: solved.frequencies,
+        ratios: solved.ratios,
+    }
 }
 
 /// S13 replaces the body: model Leduc in the engine, run plain CFR with the switches
@@ -193,7 +200,7 @@ fn solve_case(fixture: &ToyGameFixture, case: &Case) -> SolvedCase {
 /// no discounting) in one continuous run, and report the mean best-response gain of the
 /// average strategy in chips, ante 1, at each requested iteration.
 fn solve_leduc_curve(iterations: &[u64]) -> Vec<(u64, f64)> {
-    unimplemented!("pending S13: Leduc through gto-solve at iterations {iterations:?}")
+    validate::gates::solve_leduc_curve(iterations)
 }
 
 /// The free parameters of an equilibrium family, bound from the solved frequencies.
@@ -243,7 +250,6 @@ fn fact_error(
 /// 0.001 of minus 1/18 and the exploitability of the average strategy is below 0.001
 /// chips. Both numbers and both tolerances come from the fixture.
 #[test]
-#[ignore = "R2.4 pending S13"]
 fn r2_4_g1_kuhn_value_within_tolerance_and_exploitability_below_floor() {
     let fixture = load_toy_game("kuhn");
     let case = fixture.case("standard").expect("kuhn has the standard case");
@@ -273,7 +279,6 @@ fn r2_4_g1_kuhn_value_within_tolerance_and_exploitability_below_floor() {
 /// Exact facts pin a value; at the pot sized AKQ bet the segment facts accept any point
 /// of the equilibrium segment, and the range-level defense ratio is still exactly 1/2.
 #[test]
-#[ignore = "R2.5 pending S13"]
 fn r2_5_g2_akq_frequencies_match_closed_forms_within_half_a_point() {
     let fixture = load_toy_game("akq");
     let points = fixture.tolerances.frequency_points.as_ref().expect("G2 states it").value;
@@ -317,7 +322,6 @@ fn r2_5_g2_akq_frequencies_match_closed_forms_within_half_a_point() {
 /// committed `OpenSpiel` curve, the engine's exploitability of its average strategy is
 /// within the larger of 0.001 absolute and 10 percent relative of the recorded value.
 #[test]
-#[ignore = "R2.6 pending S13"]
 fn r2_6_g3_leduc_exploitability_within_o79_tolerance_at_every_checkpoint() {
     let fixture = load_toy_game("leduc");
     let curve = load_curve(&fixture);

@@ -1,7 +1,7 @@
 [package]
 name = "validate"
 version = "0.1.0"
-description = "Validation tool that re-solves sampled library entries and compares them with what is stored"
+description = "Validation tool that runs the public toy-game gates G1 to G3 and writes their reports"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -11,10 +11,15 @@ publish.workspace = true
 [dependencies]
 gto-library = { workspace = true }
 gto-solve = { workspace = true }
+# Hand class labels and combo arithmetic for the equity table fixture (R2.20).
+gto-model = { workspace = true }
 # Fixture loading for the toy-game gates G1 to G3 (R0.11, 04 section 6): the files under
-# validation/fixtures/ are JSON and the lib parses them through serde.
+# validation/fixtures/ are JSON and the lib parses them through serde. The gate reports
+# are written back through the same structs (report.schema.json).
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The machine block of every gate report: CPU, cores, memory and operating system.
+sysinfo = { workspace = true }
 
 [lints]
 workspace = true

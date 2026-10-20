@@ -40,6 +40,11 @@ thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
 rayon = "1"
+# The machine block of a gate report (R2.4 to R2.6, validation/reports/README.md): only
+# the `system` feature, for the central processing unit (CPU) model, the core count, the
+# memory and the operating system name. 0.36 is the newest release inside the 1.85
+# rust-version floor (0.39 needs 1.95). MIT.
+sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 # Property-based tests (A9 section 2): node-key round trip, suit-permutation invariance,
 # quantize then dequantize. Dev-dependency only, declared here so every crate pins one major.
 proptest = "1"

@@ -15,6 +15,9 @@ publish.workspace = true
 postflop-engine = { workspace = true }
 gto-model = { workspace = true }
 gto-tree = { workspace = true }
+# The 169 by 169 preflop equity table (R2.20, O-126) splits its 1.6e11 evaluations across
+# cores; the engine already pulls rayon in, so this adds no new crate to the graph.
+rayon = { workspace = true }
 
 # Benchmark harness (R0.10, A9 section 1). criterion stays on 0.7 because the workspace
 # pins rust-version 1.85 and the resolver is minimum supported Rust version (MSRV) aware:
