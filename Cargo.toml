@@ -40,6 +40,9 @@ thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
 rayon = "1"
+# Property-based tests (A9 section 2): node-key round trip, suit-permutation invariance,
+# quantize then dequantize. Dev-dependency only, declared here so every crate pins one major.
+proptest = "1"
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
