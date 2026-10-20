@@ -1,0 +1,19 @@
+# Line endings: LF everywhere so sh hooks and scripts run on Windows and Linux alike.
+* text=auto eol=lf
+*.sh text eol=lf
+.githooks/* text eol=lf
+justfile text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+
+# Lockfiles: never merge by text, regenerate instead
+Cargo.lock merge=binary
+pnpm-lock.yaml merge=binary

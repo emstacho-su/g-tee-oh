@@ -1,0 +1,74 @@
+# security job (R0.3, R0.4): advisories, secret scanning and the private-data guard.
+# The guard needs the whole history for its base commit, so checkout fetches everything.
+name: security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+# A cancelled run on a push would leave that push's commits unscanned by the next run,
+# whose range starts where this one would have, so only pull request runs are cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-audit
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cargo advisories
+        run: cargo audit
+      - name: pnpm advisories
+        run: pnpm audit --audit-level high
+      # Secret scanning with a pinned gitleaks binary (checksum verified). The action form builds its
+      # range as "<first pull request commit>^..HEAD", which breaks whenever a pull request carries a
+      # parentless commit, and every git subtree --squash of the vendored engine is one. Scanning the
+      # base..HEAD range has no caret and covers the same commits.
+      - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_VERSION: 8.24.3
+          GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 3 -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf gitleaks.tgz -C "$RUNNER_TEMP/gitleaks" gitleaks
+          rm gitleaks.tgz
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then RANGE="HEAD"; else RANGE="$BASE..HEAD"; fi
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --redact --exit-code 2 --no-banner --log-opts "--no-merges $RANGE" .
+      # The guard steps run even when an audit above failed, so a push whose advisories are
+      # red still gets its identifier scan; the next run's range starts past this push.
+      - name: Guard unit tests
+        if: always()
+        run: just guard-test
+      # O-58: the salt is a repository secret. A fork has no secrets, and Dependabot runs see
+      # only Dependabot secrets, so both run the path check only; on the main repository a
+      # missing salt fails closed (exit 2).
+      - name: Private-data guard (R0.4)
+        if: always()
+        env:
+          GUARD_SALT: ${{ secrets.GUARD_SALT }}
+          GUARD_FORK: ${{ github.event.pull_request.head.repo.fork == true || github.actor == 'dependabot[bot]' }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node guard/src/cli.mjs ci --base "$BASE"

@@ -1,0 +1,30 @@
+# e2e job (R0.3): end-to-end smoke through docker compose.
+# just e2e skips with a notice until infra/compose/compose.yaml exists (S02). S06 fills in the
+# compose run with FIXTURE_LIBRARY_PATH on the dev profile (O-62) and the Playwright suite.
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: End-to-end smoke
+        env:
+          # O-62: the dev profile reads the fixture library from this path; S06 sets the real one.
+          FIXTURE_LIBRARY_PATH: ${{ github.workspace }}/validation/fixtures/library
+        run: just e2e

@@ -1,0 +1,181 @@
+{
+  "generated_by": "guard/src/docs-mirror.mjs",
+  "rule": "frontmatter public: true (O-26, O-45)",
+  "files": [
+    {
+      "path": "docs/handoffs/S01-foundations.md",
+      "source": "vault/handoffs/S01-foundations.md",
+      "sha256": "6167cebf777fd8f18b28df91f83873d5b52ef6464eba2161306a0e4e798d903d"
+    },
+    {
+      "path": "docs/handoffs/S02-infra.md",
+      "source": "vault/handoffs/S02-infra.md",
+      "sha256": "d5d86778ea7cbb73fa46812d145a98c683aaad2d6ace5702ebbfe2c5f3db96aa"
+    },
+    {
+      "path": "docs/handoffs/S04-mac-bootstrap.md",
+      "source": "vault/handoffs/S04-mac-bootstrap.md",
+      "sha256": "bfb1b6f4973d11edda4fa81db81a32b44705cd43894b1b726ae25a929aafa59a"
+    },
+    {
+      "path": "docs/handoffs/S05-test-vectors.md",
+      "source": "vault/handoffs/S05-test-vectors.md",
+      "sha256": "21eac69afcaed82d95e81229f140c5ee0636e4ad4ce5eb0cb3c317f97257adea"
+    },
+    {
+      "path": "docs/handoffs/S06-contracts.md",
+      "source": "vault/handoffs/S06-contracts.md",
+      "sha256": "678908df3993aac5eadd0b3e6499b836cf5fc10a99ce7d4d6323845aca1741b6"
+    },
+    {
+      "path": "docs/handoffs/S12-gto-model.md",
+      "source": "vault/handoffs/S12-gto-model.md",
+      "sha256": "bb5a93234db02f4b050c1003ec1c6351206f440870c4ef3d9195850706691a4a"
+    },
+    {
+      "path": "docs/handoffs/S13-toy-gates.md",
+      "source": "vault/handoffs/S13-toy-gates.md",
+      "sha256": "6d544dcc4d98f154ae868177c79f7b6fe2e99e4cb5720f5c465b73ac3d8a265e"
+    },
+    {
+      "path": "docs/handoffs/S14-library-format.md",
+      "source": "vault/handoffs/S14-library-format.md",
+      "sha256": "2c323b77a5364d35ead40681d5b262c044a8b9f0b07c6a528d08f89e37fc82ad"
+    },
+    {
+      "path": "docs/handoffs/S15-tree-solve.md",
+      "source": "vault/handoffs/S15-tree-solve.md",
+      "sha256": "2cfdeced3b14a0b2dd0089059fe4b9d0cc680aaada5cdee38bf58c74baf1216d"
+    },
+    {
+      "path": "docs/handoffs/S16-solver-query.md",
+      "source": "vault/handoffs/S16-solver-query.md",
+      "sha256": "fcee99a4888a92cadd5a355c177433fa45be7509dffbac9d3273a62bf4658026"
+    },
+    {
+      "path": "docs/handoffs/S17-g4-oracle.md",
+      "source": "vault/handoffs/S17-g4-oracle.md",
+      "sha256": "87c13d584ace876c91c01290fff5bb77d69671b88791964caf649436c0614441"
+    },
+    {
+      "path": "docs/handoffs/S18-builder.md",
+      "source": "vault/handoffs/S18-builder.md",
+      "sha256": "a34e096af0a494ed1cb153698f017c421a0df5c670a8ce71830d4d06158c0b2e"
+    },
+    {
+      "path": "docs/handoffs/S19-g6a-fixtures.md",
+      "source": "vault/handoffs/S19-g6a-fixtures.md",
+      "sha256": "82fb7aa309353a20e3c808c8e30c7e09b8613151711047b04875581509e66321"
+    },
+    {
+      "path": "docs/handoffs/S20-deploy-1.md",
+      "source": "vault/handoffs/S20-deploy-1.md",
+      "sha256": "09d7fb0a633aac790db821924d9f773699624a791f7f4a0a991f2539d1a77d0a"
+    },
+    {
+      "path": "docs/handoffs/S21-api-foundation.md",
+      "source": "vault/handoffs/S21-api-foundation.md",
+      "sha256": "5131a885d4b5af6269f65728e5e97eba84504ad06066660c6b5dff64415b10d0"
+    },
+    {
+      "path": "docs/handoffs/S22-grading-policy.md",
+      "source": "vault/handoffs/S22-grading-policy.md",
+      "sha256": "a4164c156174449dfb2c15d4a897aab00ac5ba35a957c8943e0041d2407d1a14"
+    },
+    {
+      "path": "docs/handoffs/S23-api-trainer.md",
+      "source": "vault/handoffs/S23-api-trainer.md",
+      "sha256": "33ef71acc83f769f50b948087cf51dc6c88b873e4e714b674951b0f2bb9f1f11"
+    },
+    {
+      "path": "docs/handoffs/S24-web-foundation.md",
+      "source": "vault/handoffs/S24-web-foundation.md",
+      "sha256": "e221427f818e8a5cd6189d83883c9ef492424b1a2b1363d6369f835153bd5f71"
+    },
+    {
+      "path": "docs/handoffs/S25-web-study-trainer.md",
+      "source": "vault/handoffs/S25-web-study-trainer.md",
+      "sha256": "654933c7d3860a5f18364f5970bb2ad766aa25a59f07c220afc2bab5775f6368"
+    },
+    {
+      "path": "docs/handoffs/S26-drills.md",
+      "source": "vault/handoffs/S26-drills.md",
+      "sha256": "3337816c6dce2ef8f43e9f1e5c49bd587c9887679750ea23b87419a9d7ed31e3"
+    },
+    {
+      "path": "docs/handoffs/S27-insights-explanations.md",
+      "source": "vault/handoffs/S27-insights-explanations.md",
+      "sha256": "b3682399ce39a629d24665e8377befd9ad4d376af5769c2338ab3fe61faa35a6"
+    },
+    {
+      "path": "docs/handoffs/S28-coverage-admin.md",
+      "source": "vault/handoffs/S28-coverage-admin.md",
+      "sha256": "088dcc52e4f0292785ae07ec551c8f927495bb662bf4e5512db07fdc5c263f79"
+    },
+    {
+      "path": "docs/handoffs/S29-phase-3-gate.md",
+      "source": "vault/handoffs/S29-phase-3-gate.md",
+      "sha256": "57731555caa807f61937ccdee40bd3bcf9e2e388808026a1c20bfda43dc7f304"
+    },
+    {
+      "path": "docs/handoffs/S30-learning-core.md",
+      "source": "vault/handoffs/S30-learning-core.md",
+      "sha256": "213cd6f8e20656c5ef399c3ccf93b8c56cd021691bafaa58fddd2476e9e678a0"
+    },
+    {
+      "path": "docs/handoffs/S31-api-learning.md",
+      "source": "vault/handoffs/S31-api-learning.md",
+      "sha256": "912ab8bc3b216cdc4fb5c9273717babbc60ed465136c47d1bc42a70209d37afc"
+    },
+    {
+      "path": "docs/handoffs/S32-web-progress.md",
+      "source": "vault/handoffs/S32-web-progress.md",
+      "sha256": "50efada70712395a758b5d9a03176ba963b12ebbdd7485108f405f04e722d691"
+    },
+    {
+      "path": "docs/handoffs/S33-phase-4-gate.md",
+      "source": "vault/handoffs/S33-phase-4-gate.md",
+      "sha256": "cd64489538ff36b6684e094f930e0d3ea85f1c1e0069435d9084bd82b101ec39"
+    },
+    {
+      "path": "docs/handoffs/S34-deploy-2.md",
+      "source": "vault/handoffs/S34-deploy-2.md",
+      "sha256": "b3f5cb041d7339f9c3c16f2a69d82b97d6fdb870fa77475382b0a947383ce064"
+    },
+    {
+      "path": "docs/handoffs/S35-docs-release.md",
+      "source": "vault/handoffs/S35-docs-release.md",
+      "sha256": "2a2f39a806285506705d52614e40c57b8b5a0a98d6759fa1b99c7d91c70383ef"
+    },
+    {
+      "path": "docs/planning/09-v1-sprint-roadmap.md",
+      "source": "vault/planning/09-v1-sprint-roadmap.md",
+      "sha256": "8dfda842ae3287fcb37a5dedc028348003992bbb29a5a2aec734a34c1ed99281"
+    },
+    {
+      "path": "docs/planning/10-traceability.md",
+      "source": "vault/planning/10-traceability.md",
+      "sha256": "faf11f4f5a368c6373e5bf09494de8c903d08dfae5a2b52692d8246c9bee964d"
+    },
+    {
+      "path": "docs/planning/phases/phase-0-foundations.md",
+      "source": "vault/planning/phases/phase-0-foundations.md",
+      "sha256": "1dac98df1e1c0540dbc662ffd2391d832f01da60ac342a46aa168d4d53e832c1"
+    },
+    {
+      "path": "docs/planning/phases/phase-2-engine-and-pipeline.md",
+      "source": "vault/planning/phases/phase-2-engine-and-pipeline.md",
+      "sha256": "0e82b4adc5b5d0a8bda8fdbbbdc7faf2a93fcff6c509207b48f0f9f037439fc7"
+    },
+    {
+      "path": "docs/planning/phases/phase-3-preflop-trainer.md",
+      "source": "vault/planning/phases/phase-3-preflop-trainer.md",
+      "sha256": "45f7294f0111739bb271fafbde166fccd8ecb5f7234be5d66608d872ed51b96c"
+    },
+    {
+      "path": "docs/planning/phases/phase-4-rating-and-release.md",
+      "source": "vault/planning/phases/phase-4-rating-and-release.md",
+      "sha256": "defc71a033e76469fbc78744dc36f97f12b1d8bfd23fff5f6e12c38ebdf8993e"
+    }
+  ]
+}

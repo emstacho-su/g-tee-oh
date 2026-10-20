@@ -1,0 +1,20 @@
+[package]
+name = "gto-solve"
+version = "0.1.0"
+description = "Solver adapter wrapping the vendored postflop engine behind gto-model and gto-tree types"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges (A1 section 2): the vendored engine plus the two layers below. This is the only
+# crate that may name the engine, so engine types never leak upward (crates/vendor/UPSTREAM-postflop-engine.md keeps
+# local changes here rather than in the subtree).
+[dependencies]
+postflop-engine = { workspace = true }
+gto-model = { workspace = true }
+gto-tree = { workspace = true }
+
+[lints]
+workspace = true

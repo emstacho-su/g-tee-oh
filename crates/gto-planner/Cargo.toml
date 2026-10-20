@@ -1,0 +1,18 @@
+[package]
+name = "gto-planner"
+version = "0.1.0"
+description = "Build planning: decides which spots the solutions library is missing and in what order"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges (A1 section 2): gto-model and gto-library. The planner reads the library's
+# (the binaries that link both decide that).
+[dependencies]
+gto-model = { workspace = true }
+gto-library = { workspace = true }
+
+[lints]
+workspace = true

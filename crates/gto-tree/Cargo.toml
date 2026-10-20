@@ -1,0 +1,16 @@
+[package]
+name = "gto-tree"
+version = "0.1.0"
+description = "Betting tree construction from gto-model spot descriptions"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges (A1 section 2): gto-model only.
+[dependencies]
+gto-model = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,39 @@
+# rust job (R0.3): formatting, clippy, tests and the solver-query boundary, all through just recipes.
+name: rust
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # rust-boundary is a node script (scripts/check-boundary.mjs).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Formatting
+        run: just rust-fmt
+      - name: Clippy
+        run: just rust-clippy
+      - name: Tests
+        run: just rust-test
+      - name: Boundary (solver-query never depends on gto-solve, ADR 0018)
+        run: just rust-boundary

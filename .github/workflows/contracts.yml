@@ -1,0 +1,34 @@
+# contracts job (R0.3): regenerate every cross-language artifact and fail on an uncommitted diff.
+# S06 adds the generators (utoipa, Zod, openapi-typescript, kysely-codegen); until then just contracts prints a notice.
+name: contracts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate contracts
+        run: just contracts
+      - name: Fail on an uncommitted diff
+        run: git diff --exit-code

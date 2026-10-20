@@ -1,0 +1,25 @@
+[package]
+name = "gto-library"
+version = "0.1.0"
+description = "Solutions library: stores solved spots and serves them without starting a solve"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges: gto-model only. The library reads and writes solutions expressed in gto-model
+# types; it never depends on gto-solve.
+#
+# Mechanism: a request path must never be able to start a solve (ADR 0018, success
+# criterion 10), and solver-query reaches the library through this crate. Cargo unifies
+# features across every package selected on a command line, so a feature-gated edge to
+# gto-solve here would still be linked into solver-query by any workspace-wide build. A
+# dependency that does not exist cannot be unified in, which is what makes the boundary
+# structural. The glue between a solve and the library (runout extraction, publishing)
+# lives in library-builder and the tools, which depend on both crates (O-101).
+[dependencies]
+gto-model = { workspace = true }
+
+[lints]
+workspace = true

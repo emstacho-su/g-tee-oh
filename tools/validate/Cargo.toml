@@ -1,0 +1,16 @@
+[package]
+name = "validate"
+version = "0.1.0"
+description = "Validation tool that re-solves sampled library entries and compares them with what is stored"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+gto-library = { workspace = true }
+gto-solve = { workspace = true }
+
+[lints]
+workspace = true

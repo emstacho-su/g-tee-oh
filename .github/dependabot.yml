@@ -1,0 +1,16 @@
+# Weekly dependency updates for actions, crates and packages.
+# Pull requests target the default branch; retarget them when a sprint branch is the working line.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly

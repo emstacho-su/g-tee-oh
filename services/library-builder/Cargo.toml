@@ -1,0 +1,19 @@
+[package]
+name = "library-builder"
+version = "0.1.0"
+description = "Background worker that solves the planner's build list into the solutions library"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges (A1 section 2): gto-solve, gto-planner and gto-library with its default `solve`
+# feature, since this is the process that is allowed to solve.
+[dependencies]
+gto-solve = { workspace = true }
+gto-planner = { workspace = true }
+gto-library = { workspace = true }
+
+[lints]
+workspace = true

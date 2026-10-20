@@ -1,0 +1,11 @@
+{
+  "comment": "Private file patterns (R0.4, 02 Architecture section 7). Matched case-insensitively against forward-slash paths relative to the repo root. ** spans directories, * stays within one segment.",
+  "patterns": [
+    "**/*.har",
+    "**/*.harx",
+    "**/reference/**",
+    "**/capture/**",
+    "**/screenshots/**",
+    ".guard-private/**"
+  ]
+}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Co-author trailer check for commits made from Claude Code sessions (R0.1, O-29),
+# then the private-data guard over the message itself (R0.4, O-58).
+# Install once per clone with "just hooks" (git config core.hooksPath .githooks).
+node guard/src/commit-msg.mjs "$1" || exit 1
+exec node guard/src/cli.mjs message "$1"
