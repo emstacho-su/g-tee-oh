@@ -21,5 +21,23 @@ publish.workspace = true
 [dependencies]
 gto-model = { workspace = true }
 
+# Benchmark harness (R0.10, A9 section 1). criterion stays on 0.7 because the workspace
+# pins rust-version 1.85 and the resolver is minimum supported Rust version (MSRV) aware:
+# 0.7 is the newest release inside that floor. Default features are off because the
+# analysis needs neither rayon nor the plotters report; only the `cargo bench` argument
+# handling is wanted.
+[dev-dependencies]
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+
+# criterion supplies its own main, so the libtest harness is off (just bench, R0.10).
+# Both targets are stubs until S14 lands the library format (R2.7); see each file's docs.
+[[bench]]
+name = "chunk_decode"
+harness = false
+
+[[bench]]
+name = "node_read"
+harness = false
+
 [lints]
 workspace = true
