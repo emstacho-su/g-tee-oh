@@ -14,5 +14,20 @@ publish.workspace = true
 [dependencies]
 gto-library = { workspace = true }
 
+# Web service stack (S06, R0.7): axum on tokio, utoipa for the OpenAPI document, tracing for logs.
+axum = { workspace = true }
+tokio = { workspace = true }
+utoipa = { workspace = true }
+utoipa-axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# In-process request tests (tower::ServiceExt::oneshot) and response body collection.
+[dev-dependencies]
+tower = { workspace = true }
+http-body-util = { workspace = true }
+
 [lints]
 workspace = true
