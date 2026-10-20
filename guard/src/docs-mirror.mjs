@@ -10,7 +10,7 @@
 // are never touched. The private-data guard runs over docs/ afterwards (just docs-mirror).
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync , realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -106,7 +106,16 @@ function main() {
   }
 }
 
-const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: node resolves symlinks for the main module while
+// process.argv[1] keeps the path as typed, and a mismatch would skip main().
+const invokedDirectly = (() => {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) {
   process.exitCode = main();
 }

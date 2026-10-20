@@ -57,13 +57,18 @@ jobs:
           rm gitleaks.tgz
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then RANGE="HEAD"; else RANGE="$BASE..HEAD"; fi
           "$RUNNER_TEMP/gitleaks/gitleaks" git --redact --exit-code 2 --no-banner --log-opts "--no-merges $RANGE" .
+      # The guard steps run even when an audit above failed, so a push whose advisories are
+      # red still gets its identifier scan; the next run's range starts past this push.
       - name: Guard unit tests
+        if: always()
         run: just guard-test
-      # O-58: the salt is a repository secret. A fork has no secrets, so GUARD_FORK=true runs the
-      # path check only; on the main repository a missing salt fails closed (exit 2).
+      # O-58: the salt is a repository secret. A fork has no secrets, and Dependabot runs see
+      # only Dependabot secrets, so both run the path check only; on the main repository a
+      # missing salt fails closed (exit 2).
       - name: Private-data guard (R0.4)
+        if: always()
         env:
           GUARD_SALT: ${{ secrets.GUARD_SALT }}
-          GUARD_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          GUARD_FORK: ${{ github.event.pull_request.head.repo.fork == true || github.actor == 'dependabot[bot]' }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: node guard/src/cli.mjs ci --base "$BASE"

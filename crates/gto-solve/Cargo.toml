@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 # Edges (A1 section 2): the vendored engine plus the two layers below. This is the only
-# crate that may name the engine, so engine types never leak upward (UPSTREAM.md keeps
+# crate that may name the engine, so engine types never leak upward (crates/vendor/UPSTREAM-postflop-engine.md keeps
 # local changes here rather than in the subtree).
 [dependencies]
 postflop-engine = { workspace = true }

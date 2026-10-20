@@ -18,10 +18,14 @@ export class GitError extends Error {
   }
 }
 
-export function git(args, { cwd = process.cwd(), allowFailure = false } = {}) {
-  const result = spawnSync('git', ['-c', 'core.quotepath=false', ...args], {
+// Pinned so a developer's own diff.noprefix or diff.mnemonicPrefix setting cannot change
+// the a/ and b/ headers the diff parser expects.
+const BASE_ARGS = ['-c', 'core.quotepath=false', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false'];
+
+export function git(args, { cwd = process.cwd(), allowFailure = false, encoding = 'utf8' } = {}) {
+  const result = spawnSync('git', [...BASE_ARGS, ...args], {
     cwd,
-    encoding: 'utf8',
+    encoding,
     shell: false,
     windowsHide: true,
     maxBuffer: MAX_OUTPUT_BYTES,
@@ -97,6 +101,12 @@ export function commitDiff(sha, options) {
 
 export function commitMessage(sha, options) {
   return git(['show', '-s', '--format=%B', sha], options).stdout;
+}
+
+// The raw bytes of one file at a revision (":path" for the index), as a Buffer.
+export function blob(rev, path, options) {
+  const result = git(['show', `${rev}:${path}`], { ...options, encoding: 'buffer', allowFailure: true });
+  return result.status === 0 ? result.stdout : null;
 }
 
 const DEFAULT_BRANCHES = ['main', 'origin/main'];

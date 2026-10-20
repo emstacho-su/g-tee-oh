@@ -5,12 +5,14 @@
 // environment on to hooks. When that variable is set, the commit message must
 // carry the co-author trailer; otherwise the hook stays out of the way.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const REQUIRED_TRAILER = 'Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>';
-const TRAILER_PATTERN = /^co-authored-by:\s*claude/i;
+// The exact documented trailer, compared case-insensitively on a trimmed line, so a
+// different model name or a stale template does not pass as the required attribution.
+const TRAILER_PATTERN = new RegExp(`^${REQUIRED_TRAILER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
 export function isClaudeSession(env) {
   const value = env.CLAUDECODE;
@@ -64,7 +66,16 @@ function main(argv) {
   return 0;
 }
 
-const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: node resolves symlinks for the main module while
+// process.argv[1] keeps the path as typed, and a mismatch would skip main().
+const invokedDirectly = (() => {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) {
   process.exitCode = main(process.argv.slice(2));
 }

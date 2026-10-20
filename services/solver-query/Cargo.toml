@@ -8,11 +8,11 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Edges (A1 section 2): gto-library only, with its `solve` feature off, so gto-solve and
-# the engine never enter this binary's dependency tree (ADR 0018, success criterion 10).
-# `just rust-boundary` runs scripts/check-boundary.mjs to prove it on every CI run.
+# Edges (A1 section 2): gto-library only. The library has no path to gto-solve or the vendored
+# engine (O-101), so this read service cannot start a solve (ADR 0018); just rust-boundary proves
+# it on the package alone and on the workspace-wide graph.
 [dependencies]
-gto-library = { workspace = true, default-features = false }
+gto-library = { workspace = true }
 
 [lints]
 workspace = true

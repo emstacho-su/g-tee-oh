@@ -9,11 +9,10 @@ repository.workspace = true
 publish.workspace = true
 
 # Edges (A1 section 2): gto-model and gto-library. The planner reads the library's
-# catalogue; it never solves, so it does not enable the library's `solve` feature itself
 # (the binaries that link both decide that).
 [dependencies]
 gto-model = { workspace = true }
-gto-library = { workspace = true, default-features = false }
+gto-library = { workspace = true }
 
 [lints]
 workspace = true

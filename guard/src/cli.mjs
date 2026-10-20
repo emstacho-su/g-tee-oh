@@ -7,7 +7,7 @@
 // its hash and never prints the token. Added file paths and commit messages
 // go through the identifier check as well as added lines.
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,9 +15,11 @@ import * as git from './git.mjs';
 import {
   GuardConfigError,
   MAX_FILE_BYTES,
+  binaryAddedPaths,
   checkLines,
   checkPaths,
   compilePatterns,
+  decodeText,
   formatFinding,
   formatSummary,
   isBinary,
@@ -102,19 +104,34 @@ function resolveSalt(repoRoot) {
   return salt === '' ? null : salt;
 }
 
+// Files git calls binary are read back as blobs: a UTF-16 file (PowerShell's default
+// output encoding) is text and is scanned; a real binary file is skipped.
+function binaryAddedLines(binaryAdded, rev) {
+  const lines = [];
+  for (const file of binaryAdded) {
+    const buffer = git.blob(rev, file);
+    if (buffer === null) continue;
+    const text = decodeText(buffer);
+    if (text !== null) lines.push(...linesOfFile(file, text));
+  }
+  return lines;
+}
+
+function addedLines(diffText, rev) {
+  return [...parseUnifiedDiff(diffText), ...binaryAddedLines(binaryAddedPaths(diffText), rev)];
+}
+
 function runStaged(context) {
   const paths = git.stagedPaths();
-  const added = parseUnifiedDiff(git.stagedDiff());
-  return scanChange(context, paths, added);
+  return scanChange(context, paths, addedLines(git.stagedDiff(), ''));
 }
 
 function runCi(context, base) {
   const { rangeArgs, note } = git.resolveRange(base);
   if (note) console.error(note);
   const paths = git.rangePaths(rangeArgs);
-  const added = parseUnifiedDiff(git.rangeDiff(rangeArgs));
   const messages = git.rangeMessages(rangeArgs).flatMap((message) => messageLines(message));
-  return scanChange(context, paths, added, messages);
+  return scanChange(context, paths, addedLines(git.rangeDiff(rangeArgs), 'HEAD'), messages);
 }
 
 function runHistory(context) {
@@ -124,7 +141,7 @@ function runHistory(context) {
     const result = scanChange(
       context,
       git.commitPaths(sha),
-      parseUnifiedDiff(git.commitDiff(sha)),
+      addedLines(git.commitDiff(sha), sha),
       messageLines(git.commitMessage(sha)),
     );
     totals.files += result.files;
@@ -145,7 +162,7 @@ function runMessage(context, file) {
   } catch (error) {
     throw new GuardConfigError(`cannot read commit message ${file}: ${error.message}`);
   }
-  const lines = messageLines(text);
+  const lines = messageLines(text, { stripComments: true });
   const findings = context.identifierCheck ? checkLines(lines, context.salt, context.denylist) : [];
   return { files: 0, lines: lines.length, findings };
 }
@@ -160,9 +177,23 @@ function scanChange(context, paths, added, messages = []) {
   return { files: paths.length, lines: added.length, findings: [...pathFindings, ...identifierFindings] };
 }
 
+function readFirstBytes(path, count = 8192) {
+  const fd = openSync(path, 'r');
+  try {
+    const buffer = Buffer.alloc(count);
+    const read = readSync(fd, buffer, 0, count, 0);
+    return buffer.subarray(0, read);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+// Build output and dependency trees are never source and are skipped by name.
+const SKIPPED_DIRS = new Set(['.git', 'node_modules', 'target', 'dist']);
+
 function walkFiles(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === '.git') continue;
+    if (SKIPPED_DIRS.has(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
@@ -197,12 +228,13 @@ function runPaths(context, dir) {
     if (!context.identifierCheck) continue;
     findings.push(...checkLines(pathLines([relativePath]), context.salt, context.denylist));
     if (statSync(full).size > MAX_FILE_BYTES) {
-      skipped.push(relativePath);
+      // Only a text file over the limit fails closed; a large binary is skipped like any binary.
+      if (!isBinary(readFirstBytes(full))) skipped.push(relativePath);
       continue;
     }
-    const buffer = readFileSync(full);
-    if (isBinary(buffer)) continue;
-    const lines = linesOfFile(relativePath, buffer.toString('utf8'));
+    const text = decodeText(readFileSync(full));
+    if (text === null) continue;
+    const lines = linesOfFile(relativePath, text);
     lineCount += lines.length;
     findings.push(...checkLines(lines, context.salt, context.denylist));
   }
@@ -267,7 +299,17 @@ function main(argv) {
   }
 }
 
-const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) {
+// Real paths on both sides, because node resolves symlinks for the main module while
+// process.argv[1] keeps the path as typed; a mismatch would skip main() and exit 0.
+function invokedDirectly() {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
   process.exitCode = main(process.argv.slice(2));
 }

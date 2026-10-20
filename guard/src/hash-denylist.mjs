@@ -8,7 +8,7 @@
 // that is what the tokenizer extracts. The script prints counts and line
 // numbers only; it never prints a token, a hash input or the salt.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync , realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,7 +69,16 @@ function main() {
   return 0;
 }
 
-const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: node resolves symlinks for the main module while
+// process.argv[1] keeps the path as typed, and a mismatch would skip main().
+const invokedDirectly = (() => {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) {
   process.exitCode = main();
 }

@@ -24,6 +24,13 @@ export const PLANTED_PREFIX = PLANTED_HASH.slice(0, 8);
 
 const GUARD_VARS = ['GUARD_SALT', 'GUARD_DENYLIST_PATH', 'GUARD_FORK', 'GUARD_BASE', 'GUARD_PRIVATE_DIR'];
 
+// The throwaway repositories must not see the developer's global or system git settings
+// (diff prefixes, autocrlf, commit cleanup, template hooks), so every git call in the tests
+// points GIT_CONFIG_GLOBAL at an empty file and disables the system config.
+const EMPTY_GIT_CONFIG = join(mkdtempSync(join(tmpdir(), 'guard-gitconfig-')), 'empty');
+writeFileSync(EMPTY_GIT_CONFIG, '');
+export const GIT_ISOLATION = { GIT_CONFIG_GLOBAL: EMPTY_GIT_CONFIG, GIT_CONFIG_NOSYSTEM: '1' };
+
 export function makeTempDir(prefix) {
   return mkdtempSync(join(tmpdir(), `${prefix}-`));
 }
@@ -48,13 +55,13 @@ export function writeDenylist(dir, tokens, salt = TEST_SALT) {
 export function guardEnv(extra = {}) {
   const env = { ...process.env };
   for (const name of GUARD_VARS) delete env[name];
-  return { ...env, ...extra };
+  return { ...env, ...GIT_ISOLATION, ...extra };
 }
 
 export function envWithout(names, extra = {}) {
   const env = { ...process.env };
   for (const name of names) delete env[name];
-  return { ...env, ...extra };
+  return { ...env, ...GIT_ISOLATION, ...extra };
 }
 
 export function runNode(args, { cwd = REPO_ROOT, env = process.env } = {}) {
@@ -75,7 +82,7 @@ export function runNode(args, { cwd = REPO_ROOT, env = process.env } = {}) {
 }
 
 export function runGit(args, cwd) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8', shell: false, windowsHide: true });
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8', shell: false, windowsHide: true, env: { ...process.env, ...GIT_ISOLATION } });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
   return result.stdout.trim();

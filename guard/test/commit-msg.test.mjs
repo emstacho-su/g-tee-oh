@@ -21,7 +21,8 @@ after(() => removeDir(dir));
 
 test('r0_1 hasClaudeTrailer ignores comment lines and is case-insensitive on the key', () => {
   assert.equal(hasClaudeTrailer(`x\n\n${REQUIRED_TRAILER}`), true);
-  assert.equal(hasClaudeTrailer('x\n\nco-authored-by: Claude <noreply@anthropic.com>'), true);
+  assert.equal(hasClaudeTrailer(`x\n\n${REQUIRED_TRAILER.toLowerCase()}`), true);
+  assert.equal(hasClaudeTrailer('x\n\nco-authored-by: Claude <noreply@anthropic.com>'), false);
   assert.equal(hasClaudeTrailer(`x\n# ${REQUIRED_TRAILER}`), false);
   assert.equal(hasClaudeTrailer('x\n\nCo-Authored-By: Someone Else <a@b.c>'), false);
 });

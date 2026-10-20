@@ -68,7 +68,7 @@ export function normalizePath(filePath) {
 }
 
 export function compilePatterns(patterns) {
-  if (!Array.isArray(patterns) || patterns.some((p) => typeof p !== 'string' || p === '')) {
+  if (!Array.isArray(patterns) || patterns.length === 0 || patterns.some((p) => typeof p !== 'string' || p === '')) {
     throw new GuardConfigError('patterns.json must hold a non-empty array of pattern strings');
   }
   return patterns.map((pattern) => ({ pattern, regex: globToRegExp(pattern) }));
@@ -81,17 +81,25 @@ export function matchPath(filePath, compiledPatterns) {
   return hit ? hit.pattern : null;
 }
 
-// Runs of word characters, plus the underscore-separated parts of each run, so an
-// identifier glued to a suffix such as "<identifier>_response" is still seen.
+// Runs of word characters, plus every contiguous window of the underscore-separated
+// parts of each run, so an identifier glued to a prefix or suffix such as
+// "<identifier>_response" is still seen, including an identifier that itself holds
+// underscores. Runs with many parts are capped so the window count stays small.
+const MAX_UNDERSCORE_PARTS = 8;
+
 export function tokenize(line) {
   const matches = String(line).match(TOKEN_PATTERN) ?? [];
   const tokens = [];
   for (const match of matches) {
     const lower = match.toLowerCase();
     tokens.push(lower);
-    if (lower.includes('_')) {
-      for (const part of lower.split('_')) {
-        if (part.length >= 6) tokens.push(part);
+    if (!lower.includes('_')) continue;
+    const parts = lower.split('_').slice(0, MAX_UNDERSCORE_PARTS);
+    for (let start = 0; start < parts.length; start += 1) {
+      for (let end = start + 1; end <= parts.length; end += 1) {
+        if (start === 0 && end === parts.length) continue;
+        const window = parts.slice(start, end).join('_');
+        if (window.length >= 6) tokens.push(window);
       }
     }
   }
@@ -116,6 +124,8 @@ export function parseDenylist(text) {
     }
     hashes.add(line);
   }
+  // An empty list would make every identifier check vacuous, so it fails closed.
+  if (hashes.size === 0) throw new GuardConfigError('the denylist holds no hashes; regenerate it (fail closed, O-58)');
   return hashes;
 }
 
@@ -130,6 +140,19 @@ function headerPath(rest) {
 // return every added line with the path and the line number it has after the
 // change. Hunk headers give the first new line number; lines present in the
 // result advance it, removed lines do not.
+const BINARY_ADDED = /^Binary files \/dev\/null and (.+) differ$/m;
+
+// Paths of files git shows as added binaries, so the caller can read each blob and scan
+// it when it is text in another encoding, such as UTF-16.
+export function binaryAddedPaths(diffText) {
+  const paths = [];
+  for (const line of String(diffText).split('\n')) {
+    const binary = BINARY_ADDED.exec(line);
+    if (binary) paths.push(headerPath(binary[1]));
+  }
+  return paths;
+}
+
 export function parseUnifiedDiff(diffText) {
   const added = [];
   let file = null;
@@ -169,6 +192,15 @@ export function parseUnifiedDiff(diffText) {
   return added;
 }
 
+// Text decoded from a buffer: UTF-16 by its byte order mark, else UTF-8; null when the
+// buffer holds a NUL byte outside a UTF-16 encoding, which marks a real binary file.
+export function decodeText(buffer) {
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) return buffer.subarray(2).toString('utf16le');
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) return buffer.subarray(2).swap16().toString('utf16le');
+  if (isBinary(buffer)) return null;
+  return buffer.toString('utf8');
+}
+
 // File contents as if every line had been added, for paths mode.
 export function linesOfFile(file, text) {
   const normalized = normalizePath(file);
@@ -189,14 +221,16 @@ export function pathLines(paths) {
 
 export const COMMIT_MESSAGE_LABEL = '<commit message>';
 
-// A commit message as lines. Comment lines are what git strips before the
-// commit is recorded, so they are left out; the label stands in for a path.
-export function messageLines(message, label = COMMIT_MESSAGE_LABEL) {
+// A commit message as lines. In the commit-msg hook the comment lines are what git
+// strips before the commit is recorded, so they are left out there; a message read
+// back from a recorded commit keeps every line, because a line starting with "#" is
+// content once git has kept it (git keeps them for -m and -F commits).
+export function messageLines(message, { stripComments = false, label = COMMIT_MESSAGE_LABEL } = {}) {
   const lines = String(message).split(/\r?\n/);
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
   const out = [];
   lines.forEach((content, index) => {
-    if (content.startsWith('#')) return;
+    if (stripComments && content.startsWith('#')) return;
     out.push({ file: label, line: index + 1, text: content });
   });
   return out;

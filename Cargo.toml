@@ -41,7 +41,7 @@ anyhow = "1"
 tracing = "0.1"
 rayon = "1"
 
-# Vendored solver engine (git subtree, see crates/vendor/postflop-engine/UPSTREAM.md).
+# Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
 # workspace refers to it by the alias postflop-engine.
 postflop-engine = { package = "engine", path = "crates/vendor/postflop-engine" }
