@@ -72,7 +72,6 @@ name = "gto-library"
 version = "0.1.0"
 dependencies = [
  "gto-model",
- "gto-solve",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
-﻿# Upstream provenance
+# Upstream provenance
 
-This directory is the `engine/` crate of https://github.com/ucsandman/postflop, vendored under the MIT license per ADR 0002. The upstream LICENSE file sits beside this note as `LICENSE`; it stays with the code and is never edited.
+The directory `crates/vendor/postflop-engine` is the `engine/` crate of https://github.com/ucsandman/postflop, vendored under the MIT license per ADR 0002. The upstream LICENSE file sits inside that directory as `LICENSE`; it stays with the code and is never edited. This note lives outside the subtree prefix so updating it never touches the vendored tree.
 
 | Field | Value |
 |---|---|
@@ -34,7 +34,7 @@ cd ../g-tee-oh
 git subtree pull --prefix crates/vendor/postflop-engine ../upstream engine-only --squash
 ```
 
-Then update the commit fields above and rerun the validation gates G1 to G3.
+Then update the commit fields above (this file is outside the subtree, so the edit is allowed) and rerun the validation gates G1 to G3.
 
 ## Local changes
 

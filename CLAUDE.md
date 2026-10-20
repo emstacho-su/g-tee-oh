@@ -62,7 +62,7 @@ Nothing specific to GTO Wizard (GTO stands for game theory optimal) enters this 
 
 ## Vendored engine
 
-- crates/vendor/postflop-engine is a git subtree of the upstream engine named in ADR 0002, with its MIT notice kept and the pinned commit recorded in UPSTREAM.md.
+- crates/vendor/postflop-engine is a git subtree of the upstream engine named in ADR 0002, with its MIT notice kept and the pinned commit recorded in crates/vendor/UPSTREAM-postflop-engine.md, outside the subtree prefix.
 - Never edit files under crates/vendor. Changes the engine needs go into gto-solve adapters; .claude/settings.json denies Edit and Write there.
 - Its tests run in release mode only (cargo test -p engine --release, part of just rust-test) because an upstream debug-only assertion in src/br.rs misfires on zero-sum games with a negative game value.
 

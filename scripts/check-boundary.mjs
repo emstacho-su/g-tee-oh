@@ -18,6 +18,10 @@ import { fileURLToPath } from "node:url";
 const SERVICE = "solver-query";
 const FORBIDDEN = new Set(["gto-solve", "engine"]);
 const CARGO_ARGS = ["tree", "-p", SERVICE, "-e", "normal", "--prefix", "none"];
+// Second view: who depends on gto-solve when features are unified across the whole
+// workspace. A workspace-wide build links whatever this inverse tree shows, so the service
+// must not appear in it either (O-101).
+const INVERSE_ARGS = ["tree", "--workspace", "-e", "normal", "-i", "gto-solve", "--prefix", "none"];
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -27,10 +31,10 @@ function cargoCandidates() {
   return [onPath, inHome];
 }
 
-function runCargoTree() {
+function runCargoTree(args = CARGO_ARGS) {
   let lastError = null;
   for (const cargo of cargoCandidates()) {
-    const result = spawnSync(cargo, CARGO_ARGS, {
+    const result = spawnSync(cargo, args, {
       cwd: repoRoot,
       encoding: "utf8",
       shell: false,
@@ -86,7 +90,22 @@ function main() {
     );
   }
 
-  console.log(`boundary: ${SERVICE} does not depend on gto-solve (ADR 0018)`);
+  const inverse = runCargoTree(INVERSE_ARGS);
+  if (inverse.result === null || inverse.result.error) {
+    fail(`could not run ${cargo} ${INVERSE_ARGS.join(" ")}`);
+  }
+  if (inverse.result.status !== 0) {
+    fail(`${cargo} ${INVERSE_ARGS.join(" ")} exited ${inverse.result.status}\n${inverse.result.stderr}`);
+  }
+  const dependents = crateNames(inverse.result.stdout);
+  if (dependents.includes(SERVICE)) {
+    fail(
+      `${SERVICE} links gto-solve in a workspace-wide build (feature unification); ` +
+        `the edge must not exist in any crate the service depends on (O-101). Inverse tree:\n${inverse.result.stdout}`,
+    );
+  }
+
+  console.log(`boundary: ${SERVICE} does not depend on gto-solve, alone or in a workspace-wide build (ADR 0018)`);
 }
 
 main();
