@@ -6,7 +6,8 @@
  *
  * The two schemas are exported as plain objects so a caller compiles them with its own validator
  * (the tests use Ajv2020 in strict mode); the node dump invariants a schema cannot express live in
- * node-dump.ts (R0.7).
+ * node-dump.ts (R0.7). The client factories wrap openapi-fetch with the `paths` types that
+ * `just contracts` generates from the committed OpenAPI documents (O-115).
  */
 import manifestSchema from "../schemas/manifest.schema.json" with { type: "json" };
 import nodeDumpSchema from "../schemas/node-dump.schema.json" with { type: "json" };
@@ -14,6 +15,10 @@ import nodeDumpSchema from "../schemas/node-dump.schema.json" with { type: "json
 export const PACKAGE_NAME = "@g-tee-oh/contracts" as const;
 
 export { manifestSchema, nodeDumpSchema };
+export { InvalidBaseUrlError, assertHttpBaseUrl, createApiClient, createSolverQueryClient } from "./clients.js";
+export type { ClientFactoryOptions } from "./clients.js";
+export type { paths as ApiPaths } from "./api.generated.js";
+export type { paths as SolverQueryPaths } from "./solver-query.generated.js";
 export { FREQUENCY_SUM_TOLERANCE, checkNodeDumpInvariants } from "./node-dump.js";
 export type {
   DumpAction,
