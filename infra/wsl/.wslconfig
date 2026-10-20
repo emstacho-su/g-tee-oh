@@ -1,0 +1,15 @@
+# WSL2 (Windows Subsystem for Linux 2) resource template for the Zenbook S16 (02 section 6.1, O-23).
+#
+# Mechanism: WSL2 runs one lightweight virtual machine for every distribution and for the Docker Desktop
+# backend, and that machine defaults to half of the system memory (16 GB of 32 GB). Linux container builds
+# and the solver benchmarks that run inside it need more, so this template raises the machine to 24 GB of
+# memory and 18 of the 20 logical processors, leaving Windows and Claude Code the rest.
+#
+# Where it goes: copy this file to %USERPROFILE%\.wslconfig (for example C:\Users\<you>\.wslconfig), then
+# run "wsl --shutdown" so the next WSL2 start reads it; Docker Desktop restarts its backend afterwards.
+# This file is a template only: nothing in the repo reads, writes or copies the live file in the profile
+# folder, so the owner's current settings stay untouched until the owner copies it by hand.
+
+[wsl2]
+memory=24GB
+processors=18

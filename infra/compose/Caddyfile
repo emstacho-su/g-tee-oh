@@ -1,0 +1,51 @@
+# Caddy for the Compose dev and mac profiles (R0.5; A5 section 1: only Caddy publishes a port on the LAN,
+# the local area network).
+#
+# tls internal: Caddy runs its own certificate authority (CA) and signs the certificate for CADDY_SITE with
+# it, so the LAN gets TLS (Transport Layer Security) without a public domain name or an ACME (Automatic
+# Certificate Management Environment) account (A9 section 3). The CA root lives in the caddy_data volume; a browser trusts it after the root is
+# installed once ("docker compose exec caddy caddy trust" exports it), and the smoke script instead skips
+# verification for its one request to https://localhost/healthz.
+#
+# api and web arrive in S06. Until their containers exist the upstream dial fails, which Caddy reports as
+# 502; the handle_errors block turns that into a plain 503 "not deployed yet" so the gap is visible and
+# intentional rather than a generic gateway error.
+
+{
+	# Port 80 stays under this file's control: the http:// block below serves /healthz in plain HTTP
+	# (Hypertext Transfer Protocol) for the container health check and redirects everything else itself,
+	# instead of Caddy's automatic redirect.
+	auto_https disable_redirects
+}
+
+http:// {
+	handle /healthz {
+		respond "ok" 200
+	}
+	handle {
+		redir https://{host}{uri} 308
+	}
+}
+
+https://{$CADDY_SITE:localhost} {
+	tls internal
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# api on 8080 behind /api/* (A5 section 1)
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	# web: the static build served from the web container on 80 (A5 section 1)
+	handle {
+		reverse_proxy web:80
+	}
+
+	handle_errors {
+		@upstream_down expression {err.status_code} == 502
+		respond @upstream_down "not deployed yet" 503
+	}
+}

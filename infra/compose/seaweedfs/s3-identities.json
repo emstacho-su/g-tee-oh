@@ -1,0 +1,30 @@
+{
+  "identities": [
+    {
+      "name": "admin",
+      "credentials": [
+        { "accessKey": "__S3_ADMIN_ACCESS_KEY__", "secretKey": "__S3_ADMIN_SECRET_KEY__" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "library",
+      "credentials": [
+        { "accessKey": "__S3_LIBRARY_ACCESS_KEY__", "secretKey": "__S3_LIBRARY_SECRET_KEY__" }
+      ],
+      "actions": ["Read:library", "Write:library", "List:library", "Tagging:library"]
+    },
+    {
+      "name": "reference-private",
+      "credentials": [
+        { "accessKey": "__S3_REFERENCE_ACCESS_KEY__", "secretKey": "__S3_REFERENCE_SECRET_KEY__" }
+      ],
+      "actions": [
+        "Read:reference-private",
+        "Write:reference-private",
+        "List:reference-private",
+        "Tagging:reference-private"
+      ]
+    }
+  ]
+}
