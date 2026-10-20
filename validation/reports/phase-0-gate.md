@@ -18,6 +18,15 @@ Started by S01 on 2026-10-20 and completed by S06. Every row names the requireme
 
 Both throwaway branches were closed and deleted after the runs above were recorded; the runs stay readable on GitHub.
 
+## Evidence recorded by S02
+
+| R ID | Condition | Evidence | Result |
+|---|---|---|---|
+| R0.6 | Migrations apply to an empty database; `query` cannot write, `app` cannot see a schema named `capture`, `capture` inserts only its allowed rows; one `game_config` per v1 configuration | `just db-migrate` (11 applied), `just db-status`, `just db-test` (27 tests) on a native Postgres 18 because Docker was unavailable on 2026-10-20 evening; `dbmate rollback` then `up` for the seed migration | Pass |
+| R0.6 | Kysely codegen and sqlx checks | `just codegen` wrote `packages/contracts/src/db.generated.ts`; `just codegen-check` up to date; `just sqlx-check` reports no crate carries a query yet | Pass |
+| R0.10 | `just bench` writes `validation/reports/bench-zenbook.json` | File present with `solve_iteration/simple_tree_flop` (mean 42.3 ms) and the two stubs | Pass |
+| R0.5 | `docker compose --profile dev up` reaches healthy on the Zenbook; `just smoke` passes | Not run: the Docker Desktop VM was out of memory from another project's container from 15:11Z on 2026-10-20; compose, init script, identities and Caddyfile are written and parse | Pending, rerun first thing when Docker answers |
+| R0.3 | Dockerfiles build for one service | Not run for the same reason; `infra/docker/README.md` holds the commands | Pending |
 ## Conditions completed by S06
 
 | Condition | Evidence | Result |
