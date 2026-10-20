@@ -1,6 +1,7 @@
 //! R2.2 and R2.3 vectors for the rake-and-buckets module: the live caps in cbb, no flop no
-//! drop, the one online profile, configuration identifiers keyed by stake (ADR 0014), the
-//! v1 catalog, and the bet-bucket mapping with its inclusive upper edges (ADR 0008).
+//! drop, the one online profile, configuration identifiers keyed by stake (architecture
+//! decision record (ADR) 0014), the v1 catalog, and the bet-bucket mapping with its
+//! inclusive upper edges (ADR 0008).
 
 use std::collections::BTreeSet;
 

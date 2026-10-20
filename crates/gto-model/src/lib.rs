@@ -1,31 +1,51 @@
-//! Core domain types for no-limit hold'em: cards, hand indexes, canonical flops, action
-//! tokens, node keys, spot-class keys, stakes with their rake models, game configurations
-//! and the bet buckets. Every other crate speaks in these types, so this crate sits at the
-//! bottom of the layering (A1 section 2) and depends on nothing in the workspace: never on
-//! gto-solve and never on the vendored engine (architecture decision record (ADR) 0018,
-//! library-first). Only serde and thiserror come in from outside.
+//! Core domain types for no-limit hold'em, shared by every g-tee-oh crate: cards, hand
+//! indexes, canonical flops, action tokens, node keys, spot-class keys, stakes with their
+//! rake models, game configurations and bet buckets.
+//!
+//! Every other crate speaks in these types, so this crate sits at the bottom of the layering
+//! (A1 section 2) and depends on nothing in the workspace: never on gto-solve and never on
+//! the vendored engine (architecture decision record (ADR) 0018, library-first). Only serde
+//! and thiserror come in from outside, and proptest only for the tests.
 //!
 //! Units: chips outside the solver's internals are integer centi-big-blinds (cbb), so 2.5
 //! big blinds (bb) is `Cbb(250)` (A2 section 2). Keys and sizes therefore stay exact and
 //! never drift through floating point.
 //!
-//! Module map, with the requirement identifiers (R IDs) each group closes:
+//! Every value with a text form admits exactly one spelling: `Display` writes it and
+//! `FromStr` accepts only that, so parsing what was displayed gives the value back. That is
+//! what lets the library index a node key by its text (A3 section 1).
 //!
-//! - `types`: the shared plain data (`Cbb`, `Street`, `Position`, `PositionPair`,
-//!   `TableSize`, `GameFormat`, `Stake`, `RakeModel`, `GameConfig`, `ConfigId` and the one
-//!   `ModelError`).
-//! - `cards` and `index` (R2.1): `Card`, `Rank`, `Suit`, `Flop` and `Board`; the 169-class
-//!   and 1,326-combo indexes in the A3 section 1 order.
-//! - `iso` and `iso_table` (R2.1): suit permutations, the canonical flop and board, the
-//!   1,755 canonical flops with multiplicity weights summing to 22,100, and the texture
-//!   family.
-//! - `tokens`, `keys` and `spot_class` (R2.1): action tokens, node keys with a parse and
-//!   display round trip, and spot-class keys.
-//! - `rake`, `config` and `buckets` (R2.2, R2.3): rake models (ADR 0014), configurations
-//!   keyed by stake, and the bet-bucket mapping (ADR 0008, ADR 0020).
+//! Modules, each with the requirement identifiers (R IDs) it closes and the vault document
+//! it implements:
+//!
+//! - `types` (A2 section 2): the shared plain data, `Cbb`, `Street`, `Position`,
+//!   `PositionPair`, `TableSize`, `GameFormat`, `RakeModel`, `Stake`, `GameConfig` and
+//!   `ConfigId`, plus the one `ModelError` every module reports.
+//! - `cards` (R2.1; A3 section 1, A2 section 2): `Rank`, `Suit`, `Card` as the integer
+//!   `rank * 4 + suit`, `Flop` held in written order and `Board`.
+//! - `index` (R2.1; A3 section 1): the 169 hand classes and the 1,326 combos in index order.
+//! - `iso` (R2.1; A2 section 1, 06 section 2): `SuitPermutation`, the canonical flop and
+//!   board, and the texture families.
+//! - `iso_table` (R2.1; A2 section 1): the 1,755 canonical flops with the multiplicity
+//!   weights that sum to 22,100.
+//! - `tokens` (R2.1; A3 section 1): `ActionToken` and the dotted action line.
+//! - `keys` (R2.1; A3 section 1): `NodeKey` with its parse and display round trip.
+//! - `spot_class` (R2.1; A6 section 1, 06 section 2): `ActionFamily`, `DepthBand`,
+//!   `SpotClass` and `SpotClassKey`, preflop only in v1.
+//! - `rake` (R2.2; ADR 0014, O-2, O-66, O-7): the rake taken from a pot and the cap in cbb,
+//!   as behaviour on `RakeModel` and `Stake`.
+//! - `config` (R2.2; ADR 0014, 01 section 3, O-72): the stake constructors, the `ConfigId`
+//!   grammar and the eleven-row v1 catalog.
+//! - `buckets` (R2.3; ADR 0008, 05 section 6.4, ADR 0020): `Bucket` and the percent-of-pot
+//!   edge table.
 //!
 //! The two R0.11 vectors, the bucket-edge table and the node-key round trip, live under
 //! `tests/r0_11_vectors.rs`; the property tests live under `tests/props.rs`.
+//!
+//! The crate root re-exports every type and the free functions, so a caller can write
+//! `gto_model::NodeKey` or `gto_model::parse_cards`. Separators, catalog numbers and edge
+//! tables stay on their modules (`tokens::LINE_SEPARATOR`, `rake::LIVE_CAP_1_3_CENTS`,
+//! `buckets::BUCKET_EDGES_PCT`) so the path says where each number comes from.
 
 #![forbid(unsafe_code)]
 
@@ -41,17 +61,21 @@ pub mod spot_class;
 pub mod tokens;
 pub mod types;
 
-pub use buckets::{BUCKET_EDGES_PCT, Bucket, bucket_for};
-pub use cards::{Board, Card, Flop, Rank, Suit};
+pub use buckets::{Bucket, bucket_for};
+pub use cards::{Board, Card, Flop, Rank, Suit, format_cards, parse_cards};
+pub use config::v1_configs;
 pub use index::{ComboId, HandClass, HandClassKind};
-pub use iso::{SuitPermutation, TextureFamily, canonical_board, canonical_flop};
-pub use iso_table::{CanonicalFlop, canonical_flops, canonical_index, flop_weight};
+pub use iso::{SuitPermutation, TextureFamily, canonical_board, canonical_flop, is_canonical_flop};
+pub use iso_table::{
+    CANONICAL_FLOP_COUNT, CanonicalFlop, RAW_FLOP_COUNT, canonical_flops, canonical_index,
+    flop_weight, total_weight,
+};
 pub use keys::{NodeKey, StreetSection};
 pub use spot_class::{ActionFamily, DepthBand, SpotClass, SpotClassKey};
-pub use tokens::ActionToken;
+pub use tokens::{ActionToken, format_line, parse_line};
 pub use types::{
-    Cbb, ConfigId, GameConfig, GameFormat, ModelError, Position, PositionPair, RakeModel, Stake,
-    Street, TableSize,
+    Cbb, ConfigId, GameConfig, GameFormat, ModelError, NOISE_FLOOR_PCT_POT_X100,
+    PREFLOP_FLOOR_FALLBACK, Position, PositionPair, RakeModel, Stake, Street, TableSize,
 };
 
 /// The crate's package name, used by the workspace link tests (R0.1).

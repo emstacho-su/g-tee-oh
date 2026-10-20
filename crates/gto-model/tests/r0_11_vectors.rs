@@ -1,14 +1,22 @@
-//! The two R0.11 vectors that S12 writes red first inside its own session (09 section 3):
-//! the bucket-edge table for R2.3 and the node-key round trip for R2.1. Each test carries
-//! both tags in its name.
+//! The two requirement R0.11 vectors that session S12 writes red first inside its own
+//! session and then turns green (09 section 3): the bucket-edge table for R2.3 and the
+//! node-key round trip for R2.1. Each test name carries both requirement identifiers
+//! (R IDs). Chips are integer centi-big-blinds (cbb), so the 10,000 cbb pot below is 100
+//! big blinds (bb) and a 2,500 cbb size is 25 percent of it.
 
 use gto_model::buckets::{BUCKET_EDGES_PCT, Bucket, bucket_for};
 use gto_model::keys::NodeKey;
 use gto_model::tokens::ActionToken;
 use gto_model::types::Cbb;
 
-/// R0.11: 25, 50, 75, 110 and 150 percent of pot, upper edge inclusive, all-in separate:
-/// every edge, one tick above, and all-in.
+/// R2.3 and R0.11: the bucket edges are 25, 50, 75, 110 and 150 percent of pot, each
+/// bucket includes its upper edge, and an all-in is its own bucket whatever its size
+/// (architecture decision record (ADR) 0008, 05 section 6.4). The mapping compares
+/// integers exactly, so at a 10,000 cbb pot one cbb under an edge and the edge itself stay
+/// in the lower bucket while one cbb over it moves to the next. The bet token at each edge
+/// must agree with `bucket_for`, and an all-in must stay `AllIn` beside every edge and at
+/// pots of 1 and 1,000,000 cbb: the solver's tree decides which buckets have a button, so
+/// the mapping never snaps a size to a neighbouring bucket (ADR 0020).
 #[test]
 fn r2_3_r0_11_bucket_edge_table() {
     let pot = Cbb(10_000);
@@ -38,9 +46,13 @@ fn r2_3_r0_11_bucket_edge_table() {
     assert_eq!(Bucket::of_action(ActionToken::AllIn, Cbb(1_000_000)).unwrap(), Some(Bucket::AllIn));
 }
 
-/// R0.11: a node key parses and displays back to the same text, and the parsed value
-/// displays and parses back to itself, for the A3 section 1 example and a key on every
-/// street, including empty action segments.
+/// R2.1 and R0.11: a node key parses and displays back to the same text, and the parsed
+/// value displays and parses back to itself, under the A3 section 1 grammar. The keys cover
+/// the A3 example, the preflop root with an empty line, a preflop SB-BB key, a first flop
+/// decision with an empty action segment, a turn key with an empty action segment, a
+/// straddled UTG-CO river key ending in a bet and an all-in, an HJ-BTN river key with an
+/// empty action segment on every postflop street, and a preflop key that ends in a fold, so
+/// every one of the eight action tokens appears in at least one key.
 #[test]
 fn r2_1_r0_11_node_key_round_trip() {
     let keys = [
@@ -50,7 +62,8 @@ fn r2_1_r0_11_node_key_round_trip() {
         "cfg_6_online_nl25_100/BB-BTN/r250.r800.c|Kc7h2s|",
         "cfg_6_online_nl25_100/BB-BTN/r250.c|Kc7h2s|x.b150.r450.c|9d|",
         "cfg_9_live_25_300_straddle/UTG-CO/s200.r600.c|As9s2c|b250.c|Qs|x.x|3h|b1000.a",
-        "cfg_6_online_nl25_200/HJ-BTN/l.r500.f|TdTh4c|x|Ac|x|2c|",
+        "cfg_6_online_nl25_200/HJ-BTN/l.r500.c|TdTh4c||Ac||2c|",
+        "cfg_6_online_nl25_100/SB-BB/l.r300.f",
     ];
     for text in keys {
         let parsed: NodeKey = text.parse().unwrap_or_else(|err| panic!("{text}: {err}"));

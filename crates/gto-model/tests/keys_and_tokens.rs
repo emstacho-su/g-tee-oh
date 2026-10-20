@@ -201,6 +201,8 @@ fn r2_1_node_key_rejects_malformed_text() {
         "cfg_9_live_13_150/BB-BTN/r300.c|Ah7d2c|x|Kh|x|Kh|x",
         "cfg_9_live_13_150/BB-BTN/r300.c|Ah7d2c|x|Kh|x|3s|x|2d|x",
         "cfg_9_live_13_150/BB-BTN/r300.c|ah7d2c|x",
+        "cfg_9_live_13_150/BB-BTN/r300.c|2c7dAh|x",
+        "cfg_9_live_13_150/BB-BTN/r300.c|7dAh2c|x|Kh|x",
         "cfg_9_live_13_150/BB-BTN/r300.c/x|Ah7d2c|x",
     ];
     for text in bad {

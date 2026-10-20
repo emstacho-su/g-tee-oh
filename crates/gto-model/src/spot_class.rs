@@ -8,17 +8,11 @@
 //! <street>/<format>/<depth band>/<family>/<pair>
 //! ```
 //!
-//! for example `preflop/live/150/facing-open/BB-BTN`. Postflop classes (street, pot type,
-//! texture family) arrive in v1.5, so classifying a postflop node is an error here.
+//! for example `preflop/live/150/facing-open/BB-BTN`, the big blind (BB) facing an open from
+//! the button (BTN) at 150 big blinds live. Postflop classes (street, pot type, texture
+//! family) arrive in v1.5, so classifying a postflop node is an error here.
 //!
 //! Owner: the keys-and-tokens agent (files `tokens.rs`, `keys.rs` and `spot_class.rs`).
-
-#![allow(
-    unused_variables,
-    clippy::unused_self,
-    clippy::needless_pass_by_value,
-    reason = "stub bodies are todo!() until the keys-and-tokens agent fills them in"
-)]
 
 use std::fmt;
 use std::str::FromStr;
@@ -27,10 +21,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::keys::NodeKey;
 use crate::tokens::ActionToken;
-use crate::types::{Cbb, GameConfig, GameFormat, ModelError, PositionPair, Street};
+use crate::types::{Cbb, GameConfig, GameFormat, ModelError, Position, PositionPair, Street};
 
 /// The separator between the parts of a spot-class key.
 pub const KEY_SEPARATOR: char = '/';
+
+/// Parts of a key split on `KEY_SEPARATOR`: street, format, depth band, family, pair.
+const KEY_PARTS: usize = 5;
 
 /// The preflop action families of 06 section 2.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -41,8 +38,10 @@ pub enum ActionFamily {
     /// Facing one raise with no caller between. Written `facing-open`.
     FacingOpen,
     /// Facing the second raise. Written `facing-3bet`.
+    #[serde(rename = "facing-3bet")]
     Facing3Bet,
     /// Facing the third raise or beyond. Written `facing-4bet`.
+    #[serde(rename = "facing-4bet")]
     Facing4Bet,
     /// Facing one raise and at least one call of it. Written `squeeze`.
     Squeeze,
@@ -72,30 +71,66 @@ impl ActionFamily {
     /// `BlindVsBlind`; no raise and at least one limp gives `LimpedIsolation`; no raise and
     /// no limp gives `Rfi`; one raise followed by a call gives `Squeeze`, otherwise
     /// `FacingOpen`; two raises give `Facing3Bet`; three or more give `Facing4Bet`.
+    ///
+    /// A raise is any aggressive token (`ActionToken::is_aggressive`), so a preflop all-in
+    /// counts as the raise it is: `r300.r900.a` is a 4-bet shove and classifies as
+    /// `Facing4Bet`. Only calls after the first raise count toward `Squeeze`.
     #[must_use]
     pub fn classify(pair: PositionPair, preflop: &[ActionToken]) -> ActionFamily {
-        todo!()
+        if preflop.iter().any(|token| matches!(token, ActionToken::Straddle(_))) {
+            return ActionFamily::StraddledPot;
+        }
+        if pair.contains(Position::Sb) && pair.contains(Position::Bb) {
+            return ActionFamily::BlindVsBlind;
+        }
+        let raises = preflop.iter().filter(|token| token.is_aggressive()).count();
+        let limped = preflop.contains(&ActionToken::Limp);
+        let called_after_raise = preflop
+            .iter()
+            .skip_while(|token| !token.is_aggressive())
+            .any(|token| *token == ActionToken::Call);
+        match raises {
+            0 if limped => ActionFamily::LimpedIsolation,
+            0 => ActionFamily::Rfi,
+            1 if called_after_raise => ActionFamily::Squeeze,
+            1 => ActionFamily::FacingOpen,
+            2 => ActionFamily::Facing3Bet,
+            _ => ActionFamily::Facing4Bet,
+        }
     }
 
     /// The kebab-case name used in keys.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
-        todo!()
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ActionFamily::Rfi => "rfi",
+            ActionFamily::FacingOpen => "facing-open",
+            ActionFamily::Facing3Bet => "facing-3bet",
+            ActionFamily::Facing4Bet => "facing-4bet",
+            ActionFamily::Squeeze => "squeeze",
+            ActionFamily::BlindVsBlind => "blind-vs-blind",
+            ActionFamily::LimpedIsolation => "limped-isolation",
+            ActionFamily::StraddledPot => "straddled-pot",
+        }
     }
 }
 
 impl fmt::Display for ActionFamily {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(self.as_str())
     }
 }
 
 impl FromStr for ActionFamily {
     type Err = ModelError;
 
-    /// A kebab-case name from `as_str`.
+    /// A kebab-case name from `as_str`. The error is `ModelError::InvalidSpotClassKey`,
+    /// because a family name only ever appears inside a spot-class key.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        ActionFamily::ALL.into_iter().find(|family| family.as_str() == s).ok_or_else(|| {
+            let names = ActionFamily::ALL.map(ActionFamily::as_str).join(", ");
+            ModelError::InvalidSpotClassKey(s.to_owned(), format!("expected a family: {names}"))
+        })
     }
 }
 
@@ -134,31 +169,44 @@ impl DepthBand {
     /// The lower edges in cbb of every band after `Short`.
     pub const EDGES_CBB: [u32; 4] = [5_000, 12_500, 17_500, 25_000];
 
-    /// The band holding a depth.
+    /// The band holding a depth: the number of edges at or below the depth is the band's
+    /// index in `ALL`, so a depth on an edge belongs to the band the edge opens.
     #[must_use]
     pub fn from_cbb(depth: Cbb) -> DepthBand {
-        todo!()
+        let edges_passed = Self::EDGES_CBB.iter().filter(|&&edge| depth.get() >= edge).count();
+        // Four edges open the four bands after `Short`, so the index is at most four.
+        Self::ALL[edges_passed]
     }
 
     /// The name used in keys: `short`, `100`, `150`, `200`, `deep`.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
-        todo!()
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            DepthBand::Short => "short",
+            DepthBand::Hundred => "100",
+            DepthBand::OneFifty => "150",
+            DepthBand::TwoHundred => "200",
+            DepthBand::Deep => "deep",
+        }
     }
 }
 
 impl fmt::Display for DepthBand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(self.as_str())
     }
 }
 
 impl FromStr for DepthBand {
     type Err = ModelError;
 
-    /// A name from `as_str`.
+    /// A name from `as_str`. The error is `ModelError::InvalidSpotClassKey`, because a band
+    /// name only ever appears inside a spot-class key.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        DepthBand::ALL.into_iter().find(|band| band.as_str() == s).ok_or_else(|| {
+            let names = DepthBand::ALL.map(DepthBand::as_str).join(", ");
+            ModelError::InvalidSpotClassKey(s.to_owned(), format!("expected a depth band: {names}"))
+        })
     }
 }
 
@@ -178,19 +226,30 @@ pub struct SpotClass {
 }
 
 impl SpotClass {
-    /// Classifies a node under its configuration.
+    /// Classifies a node under its configuration: the street comes from the key, the
+    /// format and depth band from the configuration, and the family from the preflop line.
     ///
     /// # Errors
     ///
     /// `ModelError::PostflopSpotClass` when the node is past preflop.
     pub fn classify(config: &GameConfig, key: &NodeKey) -> Result<SpotClass, ModelError> {
-        todo!()
+        let street = key.street();
+        if street != Street::Preflop {
+            return Err(ModelError::PostflopSpotClass(street));
+        }
+        Ok(SpotClass {
+            street,
+            format: config.format,
+            depth_band: DepthBand::from_cbb(config.depth_cbb),
+            family: ActionFamily::classify(key.pair, &key.preflop),
+            pair: key.pair,
+        })
     }
 
     /// The deterministic key for this class.
     #[must_use]
     pub fn key(self) -> SpotClassKey {
-        todo!()
+        SpotClassKey(self.to_string())
     }
 
     /// The class a key names. In v1 the street part is always `preflop`; any other street
@@ -201,13 +260,65 @@ impl SpotClass {
     /// `ModelError::InvalidSpotClassKey` when the text does not follow the grammar: five
     /// parts, a known street, format, band, family and a canonical pair.
     pub fn from_key(key: &SpotClassKey) -> Result<SpotClass, ModelError> {
-        todo!()
+        parse_class(key.as_str())
     }
 }
 
+impl fmt::Display for SpotClass {
+    /// The key text: `<street>/<format>/<depth band>/<family>/<pair>`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let SpotClass { street, format, depth_band, family, pair } = self;
+        write!(
+            f,
+            "{street}{KEY_SEPARATOR}{format}{KEY_SEPARATOR}{depth_band}{KEY_SEPARATOR}\
+             {family}{KEY_SEPARATOR}{pair}"
+        )
+    }
+}
+
+/// The error for text that is not a spot-class key, with the whole text and the reason.
+fn bad_key(text: &str, reason: impl Into<String>) -> ModelError {
+    ModelError::InvalidSpotClassKey(text.to_owned(), reason.into())
+}
+
+/// Re-blames a part's parse error on the whole key text, keeping the reason when the part
+/// already reported a key error and using the error's message otherwise.
+fn blame_key(text: &str, err: ModelError) -> ModelError {
+    match err {
+        ModelError::InvalidSpotClassKey(_, reason) => bad_key(text, reason),
+        other => bad_key(text, other.to_string()),
+    }
+}
+
+/// Parses key text into its class: five parts split on `/`, the street `preflop`, then the
+/// format, band, family and canonical pair, each by its own `FromStr`.
+fn parse_class(text: &str) -> Result<SpotClass, ModelError> {
+    let parts: Vec<&str> = text.split(KEY_SEPARATOR).collect();
+    let [street, format, depth_band, family, pair] = parts.as_slice() else {
+        let found = parts.len();
+        let reason =
+            format!("expected {KEY_PARTS} parts split on {KEY_SEPARATOR:?}, found {found}");
+        return Err(bad_key(text, reason));
+    };
+    let wrap = |err: ModelError| blame_key(text, err);
+    let street: Street = street.parse().map_err(wrap)?;
+    if street != Street::Preflop {
+        let reason = format!("spot classes exist for preflop only in v1, not {street}");
+        return Err(bad_key(text, reason));
+    }
+    Ok(SpotClass {
+        street,
+        format: format.parse().map_err(wrap)?,
+        depth_band: depth_band.parse().map_err(wrap)?,
+        family: family.parse().map_err(wrap)?,
+        pair: pair.parse().map_err(wrap)?,
+    })
+}
+
 /// The text form of a spot class (A2 section 2), such as `preflop/live/150/facing-open/BB-BTN`.
+/// Serde reads it through `new`, so a stored key is always one that parses.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
+#[serde(try_from = "String", into = "String")]
 pub struct SpotClassKey(String);
 
 impl SpotClassKey {
@@ -217,19 +328,21 @@ impl SpotClassKey {
     ///
     /// `ModelError::InvalidSpotClassKey` when the text does not follow the grammar.
     pub fn new(text: impl Into<String>) -> Result<SpotClassKey, ModelError> {
-        todo!()
+        let text = text.into();
+        parse_class(&text)?;
+        Ok(SpotClassKey(text))
     }
 
     /// The key text.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        todo!()
+        &self.0
     }
 }
 
 impl fmt::Display for SpotClassKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(&self.0)
     }
 }
 
@@ -238,5 +351,19 @@ impl FromStr for SpotClassKey {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         SpotClassKey::new(s)
+    }
+}
+
+impl TryFrom<String> for SpotClassKey {
+    type Error = ModelError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        SpotClassKey::new(s)
+    }
+}
+
+impl From<SpotClassKey> for String {
+    fn from(key: SpotClassKey) -> String {
+        key.0
     }
 }

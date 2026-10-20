@@ -17,21 +17,18 @@
 //!
 //! Owner: the isomorphism agent (files `iso.rs` and `iso_table.rs`).
 
-#![allow(
-    unused_variables,
-    clippy::unused_self,
-    reason = "stub bodies are todo!() until the isomorphism agent fills them in"
-)]
-
 use std::fmt;
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::cards::{Board, Card, Flop, Suit};
+use crate::cards::{Board, Card, Flop, Rank, Suit};
 use crate::types::ModelError;
 
-/// A relabeling of the four suits: entry `i` is the suit that suit index `i` becomes.
+/// A relabeling of the four suits: entry `i` is the suit that suit index `i` becomes
+/// (A2 section 1, the suit permutation from raw to canonical and back). The derived order
+/// compares the mappings entry by entry, which is the order `all` lists them in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SuitPermutation([Suit; 4]);
 
@@ -49,80 +46,158 @@ impl SuitPermutation {
     ///
     /// `ModelError::InvalidSuitPermutation` when a suit appears twice.
     pub fn new(mapping: [Suit; 4]) -> Result<SuitPermutation, ModelError> {
-        todo!()
+        for (position, suit) in mapping.iter().enumerate() {
+            if mapping[..position].contains(suit) {
+                return Err(ModelError::InvalidSuitPermutation(format!(
+                    "suit {} appears twice in {}",
+                    suit.to_char(),
+                    mapping_text(mapping)
+                )));
+            }
+        }
+        Ok(SuitPermutation(mapping))
     }
 
     /// The image of each suit in `cdhs` order.
     #[must_use]
     pub fn mapping(self) -> [Suit; 4] {
-        todo!()
+        self.0
     }
 
     /// All 24 permutations, identity first, in lexicographic order of their mappings.
     #[must_use]
     pub fn all() -> Vec<SuitPermutation> {
-        todo!()
+        Self::each().collect()
+    }
+
+    /// Every permutation in `all` order, read from a table built once. The table lists the
+    /// 256 four-digit base-four codes in ascending order and keeps those whose digits are
+    /// distinct: ascending codes are lexicographic order of the mappings, and the identity
+    /// `cdhs` is the smallest code with distinct digits.
+    fn each() -> impl Iterator<Item = SuitPermutation> {
+        static TABLE: OnceLock<Vec<SuitPermutation>> = OnceLock::new();
+        TABLE
+            .get_or_init(|| {
+                const SUITS: usize = Suit::ALL.len();
+                (0..SUITS.pow(4))
+                    .filter_map(|code| {
+                        let digit = |place: u32| Suit::ALL[(code / SUITS.pow(place)) % SUITS];
+                        // A code with a repeated digit is not a permutation; the error
+                        // only says which digit repeats, so dropping it loses nothing.
+                        SuitPermutation::new([digit(3), digit(2), digit(1), digit(0)]).ok()
+                    })
+                    .collect()
+            })
+            .iter()
+            .copied()
     }
 
     /// The suit a suit becomes.
     #[must_use]
     pub fn apply_suit(self, suit: Suit) -> Suit {
-        todo!()
+        self.0[usize::from(suit.index())]
     }
 
     /// The card a card becomes; the rank is unchanged.
     #[must_use]
     pub fn apply(self, card: Card) -> Card {
-        todo!()
+        Card::new(card.rank(), self.apply_suit(card.suit()))
     }
 
     /// The flop a flop becomes, re-sorted into written order.
     #[must_use]
     pub fn apply_flop(self, flop: Flop) -> Flop {
-        todo!()
+        permuted_flop(flop.cards().map(|card| self.apply(card)))
     }
 
-    /// The board a board becomes.
+    /// The board a board becomes: the flop re-sorted, the turn and river relabeled in place.
     #[must_use]
     pub fn apply_board(self, board: Board) -> Board {
-        todo!()
+        permuted_board(
+            self.apply_flop(board.flop_cards()),
+            board.turn().map(|card| self.apply(card)),
+            board.river().map(|card| self.apply(card)),
+        )
     }
 
-    /// The permutation that undoes this one.
+    /// The permutation that undoes this one: where this one sends suit `i` to `j`, the
+    /// inverse sends `j` back to `i`.
     #[must_use]
     pub fn inverse(self) -> SuitPermutation {
-        todo!()
+        let mut mapping = Self::IDENTITY.0;
+        for (index, image) in self.0.into_iter().enumerate() {
+            mapping[usize::from(image.index())] = Suit::ALL[index];
+        }
+        SuitPermutation(mapping)
     }
 
     /// `self` after `first`: applying the result equals applying `first`, then `self`.
     #[must_use]
     pub fn after(self, first: SuitPermutation) -> SuitPermutation {
-        todo!()
+        SuitPermutation(first.0.map(|suit| self.apply_suit(suit)))
     }
 }
 
-/// The canonical flop of any three cards and the permutation that maps the raw flop onto it,
-/// so `perm.apply_flop(flop) == canonical` and `perm.inverse().apply_flop(canonical) == flop`.
-/// When several permutations reach the canonical flop (a suit absent from the flop is free),
-/// the one with the lexicographically smallest mapping is returned.
-#[must_use]
-pub fn canonical_flop(flop: Flop) -> (Flop, SuitPermutation) {
-    todo!()
+/// The four suit characters of a mapping back to back, for error messages.
+fn mapping_text(mapping: [Suit; 4]) -> String {
+    mapping.into_iter().map(Suit::to_char).collect()
 }
 
-/// The canonical board and the permutation that maps the raw board onto it. The flop part
-/// equals `canonical_flop`; the turn and river break ties among the permutations that reach
-/// it, smallest card first.
+/// Sorts three relabeled cards into a flop. A permutation is a bijection on cards, so three
+/// distinct cards stay distinct and `Flop::new` cannot fail.
+fn permuted_flop(cards: [Card; 3]) -> Flop {
+    Flop::new(cards).expect("a suit permutation keeps three distinct cards distinct")
+}
+
+/// Rebuilds a board from relabeled parts. The parts stay distinct for the same reason as in
+/// `permuted_flop`, and the river still follows the turn, so `Board::new` cannot fail.
+fn permuted_board(flop: Flop, turn: Option<Card>, river: Option<Card>) -> Board {
+    Board::new(flop, turn, river).expect("a suit permutation keeps a valid board valid")
+}
+
+/// The canonical flop of any three cards and the permutation that maps the raw flop onto it,
+/// so `perm.apply_flop(flop) == canonical` and `perm.inverse().apply_flop(canonical) == flop`
+/// (A2 section 1). The 24 permutations are tried in `SuitPermutation::all` order and a
+/// candidate replaces the best only when strictly smaller, so when several permutations
+/// reach the canonical flop (a suit absent from the flop is free) the one with the
+/// lexicographically smallest mapping is returned.
+#[must_use]
+pub fn canonical_flop(flop: Flop) -> (Flop, SuitPermutation) {
+    SuitPermutation::each().fold((flop, SuitPermutation::IDENTITY), |best, perm| {
+        let candidate = perm.apply_flop(flop);
+        if candidate < best.0 { (candidate, perm) } else { best }
+    })
+}
+
+/// The canonical board and the permutation that maps the raw board onto it. `Board` derives
+/// its order over (flop, turn, river) in that sequence, so the smallest relabeled board has
+/// the canonical flop as its flop part and the turn and river only break ties among the
+/// permutations that reach it, smallest card first; ties beyond that go to the smallest
+/// mapping as in `canonical_flop`.
 #[must_use]
 pub fn canonical_board(board: Board) -> (Board, SuitPermutation) {
-    todo!()
+    SuitPermutation::each().fold((board, SuitPermutation::IDENTITY), |best, perm| {
+        let candidate = perm.apply_board(board);
+        if candidate < best.0 { (candidate, perm) } else { best }
+    })
 }
 
 /// True when the flop is its own canonical form.
 #[must_use]
 pub fn is_canonical_flop(flop: Flop) -> bool {
-    todo!()
+    canonical_flop(flop).0 == flop
 }
+
+/// The smallest rank gap between any two cards of a dry ace-high flop: four, so no two of
+/// its cards sit inside one five-card straight window.
+const DRY_MIN_GAP: u8 = 4;
+
+/// The largest spread from top to bottom rank of a low connected flop: four, one straight
+/// window.
+const CONNECTED_MAX_SPAN: u8 = 4;
+
+/// The highest top card of a low connected flop.
+const LOW_TOP_RANK: Rank = Rank::Nine;
 
 /// A flop texture family (06 section 2). Rules, applied in this order so every flop lands
 /// in exactly one family:
@@ -163,31 +238,66 @@ impl TextureFamily {
         TextureFamily::Other,
     ];
 
-    /// The family of a flop, by the rules on the enum.
+    /// The family of a flop, by the rules on the enum. Ranks come highest first, so equal
+    /// ranks are adjacent and every gap is a non-negative difference of rank indexes.
     #[must_use]
     pub fn of(flop: Flop) -> TextureFamily {
-        todo!()
+        let ranks = flop.ranks();
+        let suits = flop.suits();
+        let distinct_suits = Suit::ALL.iter().filter(|suit| suits.contains(suit)).count();
+        let gap = |high: Rank, low: Rank| high.index() - low.index();
+
+        if ranks[0] == ranks[1] || ranks[1] == ranks[2] {
+            TextureFamily::Paired
+        } else if distinct_suits == 1 {
+            TextureFamily::Monotone
+        } else if distinct_suits == 2 && ranks.into_iter().all(Rank::is_broadway) {
+            TextureFamily::TwoToneBroadway
+        } else if ranks[0] == Rank::Ace
+            && distinct_suits == 3
+            && gap(ranks[0], ranks[1]) >= DRY_MIN_GAP
+            && gap(ranks[1], ranks[2]) >= DRY_MIN_GAP
+        {
+            TextureFamily::DryAceHigh
+        } else if ranks[0] <= LOW_TOP_RANK && gap(ranks[0], ranks[2]) <= CONNECTED_MAX_SPAN {
+            TextureFamily::LowConnected
+        } else {
+            TextureFamily::Other
+        }
     }
 
     /// The kebab-case name: `paired`, `monotone`, `two-tone-broadway`, `dry-ace-high`,
     /// `low-connected`, `other`.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
-        todo!()
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            TextureFamily::Paired => "paired",
+            TextureFamily::Monotone => "monotone",
+            TextureFamily::TwoToneBroadway => "two-tone-broadway",
+            TextureFamily::DryAceHigh => "dry-ace-high",
+            TextureFamily::LowConnected => "low-connected",
+            TextureFamily::Other => "other",
+        }
     }
 }
 
 impl fmt::Display for TextureFamily {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(self.as_str())
     }
 }
 
 impl FromStr for TextureFamily {
     type Err = ModelError;
 
-    /// A kebab-case name from `as_str`.
+    /// A kebab-case name from `as_str`. A texture family is a spot-class feature (06
+    /// section 2), so an unknown name is reported as `ModelError::InvalidSpotClassKey`.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        TextureFamily::ALL.into_iter().find(|family| family.as_str() == s).ok_or_else(|| {
+            ModelError::InvalidSpotClassKey(
+                s.to_owned(),
+                "expected a texture family such as dry-ace-high".to_owned(),
+            )
+        })
     }
 }

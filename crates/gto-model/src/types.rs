@@ -164,9 +164,10 @@ impl fmt::Display for Cbb {
     }
 }
 
-/// The grading noise floor in units of 0.01 percent of the pot: 0.2 percent (ADR 0008,
-/// O-22). A loss at or below the larger of this floor and the solution's reported accuracy
-/// counts as zero. A3 section 4 stores losses in the same units, so no conversion is needed.
+/// The grading noise floor in units of 0.01 percent of the pot: 0.2 percent (architecture
+/// decision record (ADR) 0008, O-22). A loss at or below the larger of this floor and the
+/// solution's reported accuracy counts as zero. A3 section 4 stores losses in the same
+/// units, so no conversion is needed.
 pub const NOISE_FLOOR_PCT_POT_X100: u32 = 20;
 
 /// The preflop floor used when a reference solution reports no accuracy: 0.02 bb (O-22).
