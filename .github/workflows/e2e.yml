@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Install dbmate (architecture decision record (ADR) 0005)
-        run: npm install -g dbmate
+        run: npm install -g dbmate@2.37.0
       - name: Create .env with per-run passwords
         # The runner is ephemeral, so the placeholders would do; fresh random values keep two runs from
         # ever sharing a password. Longer tokens are replaced first, so a token that prefixes another is

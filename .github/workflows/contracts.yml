@@ -47,7 +47,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npm install -g dbmate
+      - run: npm install -g dbmate@2.37.0
       - name: Apply migrations
         run: just db-migrate
       - name: Kysely types match the migrated database
