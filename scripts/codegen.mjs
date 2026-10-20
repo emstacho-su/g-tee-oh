@@ -62,14 +62,9 @@ function generate(outFile, url) {
     windowsHide: true,
     env: { ...process.env, DATABASE_URL: url },
   });
-  if (result.error) {
-    console.error(`codegen: could not run pnpm: ${result.error.message}`);
-    process.exit(2);
-  }
-  if (result.status !== 0) {
-    console.error(`codegen: kysely-codegen exited ${result.status}\n${result.stderr}`);
-    process.exit(2);
-  }
+  // Thrown, not exited, so main() can remove the temporary directory before reporting.
+  if (result.error) throw new Error(`codegen: could not run pnpm: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`codegen: kysely-codegen exited ${result.status}\n${result.stderr}`);
   const body = readFileSync(outFile, 'utf8').replace(/\r\n/g, '\n');
   return `${HEADER}${body}`;
 }
@@ -80,7 +75,13 @@ function main(argv) {
   const tempDir = mkdtempSync(join(tmpdir(), 'codegen-'));
   const tempFile = join(tempDir, 'db.generated.ts');
   try {
-    const generated = generate(tempFile, url);
+    let generated;
+    try {
+      generated = generate(tempFile, url);
+    } catch (error) {
+      console.error(error.message);
+      return 2;
+    }
     if (!check) {
       writeFileSync(TARGET, generated, 'utf8');
       console.log(`codegen: wrote ${TARGET_RELATIVE}`);

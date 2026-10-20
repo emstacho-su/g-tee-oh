@@ -58,12 +58,14 @@ function main() {
     shell: false,
     windowsHide: true,
   });
-  if (result.error || result.status === 101 || /no such command/i.test(result.stderr ?? '')) {
+  // Only the missing-subcommand message means the tool is absent; cargo also exits 101 for a
+  // compile error or a stale query, and those must be shown, not hidden behind an install hint.
+  if (result.error || /no such command/i.test(result.stderr ?? '')) {
     console.error('sqlx-check: cargo sqlx is missing; install it with: cargo install sqlx-cli --no-default-features --features postgres,rustls');
     return 2;
   }
-  process.stdout.write(result.stdout);
-  process.stderr.write(result.stderr);
+  process.stdout.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
   return result.status ?? 1;
 }
 

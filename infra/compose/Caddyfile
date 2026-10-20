@@ -41,7 +41,7 @@ https://{$CADDY_SITE:localhost} {
 
 	# web: the static build served from the web container on 80 (A5 section 1)
 	handle {
-		reverse_proxy web:80
+		reverse_proxy web:8080
 	}
 
 	handle_errors {

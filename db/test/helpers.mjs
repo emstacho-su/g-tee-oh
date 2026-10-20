@@ -82,21 +82,26 @@ export function createPool() {
  */
 export async function withRollback(pool, fn) {
   const client = await pool.connect();
-  let rollbackError;
+  let result;
+  let fnError;
   try {
     await client.query('begin');
-    return await fn(client);
-  } finally {
-    try {
-      await client.query('rollback');
-    } catch (err) {
-      rollbackError = err;
-    }
-    client.release(rollbackError);
-    if (rollbackError) {
-      throw rollbackError;
-    }
+    result = await fn(client);
+  } catch (err) {
+    fnError = err;
   }
+  // The rollback runs whatever happened; the client is released either way, and the test's
+  // own error wins over a rollback error so the real cause is the one reported.
+  let rollbackError;
+  try {
+    await client.query('rollback');
+  } catch (err) {
+    rollbackError = err;
+  }
+  client.release(rollbackError);
+  if (fnError) throw fnError;
+  if (rollbackError) throw rollbackError;
+  return result;
 }
 
 /**

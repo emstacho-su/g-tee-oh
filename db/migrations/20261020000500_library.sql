@@ -29,7 +29,7 @@ create index solution_lookup_idx on solution (game_config_id, kind, status);
 create table scenario (
   id uuid primary key default uuidv7(),
   solution_id uuid not null references solution (id),
-  game_config_id text not null,
+  game_config_id text not null references game_config (id),
   position_pair text not null,
   flop text not null,
   turn text not null,

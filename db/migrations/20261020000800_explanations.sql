@@ -19,7 +19,7 @@ create table explanation (
   validated bool not null,
   cost_cents int not null,
   created_at timestamptz not null default now(),
-  unique (solution_id, node_key, hand, question_hash)
+  unique nulls not distinct (solution_id, node_key, hand, question_hash)
 );
 
 create table llm_spend (

@@ -46,8 +46,7 @@ ts-test:
     pnpm run test:scripts
 
 # Contracts: the committed Kysely types must match the migrated database (R0.6); OpenAPI generators land in S06
-contracts:
-    node scripts/codegen.mjs --check
+contracts: codegen-check
 
 # End-to-end: Compose dev stack up, migrations, database tests, smoke, down (R0.5, R0.6); skips until the compose file exists
 e2e:
@@ -162,5 +161,6 @@ bench:
     cargo bench -p gto-solve -p gto-library
     node scripts/bench-report.mjs
 
-# Everything the hosted jobs run that needs no Docker, in order (e2e and images need the compose stack and buildx)
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test contracts licenses security guard-test
+# Everything the hosted jobs run that needs neither Docker nor a database, in order (contracts needs a migrated
+# database, e2e the compose stack, images buildx)
+ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test

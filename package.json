@@ -11,7 +11,7 @@
   },
   "scripts": {
     "lint": "pnpm -r --if-present lint && pnpm run lint:root",
-    "lint:root": "eslint guard scripts eslint.config.js",
+    "lint:root": "eslint guard scripts db infra/compose eslint.config.js",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test && pnpm run test:scripts",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",

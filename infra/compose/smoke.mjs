@@ -4,7 +4,7 @@
 //
 // Mechanism: every check below is a small probe of one service boundary, run in order and never short
 // circuited, so one run reports every failing check at once. The script reads .env from the repo root
-// when DATABASE_URL is unset (the justfile does not export .env; dbmate and Compose read it themselves)
+// underneath the environment (the justfile does not export .env; dbmate and Compose read it themselves)
 // and only fills variables the environment does not already carry. It exits 0 with one line per check
 // and 1 with the names of the failing checks.
 //
@@ -54,7 +54,7 @@ function parseDotEnv(text) {
 
 function loadSettings() {
   const envPath = resolve(REPO_ROOT, ".env");
-  const fromFile = process.env.DATABASE_URL === undefined && existsSync(envPath)
+  const fromFile = existsSync(envPath)
     ? parseDotEnv(readFileSync(envPath, "utf8"))
     : {};
   return { ...fromFile, ...process.env };
