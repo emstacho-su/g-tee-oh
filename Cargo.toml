@@ -1,0 +1,63 @@
+# Workspace root for g-tee-oh (session S01, R0.1).
+#
+# Layering (A1 section 2): lower crates never import higher ones.
+#   gto-model < gto-tree < gto-solve < gto-library < gto-planner
+# Binaries sit on top: solver-query reads the library only (ADR 0018, library-first),
+# library-builder, validate and library-pack may solve.
+#
+# Toolchain pin (O-23): edition 2024 on rustc 1.85 or newer. The vendored engine keeps
+# its own edition 2021 manifest and is listed here only as a member.
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/gto-model",
+    "crates/gto-tree",
+    "crates/gto-solve",
+    "crates/gto-library",
+    "crates/gto-planner",
+    "crates/vendor/postflop-engine",
+    "services/solver-query",
+    "services/library-builder",
+    "tools/validate",
+    "tools/library-pack",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+repository = "https://github.com/emstacho-su/g-tee-oh"
+# Nothing in this workspace is published to crates.io; the flag also lets cargo-deny treat
+# path dependencies as private (see deny.toml, bans.allow-wildcard-paths).
+publish = false
+
+[workspace.dependencies]
+# Third party. Versions are pinned to a major so cargo update stays within semver.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+rayon = "1"
+
+# Vendored solver engine (git subtree, see crates/vendor/postflop-engine/UPSTREAM.md).
+# The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
+# workspace refers to it by the alias postflop-engine.
+postflop-engine = { package = "engine", path = "crates/vendor/postflop-engine" }
+
+# Internal crates, so each member declares an edge as `name = { workspace = true }`.
+gto-model = { path = "crates/gto-model" }
+gto-tree = { path = "crates/gto-tree" }
+gto-solve = { path = "crates/gto-solve" }
+gto-library = { path = "crates/gto-library" }
+gto-planner = { path = "crates/gto-planner" }
+
+[workspace.lints.clippy]
+# Groups carry priority -1 so an individual lint entry added later overrides them.
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

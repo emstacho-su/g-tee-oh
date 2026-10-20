@@ -1,0 +1,15 @@
+[package]
+name = "gto-model"
+version = "0.1.0"
+description = "Core domain types for no-limit hold'em shared by every g-tee-oh crate"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Bottom of the layering (A1 section 2): no internal dependencies.
+[dependencies]
+
+[lints]
+workspace = true

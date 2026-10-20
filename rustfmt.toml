@@ -1,0 +1,7 @@
+# rustfmt settings for the workspace (stable options only, so `cargo fmt` on the stable
+# toolchain pinned by O-23 honours every line here).
+edition = "2024"
+max_width = 100
+use_small_heuristics = "Max"
+# Both Windows and Linux run this repo; emit LF so formatted files match .gitattributes.
+newline_style = "Unix"
