@@ -137,6 +137,10 @@ guard-paths DIR:
 guard-test:
     node --test "guard/test/*.test.mjs"
 
+# Pending-test tag check (R0.11): every it.todo, skipped or #[ignore] test carries its R ID; lists the untagged ones and fails
+test-tags:
+    node scripts/check-test-tags.mjs
+
 # Container images; skips until infra/docker/*.Dockerfile exists (S02)
 [unix]
 images:
@@ -163,4 +167,4 @@ bench:
 
 # Everything the hosted jobs run that needs neither Docker nor a database, in order (contracts needs a migrated
 # database, e2e the compose stack, images buildx)
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test
+ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test test-tags

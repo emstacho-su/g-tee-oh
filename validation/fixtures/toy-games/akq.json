@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "id": "akq",
+  "name": "AKQ game (ace, king, queen) and the polar river toy game",
+  "gate": "G2",
+  "r_id": "R2.5",
+  "players": 2,
+  "deck": {
+    "ranks": ["Q", "K", "A"],
+    "suits": 1,
+    "cards": 3,
+    "private_cards_per_player": 1,
+    "public_cards": 0
+  },
+  "sources": [
+    {
+      "id": "04-section-6-g2",
+      "citation": "planning/04-solver-engine.md section 6, gate G2 pass rule: bluff to value ratio and calling frequency match the closed form values (for a pot sized polar bet the bettor bluffs 1/3 of the betting range and the caller defends half of the bluff catchers) within 0.5 percentage points.",
+      "url": null
+    },
+    {
+      "id": "chen-ankenman-2006",
+      "citation": "Bill Chen and Jerrod Ankenman, The Mathematics of Poker, ConJelCo, 2006. The AKQ game and the polar bet toy games: bluff share B / (P + 2B) of the betting range, defense share P / (P + B).",
+      "url": null
+    },
+    {
+      "id": "readme-akq-derivation",
+      "citation": "validation/fixtures/README.md, section AKQ closed forms: the two indifference conditions that give the Q bluff frequency B / (P + B) and the K call frequency (P minus B) / (P + B) for one bet size B into a dead pot P.",
+      "url": null
+    }
+  ],
+  "tolerances": {
+    "game_value_abs": null,
+    "exploitability_max": null,
+    "frequency_points": { "value": 0.5, "unit": "percentage_points", "source": "04-section-6-g2" },
+    "curve_abs": null,
+    "curve_rel": null
+  },
+  "cases": [
+    {
+      "id": "pot1-bet-quarter",
+      "description": "Dead pot 1 chip (each player put in 1/2), one bet of 1/4 pot. Player 0 has checked in the dark; player 1 checks or bets, then player 0 folds or calls. Unique equilibrium.",
+      "betting": {
+        "ante": 0.5,
+        "dead_pot": 1,
+        "rounds": 1,
+        "bet_sizes": [0.25],
+        "max_raises_per_round": 0,
+        "first_to_act": 1,
+        "unit": "chips"
+      },
+      "game_value": null,
+      "strategy_facts": [
+        { "id": "p1-open-bet-q", "player": 1, "node": "open", "holding": "Q", "action": "bet", "frequency": { "kind": "exact", "value": 0.2, "exact": "1/5" }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-k", "player": 1, "node": "open", "holding": "K", "action": "bet", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-a", "player": 1, "node": "open", "holding": "A", "action": "bet", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-q", "player": 0, "node": "facing_bet", "holding": "Q", "action": "call", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-k", "player": 0, "node": "facing_bet", "holding": "K", "action": "call", "frequency": { "kind": "exact", "value": 0.6, "exact": "3/5" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-a", "player": 0, "node": "facing_bet", "holding": "A", "action": "call", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" }
+      ],
+      "ratio_facts": [
+        { "id": "bluff-share-of-bets", "name": "share of player 1's bets that are bluffs", "value": 0.16666666666666666, "exact": "1/6", "formula": "B / (P + 2B)", "source": "chen-ankenman-2006" },
+        { "id": "defense-share-of-range", "name": "share of player 0's range that continues against the bet", "value": 0.8, "exact": "4/5", "formula": "P / (P + B)", "source": "chen-ankenman-2006" }
+      ]
+    },
+    {
+      "id": "pot1-bet-half",
+      "description": "Dead pot 1 chip, one bet of 1/2 pot. Unique equilibrium.",
+      "betting": {
+        "ante": 0.5,
+        "dead_pot": 1,
+        "rounds": 1,
+        "bet_sizes": [0.5],
+        "max_raises_per_round": 0,
+        "first_to_act": 1,
+        "unit": "chips"
+      },
+      "game_value": null,
+      "strategy_facts": [
+        { "id": "p1-open-bet-q", "player": 1, "node": "open", "holding": "Q", "action": "bet", "frequency": { "kind": "exact", "value": 0.3333333333333333, "exact": "1/3" }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-k", "player": 1, "node": "open", "holding": "K", "action": "bet", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-a", "player": 1, "node": "open", "holding": "A", "action": "bet", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-q", "player": 0, "node": "facing_bet", "holding": "Q", "action": "call", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-k", "player": 0, "node": "facing_bet", "holding": "K", "action": "call", "frequency": { "kind": "exact", "value": 0.3333333333333333, "exact": "1/3" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-a", "player": 0, "node": "facing_bet", "holding": "A", "action": "call", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" }
+      ],
+      "ratio_facts": [
+        { "id": "bluff-share-of-bets", "name": "share of player 1's bets that are bluffs", "value": 0.25, "exact": "1/4", "formula": "B / (P + 2B)", "source": "chen-ankenman-2006" },
+        { "id": "defense-share-of-range", "name": "share of player 0's range that continues against the bet", "value": 0.6666666666666666, "exact": "2/3", "formula": "P / (P + B)", "source": "chen-ankenman-2006" }
+      ]
+    },
+    {
+      "id": "pot1-bet-pot",
+      "description": "Dead pot 1 chip, one pot sized bet. The equilibrium is a segment: K never calls, and the Q bluff frequency is anything in [0, 1/2]. The range level defense is exactly 1/2 at every point of the segment.",
+      "betting": {
+        "ante": 0.5,
+        "dead_pot": 1,
+        "rounds": 1,
+        "bet_sizes": [1],
+        "max_raises_per_round": 0,
+        "first_to_act": 1,
+        "unit": "chips"
+      },
+      "game_value": null,
+      "strategy_facts": [
+        { "id": "p1-open-bet-q", "player": 1, "node": "open", "holding": "Q", "action": "bet", "frequency": { "kind": "segment", "min": 0, "max": 0.5 }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-k", "player": 1, "node": "open", "holding": "K", "action": "bet", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p1-open-bet-a", "player": 1, "node": "open", "holding": "A", "action": "bet", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-q", "player": 0, "node": "facing_bet", "holding": "Q", "action": "call", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-k", "player": 0, "node": "facing_bet", "holding": "K", "action": "call", "frequency": { "kind": "exact", "value": 0, "exact": "0" }, "source": "readme-akq-derivation" },
+        { "id": "p0-facing-bet-call-a", "player": 0, "node": "facing_bet", "holding": "A", "action": "call", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "readme-akq-derivation" }
+      ],
+      "ratio_facts": [
+        { "id": "defense-share-of-range", "name": "share of player 0's range that continues against the bet", "value": 0.5, "exact": "1/2", "formula": "P / (P + B)", "source": "chen-ankenman-2006" }
+      ]
+    },
+    {
+      "id": "polar-river-pot-bet",
+      "description": "Toy river game. Player 1 holds the nuts or air in equal measure and bets or checks a pot sized bet; player 0 holds only bluff catchers and folds or calls. The holdings are nuts, air and bluff_catcher rather than cards. These are the numbers 04 section 6 states for gate G2.",
+      "betting": {
+        "ante": 0.5,
+        "dead_pot": 1,
+        "rounds": 1,
+        "bet_sizes": [1],
+        "max_raises_per_round": 0,
+        "first_to_act": 1,
+        "unit": "chips"
+      },
+      "game_value": null,
+      "strategy_facts": [
+        { "id": "p1-open-bet-nuts", "player": 1, "node": "open", "holding": "nuts", "action": "bet", "frequency": { "kind": "exact", "value": 1, "exact": "1" }, "source": "chen-ankenman-2006" },
+        { "id": "p1-open-bet-air", "player": 1, "node": "open", "holding": "air", "action": "bet", "frequency": { "kind": "exact", "value": 0.5, "exact": "1/2" }, "source": "chen-ankenman-2006" },
+        { "id": "p0-facing-bet-call-bluff-catcher", "player": 0, "node": "facing_bet", "holding": "bluff_catcher", "action": "call", "frequency": { "kind": "exact", "value": 0.5, "exact": "1/2" }, "source": "04-section-6-g2" }
+      ],
+      "ratio_facts": [
+        { "id": "bluff-share-of-bets", "name": "share of player 1's bets that are bluffs", "value": 0.3333333333333333, "exact": "1/3", "formula": "B / (P + 2B)", "source": "04-section-6-g2" },
+        { "id": "defense-share-of-bluff-catchers", "name": "share of player 0's bluff catchers that call", "value": 0.5, "exact": "1/2", "formula": "P / (P + B)", "source": "04-section-6-g2" }
+      ]
+    }
+  ],
+  "curve": null,
+  "notes": [
+    "Player 0 is out of position and has checked in the dark, so player 1 acts first. Node open is player 1's check or bet; node facing_bet is player 0's fold or call.",
+    "Cases with a bet smaller than the pot have a unique equilibrium and pin both mixed frequencies, the Q bluff and the K call. At a bet equal to the pot the K call frequency is 0 and the Q bluff frequency is any value in [0, 1/2]; those facts are segment facts, and only the range level defense of 1/2 is pinned there.",
+    "The pot sized numbers 04 section 6 states, bluffs are 1/3 of the betting range and the caller defends half of the bluff catchers, belong to the polar river toy game (case polar-river-pot-bet), where they are unique. In the AKQ game at a pot sized bet the same 1/3 is only the upper end of the segment, so gate G2 checks the AKQ frequencies at the two smaller bet sizes and the 04 numbers on the polar river case.",
+    "Frequencies are compared within 0.5 percentage points, that is 0.005 in frequency units. The derivations are in validation/fixtures/README.md."
+  ]
+}

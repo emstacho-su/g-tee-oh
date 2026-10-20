@@ -15,5 +15,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "ts-fsrs": "^5.4.2"
   }
 }

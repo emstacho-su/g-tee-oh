@@ -2,7 +2,7 @@
 // pnpm license gate (R0.2, ADR 0002): fails when any installed dependency carries a GPL
 // (GNU General Public License) or AGPL (GNU Affero General Public License) family license.
 //
-// Mechanism: runs "pnpm licenses list --json" at the repo root, parses the object it prints
+// Mechanism: runs "pnpm -r licenses list --json" over every workspace project (the root importer alone would miss a package only a workspace member depends on), parses the object it prints
 // (license id to list of packages), and asks scripts/license-policy.mjs for a verdict per id.
 // Forbidden ids list every offending package and exit 1. Unknown ids print a warning only.
 // Zero packages means pnpm install has not run, which would make the gate vacuous, so that
@@ -16,7 +16,7 @@ import { evaluateLicenseReport } from "./license-policy.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PNPM_BIN = "pnpm";
-const PNPM_LICENSES_ARGS = Object.freeze(["licenses", "list", "--json"]);
+const PNPM_LICENSES_ARGS = Object.freeze(["-r", "licenses", "list", "--json"]);
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 const EXIT_OK = 0;
 const EXIT_FAIL = 1;

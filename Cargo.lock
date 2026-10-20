@@ -571,6 +571,8 @@ version = "0.1.0"
 dependencies = [
  "gto-library",
  "gto-solve",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

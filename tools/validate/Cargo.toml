@@ -11,6 +11,10 @@ publish.workspace = true
 [dependencies]
 gto-library = { workspace = true }
 gto-solve = { workspace = true }
+# Fixture loading for the toy-game gates G1 to G3 (R0.11, 04 section 6): the files under
+# validation/fixtures/ are JSON and the lib parses them through serde.
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

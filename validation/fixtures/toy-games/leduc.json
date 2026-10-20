@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "id": "leduc",
+  "name": "Leduc hold'em",
+  "gate": "G3",
+  "r_id": "R2.6",
+  "players": 2,
+  "deck": {
+    "ranks": ["J", "Q", "K"],
+    "suits": 2,
+    "cards": 6,
+    "private_cards_per_player": 1,
+    "public_cards": 1
+  },
+  "sources": [
+    {
+      "id": "southey-2005",
+      "citation": "Finnegan Southey, Michael Bowling, Bryce Larson, Carmelo Piccione, Neil Burch, Darse Billings and Chris Rayner, Bayes' Bluff: Opponent Modelling in Poker, Proceedings of the 21st Conference on Uncertainty in Artificial Intelligence, 2005. Defines Leduc hold'em.",
+      "url": null
+    },
+    {
+      "id": "openspiel-leduc-2.0.2",
+      "citation": "OpenSpiel 2.0.2 (Apache-2.0), game leduc_poker with default parameters: six cards, ante 1, raise 2 in round one and 4 in round two, at most two raises per round, 936 information states, maximum win 13 chips. Rules read from the game object during the run recorded in openspiel/PROVENANCE.md.",
+      "url": "https://github.com/google-deepmind/open_spiel"
+    },
+    {
+      "id": "openspiel-cfr-run",
+      "citation": "openspiel/leduc_exploitability.json, the committed plain CFR run of 5000 iterations. The game value is the average policy's expected value to player 0 at the last checkpoint, where the exploitability is still 0.0036 chips, so it is a measured number and not an analytic constant.",
+      "url": null
+    },
+    {
+      "id": "o-79",
+      "citation": "planning/00-open-questions-and-risks.md O-79, the G3 tolerance: at every committed checkpoint iteration, exploitability within the larger of 0.001 absolute and 10 percent relative.",
+      "url": null
+    }
+  ],
+  "tolerances": {
+    "game_value_abs": null,
+    "exploitability_max": null,
+    "frequency_points": null,
+    "curve_abs": { "value": 0.001, "unit": "chips", "source": "o-79" },
+    "curve_rel": { "value": 0.1, "unit": "ratio", "source": "o-79" }
+  },
+  "cases": [
+    {
+      "id": "openspiel-default",
+      "description": "Six cards J, Q, K in two suits, one private card each, both ante 1 chip. Round one: player 0 acts first, a bet or raise adds 2, at most two raises. One public card. Round two: a bet or raise adds 4, at most two raises. A pair beats a high card; otherwise the higher rank wins and equal ranks split the pot.",
+      "betting": {
+        "ante": 1,
+        "dead_pot": 2,
+        "rounds": 2,
+        "bet_sizes": [2, 4],
+        "max_raises_per_round": 2,
+        "first_to_act": 0,
+        "unit": "chips"
+      },
+      "game_value": {
+        "player": 0,
+        "value": -0.0859431179350123,
+        "exact": null,
+        "unit": "chips",
+        "source": "openspiel-cfr-run"
+      },
+      "strategy_facts": [],
+      "ratio_facts": []
+    }
+  ],
+  "curve": {
+    "file": "openspiel/leduc_exploitability.json",
+    "provenance": "openspiel/PROVENANCE.md",
+    "measure": "exploitability"
+  },
+  "notes": [
+    "Gate G3 compares the engine's exploitability curve against the committed OpenSpiel curve at every checkpoint iteration (1, 10, 100, 1000, 5000) within the O-79 tolerance. It asserts no single game value and no strategy fact; the game value is recorded for reports only.",
+    "The curve's exploitability field is nash_conv divided by 2, the mean best-response gain in chips with the ante at 1. The vendored engine reports the sum of the two gains (ExploitReport.chips, NashConv in a zero-sum game), so the engine's figure is halved before the comparison, or compared with nash_conv with the absolute part of the tolerance doubled.",
+    "The curve comes from plain CFR: simultaneous updates, uniform averaging, no regret matching plus, no discounting. The engine must run with the same switches in one continuous run, or its discounted curve sits below the fixture and fails the relative rule.",
+    "The literature commonly quotes about minus 0.0856 chips as the first player's value; the committed run gives minus 0.0859 with the average policy still 0.0036 chips exploitable."
+  ]
+}

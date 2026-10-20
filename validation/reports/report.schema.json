@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/emstacho-su/g-tee-oh/validation/reports/report.schema.json",
+  "title": "g-tee-oh validation report",
+  "description": "The envelope every JSON report under validation/reports/ follows (R0.11; validation/reports/README.md explains each field). A gate report is judged, so it carries pass and thresholds. The bench baseline (report = bench) is what later thresholds are measured against (O-40), so it carries neither. Markdown gate summaries do not use this schema.",
+  "type": "object",
+  "required": ["report", "r_ids", "machine", "commit", "date", "measurements"],
+  "properties": {
+    "report": {
+      "type": "string",
+      "description": "The report id: the file name without the machine suffix and the extension (bench-zenbook.json carries bench, perf-zenbook.json carries perf, recompute.json carries recompute).",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "r_ids": {
+      "type": "array",
+      "description": "The requirement identifiers the report proves, R<phase>.<n>.",
+      "items": { "type": "string", "pattern": "^R[0-9]+\\.[0-9]+$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "machine": { "$ref": "#/$defs/machine" },
+    "commit": {
+      "type": "string",
+      "description": "git rev-parse HEAD when the report was written.",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "date": {
+      "type": "string",
+      "description": "When the report was written, ISO 8601 in Coordinated Universal Time with the Z suffix (the pattern stands in for the date-time format so ajv needs no formats plugin).",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "toolchain": {
+      "type": "string",
+      "description": "The compiler or runtime that built what was measured, for example the output of rustc --version.",
+      "minLength": 1
+    },
+    "pass": {
+      "type": "boolean",
+      "description": "True when every measurement meets its threshold. Required for a gate report, forbidden on the bench baseline."
+    },
+    "thresholds": { "$ref": "#/$defs/thresholds" },
+    "measurements": {
+      "type": "array",
+      "description": "One entry per measured quantity, at least one.",
+      "items": { "$ref": "#/$defs/measurement" },
+      "minItems": 1
+    },
+    "seed": {
+      "description": "The seed of a seeded sample, for example the 200 recompute attempts (O-60).",
+      "anyOf": [{ "type": "integer" }, { "type": "string", "minLength": 1 }]
+    },
+    "notes": {
+      "type": "string",
+      "description": "What the tool wants a reader to know: an extrapolated figure, an unavailable input."
+    }
+  },
+  "if": {
+    "properties": { "report": { "const": "bench" } },
+    "required": ["report"]
+  },
+  "then": {
+    "properties": { "pass": false, "thresholds": false }
+  },
+  "else": {
+    "required": ["pass", "thresholds"]
+  },
+  "$defs": {
+    "machine": {
+      "type": "object",
+      "description": "The machine that produced the measurements; the name is also the file name suffix. A tool may add fields, for example the Docker virtual machine memory on the Mac (O-20).",
+      "required": ["name", "os", "cpu", "cores", "memory_gb"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "os": { "type": "string", "minLength": 1 },
+        "cpu": { "type": "string", "minLength": 1 },
+        "cores": { "type": "integer", "minimum": 1 },
+        "memory_gb": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "threshold": {
+      "description": "A limit a measurement is judged against: a bare number in the measurement's unit, or an object naming the bound.",
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "properties": {
+            "max": { "type": "number" },
+            "min": { "type": "number" },
+            "unit": { "type": "string", "minLength": 1 }
+          },
+          "anyOf": [{ "required": ["max"] }, { "required": ["min"] }],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "The limits the measurements were judged against, keyed by measurement id or by a named limit (O-40 names three for perf-zenbook.json).",
+      "additionalProperties": { "$ref": "#/$defs/threshold" }
+    },
+    "measurement": {
+      "type": "object",
+      "description": "One measured quantity. value is the general form; mean_ns with median_ns is the criterion form the bench baseline uses. A tool may add fields.",
+      "required": ["id", "unit"],
+      "anyOf": [{ "required": ["value"] }, { "required": ["mean_ns"] }],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "mean_ns": { "type": "number", "exclusiveMinimum": 0 },
+        "median_ns": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "type": "string", "minLength": 1 },
+        "stub": {
+          "type": "boolean",
+          "description": "True when the routine is a placeholder and the number is not a product measurement."
+        },
+        "threshold": { "$ref": "#/$defs/threshold" },
+        "pass": { "type": "boolean" }
+      }
+    }
+  }
+}
