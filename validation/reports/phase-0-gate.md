@@ -14,6 +14,7 @@ Started by S01 on 2026-10-20 and completed by S06. Every row names the requireme
 | R0.12 | The guard passes on `docs/`; every file under `docs/` carries `public: true` | `just guard-paths docs` (37 files, 0 findings); `guard/test/docs-provenance.test.mjs` | Pass |
 | R0.3 | Every job runs on a pull request; `e2e` and `images` skip cleanly while their targets do not exist | Pull request #1 at commit 34230b3: rust https://github.com/emstacho-su/g-tee-oh/actions/runs/39443705482, ts 39443705847, contracts 39443705770, e2e 39443705733, licenses 39443705521, security 39443705940, images 39443705556 | All seven green; `e2e` and `images` printed their skip notices |
 | R0.1, R0.2 | `rust` and `ts` jobs green on the workspaces; the vendored crate builds and its tests pass in CI | The rust run above (fmt, clippy with `--no-deps`, own-crate tests, engine tests in release mode, boundary check) and the ts run (eslint, typecheck, Vitest, node:test policy suite) | Pass |
+| R0.1, R0.3, R0.4 | All seven jobs green again on the review-fix commits (guard coverage of paths and commit messages, the gto-library edge removed) | Pull request #1 at commit 4b251ee: rust https://github.com/emstacho-su/g-tee-oh/actions/runs/39447077608, security 39447077524, ts 39447077267, contracts 39447077438, licenses 39447077754, e2e 39447077328, images 39447077625 | Pass; the guard suite is 87 tests |
 
 Both throwaway branches were closed and deleted after the runs above were recorded; the runs stay readable on GitHub.
 
