@@ -1,5 +1,6 @@
-# contracts job (R0.3): regenerate every cross-language artifact and fail on an uncommitted diff.
-# S06 adds the generators (utoipa, Zod, openapi-typescript, kysely-codegen); until then just contracts prints a notice.
+# contracts job (R0.3, R0.6): the committed Kysely types must match the migrated database,
+# and the sqlx offline check runs once a crate carries a query. S06 adds the OpenAPI
+# generators (utoipa, Zod, openapi-typescript) to the same recipe.
 name: contracts
 
 on:
@@ -19,16 +20,39 @@ concurrency:
 jobs:
   contracts:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: contracts
+          POSTGRES_DB: gto
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # The service container is ephemeral, so a fixed dev password is acceptable here.
+      DATABASE_URL: postgres://postgres:contracts@localhost:5432/gto?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Regenerate contracts
+      - run: npm install -g dbmate
+      - name: Apply migrations
+        run: just db-migrate
+      - name: Kysely types match the migrated database
         run: just contracts
+      - name: sqlx offline metadata
+        run: just sqlx-check
       - name: Fail on an uncommitted diff
         run: git diff --exit-code
