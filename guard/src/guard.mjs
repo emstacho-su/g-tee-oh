@@ -13,8 +13,9 @@ export const TOKEN_PATTERN = /[A-Za-z0-9_]{6,}/g;
 // A finding prints this many leading characters of the hash, never the token.
 export const HASH_PREFIX_LENGTH = 8;
 
-// Files larger than this are skipped in paths mode.
-export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+// Text files larger than this cannot be scanned in paths mode; the run then fails
+// closed instead of calling the directory clean.
+export const MAX_FILE_BYTES = 64 * 1024 * 1024;
 
 const REGEX_SPECIALS = /[.+^${}()|[\]\\]/g;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
@@ -80,9 +81,21 @@ export function matchPath(filePath, compiledPatterns) {
   return hit ? hit.pattern : null;
 }
 
+// Runs of word characters, plus the underscore-separated parts of each run, so an
+// identifier glued to a suffix such as "<identifier>_response" is still seen.
 export function tokenize(line) {
   const matches = String(line).match(TOKEN_PATTERN) ?? [];
-  return matches.map((token) => token.toLowerCase());
+  const tokens = [];
+  for (const match of matches) {
+    const lower = match.toLowerCase();
+    tokens.push(lower);
+    if (lower.includes('_')) {
+      for (const part of lower.split('_')) {
+        if (part.length >= 6) tokens.push(part);
+      }
+    }
+  }
+  return tokens;
 }
 
 // sha256 over the salt immediately followed by the token, no separator.
@@ -164,6 +177,31 @@ export function linesOfFile(file, text) {
   return lines.map((content, index) => ({ file: normalized, line: index + 1, text: content }));
 }
 
+// Paths as synthetic lines (line 0), so a private identifier used as a file or
+// directory name is caught like one inside a file. The tokenizer splits on
+// slashes, dots and dashes by itself.
+export function pathLines(paths) {
+  return paths.map((filePath) => {
+    const normalized = normalizePath(filePath);
+    return { file: normalized, line: 0, text: normalized };
+  });
+}
+
+export const COMMIT_MESSAGE_LABEL = '<commit message>';
+
+// A commit message as lines. Comment lines are what git strips before the
+// commit is recorded, so they are left out; the label stands in for a path.
+export function messageLines(message, label = COMMIT_MESSAGE_LABEL) {
+  const lines = String(message).split(/\r?\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  const out = [];
+  lines.forEach((content, index) => {
+    if (content.startsWith('#')) return;
+    out.push({ file: label, line: index + 1, text: content });
+  });
+  return out;
+}
+
 export function isBinary(buffer) {
   return buffer.includes(0);
 }
@@ -199,6 +237,9 @@ export function checkLines(addedLines, salt, denylist) {
 export function formatFinding(finding) {
   if (finding.kind === 'path') {
     return `guard: path ${finding.file} matches private pattern ${finding.pattern}`;
+  }
+  if (finding.line === 0) {
+    return `guard: identifier in the path ${finding.file} hash ${finding.hashPrefix} is on the denylist`;
   }
   return `guard: identifier at ${finding.file}:${finding.line} hash ${finding.hashPrefix} is on the denylist`;
 }

@@ -2,6 +2,8 @@
   "permissions": {
     "deny": [
       "Read(./.guard-private/**)",
+      "Bash(*.guard-private*)",
+      "PowerShell(*.guard-private*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Edit(./crates/vendor/**)",

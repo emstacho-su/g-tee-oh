@@ -10,7 +10,8 @@ test('r0_4 tokenizer keeps runs of six or more word characters, lowercased', () 
 });
 
 test('r0_4 tokenizer splits on punctuation and drops short pieces', () => {
-  assert.deepEqual(tokenize('alpha-bravo12, "charlie_9" (d)'), ['bravo12', 'charlie_9']);
+  assert.deepEqual(tokenize('alpha-bravo12, "charlie_9" (d)'), ['bravo12', 'charlie_9', 'charlie']);
+  assert.deepEqual(tokenize('plantedtoken7q_response'), ['plantedtoken7q_response', 'plantedtoken7q', 'response']);
   assert.deepEqual(tokenize(''), []);
   assert.deepEqual(tokenize('a b c'), []);
 });

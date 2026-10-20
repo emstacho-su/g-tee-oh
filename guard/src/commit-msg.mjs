@@ -17,12 +17,17 @@ export function isClaudeSession(env) {
   return value !== undefined && value.trim() !== '';
 }
 
+const SCISSORS = /^# -+ >8 -+$/;
+
 // Comment lines (leading "#") are what git strips before committing, so a
-// trailer inside one does not count.
+// trailer inside one does not count, and nothing below the scissors line
+// counts either: "git commit -v" appends the diff there, and a diff context
+// line that happens to contain the trailer text is not a trailer.
 export function hasClaudeTrailer(message) {
-  return String(message)
-    .split(/\r?\n/)
-    .some((line) => !line.startsWith('#') && TRAILER_PATTERN.test(line.trim()));
+  const lines = String(message).split(/\r?\n/);
+  const cut = lines.findIndex((line) => SCISSORS.test(line.trim()));
+  const kept = cut >= 0 ? lines.slice(0, cut) : lines;
+  return kept.some((line) => !line.startsWith('#') && TRAILER_PATTERN.test(line.trim()));
 }
 
 export function check(message, env) {

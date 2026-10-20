@@ -10,7 +10,7 @@ The path check needs no secret, so it runs everywhere, including on forks.
 
 ## How the identifier check works
 
-Every added line of a diff is split into tokens: runs of six or more letters, digits or underscores, lowercased. Each token is hashed as `sha256(salt + token)` with the salt immediately followed by the token and no separator. A hit is any hash that appears in `guard/denylist.sha256`, which holds one lowercase hex digest per line, with blank lines and `#` comments ignored.
+Every added line of a diff, every added file path, and every line of the commit messages involved is split into tokens: runs of six or more letters, digits or underscores, lowercased. Paths count because an identifier used as a file or directory name is plain text in the public tree; commit messages count because they are plain text in the public history. A path hit is reported as `identifier in the path <path>` and a message hit as `identifier at <commit message>:<line>`. Each token is hashed as `sha256(salt + token)` with the salt immediately followed by the token and no separator. A hit is any hash that appears in `guard/denylist.sha256`, which holds one lowercase hex digest per line, with blank lines and `#` comments ignored.
 
 The guard reports the file and the line number of a hit together with the first eight characters of the hash. It never prints the token. The denylist is salted so that the public file reveals nothing about the identifiers it protects: without the salt the hashes cannot be matched against a word list.
 
@@ -18,10 +18,11 @@ The guard reports the file and the line number of a hit together with the first 
 
 Run `node guard/src/cli.mjs <mode>` from the repository root, or use the `just` recipes in brackets.
 
-- `staged` [`just guard`]: paths from `git diff --cached --name-only --diff-filter=ACR` and added lines from `git diff --cached --unified=0`. This is what the pre-commit hook runs.
-- `ci --base <sha>` [`just guard-ci`]: paths and added lines from `git diff <base>...HEAD`. When the base is empty, the zero sha, or not a commit in the clone, the guard says so and compares `HEAD~1...HEAD`; a root commit is compared against the empty tree. Without the flag the base comes from the `GUARD_BASE` environment variable.
-- `history` [`just guard-history`]: every commit from `git rev-list --all`, with paths from `git show --name-only --diff-filter=ACR --format=` and added lines from `git show --unified=0 --format=`. Merge commits are read as combined diffs. Progress is printed every 50 commits.
-- `paths <dir>` [`just guard-paths DIR`]: walks a directory, skipping `.git`. Paths are relative to the repository root when the directory sits in a work tree, otherwise relative to the directory. Files larger than 2 MB and binary files (containing a NUL byte) are not opened; every other file is scanned as if each line had been added.
+- `staged` [`just guard`]: paths from `git diff --cached --name-only -z --diff-filter=ACR` and added lines from `git diff --cached --unified=0`. This is what the pre-commit hook runs. Path listings use `-z`, so a name holding a quote or a control character arrives raw instead of C-quoted.
+- `ci --base <sha>` [`just guard-ci`]: paths and added lines from `git diff <base>...HEAD`, plus the messages of the commits in `<base>..HEAD`. When the base is empty, the zero sha, or not a commit in the clone, the guard says so and compares `main...HEAD` (or `origin/main...HEAD`), so a branch pushed for the first time is scanned back to where it left `main`; when `HEAD` is `main` itself it compares `HEAD~1...HEAD`, and a root commit is compared against the empty tree. Without the flag the base comes from the `GUARD_BASE` environment variable.
+- `history` [`just guard-history`]: every commit from `git rev-list --all`, with paths from `git show --name-only -z --diff-filter=ACR --format=`, added lines from `git show --unified=0 --format=` and the commit message from `git show -s --format=%B`. Merge commits are read as combined diffs. Progress is printed every 50 commits.
+- `paths <dir>` [`just guard-paths DIR`]: walks a directory, skipping `.git`. Paths are relative to the repository root when the directory sits in a work tree, otherwise relative to the directory; each path is also tokenized against the denylist. Binary files (containing a NUL byte) are not opened; every other file is scanned as if each line had been added. A text file over 64 MB cannot be scanned, and the run then exits 2 naming it instead of calling the directory clean.
+- `message <file>`: the commit message file, with `#` comment lines left out, tokenized against the denylist. This is what the commit-msg hook runs after the trailer check. The summary counts the message lines as added lines.
 
 ## The salt and the fail-closed rule
 
@@ -63,7 +64,7 @@ A pull request from a fork runs without repository secrets, so the identifier ch
 
 ## Hooks
 
-`just hooks` sets `git config core.hooksPath .githooks`. `.githooks/pre-commit` runs `node guard/src/cli.mjs staged`; `.githooks/commit-msg` runs `node guard/src/commit-msg.mjs`, which rejects a commit made from a Claude Code session (the `CLAUDECODE` environment variable is set) that lacks the co-author trailer (O-29). Git for Windows runs these `sh` hooks through its bundled shell. On Linux and macOS the files need the executable bit, which git stores in the index.
+`just hooks` sets `git config core.hooksPath .githooks`. `.githooks/pre-commit` runs `node guard/src/cli.mjs staged`; `.githooks/commit-msg` runs `node guard/src/commit-msg.mjs`, which rejects a commit made from a Claude Code session (the `CLAUDECODE` environment variable is set) that lacks the co-author trailer (O-29), and then `node guard/src/cli.mjs message` on the same file, so a denylisted identifier in the subject or body is rejected before the commit exists. Git for Windows runs these `sh` hooks through its bundled shell. On Linux and macOS the files need the executable bit, which git stores in the index.
 
 ## Tests
 

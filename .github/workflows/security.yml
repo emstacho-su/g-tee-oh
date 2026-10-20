@@ -12,9 +12,11 @@ on:
 permissions:
   contents: read
 
+# A cancelled run on a push would leave that push's commits unscanned by the next run,
+# whose range starts where this one would have, so only pull request runs are cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   security:

@@ -29,9 +29,10 @@ rust-test:
 rust-boundary:
     node scripts/check-boundary.mjs
 
-# ESLint across the pnpm workspace
+# ESLint across the pnpm workspace, then the root scripts (guard/, scripts/) that pnpm -r does not reach
 ts-lint:
     pnpm -r --if-present lint
+    pnpm run lint:root
 
 # TypeScript type check across the pnpm workspace
 ts-typecheck:
@@ -91,9 +92,10 @@ images:
 images:
     if (Test-Path infra/docker/*.Dockerfile) { echo "images: Dockerfiles present, the build runs in the images workflow (S06)" } else { echo "images: skipped, no infra/docker/*.Dockerfile yet (S02)" }
 
-# Copy vault files flagged public: true from $VAULT_DIR into docs/
+# Copy vault files flagged public: true from $VAULT_DIR into docs/, then guard the result
 docs-mirror:
     node guard/src/docs-mirror.mjs
+    node guard/src/cli.mjs paths docs
 
 # Point git at the versioned hooks (pre-commit guard, commit-msg trailer check)
 hooks:
@@ -103,5 +105,5 @@ hooks:
 bench:
     echo "bench: harness lands in S02 (R0.10)"
 
-# Everything CI runs, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses guard-test guard-ci
+# Everything the hosted jobs run that needs no Docker, in order (e2e and images need the compose stack and buildx)
+ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test contracts licenses security guard-test

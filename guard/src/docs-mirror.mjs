@@ -4,19 +4,19 @@
 // Mechanism: every markdown file under VAULT_DIR whose frontmatter carries the line
 // "public: true" is copied to docs/<same relative path>. Nothing else is copied, so the
 // flag in the vault is the only switch that publishes a file. A manifest records the
-// source path and the sha256 of each copy so a reviewer can tell where a file came from.
-// The private-data guard is run over docs/ afterwards by the caller (just guard-paths docs).
+// source path and the sha256 of each copy so a reviewer can tell where a file came from,
+// and the manifest is also the list of what the mirror owns: a copy whose flag was
+// removed in the vault is deleted on the next run, while hand-written files under docs/
+// are never touched. The private-data guard runs over docs/ afterwards (just docs-mirror).
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 const DEFAULT_VAULT = 'C:/Users/stack/vault/projects/g-tee-oh';
-const vaultDir = resolve(process.env.VAULT_DIR ?? DEFAULT_VAULT);
-const repoDir = resolve(process.env.REPO_DIR ?? process.cwd());
-const docsDir = join(repoDir, 'docs');
-const KEEP = new Set(['security.md', 'mirror-manifest.json', 'README.md']);
+export const MANIFEST_NAME = 'mirror-manifest.json';
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -40,39 +40,43 @@ function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
-function clearStaleMirror() {
-  // Remove previously mirrored files so a flag removed in the vault also removes the copy.
+function readPreviousManifest(docsDir) {
+  const path = join(docsDir, MANIFEST_NAME);
+  if (!existsSync(path)) return [];
+  const parsed = JSON.parse(readFileSync(path, 'utf8'));
+  return Array.isArray(parsed.files) ? parsed.files.map((entry) => entry.path) : [];
+}
+
+// Only paths the previous manifest listed are candidates for removal, and only when
+// the vault no longer flags them. Empty directories left behind are removed too.
+function removeStaleCopies(repoDir, docsDir, previousPaths, currentPaths) {
+  const current = new Set(currentPaths);
   let removed = 0;
-  const walkDocs = (dir) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walkDocs(full);
-        if (readdirSync(full).length === 0) rmSync(full, { recursive: true });
-      } else if (!KEEP.has(relative(docsDir, full).split(sep).join('/'))) {
-        rmSync(full);
-        removed += 1;
-      }
+  for (const path of previousPaths) {
+    if (current.has(path)) continue;
+    const full = join(repoDir, path);
+    if (!existsSync(full)) continue;
+    rmSync(full);
+    removed += 1;
+    let dir = dirname(full);
+    while (dir !== docsDir && existsSync(dir) && readdirSync(dir).length === 0) {
+      rmSync(dir, { recursive: true });
+      dir = dirname(dir);
     }
-  };
-  try {
-    statSync(docsDir);
-    walkDocs(docsDir);
-  } catch {
-    // docs/ does not exist yet
   }
   return removed;
 }
 
-function main() {
+export function mirror({ vaultDir, repoDir }) {
+  const docsDir = join(repoDir, 'docs');
   try {
     statSync(vaultDir);
-  } catch {
-    console.error(`docs-mirror: VAULT_DIR ${vaultDir} does not exist`);
-    process.exit(2);
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error(`docs-mirror: VAULT_DIR ${vaultDir} does not exist`);
+    throw error;
   }
-  const removed = clearStaleMirror();
   mkdirSync(docsDir, { recursive: true });
+  const previousPaths = readPreviousManifest(docsDir);
   const manifest = [];
   for (const file of walk(vaultDir).sort()) {
     const text = readFileSync(file, 'utf8');
@@ -83,9 +87,26 @@ function main() {
     writeFileSync(target, text, 'utf8');
     manifest.push({ path: `docs/${rel}`, source: `vault/${rel}`, sha256: sha256(Buffer.from(text, 'utf8')) });
   }
+  const removed = removeStaleCopies(repoDir, docsDir, previousPaths, manifest.map((entry) => entry.path));
   const manifestText = `${JSON.stringify({ generated_by: 'guard/src/docs-mirror.mjs', rule: 'frontmatter public: true (O-26, O-45)', files: manifest }, null, 2)}\n`;
-  writeFileSync(join(docsDir, 'mirror-manifest.json'), manifestText, 'utf8');
-  console.log(`docs-mirror: copied ${manifest.length} flagged files from the vault into docs/ (removed ${removed} stale copies)`);
+  writeFileSync(join(docsDir, MANIFEST_NAME), manifestText, 'utf8');
+  return { copied: manifest.length, removed };
 }
 
-main();
+function main() {
+  const vaultDir = resolve(process.env.VAULT_DIR ?? DEFAULT_VAULT);
+  const repoDir = resolve(process.env.REPO_DIR ?? process.cwd());
+  try {
+    const { copied, removed } = mirror({ vaultDir, repoDir });
+    console.log(`docs-mirror: copied ${copied} flagged files from the vault into docs/ (removed ${removed} stale copies)`);
+    return 0;
+  } catch (error) {
+    console.error(error.message);
+    return 2;
+  }
+}
+
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  process.exitCode = main();
+}

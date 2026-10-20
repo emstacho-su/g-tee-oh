@@ -27,8 +27,11 @@ test('r0_4 cli paths scans text files and reports the planted line', () => {
   });
   assert.equal(result.status, 1, result.output);
   const findings = result.stdout.split(/\r?\n/).filter((line) => line.startsWith('guard: identifier'));
-  assert.deepEqual(findings, [`guard: identifier at notes/planted.txt:2 hash ${PLANTED_PREFIX} is on the denylist`]);
-  assert.match(result.stdout, /guard: paths checked 4 files and 4 added lines; 1 findings/);
+  assert.deepEqual(findings, [
+    `guard: identifier at big.txt:1 hash ${PLANTED_PREFIX} is on the denylist`,
+    `guard: identifier at notes/planted.txt:2 hash ${PLANTED_PREFIX} is on the denylist`,
+  ]);
+  assert.match(result.stdout, /guard: paths checked 4 files and 6 added lines; 2 findings/);
   assert.doesNotMatch(result.output.toLowerCase(), new RegExp(`identifier.*${PLANTED_TOKEN}`));
 });
 

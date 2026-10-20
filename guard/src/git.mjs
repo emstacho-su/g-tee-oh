@@ -39,6 +39,19 @@ function nonEmptyLines(text) {
   return String(text).split(/\r?\n/).filter((line) => line !== '');
 }
 
+// Path listings use -z, so names arrive raw and NUL-separated instead of
+// C-quoted when they hold quotes, backslashes or control characters.
+function nulSeparated(text) {
+  return String(text).split('\0').filter((entry) => entry !== '');
+}
+
+// "git log" reads A...B as the symmetric difference, while "git diff" reads it
+// as the merge-base diff, so the diff range is translated for log.
+function logRange(rangeArgs) {
+  if (rangeArgs.length === 2 && rangeArgs[0] === EMPTY_TREE) return [rangeArgs[1]];
+  return rangeArgs.map((arg) => arg.replace('...', '..'));
+}
+
 export function topLevel(options) {
   const result = git(['rev-parse', '--show-toplevel'], { ...options, allowFailure: true });
   return result.status === 0 ? result.stdout.trim() : null;
@@ -50,7 +63,7 @@ export function commitExists(ref, options) {
 }
 
 export function stagedPaths(options) {
-  return nonEmptyLines(git(['diff', '--cached', '--name-only', '--diff-filter=ACR'], options).stdout);
+  return nulSeparated(git(['diff', '--cached', '--name-only', '-z', '--diff-filter=ACR'], options).stdout);
 }
 
 export function stagedDiff(options) {
@@ -58,11 +71,16 @@ export function stagedDiff(options) {
 }
 
 export function rangePaths(rangeArgs, options) {
-  return nonEmptyLines(git(['diff', '--name-only', '--diff-filter=ACR', ...rangeArgs], options).stdout);
+  return nulSeparated(git(['diff', '--name-only', '-z', '--diff-filter=ACR', ...rangeArgs], options).stdout);
 }
 
 export function rangeDiff(rangeArgs, options) {
   return git(['diff', '--unified=0', '--no-color', '--no-ext-diff', ...rangeArgs], options).stdout;
+}
+
+// Full messages of the commits the range adds, NUL-separated.
+export function rangeMessages(rangeArgs, options) {
+  return nulSeparated(git(['log', '--format=%B', '-z', ...logRange(rangeArgs)], options).stdout);
 }
 
 export function allCommits(options) {
@@ -70,16 +88,43 @@ export function allCommits(options) {
 }
 
 export function commitPaths(sha, options) {
-  return nonEmptyLines(git(['show', '--name-only', '--diff-filter=ACR', '--format=', sha], options).stdout);
+  return nulSeparated(git(['show', '--name-only', '-z', '--diff-filter=ACR', '--format=', sha], options).stdout);
 }
 
 export function commitDiff(sha, options) {
   return git(['show', '--unified=0', '--no-color', '--no-ext-diff', '--format=', sha], options).stdout;
 }
 
+export function commitMessage(sha, options) {
+  return git(['show', '-s', '--format=%B', sha], options).stdout;
+}
+
+const DEFAULT_BRANCHES = ['main', 'origin/main'];
+
+function revParse(ref, options) {
+  const result = git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { ...options, allowFailure: true });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+// The first default branch that exists and is not HEAD itself, so a branch
+// pushed for the first time (zero sha) is still scanned back to where it left
+// main instead of only its last commit.
+function defaultBranchBehindHead(options) {
+  const head = revParse('HEAD', options);
+  for (const branch of DEFAULT_BRANCHES) {
+    const sha = revParse(branch, options);
+    if (sha === null) continue;
+    const mergeBase = git(['merge-base', branch, 'HEAD'], { ...options, allowFailure: true });
+    if (mergeBase.status !== 0) continue;
+    if (mergeBase.stdout.trim() !== head) return branch;
+  }
+  return null;
+}
+
 // Decide what "ci --base <sha>" compares. A usable base gives base...HEAD.
-// An empty, zero or unreachable base falls back to HEAD~1, and a root commit
-// falls back to the empty tree so the whole tree is scanned.
+// An empty, zero or unreachable base falls back to the merge base with main
+// (every commit the branch adds), then to HEAD~1 when HEAD is main itself,
+// and a root commit falls back to the empty tree so the whole tree is scanned.
 export function resolveRange(base, options) {
   const trimmed = String(base ?? '').trim();
   if (trimmed !== '' && !ZERO_SHA.test(trimmed) && commitExists(trimmed, options)) {
@@ -92,6 +137,10 @@ export function resolveRange(base, options) {
     why = 'the base is the zero sha';
   } else {
     why = `the base ${trimmed.slice(0, 8)} is not a commit in this clone`;
+  }
+  const branch = defaultBranchBehindHead(options);
+  if (branch !== null) {
+    return { rangeArgs: [`${branch}...HEAD`], note: `guard: ${why}; comparing ${branch}...HEAD` };
   }
   if (commitExists('HEAD~1', options)) {
     return { rangeArgs: ['HEAD~1...HEAD'], note: `guard: ${why}; comparing HEAD~1...HEAD` };

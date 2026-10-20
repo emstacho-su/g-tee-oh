@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Entry point of the private-data guard (R0.4, O-58). See guard/README.md.
 //
-// Modes: staged, ci [--base <sha>], history, paths <dir>. Exit 0 when clean,
-// 1 on findings, 2 on a configuration error. The guard reports the file and
-// line of an identifier hit with the first characters of its hash and never
-// prints the token.
+// Modes: staged, ci [--base <sha>], history, paths <dir>, message <file>.
+// Exit 0 when clean, 1 on findings, 2 on a configuration error. The guard
+// reports the file and line of an identifier hit with the first characters of
+// its hash and never prints the token. Added file paths and commit messages
+// go through the identifier check as well as added lines.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -21,16 +22,18 @@ import {
   formatSummary,
   isBinary,
   linesOfFile,
+  messageLines,
   normalizePath,
   parseDenylist,
   parseUnifiedDiff,
+  pathLines,
 } from './guard.mjs';
 
 const EXIT_CLEAN = 0;
 const EXIT_FINDINGS = 1;
 const EXIT_CONFIG = 2;
 const PROGRESS_EVERY = 50;
-const MODES = ['staged', 'ci', 'history', 'paths'];
+const MODES = ['staged', 'ci', 'history', 'paths', 'message'];
 
 const GUARD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PATTERNS_PATH = join(GUARD_DIR, 'patterns.json');
@@ -39,7 +42,8 @@ const PRIVATE_SALT_RELATIVE = join('.guard-private', 'salt');
 
 export const MISSING_SALT_MESSAGE =
   'guard: GUARD_SALT is not set and .guard-private/salt is missing; the identifier check cannot run (fail closed, O-58)';
-const USAGE = 'usage: node guard/src/cli.mjs <staged | ci [--base <sha>] | history | paths <dir>> [--patterns-only]';
+const USAGE =
+  'usage: node guard/src/cli.mjs <staged | ci [--base <sha>] | history | paths <dir> | message <file>> [--patterns-only]';
 
 function parseArgs(argv) {
   const parsed = { mode: null, dir: null, base: process.env.GUARD_BASE ?? '', patternsOnly: false };
@@ -62,7 +66,7 @@ function parseArgs(argv) {
   parsed.mode = rest[0] ?? null;
   parsed.dir = rest[1] ?? null;
   if (!MODES.includes(parsed.mode)) throw new GuardConfigError(USAGE);
-  if (parsed.mode === 'paths' && parsed.dir === null) throw new GuardConfigError(USAGE);
+  if ((parsed.mode === 'paths' || parsed.mode === 'message') && parsed.dir === null) throw new GuardConfigError(USAGE);
   return parsed;
 }
 
@@ -109,14 +113,20 @@ function runCi(context, base) {
   if (note) console.error(note);
   const paths = git.rangePaths(rangeArgs);
   const added = parseUnifiedDiff(git.rangeDiff(rangeArgs));
-  return scanChange(context, paths, added);
+  const messages = git.rangeMessages(rangeArgs).flatMap((message) => messageLines(message));
+  return scanChange(context, paths, added, messages);
 }
 
 function runHistory(context) {
   const commits = git.allCommits();
   const totals = { files: 0, lines: 0, findings: [] };
   commits.forEach((sha, index) => {
-    const result = scanChange(context, git.commitPaths(sha), parseUnifiedDiff(git.commitDiff(sha)));
+    const result = scanChange(
+      context,
+      git.commitPaths(sha),
+      parseUnifiedDiff(git.commitDiff(sha)),
+      messageLines(git.commitMessage(sha)),
+    );
     totals.files += result.files;
     totals.lines += result.lines;
     totals.findings.push(...result.findings.map((finding) => ({ ...finding, commit: sha.slice(0, 8) })));
@@ -127,9 +137,26 @@ function runHistory(context) {
   return totals;
 }
 
-function scanChange(context, paths, added) {
+// The commit-msg hook: the message file itself, comment lines excluded.
+function runMessage(context, file) {
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (error) {
+    throw new GuardConfigError(`cannot read commit message ${file}: ${error.message}`);
+  }
+  const lines = messageLines(text);
+  const findings = context.identifierCheck ? checkLines(lines, context.salt, context.denylist) : [];
+  return { files: 0, lines: lines.length, findings };
+}
+
+// Added paths are checked against the patterns and, as text, against the
+// denylist; added lines and commit messages go through the denylist too.
+function scanChange(context, paths, added, messages = []) {
   const pathFindings = checkPaths(paths, context.patterns);
-  const identifierFindings = context.identifierCheck ? checkLines(added, context.salt, context.denylist) : [];
+  const identifierFindings = context.identifierCheck
+    ? checkLines([...pathLines(paths), ...added, ...messages], context.salt, context.denylist)
+    : [];
   return { files: paths.length, lines: added.length, findings: [...pathFindings, ...identifierFindings] };
 }
 
@@ -158,6 +185,7 @@ function runPaths(context, dir) {
   const root = git.topLevel({ cwd: target }) ?? target;
   const files = walkFiles(target, []);
   const findings = [];
+  const skipped = [];
   let lineCount = 0;
   for (const full of files) {
     const relativePath = normalizePath(relative(root, full));
@@ -167,12 +195,22 @@ function runPaths(context, dir) {
       continue;
     }
     if (!context.identifierCheck) continue;
-    if (statSync(full).size > MAX_FILE_BYTES) continue;
+    findings.push(...checkLines(pathLines([relativePath]), context.salt, context.denylist));
+    if (statSync(full).size > MAX_FILE_BYTES) {
+      skipped.push(relativePath);
+      continue;
+    }
     const buffer = readFileSync(full);
     if (isBinary(buffer)) continue;
     const lines = linesOfFile(relativePath, buffer.toString('utf8'));
     lineCount += lines.length;
     findings.push(...checkLines(lines, context.salt, context.denylist));
+  }
+  if (skipped.length > 0) {
+    // A text file the guard did not open cannot be called clean (fail closed).
+    throw new GuardConfigError(
+      `guard: ${skipped.length} text file(s) over ${MAX_FILE_BYTES} bytes were not scanned: ${skipped.join(', ')}; split them or exclude them`,
+    );
   }
   return { files: files.length, lines: lineCount, findings };
 }
@@ -202,6 +240,8 @@ function run(args) {
       return runCi(context, args.base);
     case 'history':
       return runHistory(context);
+    case 'message':
+      return runMessage(context, args.dir);
     default:
       return runPaths(context, args.dir);
   }
@@ -227,4 +267,7 @@ function main(argv) {
   }
 }
 
-process.exitCode = main(process.argv.slice(2));
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  process.exitCode = main(process.argv.slice(2));
+}
