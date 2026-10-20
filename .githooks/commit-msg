@@ -1,0 +1,4 @@
+#!/bin/sh
+# Co-author trailer check for commits made from Claude Code sessions (R0.1, O-29).
+# Install once per clone with "just hooks" (git config core.hooksPath .githooks).
+exec node guard/src/commit-msg.mjs "$1"

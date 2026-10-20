@@ -1,0 +1,36 @@
+# ts job (R0.3): lint, type check and tests across the pnpm workspace, all through just recipes.
+name: ts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      # The pnpm version comes from the packageManager field of package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: just ts-lint
+      - name: Type check
+        run: just ts-typecheck
+      - name: Tests
+        run: just ts-test

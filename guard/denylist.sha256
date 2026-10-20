@@ -1,0 +1,3 @@
+# Salted sha256 hashes of private identifiers (O-58). One lowercase hex digest per line.
+# Regenerate with: node guard/src/hash-denylist.mjs
+339b9c7ed04614487d8cfa11febbf0e345a67e9be22d0637964e52ff59fa79cc

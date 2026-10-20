@@ -1,0 +1,53 @@
+# security job (R0.3, R0.4): advisories, secret scanning and the private-data guard.
+# The guard needs the whole history for its base commit, so checkout fetches everything.
+name: security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-audit
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cargo advisories
+        run: cargo audit
+      - name: pnpm advisories
+        run: pnpm audit --audit-level high
+      # Free for a personal repository; only the workflow token is needed.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Guard unit tests
+        run: just guard-test
+      # O-58: the salt is a repository secret. A fork has no secrets, so GUARD_FORK=true runs the
+      # path check only; on the main repository a missing salt fails closed (exit 2).
+      - name: Private-data guard (R0.4)
+        env:
+          GUARD_SALT: ${{ secrets.GUARD_SALT }}
+          GUARD_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node guard/src/cli.mjs ci --base "$BASE"

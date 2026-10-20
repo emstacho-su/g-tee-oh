@@ -1,0 +1,6 @@
+#!/bin/sh
+# Private-data guard on the staged diff (R0.4, O-58).
+# Install once per clone with "just hooks" (git config core.hooksPath .githooks).
+# Git for Windows runs sh hooks through its bundled shell; Linux and macOS need
+# the executable bit, which the orchestrator sets with git update-index --chmod=+x.
+exec node guard/src/cli.mjs staged

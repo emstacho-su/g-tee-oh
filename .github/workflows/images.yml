@@ -1,0 +1,64 @@
+# images job (R0.3): multi-arch container build for one service.
+# Skips with a notice until infra/docker/*.Dockerfile exists (S02 adds the Dockerfiles, S06 picks
+# the service). Pull requests and branch pushes only build; a v* tag pushes to ghcr.io.
+# GitHub does not allow a conditional permissions block, so packages: write is granted to the job
+# and the login and push steps are gated on tags.
+name: images
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SERVICE: solver-query
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: Notice
+        run: just images
+      - name: Detect Dockerfiles
+        id: detect
+        run: |
+          shopt -s nullglob
+          files=(infra/docker/*.Dockerfile)
+          if [ "${#files[@]}" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.detect.outputs.found == 'true'
+        uses: docker/setup-qemu-action@v3
+      - if: steps.detect.outputs.found == 'true'
+        uses: docker/setup-buildx-action@v3
+      - if: steps.detect.outputs.found == 'true' && startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.detect.outputs.found == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/${{ env.SERVICE }}.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ghcr.io/${{ github.repository }}/${{ env.SERVICE }}:${{ github.ref_name }}
