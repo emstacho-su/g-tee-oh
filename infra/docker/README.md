@@ -38,7 +38,7 @@ The builder stage is pinned to the build host's platform (`FROM --platform=$BUIL
 
 ## Placeholders until S06 (R0.7)
 
-- `api.Dockerfile` runs `pnpm --filter @g-tee-oh/api run build --if-present`; with no build script the step exits 0. The runtime `CMD` runs `node services/api/dist/index.js` when that file exists and otherwise prints `api image placeholder, S06 adds the server` and exits 0.
+- `api.Dockerfile` runs the api build only when `services/api/package.json` declares a `build` script (pnpm exits 1 on a filtered run with no script, even with `--if-present`); until S06 the step prints a notice and exits 0. `web.Dockerfile` does the same for `web`. The runtime `CMD` runs `node services/api/dist/index.js` when that file exists and otherwise prints `api image placeholder, S06 adds the server` and exits 0.
 - `web.Dockerfile` runs the web build the same way and writes a placeholder `web/dist/index.html` when the build produced none. A real `web/dist/index.html` wins without any edit to the Dockerfile.
 - The Rust images carry no `HEALTHCHECK` yet. The S01 stubs ignore their arguments, print a version line and exit, so a `--version` probe would prove nothing. S06 adds `GET /healthz` (A5 section 2) and a self-check subcommand for the probe, which keeps `curl` and `wget` out of the images. The web image already probes `http://127.0.0.1:8080/` with busybox `wget`.
 

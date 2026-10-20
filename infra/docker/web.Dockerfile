@@ -50,8 +50,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY web web
-# No build script exists before S06; --if-present keeps the image buildable until then.
-RUN pnpm --filter @g-tee-oh/web run build --if-present
+# No build script exists before S06. pnpm exits 1 when a filtered run finds no script even with
+# --if-present, so the step checks package.json first and skips with a notice until then.
+RUN if node -e "process.exit(require('./web/package.json').scripts?.build ? 0 : 1)"; then pnpm --filter @g-tee-oh/web run build; else echo "web: no build script yet (S06 adds the Vite build)"; fi
 
 # Placeholder until S06's Vite build writes web/dist/index.html. The check is on the file,
 # so a real build wins without any edit here.

@@ -14,7 +14,7 @@
 #
 # Until S06 lands the server (R0.7) there is no build script and no services/api/dist, so
 # this file must still build and the container must still start:
-#   - the build stage runs `pnpm --filter @g-tee-oh/api run build --if-present`, which
+#   - the build stage runs the api build only when package.json declares one, which
 #     exits 0 when the script is absent;
 #   - the runtime CMD checks for services/api/dist/index.js and, when it is absent, prints
 #     "api image placeholder, S06 adds the server" and exits 0 instead of failing.
@@ -58,8 +58,9 @@ COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY packages/learning packages/learning
 COPY services/api services/api
-# No build script exists before S06; --if-present keeps the image buildable until then.
-RUN pnpm --filter @g-tee-oh/api run build --if-present
+# No build script exists before S06. pnpm exits 1 when a filtered run finds no script even with
+# --if-present, so the step checks package.json first and skips with a notice until then.
+RUN if node -e "process.exit(require('./services/api/package.json').scripts?.build ? 0 : 1)"; then pnpm --filter @g-tee-oh/api run build; else echo "api: no build script yet (S06 adds the server build)"; fi
 
 # ---- runtime ----------------------------------------------------------------------------
 FROM ${NODE_IMAGE} AS runtime
