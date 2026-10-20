@@ -1,0 +1,39 @@
+{
+  "report": "bench",
+  "r_ids": [
+    "R0.10"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "win32 10.0.26200",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 31
+  },
+  "commit": "4a821181a77e1cf798d238ba1cb73f29183ab5f6",
+  "date": "2026-10-20T17:02:54.523Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "measurements": [
+    {
+      "id": "chunk_decode/stub",
+      "mean_ns": 6392.373227866012,
+      "median_ns": 4238.562091503268,
+      "unit": "ns",
+      "stub": true
+    },
+    {
+      "id": "node_read/stub",
+      "mean_ns": 21.499875303927748,
+      "median_ns": 21.58791828228604,
+      "unit": "ns",
+      "stub": true
+    },
+    {
+      "id": "solve_iteration/simple_tree_flop",
+      "mean_ns": 42554325,
+      "median_ns": 37113625,
+      "unit": "ns",
+      "stub": false
+    }
+  ]
+}

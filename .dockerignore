@@ -1,0 +1,30 @@
+# Build context filter for every Dockerfile under infra/docker (R0.3). The repo root is the
+# only build context the images use, so paths are relative to it. Keeping these out makes
+# the context small and keeps secrets and private-guard inputs out of every layer.
+
+# Build output: the images compile inside the container with BuildKit cache mounts
+target
+**/target
+node_modules
+**/node_modules
+web/dist
+services/api/dist
+
+# Version control, hooks, workflows and agent settings
+.git
+.githooks
+.github
+.claude
+
+# Private-data guard inputs (O-58) and local secrets; .env.example is not needed either
+.guard-private
+.env
+.env.*
+
+# Not needed to build a service
+docs
+validation/reports
+
+# Compose data volumes: bind-mounted Postgres and SeaweedFS state under infra/compose
+infra/compose/data
+infra/compose/**/data

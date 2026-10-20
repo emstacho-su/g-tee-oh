@@ -6,6 +6,8 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 # Crates this repo owns. The vendored engine is excluded from fmt and clippy.
 OWN_CRATES := "-p gto-model -p gto-tree -p gto-solve -p gto-library -p gto-planner -p solver-query -p library-builder -p validate -p library-pack"
 COMPOSE_FILE := "infra/compose/compose.yaml"
+# The project directory is the repo root so .env and relative paths resolve from there
+COMPOSE := "docker compose --project-directory . -f infra/compose/compose.yaml"
 
 # List the recipes (the task surface)
 default:
@@ -43,23 +45,76 @@ ts-test:
     pnpm -r --if-present test
     pnpm run test:scripts
 
-# Contract generators land in S06
-contracts:
-    echo "contracts: no generators yet (S06 adds utoipa, Zod, openapi-typescript, kysely-codegen)"
+# Contracts: the committed Kysely types must match the migrated database (R0.6); OpenAPI generators land in S06
+contracts: codegen-check
 
-# End-to-end smoke; skips until infra/compose/compose.yaml exists (S02/S06)
+# End-to-end: Compose dev stack up, migrations, database tests, smoke, down (R0.5, R0.6); skips until the compose file exists
 e2e:
-    {{ if path_exists(COMPOSE_FILE) == "true" { "docker compose -f " + COMPOSE_FILE + " --profile dev up" } else { "echo 'e2e: skipped, " + COMPOSE_FILE + " does not exist yet (S02/S06)'" } }}
+    {{ if path_exists(COMPOSE_FILE) == "true" { "just e2e-stack" } else { "echo 'e2e: skipped, " + COMPOSE_FILE + " does not exist yet (S02/S06)'" } }}
+
+# The e2e chain once the compose file exists: up, migrate, database tests, smoke, and always down
+e2e-stack:
+    node infra/compose/e2e.mjs
+
+# Compose dev stack with health checks; .env at the repo root supplies credentials (R0.5).
+# The long-running services are waited on for health; the one-shot bucket-init is started
+# afterwards and "compose wait" returns its exit code, because "up --wait" treats a
+# container that exited, even with 0, as a failure.
+dev-up:
+    {{COMPOSE}} --profile dev up -d --wait postgres seaweedfs caddy
+    {{COMPOSE}} --profile dev up -d bucket-init
+    {{COMPOSE}} --profile dev wait bucket-init
+
+# Compose dev stack down, volumes removed
+dev-down:
+    {{COMPOSE}} --profile dev down -v
+
+# Health smoke over Postgres, the S3 gateway and Caddy; what the e2e job calls (R0.5)
+smoke:
+    node infra/compose/smoke.mjs
+
+# Apply migrations; dbmate reads DATABASE_URL from the environment or .env (R0.6)
+db-migrate:
+    dbmate --wait --no-dump-schema up
+
+# Migration status
+db-status:
+    dbmate status
+
+# Migration, role and seed tests against the migrated database (R0.6)
+db-test:
+    node --test "db/test/*.test.mjs"
+
+# Regenerate the Kysely types from the migrated database (R0.6)
+codegen:
+    node scripts/codegen.mjs
+
+# Fail when the generated Kysely types differ from the committed file
+codegen-check:
+    node scripts/codegen.mjs --check
+
+# sqlx offline metadata check; reports that no crate carries a query yet until one does (R0.6)
+sqlx-check:
+    node scripts/sqlx-check.mjs
 
 # License policy (ADR 0002): cargo-deny for crates, scripts/check-licenses.mjs for packages
 licenses:
     cargo deny check licenses
     node scripts/check-licenses.mjs
 
+# pnpm advisories ignored, each with its reason. GHSA-vfj7-8cjw-p6xm: stack exhaustion in braces, a
+# transitive dependency of the dev-only kysely-codegen (through micromatch) with no patched version;
+# the generator only ever sees this repository's own globs, so no untrusted pattern reaches it.
+PNPM_AUDIT_IGNORES := "--ignore GHSA-vfj7-8cjw-p6xm"
+
+# pnpm advisories at high severity, with the documented ignores above
+audit-ts:
+    pnpm audit --audit-level high {{PNPM_AUDIT_IGNORES}}
+
 # Advisories, then the private-data guard on the commit range
 security:
     cargo audit
-    pnpm audit --audit-level high
+    just audit-ts
     just guard-ci
 
 # Private-data guard on the staged diff (what the pre-commit hook runs)
@@ -101,9 +156,11 @@ docs-mirror:
 hooks:
     git config core.hooksPath .githooks
 
-# Benchmark harness lands in S02 (R0.10)
+# Benchmark harness: solve iteration, chunk decode, node read; writes validation/reports/bench-zenbook.json (R0.10)
 bench:
-    echo "bench: harness lands in S02 (R0.10)"
+    cargo bench -p gto-solve -p gto-library
+    node scripts/bench-report.mjs
 
-# Everything the hosted jobs run that needs no Docker, in order (e2e and images need the compose stack and buildx)
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test contracts licenses security guard-test
+# Everything the hosted jobs run that needs neither Docker nor a database, in order (contracts needs a migrated
+# database, e2e the compose stack, images buildx)
+ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test

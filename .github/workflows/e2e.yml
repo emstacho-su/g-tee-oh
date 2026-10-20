@@ -1,6 +1,7 @@
-# e2e job (R0.3): end-to-end smoke through docker compose.
-# just e2e skips with a notice until infra/compose/compose.yaml exists (S02). S06 fills in the
-# compose run with FIXTURE_LIBRARY_PATH on the dev profile (O-62) and the Playwright suite.
+# e2e job (R0.3, R0.5, R0.6): end-to-end smoke through docker compose. just e2e runs the e2e-stack chain
+# now that infra/compose/compose.yaml exists: dev-up, db-migrate, db-test, smoke, dev-down. S06 adds the
+# Playwright flows and the real FIXTURE_LIBRARY_PATH on the dev profile (O-62). Docker Engine and Compose
+# v2 ship on ubuntu-latest, so nothing installs them.
 name: e2e
 
 on:
@@ -23,6 +24,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v2
+      # The pnpm version comes from the packageManager field of package.json; db-test and codegen import
+      # pg and kysely from the workspace root, so the install happens before the stack comes up.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install dbmate (architecture decision record (ADR) 0005)
+        run: npm install -g dbmate@2.37.0
+      - name: Create .env with per-run passwords
+        # The runner is ephemeral, so the placeholders would do; fresh random values keep two runs from
+        # ever sharing a password. Longer tokens are replaced first, so a token that prefixes another is
+        # never clobbered by the shorter replacement, and a leftover placeholder fails the step.
+        run: |
+          cp .env.example .env
+          for token in $(grep -oE 'change-me-[a-z0-9-]+' .env | sort -u | awk '{ print length($0), $0 }' | sort -rn | cut -d' ' -f2); do
+            sed -i "s/$token/$(openssl rand -hex 16)/g" .env
+          done
+          if grep -qE 'change-me-[a-z0-9-]+' .env; then
+            echo "a change-me placeholder survived the rewrite" >&2
+            exit 1
+          fi
       - name: End-to-end smoke
         env:
           # O-62: the dev profile reads the fixture library from this path; S06 sets the real one.

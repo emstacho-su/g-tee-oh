@@ -1,0 +1,180 @@
+# Compose for the g-tee-oh dev and mac profiles (R0.5, A1 section 6). Run from the repo root with
+# --project-directory . so .env and the relative bind mounts resolve from there (the justfile's COMPOSE):
+#   docker compose --project-directory . -f infra/compose/compose.yaml --profile dev up -d --wait
+#
+# Profiles: dev (Zenbook, Docker Desktop with the WSL2 (Windows Subsystem for Linux 2) backend) publishes
+# Postgres and the S3 (Simple Storage Service) gateway on 127.0.0.1 and carries no limits; mac (M2 Pro
+# service, 02 section 6.2) carries the memory limits and restart: unless-stopped and publishes only Caddy.
+# Each service body is one YAML (YAML Ain't Markup Language) anchor shared by a dev entry and a mac entry,
+# so the profiles differ only in ports, limits and restart policy. The mac entries carry the plain names
+# postgres, seaweedfs and caddy as network aliases, so api and web (S06) reach them under one name in both
+# profiles.
+#
+# Services (A5 section 1): postgres:18-alpine (uuidv7() is native in Postgres 18, A4 section 1;
+# architecture decision record (ADR) 0005), SeaweedFS in single-server mode with the S3 gateway on 8333 and
+# two buckets with separate credentials (ADR 0019, 02 section 6.4), the one-shot bucket-init that creates
+# those buckets, and Caddy on 80 and 443 with TLS (Transport Layer Security) from its internal certificate
+# authority (A9 section 3). Only Caddy publishes a port on the LAN (local area network). Every service sits
+# on the one network gto.
+
+x-postgres: &postgres
+  image: postgres:18-alpine
+  environment:
+    POSTGRES_DB: gto
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # Read by infra/compose/postgres-init/10-role-logins.sql on the first run (O-28)
+    APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    BUILDER_DB_PASSWORD: ${BUILDER_DB_PASSWORD:?set BUILDER_DB_PASSWORD in .env}
+    CAPTURE_DB_PASSWORD: ${CAPTURE_DB_PASSWORD:?set CAPTURE_DB_PASSWORD in .env}
+    QUERY_DB_PASSWORD: ${QUERY_DB_PASSWORD:?set QUERY_DB_PASSWORD in .env}
+  volumes:
+    # postgres:18 keeps PGDATA at /var/lib/postgresql/18/docker and declares its volume one level up
+    - postgres_data:/var/lib/postgresql
+    - ./infra/compose/postgres-init:/docker-entrypoint-initdb.d:ro
+  healthcheck:
+    # Over TCP (Transmission Control Protocol) on purpose: the first-run init serves a socket-only temporary
+    # server, which must not count as healthy
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d gto"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+    start_period: 30s
+  networks:
+    gto: {}
+
+x-seaweedfs: &seaweedfs
+  image: chrislusf/seaweedfs:4.48
+  # start.sh renders the identity template with the credentials below, then execs weed server
+  entrypoint: ["/bin/sh", "/etc/seaweedfs/start.sh"]
+  environment:
+    S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY:?set S3_ADMIN_ACCESS_KEY in .env}
+    S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY:?set S3_ADMIN_SECRET_KEY in .env}
+    S3_LIBRARY_ACCESS_KEY: ${S3_LIBRARY_ACCESS_KEY:?set S3_LIBRARY_ACCESS_KEY in .env}
+    S3_LIBRARY_SECRET_KEY: ${S3_LIBRARY_SECRET_KEY:?set S3_LIBRARY_SECRET_KEY in .env}
+    S3_REFERENCE_ACCESS_KEY: ${S3_REFERENCE_ACCESS_KEY:?set S3_REFERENCE_ACCESS_KEY in .env}
+    S3_REFERENCE_SECRET_KEY: ${S3_REFERENCE_SECRET_KEY:?set S3_REFERENCE_SECRET_KEY in .env}
+  volumes:
+    - seaweedfs_data:/data
+    - ./infra/compose/seaweedfs/start.sh:/etc/seaweedfs/start.sh:ro
+    - ./infra/compose/seaweedfs/s3-identities.json:/etc/seaweedfs/s3-identities.json:ro
+  healthcheck:
+    # The S3 gateway's unauthenticated readiness route; healthy means the gateway accepts requests. busybox
+    # wget ships in the alpine-based image and fails on any non-2xx answer, so no curl is assumed there.
+    test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/status"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+    start_period: 20s
+  networks:
+    gto: {}
+
+x-bucket-init: &bucket-init
+  image: curlimages/curl:8.23.0
+  entrypoint: ["/bin/sh", "/create-buckets.sh"]
+  environment:
+    S3_INTERNAL_ENDPOINT: http://seaweedfs:8333
+    S3_ADMIN_ACCESS_KEY: ${S3_ADMIN_ACCESS_KEY:?set S3_ADMIN_ACCESS_KEY in .env}
+    S3_ADMIN_SECRET_KEY: ${S3_ADMIN_SECRET_KEY:?set S3_ADMIN_SECRET_KEY in .env}
+  volumes:
+    - ./infra/compose/seaweedfs/create-buckets.sh:/create-buckets.sh:ro
+  # A one-shot: it exits 0 once both buckets exist and is never restarted, in either profile
+  restart: "no"
+  networks:
+    gto: {}
+
+x-caddy: &caddy
+  image: caddy:2-alpine
+  environment:
+    CADDY_SITE: ${CADDY_SITE:-localhost}
+  ports:
+    - "80:80"
+    - "443:443"
+  volumes:
+    - ./infra/compose/Caddyfile:/etc/caddy/Caddyfile:ro
+    # The internal certificate authority root lives under /data; keep it across restarts
+    - caddy_data:/data
+    - caddy_config:/config
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+    start_period: 10s
+  networks:
+    gto: {}
+
+services:
+  postgres:
+    <<: *postgres
+    profiles: [dev]
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  seaweedfs:
+    <<: *seaweedfs
+    profiles: [dev]
+    ports:
+      - "127.0.0.1:8333:8333"
+
+  bucket-init:
+    <<: *bucket-init
+    profiles: [dev]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+
+  caddy:
+    <<: *caddy
+    profiles: [dev]
+
+  postgres-mac:
+    <<: *postgres
+    profiles: [mac]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks:
+      gto:
+        aliases: [postgres]
+
+  seaweedfs-mac:
+    <<: *seaweedfs
+    profiles: [mac]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      gto:
+        aliases: [seaweedfs]
+
+  bucket-init-mac:
+    <<: *bucket-init
+    profiles: [mac]
+    depends_on:
+      seaweedfs-mac:
+        condition: service_healthy
+
+  caddy-mac:
+    <<: *caddy
+    profiles: [mac]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks:
+      gto:
+        aliases: [caddy]
+
+volumes:
+  postgres_data: {}
+  seaweedfs_data: {}
+  caddy_data: {}
+  caddy_config: {}
+
+networks:
+  gto: {}

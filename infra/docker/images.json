@@ -1,0 +1,4 @@
+{
+  "comment": "Image matrix read by .github/workflows/images.yml with jq (R0.3). Each entry is an object {name, dockerfile, context}; the build job runs once per entry for linux/amd64 and linux/arm64 and pushes to ghcr.io on v* tags only. The list is empty until S06 adds {\"name\": \"solver-query\", \"dockerfile\": \"infra/docker/solver-query.Dockerfile\", \"context\": \".\"} first; api, library-builder and web follow the same shape with their own Dockerfile under infra/docker. With an empty list the workflow prints a notice and skips the build job.",
+  "services": []
+}
