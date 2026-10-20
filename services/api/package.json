@@ -14,7 +14,9 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "node build.mjs",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@fastify/swagger": "^9.9.2",

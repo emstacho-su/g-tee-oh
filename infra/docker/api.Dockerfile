@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# api image (R0.3 Dockerfile part, R0.5). The TypeScript Fastify product application
+# api image (R0.3 Dockerfile part, R0.5, R0.7). The TypeScript Fastify product application
 # programming interface (API) from A1 section 1 and A5 section 1, internal port 8080,
 # exposed through Caddy at /api/*. Multi-arch for
 # linux/amd64 and linux/arm64 through buildx: node:24-slim publishes both platforms and the
@@ -9,17 +9,14 @@
 # version comes from the packageManager field in package.json), copies every workspace
 # manifest so pnpm can resolve the whole workspace graph, installs only the api package and
 # its workspace dependencies with --frozen-lockfile, then copies the sources and runs the
-# build script if one exists. The runtime stage copies the installed tree to a fresh
-# node:24-slim and runs as the image's unprivileged node user.
+# api build script (esbuild, services/api/build.mjs, O-114), which bundles the workspace
+# packages into services/api/dist/index.js and leaves npm packages external. The runtime
+# stage copies the installed tree to a fresh node:24-slim and runs as the image's unprivileged
+# node user.
 #
-# Until S06 lands the server (R0.7) there is no build script and no services/api/dist, so
-# this file must still build and the container must still start:
-#   - the build stage runs the api build only when package.json declares one, which
-#     exits 0 when the script is absent;
-#   - the runtime CMD checks for services/api/dist/index.js and, when it is absent, prints
-#     "api image placeholder, S06 adds the server" and exits 0 instead of failing.
-# S06 replaces the placeholder branch with the real entrypoint and adds a HEALTHCHECK against
-# GET /api/v1/healthz (A5 section 3).
+# The HEALTHCHECK probes GET /healthz, the root alias of /api/v1/healthz (A5 section 3; the
+# api serves both), with Node's own fetch so the image carries no curl. It assumes the default
+# API_PORT of 8080, which compose also sets.
 #
 # Build one platform locally (infra/docker/README.md):
 #   docker buildx build --load --platform linux/amd64 \
@@ -38,7 +35,7 @@ ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
 WORKDIR /app
 
-# ---- build: install the api workspace slice and run its build script if present ---------
+# ---- build: install the api workspace slice and run its build script --------------------
 FROM base AS build
 # Manifests first, so the install layer is reused until a manifest or the lockfile changes.
 # Every workspace manifest is needed: pnpm resolves the whole workspace before it filters,
@@ -49,8 +46,8 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/learning/package.json packages/learning/
 COPY web/package.json web/
 # "@g-tee-oh/api..." selects the api package and everything it depends on in the workspace.
-# The root package's devDependencies are not selected; if S06's build needs them (tsc from
-# the root), add --filter . or move the compiler into services/api.
+# The root package's devDependencies are not selected, which is why esbuild is a direct
+# devDependency of services/api.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@g-tee-oh/api..."
 
@@ -58,9 +55,8 @@ COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY packages/learning packages/learning
 COPY services/api services/api
-# No build script exists before S06. pnpm exits 1 when a filtered run finds no script even with
-# --if-present, so the step checks package.json first and skips with a notice until then.
-RUN if node -e "process.exit(require('./services/api/package.json').scripts?.build ? 0 : 1)"; then pnpm --filter @g-tee-oh/api run build; else echo "api: no build script yet (S06 adds the server build)"; fi
+# Writes services/api/dist/index.js and services/api/dist/openapi-export.js.
+RUN pnpm --filter @g-tee-oh/api run build
 
 # ---- runtime ----------------------------------------------------------------------------
 FROM ${NODE_IMAGE} AS runtime
@@ -70,14 +66,14 @@ LABEL org.opencontainers.image.source="https://github.com/emstacho-su/g-tee-oh" 
       org.opencontainers.image.description="Fastify product API in front of solver-query and Postgres (app role)"
 ENV NODE_ENV=production
 WORKDIR /app
-# The installed tree keeps pnpm's node_modules symlinks, so it is copied whole. The node
-# user (uid 1000) ships with the official image. S06 may switch this to `pnpm deploy` once
-# the api has runtime dependencies worth pruning.
+# The installed tree keeps pnpm's node_modules symlinks, so it is copied whole: the bundle
+# still imports fastify and its dependencies from node_modules at runtime. S21 may switch
+# this to `pnpm deploy` once the api has runtime dependencies worth pruning.
 COPY --from=build --chown=node:node /app /app
 USER node
 # A5 section 1: the api listens on 8080 inside the compose network; Caddy publishes it.
 EXPOSE 8080
 
-# Placeholder rule (see the header): run the built server when services/api/dist/index.js
-# exists, otherwise print the placeholder line and exit 0. S06 removes the else branch.
-CMD ["sh", "-c", "if [ -f services/api/dist/index.js ]; then exec node services/api/dist/index.js; else node -e \"console.log('api image placeholder, S06 adds the server')\"; fi"]
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 CMD node -e "fetch('http://127.0.0.1:8080/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+CMD ["node", "services/api/dist/index.js"]
