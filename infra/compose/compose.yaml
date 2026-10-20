@@ -7,15 +7,21 @@
 # service, 02 section 6.2) carries the memory limits and restart: unless-stopped and publishes only Caddy.
 # Each service body is one YAML (YAML Ain't Markup Language) anchor shared by a dev entry and a mac entry,
 # so the profiles differ only in ports, limits and restart policy. The mac entries carry the plain names
-# postgres, seaweedfs and caddy as network aliases, so api and web (S06) reach them under one name in both
-# profiles.
+# postgres, seaweedfs and caddy as network aliases, so api and web reach them under one name in both
+# profiles. solver-query, api and web have dev entries only; S34 adds their mac entries from the same
+# anchors.
 #
 # Services (A5 section 1): postgres:18-alpine (uuidv7() is native in Postgres 18, A4 section 1;
 # architecture decision record (ADR) 0005), SeaweedFS in single-server mode with the S3 gateway on 8333 and
 # two buckets with separate credentials (ADR 0019, 02 section 6.4), the one-shot bucket-init that creates
-# those buckets, and Caddy on 80 and 443 with TLS (Transport Layer Security) from its internal certificate
-# authority (A9 section 3). Only Caddy publishes a port on the LAN (local area network). Every service sits
-# on the one network gto.
+# those buckets, solver-query (built from infra/docker/solver-query.Dockerfile, port 7070, the fixture
+# library bind-mounted read-only at /fixtures/library from FIXTURE_LIBRARY_PATH, O-62), api (built from
+# infra/docker/api.Dockerfile, port 8080, behind Caddy at /api/*), web (built from infra/docker/web.Dockerfile,
+# port 8080, the static build) and Caddy on 80 and 443 with TLS (Transport Layer Security) from its internal
+# certificate authority (A9 section 3). Only Caddy publishes a port on the LAN (local area network). Every
+# service sits on the one network gto. The three built images carry their own HEALTHCHECK, so no healthcheck
+# block repeats it here; "just dev-up" runs up --build, so a source change is rebuilt rather than hot
+# reloaded (O-122).
 
 x-postgres: &postgres
   image: postgres:18-alpine
@@ -103,6 +109,47 @@ x-caddy: &caddy
   networks:
     gto: {}
 
+x-solver-query: &solver-query
+  build:
+    context: .
+    dockerfile: infra/docker/solver-query.Dockerfile
+  environment:
+    SOLVER_QUERY_BIND: "0.0.0.0:7070"
+    # The container path is fixed; the host side of the bind mount below comes from FIXTURE_LIBRARY_PATH
+    FIXTURE_LIBRARY_PATH: /fixtures/library
+    QUERY_CACHE_BYTES: ${QUERY_CACHE_BYTES:?set QUERY_CACHE_BYTES in .env}
+    QUERY_DB_PASSWORD: ${QUERY_DB_PASSWORD:?set QUERY_DB_PASSWORD in .env}
+  volumes:
+    # O-62: the host directory from .env, read-only; empty or unset falls back to the placeholder directory
+    # (its README says what S19 puts there). Relative to the project directory, which is the repo root.
+    - ${FIXTURE_LIBRARY_PATH:-./validation/fixtures/library}:/fixtures/library:ro
+  # A9 section 3: no writable root filesystem, no capabilities, no privilege escalation. The image's own
+  # HEALTHCHECK (the binary's healthz self-probe) is the health probe.
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  networks:
+    gto: {}
+
+x-api: &api
+  build:
+    context: .
+    dockerfile: infra/docker/api.Dockerfile
+  environment:
+    API_PORT: "8080"
+    # The app role login (O-28); the image's HEALTHCHECK probes GET /healthz with Node's fetch
+    APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+  networks:
+    gto: {}
+
+x-web: &web
+  build:
+    context: .
+    dockerfile: infra/docker/web.Dockerfile
+  # The image's HEALTHCHECK probes GET / on 8080 with busybox wget
+  networks:
+    gto: {}
+
 services:
   postgres:
     <<: *postgres
@@ -123,9 +170,32 @@ services:
       seaweedfs:
         condition: service_healthy
 
+  solver-query:
+    <<: *solver-query
+    profiles: [dev]
+
+  api:
+    <<: *api
+    profiles: [dev]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      solver-query:
+        condition: service_healthy
+
+  web:
+    <<: *web
+    profiles: [dev]
+
   caddy:
     <<: *caddy
     profiles: [dev]
+    # Both upstreams exist before Caddy starts, so its 503 "not deployed yet" branch never shows in e2e
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
 
   postgres-mac:
     <<: *postgres

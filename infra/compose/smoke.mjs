@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Health smoke over the Compose dev profile (R0.5): what "just smoke" and the e2e job run after dev-up.
+// Health smoke over the Compose dev profile (R0.3, R0.5): what "just smoke" and the e2e job run after dev-up.
 // Zero dependencies, node ESM (ECMAScript modules). It needs no migration, so it passes on a fresh stack.
 //
 // Mechanism: every check below is a small probe of one service boundary, run in order and never short
@@ -8,14 +8,16 @@
 // and only fills variables the environment does not already carry. It exits 0 with one line per check
 // and 1 with the names of the failing checks.
 //
-// Checks: compose ps reports every dev service healthy, or exited 0 for the bucket-init one-shot; TCP
-// (Transmission Control Protocol) 5432 accepts a connection and pg_isready succeeds inside the container;
-// the S3 (Simple Storage Service) gateway answers HTTP (Hypertext Transfer Protocol) on 8333; ListBuckets
-// with the admin identity, signed with Amazon Web Services (AWS) Signature Version 4 (SigV4), lists
-// library and reference-private; the library identity is denied on reference-private
+// Checks: compose ps reports every dev service healthy (postgres, seaweedfs, solver-query, api, web and
+// caddy; the three built images report through their own HEALTHCHECK), or exited 0 for the bucket-init
+// one-shot; TCP (Transmission Control Protocol) 5432 accepts a connection and pg_isready succeeds inside
+// the container; the S3 (Simple Storage Service) gateway answers HTTP (Hypertext Transfer Protocol) on
+// 8333; ListBuckets with the admin identity, signed with Amazon Web Services (AWS) Signature Version 4
+// (SigV4), lists library and reference-private; the library identity is denied on reference-private
 // (02 section 6.4, separate credentials per bucket); Caddy answers /healthz over plain HTTP on 80 and
 // over TLS (Transport Layer Security) on 443 with its internal certificate authority (A9 section 3),
-// verification skipped for that one request only.
+// verification skipped for the TLS requests only; and the api answers GET /api/v1/healthz through
+// Caddy's /api/* route with JSON (JavaScript Object Notation) status "ok" (R0.7), the same way.
 
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
@@ -29,7 +31,7 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const COMPOSE_FILE = "infra/compose/compose.yaml";
 const COMPOSE_ARGS = ["compose", "--project-directory", ".", "-f", COMPOSE_FILE, "--profile", "dev"];
-const DEV_SERVICES = ["postgres", "seaweedfs", "bucket-init", "caddy"];
+const DEV_SERVICES = ["postgres", "seaweedfs", "bucket-init", "solver-query", "api", "web", "caddy"];
 const ONE_SHOT_SERVICES = new Set(["bucket-init"]);
 const BUCKETS = ["library", "reference-private"];
 const POSTGRES_HOST = "127.0.0.1";
@@ -37,6 +39,9 @@ const POSTGRES_PORT = 5432;
 const S3_URL = "http://127.0.0.1:8333";
 const CADDY_HTTP_URL = "http://127.0.0.1/healthz";
 const CADDY_HTTPS_URL = "https://127.0.0.1/healthz";
+const CADDY_API_HEALTHZ_URL = "https://127.0.0.1/api/v1/healthz";
+const DEFAULT_CADDY_SITE = "localhost";
+const HEALTHZ_OK_STATUS = "ok";
 const SIGV4_REGION = "us-east-1";
 const SIGV4_SERVICE = "s3";
 const REQUEST_TIMEOUT_MS = 5000;
@@ -225,17 +230,48 @@ async function checkCaddyHttp() {
   return `GET ${CADDY_HTTP_URL} answered 200 ok`;
 }
 
+function caddySite(settings) {
+  return settings.CADDY_SITE || DEFAULT_CADDY_SITE;
+}
+
+// One request to the edge Caddy over TLS: Host and SNI (Server Name Indication) carry CADDY_SITE so Caddy
+// picks its https site block, and certificate verification is skipped for this request only because the
+// certificate is signed by Caddy's internal authority, which the host does not trust (A9 section 3, O-113).
+function requestThroughCaddyTls(url, settings) {
+  const site = caddySite(settings);
+  return request(url, { headers: { host: site }, servername: site, rejectUnauthorized: false });
+}
+
+function parseJsonBody(url, text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`GET ${url} did not answer JSON: ${error.message}; body "${text.trim()}"`);
+  }
+}
+
 async function checkCaddyHttps(settings) {
-  const site = settings.CADDY_SITE || "localhost";
-  const response = await request(CADDY_HTTPS_URL, {
-    headers: { host: site },
-    servername: site,
-    rejectUnauthorized: false,
-  });
-  if (response.status !== 200 || response.body.trim() !== "ok") {
+  const site = caddySite(settings);
+  const response = await requestThroughCaddyTls(CADDY_HTTPS_URL, settings);
+  if (response.status !== 200 || response.body.trim() !== HEALTHZ_OK_STATUS) {
     throw new Error(`GET ${CADDY_HTTPS_URL} as ${site} answered HTTP ${response.status} "${response.body.trim()}"`);
   }
   return `GET ${CADDY_HTTPS_URL} as ${site} answered 200 ok over tls internal`;
+}
+
+// The api behind Caddy's /api/* route (A5 section 1): the health JSON proves the proxy, the api container
+// and its /api/v1 prefix in one request (R0.7).
+async function checkApiHealthzThroughCaddy(settings) {
+  const site = caddySite(settings);
+  const response = await requestThroughCaddyTls(CADDY_API_HEALTHZ_URL, settings);
+  if (response.status !== 200) {
+    throw new Error(`GET ${CADDY_API_HEALTHZ_URL} as ${site} answered HTTP ${response.status} "${response.body.trim()}"`);
+  }
+  const body = parseJsonBody(CADDY_API_HEALTHZ_URL, response.body);
+  if (body?.status !== HEALTHZ_OK_STATUS) {
+    throw new Error(`GET ${CADDY_API_HEALTHZ_URL} as ${site} answered status ${JSON.stringify(body?.status)}, expected "${HEALTHZ_OK_STATUS}"`);
+  }
+  return `GET ${CADDY_API_HEALTHZ_URL} as ${site} answered 200 with status ok from ${body.service ?? "an unnamed service"}`;
 }
 
 const CHECKS = [
@@ -247,6 +283,7 @@ const CHECKS = [
   ["s3 bucket isolation", checkBucketIsolation],
   ["caddy http /healthz", checkCaddyHttp],
   ["caddy https /healthz", checkCaddyHttps],
+  ["caddy https /api/v1/healthz", checkApiHealthzThroughCaddy],
 ];
 
 async function runCheck(name, check, settings) {
