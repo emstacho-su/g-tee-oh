@@ -1,8 +1,16 @@
-# images job (R0.3): multi-arch container build for one service.
-# Skips with a notice until infra/docker/*.Dockerfile exists (S02 adds the Dockerfiles, S06 picks
-# the service). Pull requests and branch pushes only build; a v* tag pushes to ghcr.io.
-# GitHub does not allow a conditional permissions block, so packages: write is granted to the job
-# and the login and push steps are gated on tags.
+# images job (R0.3): multi-arch container builds for the services listed in
+# infra/docker/images.json. S02 wrote the Dockerfiles under infra/docker; S06 adds solver-query
+# to the matrix first. Pull requests and branch pushes only build; a v* tag pushes to ghcr.io.
+#
+# Mechanism: the plan job reads the matrix file with jq and exposes the services array and
+# its length as outputs. The build job is skipped when the length is 0 (a job-level if runs
+# before the matrix expands, and an empty matrix would otherwise fail the job) and otherwise
+# fans out one build per service through fromJSON.
+#
+# Permissions: the workflow grants contents: read. GitHub does not allow a conditional
+# permissions block, so packages: write is granted at the build job level and the login and
+# push steps are gated on refs/tags/v*, as the previous version of this file did. On pull
+# requests from forks the token is read-only regardless.
 name: images
 
 on:
@@ -22,43 +30,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  images:
+  plan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      SERVICE: solver-query
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+      count: ${{ steps.matrix.outputs.count }}
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v2
+      # The justfile recipe prints whether Dockerfiles are present; CI calls just recipes
+      # wherever one exists (CLAUDE.md, task surface).
       - name: Notice
         run: just images
-      - name: Detect Dockerfiles
-        id: detect
+      - name: Read infra/docker/images.json
+        id: matrix
         run: |
-          shopt -s nullglob
-          files=(infra/docker/*.Dockerfile)
-          if [ "${#files[@]}" -gt 0 ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          file=infra/docker/images.json
+          services="$(jq -c '.services' "$file")"
+          count="$(jq -r '.services | length' "$file")"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" = "0" ]; then
+            echo "::notice title=images::no services listed in $file yet; the build job is skipped. S06 adds solver-query first."
           else
-            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "images: $count service(s) to build: $(jq -r '[.services[].name] | join(", ")' "$file")"
           fi
-      - if: steps.detect.outputs.found == 'true'
-        uses: docker/setup-qemu-action@v3
-      - if: steps.detect.outputs.found == 'true'
-        uses: docker/setup-buildx-action@v3
-      - if: steps.detect.outputs.found == 'true' && startsWith(github.ref, 'refs/tags/v')
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    # packages: write only here, the publish path (see the header comment).
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.plan.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to ghcr.io (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - if: steps.detect.outputs.found == 'true'
+      # Rule: an image tag must never contain a slash. metadata-action lowercases the image
+      # name (ghcr.io requires it) and derives tags that are always valid: the tag name on v*
+      # refs (type=ref,event=tag) and sha-<short commit> on every ref (type=sha). A raw
+      # github.ref_name is never used, because on a pull request it looks like 123/merge and
+      # on a sprint branch like sprint/1-v1, and both are rejected by the registry.
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service.name }}
+          tags: |
+            type=ref,event=tag
+            type=sha
+      - name: Build (and push on v* tags)
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: infra/docker/${{ env.SERVICE }}.Dockerfile
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          tags: ghcr.io/${{ github.repository }}/${{ env.SERVICE }}:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # The GitHub Actions cache keeps image layers per service. The Dockerfiles' BuildKit
+          # cache mounts (cargo registry and target, pnpm store) are not exported by it, so a
+          # cold runner rebuilds Rust dependencies; infra/docker/README.md records the options.
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
