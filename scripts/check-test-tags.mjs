@@ -6,20 +6,31 @@
 //
 // Mechanism: the script walks every TypeScript, JavaScript and Rust source under the repo
 // (packages/**/test and src, guard/test, scripts, db/test, infra, web, crates/**/tests and src,
-// services/**/tests and src, tools/**/tests and src), skipping node_modules, target, dist, docs,
-// .guard-private and the vendored engine under crates/vendor, whose ignored tests are upstream's.
-// A small tokenizer drops comments and reads string literals, so a call inside a comment, a
-// string or a regex never counts; a pass over the tokens then finds
+// services/**/tests and src, tools/**/tests and src), skipping node_modules, target, dist,
+// coverage, .vitest, .next, .git, docs, .guard-private and the vendored engine under
+// crates/vendor, whose ignored tests are upstream's, and any file over 2 MB. A file whose text
+// holds none of the markers ".todo", ".skip", "skip:", "todo:" and "#[ignore" has nothing to
+// find and is not tokenized. A small tokenizer drops comments and reads string literals
+// (JavaScript quoted strings end at a newline; template literals and Rust strings span lines),
+// so a call inside a comment, a string or a regex never counts; a pass over the tokens then
+// finds
 //   - Vitest and node:test calls with a .todo or .skip modifier: it.todo("..."), test.skip("..."),
-//     describe.todo("...");
-//   - node:test and Vitest calls whose second argument is an options object with a skip or todo
-//     key: test("...", { skip: true }, fn), it("...", { todo: "reason" }, fn);
+//     describe.todo("..."), and the table forms it.skip.each(...)("...", fn) and
+//     describe.todo.each(...)("...", fn), which are pending for every row; skipIf(...), runIf(...)
+//     and todoIf(...) chains decide at run time and are left alone;
+//   - node:test and Vitest calls whose second argument is an options object setting skip or todo
+//     to the literal true or a string literal: test("...", { skip: true }, fn),
+//     it("...", { todo: "reason" }, fn); a computed value such as { skip: !process.env.DOCKER }
+//     is conditional, so the test is not pending and needs no tag;
 //   - Rust #[ignore] and #[ignore = "reason"] attributes and the fn they annotate.
-// A pending test is tagged when /R\d+\.\d+/ matches its title, the title of an enclosing
-// describe or suite, its #[ignore] reason, or (Rust only, because an identifier cannot carry a
-// dot) its fn name in the r<phase>_<n> form, for example r2_4_kuhn_gate. The first R ID found
-// is the one counted. Untagged pending tests are printed with file and line and the exit code
-// is 1; otherwise the count per R ID is printed and the exit code is 0. No npm packages.
+// A pending test is tagged when its title, the title of an enclosing describe or suite, its
+// #[ignore] reason or its Rust fn name carries an R ID in either of the repo's two forms:
+// R<phase>.<n> ("R4.1 rates the worked example") or the identifier form r<phase>_<n> ("r0_4 cli
+// history", fn r2_4_kuhn_gate; a Rust identifier cannot carry a dot), which is reported as
+// R<phase>.<n>. The first R ID found is the one counted. Untagged pending tests are printed
+// with file and line and the exit code is 1; otherwise the count per R ID is printed and the
+// exit code is 0. A directory or file that cannot be read stops the check with a one-line
+// message and exit code 2. No npm packages.
 //
 // Usage: node scripts/check-test-tags.mjs [root]   (root defaults to the repository)
 
@@ -27,28 +38,37 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const R_ID_PATTERN = /R\d+\.\d+/;
-// Rust fn names are snake_case, so the tag is r<phase>_<n> at the start or after an underscore.
-const RUST_NAME_R_ID = /(?:^|_)r(\d+)_(\d+)(?=_|$)/i;
+// Both tag forms: R<phase>.<n> in groups 1 and 2, and the identifier form r<phase>_<n> in groups
+// 3 and 4, at the start or after a non-alphanumeric character (a space in a title, an underscore
+// in a snake_case fn name) and not followed by one. The leftmost match wins.
+const R_ID_FORMS = /R(\d+)\.(\d+)|(?:^|[^A-Za-z0-9])[rR](\d+)_(\d+)(?![A-Za-z0-9])/;
 export const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".jsx", ".rs"]);
-export const SKIPPED_DIRECTORY_NAMES = new Set(["node_modules", "target", "dist", ".git", ".guard-private", "docs"]);
+export const SKIPPED_DIRECTORY_NAMES = new Set(["node_modules", "target", "dist", "coverage", ".vitest", ".next", ".git", ".guard-private", "docs"]);
 // Repo-relative, forward slashes: the vendored engine is upstream code (CLAUDE.md, ADR 0002).
 export const SKIPPED_PATHS = new Set(["crates/vendor"]);
+// A larger source is generated or vendored, never a test file.
+export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+// A file holding none of these cannot hold a pending test this check reads, so it is not tokenized.
+export const PENDING_MARKERS = Object.freeze([".todo", ".skip", "skip:", "todo:", "#[ignore"]);
 
 const TEST_CALLEES = new Set(["it", "test", "describe", "suite"]);
 const GROUP_CALLEES = new Set(["describe", "suite"]);
 const PENDING_MODIFIERS = new Set(["todo", "skip"]);
-// Modifiers that take their own arguments before the title; such calls are left alone.
-const ARGUMENT_MODIFIERS = new Set(["each", "for", "skipIf", "runIf", "todoIf", "extend"]);
+// Modifiers that take a table and return the function called with the title: it.each([...])("...").
+const TABLE_MODIFIERS = new Set(["each", "for"]);
+// Modifiers whose argument decides at run time, or that build a fixture; such calls are left alone.
+const CONDITIONAL_MODIFIERS = new Set(["skipIf", "runIf", "todoIf", "extend"]);
 const KEYWORDS_BEFORE_REGEX = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
 const DIVISION_PREDECESSORS = new Set([")", "]", "}"]);
+const OPENING_BRACKETS = new Set(["(", "[", "{"]);
+const CLOSING_BRACKETS = new Set([")", "]", "}"]);
 const RUST_STRING_PREFIX = /^(b|c|br|cr|r)$/;
 const IDENT_START = /[A-Za-z_$]/;
 const IDENT_PART = /[A-Za-z0-9_$]/;
 const MAX_TOKENS_TO_FN = 64;
 
-const JS_LANGUAGE = Object.freeze({ singleQuoteStrings: true, templateStrings: true, regexLiterals: true, nestedBlockComments: false, rustLiterals: false });
-const RUST_LANGUAGE = Object.freeze({ singleQuoteStrings: false, templateStrings: false, regexLiterals: false, nestedBlockComments: true, rustLiterals: true });
+export const JS_LANGUAGE = Object.freeze({ singleQuoteStrings: true, multilineStrings: false, templateStrings: true, regexLiterals: true, nestedBlockComments: false, rustLiterals: false });
+export const RUST_LANGUAGE = Object.freeze({ singleQuoteStrings: false, multilineStrings: true, templateStrings: false, regexLiterals: false, nestedBlockComments: true, rustLiterals: true });
 
 const EXIT_OK = 0;
 const EXIT_UNTAGGED = 1;
@@ -94,8 +114,8 @@ function blockCommentEnd(text, start, nested) {
   return text.length;
 }
 
-/** A '...' or "..." literal; an unterminated one stops at the end of its line. */
-function readQuoted(text, start, quote) {
+/** A '...' or "..." literal; it stops at the end of its line unless multiline, as Rust strings are. */
+function readQuoted(text, start, quote, multiline) {
   let value = "";
   let i = start + 1;
   while (i < text.length) {
@@ -105,7 +125,7 @@ function readQuoted(text, start, quote) {
       i += 2;
     } else if (ch === quote) {
       return { value, end: i + 1 };
-    } else if (ch === "\n") {
+    } else if (ch === "\n" && !multiline) {
       return { value, end: i };
     } else {
       value += ch;
@@ -122,7 +142,7 @@ function templateExpressionEnd(text, start) {
   while (i < text.length) {
     const ch = text[i];
     if (ch === '"' || ch === "'") {
-      i = readQuoted(text, i, ch).end;
+      i = readQuoted(text, i, ch, false).end;
     } else if (ch === "`") {
       i = readTemplate(text, i).end;
     } else if (ch === "/" && text[i + 1] === "/") {
@@ -175,22 +195,32 @@ function regexEnd(text, start) {
     }
     if (ch === "[") inClass = true;
     else if (ch === "]") inClass = false;
-    else if (ch === "/" && !inClass) {
-      i++;
-      while (i < text.length && IDENT_PART.test(text[i])) i++;
-      return i;
-    }
+    else if (ch === "/" && !inClass) return identEnd(text, i + 1);
     i++;
   }
   return null;
 }
 
-function regexAllowed(tokens) {
-  const prev = tokens[tokens.length - 1];
+/** Whether a slash after the previous token starts a regex rather than a division. */
+function regexAllowed(prev) {
   if (prev === undefined) return true;
   if (prev.type === "punct") return !DIVISION_PREDECESSORS.has(prev.value);
   if (prev.type === "ident") return KEYWORDS_BEFORE_REGEX.has(prev.value);
   return false;
+}
+
+/** The index after the identifier characters that run from text[start]. */
+function identEnd(text, start) {
+  let i = start;
+  while (i < text.length && IDENT_PART.test(text[i])) i++;
+  return i;
+}
+
+/** The index after the number starting at text[start]: digits, then letters, underscores and dots. */
+function numberEnd(text, start) {
+  let i = start + 1;
+  while (i < text.length && (IDENT_PART.test(text[i]) || text[i] === ".")) i++;
+  return i;
 }
 
 /** A Rust raw string r"...", r#"..."#, br"..."; null when the prefix is a raw identifier (r#type). */
@@ -218,68 +248,63 @@ function rustQuoteEnd(text, start) {
   return text[start + 2] === "'" ? start + 3 : start + 1;
 }
 
+/** A Rust b"...", c"...", r"...", r#"..."#, br"..." or cr"..." literal whose prefix starts at text[start]; null when none. */
+function readPrefixedString(text, start) {
+  const end = identEnd(text, start);
+  const prefix = text.slice(start, end);
+  if (!RUST_STRING_PREFIX.test(prefix)) return null;
+  if (prefix.endsWith("r")) {
+    const raw = text[end] === '"' || text[end] === "#" ? readRawString(text, end) : null;
+    return raw === null ? null : { type: "string", ...raw };
+  }
+  return text[end] === '"' ? { type: "string", ...readQuoted(text, end, '"', true) } : null;
+}
+
+/** The comment, string, template, Rust raw string or regex literal starting at text[i], with the token
+ *  type it yields (null for a comment or a Rust char literal, which yield none); null when none starts there. */
+function readLiteral(text, i, language, prev) {
+  const ch = text[i];
+  const next = text[i + 1];
+  if (ch === "/" && next === "/") return { type: null, value: "", end: lineCommentEnd(text, i) };
+  if (ch === "/" && next === "*") return { type: null, value: "", end: blockCommentEnd(text, i, language.nestedBlockComments) };
+  if (ch === '"' || (ch === "'" && language.singleQuoteStrings)) return { type: "string", ...readQuoted(text, i, ch, language.multilineStrings) };
+  if (ch === "'") return { type: null, value: "", end: rustQuoteEnd(text, i) };
+  if (ch === "`" && language.templateStrings) return { type: "string", ...readTemplate(text, i) };
+  if (ch === "/" && language.regexLiterals && regexAllowed(prev)) {
+    const end = regexEnd(text, i);
+    if (end !== null) return { type: "regex", value: "", end };
+  }
+  if (language.rustLiterals && IDENT_START.test(ch)) return readPrefixedString(text, i);
+  return null;
+}
+
 export function tokenize(text, language) {
   const tokens = [];
-  let i = 0;
   let line = 1;
-  const push = (type, value) => tokens.push({ type, value, line });
-  const consume = (end) => {
-    line += countNewlines(text, i, end);
-    i = end;
-  };
-
+  let i = 0;
   while (i < text.length) {
     const ch = text[i];
-    const slashStartsCode = ch === "/" && text[i + 1] !== "/" && text[i + 1] !== "*";
-    const regexStop = slashStartsCode && language.regexLiterals && regexAllowed(tokens) ? regexEnd(text, i) : null;
-    if (ch === "\n") {
-      line++;
-      i++;
+    const literal = readLiteral(text, i, language, tokens[tokens.length - 1]);
+    let token = null;
+    let end;
+    if (literal !== null) {
+      end = literal.end;
+      if (literal.type !== null) token = { type: literal.type, value: literal.value };
     } else if (ch <= " ") {
-      i++;
-    } else if (ch === "/" && text[i + 1] === "/") {
-      consume(lineCommentEnd(text, i));
-    } else if (ch === "/" && text[i + 1] === "*") {
-      consume(blockCommentEnd(text, i, language.nestedBlockComments));
-    } else if (ch === '"' || (ch === "'" && language.singleQuoteStrings)) {
-      const { value, end } = readQuoted(text, i, ch);
-      push("string", value);
-      consume(end);
-    } else if (ch === "'") {
-      consume(rustQuoteEnd(text, i));
-    } else if (ch === "`" && language.templateStrings) {
-      const { value, end } = readTemplate(text, i);
-      push("string", value);
-      consume(end);
-    } else if (regexStop !== null) {
-      push("regex", "");
-      consume(regexStop);
+      end = i + 1;
     } else if (IDENT_START.test(ch)) {
-      let end = i + 1;
-      while (end < text.length && IDENT_PART.test(text[end])) end++;
-      const ident = text.slice(i, end);
-      const raw = language.rustLiterals && RUST_STRING_PREFIX.test(ident) && (text[end] === '"' || (text[end] === "#" && ident.endsWith("r")))
-        ? (ident.endsWith("r") ? readRawString(text, end) : readQuoted(text, end, '"'))
-        : null;
-      if (raw !== null) {
-        push("string", raw.value);
-        consume(raw.end);
-      } else {
-        push("ident", ident);
-        consume(end);
-      }
+      end = identEnd(text, i + 1);
+      token = { type: "ident", value: text.slice(i, end) };
     } else if (ch >= "0" && ch <= "9") {
-      let end = i + 1;
-      while (end < text.length && (IDENT_PART.test(text[end]) || text[end] === ".")) end++;
-      push("number", text.slice(i, end));
-      consume(end);
-    } else if (ch === "=" && text[i + 1] === ">") {
-      push("punct", "=>");
-      i += 2;
+      end = numberEnd(text, i);
+      token = { type: "number", value: text.slice(i, end) };
     } else {
-      push("punct", ch);
-      i++;
+      end = ch === "=" && text[i + 1] === ">" ? i + 2 : i + 1;
+      token = { type: "punct", value: text.slice(i, end) };
     }
+    if (token !== null) tokens.push({ ...token, line });
+    line += countNewlines(text, i, end);
+    i = end;
   }
   return tokens;
 }
@@ -290,47 +315,84 @@ const isIdent = (token, value) => token !== undefined && token.type === "ident" 
 // ---------------------------------------------------------------------------------------------
 // JavaScript and TypeScript: Vitest and node:test calls.
 
-/** The top-level keys of an object literal starting at tokens[start] ({), and the index after it. */
-function readObjectLiteral(tokens, start) {
-  const keys = new Set();
+const isOpening = (token) => token !== undefined && token.type === "punct" && OPENING_BRACKETS.has(token.value);
+const isClosing = (token) => token !== undefined && token.type === "punct" && CLOSING_BRACKETS.has(token.value);
+
+/** The index after the bracket group opening at tokens[start]; the end of the tokens when it never closes. */
+function groupEnd(tokens, start) {
   let depth = 0;
-  let i = start;
-  for (; i < tokens.length; i++) {
-    const token = tokens[i];
-    if (isPunct(token, "{") || isPunct(token, "[") || isPunct(token, "(")) depth++;
-    else if (isPunct(token, "}") || isPunct(token, "]") || isPunct(token, ")")) {
+  for (let i = start; i < tokens.length; i++) {
+    if (isOpening(tokens[i])) depth++;
+    else if (isClosing(tokens[i])) {
       depth--;
-      if (depth === 0) return { keys, next: i + 1 };
-    } else if (depth === 1 && (token.type === "ident" || token.type === "string")) {
-      const next = tokens[i + 1];
-      if (isPunct(next, ":") || isPunct(next, ",") || isPunct(next, "}")) keys.add(token.value);
+      if (depth === 0) return i + 1;
     }
   }
-  return { keys, next: i };
+  return tokens.length;
+}
+
+/** Whether tokens[i] is the whole value of an options key and pending: the literal true or a string literal, then , or }. */
+function isPendingValue(tokens, i) {
+  const value = tokens[i];
+  const after = tokens[i + 1];
+  return (isIdent(value, "true") || value?.type === "string") && (isPunct(after, ",") || isPunct(after, "}"));
+}
+
+/** The options object at tokens[start] ({): "todo" or "skip" when that key holds the literal true or a string
+ *  literal (a computed value is conditional, so the test is not pending), else null; and the index after it. */
+function readOptions(tokens, start) {
+  const end = groupEnd(tokens, start);
+  const pendingKeys = new Set();
+  let i = start + 1;
+  while (i < end) {
+    const token = tokens[i];
+    if (isOpening(token)) {
+      i = groupEnd(tokens, i);
+      continue;
+    }
+    const startsKey = (isPunct(tokens[i - 1], "{") || isPunct(tokens[i - 1], ",")) && (token.type === "ident" || token.type === "string");
+    if (startsKey && isPunct(tokens[i + 1], ":") && isPendingValue(tokens, i + 2)) pendingKeys.add(token.value);
+    i++;
+  }
+  const kind = pendingKeys.has("todo") ? "todo" : pendingKeys.has("skip") ? "skip" : null;
+  return { kind, next: end };
+}
+
+/** The index after the table of an each or for modifier at tokens[i], a (...) argument list or a tagged template; null when neither follows. */
+function tableEnd(tokens, i) {
+  if (isPunct(tokens[i], "(")) return groupEnd(tokens, i);
+  return tokens[i]?.type === "string" ? i + 1 : null;
 }
 
 /** it("title" ...) style call at tokens[start], or null when it is not one this check reads. */
 function readTestCall(tokens, start) {
   const callee = tokens[start].value;
   const modifiers = [];
+  let table = null;
   let i = start + 1;
-  while (isPunct(tokens[i], ".") && isIdent(tokens[i + 1])) {
+  while (table === null && isPunct(tokens[i], ".") && isIdent(tokens[i + 1])) {
     const modifier = tokens[i + 1].value;
-    if (ARGUMENT_MODIFIERS.has(modifier)) return null;
+    if (CONDITIONAL_MODIFIERS.has(modifier)) return null;
     modifiers.push(modifier);
     i += 2;
+    if (TABLE_MODIFIERS.has(modifier)) {
+      table = modifier;
+      i = tableEnd(tokens, i);
+      if (i === null) return null;
+    }
   }
   if (!isPunct(tokens[i], "(") || tokens[i + 1]?.type !== "string") return null;
   const title = tokens[i + 1].value;
   i += 2;
   let optionKind = null;
   if (isPunct(tokens[i], ",") && isPunct(tokens[i + 1], "{")) {
-    const options = readObjectLiteral(tokens, i + 1);
-    optionKind = options.keys.has("todo") ? "todo" : options.keys.has("skip") ? "skip" : null;
+    const options = readOptions(tokens, i + 1);
+    optionKind = options.kind;
     i = options.next;
   }
-  const modifierKind = modifiers.find((modifier) => PENDING_MODIFIERS.has(modifier)) ?? null;
-  const kind = modifierKind !== null ? `${callee}.${modifierKind}` : optionKind !== null ? `${callee} { ${optionKind} }` : null;
+  const pending = modifiers.find((modifier) => PENDING_MODIFIERS.has(modifier));
+  const modifierKind = pending === undefined ? null : [callee, pending, ...(table === null ? [] : [table])].join(".");
+  const kind = modifierKind !== null ? modifierKind : optionKind !== null ? `${callee} { ${optionKind} }` : null;
   return { callee, title, kind, next: i };
 }
 
@@ -411,29 +473,63 @@ export function scanRust(text) {
 // ---------------------------------------------------------------------------------------------
 // Tags, the walk and the verdict.
 
-/** The R ID a pending test carries, from its title, its enclosing groups or its Rust fn name; null when untagged. */
-export function rIdOf(entry) {
-  const fromTitle = R_ID_PATTERN.exec(entry.title ?? "");
-  if (fromTitle !== null) return fromTitle[0];
-  for (const group of [...(entry.context ?? [])].reverse()) {
-    const match = R_ID_PATTERN.exec(group);
-    if (match !== null) return match[0];
-  }
-  const fromName = RUST_NAME_R_ID.exec(entry.name ?? "");
-  return fromName === null ? null : `R${fromName[1]}.${fromName[2]}`;
+/** The first R ID in a title, group name, ignore reason or fn name, as R<phase>.<n>; null when there is none. */
+export function rIdIn(text) {
+  const match = R_ID_FORMS.exec(text);
+  if (match === null) return null;
+  return match[1] !== undefined ? `R${match[1]}.${match[2]}` : `R${match[3]}.${match[4]}`;
 }
 
-/** Every source file under root, repo-relative with forward slashes, sorted; skipped trees left out. */
+/** The R ID a pending test carries, from its title, its enclosing groups (innermost first) or its Rust fn name; null when untagged. */
+export function rIdOf(entry) {
+  const sources = [entry.title ?? "", ...[...(entry.context ?? [])].reverse(), entry.name ?? ""];
+  for (const source of sources) {
+    const rId = rIdIn(source);
+    if (rId !== null) return rId;
+  }
+  return null;
+}
+
+const compareNames = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
+/** The entries of a directory in name order; one that cannot be listed stops the check. */
+function readDirectory(dir, relDir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).toSorted(compareNames);
+  } catch (error) {
+    throw new CheckError(`cannot read directory ${relDir === "" ? dir : relDir}: ${error.message}`);
+  }
+}
+
+/** The size of a file in bytes; one that cannot be inspected stops the check. */
+function fileSize(path, relPath) {
+  try {
+    return statSync(path).size;
+  } catch (error) {
+    throw new CheckError(`cannot read ${relPath}: ${error.message}`);
+  }
+}
+
+/** The text of a source file; one that cannot be read stops the check. */
+function readSource(root, relPath) {
+  try {
+    return readFileSync(join(root, relPath), "utf8");
+  } catch (error) {
+    throw new CheckError(`cannot read ${relPath}: ${error.message}`);
+  }
+}
+
+/** Every source file under root, repo-relative with forward slashes, sorted; skipped trees and files over MAX_FILE_BYTES left out. */
 export function listSourceFiles(root) {
   const files = [];
   const walk = (dir, relDir) => {
-    const entries = readdirSync(dir, { withFileTypes: true }).toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    for (const entry of entries) {
+    for (const entry of readDirectory(dir, relDir)) {
       const relPath = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
+      const path = join(dir, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        if (!SKIPPED_DIRECTORY_NAMES.has(entry.name) && !SKIPPED_PATHS.has(relPath)) walk(join(dir, entry.name), relPath);
-      } else if (entry.isFile() && SOURCE_EXTENSIONS.has(extname(entry.name))) {
+        if (!SKIPPED_DIRECTORY_NAMES.has(entry.name) && !SKIPPED_PATHS.has(relPath)) walk(path, relPath);
+      } else if (entry.isFile() && SOURCE_EXTENSIONS.has(extname(entry.name)) && fileSize(path, relPath) <= MAX_FILE_BYTES) {
         files.push(relPath);
       }
     }
@@ -442,16 +538,17 @@ export function listSourceFiles(root) {
   return files;
 }
 
+/** Whether a source can hold a pending test at all: a cheap check that spares the tokenizer. */
+export function hasPendingMarker(text) {
+  return PENDING_MARKERS.some((marker) => text.includes(marker));
+}
+
 /** Every pending test under root with its file and R ID (null when untagged). */
 export function findPendingTests(root) {
   const found = [];
   for (const file of listSourceFiles(root)) {
-    let text;
-    try {
-      text = readFileSync(join(root, file), "utf8");
-    } catch (error) {
-      throw new CheckError(`cannot read ${file}: ${error.message}`);
-    }
+    const text = readSource(root, file);
+    if (!hasPendingMarker(text)) continue;
     const entries = extname(file) === ".rs" ? scanRust(text) : scanJavaScript(text);
     for (const entry of entries) {
       found.push({ ...entry, file, rId: rIdOf(entry) });
@@ -483,7 +580,7 @@ export function summarize(entries) {
 export function formatReport(summary) {
   if (summary.untagged.length > 0) {
     const lines = summary.untagged.map((entry) => `check-test-tags: ${entry.file}:${entry.line}: ${entry.kind} ${JSON.stringify(entry.title)} has no R ID`);
-    lines.push(`check-test-tags: ${summary.untagged.length} of ${summary.total} pending tests untagged; put the R ID (R<phase>.<n>) in the title, the enclosing describe or the ignore reason (R0.11)`);
+    lines.push(`check-test-tags: ${summary.untagged.length} of ${summary.total} pending tests untagged; put the R ID (R<phase>.<n> or r<phase>_<n>) in the title, the enclosing describe or the ignore reason (R0.11)`);
     return { lines, exitCode: EXIT_UNTAGGED };
   }
   const lines = [`check-test-tags: ${summary.total} pending tests, all tagged (R0.11)`];
