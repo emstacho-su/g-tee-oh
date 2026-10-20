@@ -12,9 +12,12 @@
     }
   },
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@g-tee-oh/contracts": "workspace:*",
