@@ -30,7 +30,7 @@ async fn get_healthz(router: Router) -> (StatusCode, Option<String>, Value) {
 
 #[tokio::test]
 async fn r0_7_healthz_returns_ok_json() {
-    let (router, _document) = app();
+    let (router, _document) = app().expect("no malformed solver-query variable in the test env");
 
     let (status, content_type, json) = get_healthz(router).await;
 

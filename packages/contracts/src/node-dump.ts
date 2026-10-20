@@ -11,9 +11,13 @@
  * Rules, per node and per hand:
  *   1. one frequency and one EV per action: frequencies.length === actions.length === ev_bb.length;
  *   2. the frequencies of a hand sum to 1 within FREQUENCY_SUM_TOLERANCE;
- *   3. hand labels match hand_space: a preflop_169 label is two ranks plus s or o for a non-pair,
- *      a postflop_1326 label is two distinct cards;
- *   4. no action token twice in a node and no hand twice in a node;
+ *   3. hand labels match hand_space in gto-model's canonical spelling, so that one hand has one
+ *      label: a preflop_169 label is the higher rank first plus s or o for a non-pair and nothing
+ *      for a pair (HandClass Display: AKs and AA, never KAs or AAs); a postflop_1326 label is two
+ *      distinct cards with the higher rank first and, for two cards of one rank, the lower suit
+ *      first in the order cdhs (ComboId Display: AsKc and AcAd, never KcAs or AdAc);
+ *   4. no action token twice in a node and no hand twice in a node; rule 3 is what lets this rule
+ *      compare labels as text, since a second spelling of the same hand is already a violation;
  *   5. metadata completeness: every field the schema requires, including the six game
  *      configuration fields, is present (config_id stays optional, the configuration is enough).
  *
@@ -88,6 +92,10 @@ const REQUIRED_CONFIG_FIELDS = ["format", "table_size", "stake_label", "depth_cb
 const LABEL_169 = /^([2-9TJQKA])([2-9TJQKA])([so])?$/;
 /** A 1326-combination label: two cards, rank then suit each. */
 const LABEL_1326 = /^([2-9TJQKA][cdhs])([2-9TJQKA][cdhs])$/;
+/** The ranks in ascending order, deuce lowest and ace highest (gto-model's Rank). */
+const RANK_ORDER = "23456789TJQKA";
+/** The suits in ascending order (gto-model's Suit, the order cdhs). */
+const SUIT_ORDER = "cdhs";
 /** Decimal places a reported frequency sum is rounded to, enough to show a 0.001 miss. */
 const SUM_DECIMALS = 6;
 
@@ -118,16 +126,37 @@ function formatSum(sum: number): string {
   return Number(sum.toFixed(SUM_DECIMALS)).toString();
 }
 
+function rankIndex(rank: string): number {
+  return RANK_ORDER.indexOf(rank);
+}
+
+function suitIndex(suit: string): number {
+  return SUIT_ORDER.indexOf(suit);
+}
+
+/**
+ * A preflop_169 label in gto-model's canonical spelling (HandClass Display): the higher rank
+ * first, then s or o for a non-pair and no suffix for a pair.
+ */
 function isLabel169(label: string): boolean {
   const match = LABEL_169.exec(label);
   if (match === null) return false;
-  const [, first, second, suffix] = match;
-  return first === second ? suffix === undefined : suffix !== undefined;
+  const [, first = "", second = "", suffix] = match;
+  if (first === second) return suffix === undefined;
+  return suffix !== undefined && rankIndex(first) > rankIndex(second);
 }
 
+/**
+ * A postflop_1326 label in gto-model's canonical spelling (ComboId Display): two distinct cards,
+ * the higher rank first and, for two cards of one rank, the lower suit first in the order cdhs.
+ */
 function isLabel1326(label: string): boolean {
   const match = LABEL_1326.exec(label);
-  return match !== null && match[1] !== match[2];
+  if (match === null) return false;
+  const [, first = "", second = ""] = match;
+  const rankGap = rankIndex(first.charAt(0)) - rankIndex(second.charAt(0));
+  if (rankGap !== 0) return rankGap > 0;
+  return suitIndex(first.charAt(1)) < suitIndex(second.charAt(1));
 }
 
 function checkConfig(config: unknown): readonly string[] {
@@ -151,13 +180,19 @@ function checkMetadata(dump: JsonRecord): readonly string[] {
   return [...missing, ...checkConfig(dump.config), ...handSpace, ...nodes];
 }
 
-/** Rule 3: the label is written in the dump's hand space; skipped when the hand space itself is invalid. */
+/**
+ * Rule 3: the label is written in the dump's hand space, in the canonical spelling; skipped when
+ * the hand space itself is invalid.
+ */
 function checkLabel(who: string, label: string, handSpace: HandSpace | undefined): readonly string[] {
   if (handSpace === undefined) return [];
   if (handSpace === "preflop_169") {
-    return isLabel169(label) ? [] : [`${who} is not a preflop_169 label (two ranks, plus s or o for a non-pair).`];
+    return isLabel169(label)
+      ? []
+      : [`${who} is not a preflop_169 label (higher rank first, plus s or o for a non-pair).`];
   }
-  return isLabel1326(label) ? [] : [`${who} is not a postflop_1326 label (two distinct cards).`];
+  const reason = "two distinct cards, higher rank first, lower suit first for a pair";
+  return isLabel1326(label) ? [] : [`${who} is not a postflop_1326 label (${reason}).`];
 }
 
 /** Rules 1 and 2 for the frequencies of one hand. */

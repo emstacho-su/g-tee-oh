@@ -20,9 +20,10 @@
 //      Docker build context excludes packages/, so the crate reads its own copy with include_str!).
 //      A copy whose source is gone is removed (or reported stale under --check).
 //
-// cargo and node are spawned without a shell. pnpm is a .cmd shim on Windows, which Node refuses
-// to spawn without a shell, so that call goes through the shell as one validated command string,
-// the way scripts/codegen.mjs does.
+// cargo and node are spawned without a shell. pnpm goes through scripts/lib/spawn.mjs, the one
+// place that knows pnpm is a .cmd shim on Windows and polices the arguments of the command string
+// it runs under the shell; scripts/codegen.mjs uses the same helper. The line ending and byte
+// order mark normalization comes from scripts/lib/text.mjs, shared the same way.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
@@ -30,6 +31,9 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+
+import { SpawnError, runPnpm as spawnPnpm } from "./lib/spawn.mjs";
+import { normalizeLineEndings, stripBom } from "./lib/text.mjs";
 
 export const SOLVER_QUERY_DOCUMENT = "packages/contracts/solver-query.openapi.json";
 export const API_DOCUMENT = "packages/contracts/api.openapi.json";
@@ -53,9 +57,6 @@ const TYPED_DOCUMENTS = [
   [API_DOCUMENT, API_TYPES],
 ];
 const USAGE = "usage: node scripts/contracts.mjs [--check]";
-const BOM = "﻿";
-// Characters cmd.exe or sh would interpret inside the one pnpm command string.
-const UNSAFE_ARGUMENT = /["'\r\n&|<>^$`;()!%*?]/;
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -68,8 +69,7 @@ export class ContractsError extends Error {
 
 /** The text with a leading byte order mark removed and CRLF turned into LF. */
 export function normalize(text) {
-  const withoutBom = text.startsWith(BOM) ? text.slice(BOM.length) : text;
-  return withoutBom.replace(/\r\n/g, "\n");
+  return normalizeLineEndings(stripBom(text));
 }
 
 /** The schema files to copy, sorted by name, each with its source and copy path relative to the root. */
@@ -270,16 +270,14 @@ function runNode(args, cwd) {
   return result.status ?? EXIT_FAILED;
 }
 
-function shellArgument(value) {
-  if (UNSAFE_ARGUMENT.test(value)) throw new ContractsError(`argument ${JSON.stringify(value)} holds a character the shell would interpret`);
-  return value.includes(" ") ? `"${value}"` : value;
-}
-
+/** pnpm through the shared helper; its refusal of an argument or a shell is a ContractsError. */
 function runPnpm(args, cwd) {
-  const command = ["pnpm", ...args.map(shellArgument)].join(" ");
-  const result = spawnSync(command, { ...spawnOptions(cwd), shell: true });
-  if (result.error) throw new ContractsError(`could not run pnpm: ${result.error.message}`);
-  return result.status ?? EXIT_FAILED;
+  try {
+    return spawnPnpm(args, { cwd }).status;
+  } catch (error) {
+    if (error instanceof SpawnError) throw new ContractsError(error.message);
+    throw error;
+  }
 }
 
 /** The real tool runner: cargo and node without a shell, pnpm through its shim. */

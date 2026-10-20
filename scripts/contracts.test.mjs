@@ -34,7 +34,7 @@ import {
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = join(REPO_ROOT, "scripts", "contracts.mjs");
-const BOM = "﻿";
+const BOM = "\uFEFF";
 const TOOL_FAILURE_STATUS = 101;
 
 /** Two synthetic schemas, LF only, standing in for packages/contracts/schemas/*.schema.json. */

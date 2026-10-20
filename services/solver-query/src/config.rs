@@ -3,7 +3,10 @@
 //! library directory the health response reports (O-62), `QUERY_CACHE_BYTES` is the
 //! chunk cache budget a later session consumes, and `SOLVER_QUERY_LOG` selects the log
 //! format. A variable that is set but malformed is an error at startup that names the
-//! variable, so a typo never runs on a silent default.
+//! variable, so a typo never runs on a silent default. A variable set to the empty string
+//! counts as unset: that is what a blank `.env` line and compose's `${VAR:-}` interpolation
+//! produce, and the documented fallback (the default bind, no fixture library, no cache
+//! budget, text logs) is what an operator who left the value blank expects.
 //!
 //! The reader takes a lookup function so unit tests never touch the process environment
 //! (mutating it is unsound across threads, and edition 2024 marks it unsafe).
@@ -113,7 +116,8 @@ impl Config {
         Self::from_lookup(|name| std::env::var_os(name))
     }
 
-    /// Reads the configuration through `lookup`, which answers like `std::env::var_os`.
+    /// Reads the configuration through `lookup`, which answers like `std::env::var_os`. A
+    /// variable that is unset or set to the empty string takes its fallback.
     ///
     /// # Errors
     ///
@@ -126,7 +130,7 @@ impl Config {
             Some(value) => value.parse().map_err(|source| Error::InvalidBind { value, source })?,
             None => DEFAULT_BIND,
         };
-        let fixture_library_path = lookup(FIXTURE_LIBRARY_VAR).map(PathBuf::from);
+        let fixture_library_path = present(&lookup, FIXTURE_LIBRARY_VAR).map(PathBuf::from);
         let query_cache_bytes = match unicode(&lookup, CACHE_BYTES_VAR)? {
             Some(value) => {
                 Some(value.parse().map_err(|source| Error::InvalidCacheBytes { value, source })?)
@@ -142,12 +146,20 @@ impl Config {
     }
 }
 
-/// Looks `name` up and requires it to be Unicode when set.
+/// Looks `name` up; a variable set to the empty string counts as unset (see the module docs).
+fn present<F>(lookup: &F, name: &str) -> Option<OsString>
+where
+    F: Fn(&str) -> Option<OsString>,
+{
+    lookup(name).filter(|value| !value.is_empty())
+}
+
+/// Looks `name` up and requires it to be Unicode when set and non-empty.
 fn unicode<F>(lookup: &F, name: &'static str) -> Result<Option<String>, Error>
 where
     F: Fn(&str) -> Option<OsString>,
 {
-    lookup(name)
+    present(lookup, name)
         .map(|value| value.into_string().map_err(|_| Error::NotUnicode { name }))
         .transpose()
 }
@@ -192,6 +204,21 @@ mod tests {
         assert_eq!(config.fixture_library_path, Some(PathBuf::from("/fixtures/library")));
         assert_eq!(config.query_cache_bytes, Some(268_435_456));
         assert!(config.log_json);
+    }
+
+    #[test]
+    fn r0_7_config_treats_an_empty_variable_as_unset() {
+        let config = Config::from_lookup(lookup(&[
+            (BIND_VAR, ""),
+            (FIXTURE_LIBRARY_VAR, ""),
+            (CACHE_BYTES_VAR, ""),
+            (LOG_FORMAT_VAR, ""),
+        ]))
+        .expect("an empty value is the documented fallback, not a malformed value");
+        assert_eq!(config.bind, DEFAULT_BIND);
+        assert_eq!(config.fixture_library_path, None);
+        assert_eq!(config.query_cache_bytes, None);
+        assert!(!config.log_json);
     }
 
     #[test]

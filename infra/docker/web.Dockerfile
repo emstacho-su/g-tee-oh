@@ -82,7 +82,14 @@ COPY --from=build /app/web/dist /srv
 # Non-root with a fixed user id. /config and /data are the image's XDG_CONFIG_HOME and
 # XDG_DATA_HOME directories; they are owned by the user so Caddy can still write there if a
 # later Caddyfile needs it.
+# The base image grants /usr/bin/caddy the file capability cap_net_bind_service. Compose
+# drops every capability and sets no-new-privileges, and the kernel then refuses to exec a
+# binary that asks for one (exit 255). This Caddy listens on 8080 and never needs it, so the
+# binary is copied over itself: busybox cp keeps no extended attributes, which removes it.
 RUN set -eu; \
+    cp /usr/bin/caddy /tmp/caddy; \
+    mv /tmp/caddy /usr/bin/caddy; \
+    chmod 0755 /usr/bin/caddy; \
     addgroup -S -g 10001 gto; \
     adduser -S -D -H -u 10001 -G gto -s /sbin/nologin gto; \
     chown -R gto:gto /config /data /srv

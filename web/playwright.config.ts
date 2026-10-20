@@ -2,24 +2,31 @@
 //
 // Mechanism: `pnpm --filter @g-tee-oh/web run e2e` runs the files under e2e/ that match the
 // .e2e.ts suffix against the Compose dev profile. The base address is the edge Caddy on the
-// host; E2E_BASE_URL overrides it for the CI runner. Caddy signs with its internal
-// certificate authority, which the browser does not trust, so ignoreHTTPSErrors stays on
-// until S29 exports that root (O-113). One worker and no retries keep a flake visible. The
-// html report lands in playwright-report/ and traces in test-results/, both ignored by git
-// and eslint; `open: "never"` stops the reporter from launching a browser after a run.
+// host and must name the one https site Caddy serves, CADDY_SITE (e2e/base-url.ts): it is
+// E2E_BASE_URL when set, else https://<CADDY_SITE> with CADDY_SITE from the environment or
+// from the repo .env, else https://localhost. Caddy signs with its internal certificate
+// authority, which the browser does not trust, so ignoreHTTPSErrors stays on until S29 exports
+// that root (O-113). One worker and no retries keep a flake visible. Two reporters: "list"
+// prints one line per test, so the terminal and the CI log keep the per-test summary, and
+// "html" writes playwright-report/ (traces go to test-results/; both are ignored by git and
+// eslint) with `open: "never"` so it never launches a browser after a run.
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, devices } from "@playwright/test";
 
-const DEFAULT_BASE_URL = "https://localhost";
+import { envFileLookup, resolveBaseUrl } from "./e2e/base-url.js";
+
 const REPORT_DIRECTORY = "playwright-report";
+const REPO_ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
 
 export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.e2e.ts",
   workers: 1,
   retries: 0,
-  reporter: [["html", { outputFolder: REPORT_DIRECTORY, open: "never" }]],
+  reporter: [["list"], ["html", { outputFolder: REPORT_DIRECTORY, open: "never" }]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? DEFAULT_BASE_URL,
+    baseURL: resolveBaseUrl(process.env, envFileLookup(REPO_ENV_FILE)),
     ignoreHTTPSErrors: true,
   },
   projects: [

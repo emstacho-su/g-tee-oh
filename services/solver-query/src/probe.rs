@@ -1,14 +1,15 @@
 //! The health self-probe behind `solver-query healthz`: the container `HEALTHCHECK` runs
 //! this subcommand, so the image needs neither curl nor wget. It opens one Transmission
-//! Control Protocol (TCP) connection to the loopback address on the configured port,
-//! sends a single Hypertext Transfer Protocol (HTTP) `GET /healthz` with
+//! Control Protocol (TCP) connection to the address the server is bound to (see
+//! [`probe_address`]: a bind on every interface is probed through the loopback of the same
+//! family), sends a single Hypertext Transfer Protocol (HTTP) `GET /healthz` with
 //! `Connection: close`, reads the answer to the end of the stream and judges the status
 //! line: 200 is healthy, anything else is not. The standard library's `TcpStream` is
 //! enough; no async runtime is started.
 
 use std::fmt;
 use std::io::{self, ErrorKind, Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, TcpStream};
 use std::time::Duration;
 
 /// How long the probe waits to connect and for each read or write. The Dockerfile gives
@@ -18,26 +19,52 @@ pub const TIMEOUT: Duration = Duration::from_secs(2);
 /// The status that means healthy.
 pub const HEALTHY_STATUS: u16 = 200;
 
-/// The request. `Connection: close` makes the server end the stream after the response.
-const REQUEST: &str = "GET /healthz HTTP/1.1\r\n\
-    Host: 127.0.0.1\r\n\
-    User-Agent: solver-query-healthz\r\n\
-    Accept: application/json\r\n\
-    Connection: close\r\n\
-    \r\n";
-
 /// The most the probe reads; the health body is a few hundred bytes.
 const READ_LIMIT: usize = 64 * 1024;
 
 /// The separator between the header block and the body.
 const HEADER_END: &str = "\r\n\r\n";
 
+/// The address to probe for a server bound at `bind`: the bind's own address and port,
+/// except that an unspecified address (`0.0.0.0` or `::`, every interface) becomes the
+/// loopback of the same family (`127.0.0.1` or `::1`), the one interface a listener on every
+/// interface is sure to answer on. A bind on one concrete address is probed there, since
+/// nothing listens on the loopback in that case.
+#[must_use]
+pub fn probe_address(bind: SocketAddr) -> SocketAddr {
+    match bind {
+        SocketAddr::V4(v4) if v4.ip().is_unspecified() => {
+            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, v4.port()))
+        }
+        SocketAddr::V6(v6) if v6.ip().is_unspecified() => SocketAddr::V6(SocketAddrV6::new(
+            Ipv6Addr::LOCALHOST,
+            v6.port(),
+            v6.flowinfo(),
+            v6.scope_id(),
+        )),
+        concrete => concrete,
+    }
+}
+
+/// The request for `address`. `Connection: close` makes the server end the stream after the
+/// response; `Host` carries the address the probe connects to.
+fn request_for(address: SocketAddr) -> String {
+    format!(
+        "GET /healthz HTTP/1.1\r\n\
+         Host: {address}\r\n\
+         User-Agent: solver-query-healthz\r\n\
+         Accept: application/json\r\n\
+         Connection: close\r\n\
+         \r\n"
+    )
+}
+
 /// Why the probe got no status line.
 #[derive(Debug)]
 pub enum Error {
     /// The connection could not be opened: nothing listens, or not yet.
     Connect {
-        /// The loopback address that was tried.
+        /// The address that was tried.
         address: SocketAddr,
         /// The failure.
         source: io::Error,
@@ -84,19 +111,19 @@ impl Response {
     }
 }
 
-/// Sends the probe to `127.0.0.1:<port>` and returns the response.
+/// Sends the probe to `address` (see [`probe_address`] for the one to use for a bind) and
+/// returns the response.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Connect`] when nothing accepts the connection, [`Error::Io`] when
 /// the exchange fails and [`Error::NoStatusLine`] when the answer is not HTTP.
-pub fn status(port: u16) -> Result<Response, Error> {
-    let address = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port));
+pub fn status(address: SocketAddr) -> Result<Response, Error> {
     let mut stream = TcpStream::connect_timeout(&address, TIMEOUT)
         .map_err(|source| Error::Connect { address, source })?;
     stream.set_read_timeout(Some(TIMEOUT)).map_err(Error::Io)?;
     stream.set_write_timeout(Some(TIMEOUT)).map_err(Error::Io)?;
-    stream.write_all(REQUEST.as_bytes()).map_err(Error::Io)?;
+    stream.write_all(request_for(address).as_bytes()).map_err(Error::Io)?;
     let raw = read_response(&mut stream)?;
     parse_response(&raw)
 }
@@ -150,9 +177,22 @@ fn parse_status_line(line: &str) -> Result<u16, Error> {
 #[cfg(test)]
 mod tests {
     use std::io::{Read, Write};
-    use std::net::TcpListener;
+    use std::net::{SocketAddr, TcpListener};
 
-    use super::{Error, Response, parse_response, status};
+    use super::{Error, Response, parse_response, probe_address, status};
+
+    /// Parses a literal socket address in a test.
+    fn address(literal: &str) -> SocketAddr {
+        literal.parse().expect("a literal socket address")
+    }
+
+    #[test]
+    fn r0_7_probe_targets_the_loopback_for_an_unspecified_bind() {
+        assert_eq!(probe_address(address("0.0.0.0:7070")), address("127.0.0.1:7070"));
+        assert_eq!(probe_address(address("[::]:7070")), address("[::1]:7070"));
+        assert_eq!(probe_address(address("10.0.0.5:7070")), address("10.0.0.5:7070"));
+        assert_eq!(probe_address(address("127.0.0.1:7071")), address("127.0.0.1:7071"));
+    }
 
     const CANNED: &str = "HTTP/1.1 200 OK\r\n\
         content-type: application/json\r\n\
@@ -179,17 +219,18 @@ mod tests {
     #[test]
     fn r0_7_probe_reads_a_canned_response_over_tcp() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
-        let port = listener.local_addr().expect("the bound address").port();
+        let bound = listener.local_addr().expect("the bound address");
         let server = std::thread::spawn(move || {
             let (mut socket, _) = listener.accept().expect("one connection");
             let mut request = [0_u8; 1024];
             let count = socket.read(&mut request).expect("the request arrives");
             let request = String::from_utf8_lossy(&request[..count]);
             assert!(request.starts_with("GET /healthz HTTP/1.1\r\n"), "request was {request}");
+            assert!(request.contains(&format!("\r\nHost: {bound}\r\n")), "request was {request}");
             socket.write_all(CANNED.as_bytes()).expect("the answer is written");
         });
 
-        let response = status(port).expect("the probe reads the answer");
+        let response = status(bound).expect("the probe reads the answer");
         server.join().expect("the server thread finishes");
 
         assert_eq!(response, Response { status: 200, body: "{\"status\":\"ok\"}".to_owned() });
@@ -198,10 +239,10 @@ mod tests {
     #[test]
     fn r0_7_probe_reports_a_closed_port() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
-        let port = listener.local_addr().expect("the bound address").port();
+        let bound = listener.local_addr().expect("the bound address");
         drop(listener);
 
-        let error = status(port).expect_err("nothing listens any more");
+        let error = status(bound).expect_err("nothing listens any more");
         assert!(matches!(error, Error::Connect { .. }), "error was {error}");
     }
 }

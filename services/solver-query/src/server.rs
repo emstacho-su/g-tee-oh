@@ -1,6 +1,7 @@
 //! The Hypertext Transfer Protocol (HTTP) server: reads the configuration, installs the
 //! log subscriber, binds `SOLVER_QUERY_BIND`, serves the router from `app` and stops on
-//! ctrl-c, letting in-flight requests finish (graceful shutdown through `tokio::signal`).
+//! ctrl-c or, on Unix, SIGTERM, letting in-flight requests finish (graceful shutdown
+//! through `tokio::signal`).
 
 use std::fmt;
 use std::io;
@@ -52,7 +53,7 @@ impl std::error::Error for Error {
     }
 }
 
-/// Reads the configuration, starts logging and runs the server until ctrl-c.
+/// Reads the configuration, starts logging and runs the server until a shutdown signal.
 ///
 /// # Errors
 ///
@@ -92,15 +93,65 @@ pub async fn serve(config: &Config) -> Result<(), Error> {
     Ok(())
 }
 
-/// Resolves when ctrl-c arrives. If the signal handler cannot be installed, the error is
-/// logged and the future never resolves, so the server keeps serving instead of stopping
-/// at once; the process can still be killed.
+/// Resolves when a shutdown signal arrives. Two listeners race in `tokio::select!` and the
+/// first to fire wins: ctrl-c (SIGINT on Unix, the console event on Windows) on every
+/// platform, and SIGTERM through [`terminate`] on Unix. SIGTERM matters in the container:
+/// the binary is process 1 there, `docker stop` and `compose down` send it SIGTERM and wait
+/// a grace period, and a process that only listens for ctrl-c would ignore the request and
+/// be killed when the period ends, dropping in-flight requests instead of finishing them.
+/// If a listener cannot be installed, the error is logged and that branch never resolves,
+/// so the server keeps serving instead of stopping at once; the process can still be killed.
 async fn shutdown_signal() {
-    match tokio::signal::ctrl_c().await {
-        Ok(()) => tracing::info!("ctrl-c received, shutting down"),
+    let interrupt = async {
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => tracing::info!("ctrl-c received, shutting down"),
+            Err(error) => {
+                tracing::error!(%error, "cannot listen for ctrl-c; graceful shutdown on it is off");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    tokio::select! {
+        () = interrupt => {}
+        () = terminate() => {}
+    }
+}
+
+/// Resolves when SIGTERM arrives. `tokio::signal::unix::signal` registers the handler when
+/// the stream is created, so a SIGTERM that lands while the listener exists is queued for
+/// `recv` rather than killing the process with the default action.
+#[cfg(unix)]
+async fn terminate() {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    match signal(SignalKind::terminate()) {
+        Ok(mut stream) => {
+            stream.recv().await;
+            tracing::info!("SIGTERM received, shutting down");
+        }
         Err(error) => {
-            tracing::error!(%error, "cannot listen for ctrl-c; graceful shutdown is off");
+            tracing::error!(%error, "cannot listen for SIGTERM; graceful shutdown on it is off");
             std::future::pending::<()>().await;
         }
+    }
+}
+
+/// Never resolves: there is no SIGTERM outside Unix, so only ctrl-c stops the server.
+#[cfg(not(unix))]
+async fn terminate() {
+    std::future::pending::<()>().await;
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    /// The listener [`super::terminate`] installs is installable in a plain test process
+    /// (the same runtime shape as `serve`), so the Unix branch is compiled and exercised
+    /// wherever the tests run on Unix.
+    #[tokio::test]
+    async fn r0_7_sigterm_listener_installs_on_unix() {
+        let stream = signal(SignalKind::terminate());
+        assert!(stream.is_ok(), "SIGTERM listener: {:?}", stream.err());
     }
 }

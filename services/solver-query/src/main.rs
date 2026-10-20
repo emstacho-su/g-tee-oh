@@ -47,8 +47,16 @@ fn serve() -> ExitCode {
 }
 
 /// Writes the `OpenAPI` document to `out` from this process (O-116: never a redirection).
+/// The document comes from the same `app()` the server mounts, so a malformed environment
+/// variable fails here the way it would fail `serve`.
 fn write_openapi(out: &Path) -> ExitCode {
-    let (_router, document) = app::app();
+    let (_router, document) = match app::app() {
+        Ok(parts) => parts,
+        Err(error) => {
+            eprintln!("solver-query openapi: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     match openapi::write_document(&document, out) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -58,22 +66,23 @@ fn write_openapi(out: &Path) -> ExitCode {
     }
 }
 
-/// Probes `/healthz` on the configured port: exit 0 on a 200 status line, 1 otherwise.
+/// Probes `/healthz` at the configured bind (through the loopback when the bind is every
+/// interface, see `probe::probe_address`): exit 0 on a 200 status line, 1 otherwise.
 fn healthz() -> ExitCode {
-    let port = match Config::from_env() {
-        Ok(config) => config.bind.port(),
+    let address = match Config::from_env() {
+        Ok(config) => probe::probe_address(config.bind),
         Err(error) => {
             eprintln!("solver-query healthz: {error}");
             return ExitCode::FAILURE;
         }
     };
-    match probe::status(port) {
+    match probe::status(address) {
         Ok(response) if response.healthy() => {
             println!("{}", response.body.trim_end());
             ExitCode::SUCCESS
         }
         Ok(response) => {
-            eprintln!("solver-query healthz: status {} from port {port}", response.status);
+            eprintln!("solver-query healthz: status {} from {address}", response.status);
             ExitCode::FAILURE
         }
         Err(error) => {

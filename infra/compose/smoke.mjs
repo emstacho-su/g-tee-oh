@@ -16,8 +16,12 @@
 // (SigV4), lists library and reference-private; the library identity is denied on reference-private
 // (02 section 6.4, separate credentials per bucket); Caddy answers /healthz over plain HTTP on 80 and
 // over TLS (Transport Layer Security) on 443 with its internal certificate authority (A9 section 3),
-// verification skipped for the TLS requests only; and the api answers GET /api/v1/healthz through
-// Caddy's /api/* route with JSON (JavaScript Object Notation) status "ok" (R0.7), the same way.
+// verification skipped for the TLS requests only; the api answers GET /api/v1/healthz through
+// Caddy's /api/* route with JSON (JavaScript Object Notation) status "ok" (R0.7), the same way; and
+// the fixture library mount is proven from inside the solver-query container (O-62): compose exec
+// runs the binary's own healthz subcommand, which prints the health JSON, and the check fails unless
+// its fixture_library block reports path "/fixtures/library" with present true, so a missing or
+// misplaced bind mount fails here rather than in S19's first library read.
 
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
@@ -42,6 +46,9 @@ const CADDY_HTTPS_URL = "https://127.0.0.1/healthz";
 const CADDY_API_HEALTHZ_URL = "https://127.0.0.1/api/v1/healthz";
 const DEFAULT_CADDY_SITE = "localhost";
 const HEALTHZ_OK_STATUS = "ok";
+const SOLVER_QUERY_SERVICE = "solver-query";
+const SOLVER_QUERY_HEALTHZ_COMMAND = ["/usr/local/bin/solver-query", "healthz"];
+const FIXTURE_LIBRARY_CONTAINER_PATH = "/fixtures/library";
 const SIGV4_REGION = "us-east-1";
 const SIGV4_SERVICE = "s3";
 const REQUEST_TIMEOUT_MS = 5000;
@@ -242,11 +249,12 @@ function requestThroughCaddyTls(url, settings) {
   return request(url, { headers: { host: site }, servername: site, rejectUnauthorized: false });
 }
 
-function parseJsonBody(url, text) {
+// `source` names what produced the text, such as "GET <url>" or a command, for the message.
+function parseJsonBody(source, text) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error(`GET ${url} did not answer JSON: ${error.message}; body "${text.trim()}"`);
+    throw new Error(`${source} did not answer JSON: ${error.message}; body "${text.trim()}"`);
   }
 }
 
@@ -267,11 +275,35 @@ async function checkApiHealthzThroughCaddy(settings) {
   if (response.status !== 200) {
     throw new Error(`GET ${CADDY_API_HEALTHZ_URL} as ${site} answered HTTP ${response.status} "${response.body.trim()}"`);
   }
-  const body = parseJsonBody(CADDY_API_HEALTHZ_URL, response.body);
+  const body = parseJsonBody(`GET ${CADDY_API_HEALTHZ_URL}`, response.body);
   if (body?.status !== HEALTHZ_OK_STATUS) {
     throw new Error(`GET ${CADDY_API_HEALTHZ_URL} as ${site} answered status ${JSON.stringify(body?.status)}, expected "${HEALTHZ_OK_STATUS}"`);
   }
   return `GET ${CADDY_API_HEALTHZ_URL} as ${site} answered 200 with status ok from ${body.service ?? "an unnamed service"}`;
+}
+
+// The fixture library mount (O-62), proven from inside the container: the health self-probe the
+// image's HEALTHCHECK runs prints the health JSON on exit 0, and its fixture_library block says
+// whether the configured path exists there. Both the path and the presence are asserted, so a mount
+// that landed somewhere else, or did not land, fails the check.
+function checkFixtureLibraryMount() {
+  const command = `compose exec ${SOLVER_QUERY_SERVICE} ${SOLVER_QUERY_HEALTHZ_COMMAND.join(" ")}`;
+  const result = runCompose(["exec", "-T", SOLVER_QUERY_SERVICE, ...SOLVER_QUERY_HEALTHZ_COMMAND]);
+  if (result.status !== 0) {
+    const output = (result.stdout + result.stderr).trim();
+    throw new Error(`${command} exited ${result.status}: ${output}`);
+  }
+  const body = parseJsonBody(command, result.stdout);
+  const library = body?.fixture_library;
+  const path = JSON.stringify(library?.path);
+  if (library?.path !== FIXTURE_LIBRARY_CONTAINER_PATH) {
+    throw new Error(`fixture_library.path is ${path}, expected "${FIXTURE_LIBRARY_CONTAINER_PATH}"`);
+  }
+  if (library.present !== true) {
+    const present = JSON.stringify(library.present);
+    throw new Error(`fixture_library.present is ${present}: nothing is mounted at ${path}`);
+  }
+  return `healthz inside the container reports ${FIXTURE_LIBRARY_CONTAINER_PATH} present`;
 }
 
 const CHECKS = [
@@ -284,6 +316,7 @@ const CHECKS = [
   ["caddy http /healthz", checkCaddyHttp],
   ["caddy https /healthz", checkCaddyHttps],
   ["caddy https /api/v1/healthz", checkApiHealthzThroughCaddy],
+  ["solver-query fixture library mount", checkFixtureLibraryMount],
 ];
 
 async function runCheck(name, check, settings) {

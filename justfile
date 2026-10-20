@@ -84,6 +84,7 @@ dev-down:
 smoke:
     node infra/compose/smoke.mjs
 
+# Base URL: E2E_BASE_URL, else https://<CADDY_SITE> (environment or .env), else https://localhost
 # Playwright smoke flow against the running dev stack through Caddy (R0.3, R0.7); e2e runs it after smoke
 e2e-web:
     pnpm --filter @g-tee-oh/web run e2e

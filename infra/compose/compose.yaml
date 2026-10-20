@@ -21,7 +21,9 @@
 # certificate authority (A9 section 3). Only Caddy publishes a port on the LAN (local area network). Every
 # service sits on the one network gto. The three built images carry their own HEALTHCHECK, so no healthcheck
 # block repeats it here; "just dev-up" runs up --build, so a source change is rebuilt rather than hot
-# reloaded (O-122).
+# reloaded (O-122). The three built services run hardened the same way (A9 section 3): read-only
+# root filesystem, every capability dropped, no privilege escalation, and a tmpfs on each path the
+# process still writes, so a write anywhere else fails loudly instead of persisting in the container.
 
 x-postgres: &postgres
   image: postgres:18-alpine
@@ -139,6 +141,13 @@ x-api: &api
     API_PORT: "8080"
     # The app role login (O-28); the image's HEALTHCHECK probes GET /healthz with Node's fetch
     APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+  # A9 section 3, the same hardening as solver-query. Node writes nothing of its own; /tmp is a
+  # tmpfs so os.tmpdir() keeps working for a scratch file (private to the container, gone with it).
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp
   networks:
     gto: {}
 
@@ -147,6 +156,16 @@ x-web: &web
     context: .
     dockerfile: infra/docker/web.Dockerfile
   # The image's HEALTHCHECK probes GET / on 8080 with busybox wget
+  # A9 section 3, the same hardening as solver-query. Caddy's data (XDG_DATA_HOME) and config
+  # (XDG_CONFIG_HOME) directories are /data and /config in the image; with admin off and auto_https
+  # off nothing persistent lands there, but Caddy still creates them at start, so both are tmpfs
+  # mounts rather than holes in the read-only root.
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /data
+    - /config
   networks:
     gto: {}
 

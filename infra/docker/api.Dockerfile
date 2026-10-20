@@ -10,9 +10,10 @@
 # manifest so pnpm can resolve the whole workspace graph, installs only the api package and
 # its workspace dependencies with --frozen-lockfile, then copies the sources and runs the
 # api build script (esbuild, services/api/build.mjs, O-114), which bundles the workspace
-# packages into services/api/dist/index.js and leaves npm packages external. The runtime
-# stage copies the installed tree to a fresh node:24-slim and runs as the image's unprivileged
-# node user.
+# packages and whatever they import into services/api/dist/index.js and leaves only Node's
+# built-ins and the api's own dependencies external, since those are what services/api/node_modules
+# holds. The runtime stage copies the installed tree to a fresh node:24-slim and runs as the
+# image's unprivileged node user.
 #
 # The HEALTHCHECK probes GET /healthz, the root alias of /api/v1/healthz (A5 section 3; the
 # api serves both), with Node's own fetch so the image carries no curl. It assumes the default

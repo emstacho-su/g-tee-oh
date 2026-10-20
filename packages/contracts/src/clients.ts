@@ -6,7 +6,10 @@
  * route, method or body the service does not serve is a compile error in the caller and a
  * response body comes back typed. The base URL must be an absolute http or https URL: a relative
  * one would resolve against whatever page or process called the client, which is how a request
- * silently lands on the wrong host.
+ * silently lands on the wrong host. It must also carry neither a query string nor a fragment:
+ * openapi-fetch appends the route path to the base as text, so the path would land inside the
+ * query (`/api?x=1/healthz`) or inside the fragment, which is never sent, and the request would
+ * reach the wrong route.
  */
 import createClient, { type Client, type ClientOptions } from "openapi-fetch";
 
@@ -35,7 +38,11 @@ function parseUrl(baseUrl: string): URL | null {
   }
 }
 
-/** Returns the base URL when it is absolute http or https; throws InvalidBaseUrlError otherwise. */
+/**
+ * Returns the base URL when it is absolute http or https with no query string and no fragment;
+ * throws InvalidBaseUrlError otherwise. A bare `?` or `#` counts too: the parser drops it, so
+ * the request would not carry what the caller wrote.
+ */
 export function assertHttpBaseUrl(baseUrl: string): string {
   const parsed = parseUrl(baseUrl);
   if (parsed === null) {
@@ -43,6 +50,12 @@ export function assertHttpBaseUrl(baseUrl: string): string {
   }
   if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
     throw new InvalidBaseUrlError(baseUrl, `protocol ${parsed.protocol} is not http or https`);
+  }
+  if (parsed.search !== "" || baseUrl.includes("?")) {
+    throw new InvalidBaseUrlError(baseUrl, "a query string is not allowed in a base URL");
+  }
+  if (parsed.hash !== "" || baseUrl.includes("#")) {
+    throw new InvalidBaseUrlError(baseUrl, "a fragment is not allowed in a base URL");
   }
   return baseUrl;
 }

@@ -5,7 +5,12 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { paths as ApiPaths } from "../src/api.generated.js";
-import { InvalidBaseUrlError, createApiClient, createSolverQueryClient } from "../src/index.js";
+import {
+  InvalidBaseUrlError,
+  assertHttpBaseUrl,
+  createApiClient,
+  createSolverQueryClient,
+} from "../src/index.js";
 import type { components as SolverQueryComponents } from "../src/solver-query.generated.js";
 
 const API_BASE_URL = "http://api.test";
@@ -14,6 +19,14 @@ const API_HEALTH_PATH = "/api/v1/healthz";
 const SOLVER_QUERY_HEALTH_PATH = "/healthz";
 const HTTP_OK = 200;
 const REJECTED_BASE_URLS = ["/api/v1", "api.test", "ftp://api.test", "", "http//api.test"];
+// A query string or a fragment on the base: openapi-fetch appends the route path to the base
+// as text, so the path would land inside the query or the fragment instead of on the host.
+const DECORATED_BASE_URLS = [
+  "https://host/api?x=1",
+  "https://host/api#frag",
+  "https://host/?",
+  "https://host/#",
+];
 
 type ApiHealth = ApiPaths[typeof API_HEALTH_PATH]["get"]["responses"][typeof HTTP_OK]["content"]["application/json"];
 type SolverQueryHealth = SolverQueryComponents["schemas"]["Healthz"];
@@ -70,6 +83,16 @@ describe("R0.7 contract clients", () => {
     }
     expect(() => createApiClient(API_BASE_URL)).not.toThrow();
     expect(() => createSolverQueryClient(SOLVER_QUERY_BASE_URL)).not.toThrow();
+  });
+
+  it("R0.7 both factories reject a base URL carrying a query string or a fragment", () => {
+    for (const baseUrl of DECORATED_BASE_URLS) {
+      expect(() => assertHttpBaseUrl(baseUrl), baseUrl).toThrow(InvalidBaseUrlError);
+      expect(() => createApiClient(baseUrl), baseUrl).toThrow(InvalidBaseUrlError);
+      expect(() => createSolverQueryClient(baseUrl), baseUrl).toThrow(InvalidBaseUrlError);
+    }
+    expect(assertHttpBaseUrl("https://host/api")).toBe("https://host/api");
+    expect(assertHttpBaseUrl("https://host/api/")).toBe("https://host/api/");
   });
 
   it("R0.7 a mocked fetch round trip returns the typed body through the api client", async () => {

@@ -43,6 +43,20 @@ function withFirstHand(hand: Readonly<Record<string, unknown>>): unknown {
   return { ...nodeDump, nodes: [{ ...exampleNode, hands: [hand, ...exampleNode.hands.slice(1)] }] };
 }
 
+/** The example rewritten to one node holding `labels` as its hands, in the given hand space. */
+function withHands(handSpace: string, labels: readonly string[]): unknown {
+  const hands = labels.map((hand) => ({ ...exampleHand, hand }));
+  return { ...nodeDump, hand_space: handSpace, nodes: [{ ...exampleNode, hands }] };
+}
+
+// gto-model's canonical spellings (HandClass and ComboId Display): the higher rank first, and for
+// two cards of one rank the lower suit first in the order cdhs. Each rejected label is a different
+// spelling of the accepted one at the same index.
+const CANONICAL_169 = ["AKs", "AA", "72o", "T9s", "KQo"];
+const NON_CANONICAL_169 = ["KAs", "AAs", "27o", "9Ts", "QKo"];
+const CANONICAL_1326 = ["AsKc", "AcAd", "7h2c", "Td9d", "2c2s"];
+const NON_CANONICAL_1326 = ["KcAs", "AdAc", "2c7h", "9dTd", "2s2c"];
+
 describe("R0.7 contract schemas", () => {
   it("R0.7 both schemas compile under Ajv2020 strict mode", () => {
     const strictAjv = new Ajv2020({ strict: true, allErrors: true });
@@ -120,6 +134,42 @@ describe("R0.7 node dump invariants", () => {
     expect(violations.length).toBeGreaterThanOrEqual(1);
     expect(violations).toContainEqual(expect.stringContaining("AKs"));
     expect(violations.every((violation) => violation.includes("postflop_1326"))).toBe(true);
+  });
+
+  it("R0.7 preflop_169 labels: KAs is rejected and AKs accepted (gto-model's spelling)", () => {
+    expect(checkNodeDumpInvariants(withHands("preflop_169", CANONICAL_169))).toEqual([]);
+    for (const label of NON_CANONICAL_169) {
+      const violations = checkNodeDumpInvariants(withHands("preflop_169", [label]));
+      expect(violations, label).toHaveLength(1);
+      expect(first(violations)).toContain(label);
+      expect(first(violations)).toContain("preflop_169");
+    }
+  });
+
+  it("R0.7 postflop_1326 labels: KcAs and AdAc are rejected, AsKc and AcAd accepted", () => {
+    expect(checkNodeDumpInvariants(withHands("postflop_1326", CANONICAL_1326))).toEqual([]);
+    for (const label of NON_CANONICAL_1326) {
+      const violations = checkNodeDumpInvariants(withHands("postflop_1326", [label]));
+      expect(violations, label).toHaveLength(1);
+      expect(first(violations)).toContain(label);
+      expect(first(violations)).toContain("postflop_1326");
+    }
+  });
+
+  it("R0.7 AKs listed twice is one duplicate; AKs beside KAs is a spelling violation", () => {
+    const twice = checkNodeDumpInvariants(withHands("preflop_169", ["AKs", "72o", "AKs"]));
+    expect(twice).toEqual([`Node ${exampleNode.node_key} lists the hand AKs more than once.`]);
+
+    const twoPairs = checkNodeDumpInvariants(withHands("preflop_169", ["AKs", "AKs", "72o", "72o"]));
+    expect(twoPairs).toHaveLength(2);
+    expect(twoPairs).toHaveLength(2);
+    expect(twoPairs).toContainEqual(expect.stringContaining("AKs more than once"));
+    expect(twoPairs).toContainEqual(expect.stringContaining("72o more than once"));
+
+    const spellings = checkNodeDumpInvariants(withHands("preflop_169", ["AKs", "KAs"]));
+    expect(spellings).toHaveLength(1);
+    expect(first(spellings)).toContain("KAs");
+    expect(first(spellings)).not.toMatch(/more than once/);
   });
 
   it("R0.7 the checker rejects a duplicate action token in a node", () => {

@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 use solver_query::app::app;
 use solver_query::openapi::document_json;
+use utoipa::openapi::OpenApi;
 
 /// The committed copy, relative to this crate's manifest directory.
 const COMMITTED_DOCUMENT: &str = "../../packages/contracts/solver-query.openapi.json";
@@ -19,6 +20,13 @@ const COMMITTED_DOCUMENT: &str = "../../packages/contracts/solver-query.openapi.
 /// Pretty prints a value the one way every comparison in this file uses.
 fn pretty(value: &Value) -> String {
     serde_json::to_string_pretty(value).expect("a JSON value pretty prints")
+}
+
+/// The in-process document; `app()` reads the configuration, which the test environment
+/// leaves well formed.
+fn generated_document() -> OpenApi {
+    let (_router, document) = app().expect("no malformed solver-query variable in the test env");
+    document
 }
 
 /// The shape every copy of the document must have: an `OpenAPI` 3 document titled after
@@ -47,7 +55,7 @@ fn scratch_dir(label: &str) -> PathBuf {
 
 #[test]
 fn r0_7_openapi_document_describes_healthz() {
-    let (_router, document) = app();
+    let document = generated_document();
 
     let value = serde_json::to_value(&document).expect("the document serializes");
 
@@ -77,8 +85,7 @@ fn r0_7_openapi_subcommand_writes_the_document() {
     assert!(!text.contains('\r'), "the document uses LF line endings only");
     let value: Value = serde_json::from_str(&text).expect("the document is JSON");
     assert_describes_healthz(&value);
-    let (_router, document) = app();
-    let in_process = document_json(&document).expect("the document serializes");
+    let in_process = document_json(&generated_document()).expect("the document serializes");
     assert_eq!(text, in_process, "the file is the in-process document, byte for byte");
 
     if let Err(error) = fs::remove_dir_all(&dir) {
@@ -94,8 +101,7 @@ fn r0_7_committed_document_matches_generated() {
     });
     let committed: Value = serde_json::from_str(&committed).expect("the committed file is JSON");
 
-    let (_router, document) = app();
-    let generated = serde_json::to_value(&document).expect("the document serializes");
+    let generated = serde_json::to_value(generated_document()).expect("the document serializes");
 
     assert_describes_healthz(&committed);
     assert_eq!(
