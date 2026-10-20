@@ -57,9 +57,14 @@ e2e:
 e2e-stack:
     node infra/compose/e2e.mjs
 
-# Compose dev stack with health checks; .env at the repo root supplies credentials (R0.5)
+# Compose dev stack with health checks; .env at the repo root supplies credentials (R0.5).
+# The long-running services are waited on for health; the one-shot bucket-init is started
+# afterwards and "compose wait" returns its exit code, because "up --wait" treats a
+# container that exited, even with 0, as a failure.
 dev-up:
-    {{COMPOSE}} --profile dev up -d --wait
+    {{COMPOSE}} --profile dev up -d --wait postgres seaweedfs caddy
+    {{COMPOSE}} --profile dev up -d bucket-init
+    {{COMPOSE}} --profile dev wait bucket-init
 
 # Compose dev stack down, volumes removed
 dev-down:
@@ -98,10 +103,19 @@ licenses:
     cargo deny check licenses
     node scripts/check-licenses.mjs
 
+# pnpm advisories ignored, each with its reason. GHSA-vfj7-8cjw-p6xm: stack exhaustion in braces, a
+# transitive dependency of the dev-only kysely-codegen (through micromatch) with no patched version;
+# the generator only ever sees this repository's own globs, so no untrusted pattern reaches it.
+PNPM_AUDIT_IGNORES := "--ignore GHSA-vfj7-8cjw-p6xm"
+
+# pnpm advisories at high severity, with the documented ignores above
+audit-ts:
+    pnpm audit --audit-level high {{PNPM_AUDIT_IGNORES}}
+
 # Advisories, then the private-data guard on the commit range
 security:
     cargo audit
-    pnpm audit --audit-level high
+    just audit-ts
     just guard-ci
 
 # Private-data guard on the staged diff (what the pre-commit hook runs)

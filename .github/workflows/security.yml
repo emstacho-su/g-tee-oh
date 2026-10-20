@@ -38,7 +38,7 @@ jobs:
       - name: Cargo advisories
         run: cargo audit
       - name: pnpm advisories
-        run: pnpm audit --audit-level high
+        run: just audit-ts
       # Secret scanning with a pinned gitleaks binary (checksum verified). The action form builds its
       # range as "<first pull request commit>^..HEAD", which breaks whenever a pull request carries a
       # parentless commit, and every git subtree --squash of the vendored engine is one. Scanning the
