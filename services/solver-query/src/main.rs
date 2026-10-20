@@ -1,19 +1,84 @@
-//! `solver-query`: the query service that answers spot lookups from the solutions
-//! library. It links the read-only face of `gto-library` and nothing that can solve, so
-//! no request path can start a solve (ADR 0018, success criterion 10). In S01 the binary
-//! is a stub that prints its name and version; the HTTP surface lands in S06.
+//! `solver-query` entry point: parse the subcommand (see `cli`) and run it. No argument or
+//! `serve` runs the Hypertext Transfer Protocol (HTTP) server; `openapi --out <path>`
+//! writes the `OpenAPI` document and exits; `healthz` probes the running server for the
+//! container health check; `version` prints one line; anything else prints usage on
+//! stderr and exits 2. The work lives in the library half of the crate so the integration
+//! tests can reach it; this file only maps commands to exit codes.
 
 #![forbid(unsafe_code)]
 
-/// The binary's package name.
-const BIN_NAME: &str = env!("CARGO_PKG_NAME");
+use std::ffi::OsString;
+use std::path::Path;
+use std::process::ExitCode;
 
-/// The binary's package version.
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use solver_query::cli::{self, Command, USAGE};
+use solver_query::config::Config;
+use solver_query::{app, openapi, probe, server};
 
-/// Internal crates this binary links (A1 section 2), named so the edges are exercised.
-const LINKS: &[&str] = &[gto_library::CRATE_NAME];
+/// Exit status for a usage error, the value shell conventions reserve for it.
+const EXIT_USAGE: u8 = 2;
 
-fn main() {
-    println!("{BIN_NAME} {VERSION} (links {})", LINKS.join(", "));
+fn main() -> ExitCode {
+    let args: Vec<OsString> = std::env::args_os().skip(1).collect();
+    match cli::parse(&args) {
+        Ok(Command::Serve) => serve(),
+        Ok(Command::Openapi { out }) => write_openapi(&out),
+        Ok(Command::Healthz) => healthz(),
+        Ok(Command::Version) => {
+            println!("{}", solver_query::version_line());
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("solver-query: {error}\n{USAGE}");
+            ExitCode::from(EXIT_USAGE)
+        }
+    }
+}
+
+/// Runs the server until ctrl-c; any startup or serve error goes to stderr with exit 1.
+fn serve() -> ExitCode {
+    match server::run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("solver-query: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Writes the `OpenAPI` document to `out` from this process (O-116: never a redirection).
+fn write_openapi(out: &Path) -> ExitCode {
+    let (_router, document) = app::app();
+    match openapi::write_document(&document, out) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("solver-query openapi: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Probes `/healthz` on the configured port: exit 0 on a 200 status line, 1 otherwise.
+fn healthz() -> ExitCode {
+    let port = match Config::from_env() {
+        Ok(config) => config.bind.port(),
+        Err(error) => {
+            eprintln!("solver-query healthz: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match probe::status(port) {
+        Ok(response) if response.healthy() => {
+            println!("{}", response.body.trim_end());
+            ExitCode::SUCCESS
+        }
+        Ok(response) => {
+            eprintln!("solver-query healthz: status {} from port {port}", response.status);
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("solver-query healthz: {error}");
+            ExitCode::FAILURE
+        }
+    }
 }
