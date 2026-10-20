@@ -12,6 +12,8 @@ Started by S01 on 2026-10-20 and completed by S06. Every row names the requireme
 | R0.4 | Guard unit tests with synthetic planted strings | `just guard-test` | 81 tests, 0 failures |
 | R0.1 | `just --list` shows the task surface; the commit-msg hook rejects a Claude commit without the trailer; the template carries the R ID field | `guard/test/justfile.test.mjs`, `guard/test/commit-msg.test.mjs`, `guard/test/pr-template.test.mjs` (part of `just guard-test`) | Pass |
 | R0.12 | The guard passes on `docs/`; every file under `docs/` carries `public: true` | `just guard-paths docs` (37 files, 0 findings); `guard/test/docs-provenance.test.mjs` | Pass |
+| R0.3 | Every job runs on a pull request; `e2e` and `images` skip cleanly while their targets do not exist | Pull request #1 at commit 34230b3: rust https://github.com/emstacho-su/g-tee-oh/actions/runs/39443705482, ts 39443705847, contracts 39443705770, e2e 39443705733, licenses 39443705521, security 39443705940, images 39443705556 | All seven green; `e2e` and `images` printed their skip notices |
+| R0.1, R0.2 | `rust` and `ts` jobs green on the workspaces; the vendored crate builds and its tests pass in CI | The rust run above (fmt, clippy with `--no-deps`, own-crate tests, engine tests in release mode, boundary check) and the ts run (eslint, typecheck, Vitest, node:test policy suite) | Pass |
 
 Both throwaway branches were closed and deleted after the runs above were recorded; the runs stay readable on GitHub.
 
