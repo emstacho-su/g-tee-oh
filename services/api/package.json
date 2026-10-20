@@ -1,0 +1,23 @@
+{
+  "name": "@g-tee-oh/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify service in front of solver-query and the database (S06, S21)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@g-tee-oh/contracts": "workspace:*",
+    "@g-tee-oh/learning": "workspace:*"
+  }
+}

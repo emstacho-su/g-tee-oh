@@ -1,0 +1,19 @@
+{
+  "name": "@g-tee-oh/learning",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure learning model: grading policy, Glicko-2, FSRS, BKT and leak cost (S05, S22, S30)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

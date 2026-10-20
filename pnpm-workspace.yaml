@@ -1,0 +1,17 @@
+# pnpm workspace (R0.1, A1 section 1). Every TypeScript package lives here; the Rust side is a
+# separate Cargo workspace. pnpm 12 reads its own settings from this file, not from .npmrc, which
+# is why engineStrict is repeated here (.npmrc keeps engine-strict for npm and editors).
+packages:
+  - web
+  - services/api
+  - packages/contracts
+  - packages/learning
+
+# Refuse to install when the running Node does not satisfy the root package.json engines field.
+engineStrict: true
+
+# pnpm 12 fails the install unless every dependency with an install script has an explicit
+# decision here. esbuild's postinstall only verifies the platform binary that vite (via vitest)
+# depends on, so it is allowed.
+allowBuilds:
+  esbuild: true
