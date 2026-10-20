@@ -15,6 +15,7 @@ export const healthResponseSchema = z.object({
   status: z.literal("ok"),
   service: z.literal(API_SERVICE_NAME),
   version: z.string(),
+  uptime_s: z.number(),
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
@@ -25,7 +26,7 @@ export interface HealthzRouteOptions {
 }
 
 export function healthResponse(): HealthResponse {
-  return { status: "ok", service: API_SERVICE_NAME, version: API_VERSION };
+  return { status: "ok", service: API_SERVICE_NAME, version: API_VERSION, uptime_s: process.uptime() };
 }
 
 export const healthzRoutes: FastifyPluginCallbackZod<HealthzRouteOptions> = (app, options, done) => {
