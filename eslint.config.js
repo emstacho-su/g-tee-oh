@@ -5,9 +5,10 @@
 // the repo root and applies it to the package's own files. Ignore patterns are resolved relative to
 // this file, not to the package.
 //
-// TypeScript files get the type-checked rule set. The project service resolves the nearest
-// tsconfig.json for every linted file, which is why every .ts file must be covered by a package
-// tsconfig (src and test are; config files written in TypeScript would not be).
+// TypeScript files (.ts and .tsx) get the type-checked rule set. The project service resolves the
+// nearest tsconfig.json for every linted file, which is why every linted TypeScript file must be
+// covered by a package tsconfig: src and test everywhere, plus e2e and the two TypeScript config
+// files in web, which its tsconfig lists by name.
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
@@ -20,13 +21,15 @@ const IGNORED_PATHS = [
   "crates/**",
   "docs/**",
   ".guard-private/**",
+  "web/playwright-report/**",
+  "web/test-results/**",
 ];
 
 export default defineConfig(
   { ignores: IGNORED_PATHS },
   js.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {

@@ -4,12 +4,12 @@
 # tls internal: Caddy runs its own certificate authority (CA) and signs the certificate for CADDY_SITE with
 # it, so the LAN gets TLS (Transport Layer Security) without a public domain name or an ACME (Automatic
 # Certificate Management Environment) account (A9 section 3). The CA root lives in the caddy_data volume; a browser trusts it after the root is
-# installed once ("docker compose exec caddy caddy trust" exports it), and the smoke script instead skips
-# verification for its one request to https://localhost/healthz.
+# installed once ("docker compose exec caddy caddy trust" exports it), and the smoke script and the
+# Playwright flow instead skip verification for their requests to https://localhost (O-113).
 #
-# api and web arrive in S06. Until their containers exist the upstream dial fails, which Caddy reports as
-# 502; the handle_errors block turns that into a plain 503 "not deployed yet" so the gap is visible and
-# intentional rather than a generic gateway error.
+# api and web are compose services on the dev profile (S06) and Caddy starts after them (depends_on). When
+# an upstream is down the dial fails, which Caddy reports as 502; the handle_errors block turns that into a
+# plain 503 "not deployed yet" so the gap is visible and intentional rather than a generic gateway error.
 
 {
 	# Port 80 stays under this file's control: the http:// block below serves /healthz in plain HTTP

@@ -8,13 +8,17 @@
 // the generated file was not regenerated (A1 section 3: a contract change is always a
 // visible diff). DATABASE_URL is read from the environment, else from .env at the
 // repository root. Node and the workspace's kysely-codegen are the only requirements.
+// pnpm runs through scripts/lib/spawn.mjs (the shim and argument policy shared with
+// scripts/contracts.mjs) and the line endings go through scripts/lib/text.mjs.
 
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
+import { SpawnError, runPnpm } from './lib/spawn.mjs';
+import { normalizeLineEndings } from './lib/text.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = join(repoRoot, 'packages', 'contracts', 'src', 'db.generated.ts');
@@ -47,25 +51,24 @@ function databaseUrl() {
   process.exit(2);
 }
 
-function generate(outFile, url) {
-  // The URL travels in the environment, never on the command line, and the command is one
-  // string so pnpm's .cmd shim resolves on Windows without passing arguments through a shell.
-  if (/["\r\n]/.test(outFile)) {
-    console.error('codegen: the temporary path contains a quote or newline');
-    process.exit(2);
+/** kysely-codegen through pnpm; a refused temporary path or a shell that cannot start is an Error. */
+function runKyselyCodegen(outFile, url) {
+  const args = ['exec', 'kysely-codegen', '--dialect', 'postgres', '--out-file', outFile];
+  const options = { cwd: repoRoot, env: { ...process.env, DATABASE_URL: url }, stdio: 'pipe' };
+  try {
+    return runPnpm([...args, '--log-level', 'warn'], options);
+  } catch (error) {
+    if (error instanceof SpawnError) throw new Error(`codegen: ${error.message}`);
+    throw error;
   }
-  const command = `pnpm exec kysely-codegen --dialect postgres --out-file "${outFile}" --log-level warn`;
-  const result = spawnSync(command, {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    shell: true,
-    windowsHide: true,
-    env: { ...process.env, DATABASE_URL: url },
-  });
-  // Thrown, not exited, so main() can remove the temporary directory before reporting.
-  if (result.error) throw new Error(`codegen: could not run pnpm: ${result.error.message}`);
+}
+
+function generate(outFile, url) {
+  // The URL travels in the environment, never on the command line. Errors are thrown, not
+  // exited, so main() can remove the temporary directory before reporting.
+  const result = runKyselyCodegen(outFile, url);
   if (result.status !== 0) throw new Error(`codegen: kysely-codegen exited ${result.status}\n${result.stderr}`);
-  const body = readFileSync(outFile, 'utf8').replace(/\r\n/g, '\n');
+  const body = normalizeLineEndings(readFileSync(outFile, 'utf8'));
   return `${HEADER}${body}`;
 }
 
@@ -91,7 +94,7 @@ function main(argv) {
       console.error(`codegen: ${TARGET_RELATIVE} is missing; run just codegen and commit it`);
       return 1;
     }
-    const committed = readFileSync(TARGET, 'utf8').replace(/\r\n/g, '\n');
+    const committed = normalizeLineEndings(readFileSync(TARGET, 'utf8'));
     if (committed !== generated) {
       console.error(`codegen: ${TARGET_RELATIVE} is stale; run just codegen and commit the result`);
       return 1;

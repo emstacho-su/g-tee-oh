@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/emstacho-su/g-tee-oh/packages/contracts/schemas/manifest.schema.json",
+  "title": "g-tee-oh solution manifest",
+  "description": "The manifest.json that describes one solution in the solutions library (A3 section 3, R0.7, O-117): the game configuration it was solved for, the files it is made of with their sha256 checksums, and the solve settings. A preflop solution lists its chunks; a flop build lists its lines and runouts. The document version is format_version (O-118); amounts in centi-big-blinds (cbb) are integers; formats are expressed as patterns so a validator needs no formats plugin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "kind", "source", "id", "engine_version", "config", "created_at"],
+  "properties": {
+    "format_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "The version of this manifest format; a reader rejects any other value (O-118)."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["preflop", "flop_build"],
+      "description": "The solution kind (A4 solution_kind): a preflop tree in chunks, or a flop build with its lines and runouts."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["own", "reference"],
+      "description": "Where the solution comes from (A4 solution_source): solved by this project's engine, or imported as a reference."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The solution's universally unique identifier (UUID) in lowercase hexadecimal, the same value as the solutions table row."
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The engine that produced the solution: a semantic version for an own solution, an opaque label for a reference solution, never a product name."
+    },
+    "config": {
+      "$ref": "#/$defs/game_config",
+      "description": "The game configuration the solution was solved for."
+    },
+    "config_id": {
+      "$ref": "#/$defs/config_id",
+      "description": "The identifier of the matching game_config row when the configuration is seeded, for example cfg_9_live_13_150 (O-112)."
+    },
+    "pair": {
+      "$ref": "#/$defs/position_pair",
+      "description": "The two positions of a flop build, out of position first."
+    },
+    "flop": {
+      "type": "string",
+      "pattern": "^([2-9TJQKA][cdhs]){3}$",
+      "description": "The three board cards of a flop build, rank then suit, for example Ah7d2c."
+    },
+    "flop_weight": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 24,
+      "description": "How many of the suit-isomorphic flops this flop stands for, so a flop subset weights the strategically equivalent boards correctly."
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The preflop lines a flop build was solved for, one tree per line.",
+      "items": { "$ref": "#/$defs/line_entry" }
+    },
+    "runouts": {
+      "type": "array",
+      "description": "The turn and river runouts a flop build carries, each with its per-line files.",
+      "items": { "$ref": "#/$defs/runout" }
+    },
+    "turn_roots": {
+      "type": "array",
+      "description": "Reserved for turn-rooted trees that extend a flop build (A3 section 2, O-15); empty or absent in version 1.",
+      "items": { "$ref": "#/$defs/turn_root" }
+    },
+    "chunks": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The node chunks of a preflop solution, in file order.",
+      "items": { "$ref": "#/$defs/chunk" }
+    },
+    "tree_hash": {
+      "$ref": "#/$defs/tree_hash",
+      "description": "The hash of the preflop tree definition, so two solutions of the same tree can be told apart from two different trees."
+    },
+    "seed": {
+      "$ref": "#/$defs/seed",
+      "description": "The random seed of the preflop solve."
+    },
+    "iterations": {
+      "$ref": "#/$defs/iterations",
+      "description": "How many solver iterations the preflop solve ran."
+    },
+    "exploitability_pct_pot": {
+      "$ref": "#/$defs/exploitability_pct_pot",
+      "description": "The exploitability the preflop solve reached, in percent of the pot, one value per position."
+    },
+    "synthetic": {
+      "type": "boolean",
+      "description": "True when the solution is synthetic test data rather than a real solve, which the web app shows as a banner (O-57)."
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp",
+      "description": "When the manifest was written."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "kind": { "const": "flop_build" } },
+        "required": ["kind"]
+      },
+      "then": {
+        "$comment": "The property stubs let a strict validator check this required list; the shapes are defined by the top-level properties.",
+        "properties": { "pair": true, "flop": true, "flop_weight": true, "lines": true, "runouts": true },
+        "required": ["pair", "flop", "flop_weight", "lines", "runouts"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "kind": { "const": "preflop" } },
+        "required": ["kind"]
+      },
+      "then": {
+        "$comment": "The property stubs let a strict validator check this required list; the shapes are defined by the top-level properties.",
+        "properties": { "chunks": true, "tree_hash": true, "seed": true, "iterations": true, "exploitability_pct_pot": true },
+        "required": ["chunks", "tree_hash", "seed", "iterations", "exploitability_pct_pot"]
+      }
+    }
+  ],
+  "$defs": {
+    "game_config": {
+      "type": "object",
+      "description": "The game configuration a solution was solved for (A4 game_config): format, table size, stake, depth, straddle and ante.",
+      "additionalProperties": false,
+      "required": ["format", "table_size", "stake", "depth_cbb", "straddle", "ante_cbb"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["online", "live"],
+          "description": "Whether the game is an online or a live game, which decides the sizing conventions."
+        },
+        "table_size": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 9,
+          "description": "How many seats the table has, from heads-up to nine-handed."
+        },
+        "stake": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The blinds as players name them, for example 1/3 for a one and three dollar live game."
+        },
+        "depth_cbb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The effective stack depth in centi-big-blinds (cbb), so 10000 is one hundred big blinds."
+        },
+        "straddle": {
+          "type": "boolean",
+          "description": "True when a straddle is posted, which adds a forced bet after the big blind."
+        },
+        "ante_cbb": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The ante each player posts in centi-big-blinds (cbb), zero when there is none (O-33)."
+        }
+      }
+    },
+    "config_id": {
+      "type": "string",
+      "pattern": "^cfg_[2-9]_(online|live)(_[0-9]+)+$",
+      "description": "A seeded game_config identifier: cfg_, the table size, the format and the numeric parts of the stake and depth (O-112)."
+    },
+    "position_pair": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9+]{0,4}-[A-Z][A-Z0-9+]{0,4}$",
+      "description": "Two position labels joined by a hyphen, out of position first, for example BB-BTN."
+    },
+    "card": {
+      "type": "string",
+      "pattern": "^[2-9TJQKA][cdhs]$",
+      "description": "One card as rank then suit, for example Kh."
+    },
+    "line": {
+      "type": "string",
+      "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
+      "description": "A preflop line as dot-separated action tokens, for example r250.c for a raise to 250 cbb that is called."
+    },
+    "tree_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16,64}$",
+      "description": "A lowercase hexadecimal hash of a tree definition, between 16 and 64 digits."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The sha256 checksum of a file as 64 lowercase hexadecimal digits, checked on first open."
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The random seed a solve ran with, so the solve can be repeated."
+    },
+    "iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How many solver iterations a solve ran."
+    },
+    "exploitability_pct_pot": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "The exploitability a solve reached, in percent of the pot, one value per position in pair order.",
+      "items": { "type": "number", "minimum": 0 }
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$",
+      "description": "A point in time in Coordinated Universal Time with the Z suffix, ISO 8601 (the pattern stands in for the date-time format)."
+    },
+    "file_ref": {
+      "type": "object",
+      "description": "One file of the solution with its checksum.",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file path relative to the solution directory, with forward slashes."
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "The checksum of the file at path."
+        }
+      }
+    },
+    "line_entry": {
+      "type": "object",
+      "description": "One preflop line of a flop build with the settings and the result of its flop solve.",
+      "additionalProperties": false,
+      "required": ["line", "tree_hash", "seed", "iterations", "exploitability_pct_pot", "flop_file", "sha256"],
+      "properties": {
+        "line": {
+          "$ref": "#/$defs/line",
+          "description": "The preflop line that leads to this flop tree."
+        },
+        "tree_hash": {
+          "$ref": "#/$defs/tree_hash",
+          "description": "The hash of this line's flop tree definition."
+        },
+        "seed": {
+          "$ref": "#/$defs/seed",
+          "description": "The random seed of this line's solve."
+        },
+        "iterations": {
+          "$ref": "#/$defs/iterations",
+          "description": "How many iterations this line's solve ran."
+        },
+        "exploitability_pct_pot": {
+          "$ref": "#/$defs/exploitability_pct_pot",
+          "description": "The exploitability this line's solve reached, per position."
+        },
+        "flop_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The path of this line's flop tree file relative to the solution directory."
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "The checksum of flop_file."
+        }
+      }
+    },
+    "runout": {
+      "type": "object",
+      "description": "One turn and river runout of a flop build with the file that holds each line's tree for it.",
+      "additionalProperties": false,
+      "required": ["turn", "river", "files"],
+      "properties": {
+        "turn": {
+          "$ref": "#/$defs/card",
+          "description": "The turn card of the runout."
+        },
+        "river": {
+          "$ref": "#/$defs/card",
+          "description": "The river card of the runout."
+        },
+        "files": {
+          "type": "object",
+          "description": "The runout's tree file per preflop line, keyed by the line.",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$"
+          },
+          "additionalProperties": { "$ref": "#/$defs/file_ref" }
+        }
+      }
+    },
+    "turn_root": {
+      "type": "object",
+      "description": "A turn-rooted tree for one line, reserved for later versions (O-15).",
+      "additionalProperties": false,
+      "required": ["line", "path", "sha256"],
+      "properties": {
+        "line": {
+          "$ref": "#/$defs/line",
+          "description": "The preflop line the turn-rooted tree belongs to."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The path of the turn-rooted tree file relative to the solution directory."
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "The checksum of the file at path."
+        }
+      }
+    },
+    "chunk": {
+      "type": "object",
+      "description": "One zstd-compressed chunk of node records of a preflop solution.",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "node_count"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^chunks/[0-9]{4}\\.bin\\.zst$",
+          "description": "The chunk file path, chunks/ followed by a four-digit sequence number and the .bin.zst suffix."
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "The checksum of the chunk file."
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many node records the chunk holds."
+        }
+      }
+    }
+  }
+}

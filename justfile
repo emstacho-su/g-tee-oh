@@ -45,23 +45,34 @@ ts-test:
     pnpm -r --if-present test
     pnpm run test:scripts
 
-# Contracts: the committed Kysely types must match the migrated database (R0.6); OpenAPI generators land in S06
-contracts: codegen-check
+# The contracts job runs this and then git diff. The steps, in order, stopping at the first failure: the
+# solver-query OpenAPI document (utoipa), the api OpenAPI document (Fastify), the openapi-typescript clients,
+# the Kysely types (R0.6; needs a migrated database through DATABASE_URL, so dev-up and db-migrate first) and
+# the schema copies under crates/gto-library/schemas (O-119). just --list shows the last comment line only.
+# Contracts (R0.7): regenerate every committed contract artifact (OpenAPI documents, clients, Kysely types, schema copies)
+contracts:
+    node scripts/contracts.mjs
 
-# End-to-end: Compose dev stack up, migrations, database tests, smoke, down (R0.5, R0.6); skips until the compose file exists
+# Fail when any committed contract artifact differs from what the generators produce, naming each stale path
+contracts-check:
+    node scripts/contracts.mjs --check
+
+# Skips until the compose file exists; the chain lives in infra/compose/e2e.mjs so dev-down always runs.
+# End-to-end: dev stack up (builds solver-query, api, web), migrate, database tests, smoke, Playwright flow, down (R0.3, R0.5, R0.6)
 e2e:
     {{ if path_exists(COMPOSE_FILE) == "true" { "just e2e-stack" } else { "echo 'e2e: skipped, " + COMPOSE_FILE + " does not exist yet (S02/S06)'" } }}
 
-# The e2e chain once the compose file exists: up, migrate, database tests, smoke, and always down
+# The e2e chain once the compose file exists: up, migrate, database tests, smoke, e2e-web, and always down
 e2e-stack:
     node infra/compose/e2e.mjs
 
-# Compose dev stack with health checks; .env at the repo root supplies credentials (R0.5).
-# The long-running services are waited on for health; the one-shot bucket-init is started
-# afterwards and "compose wait" returns its exit code, because "up --wait" treats a
-# container that exited, even with 0, as a failure.
+# .env at the repo root supplies credentials (R0.5). --build rebuilds the solver-query, api and web images
+# from the working tree every time (O-122: built images, no hot reload yet). The one-shot bucket-init is
+# started after the long-running services are healthy and "compose wait" returns its exit code, because
+# "up --wait" treats a container that exited, even with 0, as a failure.
+# Compose dev stack: build the three images, wait for every service's health, then run bucket-init once (R0.5)
 dev-up:
-    {{COMPOSE}} --profile dev up -d --wait postgres seaweedfs caddy
+    {{COMPOSE}} --profile dev up -d --build --wait postgres seaweedfs solver-query api web caddy
     {{COMPOSE}} --profile dev up -d bucket-init
     {{COMPOSE}} --profile dev wait bucket-init
 
@@ -69,9 +80,14 @@ dev-up:
 dev-down:
     {{COMPOSE}} --profile dev down -v
 
-# Health smoke over Postgres, the S3 gateway and Caddy; what the e2e job calls (R0.5)
+# Health smoke over Postgres, the S3 gateway, the three built services and Caddy; what the e2e job calls (R0.3, R0.5)
 smoke:
     node infra/compose/smoke.mjs
+
+# Base URL: E2E_BASE_URL, else https://<CADDY_SITE> (environment or .env), else https://localhost
+# Playwright smoke flow against the running dev stack through Caddy (R0.3, R0.7); e2e runs it after smoke
+e2e-web:
+    pnpm --filter @g-tee-oh/web run e2e
 
 # Apply migrations; dbmate reads DATABASE_URL from the environment or .env (R0.6)
 db-migrate:
@@ -102,14 +118,11 @@ licenses:
     cargo deny check licenses
     node scripts/check-licenses.mjs
 
-# pnpm advisories ignored, each with its reason. GHSA-vfj7-8cjw-p6xm: stack exhaustion in braces, a
-# transitive dependency of the dev-only kysely-codegen (through micromatch) with no patched version;
-# the generator only ever sees this repository's own globs, so no untrusted pattern reaches it.
-PNPM_AUDIT_IGNORES := "--ignore GHSA-vfj7-8cjw-p6xm"
-
-# pnpm advisories at high severity, with the documented ignores above
+# Ignored advisories live in the auditConfig block of pnpm-workspace.yaml, each with its reason; pnpm 12
+# reads that block on every audit, so no --ignore flag here (a flag would rewrite the file on every run).
+# pnpm advisories at high severity, with the ignores documented in pnpm-workspace.yaml
 audit-ts:
-    pnpm audit --audit-level high {{PNPM_AUDIT_IGNORES}}
+    pnpm audit --audit-level high
 
 # Advisories, then the private-data guard on the commit range
 security:
@@ -165,6 +178,6 @@ bench:
     cargo bench -p gto-solve -p gto-library
     node scripts/bench-report.mjs
 
-# Everything the hosted jobs run that needs neither Docker nor a database, in order (contracts needs a migrated
-# database, e2e the compose stack, images buildx)
+# contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
+# Everything the hosted jobs run that needs neither Docker nor a database, in order
 ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test test-tags

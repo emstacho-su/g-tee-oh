@@ -40,6 +40,16 @@ thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
 rayon = "1"
+# Web service stack for solver-query (S06, R0.7, ADR 0018). utoipa-axum 0.3 requires rustc 1.88,
+# above the workspace rust-version of 1.85, so the pair is pinned to utoipa 5 with utoipa-axum 0.2.
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+utoipa = "5"
+utoipa-axum = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# Test-only HTTP plumbing: tower::ServiceExt::oneshot and response body collection.
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
 # Property-based tests (A9 section 2): node-key round trip, suit-permutation invariance,
 # quantize then dequantize. Dev-dependency only, declared here so every crate pins one major.
 proptest = "1"
