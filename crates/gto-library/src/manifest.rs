@@ -11,13 +11,15 @@
 //! reader (lane R) build and read them; lane M owns this file's function bodies and the
 //! schema, and asks the integrator before changing a field.
 
-#![allow(unused_variables, reason = "S14 red skeleton: lane M replaces the todo!() bodies")]
+mod validate;
 
 use std::collections::BTreeMap;
 
 use gto_model::{Cbb, ConfigId, GameFormat, PositionPair, TableSize};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
+use crate::SUPPORTED_FORMAT_VERSIONS;
 use crate::error::LibraryError;
 
 /// The manifest schema, compiled into the crate so tests and tools validate against it.
@@ -202,7 +204,13 @@ impl Manifest {
     /// `validate`; `LibraryError::UnsupportedFormat` for a version outside
     /// `SUPPORTED_FORMAT_VERSIONS`.
     pub fn from_json(b: &[u8]) -> Result<Self, LibraryError> {
-        todo!("lane M: parse then validate")
+        let value: Value = serde_json::from_slice(b)
+            .map_err(|err| LibraryError::Manifest(format!("the bytes are not JSON: {err}")))?;
+        check_version_field(&value)?;
+        let manifest: Manifest = serde_json::from_value(value)
+            .map_err(|err| LibraryError::Manifest(format!("the JSON is not a manifest: {err}")))?;
+        manifest.validate()?;
+        Ok(manifest)
     }
 
     /// The manifest as pretty-printed JSON with a trailing newline, the bytes the writer
@@ -212,7 +220,9 @@ impl Manifest {
     ///
     /// `LibraryError::Manifest` when serialization fails.
     pub fn to_json_pretty(&self) -> Result<String, LibraryError> {
-        todo!("lane M: deterministic pretty JSON")
+        serde_json::to_string_pretty(self).map(|text| format!("{text}\n")).map_err(|err| {
+            LibraryError::Manifest(format!("the manifest does not serialize: {err}"))
+        })
     }
 
     /// Checks the rules serde cannot express: the version, the fields each kind requires
@@ -223,6 +233,22 @@ impl Manifest {
     /// `LibraryError::UnsupportedFormat` or `LibraryError::Manifest` naming the first rule
     /// broken.
     pub fn validate(&self) -> Result<(), LibraryError> {
-        todo!("lane M: schema rules serde cannot express")
+        validate::manifest(self)
+    }
+}
+
+/// Reads `format_version` before the rest of the document, so a manifest of another version
+/// is reported as `UnsupportedFormat` even when its other fields no longer match this
+/// version's shape.
+fn check_version_field(value: &Value) -> Result<(), LibraryError> {
+    let raw = value.get("format_version").and_then(Value::as_u64).ok_or_else(|| {
+        LibraryError::Manifest("format_version is missing or not a whole number".to_owned())
+    })?;
+    let version = u32::try_from(raw)
+        .map_err(|_| LibraryError::Manifest(format!("format_version {raw} is out of range")))?;
+    if SUPPORTED_FORMAT_VERSIONS.contains(&version) {
+        Ok(())
+    } else {
+        Err(LibraryError::UnsupportedFormat(version))
     }
 }
