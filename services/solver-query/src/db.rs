@@ -1,18 +1,26 @@
-#![allow(unused_variables, dead_code, reason = "S16 stub: lane D fills this file")]
 //! The query-role database connection (R2.13, O-28, O-146, O-147, plan C.6): a lazy
-//! sqlx pool as `query_login`, the coverage queries and the role probe.
+//! sqlx pool as `query_login`, the coverage reads and the role probe.
 //!
-//! S16 lands `Db::connect_lazy`, which `AppState::from_config` calls when
-//! `QUERY_DATABASE_URL` is set: `PgPoolOptions::connect_lazy` with `MAX_CONNECTIONS`
-//! parses the string and opens nothing, so the service starts before Postgres is healthy
-//! (compose gives solver-query no `depends_on`). Lane D adds the runtime-checked
-//! `sqlx::query` reads (no macros, so no `DATABASE_URL` at build and no `.sqlx`
-//! directory, O-147): preflop availability from `solution`, flops and scenario counts
-//! from `scenario`, queue positions from `build_job`, and the role probe
-//! `select current_user, pg_has_role(current_user, 'query', 'member')` for `/healthz`.
-//! A failed query answers 503 `database-unavailable`, never a 500. Lane D removes the
-//! allowance at the top of this file.
+//! Mechanism: `Db::connect_lazy` parses `QUERY_DATABASE_URL` and opens nothing, so the
+//! service starts before Postgres is healthy (compose gives solver-query no `depends_on`);
+//! the first query opens a connection, up to `MAX_CONNECTIONS`. Every read is a
+//! runtime-checked `sqlx::query` (no macros, so no `DATABASE_URL` at build and no `.sqlx`
+//! directory, O-147) over the tables the query role may select
+//! (`db/migrations/20261020001000_grants.sql`): preflop availability from `solution`, flops
+//! and scenario counts from `scenario` joined to the solution's status, and queue
+//! positions from `build_job`. The role probe behind `/healthz` and `/metrics` runs
+//! `select current_user, pg_has_role(current_user, 'query', 'member')`, bounded by
+//! `PROBE_TIMEOUT` so a database that is down never holds the liveness answer.
+//!
+//! A failure of any kind is `ApiError::DatabaseUnavailable` (503), never a 500. Its detail
+//! names the failure class only; the server's text goes to the log, and no path carries
+//! the connection string or its password (A9 section 3; `config::DatabaseUrl` redacts it
+//! wherever it is shown).
 
+use std::fmt;
+use std::time::Duration;
+
+use gto_model::{ConfigId, PositionPair};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
 use crate::error::ApiError;
@@ -20,10 +28,108 @@ use crate::error::ApiError;
 /// The most connections the lazy pool opens (plan C.6).
 pub const MAX_CONNECTIONS: u32 = 4;
 
+/// How long a query waits for a connection before the answer is `database-unavailable`
+/// (O-146). The pool retries a refused connection until this deadline, so without it a
+/// stopped Postgres would hold a coverage request for sqlx's default of thirty seconds.
+pub const ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long the role probe behind `/healthz` and `/metrics` may take (O-146). The
+/// container health check gives the whole probe three seconds (`probe::TIMEOUT` is two),
+/// so the database block must answer well inside that whether or not Postgres is up.
+pub const PROBE_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// The group role the login must be a member of (O-28,
+/// `db/migrations/20261020000200_roles.sql`).
+pub const QUERY_ROLE: &str = "query";
+
+/// The SQLSTATE of a privilege failure, what any write under the query role reports.
+pub const INSUFFICIENT_PRIVILEGE: &str = "42501";
+
+/// The role probe: who the pool connected as and whether that login holds `$1`.
+const ROLE_PROBE_SQL: &str = "select current_user::text, pg_has_role(current_user, $1, 'member')";
+
+/// Published preflop solutions of one configuration and pair, by id.
+const PREFLOP_SOLUTIONS_SQL: &str = "select id::text from solution \
+    where kind = 'preflop' and status = 'published' \
+    and game_config_id = $1 and position_pair = $2 \
+    order by id";
+
+/// Scenario counts by flop and by the status of the solution that holds them.
+const FLOPS_SQL: &str = "select sc.flop, s.status, count(*) \
+    from scenario sc join solution s on s.id = sc.solution_id \
+    where sc.game_config_id = $1 and sc.position_pair = $2 \
+    group by sc.flop, s.status \
+    order by sc.flop, s.status";
+
+/// Queued build jobs of one configuration and pair with their place in the whole queue,
+/// highest priority first, ties by age (the builder's claim order, ADR 0005).
+const QUEUE_SQL: &str = "select id::text, flop, round(priority)::int4, status::text, position \
+    from (select id, flop, priority, status, game_config_id, position_pair, \
+        row_number() over (order by priority desc, created_at, id) as position \
+        from build_job where status = 'queued') queued \
+    where game_config_id = $1 and position_pair = $2 \
+    order by position";
+
 /// The query-role pool.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Db {
     pool: PgPool,
+}
+
+/// What the role probe answered.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RoleProbe {
+    /// `current_user` as Postgres reports it, `query_login` on the dev profile.
+    pub current_user: String,
+    /// True when that login is a member of [`QUERY_ROLE`].
+    pub is_query_member: bool,
+}
+
+impl RoleProbe {
+    /// The role `/healthz` reports: [`QUERY_ROLE`] when the login holds it, else the login
+    /// itself, so a connection under the wrong role is visible.
+    #[must_use]
+    pub fn role(&self) -> String {
+        if self.is_query_member { QUERY_ROLE.to_owned() } else { self.current_user.clone() }
+    }
+}
+
+/// One flop of the `scenario` table: its scenarios under one solution status.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FlopRow {
+    /// The flop text as stored, for example `Ah7d2c`.
+    pub flop: String,
+    /// The status of the solution holding the scenarios (`published`, `unavailable`,
+    /// `superseded`).
+    pub status: String,
+    /// How many scenarios the flop holds under that status.
+    pub scenarios: u32,
+}
+
+/// One queued build job.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QueueRow {
+    /// The job id.
+    pub job_id: String,
+    /// The flop the job builds.
+    pub flop: String,
+    /// The priority, rounded to the nearest integer.
+    pub priority: i32,
+    /// The job status, `queued`.
+    pub status: String,
+    /// The place in the whole queue, 1 first.
+    pub position: u32,
+}
+
+/// What the database holds for one configuration and pair.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DbCoverage {
+    /// Published preflop solution ids.
+    pub preflop_ids: Vec<String>,
+    /// Flops with scenarios, by flop and status.
+    pub flops: Vec<FlopRow>,
+    /// Queued build jobs, queue order.
+    pub queue: Vec<QueueRow>,
 }
 
 impl Db {
@@ -36,6 +142,7 @@ impl Db {
     pub fn connect_lazy(url: &str) -> Result<Db, ApiError> {
         let pool = PgPoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
+            .acquire_timeout(ACQUIRE_TIMEOUT)
             .connect_lazy(url)
             .map_err(|err| {
                 tracing::error!(error = %err, "QUERY_DATABASE_URL is not a connection string");
@@ -50,5 +157,193 @@ impl Db {
     #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
+    }
+
+    /// Who the pool connects as and whether that login holds [`QUERY_ROLE`], within
+    /// [`PROBE_TIMEOUT`].
+    ///
+    /// # Errors
+    ///
+    /// `ApiError::DatabaseUnavailable` when the connection or the query fails or the
+    /// deadline passes.
+    pub async fn probe_role(&self) -> Result<RoleProbe, ApiError> {
+        let query = sqlx::query_as::<_, (String, bool)>(ROLE_PROBE_SQL)
+            .bind(QUERY_ROLE)
+            .fetch_one(&self.pool);
+        let (current_user, is_query_member) = match tokio::time::timeout(PROBE_TIMEOUT, query).await
+        {
+            Ok(answer) => answer.map_err(|err| unavailable("role probe", &err))?,
+            Err(_elapsed) => return Err(probe_timed_out()),
+        };
+        Ok(RoleProbe { current_user, is_query_member })
+    }
+
+    /// True when the role probe answered, for the `solver_query_db_connected` gauge.
+    pub async fn is_connected(&self) -> bool {
+        self.probe_role().await.is_ok()
+    }
+
+    /// Everything the database holds for `config_id` and `pair`: published preflop
+    /// solutions, flops with their scenario counts, and queued jobs with their positions.
+    ///
+    /// # Errors
+    ///
+    /// `ApiError::DatabaseUnavailable` on the first read that fails.
+    pub async fn coverage(
+        &self,
+        config_id: &ConfigId,
+        pair: PositionPair,
+    ) -> Result<DbCoverage, ApiError> {
+        let pair = pair.to_string();
+        let preflop_ids = self.preflop_ids(config_id.as_str(), &pair).await?;
+        let flops = self.flops(config_id.as_str(), &pair).await?;
+        let queue = self.queue(config_id.as_str(), &pair).await?;
+        Ok(DbCoverage { preflop_ids, flops, queue })
+    }
+
+    async fn preflop_ids(&self, config_id: &str, pair: &str) -> Result<Vec<String>, ApiError> {
+        let rows = sqlx::query_as::<_, (String,)>(PREFLOP_SOLUTIONS_SQL)
+            .bind(config_id)
+            .bind(pair)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| unavailable("preflop solutions", &err))?;
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    async fn flops(&self, config_id: &str, pair: &str) -> Result<Vec<FlopRow>, ApiError> {
+        let rows = sqlx::query_as::<_, (String, String, i64)>(FLOPS_SQL)
+            .bind(config_id)
+            .bind(pair)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| unavailable("flops", &err))?;
+        Ok(rows
+            .into_iter()
+            .map(|(flop, status, scenarios)| FlopRow {
+                flop,
+                status,
+                scenarios: saturated(scenarios),
+            })
+            .collect())
+    }
+
+    async fn queue(&self, config_id: &str, pair: &str) -> Result<Vec<QueueRow>, ApiError> {
+        let rows = sqlx::query_as::<_, (String, String, i32, String, i64)>(QUEUE_SQL)
+            .bind(config_id)
+            .bind(pair)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| unavailable("queue", &err))?;
+        Ok(rows
+            .into_iter()
+            .map(|(job_id, flop, priority, status, position)| QueueRow {
+                job_id,
+                flop,
+                priority,
+                status,
+                position: saturated(position),
+            })
+            .collect())
+    }
+}
+
+impl fmt::Debug for Db {
+    /// The pool's size only: its options hold the connection string.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Db")
+            .field("connections", &self.pool.size())
+            .field("max_connections", &MAX_CONNECTIONS)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A count from Postgres (`bigint`) as the contract's `u32`; a negative or oversized count
+/// cannot come from `count(*)` or `row_number()`, and saturates rather than panics.
+fn saturated(count: i64) -> u32 {
+    u32::try_from(count).unwrap_or(if count < 0 { 0 } else { u32::MAX })
+}
+
+/// The `database-unavailable` answer for a sqlx failure during `context`: the class of
+/// the failure for the caller, the server's text for the log.
+fn unavailable(context: &str, err: &sqlx::Error) -> ApiError {
+    tracing::warn!(context, error = %err, "the query database did not answer");
+    ApiError::DatabaseUnavailable(format!("{context}: {}", failure_class(err)))
+}
+
+/// The probe did not answer within [`PROBE_TIMEOUT`].
+fn probe_timed_out() -> ApiError {
+    tracing::warn!(timeout_ms = PROBE_TIMEOUT.as_millis(), "the role probe timed out");
+    ApiError::DatabaseUnavailable(format!(
+        "role probe: no answer within {} ms",
+        PROBE_TIMEOUT.as_millis()
+    ))
+}
+
+/// A short, fixed description per failure class, so the detail never echoes server text.
+fn failure_class(err: &sqlx::Error) -> &'static str {
+    match err {
+        sqlx::Error::PoolTimedOut => "no connection within the acquire timeout",
+        sqlx::Error::PoolClosed => "the pool is closed",
+        sqlx::Error::Io(_) | sqlx::Error::Tls(_) | sqlx::Error::Protocol(_) => {
+            "the connection failed"
+        }
+        sqlx::Error::Database(_) => "the database rejected the query",
+        sqlx::Error::RowNotFound => "no row answered",
+        sqlx::Error::ColumnDecode { .. }
+        | sqlx::Error::ColumnNotFound(_)
+        | sqlx::Error::ColumnIndexOutOfBounds { .. }
+        | sqlx::Error::TypeNotFound { .. }
+        | sqlx::Error::Decode(_) => "the answer did not decode",
+        _ => "an unexpected failure",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Db, QUERY_ROLE, RoleProbe, failure_class, saturated};
+
+    /// A connection string with a dev placeholder password, never a real secret.
+    const URL: &str = "postgres://query_login:change-me-query@localhost:5432/gto?sslmode=disable";
+
+    #[test]
+    fn r2_13_role_probe_reports_the_group_role_or_the_login() {
+        let member = RoleProbe { current_user: "query_login".to_owned(), is_query_member: true };
+        assert_eq!(member.role(), QUERY_ROLE);
+        let stray = RoleProbe { current_user: "app_login".to_owned(), is_query_member: false };
+        assert_eq!(stray.role(), "app_login");
+    }
+
+    #[test]
+    fn r2_13_counts_from_postgres_saturate_into_the_contract() {
+        assert_eq!(saturated(0), 0);
+        assert_eq!(saturated(7), 7);
+        assert_eq!(saturated(i64::from(u32::MAX) + 1), u32::MAX);
+        assert_eq!(saturated(-1), 0);
+    }
+
+    #[test]
+    fn r2_13_failure_class_never_echoes_server_text() {
+        let io = sqlx::Error::Io(std::io::Error::other("secret host text"));
+        assert_eq!(failure_class(&io), "the connection failed");
+        assert_eq!(
+            failure_class(&sqlx::Error::PoolTimedOut),
+            "no connection within the acquire timeout"
+        );
+        assert_eq!(failure_class(&sqlx::Error::RowNotFound), "no row answered");
+        assert_eq!(
+            failure_class(&sqlx::Error::ColumnNotFound("x".into())),
+            "the answer did not decode"
+        );
+    }
+
+    #[tokio::test]
+    async fn r2_13_db_debug_and_a_refused_connection_never_show_the_connection_string() {
+        let db = Db::connect_lazy(URL).expect("a lazy pool opens nothing");
+        let shown = format!("{db:?}");
+        assert!(!shown.contains("change-me-query"), "{shown}");
+        assert!(shown.starts_with("Db {"), "{shown}");
+        let error = Db::connect_lazy("postgres://u:p@h:not-a-port/d").expect_err("rejected");
+        assert!(!error.to_string().contains("not-a-port"), "{error}");
     }
 }

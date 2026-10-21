@@ -1,13 +1,18 @@
 //! `GET /metrics` (A5 section 2, A9 section 4, R2.13, O-155): the Prometheus text
-//! exposition. A stub until the registry of plan C.8 lands: it answers 501 with a problem
-//! body.
+//! exposition. The counters and the histogram come from the registry the latency
+//! middleware writes (`Metrics::render`); the gauges are read at scrape time from the
+//! library (`Library::stats`), the query-role pool (`Db::is_connected`, the probe bounded
+//! by its timeout) and the deal store (`DealStore::held`). The body is served as
+//! `text/plain; version=0.0.4`, the exposition media type.
 
 use axum::extract::State;
-use axum::response::Response;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 
 use crate::api::problem::Problem;
 use crate::app::AppState;
 use crate::error::ApiError;
+use crate::metrics::Gauges;
 
 /// The media type of the exposition, Prometheus text format version 0.0.4.
 pub const METRICS_CONTENT_TYPE: &str = "text/plain; version=0.0.4";
@@ -16,7 +21,7 @@ pub const METRICS_CONTENT_TYPE: &str = "text/plain; version=0.0.4";
 ///
 /// # Errors
 ///
-/// A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+/// None today: the registry's lock is reused when poisoned, so every scrape answers.
 #[utoipa::path(
     get,
     path = "/metrics",
@@ -28,6 +33,13 @@ pub const METRICS_CONTENT_TYPE: &str = "text/plain; version=0.0.4";
             body = Problem, content_type = "application/problem+json"),
     )
 )]
-pub async fn metrics(State(_state): State<AppState>) -> Result<Response, ApiError> {
-    Err(ApiError::NotImplemented)
+pub async fn metrics(State(state): State<AppState>) -> Result<Response, ApiError> {
+    let db_connected = match state.db.as_deref() {
+        Some(db) => db.is_connected().await,
+        None => false,
+    };
+    let gauges =
+        Gauges { library: state.library.stats(), db_connected, deals_held: state.deals.held() };
+    let text = state.metrics.render(&gauges);
+    Ok(([(header::CONTENT_TYPE, METRICS_CONTENT_TYPE)], text).into_response())
 }

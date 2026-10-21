@@ -21,7 +21,10 @@
 // the fixture library mount is proven from inside the solver-query container (O-62): compose exec
 // runs the binary's own healthz subcommand, which prints the health JSON, and the check fails unless
 // its fixture_library block reports path "/fixtures/library" with present true, so a missing or
-// misplaced bind mount fails here rather than in S19's first library read.
+// misplaced bind mount fails here rather than in S19's first library read. The same health JSON proves
+// the query-role connection (O-28, O-146): its database block must say configured and connected with
+// role "query", which means the pool composed from QUERY_DB_PASSWORD reached postgres as query_login and
+// that login is a member of the read-only query group role, with no Rust on the runner.
 
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
@@ -49,6 +52,8 @@ const HEALTHZ_OK_STATUS = "ok";
 const SOLVER_QUERY_SERVICE = "solver-query";
 const SOLVER_QUERY_HEALTHZ_COMMAND = ["/usr/local/bin/solver-query", "healthz"];
 const FIXTURE_LIBRARY_CONTAINER_PATH = "/fixtures/library";
+// The group role solver-query must hold (O-28, db/migrations/20261020000200_roles.sql).
+const QUERY_ROLE = "query";
 const SIGV4_REGION = "us-east-1";
 const SIGV4_SERVICE = "s3";
 const REQUEST_TIMEOUT_MS = 5000;
@@ -282,18 +287,23 @@ async function checkApiHealthzThroughCaddy(settings) {
   return `GET ${CADDY_API_HEALTHZ_URL} as ${site} answered 200 with status ok from ${body.service ?? "an unnamed service"}`;
 }
 
-// The fixture library mount (O-62), proven from inside the container: the health self-probe the
-// image's HEALTHCHECK runs prints the health JSON on exit 0, and its fixture_library block says
-// whether the configured path exists there. Both the path and the presence are asserted, so a mount
-// that landed somewhere else, or did not land, fails the check.
-function checkFixtureLibraryMount() {
+// The health JSON from inside the solver-query container: the health self-probe the image's
+// HEALTHCHECK runs prints it on exit 0.
+function solverQueryHealthz() {
   const command = `compose exec ${SOLVER_QUERY_SERVICE} ${SOLVER_QUERY_HEALTHZ_COMMAND.join(" ")}`;
   const result = runCompose(["exec", "-T", SOLVER_QUERY_SERVICE, ...SOLVER_QUERY_HEALTHZ_COMMAND]);
   if (result.status !== 0) {
     const output = (result.stdout + result.stderr).trim();
     throw new Error(`${command} exited ${result.status}: ${output}`);
   }
-  const body = parseJsonBody(command, result.stdout);
+  return parseJsonBody(command, result.stdout);
+}
+
+// The fixture library mount (O-62), proven from inside the container: the fixture_library block of
+// the health JSON says whether the configured path exists there. Both the path and the presence are
+// asserted, so a mount that landed somewhere else, or did not land, fails the check.
+function checkFixtureLibraryMount() {
+  const body = solverQueryHealthz();
   const library = body?.fixture_library;
   const path = JSON.stringify(library?.path);
   if (library?.path !== FIXTURE_LIBRARY_CONTAINER_PATH) {
@@ -304,6 +314,27 @@ function checkFixtureLibraryMount() {
     throw new Error(`fixture_library.present is ${present}: nothing is mounted at ${path}`);
   }
   return `healthz inside the container reports ${FIXTURE_LIBRARY_CONTAINER_PATH} present`;
+}
+
+// The query-role connection (O-28, O-146), proven from inside the container: the database block of
+// the health JSON says whether QUERY_DATABASE_URL is set (configured), whether the pool reached
+// postgres on that request (connected) and which group role the login holds (role). All three are
+// asserted, so a missing variable, a wrong password or a login outside the query role fails here.
+function checkQueryRoleConnection() {
+  const body = solverQueryHealthz();
+  const database = body?.database;
+  if (database?.configured !== true) {
+    const configured = JSON.stringify(database?.configured);
+    throw new Error(`database.configured is ${configured}: QUERY_DATABASE_URL is not set in the container`);
+  }
+  if (database.connected !== true) {
+    const connected = JSON.stringify(database.connected);
+    throw new Error(`database.connected is ${connected}: the pool did not reach postgres as the query role`);
+  }
+  if (database.role !== QUERY_ROLE) {
+    throw new Error(`database.role is ${JSON.stringify(database.role)}, expected "${QUERY_ROLE}"`);
+  }
+  return `healthz inside the container reports the database connected under role ${QUERY_ROLE}`;
 }
 
 const CHECKS = [
@@ -317,6 +348,7 @@ const CHECKS = [
   ["caddy https /healthz", checkCaddyHttps],
   ["caddy https /api/v1/healthz", checkApiHealthzThroughCaddy],
   ["solver-query fixture library mount", checkFixtureLibraryMount],
+  ["solver-query query-role connection", checkQueryRoleConnection],
 ];
 
 async function runCheck(name, check, settings) {
