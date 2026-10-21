@@ -42,7 +42,7 @@ Both throwaway branches were closed and deleted after the runs above were record
 
 | Condition | Evidence | Holds |
 |---|---|---|
-| All seven jobs green on `sprint/1-v1` | All seven green on pull request #8 at 40110ad (runs above); the `sprint/1-v1` run after the merge is appended by a one-line `p0/gate-link` docs commit | Not yet: pending the merge |
+| All seven jobs green on `sprint/1-v1` | All seven green on pull request #8 at 40110ad and again on `sprint/1-v1` at the merge commit 2d012c0 (runs in the last section) | Holds |
 | `docker compose --profile dev up` reaches healthy on the Zenbook | The S02 row and the S06 `just e2e` row | Holds |
 | The guard rejects the planted path and the planted identifier locally and in CI | The S01 R0.4 rows | Holds |
 | Every vector is a pending test tagged with its R ID; zero untagged pending tests | `just test-tags` on `sprint/1-v1` after pull request #6 (S05): 83 pending tests, all tagged | Holds |
@@ -90,4 +90,4 @@ Pending as of 2026-10-20. Deadline: S20, the first deploy (O-67). Its report wil
 
 ## sprint/1-v1 run
 
-Appended by the `p0/gate-link` commit after pull request #8 merges.
+Push runs on `sprint/1-v1` at 2d012c0, the merge of pull request #8, all green on 2026-10-21: rust https://github.com/emstacho-su/g-tee-oh/actions/runs/39519980224, ts 39519980222, contracts 39519980130, e2e 39519980205, licenses 39519980157, security 39519980185, images 39519980143. The repo part of the Phase 0 gate holds; the Mac part (R0.9) waits on S04.
