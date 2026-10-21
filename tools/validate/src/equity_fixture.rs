@@ -1,8 +1,7 @@
 //! The 169 by 169 preflop equity fixture, `validation/fixtures/equity/preflop-169.json`
 //! (R2.20, O-32, O-126), written from `gto_solve::equity::table()` by the `equity-table`
-//! subcommand. Owner: the S13 integrator (plan task 6). The writer and the builder are
-//! stubs until then; the file format and the loader are settled here so the tests under
-//! `tests/equity_table.rs` read the committed file.
+//! subcommand; the tests under `tests/equity_table.rs` read the committed file through
+//! the loader here.
 //!
 //! Format (S13 plan section B): `schema_version` 1; `classes`, the 169 labels in
 //! `gto_model::HandClass` index order; `equity[i][j]`, the hero class `i` against the
@@ -172,18 +171,48 @@ fn check_shape(fixture: &EquityFixture) -> Result<(), String> {
     Ok(())
 }
 
+/// How the fixture's numbers are produced, recorded in the file: every disjoint ordered
+/// combo pair of the two classes against every board, each suit-permutation orbit of combo
+/// pairs scored once and weighted by its size, equity `(wins + ties / 2) / total`. Kept
+/// short so the pretty-printed line stays within 100 columns.
+pub const METHOD: &str =
+    "exact: every disjoint ordered combo pair and C(48, 5) board, by suit orbit";
+
+/// The evaluator that scores the boards, recorded in the file.
+pub const EVALUATOR: &str = "postflop_engine::evaluator::eval7 in crates/vendor/postflop-engine";
+
 /// Build the fixture from `gto_solve::equity::table()`, dated `generated_at` at `commit`.
 #[must_use]
 pub fn build(generated_at: &str, commit: &str) -> EquityFixture {
-    todo!("integrator: the table at {commit} on {generated_at}")
+    let table = gto_solve::equity::table();
+    EquityFixture {
+        schema_version: SCHEMA_VERSION,
+        classes: table.classes,
+        equity: table.equity,
+        pairs: table.pairs,
+        method: METHOD.to_owned(),
+        evaluator: EVALUATOR.to_owned(),
+        boards_per_pair: BOARDS_PER_PAIR,
+        generated_at: generated_at.to_owned(),
+        commit: commit.to_owned(),
+    }
 }
 
 /// Write the fixture as pretty-printed JSON with a trailing newline, creating the parent
-/// directory when it is missing.
+/// directory when it is missing. The shape is checked first, so a malformed table is
+/// never written.
 ///
 /// # Errors
 ///
-/// `EquityFixtureError::Serialize` or `Write`.
+/// `EquityFixtureError::Invalid`, `Serialize` or `Write`.
 pub fn write(fixture: &EquityFixture, path: &Path) -> Result<(), EquityFixtureError> {
-    todo!("integrator: write {} classes to {}", fixture.classes.len(), path.display())
+    check_shape(fixture)
+        .map_err(|reason| EquityFixtureError::Invalid { path: path.to_path_buf(), reason })?;
+    let text = serde_json::to_string_pretty(fixture)
+        .map_err(|source| EquityFixtureError::Serialize { path: path.to_path_buf(), source })?;
+    let write_error = |source| EquityFixtureError::Write { path: path.to_path_buf(), source };
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent).map_err(write_error)?;
+    }
+    std::fs::write(path, format!("{text}\n")).map_err(write_error)
 }

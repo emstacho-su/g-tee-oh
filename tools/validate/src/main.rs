@@ -218,10 +218,36 @@ fn run_context(repo_root: &Path, options: &Options) -> Result<Context, String> {
     Ok(Context { machine, commit, date, toolchain })
 }
 
-/// Build the equity table and write the fixture (the S13 integrator fills this, plan
-/// task 6).
+/// Build the equity table, write the fixture, read it back and check that every number
+/// survived the JSON round trip exactly, then print the elapsed time and the path.
 fn run_equity_table(options: &Options) -> Result<(), String> {
-    todo!("integrator: equity-table with {options:?}")
+    use validate::equity_fixture;
+
+    let repo_root = validate::repo_root();
+    let out = options.out.clone().unwrap_or_else(|| repo_root.join(equity_fixture::DEFAULT_PATH));
+    let commit = match &options.commit {
+        Some(commit) => {
+            machine::check_commit(commit).map_err(|error| error.to_string())?;
+            commit.clone()
+        }
+        None => machine::git_head(&repo_root).map_err(|error| error.to_string())?,
+    };
+    let generated_at =
+        report::iso_8601_utc(SystemTime::now()).map_err(|error| error.to_string())?;
+    let started = std::time::Instant::now();
+    let fixture = equity_fixture::build(&generated_at, &commit);
+    let elapsed = started.elapsed();
+    equity_fixture::write(&fixture, &out).map_err(|error| error.to_string())?;
+    let reread = equity_fixture::load(&out).map_err(|error| error.to_string())?;
+    if reread != fixture {
+        return Err(format!("{} does not read back to the table written", out.display()));
+    }
+    println!(
+        "{BIN_NAME}: equity table written to {} in {:.1} s at {commit}",
+        out.display(),
+        elapsed.as_secs_f64()
+    );
+    Ok(())
 }
 
 #[cfg(test)]

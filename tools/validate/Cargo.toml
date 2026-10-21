@@ -17,7 +17,7 @@ gto-model = { workspace = true }
 # validation/fixtures/ are JSON and the lib parses them through serde. The gate reports
 # are written back through the same structs (report.schema.json).
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 # The machine block of every gate report: CPU, cores, memory and operating system.
 sysinfo = { workspace = true }
 
