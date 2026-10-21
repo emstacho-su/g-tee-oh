@@ -57,12 +57,12 @@
     "config_id": {
       "type": "string",
       "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-      "description": "A seeded game_config identifier in gto-model's grammar (O-112, O-132), the same pattern as the manifest and the node dump: cfg_, the table size, the format, the stake slug unless it repeats the format, the depth in whole big blinds or as <n>cbb, then _straddle and _ante<cbb> when they apply, for example cfg_9_live_13_150_straddle."
+      "description": "A game_config id in gto-model's grammar (O-112, O-132), as in the manifest."
     },
     "position": {
       "type": "string",
       "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-      "description": "One of the nine gto-model position names (UTG, UTG1, UTG2, LJ, HJ, CO, BTN, SB, BB), the same pattern as the manifest and the node dump (O-132)."
+      "description": "One of gto-model's nine seat names, as in the manifest (O-132)."
     },
     "positive_bb": {
       "type": "number",
