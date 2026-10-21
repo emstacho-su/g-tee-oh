@@ -137,7 +137,7 @@
         "pot_cbb": {
           "type": "integer",
           "minimum": 0,
-          "description": "The pot before the action at this node, in centi-big-blinds (cbb)."
+          "description": "The pot at this node in centi-big-blinds (cbb), including any outstanding bet the actor faces (O-137); the pack buckets the node's actions against this pot and stores it unchanged."
         },
         "stacks_cbb": {
           "type": "array",
