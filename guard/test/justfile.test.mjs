@@ -28,6 +28,9 @@ const CONTRACT_RECIPES = [
   'docs-mirror',
   'hooks',
   'bench',
+  'gates',
+  'equity-table',
+  'report-check',
   'ci',
 ];
 

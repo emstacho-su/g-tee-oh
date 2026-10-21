@@ -165,6 +165,25 @@ bench:
     cargo bench -p gto-solve -p gto-library
     node scripts/bench-report.mjs
 
+# The validate tool solves the toy games and writes g1-kuhn, g2-akq and g3-leduc as JSON
+# (JavaScript Object Notation) with Markdown twins; VALIDATE_MACHINE names the machine
+# (O-125). No database needed.
+# Validation gates G1 to G3 (R2.4 to R2.6); writes the six reports to validation/reports
+gates:
+    cargo run --release -p validate -- gates --out validation/reports
+
+EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
+
+# Exact enumeration in gto_solve::equity, run once on the Zenbook and committed, never in CI
+# (O-126).
+# 169 by 169 preflop equity table (R2.20); writes validation/fixtures/equity/preflop-169.json
+equity-table:
+    cargo run --release -p validate -- equity-table --out {{EQUITY_TABLE}}
+
+# Report schema check (R0.11): validation/reports/*.json against the schema, gate reports pass
+report-check:
+    node scripts/check-reports.mjs
+
 # Everything the hosted jobs run that needs neither Docker nor a database, in order (contracts needs a migrated
 # database, e2e the compose stack, images buildx)
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates ts-lint ts-typecheck ts-test report-check licenses security guard-test test-tags

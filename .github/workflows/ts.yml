@@ -36,3 +36,5 @@ jobs:
         run: just ts-test
       - name: Pending-test tags (R0.11)
         run: just test-tags
+      - name: Report schema (R0.11)
+        run: just report-check
