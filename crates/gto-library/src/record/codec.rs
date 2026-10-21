@@ -2,9 +2,10 @@
 //! `decode`, with the code tables for streets, action tokens and buckets. The layout is in the
 //! `record` module docs; this file turns it into bytes and back.
 //!
-//! Mechanism: `encode` checks every table against the action and hand counts first, so the
-//! bytes it appends always decode. `decode` reads the fixed header, then the hand tables, and
-//! every length is bounds-checked through `LeReader`, so malformed input is an error and
+//! Mechanism: `encode` checks every table against the action and hand counts first, and then
+//! the values `decode` refuses (a strategy column off 255, a float that is not finite), so
+//! the bytes it appends always decode. `decode` reads the fixed header, then the hand tables,
+//! and every length is bounds-checked through `LeReader`, so malformed input is an error and
 //! never a panic.
 //!
 //! Lane W (writer) owns this file.
@@ -22,6 +23,8 @@ use super::{
 
 /// Bytes before the action table: hash 8, four `u8` fields, pot 4, two stacks 4 each.
 const HEADER_BYTES: usize = 24;
+/// Why a strategy column off `FREQUENCY_SCALE` is refused, by `encode` and `decode` alike.
+const COLUMN_SUM_REASON: &str = "a strategy column does not sum to 255";
 /// One action: type `u8`, size `u32`, bucket `u8`.
 const ACTION_BYTES: usize = 6;
 /// Action tokens in type-code order (O-130); sized tokens carry a placeholder size here.
@@ -60,9 +63,11 @@ impl NodeRecord {
     /// # Errors
     ///
     /// `LibraryError::Quantize` when a table's shape disagrees with the action or hand
-    /// count, so the bytes would not decode.
+    /// count, a strategy column does not sum to 255, or `ev_best` or `accuracy_pct_pot`
+    /// holds a float that is not finite: in each case the bytes would not decode.
     pub fn encode(&self, out: &mut Vec<u8>) -> Result<(), LibraryError> {
         let (n_actions, n_hands) = self.check_shape()?;
+        self.check_values()?;
         out.reserve(self.encoded_len());
         out.extend_from_slice(&self.key_hash.to_le_bytes());
         out.extend_from_slice(&[street_code(self.street), self.to_act, n_actions, self.flags()]);
@@ -116,6 +121,20 @@ impl NodeRecord {
             return Err(shape_error("strategy and loss must be [action][hand]"));
         }
         Ok((n_actions, n_hands))
+    }
+
+    /// The value rules `decode` holds the bytes to, checked after `check_shape` so every row
+    /// is known to be `hand_count` long: each strategy column sums to `FREQUENCY_SCALE` and
+    /// every stored float is finite. The reasons are the ones `decode` reports.
+    fn check_values(&self) -> Result<(), LibraryError> {
+        if (0..self.hand_count()).any(|h| !column_sums_to_scale(&self.strategy, h)) {
+            return Err(LibraryError::Quantize(COLUMN_SUM_REASON.into()));
+        }
+        let floats = self.ev_best.iter().chain(self.accuracy_pct_pot.as_ref());
+        match floats.copied().find(|value| !value.is_finite()) {
+            Some(value) => Err(LibraryError::Quantize(not_finite_reason(value))),
+            None => Ok(()),
+        }
     }
 
     /// Decodes one record from the front of `b`, returning it with the bytes it used.
@@ -212,9 +231,8 @@ fn decode_tables(r: &mut LeReader<'_>, header: &Header) -> Result<Tables, Librar
     let strategy = (0..n_actions)
         .map(|_| r.take(n, "a strategy row").map(<[u8]>::to_vec))
         .collect::<Result<Vec<_>, _>>()?;
-    let column_sum = |h: usize| strategy.iter().map(|row| u32::from(row[h])).sum::<u32>();
-    if (0..n).any(|h| column_sum(h) != u32::from(FREQUENCY_SCALE)) {
-        return Err(LibraryError::Decode("a strategy column does not sum to 255".into()));
+    if (0..n).any(|h| !column_sums_to_scale(&strategy, h)) {
+        return Err(LibraryError::Decode(COLUMN_SUM_REASON.into()));
     }
     let ev_best = (0..n).map(|_| finite_stored(r.f32("ev_best")?)).collect::<Result<_, _>>()?;
     let loss = (0..n_actions).map(|_| u16_table(r, n)).collect::<Result<_, _>>()?;
@@ -232,12 +250,19 @@ fn valid_ids(ids: &[u16], space: HandSpace) -> bool {
         && ids.last().is_none_or(|last| *last < space.size())
 }
 
+/// True when hand `h`'s strategy column sums to `FREQUENCY_SCALE`; every row holds at least
+/// `h + 1` entries.
+fn column_sums_to_scale(strategy: &[Vec<u8>], h: usize) -> bool {
+    strategy.iter().map(|row| u32::from(row[h])).sum::<u32>() == u32::from(FREQUENCY_SCALE)
+}
+
+/// Why a float that is not finite is refused, by `encode` and `decode` alike.
+fn not_finite_reason(value: f32) -> String {
+    format!("a stored float {value} is not finite")
+}
+
 fn finite_stored(value: f32) -> Result<f32, LibraryError> {
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(LibraryError::Decode(format!("a stored float {value} is not finite")))
-    }
+    if value.is_finite() { Ok(value) } else { Err(LibraryError::Decode(not_finite_reason(value))) }
 }
 
 fn street_code(street: Street) -> u8 {

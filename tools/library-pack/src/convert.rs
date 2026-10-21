@@ -17,7 +17,8 @@
 //! Lane P (pack) owns this file.
 
 use gto_library::{
-    HandSpace, ManifestConfig, SolutionMeta, SolvedHand, SolvedNode, Source, sha256_hex,
+    HandSpace, ManifestConfig, SolutionMeta, SolvedHand, SolvedNode, Source, is_uuid, narrow_f32,
+    sha256_hex,
 };
 use gto_model::format_line;
 use gto_model::{ActionToken, Cbb, GameFormat, NodeKey, Position, PositionPair, TableSize};
@@ -153,18 +154,6 @@ pub fn default_solution_id(d: &NodeDump) -> Result<String, Violation> {
     Ok(groups.join("-"))
 }
 
-/// True for a lowercase hexadecimal UUID, the manifest schema's `id` pattern.
-#[must_use]
-pub fn is_uuid(text: &str) -> bool {
-    let is_lower_hex = |byte: u8| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte);
-    let groups: Vec<&str> = text.split('-').collect();
-    groups.len() == UUID_GROUPS.len()
-        && groups
-            .iter()
-            .zip(UUID_GROUPS)
-            .all(|(group, width)| group.len() == width && group.bytes().all(is_lower_hex))
-}
-
 fn structural(message: impl Into<String>) -> Violation {
     Violation::new(Rule::Structural, message)
 }
@@ -204,7 +193,7 @@ fn solved_node(node: &DumpNode) -> Result<SolvedNode, Vec<Violation>> {
         actions,
         hand_space: HandSpace::Preflop169,
         hands,
-        accuracy_pct_pot: node.accuracy_pct_pot.map(narrow),
+        accuracy_pct_pot: node.accuracy_pct_pot.map(narrow_f32),
     })
 }
 
@@ -311,7 +300,8 @@ fn provenance(d: &NodeDump, o: &PackOptions, source: Source) -> Result<Provenanc
 }
 
 /// A lowercase UUID id and a Coordinated Universal Time (UTC) timestamp in the schema's
-/// pattern, checked before any output path is built from them.
+/// pattern, checked with the manifest's own matchers before any output path is built from
+/// them.
 fn identity_violations(id: &str, created_at: &str) -> Vec<Violation> {
     let checks = [
         (!is_uuid(id)).then(|| format!("The solution id {id:?} is not a lowercase UUID.")),
@@ -339,13 +329,4 @@ fn manifest_config(d: &NodeDump) -> Result<ManifestConfig, Vec<Violation>> {
         straddle: config.straddle,
         ante_cbb: Cbb(config.ante_cbb),
     })
-}
-
-/// An accuracy in percent of the pot as the record's f32.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "the record stores accuracy as an f32 (A3 section 4, O-130); rounding is intended"
-)]
-fn narrow(value: f64) -> f32 {
-    value as f32
 }

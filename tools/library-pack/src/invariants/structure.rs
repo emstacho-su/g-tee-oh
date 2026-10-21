@@ -11,7 +11,9 @@
 //! pair and a configuration of the dump's seat count and format, and agrees with the node's
 //! street and board; `to_act` is a seat of the pair; two stacks; a pot above zero; 1 to 255
 //! actions, each token parsable with a sized token equal to its `size_cbb` and a fold or check
-//! at 0; reach and frequencies within `[0, 1]`; accuracy at or above zero.
+//! at 0; at least one hand (schema `minItems`), so the pack never writes a record the library
+//! claims to hold but has no hands for; reach and frequencies within `[0, 1]`; accuracy at or
+//! above zero.
 
 use std::collections::BTreeSet;
 
@@ -21,6 +23,11 @@ use gto_model::{ActionToken, ConfigId, GameFormat, NodeKey, Position, PositionPa
 use super::{PREFLOP_169, Rule, Violation};
 use crate::dump::{DumpAction, DumpHand, DumpNode, NodeDump};
 
+/// The dump's `exported_at` pattern is the manifest's `created_at` pattern (schema
+/// `$defs/timestamp`), so the manifest's matcher checks it; `invariants` re-exports it
+/// for `convert`.
+pub(crate) use gto_library::is_timestamp;
+
 /// The only dump schema version.
 const SCHEMA_VERSION: u32 = 1;
 /// The two sources a dump may name.
@@ -29,10 +36,6 @@ const SOURCES: [&str; 2] = ["own", "reference"];
 const MAX_ACTIONS: usize = 255;
 /// Stacks and reach values per node or hand, one per seat of the pair.
 const SEATS: usize = 2;
-/// The fixed part of a timestamp, `9` standing for a digit (schema `$defs/timestamp`).
-const TIMESTAMP_SHAPE: &[u8] = b"9999-99-99T99:99:99";
-/// The most fraction digits a timestamp may carry.
-const MAX_FRACTION_DIGITS: usize = 9;
 
 /// What every node is checked against, parsed once from the dump's header.
 struct Expected {
@@ -62,30 +65,6 @@ pub fn check_structure(d: &NodeDump) -> Vec<Violation> {
         .chain(nodes)
         .map(|message| Violation::new(Rule::Structural, message))
         .collect()
-}
-
-/// True when `text` follows the schema's timestamp pattern,
-/// `YYYY-MM-DDTHH:MM:SS` with an optional fraction of 1 to 9 digits and a `Z`.
-pub(crate) fn is_timestamp(text: &str) -> bool {
-    let Some(rest) = text.as_bytes().strip_suffix(b"Z") else {
-        return false;
-    };
-    let Some((base, fraction)) = rest.split_at_checked(TIMESTAMP_SHAPE.len()) else {
-        return false;
-    };
-    let base_ok = base.iter().zip(TIMESTAMP_SHAPE).all(|(byte, shape)| match shape {
-        b'9' => byte.is_ascii_digit(),
-        separator => byte == separator,
-    });
-    let fraction_ok = match fraction.split_first() {
-        None => true,
-        Some((dot, digits)) => {
-            *dot == b'.'
-                && (1..=MAX_FRACTION_DIGITS).contains(&digits.len())
-                && digits.iter().all(u8::is_ascii_digit)
-        }
-    };
-    base_ok && fraction_ok
 }
 
 /// The header checks.
@@ -189,7 +168,7 @@ fn check_key(expected: &Expected, node: &DumpNode, name: &str, key: &NodeKey) ->
     checks.into_iter().flatten().collect()
 }
 
-/// The seat, stack, pot, action count and accuracy checks of one node.
+/// The seat, stack, pot, action count, hand count and accuracy checks of one node.
 fn check_values(expected: &Expected, node: &DumpNode, name: &str) -> Vec<String> {
     let seat = match node.to_act.parse::<Position>() {
         Err(err) => Some(format!("{name} has to_act {:?}: {err}.", node.to_act)),
@@ -206,6 +185,7 @@ fn check_values(expected: &Expected, node: &DumpNode, name: &str) -> Vec<String>
         (node.pot_cbb == 0).then(|| format!("{name} has a pot of 0, not above 0.")),
         (count == 0 || count > MAX_ACTIONS)
             .then(|| format!("{name} has {count} actions, not 1 to {MAX_ACTIONS}.")),
+        node.hands.is_empty().then(|| format!("{name} has no hands; a node holds at least one.")),
         node.accuracy_pct_pot
             .filter(|accuracy| *accuracy < 0.0)
             .map(|accuracy| format!("{name} has accuracy_pct_pot {accuracy}, below 0.")),

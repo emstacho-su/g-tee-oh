@@ -5,7 +5,9 @@
 //! (cbb). Every struct denies unknown fields and every optional field is skipped when absent, so a
 //! manifest serializes to exactly the shape the schema allows. `validate` checks the rules
 //! serde cannot: the format version, the fields each kind requires, and the string patterns
-//! (identifier, timestamp, sha256, chunk path).
+//! (identifier, timestamp, sha256, chunk path). The identifier and timestamp matchers,
+//! `is_uuid` and `is_timestamp`, are public so a tool that builds those fields checks them
+//! with the same code.
 //!
 //! The struct fields are fixed by the S14 red commit because the writer (lane W) and the
 //! reader (lane R) build and read them; lane M owns this file's function bodies and the
@@ -21,6 +23,8 @@ use serde_json::Value;
 
 use crate::SUPPORTED_FORMAT_VERSIONS;
 use crate::error::LibraryError;
+
+pub use validate::{is_timestamp, is_uuid};
 
 /// The manifest schema, compiled into the crate so tests and tools validate against it.
 pub const MANIFEST_SCHEMA: &str = include_str!("../schemas/manifest.schema.json");

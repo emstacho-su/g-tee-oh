@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use gto_model::NodeKey;
 
+use crate::DEFAULT_QUERY_CACHE_BYTES;
 use crate::cache::ByteLru;
 use crate::checksum::verify_sha256;
 use crate::chunk::{FileDirectory, FrameEntry, decode_frame, read_directory};
@@ -34,7 +35,6 @@ use crate::manifest::{MANIFEST_FILE, Manifest};
 use crate::record::NodeRecord;
 use crate::store::ObjectStore;
 use crate::view::NodeView;
-use crate::{DEFAULT_QUERY_CACHE_BYTES, SUPPORTED_FORMAT_VERSIONS};
 use routes::{FileSlot, Planned, Routes, at_path, corrupt, index_u32, plan_files, route};
 
 /// Reader settings.
@@ -72,13 +72,14 @@ pub enum Availability {
 /// A cached frame: (solution handle, file index in the solution, frame index in the file).
 type FrameKey = (u32, u32, u32);
 
-/// Where a key's record lives: the solution prefix, the file index and the file.
-type Located = Result<Option<(String, u32, FileSlot)>, LibraryError>;
+/// Where a key's record lives: the solution prefix, the file index and the file. The prefix
+/// and the file's strings are shared, so handing them out of the lock allocates nothing.
+type Located = Result<Option<(Arc<str>, u32, FileSlot)>, LibraryError>;
 
 /// One opened solution.
 #[derive(Debug)]
 struct Solution {
-    prefix: String,
+    prefix: Arc<str>,
     files: Vec<FileSlot>,
     routes: Routes,
 }
@@ -110,6 +111,13 @@ impl ReaderState {
             let (prefix, reason) = (marked.prefix.clone(), marked.reason.clone());
             Err(LibraryError::Unavailable { prefix, reason })
         })
+    }
+
+    /// The handle of an opened prefix, or `Unavailable` for a prefix marked earlier.
+    fn handle_of(&self, prefix: &str) -> Result<Option<SolutionHandle>, LibraryError> {
+        self.refuse(prefix)?;
+        let found = self.solutions.iter().position(|solution| &*solution.prefix == prefix);
+        found.map(|index| index_u32(prefix, index).map(SolutionHandle)).transpose()
     }
 }
 
@@ -144,20 +152,11 @@ impl<S: ObjectStore> Reader<S> {
         let manifest_path = format!("{prefix}/{MANIFEST_FILE}");
         let bytes = self.store.get(&manifest_path)?;
         let manifest = Manifest::from_json(&bytes).map_err(|err| at_path(&manifest_path, err))?;
-        if !SUPPORTED_FORMAT_VERSIONS.contains(&manifest.format_version) {
-            return Err(LibraryError::UnsupportedFormat(manifest.format_version));
-        }
         let (files, routes) = match plan_files(prefix, &manifest)? {
             (files, Routes::Preflop(_)) => self.check_chunks(prefix, &files)?,
             (files, flop_build @ Routes::FlopBuild { .. }) => (files, flop_build),
         };
-        if let Some(found) = self.known(prefix)? {
-            return Ok(found);
-        }
-        let mut state = self.lock();
-        let index = index_u32(prefix, state.solutions.len())?;
-        state.solutions.push(Solution { prefix: prefix.to_owned(), files, routes });
-        Ok(SolutionHandle(index))
+        self.register(prefix, files, routes)
     }
 
     /// Reads one node, decoding its frame through the cache.
@@ -173,7 +172,7 @@ impl<S: ObjectStore> Reader<S> {
         let (prefix, file, slot) = self.locate(h, key, hash)?.ok_or_else(not_found)?;
         let directory = self.directory(h, &prefix, file, &slot)?;
         let entry = directory.find(hash).ok_or_else(not_found)?;
-        let path = slot.path.as_str();
+        let path: &str = &slot.path;
         let record = self.guarded(&prefix, path, || {
             let frame_entry = directory.frames.get(entry.frame as usize);
             let frame_entry =
@@ -226,10 +225,25 @@ impl<S: ObjectStore> Reader<S> {
 
     /// The handle of an opened prefix, or `Unavailable` for a prefix marked earlier.
     fn known(&self, prefix: &str) -> Result<Option<SolutionHandle>, LibraryError> {
-        let state = self.lock();
-        state.refuse(prefix)?;
-        let found = state.solutions.iter().position(|solution| solution.prefix == prefix);
-        found.map(|index| index_u32(prefix, index).map(SolutionHandle)).transpose()
+        self.lock().handle_of(prefix)
+    }
+
+    /// Registers a planned solution and returns its handle. The check for a prefix opened
+    /// meanwhile and the push happen under one lock, so two concurrent opens of one prefix
+    /// end with one `Solution` and one handle, as the `open` doc promises.
+    fn register(
+        &self,
+        prefix: &str,
+        files: Vec<FileSlot>,
+        routes: Routes,
+    ) -> Result<SolutionHandle, LibraryError> {
+        let mut state = self.lock();
+        if let Some(found) = state.handle_of(prefix)? {
+            return Ok(found);
+        }
+        let index = index_u32(prefix, state.solutions.len())?;
+        state.solutions.push(Solution { prefix: Arc::from(prefix), files, routes });
+        Ok(SolutionHandle(index))
     }
 
     /// Runs `step` on the file at `path`. A checksum mismatch or a `Corrupt` file marks
@@ -289,12 +303,14 @@ impl<S: ObjectStore> Reader<S> {
     }
 
     /// The file a key routes to in `h`'s solution, or `None` when it cannot hold the key.
+    /// The prefix and the slot are `Arc`-shared, so a warm read allocates nothing here.
     fn locate(&self, h: SolutionHandle, key: &NodeKey, hash: u64) -> Located {
         let state = self.lock();
         let solution = state.solutions.get(h.0 as usize).ok_or(LibraryError::UnknownHandle(h.0))?;
         state.refuse(&solution.prefix)?;
         let found = route(&solution.routes, key, hash);
-        Ok(found.map(|file| (solution.prefix.clone(), file, solution.files[file as usize].clone())))
+        let prefix = &solution.prefix;
+        Ok(found.map(|file| (Arc::clone(prefix), file, solution.files[file as usize].clone())))
     }
 
     /// A file's directory, checking the file on its first use and keeping the result.

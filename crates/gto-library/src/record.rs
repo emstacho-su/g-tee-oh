@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::LibraryError;
 use crate::key_hash::key_hash;
-use crate::quantize::{loss_units, quantize_frequencies, quantize_reach};
+use crate::quantize::{loss_units, narrow_f32, quantize_frequencies, quantize_reach};
 
 /// Flag bit 0: the record lists its hands (`hand_ids` present).
 pub const FLAG_SPARSE: u8 = 1;
@@ -262,7 +262,7 @@ fn quantize_hand(hand: &SolvedHand, actions: usize, pot: Cbb) -> Result<HandColu
     let best = hand.ev_bb.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let loss =
         hand.ev_bb.iter().map(|ev| loss_units(best, *ev, pot)).collect::<Result<Vec<_>, _>>()?;
-    let ev_best = finite_f32(Some(narrow(best)), "ev_best")?.unwrap_or_default();
+    let ev_best = finite_f32(Some(narrow_f32(best)), "ev_best")?.unwrap_or_default();
     Ok(HandColumn { strategy, ev_best, loss })
 }
 
@@ -296,11 +296,6 @@ fn seat_index(to_act: Position, pair: PositionPair) -> Result<u8, LibraryError> 
         (_, true) => Ok(1),
         _ => Err(LibraryError::Quantize(format!("seat {to_act} is not in the pair {pair}"))),
     }
-}
-
-#[allow(clippy::cast_possible_truncation, reason = "f32 is the stored precision")]
-fn narrow(x: f64) -> f32 {
-    x as f32
 }
 
 /// `value` when it is absent or finite; an error naming `what` otherwise.

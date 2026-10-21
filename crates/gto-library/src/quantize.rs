@@ -78,7 +78,7 @@ pub fn dequantize_frequencies(row: &[u8]) -> Vec<f32> {
     if total == 0 {
         return vec![0.0; row.len()];
     }
-    row.iter().map(|q| to_f32(f64::from(*q) / f64::from(total))).collect()
+    row.iter().map(|q| narrow_f32(f64::from(*q) / f64::from(total))).collect()
 }
 
 /// Quantizes a reach probability to 1/65535, rounding to the nearest step.
@@ -96,7 +96,7 @@ pub fn quantize_reach(p: f64) -> Result<u16, LibraryError> {
 /// The reach probability a quantized value stands for.
 #[must_use]
 pub fn dequantize_reach(q: u16) -> f32 {
-    to_f32(f64::from(q) / f64::from(REACH_SCALE))
+    narrow_f32(f64::from(q) / f64::from(REACH_SCALE))
 }
 
 /// The loss of an action against the best one, in units of 0.01% of `pot`, rounded to the
@@ -128,11 +128,19 @@ pub fn loss_units(ev_best_bb: f64, ev_bb: f64, pot: Cbb) -> Result<u16, LibraryE
     Ok(round_to_u16(units))
 }
 
-/// The loss in big blinds that `units` stand for at `pot`.
+/// The loss in big blinds that `units` stand for at `pot`, `loss_bb_f64` narrowed.
 #[must_use]
 pub fn loss_bb(units: u16, pot: Cbb) -> f32 {
+    narrow_f32(loss_bb_f64(units, pot))
+}
+
+/// The loss in big blinds that `units` stand for at `pot`, in f64: `loss_units` of this
+/// value against any finite best EV gives `units` back, which the read-back side of a
+/// round trip relies on (O-133).
+#[must_use]
+pub fn loss_bb_f64(units: u16, pot: Cbb) -> f64 {
     let pot_bb = f64::from(pot.get()) / CBB_PER_BB;
-    to_f32(f64::from(units) * pot_bb / f64::from(LOSS_UNITS_PER_POT))
+    f64::from(units) * pot_bb / f64::from(LOSS_UNITS_PER_POT)
 }
 
 /// True for a finite number in `[0, 1]`.
@@ -160,8 +168,23 @@ fn round_to_u16(x: f64) -> u16 {
     x.round().clamp(0.0, f64::from(u16::MAX)) as u16
 }
 
-/// `x` as the nearest `f32`, the precision the record stores.
+/// `value` as the nearest `f32`, the precision the record stores for an EV, an accuracy
+/// and every dequantized number. The one place the crate and its tools narrow a float.
+#[must_use]
 #[allow(clippy::cast_possible_truncation, reason = "f32 is the stored precision")]
-fn to_f32(x: f64) -> f32 {
-    x as f32
+pub fn narrow_f32(value: f64) -> f32 {
+    value as f32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::narrow_f32;
+
+    #[test]
+    fn r2_7_narrow_f32_rounds_to_the_nearest_f32() {
+        assert_eq!(narrow_f32(0.1).to_bits(), 0.1_f32.to_bits());
+        assert_eq!(narrow_f32(100.0), 100.0);
+        assert_eq!(narrow_f32(f64::from(f32::MAX) * 2.0), f32::INFINITY);
+        assert!(narrow_f32(f64::NAN).is_nan());
+    }
 }

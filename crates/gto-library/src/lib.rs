@@ -52,11 +52,11 @@ pub use error::LibraryError;
 pub use key_hash::key_hash;
 pub use manifest::{
     ChunkRef, FileRef, LineEntry, MANIFEST_FILE, MANIFEST_SCHEMA, MAX_CHUNKS, Manifest,
-    ManifestConfig, ManifestKind, Runout, Source, TurnRoot,
+    ManifestConfig, ManifestKind, Runout, Source, TurnRoot, is_timestamp, is_uuid,
 };
 pub use quantize::{
-    dequantize_frequencies, dequantize_reach, loss_bb, loss_units, quantize_frequencies,
-    quantize_reach,
+    dequantize_frequencies, dequantize_reach, loss_bb, loss_bb_f64, loss_units, narrow_f32,
+    quantize_frequencies, quantize_reach,
 };
 pub use reader::{Availability, Reader, ReaderOptions, SolutionHandle};
 pub use record::{HandSpace, NodeRecord, RecordAction, SolvedHand, SolvedNode};

@@ -9,6 +9,8 @@
 //! list, the way the schema's `allOf` conditionals do. The first broken rule is reported as
 //! one sentence that names the field.
 
+use std::fmt;
+
 use crate::SUPPORTED_FORMAT_VERSIONS;
 use crate::error::LibraryError;
 
@@ -52,7 +54,7 @@ fn check_header(m: &Manifest) -> Result<(), LibraryError> {
         rule(is_config_id(id.as_str()), || format!("config_id {id} breaks the grammar"))?;
     }
     if let Some(flop) = &m.flop {
-        rule(is_flop(flop), || format!("flop {flop:?} is not three cards"))?;
+        rule(is_flop(flop), || format!("flop {flop:?} is not three cards in written order"))?;
     }
     if let Some(weight) = m.flop_weight {
         rule((1..=MAX_FLOP_WEIGHT).contains(&weight), || {
@@ -90,9 +92,13 @@ fn check_files(m: &Manifest) -> Result<(), LibraryError> {
     if let Some(lines) = &m.lines {
         rule(!lines.is_empty(), || "lines is empty".to_owned())?;
         lines.iter().try_for_each(check_line_entry)?;
+        let names: Vec<&str> = lines.iter().map(|entry| entry.line.as_str()).collect();
+        listed_once("line", &names)?;
     }
     if let Some(runouts) = &m.runouts {
         runouts.iter().try_for_each(check_runout)?;
+        let names: Vec<String> = runouts.iter().map(|r| format!("{}{}", r.turn, r.river)).collect();
+        listed_once("runout", &names)?;
     }
     for root in m.turn_roots.iter().flatten() {
         rule(is_line(&root.line), || format!("turn_roots line {:?} is malformed", root.line))?;
@@ -151,6 +157,17 @@ fn check_file_ref(owner: &str, file: &FileRef) -> Result<(), LibraryError> {
     rule(is_sha256(&file.sha256), || format!("{owner} has a malformed sha256"))
 }
 
+/// `Ok` when no name repeats, else `Manifest` naming the first `what` listed twice. The
+/// reader keys its routes by these names, so a repeat would leave a file unreachable.
+fn listed_once<T: PartialEq + fmt::Display>(what: &str, names: &[T]) -> Result<(), LibraryError> {
+    match names.iter().enumerate().find(|(i, name)| names[..*i].contains(name)) {
+        Some((_, name)) => {
+            Err(LibraryError::Manifest(format!("{what} {name} is listed more than once")))
+        }
+        None => Ok(()),
+    }
+}
+
 fn check_preflop_requires(m: &Manifest) -> Result<(), LibraryError> {
     rule(m.chunks.is_some(), || "a preflop manifest needs chunks".to_owned())?;
     rule(m.tree_hash.is_some(), || "a preflop manifest needs tree_hash".to_owned())?;
@@ -187,8 +204,11 @@ fn is_lower_hex(b: u8) -> bool {
     b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
 }
 
-/// `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
-fn is_uuid(s: &str) -> bool {
+/// `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`, the manifest's `id`
+/// pattern: a lowercase universally unique identifier (UUID). Shared with the tools that
+/// build an id before they write a manifest.
+#[must_use]
+pub fn is_uuid(s: &str) -> bool {
     const HYPHENS: [usize; 4] = [8, 13, 18, 23];
     const UUID_LEN: usize = 36;
     s.len() == UUID_LEN
@@ -199,8 +219,12 @@ fn is_uuid(s: &str) -> bool {
         )
 }
 
-/// `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z$`
-fn is_timestamp(s: &str) -> bool {
+/// `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z$`, the
+/// manifest's `created_at` pattern and the node dump's `exported_at` pattern: a Coordinated
+/// Universal Time (UTC) timestamp with an optional fraction of 1 to 9 digits. Shared with
+/// the tools that check a timestamp before they write a manifest.
+#[must_use]
+pub fn is_timestamp(s: &str) -> bool {
     const TEMPLATE: &[u8] = b"0000-00-00T00:00:00";
     let bytes = s.as_bytes();
     let Some((head, tail)) = bytes.split_at_checked(TEMPLATE.len()) else {
@@ -226,13 +250,16 @@ fn is_card(s: &str) -> bool {
     matches!(s.as_bytes(), [rank, suit] if RANKS.contains(rank) && SUITS.contains(suit))
 }
 
-/// `^([2-9TJQKA][cdhs]){3}$`, with the three cards distinct as `gto_model::Flop` requires.
+/// `^([2-9TJQKA][cdhs]){3}$`, with the three cards distinct and in the written order of
+/// `gto_model::Flop` (rank descending, then suit ascending). `Flop::from_str` accepts any
+/// order, but the reader routes a key by comparing the manifest's text with the key's
+/// `Flop` display, so only the written order is routable.
 fn is_flop(s: &str) -> bool {
     const FLOP_LEN: usize = 6;
     s.len() == FLOP_LEN
         && s.is_ascii()
         && (0..FLOP_LEN).step_by(2).all(|i| is_card(&s[i..i + 2]))
-        && s.parse::<gto_model::Flop>().is_ok()
+        && s.parse::<gto_model::Flop>().is_ok_and(|flop| flop.to_string() == s)
 }
 
 /// `^[a-z][0-9]*(\.[a-z][0-9]*)*$`
@@ -337,16 +364,28 @@ mod tests {
         assert!(is_uuid("a3c9e1f2-7b4d-4e6f-9a0b-2c3d4e5f6a7b"));
         assert!(!is_uuid("A3C9E1F2-7B4D-4E6F-9A0B-2C3D4E5F6A7B"));
         assert!(!is_uuid("a3c9e1f27b4d4e6f9a0b2c3d4e5f6a7b"));
+        assert!(!is_uuid("a3c9e1f2-7b4d-4e6f-9a0b2-c3d4e5f6a7b") && !is_uuid(""));
         assert!(is_timestamp("2026-10-20T12:00:00Z"));
+        assert!(is_timestamp("2026-10-20T12:00:00.5Z"));
         assert!(is_timestamp("2026-10-20T12:00:00.123456789Z"));
+        assert!(!is_timestamp("2026-10-20T12:00:00.1234567890Z"));
         assert!(!is_timestamp("2026-10-20T12:00:00.Z"));
         assert!(!is_timestamp("2026-10-20T12:00:00+00:00"));
         assert!(!is_timestamp("2026-10-20 12:00:00Z"));
+        assert!(!is_timestamp("2026-10-20T12:00:00") && !is_timestamp("Z"));
         assert!(is_line("r250.c") && is_line("x") && is_line("b33.r120.c"));
         assert!(!is_line("") && !is_line("r250.") && !is_line("R250") && !is_line("250"));
         assert!(is_chunk_path("chunks/0000.bin.zst") && is_chunk_path("chunks/9999.bin.zst"));
         assert!(!is_chunk_path("chunks/10000.bin.zst") && !is_chunk_path("chunks/000a.bin.zst"));
         assert!(is_flop("Ah7d2c"));
         assert!(!is_flop("AhAh2c") && !is_flop("ah7d2c") && !is_flop("Ah7d2"));
+    }
+
+    #[test]
+    fn r2_7_flop_matcher_requires_canonical_card_order() {
+        // The reader compares the manifest's flop byte for byte with a key's `Flop` display,
+        // so only the written order (rank descending, then suit ascending) routes.
+        assert!(is_flop("Ah7d2c") && is_flop("7c7d2s"));
+        assert!(!is_flop("2c7dAh") && !is_flop("7dAh2c") && !is_flop("7d7c2s"));
     }
 }

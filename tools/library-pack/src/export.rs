@@ -5,15 +5,18 @@
 //! half a unit (0.005% of the pot), reach within 1/131070 and the best action's expected
 //! value (EV) exactly equal as an f32. `compare_dumps` checks exactly that, plus the header
 //! (source, configuration, pair, hand space, and the config id and exploitability when the
-//! original has them). Nodes are matched by key and hands by label, so order does not
-//! matter. Each tolerance carries `F32_SLACK` because the library hands numbers back as f32.
+//! original has them), and names each difference once. Nodes are matched by key and hands by
+//! label, so order does not matter. Each tolerance carries `F32_SLACK` because the library
+//! hands numbers back as f32. The loss tolerances derive from `gto_library::quantize`, so a
+//! change to the loss unit cannot leave `verify` checking against stale values.
 //!
 //! Lane P (pack) owns this file.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use gto_library::{HandSpace, SolutionMeta, SolvedHand, SolvedNode, Source};
-use gto_model::{ComboId, HandClass, format_cards};
+use gto_library::quantize::{LOSS_SATURATED, LOSS_UNITS_PER_POT};
+use gto_library::{HandSpace, SolutionMeta, SolvedHand, SolvedNode, Source, narrow_f32};
+use gto_model::{Cbb, ComboId, HandClass, format_cards};
 
 use crate::dump::{DumpAction, DumpConfig, DumpHand, DumpNode, NodeDump};
 use crate::invariants::{POSTFLOP_1326, PREFLOP_169};
@@ -22,16 +25,16 @@ use crate::invariants::{POSTFLOP_1326, PREFLOP_169};
 pub const FREQUENCY_TOLERANCE: f64 = 1.0 / 255.0;
 /// A reach reads back within half a step of 1/65535 (R2.7, O-133).
 pub const REACH_TOLERANCE: f64 = 1.0 / 131_070.0;
-/// A loss reads back within half a unit of 0.01% of the pot, as a share of the pot.
-pub const LOSS_TOLERANCE_PER_POT: f64 = 0.000_05;
-/// A loss saturates at 655.35% of the pot (65,535 units, A3 section 4).
-pub const LOSS_SATURATION_PER_POT: f64 = 6.5535;
+/// A loss reads back within half a unit, one unit being 1/`LOSS_UNITS_PER_POT` of the pot
+/// (0.01%), as a share of the pot. The casts are exact; `f64::from` is not `const`.
+pub const LOSS_TOLERANCE_PER_POT: f64 = 0.5 / LOSS_UNITS_PER_POT as f64;
+/// A loss saturates at `LOSS_SATURATED` units (655.35% of the pot, A3 section 4), as a
+/// share of the pot.
+pub const LOSS_SATURATION_PER_POT: f64 = LOSS_SATURATED as f64 / LOSS_UNITS_PER_POT as f64;
 /// The relative rounding an f32 adds to a value read back from the library.
 pub const F32_SLACK: f64 = 1e-6;
 /// The dump schema version `export_dump` writes.
 const SCHEMA_VERSION: u32 = 1;
-/// Centi-big-blinds per big blind.
-const CBB_PER_BB: f64 = 100.0;
 
 /// A dump of `nodes` under `meta`: the inverse of `to_solution`. A hand index outside the
 /// hand space gets a label no checker accepts, so such a dump never packs again.
@@ -60,20 +63,24 @@ pub fn export_dump(meta: &SolutionMeta, nodes: &[SolvedNode]) -> NodeDump {
 }
 
 /// Every difference between a dump and its read-back beyond the O-133 tolerances, one
-/// sentence each; empty when they agree.
+/// sentence each and each difference once: a node missing from or only in the read-back is
+/// named, so the node counts are not compared on top; empty when they agree.
 #[must_use]
 pub fn compare_dumps(original: &NodeDump, read_back: &NodeDump) -> Vec<String> {
     let mut found = compare_header(original, read_back);
     let back: BTreeMap<&str, &DumpNode> =
         read_back.nodes.iter().map(|node| (node.node_key.as_str(), node)).collect();
+    if back.len() != read_back.nodes.len() {
+        found.push("The read-back lists a node key more than once.".to_owned());
+    }
     for node in &original.nodes {
         match back.get(node.node_key.as_str()) {
             Some(other) => found.extend(compare_node(node, other)),
             None => found.push(format!("Node {} is missing from the read-back.", node.node_key)),
         }
     }
-    let known: Vec<&str> = original.nodes.iter().map(|node| node.node_key.as_str()).collect();
-    let extra = read_back.nodes.iter().filter(|node| !known.contains(&node.node_key.as_str()));
+    let known: BTreeSet<&str> = original.nodes.iter().map(|node| node.node_key.as_str()).collect();
+    let extra = read_back.nodes.iter().filter(|node| !known.contains(node.node_key.as_str()));
     found.extend(extra.map(|node| format!("Node {} is only in the read-back.", node.node_key)));
     found
 }
@@ -153,15 +160,14 @@ fn compare_header(original: &NodeDump, back: &NodeDump) -> Vec<String> {
         config_id.map(|id| differs("config_id", id, &back.config_id)),
         exploitability
             .map(|values| differs("exploitability", values, &back.exploitability_pct_pot)),
-        (original.nodes.len() != back.nodes.len())
-            .then(|| differs("node count", &original.nodes.len(), &back.nodes.len())),
     ];
     checks.into_iter().flatten().collect()
 }
 
 fn compare_node(original: &DumpNode, back: &DumpNode) -> Vec<String> {
     let name = format!("Node {}", original.node_key);
-    let same_accuracy = original.accuracy_pct_pot.map(narrow) == back.accuracy_pct_pot.map(narrow);
+    let same_accuracy =
+        original.accuracy_pct_pot.map(narrow_f32) == back.accuracy_pct_pot.map(narrow_f32);
     let fields = [
         ("street", original.street == back.street),
         ("board", original.board == back.board),
@@ -182,7 +188,7 @@ fn compare_node(original: &DumpNode, back: &DumpNode) -> Vec<String> {
         let (want, got) = (original.hands.len(), back.hands.len());
         found.push(format!("{name} reads back {got} hands, not {want}."));
     }
-    let pot_bb = f64::from(original.pot_cbb) / CBB_PER_BB;
+    let pot_bb = f64::from(original.pot_cbb) / f64::from(Cbb::PER_BB);
     for hand in &original.hands {
         match back_hands.get(hand.hand.as_str()) {
             Some(other) => found.extend(compare_hand(&name, pot_bb, hand, other)),
@@ -240,7 +246,7 @@ fn evs_agree(pot_bb: f64, original: &[f64], back: &[f64]) -> bool {
         return original.is_empty() && back.is_empty();
     };
     if original.len() != back.len()
-        || narrow(original[best]).to_bits() != narrow(back[best]).to_bits()
+        || narrow_f32(original[best]).to_bits() != narrow_f32(back[best]).to_bits()
     {
         return false;
     }
@@ -267,13 +273,4 @@ fn best_action(evs: &[f64]) -> Option<usize> {
             _ => Some((index, *ev)),
         })
         .map(|(index, _)| index)
-}
-
-/// A value as the f32 the library stores.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "the library stores these values as f32 (A3 section 4); the comparison is at f32"
-)]
-fn narrow(value: f64) -> f32 {
-    value as f32
 }

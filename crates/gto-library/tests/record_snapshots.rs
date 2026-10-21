@@ -292,6 +292,54 @@ fn r2_7_chunk_frames_respect_target_size() {
     }
 }
 
+/// `record` with one nonzero strategy byte lowered by one, so that hand's column sums to 254.
+fn with_short_column(record: &NodeRecord) -> NodeRecord {
+    let (action, hand) = record
+        .strategy
+        .iter()
+        .enumerate()
+        .find_map(|(a, row)| row.iter().position(|q| *q > 0).map(|h| (a, h)))
+        .expect("a quantized column has a nonzero entry");
+    let strategy = record
+        .strategy
+        .iter()
+        .enumerate()
+        .map(|(a, row)| {
+            row.iter()
+                .enumerate()
+                .map(|(h, q)| if (a, h) == (action, hand) { q - 1 } else { *q })
+                .collect()
+        })
+        .collect();
+    NodeRecord { strategy, ..record.clone() }
+}
+
+#[test]
+fn r2_7_encode_rejects_what_decode_rejects() {
+    let valid = NodeRecord::from_solved(&sparse_postflop_node(), pair()).expect("quantizes");
+    let hands = valid.ev_best.len();
+    let broken = [
+        ("a column summing to 254", with_short_column(&valid), "does not sum to 255"),
+        ("a NaN ev_best", NodeRecord { ev_best: vec![f32::NAN; hands], ..valid.clone() }, "finite"),
+        (
+            "an infinite accuracy",
+            NodeRecord { accuracy_pct_pot: Some(f32::INFINITY), ..valid.clone() },
+            "finite",
+        ),
+    ];
+    let opts = ChunkOptions { target_bytes: 4_096, zstd_level: 3 };
+    for (what, record, named) in broken {
+        match record.encode(&mut Vec::new()) {
+            Err(LibraryError::Quantize(reason)) => {
+                assert!(reason.contains(named), "{what}: reason {reason:?} names {named:?}");
+            }
+            other => panic!("{what}: expected a Quantize error from encode, got {other:?}"),
+        }
+        assert!(encode_file(&[record], &opts).is_err(), "{what}: encode_file refuses it too");
+    }
+    valid.encode(&mut Vec::new()).expect("the valid record still encodes");
+}
+
 #[test]
 fn r2_7_writer_rejects_duplicate_key() {
     let node = small_node(250);

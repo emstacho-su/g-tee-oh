@@ -2,13 +2,19 @@
 //! renormalized, reach at 1/65535, and each action's expected value (EV) as the best
 //! action's EV minus the action's loss, so the best action reads back its EV exactly.
 //!
+//! The loss is rebuilt in f64 (`loss_bb_f64`, from the stored units through `loss_units`)
+//! and the EV as `f64::from(ev_best) - loss`, so quantizing a read-back EV gives the stored
+//! loss units again whatever the pot: at a 2 cbb pot one unit is 2e-6 bb, finer than the
+//! f32 spacing near 100 bb, and an f32 subtraction would lose it (O-133). The f32 accessors
+//! are the f64 values narrowed.
+//!
 //! Lane W (writer) owns this file.
 
 use gto_model::NodeKey;
 
 use crate::error::LibraryError;
 use crate::key_hash::key_hash;
-use crate::quantize::{dequantize_frequencies, dequantize_reach, loss_bb};
+use crate::quantize::{dequantize_frequencies, dequantize_reach, loss_bb_f64, narrow_f32};
 use crate::record::{NodeRecord, RecordAction, SolvedHand, SolvedNode};
 
 /// A dequantized view of one node record. The reader hands these out.
@@ -72,18 +78,41 @@ impl NodeView {
         Some([dequantize_reach(*oop.get(column)?), dequantize_reach(*ip.get(column)?)])
     }
 
-    /// One hand's EV for one action in big blinds (bb); `None` when either is not held.
+    /// One hand's EV for one action in big blinds (bb), `ev_bb_f64` narrowed; `None` when
+    /// either is not held.
     #[must_use]
     pub fn ev_bb(&self, hand: u16, action: usize) -> Option<f32> {
-        let ev_best = *self.record.ev_best.get(self.column(hand)?)?;
-        Some(ev_best - self.loss_bb(hand, action)?)
+        self.ev_bb_f64(hand, action).map(narrow_f32)
     }
 
-    /// One hand's loss for one action in bb; `None` when either is not held.
+    /// One hand's EV for one action in bb: the best action's stored EV minus the action's
+    /// f64 loss, so the best action reads back exactly and every other action quantizes
+    /// back to its stored loss units; `None` when either is not held.
+    #[must_use]
+    pub fn ev_bb_f64(&self, hand: u16, action: usize) -> Option<f64> {
+        let ev_best = *self.record.ev_best.get(self.column(hand)?)?;
+        Some(f64::from(ev_best) - self.loss_bb_f64(hand, action)?)
+    }
+
+    /// One hand's loss for one action in bb, `loss_bb_f64` narrowed; `None` when either is
+    /// not held.
     #[must_use]
     pub fn loss_bb(&self, hand: u16, action: usize) -> Option<f32> {
-        let units = *self.record.loss.get(action)?.get(self.column(hand)?)?;
-        Some(loss_bb(units, self.record.pot))
+        self.loss_bb_f64(hand, action).map(narrow_f32)
+    }
+
+    /// One hand's loss for one action in bb, from the stored units; `None` when either is
+    /// not held.
+    #[must_use]
+    pub fn loss_bb_f64(&self, hand: u16, action: usize) -> Option<f64> {
+        Some(loss_bb_f64(self.loss_units(hand, action)?, self.record.pot))
+    }
+
+    /// One hand's loss for one action as stored, in units of 0.01% of the pot; `None` when
+    /// either is not held.
+    #[must_use]
+    pub fn loss_units(&self, hand: u16, action: usize) -> Option<u16> {
+        Some(*self.record.loss.get(action)?.get(self.column(hand)?)?)
     }
 
     /// The node as a `SolvedNode` under `key`, the read-back side of a round trip (O-133).
@@ -130,7 +159,7 @@ impl NodeView {
         };
         let frequencies = self.frequencies(hand)?.into_iter().map(f64::from).collect();
         let ev_bb = (0..self.record.actions.len())
-            .map(|action| self.ev_bb(hand, action).map(f64::from))
+            .map(|action| self.ev_bb_f64(hand, action))
             .collect::<Option<Vec<f64>>>()?;
         Some(SolvedHand { hand, reach, frequencies, ev_bb })
     }

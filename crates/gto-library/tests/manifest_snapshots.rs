@@ -251,6 +251,37 @@ fn r2_7_manifest_validates_against_schema() {
     }
 }
 
+/// The `Manifest` error `validate` reports for `manifest`, or a panic naming `what`.
+fn manifest_error(what: &str, manifest: &Manifest) -> String {
+    match manifest.validate() {
+        Err(LibraryError::Manifest(reason)) => reason,
+        other => panic!("{what}: expected a Manifest error, got {other:?}"),
+    }
+}
+
+#[test]
+fn r2_7_manifest_rejects_a_flop_out_of_canonical_order() {
+    let manifest = flop_build_manifest();
+    let unroutable = Manifest { flop: Some("2c7dAh".to_owned()), ..manifest.clone() };
+    let reason = manifest_error("a flop out of canonical order", &unroutable);
+    assert!(reason.contains("2c7dAh"), "the reason names the flop: {reason}");
+    let canonical = Manifest { flop: Some("Ah7d2c".to_owned()), ..manifest };
+    canonical.validate().expect("the canonical spelling validates");
+}
+
+#[test]
+fn r2_7_manifest_rejects_a_line_or_runout_listed_twice() {
+    let manifest = flop_build_manifest();
+    let lines = manifest.lines.clone().expect("a flop build lists lines");
+    let line_twice = Manifest { lines: Some([lines.clone(), lines].concat()), ..manifest.clone() };
+    let reason = manifest_error("a line listed twice", &line_twice);
+    assert!(reason.contains("r250.c") && reason.contains("more than once"), "{reason}");
+    let runouts = manifest.runouts.clone().expect("a flop build lists runouts");
+    let runout_twice = Manifest { runouts: Some([runouts.clone(), runouts].concat()), ..manifest };
+    let reason = manifest_error("a runout listed twice", &runout_twice);
+    assert!(reason.contains("Kh9s") && reason.contains("more than once"), "{reason}");
+}
+
 #[test]
 fn r2_7_manifest_rejects_format_version_2() {
     let mut value: Value = serde_json::from_str(EXAMPLE_PREFLOP).expect("the example is JSON");

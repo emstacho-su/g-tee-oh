@@ -18,10 +18,11 @@ pub(super) type Planned = Result<(Vec<FileSlot>, Routes), LibraryError>;
 
 /// One file of a solution: its store path, the sha256 and node count its manifest lists
 /// (the count for a preflop chunk only), and its directory once the file has been checked.
+/// The strings are `Arc`-shared so a clone handed out of the reader's lock allocates nothing.
 #[derive(Clone, Debug)]
 pub(super) struct FileSlot {
-    pub(super) path: String,
-    pub(super) sha256: String,
+    pub(super) path: Arc<str>,
+    pub(super) sha256: Arc<str>,
     pub(super) nodes: Option<u32>,
     pub(super) directory: Option<Arc<FileDirectory>>,
 }
@@ -64,8 +65,8 @@ pub(super) fn index_u32(path: &str, n: usize) -> Result<u32, LibraryError> {
 /// The files and routes of a solution from its manifest, before any file is fetched.
 pub(super) fn plan_files(prefix: &str, m: &Manifest) -> Planned {
     let slot = |path: &str, sha256: &str, nodes| FileSlot {
-        path: format!("{prefix}/{path}"),
-        sha256: sha256.to_owned(),
+        path: Arc::from(format!("{prefix}/{path}")),
+        sha256: Arc::from(sha256),
         nodes,
         directory: None,
     };
