@@ -178,6 +178,17 @@ bench:
     cargo bench -p gto-solve -p gto-library --features gto-library/synthetic
     node scripts/bench-report.mjs
 
+# Release build: the three scenarios pack in seconds there and in minutes in debug (O-134).
+# Synthetic library size estimate written by library-pack, seed and parameters printed (R2.7, R-19)
+library-size-estimate:
+    cargo run --release -p library-pack -- estimate --seed 7 \
+        --out validation/reports/library-size-estimate.md
+
+# Line coverage of gto-library and library-pack at the 80% gate (O-134); needs cargo-llvm-cov
+coverage-library:
+    cargo llvm-cov -p gto-library -p library-pack --features gto-library/synthetic \
+        --ignore-filename-regex "(gto-model|vendor|gto-solve)" --fail-under-lines 80
+
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
 ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test test-tags
