@@ -31,7 +31,8 @@ are not part of the agreement, so a case breaks at most rules 1 to 5.
 ## Cases
 
 Every case is the contract example `packages/contracts/schemas/examples/node-dump.json` with one
-edit, so each file differs from `valid/example.json` in one place.
+edit, so each file differs from `valid/example.json` in one place; a case that checks that both
+checkers report every broken rule, not just the first, carries two edits.
 
 | File | Expected | Why |
 |---|---|---|
@@ -49,6 +50,8 @@ edit, so each file differs from `valid/example.json` in one place.
 | `invalid/duplicate-token.json` | rule 4 | The token `c` is listed twice. |
 | `invalid/missing-stake-label.json` | rule 5 | The configuration has no `stake_label`. |
 | `invalid/missing-exported-at.json` | rule 5 | The dump has no `exported_at`. |
+| `invalid/no-exported-at-bad-sum.json` | rules 2 and 5 | No `exported_at`; 72o sums to 1.0011. |
+| `invalid/node-missing-board.json` | rule 5 | The node has no `board`, a required node field. |
 | `invalid/unknown-hand-space.json` | rule 5 | `preflop_1326` is not a hand space. |
 
 A new case needs a file here, a row in `cases.json` and a row in this table; neither test changes.

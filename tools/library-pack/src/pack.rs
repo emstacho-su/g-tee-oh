@@ -7,8 +7,9 @@
 //! rejected; it then creates the library root if needed and writes
 //! `<out_root>/preflop/<config_id>/<id>/` through `gto_library::FsStore`. `verify` reads the
 //! manifest and every node back through `gto_library::Reader`, re-exports them under the
-//! manifest's metadata and compares the result with the dump (O-133); it also checks the
-//! manifest's node count and tree hash against the dump.
+//! manifest's metadata and compares the result with the dump (O-133), naming each
+//! difference once; it also checks the manifest's tree hash against the dump's and its node
+//! count against the nodes read back, which reports nodes the library holds beyond the dump.
 //!
 //! Lane P (pack) owns this file.
 
@@ -67,9 +68,12 @@ pub fn verify(library_root: &Path, prefix: &str, dump: &Path) -> Result<(), Pack
     let nodes = solved_nodes(&original).map_err(PackError::Rejected)?;
     let manifest = read_manifest(library_root, prefix)?;
     let meta = meta_from_manifest(&manifest)?;
-    let (back, mut found) = read_nodes(library_root, prefix, &nodes)?;
-    found.extend(compare_dumps(&original, &export_dump(&meta, &back)));
-    found.extend(manifest_differences(&manifest, &meta, &nodes));
+    let back = read_nodes(library_root, prefix, &nodes)?;
+    let found = [
+        compare_dumps(&original, &export_dump(&meta, &back)),
+        manifest_differences(&manifest, &meta, &nodes, back.len()),
+    ]
+    .concat();
     if found.is_empty() { Ok(()) } else { Err(PackError::Mismatch(found)) }
 }
 
@@ -124,41 +128,46 @@ fn meta_from_manifest(manifest: &Manifest) -> Result<SolutionMeta, PackError> {
     })
 }
 
-/// Every node of the dump read back, plus one sentence per node the library does not hold.
+/// Every node of the dump the library holds, read back in dump order. A node the library
+/// does not hold is left out here and reported once, by `compare_dumps`, as missing from the
+/// read-back.
 fn read_nodes(
     library_root: &Path,
     prefix: &str,
     nodes: &[SolvedNode],
-) -> Result<(Vec<SolvedNode>, Vec<String>), PackError> {
+) -> Result<Vec<SolvedNode>, PackError> {
     let reader = Reader::new(FsStore::new(library_root)?, ReaderOptions::default());
     let handle = reader.open(prefix)?;
     let mut back = Vec::with_capacity(nodes.len());
-    let mut missing = Vec::new();
     for node in nodes {
         match reader.node(handle, &node.key) {
             Ok(view) => back.push(view.to_solved(&node.key)?),
-            Err(LibraryError::NodeNotFound(key)) => {
-                missing.push(format!("Node {key} is not in the library."));
-            }
+            Err(LibraryError::NodeNotFound(_)) => {}
             Err(err) => return Err(err.into()),
         }
     }
-    Ok((back, missing))
+    Ok(back)
 }
 
-/// The manifest's node count and tree hash against the dump.
+/// The manifest's tree hash against the dump's, and its node count against the `read`
+/// nodes that came back. A node the library lacks already has its sentence from
+/// `compare_dumps`, so the count is held against what read back, not against the dump, and
+/// speaks only for nodes the manifest holds beyond the dump's keys.
 fn manifest_differences(
     manifest: &Manifest,
     meta: &SolutionMeta,
     nodes: &[SolvedNode],
+    read: usize,
 ) -> Vec<String> {
     let stored: u64 =
         manifest.chunks.iter().flatten().map(|chunk| u64::from(chunk.node_count)).sum();
+    let read = u64::try_from(read).unwrap_or(u64::MAX);
     let dumped = u64::try_from(nodes.len()).unwrap_or(u64::MAX);
     let expected_hash = tree_hash(nodes);
     let checks = [
-        (stored != dumped)
-            .then(|| format!("The manifest lists {stored} nodes, the dump {dumped}.")),
+        (stored != read).then(|| {
+            format!("The manifest lists {stored} nodes; {read} of the dump's {dumped} read back.")
+        }),
         (meta.tree_hash != expected_hash).then(|| {
             format!("The manifest's tree_hash is {}, the dump's {expected_hash}.", meta.tree_hash)
         }),

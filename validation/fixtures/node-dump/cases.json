@@ -15,6 +15,8 @@
     { "file": "invalid/missing-ev-for-an-action.json", "accept": false, "rules": [1] },
     { "file": "invalid/missing-exported-at.json", "accept": false, "rules": [5] },
     { "file": "invalid/missing-stake-label.json", "accept": false, "rules": [5] },
+    { "file": "invalid/no-exported-at-bad-sum.json", "accept": false, "rules": [2, 5] },
+    { "file": "invalid/node-missing-board.json", "accept": false, "rules": [5] },
     { "file": "invalid/unknown-hand-space.json", "accept": false, "rules": [5] }
   ]
 }

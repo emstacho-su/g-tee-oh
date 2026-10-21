@@ -16,10 +16,10 @@ use proptest::prelude::*;
 
 /// Slack for the f32 a dequantized value is returned in.
 const F32_SLACK: f64 = 1e-6;
-/// Cbb in one big blind.
-const CBB_PER_BB: f64 = 100.0;
-/// The saturated loss as a share of the pot: 65,535 units of 1/10,000.
-const SATURATED_SHARE: f64 = 6.5535;
+/// One loss unit as a share of the pot (the casts are exact; `f64::from` is not `const`).
+const UNIT_SHARE: f64 = 1.0 / LOSS_UNITS_PER_POT as f64;
+/// The saturated loss as a share of the pot: `LOSS_SATURATED` units.
+const SATURATED_SHARE: f64 = LOSS_SATURATED as f64 * UNIT_SHARE;
 
 /// A frequency row of one to eight entries with a positive sum.
 fn frequency_row() -> impl Strategy<Value = Vec<f64>> {
@@ -33,7 +33,7 @@ fn pot() -> impl Strategy<Value = Cbb> {
 }
 
 fn pot_bb(pot: Cbb) -> f64 {
-    f64::from(pot.get()) / CBB_PER_BB
+    f64::from(pot.get()) / f64::from(Cbb::PER_BB)
 }
 
 proptest! {
@@ -92,7 +92,10 @@ proptest! {
     }
 
     #[test]
-    fn r2_7_loss_saturates_at_655_35_pct(pot in pot(), share in 6.5536_f64..100.0) {
+    fn r2_7_loss_saturates_at_655_35_pct(
+        pot in pot(),
+        share in (SATURATED_SHARE + UNIT_SHARE)..100.0,
+    ) {
         let loss = share * pot_bb(pot);
         prop_assert_eq!(loss_units(1.0, 1.0 - loss, pot).expect("finite EVs"), LOSS_SATURATED);
         let saturated = f64::from(loss_bb(LOSS_SATURATED, pot));

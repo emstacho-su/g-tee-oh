@@ -81,6 +81,53 @@ fn r2_8_rejects_incomplete_config_metadata() {
 }
 
 #[test]
+fn r2_8_reports_every_rule_of_a_dump_with_missing_fields() {
+    let two = edited(|d| {
+        d.as_object_mut().expect("an object").remove("exported_at");
+        d["nodes"][0]["hands"][1]["frequencies"] = json!([0.85, 0.05, 0.1011]);
+    });
+    let found = violations(&two);
+    assert_eq!(rules(&found), [Rule::FrequencySum, Rule::Metadata].into(), "found {found:?}");
+    let no_board = edited(|d| {
+        d["nodes"][0].as_object_mut().expect("an object").remove("board");
+    });
+    let found = violations(&no_board);
+    assert_eq!(rules(&found), [Rule::Metadata].into(), "found {found:?}");
+    let sentence = "Node cfg_6_online_100/BB-BTN/ has no board field.";
+    assert!(found.iter().any(|v| v.message == sentence), "as node-dump.ts says it: {found:?}");
+}
+
+#[test]
+fn r2_8_skips_the_checks_an_absent_field_feeds_as_node_dump_ts_does() {
+    // No actions array: rule 1 has no action count, so the label is the only other rule.
+    let no_actions = edited(|d| {
+        d["nodes"][0].as_object_mut().expect("an object").remove("actions");
+        d["nodes"][0]["hands"][0]["hand"] = json!("KAs");
+    });
+    let found = violations(&no_actions);
+    assert_eq!(rules(&found), [Rule::HandLabel, Rule::Metadata].into(), "found {found:?}");
+    // No hand labels: rule 3 and the duplicate check skip them; the arrays are still counted.
+    let no_labels = edited(|d| {
+        for hand in d["nodes"][0]["hands"].as_array_mut().expect("an array") {
+            hand.as_object_mut().expect("an object").remove("hand");
+        }
+        d["nodes"][0]["hands"][0]["ev_bb"] = json!([0, 0.62]);
+    });
+    let found = violations(&no_labels);
+    assert_eq!(rules(&found), [Rule::Counts, Rule::Metadata].into(), "found {found:?}");
+    let counted = "hand at index 0 has 2 expected values for 3 actions.";
+    assert!(found.iter().any(|v| v.message.ends_with(counted)), "found {found:?}");
+}
+
+#[test]
+fn r2_8_rejects_node_with_no_hands() {
+    let dump = edited(|d| d["nodes"][0]["hands"] = json!([]));
+    let found = violations(&dump);
+    assert!(rules(&found).contains(&Rule::Structural), "found {found:?}");
+    assert!(found.iter().any(|v| v.message.contains("no hands")), "found {found:?}");
+}
+
+#[test]
 fn r2_8_rejects_noncanonical_hand_label() {
     for label in ["KAs", "AAs", "AKx", "AsKs"] {
         let dump = edited(|d| d["nodes"][0]["hands"][0]["hand"] = json!(label));

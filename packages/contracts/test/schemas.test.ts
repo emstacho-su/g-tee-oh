@@ -178,6 +178,22 @@ describe("R0.7 node dump invariants", () => {
     expect(violations).toContainEqual(expect.stringContaining("more than once"));
   });
 
+  it("R2.8 the checker rejects a node without a board as missing metadata (rule 5)", () => {
+    const dump = { ...nodeDump, nodes: [withoutKey(exampleNode, "board")] };
+    const violations = checkNodeDumpInvariants(dump);
+    expect(violations).toEqual([`Node ${exampleNode.node_key} has no board field.`]);
+  });
+
+  it("R2.8 a bad frequency sum is reported alongside a missing exported_at (rules 2 and 5)", () => {
+    const first = { ...exampleHand, frequencies: [0.5, 0.4, 0.05] };
+    const hands = [first, ...exampleNode.hands.slice(1)];
+    const dump = { ...withoutKey(nodeDump, "exported_at"), nodes: [{ ...exampleNode, hands }] };
+    const violations = checkNodeDumpInvariants(dump);
+    expect(violations).toContainEqual(expect.stringContaining("exported_at"));
+    expect(violations).toContainEqual(expect.stringContaining("summing to 0.95"));
+    expect(violations).toHaveLength(2);
+  });
+
   it("R0.7 the checker reports a malformed dump instead of throwing", () => {
     expect(checkNodeDumpInvariants(null)).toHaveLength(1);
     expect(checkNodeDumpInvariants({ nodes: "none" })).toContainEqual(expect.stringContaining("nodes"));

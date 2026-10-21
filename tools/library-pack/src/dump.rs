@@ -5,17 +5,22 @@
 //! bad value becomes a violation sentence from `invariants` rather than a serde error.
 //! `parse_dump` reads the bytes as a JSON (JavaScript Object Notation) value first and
 //! reports every missing required field the way `checkNodeDumpInvariants` does, before the
-//! typed parse: rule 5 for metadata and labels, rule 1 for a hand without its frequencies or
-//! expected values. Anything else serde rejects (a wrong type, an unknown field, a number out
-//! of range) is one `Rule::Structural` sentence. It never panics; `serde_json`'s default
-//! recursion limit of 128 bounds nesting.
+//! typed parse: rule 5 for metadata, node fields and labels, rule 1 for a hand without its
+//! frequencies or expected values. A dump with a missing field is rejected without the typed
+//! parse, but rules 1 to 4 still run over what it does hold (`invariants::check_facts`),
+//! skipping each check whose field is absent as the TypeScript checker does, so the two
+//! checkers report the same rules for the same dump. Anything else serde rejects (a wrong
+//! type, an unknown field, a number out of range) is one `Rule::Structural` sentence. It never
+//! panics; `serde_json`'s default recursion limit of 128 bounds nesting.
 //!
 //! Lane P (pack) owns this file and may reshape these types, which only lane P uses.
+
+use std::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use crate::invariants::{Rule, Violation};
+use crate::invariants::{HandFacts, NodeFacts, Rule, Violation, check_facts};
 
 /// The game configuration a dump was exported for.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -117,17 +122,36 @@ const REQUIRED_DUMP_FIELDS: [&str; 7] =
 /// The six game configuration fields (rule 5).
 const REQUIRED_CONFIG_FIELDS: [&str; 6] =
     ["format", "table_size", "stake_label", "depth_cbb", "straddle", "ante_cbb"];
-/// The fields every node carries (rule 5).
-const REQUIRED_NODE_FIELDS: [&str; 8] =
-    ["node_key", "street", "board", "to_act", "pot_cbb", "stacks_cbb", "actions", "hands"];
+/// The fields every node carries (rule 5), each with the word `checkNodeDumpInvariants`
+/// uses for its shape in the sentence `<node> has no <field> <shape>.`.
+const REQUIRED_NODE_FIELDS: [(&str, &str); 8] = [
+    (NODE_KEY_FIELD, "string"),
+    ("street", "field"),
+    ("board", "field"),
+    ("to_act", "field"),
+    ("pot_cbb", "field"),
+    ("stacks_cbb", "field"),
+    (ACTIONS_FIELD, "array"),
+    (HANDS_FIELD, "array"),
+];
 /// The per-action arrays of a hand; a missing one breaks rule 1, as in node-dump.ts.
-const PER_ACTION_HAND_FIELDS: [&str; 2] = ["frequencies", "ev_bb"];
+const PER_ACTION_HAND_FIELDS: [&str; 2] = [FREQUENCIES_FIELD, EV_FIELD];
 /// The hand label field; a missing one breaks rule 5.
 const HAND_LABEL_FIELD: &str = "hand";
+/// The field names rules 1 to 4 read from an incomplete dump.
+const HAND_SPACE_FIELD: &str = "hand_space";
+const NODES_FIELD: &str = "nodes";
+const NODE_KEY_FIELD: &str = "node_key";
+const ACTIONS_FIELD: &str = "actions";
+const TOKEN_FIELD: &str = "token";
+const HANDS_FIELD: &str = "hands";
+const FREQUENCIES_FIELD: &str = "frequencies";
+const EV_FIELD: &str = "ev_bb";
 
 /// Parses dump bytes, reporting a malformed shape as violation sentences (rule 5 for a
 /// missing required field, rule 1 for a hand without its frequencies or expected values,
-/// `Rule::Structural` for anything else serde rejects).
+/// `Rule::Structural` for anything else serde rejects). A dump with a missing field also
+/// gets rules 1 to 4 over the fields it has, so no rule is hidden behind rule 5.
 ///
 /// # Errors
 ///
@@ -137,13 +161,15 @@ pub fn parse_dump(bytes: &[u8]) -> Result<NodeDump, Vec<Violation>> {
         vec![Violation::new(Rule::Structural, format!("The dump is not valid JSON: {err}."))]
     })?;
     let missing = missing_fields(&value);
-    if !missing.is_empty() {
-        return Err(missing);
+    if missing.is_empty() {
+        return serde_json::from_value(value).map_err(|err| {
+            let message = format!("The dump does not match the node-dump schema: {err}.");
+            vec![Violation::new(Rule::Structural, message)]
+        });
     }
-    serde_json::from_value(value).map_err(|err| {
-        let message = format!("The dump does not match the node-dump schema: {err}.");
-        vec![Violation::new(Rule::Structural, message)]
-    })
+    let hand_space = value.get(HAND_SPACE_FIELD).and_then(Value::as_str);
+    let present = check_facts(hand_space, node_facts_of(&value));
+    Err([missing, present].concat())
 }
 
 /// Every required field the value lacks, in the sentences `checkNodeDumpInvariants` writes.
@@ -161,9 +187,21 @@ fn missing_fields(value: &Value) -> Vec<Violation> {
             .collect()
     });
     let metadata = top.chain(config_fields).map(|message| Violation::new(Rule::Metadata, message));
-    let nodes = dump.get("nodes").and_then(Value::as_array).map_or(&[][..], Vec::as_slice);
-    let in_nodes = nodes.iter().enumerate().flat_map(|(index, node)| missing_in_node(index, node));
+    let in_nodes = nodes_of(dump).iter().enumerate().flat_map(|(i, node)| missing_in_node(i, node));
     metadata.chain(in_nodes).collect()
+}
+
+/// The `nodes` array of a dump object, empty when absent or not an array.
+fn nodes_of(dump: &Map<String, Value>) -> &[Value] {
+    dump.get(NODES_FIELD).and_then(Value::as_array).map_or(&[][..], Vec::as_slice)
+}
+
+/// `Node <key>`, or `The node at index <index>` when the node has no key string.
+fn node_name(index: usize, node: &Map<String, Value>) -> String {
+    match node.get(NODE_KEY_FIELD).and_then(Value::as_str) {
+        Some(key) => format!("Node {key}"),
+        None => format!("The node at index {index}"),
+    }
 }
 
 /// The names in `required` that `object` lacks, in `required` order.
@@ -179,13 +217,11 @@ fn missing_in_node(index: usize, node: &Value) -> Vec<Violation> {
     let Some(node) = node.as_object() else {
         return Vec::new();
     };
-    let name = match node.get("node_key").and_then(Value::as_str) {
-        Some(key) => format!("Node {key}"),
-        None => format!("The node at index {index}"),
-    };
-    let own = absent(node, &REQUIRED_NODE_FIELDS)
-        .map(|field| Violation::new(Rule::Metadata, format!("{name} has no {field} field.")));
-    let hands = node.get("hands").and_then(Value::as_array).map_or(&[][..], Vec::as_slice);
+    let name = node_name(index, node);
+    let own = REQUIRED_NODE_FIELDS.iter().filter(|(field, _)| !node.contains_key(*field)).map(
+        |(field, shape)| Violation::new(Rule::Metadata, format!("{name} has no {field} {shape}.")),
+    );
+    let hands = node.get(HANDS_FIELD).and_then(Value::as_array).map_or(&[][..], Vec::as_slice);
     let in_hands = hands.iter().enumerate().flat_map(|(at, hand)| missing_in_hand(&name, at, hand));
     own.chain(in_hands).collect()
 }
@@ -207,4 +243,38 @@ fn missing_in_hand(name: &str, index: usize, hand: &Value) -> Vec<Violation> {
         })
         .collect::<Vec<_>>();
     label.into_iter().chain(arrays).collect()
+}
+
+/// The nodes of an incomplete dump as rules 1 to 4 read them, with `None` for every absent
+/// field, so the rules run over what is present and skip what they cannot read. A node that
+/// is not an object has no facts; the typed parse would reject it, and the dump is already
+/// rejected for its missing fields.
+fn node_facts_of(value: &Value) -> impl Iterator<Item = NodeFacts<'_>> {
+    let nodes = value.as_object().map_or(&[][..], nodes_of);
+    nodes.iter().enumerate().filter_map(|(index, node)| {
+        let node = node.as_object()?;
+        let actions = node.get(ACTIONS_FIELD).and_then(Value::as_array);
+        let tokens = actions.map_or(&[][..], Vec::as_slice);
+        let hands = node.get(HANDS_FIELD).and_then(Value::as_array);
+        Some(NodeFacts {
+            name: node_name(index, node),
+            action_count: actions.map(Vec::len),
+            tokens: tokens.iter().filter_map(|action| action.get(TOKEN_FIELD)?.as_str()).collect(),
+            hands: hands.map(|hands| hands.iter().map(hand_facts_of).collect()),
+        })
+    })
+}
+
+/// One hand as rules 1 to 3 read it; a hand that is not an object has no facts.
+fn hand_facts_of(hand: &Value) -> HandFacts<'_> {
+    HandFacts {
+        label: hand.get(HAND_LABEL_FIELD).and_then(Value::as_str),
+        frequencies: number_list(hand.get(FREQUENCIES_FIELD)).map(Cow::Owned),
+        ev_bb: number_list(hand.get(EV_FIELD)).map(Cow::Owned),
+    }
+}
+
+/// The numbers of a JSON array; `None` when absent, not an array, or holding a non-number.
+fn number_list(value: Option<&Value>) -> Option<Vec<f64>> {
+    value?.as_array()?.iter().map(Value::as_f64).collect()
 }

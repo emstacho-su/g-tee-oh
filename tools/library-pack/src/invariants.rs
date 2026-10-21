@@ -8,7 +8,10 @@
 //! each hand's frequencies sum to 1 within `FREQUENCY_SUM_TOLERANCE`; hand labels in
 //! `gto-model`'s canonical spelling (`Display == input`, since `ComboId::from_str` is lenient
 //! about card order); no token or hand twice in a node; complete metadata. A missing field is
-//! reported by `parse_dump`, so `check_invariants` adds only rule 5's known hand space.
+//! reported by `parse_dump`, which then runs `check_facts` over what the dump does hold, so
+//! `check_invariants` adds only rule 5's known hand space to a complete dump. Both paths
+//! feed the same `NodeFacts`, in which an absent field is `None` and its checks are skipped
+//! exactly where node-dump.ts skips them.
 //!
 //! Structural (Rust only, in the `structure` submodule): every key parses, its config id and
 //! pair match the dump's, its street and board match the node's, `to_act` is in the pair, two
@@ -17,6 +20,7 @@
 //!
 //! Lane P (pack) owns this file.
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -114,73 +118,142 @@ pub fn canonical_hand_index(hand_space: &str, label: &str) -> Option<u16> {
     }
 }
 
+/// What rules 1 to 4 read of one hand. A field is `None` when the dump lacks it: its
+/// absence is `parse_dump`'s rule 5 or rule 1 sentence, and the checks that need it are
+/// skipped, as `checkNodeDumpInvariants` skips them.
+pub(crate) struct HandFacts<'a> {
+    /// The hand label.
+    pub label: Option<&'a str>,
+    /// One frequency per action.
+    pub frequencies: Option<Cow<'a, [f64]>>,
+    /// One expected value per action.
+    pub ev_bb: Option<Cow<'a, [f64]>>,
+}
+
+/// What rules 1 to 4 read of one node; `None` marks an absent field as in `HandFacts`.
+pub(crate) struct NodeFacts<'a> {
+    /// `Node <key>`, or `The node at index <i>` for a node without a key.
+    pub name: String,
+    /// How many actions the node lists.
+    pub action_count: Option<usize>,
+    /// The tokens the node's actions carry.
+    pub tokens: Vec<&'a str>,
+    /// The node's hands.
+    pub hands: Option<Vec<HandFacts<'a>>>,
+}
+
 /// Rules 1 to 4 over a parsed dump, plus rule 5's known hand space (the missing fields of
 /// rule 5 are `parse_dump`'s); empty when the dump holds.
 #[must_use]
 pub fn check_invariants(d: &NodeDump) -> Vec<Violation> {
-    let known_space = [PREFLOP_169, POSTFLOP_1326].contains(&d.hand_space.as_str());
-    let space = (!known_space).then(|| {
-        let shown = &d.hand_space;
+    check_facts(Some(&d.hand_space), d.nodes.iter().map(node_facts))
+}
+
+/// Every fact of a typed node, which has every field.
+fn node_facts(node: &DumpNode) -> NodeFacts<'_> {
+    let hands = node.hands.iter().map(hand_facts).collect();
+    NodeFacts {
+        name: format!("Node {}", node.node_key),
+        action_count: Some(node.actions.len()),
+        tokens: node.actions.iter().map(|action| action.token.as_str()).collect(),
+        hands: Some(hands),
+    }
+}
+
+fn hand_facts(hand: &DumpHand) -> HandFacts<'_> {
+    HandFacts {
+        label: Some(&hand.hand),
+        frequencies: Some(Cow::Borrowed(&hand.frequencies)),
+        ev_bb: Some(Cow::Borrowed(&hand.ev_bb)),
+    }
+}
+
+/// Rules 1 to 4 over the facts present, plus rule 5's known hand space. A `None` hand
+/// space is absent from the dump: `parse_dump` reports it and rule 3 is skipped.
+pub(crate) fn check_facts<'a>(
+    hand_space: Option<&str>,
+    nodes: impl Iterator<Item = NodeFacts<'a>>,
+) -> Vec<Violation> {
+    let known = hand_space.filter(|space| [PREFLOP_169, POSTFLOP_1326].contains(space));
+    let unknown = hand_space.filter(|_| known.is_none()).map(|shown| {
         let message =
             format!("The dump's hand_space {shown:?} is not {PREFLOP_169} or {POSTFLOP_1326}.");
         Violation::new(Rule::Metadata, message)
     });
-    let hand_space = known_space.then_some(d.hand_space.as_str());
-    let nodes = d.nodes.iter().flat_map(|node| check_node(node, hand_space));
-    space.into_iter().chain(nodes).collect()
+    let nodes = nodes.flat_map(|node| check_node(&node, known));
+    unknown.into_iter().chain(nodes).collect()
 }
 
 /// Rules 1 to 4 for one node.
-fn check_node(node: &DumpNode, hand_space: Option<&str>) -> Vec<Violation> {
-    let name = format!("Node {}", node.node_key);
-    let tokens = duplicates(node.actions.iter().map(|action| action.token.as_str()))
+fn check_node(node: &NodeFacts<'_>, hand_space: Option<&str>) -> Vec<Violation> {
+    let name = node.name.as_str();
+    let hands = node.hands.as_deref().unwrap_or_default();
+    let tokens = duplicates(node.tokens.iter().copied())
         .into_iter()
         .map(|token| format!("{name} lists the action token {token} more than once."));
-    let labels = duplicates(node.hands.iter().map(|hand| hand.hand.as_str()))
+    let labels = duplicates(hands.iter().filter_map(|hand| hand.label))
         .into_iter()
         .map(|label| format!("{name} lists the hand {label} more than once."));
     let repeated: Vec<Violation> =
         tokens.chain(labels).map(|message| Violation::new(Rule::Duplicates, message)).collect();
-    let actions = node.actions.len();
-    let hands = node.hands.iter().flat_map(|hand| check_hand(&name, hand, actions, hand_space));
-    hands.chain(repeated).collect()
+    let checked = hands
+        .iter()
+        .enumerate()
+        .flat_map(|(index, hand)| check_hand(name, index, hand, node.action_count, hand_space));
+    checked.chain(repeated).collect()
 }
 
-/// Rules 1 to 3 for one hand.
+/// Rules 1 to 3 for one hand; a check whose field is absent is skipped.
 fn check_hand(
     name: &str,
-    hand: &DumpHand,
-    actions: usize,
+    index: usize,
+    hand: &HandFacts<'_>,
+    actions: Option<usize>,
     hand_space: Option<&str>,
 ) -> Vec<Violation> {
-    let who = format!("{name} hand {}", hand.hand);
-    let label =
-        hand_space.filter(|space| canonical_hand_index(space, &hand.hand).is_none()).map(|space| {
+    let who = match hand.label {
+        Some(label) => format!("{name} hand {label}"),
+        None => format!("{name} hand at index {index}"),
+    };
+    let label = hand_space
+        .zip(hand.label)
+        .filter(|(space, label)| canonical_hand_index(space, label).is_none())
+        .map(|(space, _)| {
             let message =
                 format!("{who} is not a {space} label in gto-model's canonical spelling.");
             Violation::new(Rule::HandLabel, message)
         });
-    let frequency_count = (hand.frequencies.len() != actions).then(|| {
-        let count = hand.frequencies.len();
-        Violation::new(
-            Rule::Counts,
-            format!("{who} has {count} frequencies for {actions} actions."),
-        )
-    });
-    let sum = hand.frequencies.iter().fold(0.0, |total, frequency| total + frequency);
-    let frequency_sum = ((sum - 1.0).abs() > FREQUENCY_SUM_TOLERANCE).then(|| {
+    let frequencies = hand.frequencies.as_deref();
+    let frequency_count = count_mismatch(&who, "frequencies", frequencies, actions);
+    let frequency_sum = frequencies.and_then(|row| sum_mismatch(&who, row));
+    let ev_count = count_mismatch(&who, "expected values", hand.ev_bb.as_deref(), actions);
+    [label, frequency_count, frequency_sum, ev_count].into_iter().flatten().collect()
+}
+
+/// Rule 1: one entry of `row` per action, when the dump has both.
+fn count_mismatch(
+    who: &str,
+    what: &str,
+    row: Option<&[f64]>,
+    actions: Option<usize>,
+) -> Option<Violation> {
+    let (row, actions) = row.zip(actions)?;
+    let count = row.len();
+    (count != actions).then(|| {
+        Violation::new(Rule::Counts, format!("{who} has {count} {what} for {actions} actions."))
+    })
+}
+
+/// Rule 2: the frequencies sum to 1 within the tolerance.
+fn sum_mismatch(who: &str, row: &[f64]) -> Option<Violation> {
+    let sum = row.iter().fold(0.0, |total, frequency| total + frequency);
+    ((sum - 1.0).abs() > FREQUENCY_SUM_TOLERANCE).then(|| {
         let shown = format_sum(sum);
         let message = format!(
             "{who} has frequencies summing to {shown}, not 1 within {FREQUENCY_SUM_TOLERANCE}."
         );
         Violation::new(Rule::FrequencySum, message)
-    });
-    let ev_count = (hand.ev_bb.len() != actions).then(|| {
-        let count = hand.ev_bb.len();
-        let message = format!("{who} has {count} expected values for {actions} actions.");
-        Violation::new(Rule::Counts, message)
-    });
-    [label, frequency_count, frequency_sum, ev_count].into_iter().flatten().collect()
+    })
 }
 
 /// The values that occur more than once, each listed once, in first-repeat order.

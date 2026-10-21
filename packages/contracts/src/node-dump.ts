@@ -19,10 +19,12 @@
  *   4. no action token twice in a node and no hand twice in a node; rule 3 is what lets this rule
  *      compare labels as text, since a second spelling of the same hand is already a violation;
  *   5. metadata completeness: every field the schema requires, including the six game
- *      configuration fields, is present (config_id stays optional, the configuration is enough).
+ *      configuration fields and the eight fields of a node, is present (config_id stays optional,
+ *      the configuration is enough).
  *
  * Every violation comes back as one plain sentence naming the node key and the hand. A malformed
- * shape is reported the same way: the function never throws and never mutates its input.
+ * shape is reported the same way: the function never throws and never mutates its input. Every
+ * rule is reported, never only the first: a missing field skips just the checks that read it.
  */
 
 /** How far from 1 the frequencies of one hand may sum (criterion 2). */
@@ -88,6 +90,11 @@ type JsonRecord = Readonly<Record<string, unknown>>;
 const HAND_SPACES: readonly HandSpace[] = ["preflop_169", "postflop_1326"];
 const REQUIRED_DUMP_FIELDS = ["schema_version", "source", "exported_at", "config", "position_pair", "hand_space", "nodes"] as const;
 const REQUIRED_CONFIG_FIELDS = ["format", "table_size", "stake_label", "depth_cbb", "straddle", "ante_cbb"] as const;
+/**
+ * The node fields rule 5 requires besides node_key, actions and hands, which have shape checks
+ * of their own.
+ */
+const REQUIRED_NODE_FIELDS = ["street", "board", "to_act", "pot_cbb", "stacks_cbb"] as const;
 /** A 169-class label: two ranks and, for a non-pair, s (suited) or o (offsuit). */
 const LABEL_169 = /^([2-9TJQKA])([2-9TJQKA])([so])?$/;
 /** A 1326-combination label: two cards, rank then suit each. */
@@ -244,12 +251,16 @@ function checkNode(node: unknown, index: number, handSpace: HandSpace | undefine
   if (!isRecord(node)) return [`The node at index ${index} is not a JSON object.`];
   const name = typeof node.node_key === "string" ? `Node ${node.node_key}` : `The node at index ${index}`;
   const key = typeof node.node_key === "string" ? [] : [`${name} has no node_key string.`];
+  const fields = REQUIRED_NODE_FIELDS.filter((field) => node[field] === undefined).map(
+    (field) => `${name} has no ${field} field.`,
+  );
   const actions = Array.isArray(node.actions) ? node.actions : undefined;
   const actionViolations = actions === undefined ? [`${name} has no actions array.`] : checkActions(name, actions);
-  if (!Array.isArray(node.hands)) return [...key, ...actionViolations, `${name} has no hands array.`];
+  const metadata = [...key, ...fields, ...actionViolations];
+  if (!Array.isArray(node.hands)) return [...metadata, `${name} has no hands array.`];
   const hands: readonly unknown[] = node.hands;
   const handViolations = hands.flatMap((hand, handIndex) => checkHand(name, hand, handIndex, actions?.length, handSpace));
-  return [...key, ...actionViolations, ...handViolations, ...checkHandDuplicates(name, hands)];
+  return [...metadata, ...handViolations, ...checkHandDuplicates(name, hands)];
 }
 
 /**
