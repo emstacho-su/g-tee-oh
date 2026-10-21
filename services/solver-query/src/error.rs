@@ -32,6 +32,9 @@ pub enum ApiError {
     BadRequest(String),
     /// The solution, node, hand or deal does not exist (404).
     NotFound(String),
+    /// The request is well formed but out of order with the deal's state: a street
+    /// revealed before the one that precedes it (409, plan C.4).
+    Conflict(String),
     /// The solution is marked unavailable by the reader (503).
     Unavailable {
         /// The solution's store prefix.
@@ -54,6 +57,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ApiError::NotFound(_) => StatusCode::NOT_FOUND,
+            ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::Unavailable { .. } | ApiError::DatabaseUnavailable(_) => {
                 StatusCode::SERVICE_UNAVAILABLE
             }
@@ -68,6 +72,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(_) => "bad-request",
             ApiError::NotFound(_) => "not-found",
+            ApiError::Conflict(_) => "conflict",
             ApiError::Unavailable { .. } => "unavailable",
             ApiError::DatabaseUnavailable(_) => "database-unavailable",
             ApiError::NotImplemented => "not-implemented",
@@ -81,6 +86,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(_) => "Bad request",
             ApiError::NotFound(_) => "Not found",
+            ApiError::Conflict(_) => "Conflict",
             ApiError::Unavailable { .. } => "Solution unavailable",
             ApiError::DatabaseUnavailable(_) => "Database unavailable",
             ApiError::NotImplemented => "Not implemented",
@@ -92,7 +98,9 @@ impl ApiError {
     #[must_use]
     pub fn detail(&self) -> String {
         match self {
-            ApiError::BadRequest(message) | ApiError::NotFound(message) => message.clone(),
+            ApiError::BadRequest(message)
+            | ApiError::NotFound(message)
+            | ApiError::Conflict(message) => message.clone(),
             ApiError::Unavailable { prefix, reason } => {
                 format!("solution {prefix} is unavailable: {reason}")
             }
@@ -189,6 +197,7 @@ mod tests {
         let cases = [
             (ApiError::BadRequest("x".into()), 400, "bad-request"),
             (ApiError::NotFound("x".into()), 404, "not-found"),
+            (ApiError::Conflict("x".into()), 409, "conflict"),
             (ApiError::Unavailable { prefix: "p".into(), reason: "r".into() }, 503, "unavailable"),
             (ApiError::DatabaseUnavailable("x".into()), 503, "database-unavailable"),
             (ApiError::NotImplemented, 501, "not-implemented"),

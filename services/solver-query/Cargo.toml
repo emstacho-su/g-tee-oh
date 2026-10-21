@@ -26,10 +26,16 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# In-process request tests (tower::ServiceExt::oneshot) and response body collection.
+# In-process request tests (tower::ServiceExt::oneshot) and response body collection, plus the
+# packed synthetic fixture the integration tests build in a temporary directory (plan C.9, O-149):
+# gto-library's synthetic generator, library-pack's dump export and pack, and tempfile. None of
+# them reaches gto-solve, and dev-dependencies are outside the normal graph rust-boundary checks.
 [dev-dependencies]
 tower = { workspace = true }
 http-body-util = { workspace = true }
+gto-library = { workspace = true, features = ["synthetic"] }
+library-pack = { path = "../../tools/library-pack" }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
