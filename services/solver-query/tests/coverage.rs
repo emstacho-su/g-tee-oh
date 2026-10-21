@@ -47,7 +47,7 @@ async fn r2_13_coverage_without_a_database_reports_fixture_preflop_availability(
 }
 
 #[test]
-#[ignore = "R2.13: needs QUERY_DATABASE_URL from the compose dev profile (just dev-up, just db-migrate)"]
+#[ignore = "R2.13: needs QUERY_DATABASE_URL from the dev profile (just dev-up, just db-migrate)"]
 fn r2_13_coverage_reads_under_the_query_role() {
     unimplemented!(
         "current_user is query_login and pg_has_role(current_user, 'query', 'member'); an insert \

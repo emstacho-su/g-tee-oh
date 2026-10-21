@@ -84,7 +84,8 @@ function writeResult(id, { mean, median, run = "new", withBenchmarkJson = true, 
  */
 function p95Sample() {
   const iters = Array.from({ length: P95_SAMPLES }, () => ITERS_PER_SAMPLE);
-  const times = Array.from({ length: P95_SAMPLES }, (_, k) => (k + 1) * NS_PER_ITERATION_STEP * ITERS_PER_SAMPLE);
+  const iterationNs = (k) => (k + 1) * NS_PER_ITERATION_STEP;
+  const times = Array.from({ length: P95_SAMPLES }, (_, k) => iterationNs(k) * ITERS_PER_SAMPLE);
   // Shuffled, so the percentile must sort.
   return { sampling_mode: "Linear", iters, times: [...times].reverse() };
 }

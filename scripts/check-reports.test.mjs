@@ -29,7 +29,14 @@ const UNDER_BUDGET_NS = GRADE_P95_BUDGET_NS - 5_000_000;
 /** The committed bench baseline with one grade/warm_cache measurement at the given p95. */
 function benchReportWithGrade(p95Ns) {
   const report = JSON.parse(readFileSync(BENCH_REPORT, "utf8"));
-  const grade = { id: GRADE_ID, mean_ns: 20_000_000, median_ns: 19_000_000, p95_ns: p95Ns, unit: "ns", stub: false };
+  const grade = {
+    id: GRADE_ID,
+    mean_ns: 20_000_000,
+    median_ns: 19_000_000,
+    p95_ns: p95Ns,
+    unit: "ns",
+    stub: false,
+  };
   const measurements = [...report.measurements.filter((entry) => entry.id !== GRADE_ID), grade];
   return { ...report, measurements };
 }

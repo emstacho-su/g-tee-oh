@@ -67,7 +67,8 @@ test("R2.15 the forbidden package list names the builder, the solver and the wor
 
 test("R2.15 a package.json with a dependency named library-builder fails", async () => {
   const { dependencyFindings } = await boundary();
-  const planted = { ...CLEAN_MANIFEST, dependencies: { ...CLEAN_MANIFEST.dependencies, "library-builder": "workspace:*" } };
+  const dependencies = { ...CLEAN_MANIFEST.dependencies, "library-builder": "workspace:*" };
+  const planted = { ...CLEAN_MANIFEST, dependencies };
   const findings = dependencyFindings(planted);
   assert.equal(findings.length, 1, JSON.stringify(findings));
   assert.match(findings[0], /library-builder/);
@@ -82,22 +83,30 @@ test("R2.15 a package.json with a dependency named library-builder fails", async
   assert.deepEqual(dependencyFindings(CLEAN_MANIFEST), []);
 });
 
-test("R2.15 a planted child_process spawn of library-builder under services/api/src fails", async () => {
+const SPAWNS_BUILDER = [
+  'import { spawn } from "node:child_process";',
+  "",
+  "export function pack(): void {",
+  '  spawn("library-builder", ["pack"]);',
+  "}",
+  "",
+].join("\n");
+const USES_EXECA = 'import { execa } from "execa";\nexport const run = () => execa("ls");\n';
+
+test("R2.15 a planted spawn of library-builder under services/api/src fails", async () => {
   const { sourceFindings } = await boundary();
   writeSource("src/routes/healthz.ts", 'export const healthz = () => ({ status: "ok" });\n');
   assert.deepEqual(sourceFindings(join(dir, "src")), [], "a clean tree has no finding");
 
-  const planted = writeSource(
-    "src/jobs/pack.ts",
-    'import { spawn } from "node:child_process";\n\nexport function pack(): void {\n  spawn("library-builder", ["pack"]);\n}\n',
-  );
+  const planted = writeSource("src/jobs/pack.ts", SPAWNS_BUILDER);
   const findings = sourceFindings(join(dir, "src"));
-  assert.ok(findings.length >= 1, JSON.stringify(findings));
-  assert.ok(findings.every((finding) => finding.includes("pack.ts")), JSON.stringify(findings));
-  assert.ok(findings.some((finding) => /child_process|library-builder/.test(finding)), JSON.stringify(findings));
+  const shown = JSON.stringify(findings);
+  assert.ok(findings.length >= 1, shown);
+  assert.ok(findings.every((finding) => finding.includes("pack.ts")), shown);
+  assert.ok(findings.some((finding) => /child_process|library-builder/.test(finding)), shown);
   assert.ok(planted.endsWith("pack.ts"));
 
-  writeSource("src/jobs/pack.ts", 'import { execa } from "execa";\nexport const run = () => execa("ls");\n');
+  writeSource("src/jobs/pack.ts", USES_EXECA);
   assert.match(sourceFindings(join(dir, "src"))[0], /execa/);
 });
 

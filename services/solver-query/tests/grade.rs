@@ -257,7 +257,7 @@ async fn r2_13_grade_equals_direct_reader_recomputation() {
         }
     }
     println!(
-        "r2_13_grade_equals_direct_reader_recomputation: compared {compared} decisions over {} nodes",
+        "r2_13_grade_equals_direct_reader_recomputation: compared {compared} decisions, {} nodes",
         fixture.nodes.len()
     );
     assert!(compared > 0);

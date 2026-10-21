@@ -43,7 +43,11 @@ fn r2_15_solver_query_manifest_declares_no_solver_edge() {
 
 #[test]
 fn r2_15_section_keys_reads_one_section_only() {
-    let toml = "[package]\nname = \"x\"\n\n[dependencies]\n# a comment\ngto-library = { workspace = true }\nserde = \"1\"\n\n[dev-dependencies]\ntempfile = \"3\"\n";
+    let toml = concat!(
+        "[package]\nname = \"x\"\n\n",
+        "[dependencies]\n# a comment\ngto-library = { workspace = true }\nserde = \"1\"\n\n",
+        "[dev-dependencies]\ntempfile = \"3\"\n",
+    );
     assert_eq!(section_keys(toml, "[dependencies]"), vec!["gto-library", "serde"]);
     assert_eq!(section_keys(toml, "[dev-dependencies]"), vec!["tempfile"]);
     assert_eq!(section_keys(toml, "[build-dependencies]"), Vec::<String>::new());

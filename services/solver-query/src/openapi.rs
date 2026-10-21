@@ -23,7 +23,10 @@ use utoipa::OpenApi;
     ),
     tags(
         (name = "nodes", description = "One node of one solution (GET /v1/nodes)"),
-        (name = "grade", description = "Grade one decision with the preflop floor (POST /v1/grade)"),
+        (
+            name = "grade",
+            description = "Grade one decision with the preflop floor (POST /v1/grade)"
+        ),
         (name = "insights", description = "E3 insight data for one hand (GET /v1/insights)"),
         (name = "deal", description = "Seeded server-side deals and street reveals"),
         (name = "sample-action", description = "The opponent's action at a node"),
