@@ -23,29 +23,8 @@ until curl -s -o /dev/null "$ENDPOINT/"; do
   sleep 1
 done
 
-signed_status() {
-  curl -s -o /dev/null -w '%{http_code}' --aws-sigv4 "$SIGV4" --user "$AUTH" "$@"
-}
-
-# The gateway can answer / before its filer accepts bucket requests, so a signed request that
-# gets no answer (000) or a server error (5xx) is retried with the same bounded loop; any other
-# code is returned at once for the caller to judge.
 status_of() {
-  attempt=0
-  while :; do
-    code=$(signed_status "$@") || code=000
-    case "$code" in
-      000|5??) ;;
-      *) echo "$code"; return 0 ;;
-    esac
-    attempt=$((attempt + 1))
-    if [ "$attempt" -ge "$MAX_TRIES" ]; then
-      echo "$code"
-      return 0
-    fi
-    echo "bucket-init: HTTP $code from the S3 gateway, retrying ($attempt of $MAX_TRIES)" >&2
-    sleep 1
-  done
+  curl -s -o /dev/null -w '%{http_code}' --aws-sigv4 "$SIGV4" --user "$AUTH" "$@"
 }
 
 for bucket in library reference-private; do

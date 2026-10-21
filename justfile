@@ -74,7 +74,7 @@ e2e-stack:
 dev-up:
     {{COMPOSE}} --profile dev up -d --build --wait postgres seaweedfs solver-query api web caddy
     {{COMPOSE}} --profile dev up -d bucket-init
-    {{COMPOSE}} --profile dev wait bucket-init
+    node infra/compose/wait-one-shot.mjs bucket-init
 
 # Compose dev stack down, volumes removed
 dev-down:
