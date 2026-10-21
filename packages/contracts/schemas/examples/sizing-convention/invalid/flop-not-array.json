@@ -1,0 +1,19 @@
+{
+  "open_bb": 2.5,
+  "iso_rule": {
+    "base_bb": 3,
+    "per_limper_bb": 1
+  },
+  "threebet_ip": 3,
+  "threebet_oop": 4,
+  "fourbet": 2.2,
+  "postflop": {
+    "flop": 0.33,
+    "turn": [
+      0.75
+    ],
+    "river": [
+      1
+    ]
+  }
+}

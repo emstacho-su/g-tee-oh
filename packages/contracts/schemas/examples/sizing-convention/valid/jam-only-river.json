@@ -1,0 +1,8 @@
+{
+  "open_bb": 2.5,
+  "iso_rule": { "base_bb": 3.0, "per_limper_bb": 1.0 },
+  "threebet_ip": 3.0,
+  "threebet_oop": 4.0,
+  "fourbet": 2.2,
+  "postflop": { "flop": [0.33], "turn": [0.75], "river": [], "bet_allin": true }
+}

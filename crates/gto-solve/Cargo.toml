@@ -18,6 +18,8 @@ gto-tree = { workspace = true }
 # The 169 by 169 preflop equity table (R2.20, O-126) splits its 1.6e11 evaluations across
 # cores; the engine already pulls rayon in, so this adds no new crate to the graph.
 rayon = { workspace = true }
+# The postflop adapter's error type (R2.10).
+thiserror = { workspace = true }
 
 # Benchmark harness (R0.10, A9 section 1). criterion stays on 0.7 because the workspace
 # pins rust-version 1.85 and the resolver is minimum supported Rust version (MSRV) aware:
@@ -26,6 +28,11 @@ rayon = { workspace = true }
 # handling is wanted.
 [dev-dependencies]
 criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+# The R2.10 tests: skeleton and engine parity (proptest), the seed spec rows (serde_json)
+# and the allocator peak against estimate_bytes (peak_alloc, O-139).
+proptest = { workspace = true }
+serde_json = { workspace = true }
+peak_alloc = { workspace = true }
 
 # criterion supplies its own main, so the libtest harness is off (just bench, R0.10).
 [[bench]]

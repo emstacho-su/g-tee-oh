@@ -1,50 +1,40 @@
-//! Exploitability of a strategy profile from the engine's best-response and
-//! expected-value walks, and the copy of a profile into `f64` tables. Owner: the G1
-//! agent (R2.4, O-102, O-108).
+//! Exploitability of a strategy profile from the crate's shared unilateral-gain measure,
+//! and the copy of a profile into `f64` tables. Owner: the G1 agent (R2.4, O-102, O-108).
 //!
-//! Mechanism. For each player `i`, `postflop_engine::br::best_response_value(game, i,
-//! profile)` is the value of best-responding to the profile and
-//! `postflop_engine::br::expected_value(game, i, profile)` the value of following it; the
-//! unilateral gain is their difference. That is four walks, all `f32`, each widened to
-//! `f64` before the subtraction so the difference of the two engine figures is exact.
-//! `NashConv` is the sum of the two gains, the figure the engine itself calls
-//! exploitability; the mean is half of it, what `OpenSpiel` calls exploitability (O-108);
-//! the percentage is `NashConv` over `root_pot`. The engine's `br::exploitability` is
-//! never called: its debug assertion that every gain is at least minus 1e-3 trips on
-//! Kuhn (O-102), and this measure carries no assertion, so `gto-solve` and `validate`
-//! run their tests in the default debug profile.
+//! Mechanism. For each player `i`, `crate::exploit::unilateral_gain` runs the engine's
+//! best-response and expected-value walks, both `f32`, each widened to `f64` before the
+//! subtraction so the gain is the exact difference of the two engine figures; the postflop
+//! adapter's `best_response` uses the same function (R2.10). `NashConv` is the sum of the
+//! two gains, the figure the engine itself calls exploitability; the mean is half of it,
+//! what `OpenSpiel` calls exploitability (O-108); the percentage is `NashConv` over
+//! `root_pot`. The engine's `br::exploitability` is never called: its debug assertion that
+//! every gain is at least minus 1e-3 trips on Kuhn (O-102), and this measure carries no
+//! assertion, so `gto-solve` and `validate` run their tests in the default debug profile.
 
 use std::collections::BTreeMap;
 
-use postflop_engine::br::{self, StrategyProfile};
+use postflop_engine::br::StrategyProfile;
 use postflop_engine::game::{Game, NodeInfo};
 
 use super::{Exploitability, Measurement, NodeStrategy, Tables};
+use crate::exploit::unilateral_gain;
 
 /// Measure `profile` on `game`: both players' gains, `NashConv`, its mean and its share
 /// of the pot, plus the expected value to each player, all in chips.
 pub(crate) fn measure<G: Game, P: StrategyProfile>(game: &G, profile: &P) -> Measurement {
-    let (gain_0, value_0) = gain_and_value(game, 0, profile);
-    let (gain_1, value_1) = gain_and_value(game, 1, profile);
-    let nash_conv_chips = gain_0 + gain_1;
+    let player_0 = unilateral_gain(game, 0, profile);
+    let player_1 = unilateral_gain(game, 1, profile);
+    let nash_conv_chips = player_0.gain + player_1.gain;
     let root_pot = f64::from(game.root_pot());
     Measurement {
         exploitability: Exploitability {
-            gain_chips: [gain_0, gain_1],
+            gain_chips: [player_0.gain, player_1.gain],
             nash_conv_chips,
             mean_chips: nash_conv_chips / 2.0,
             pct_of_pot: 100.0 * nash_conv_chips / root_pot,
         },
-        value_chips: [value_0, value_1],
+        value_chips: [player_0.expected, player_1.expected],
     }
-}
-
-/// Player `hero`'s unilateral gain and expected value under `profile`: two engine walks,
-/// widened to `f64` before the subtraction.
-fn gain_and_value<G: Game, P: StrategyProfile>(game: &G, hero: u8, profile: &P) -> (f64, f64) {
-    let best_response = f64::from(br::best_response_value(game, hero, profile));
-    let expected = f64::from(br::expected_value(game, hero, profile));
-    (best_response - expected, expected)
 }
 
 /// Copy `profile`'s strategy at every decision node of `game` and the root weights into

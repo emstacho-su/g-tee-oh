@@ -1,0 +1,10 @@
+{
+  "placeholder_for": "cfg_6_online_100",
+  "open_bb": 2.5,
+  "iso_rule": { "base_bb": 3.0, "per_limper_bb": 1.0 },
+  "threebet_ip": 3.0,
+  "threebet_oop": 4.0,
+  "fourbet": 2.2,
+  "straddle_bb": null,
+  "postflop": { "flop": [0.33, 0.75], "turn": [0.75], "river": [0.75] }
+}

@@ -1,4 +1,5 @@
 # rust job (R0.3): formatting, clippy, tests and the solver-query boundary, all through just recipes.
+# tree-hash-arm64 job (R2.9, O-140): the tree-hash golden on an arm64 runner.
 name: rust
 
 on:
@@ -51,3 +52,18 @@ jobs:
           name: gate-reports
           path: validation/reports/g*-*.*
           if-no-files-found: error
+
+  # The canonical tree hash is sha256 over integers in little endian with no float, no map
+  # order and no usize, so an arm64 runner must reproduce the golden committed from x86
+  # (crates/gto-tree/tests/snapshots). The toolchain steps match the rust job; the test
+  # is plain cargo, so neither just nor node is needed. S20 rechecks on the Mac.
+  tree-hash-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Tree-hash golden (R2.9, O-140)
+        run: cargo test -p gto-tree --test r2_9_hash

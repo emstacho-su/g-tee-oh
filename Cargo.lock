@@ -640,7 +640,11 @@ dependencies = [
  "engine",
  "gto-model",
  "gto-tree",
+ "peak_alloc",
+ "proptest",
  "rayon",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -648,6 +652,12 @@ name = "gto-tree"
 version = "0.1.0"
 dependencies = [
  "gto-model",
+ "insta",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -1153,6 +1163,12 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "peak_alloc"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c4e8e2dd832fd76346468f822e4e600d30ba4e5aa545a128abf12cfae7ea3e"
 
 [[package]]
 name = "percent-encoding"
