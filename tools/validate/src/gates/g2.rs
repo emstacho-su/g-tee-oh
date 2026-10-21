@@ -26,15 +26,16 @@
 //! fixture path.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use gto_solve::toy::{StopRule, ToyGame, ToySolution, solve_dcfr};
 
-use crate::fixtures::FixtureError;
 use crate::fixtures::toy_game::{Case, Frequency, RatioFact, StrategyFact, ToyGameFixture};
 use crate::report::{Measurement, Threshold};
 
-use super::{Gate, GateError, GateReport, SolvedCase};
+use super::{
+    Gate, GateError, GateReport, SolvedCase, iterations_as_f64, missing_fact, required_tolerance,
+    resolve_frequencies, unknown_case,
+};
 
 /// The stop rule: chunks of 1,000 iterations until `NashConv` is below 1e-5 chips or
 /// 1,000,000 iterations have run.
@@ -48,7 +49,7 @@ const POINTS_UNIT: &str = "percentage_points";
 const FREQUENCY: &str = "frequency";
 const CHIPS: &str = "chips";
 const ITERATIONS: &str = "iterations";
-/// The fixture, relative to the repository root, for the notes and for errors.
+/// The fixture, relative to the repository root, for the notes.
 const FIXTURE_PATH: &str = "validation/fixtures/toy-games/akq.json";
 /// The three AKQ cases and the polar river case, by id.
 const AKQ_CASES: [&str; 3] = ["pot1-bet-quarter", "pot1-bet-half", "pot1-bet-pot"];
@@ -140,16 +141,7 @@ fn game_of(fixture: &ToyGameFixture, case: &Case) -> Result<(ToyGame, &'static P
 fn solve(fixture: &ToyGameFixture, case: &Case) -> Result<Solved, GateError> {
     let (game, parts) = game_of(fixture, case)?;
     let solution = solve_dcfr(game, &STOP);
-    let frequencies = case
-        .strategy_facts
-        .iter()
-        .map(|fact| {
-            solution
-                .frequency(fact.player, &fact.node, &fact.holding, &fact.action)
-                .map(|value| (fact.id.clone(), value))
-                .ok_or_else(|| missing_fact(fixture, case, &fact.id))
-        })
-        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let frequencies = resolve_frequencies(fixture, case, &solution)?;
     let ratios = case
         .ratio_facts
         .iter()
@@ -212,23 +204,14 @@ fn ratio_value(solution: &ToySolution, parts: &Parts, id: &str) -> Option<f64> {
 
 /// The G2 tolerance in frequency units: the fixture's percentage points over 100.
 fn frequency_tolerance(fixture: &ToyGameFixture) -> Result<f64, GateError> {
-    let invalid = |reason: &str| {
-        GateError::Fixture(FixtureError::Invalid {
-            path: PathBuf::from(FIXTURE_PATH),
-            reason: reason.to_owned(),
-        })
-    };
-    let points =
-        fixture.tolerances.frequency_points.as_ref().ok_or_else(|| {
-            invalid("tolerances.frequency_points is null; gate G2 judges nothing")
-        })?;
-    if points.unit != POINTS_UNIT {
-        return Err(invalid(&format!(
-            "tolerances.frequency_points.unit is {}, gate G2 reads {POINTS_UNIT}",
-            points.unit
-        )));
-    }
-    Ok(points.value / POINTS_PER_UNIT)
+    let points = required_tolerance(
+        fixture,
+        fixture.tolerances.frequency_points.as_ref(),
+        "frequency_points",
+        POINTS_UNIT,
+        Gate::G2,
+    )?;
+    Ok(points / POINTS_PER_UNIT)
 }
 
 /// Every measurement of one case: a judged one per strategy fact and per ratio fact,
@@ -317,23 +300,6 @@ fn measurement_id(case: &Case, fact: &str) -> String {
     format!("{}/{}/{fact}", Gate::G2.fixture_id(), case.id)
 }
 
-fn unknown_case(fixture: &ToyGameFixture, case: &Case) -> GateError {
-    GateError::UnknownCase { fixture: fixture.id.clone(), case: case.id.clone() }
-}
-
-fn missing_fact(fixture: &ToyGameFixture, case: &Case, fact: &str) -> GateError {
-    GateError::MissingFact {
-        fixture: fixture.id.clone(),
-        case: case.id.clone(),
-        fact: fact.to_owned(),
-    }
-}
-
-#[allow(clippy::cast_precision_loss, reason = "at most 1,000,000 iterations, exact in f64")]
-fn iterations_as_f64(iterations: u64) -> f64 {
-    iterations as f64
-}
-
 fn notes(tolerance: f64) -> String {
     format!(
         "DCFR default schedule (alpha 1.5, beta 0, gamma 2, no regret floor) in chunks of {} \
@@ -361,8 +327,10 @@ mod tests {
             .unwrap_or_else(|error| panic!("{error}"))
     }
 
+    /// R2.5: a case id the gate does not model is refused as an unknown case, naming the
+    /// fixture and the case.
     #[test]
-    fn a_case_the_gate_does_not_model_is_an_unknown_case_error() {
+    fn r2_5_a_case_the_gate_does_not_model_is_an_unknown_case_error() {
         let fixture = fixture();
         let mut case = fixture.cases[0].clone();
         case.id = "pot1-bet-double".to_owned();

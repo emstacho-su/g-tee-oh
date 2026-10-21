@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 // Report schema check (R0.11): validates every JSON (JavaScript Object Notation) report
 // under validation/reports/ against validation/reports/report.schema.json with ajv (draft
-// 2020-12) and requires pass: true on every report other than the bench baseline.
-// `just report-check` runs it locally and in the ts job; scripts/check-reports.test.mjs
-// covers it under `pnpm run test:scripts`.
+// 2020-12), checks that each gate report's verdict agrees with its measurements, and
+// requires pass: true on every report other than the bench baseline. `just report-check`
+// runs it on the committed reports locally and in the ts job; `just gates-check` runs it
+// on a fresh run under target/gate-reports; scripts/check-reports.test.mjs covers it under
+// `pnpm run test:scripts`.
+//
+// The consistency rule (every report other than the bench baseline, which carries no
+// pass): a judged measurement is one whose pass is a boolean. A report whose pass is true
+// while any measurement carries pass: false is rejected, naming those measurements, and so
+// is a report whose pass is false while every judged measurement passes. So the top-level
+// verdict can neither hide a failed measurement nor fail with no measurement to blame.
 //
 // Command-line contract (scripts/check-reports.test.mjs fixes it):
 //   node scripts/check-reports.mjs [DIR]
@@ -22,8 +30,9 @@
 // parent defines, which is valid draft 2020-12. Each file is read, parsed and validated;
 // ajv errors are turned into "<field> <problem>" reasons. The if/then/else wrapper error
 // is dropped because the error inside the branch already names the field. The schema
-// leaves pass optional in type terms, so the pass rule (pass must be true on a gate
-// report) is checked here after the schema passes.
+// leaves pass optional in type terms and cannot compare fields, so the consistency rule
+// and the pass rule (pass must be true on a gate report) are checked here after the schema
+// passes, consistency first.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -86,6 +95,22 @@ function schemaReasons(validate, report) {
   return [...new Set(reasons)];
 }
 
+function consistencyReasons(report) {
+  if (report.report === BENCH_REPORT_ID) return [];
+  const judged = report.measurements.filter((entry) => typeof entry.pass === "boolean");
+  const failing = judged.filter((entry) => entry.pass === false);
+  if (report.pass === true && failing.length > 0) {
+    const ids = failing.map((entry) => entry.id).join(", ");
+    const subject =
+      failing.length === 1 ? `measurement ${ids} carries` : `measurements ${ids} carry`;
+    return [`pass is true but ${subject} pass false`];
+  }
+  if (report.pass === false && failing.length === 0) {
+    return ["pass is false but every judged measurement passes"];
+  }
+  return [];
+}
+
 function passReasons(report) {
   if (report.report === BENCH_REPORT_ID) return [];
   return report.pass === true ? [] : ["pass is not true: a gate report on record must pass"];
@@ -99,7 +124,7 @@ function checkReport(validate, path) {
     return [`cannot be read as JSON: ${error.message}`];
   }
   const reasons = schemaReasons(validate, report);
-  return reasons.length > 0 ? reasons : passReasons(report);
+  return reasons.length > 0 ? reasons : [...consistencyReasons(report), ...passReasons(report)];
 }
 
 function listReports(dir) {

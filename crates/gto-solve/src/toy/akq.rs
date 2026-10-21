@@ -91,7 +91,7 @@ mod tests {
     const TOLERANCE: f32 = 0.02;
 
     #[test]
-    fn names_list_six_facts_and_six_holdings_without_duplicates() {
+    fn r2_5_names_list_six_facts_and_six_holdings_without_duplicates() {
         let names = names();
         assert_eq!(names.facts.len(), 6);
         assert_eq!(names.holdings.len(), 6);
@@ -113,7 +113,7 @@ mod tests {
     /// bets A always, never bets K, calls A always, folds Q always, and mixes Q bets and
     /// K calls at one third each (`crates/vendor/postflop-engine/src/games/akq.rs`).
     #[test]
-    fn slots_read_the_engine_average_strategy_in_the_fixture_words() {
+    fn r2_5_slots_read_the_engine_average_strategy_in_the_fixture_words() {
         let mut solver = Solver::new(Akq::new(1.0, 0.5));
         solver.run(ITERATIONS, &DcfrParams::default(), 0, |_, _, _| {});
         let read = |player: u8, node: &str, holding: &str, action: &str| -> f32 {

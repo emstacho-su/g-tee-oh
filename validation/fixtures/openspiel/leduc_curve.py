@@ -128,11 +128,14 @@ def run_curve(
     """Run plain CFR to the last checkpoint, measuring at each one.
 
     Returns the checkpoint rows, the final average policy and the solver's switches as
-    solver_switches reads them. The solver is not reset
-    between checkpoints: iteration n in the output is the state after n updates in one
-    continuous run, which is what tools/validate G3 must reproduce.
+    solver_switches reads them right after construction, before any iteration, so the
+    report records the configuration the run started with and a missing attribute fails
+    before minutes of solving. The solver is not reset between checkpoints: iteration n in
+    the output is the state after n updates in one continuous run, which is what
+    tools/validate G3 must reproduce.
     """
     solver = cfr.CFRSolver(game)
+    switches = solver_switches(solver)
     rows: list[dict[str, float]] = []
     started = time.perf_counter()
     iteration = 0
@@ -153,7 +156,7 @@ def run_curve(
             f"  nash_conv {row['nash_conv']:.9f}  ({row['elapsed_seconds']:.1f} s)\n"
         )
         log.flush()
-    return rows, solver.average_policy(), solver_switches(solver)
+    return rows, solver.average_policy(), switches
 
 
 def build_report(

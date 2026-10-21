@@ -5,15 +5,17 @@
 //!
 //! Mechanism. A gate hands back a [`crate::gates::GateReport`], its own data only;
 //! [`Report::from_gate`] attaches the run [`Context`] (machine, commit, date, toolchain)
-//! to make the envelope. [`write_json`] serialises it pretty-printed with a trailing
-//! newline, field order as the README lists it. [`write_markdown`] renders the same
-//! value as the Markdown twin through the `markdown` child module, title, R IDs, commit,
-//! date, machine, the notes line and one table row per measurement with its threshold
-//! and verdict, so the two files cannot disagree (A2 section 6; the README's "assembled
-//! by hand" rule is updated by S13). [`iso_8601_utc`] formats a clock reading as
-//! `YYYY-MM-DDTHH:MM:SSZ` through a civil-from-days conversion, so no date crate is
-//! pulled in. Both writers go through `std::fs`, which does no newline translation, so
-//! the files are LF on every platform.
+//! to make the envelope, and appends [`DIRTY_TREE_NOTE`] to the notes when the run went
+//! ahead on a dirty working tree under `--allow-dirty`. [`write_json`] serialises it
+//! pretty-printed with a trailing newline, field order as the README lists it.
+//! [`write_markdown`] renders the same value as the Markdown twin through the `markdown`
+//! child module, title, R IDs, commit, date, machine, the notes line and one table row
+//! per measurement with its threshold and verdict, so the two files cannot disagree (A2
+//! section 6; the README's "assembled by hand" rule is updated by S13).
+//! [`iso_8601_utc`] formats a clock reading as `YYYY-MM-DDTHH:MM:SSZ` through a
+//! civil-from-days conversion, so no date crate is pulled in. Both writers go through
+//! `std::fs`, which does no newline translation, so the files are LF on every platform.
+//! The unit tests live in the `tests` child module.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -166,7 +168,14 @@ pub struct Context {
     pub date: String,
     /// `rustc --version` of the compiler that built the tool.
     pub toolchain: String,
+    /// True when the run went ahead on a dirty working tree under `--allow-dirty`; every
+    /// report's notes then end with [`DIRTY_TREE_NOTE`] on a line of its own.
+    pub tree_dirty: bool,
 }
+
+/// The line a report's notes gain when the working tree was dirty at run time, so the
+/// commit it names is not mistaken for the code that ran.
+pub const DIRTY_TREE_NOTE: &str = "working tree dirty at run time";
 
 /// A gate report, field order as the README lists it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,9 +203,15 @@ pub struct Report {
 }
 
 impl Report {
-    /// The envelope of `gate`'s data under `context`.
+    /// The envelope of `gate`'s data under `context`; the notes gain [`DIRTY_TREE_NOTE`]
+    /// as their last line when the context says the tree was dirty.
     #[must_use]
     pub fn from_gate(gate: &GateReport, context: &Context) -> Self {
+        let notes = if context.tree_dirty {
+            format!("{}\n{DIRTY_TREE_NOTE}", gate.notes)
+        } else {
+            gate.notes.clone()
+        };
         Self {
             report: gate.report.clone(),
             r_ids: gate.r_ids.clone(),
@@ -207,7 +222,7 @@ impl Report {
             pass: gate.pass,
             thresholds: gate.thresholds.clone(),
             measurements: gate.measurements.clone(),
-            notes: gate.notes.clone(),
+            notes,
         }
     }
 }
@@ -330,30 +345,4 @@ fn civil_from_days(days: u64) -> (u64, u64, u64) {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::time::{Duration, UNIX_EPOCH};
-
-    use super::{ReportError, iso_8601_utc};
-
-    /// R2.4 (the date every gate report carries): known instants format as ISO 8601 UTC
-    /// with the `Z` suffix, leap days and century rules included, and a clock before the
-    /// epoch is an error.
-    #[test]
-    fn r2_4_iso_8601_utc_formats_known_dates() {
-        let cases = [
-            (0, "1970-01-01T00:00:00Z"),
-            (86_399, "1970-01-01T23:59:59Z"),
-            (951_782_400, "2000-02-29T00:00:00Z"),
-            (1_000_000_000, "2001-09-09T01:46:40Z"),
-            (1_792_454_400, "2026-10-20T00:00:00Z"),
-            (4_102_444_800, "2100-01-01T00:00:00Z"),
-            (4_102_444_799, "2099-12-31T23:59:59Z"),
-        ];
-        for (seconds, expected) in cases {
-            let time = UNIX_EPOCH + Duration::from_secs(seconds);
-            assert_eq!(iso_8601_utc(time).expect("after the epoch"), expected, "{seconds}");
-        }
-        let before = UNIX_EPOCH - Duration::from_secs(1);
-        assert!(matches!(iso_8601_utc(before), Err(ReportError::ClockBeforeEpoch)));
-    }
-}
+mod tests;

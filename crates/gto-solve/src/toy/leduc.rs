@@ -315,7 +315,7 @@ mod tests {
     /// The model pin, through the engine's own walks: the uniform profile's mean gain is
     /// the first row of the committed curve.
     #[test]
-    fn uniform_profile_mean_gain_is_the_first_openspiel_row() {
+    fn r2_6_uniform_profile_mean_gain_is_the_first_openspiel_row() {
         let game = build();
         let profile = UniformProfile(&game);
         let gain = |player: u8| {
@@ -332,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn information_states_are_936() {
+    fn r2_6_information_states_are_936() {
         let game = build();
         let states: usize =
             decision_nodes(&game).map(|(node, player, _)| game.combo_count(node, player)).sum();
@@ -340,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn tree_has_465_nodes_five_chance_nodes_and_consistent_edges() {
+    fn r2_6_tree_has_465_nodes_five_chance_nodes_and_consistent_edges() {
         let game = build();
         assert_eq!(game.num_nodes(), NODES);
         let chance: Vec<u32> = (0..NODES)
@@ -375,7 +375,7 @@ mod tests {
 
     /// `u0(i, j) + u1(j, i) == 0` at every terminal, read off one-hot reach vectors.
     #[test]
-    fn every_terminal_is_zero_sum_per_combo_pair() {
+    fn r2_6_every_terminal_is_zero_sum_per_combo_pair() {
         let game = build();
         let utility = |node: u32, hero: u8, opp: usize, combos: usize| {
             let mut reach = vec![0.0f32; combos];

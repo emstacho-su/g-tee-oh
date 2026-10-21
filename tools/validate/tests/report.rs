@@ -85,10 +85,27 @@ fn read_json(path: &PathBuf) -> Value {
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
-/// R2.4, R2.5, R2.6: `validate gates --out DIR` exits 0, writes the six report files,
-/// and every JSON report carries its id, its R ID, `pass: true`, non-empty thresholds
-/// and measurements, a 40-hex commit, an ISO 8601 UTC date, the machine name given and a
-/// toolchain; the Markdown twin names the report and the R ID.
+/// R2.4: a usage error exits 2 before any gate runs or any file is written, here a
+/// repeated `--allow-dirty`; the dirty-tree refusal shares that exit code.
+#[test]
+fn r2_4_repeated_allow_dirty_is_a_usage_error_with_exit_2() {
+    let dir = TempDir::new();
+    let output = Command::new(env!("CARGO_BIN_EXE_validate"))
+        .args(["gates", "--allow-dirty", "--allow-dirty", "--out"])
+        .arg(&dir.0)
+        .output()
+        .expect("the validate binary built by cargo should start");
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--allow-dirty given twice"), "{stderr}");
+    let written = std::fs::read_dir(&dir.0).expect("the directory exists").count();
+    assert_eq!(written, 0, "nothing is written on a usage error");
+}
+
+/// R2.4, R2.5, R2.6: `validate gates --out DIR --allow-dirty` exits 0, writes the six
+/// report files, and every JSON report carries its id, its R ID, `pass: true`, non-empty
+/// thresholds and measurements, a 40-hex commit, an ISO 8601 UTC date, the machine name
+/// given and a toolchain; the Markdown twin names the report and the R ID.
 #[test]
 fn r2_4_r2_5_r2_6_gate_reports_follow_the_schema_envelope() {
     let dir = TempDir::new();
@@ -98,6 +115,9 @@ fn r2_4_r2_5_r2_6_gate_reports_follow_the_schema_envelope() {
         .arg(&dir.0)
         .arg("--machine")
         .arg(MACHINE)
+        // A development tree may be dirty; the clean-tree rule is unit-tested in
+        // `machine` against canned `git status --porcelain` output.
+        .arg("--allow-dirty")
         .output()
         .expect("the validate binary built by cargo should start");
     assert!(

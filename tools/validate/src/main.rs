@@ -3,17 +3,24 @@
 //! (R2.4, R2.5, R2.6), `gates` runs all three, `equity-table` writes the 169 by 169
 //! preflop equity fixture (R2.20). Options: `--out DIR|FILE` (the report directory, or
 //! the fixture file for `equity-table`), `--machine NAME` (default `VALIDATE_MACHINE`,
-//! else `zenbook`) and `--commit SHA` (default `git rev-parse HEAD`). With no argument
-//! the tool prints its name and version, which `tests/smoke.rs` checks. The S29
-//! `recompute` subcommand (O-60) lands later.
+//! else the host name mapped onto the schema's name pattern), `--commit SHA` (default
+//! `git rev-parse HEAD`) and `--allow-dirty`. With no argument the tool prints its name
+//! and version, which `tests/smoke.rs` checks. The S29 `recompute` subcommand (O-60)
+//! lands later.
 //!
 //! Mechanism. The command line is parsed by hand (no argument-parsing crate): the first
-//! token is the command, the rest are `--flag value` pairs, each given at most once.
-//! The gate commands build the run context (machine block, commit, date, toolchain),
-//! then `validate::gates::write_gate_reports` runs every gate and writes both report
-//! files per gate before the verdict is read, so a failed gate still leaves its report.
-//! Exit codes: 0 when every gate passed, 1 when any gate failed, 2 on a usage error or
-//! when a fixture, a probe or a report write failed.
+//! token is the command, the rest are `--flag value` pairs and the bare `--allow-dirty`,
+//! each given at most once. Both writing commands resolve the commit through
+//! `machine::resolve_commit`, which first runs `git status --porcelain`: a dirty working
+//! tree is refused, naming the first dirty path, unless `--allow-dirty` is given, and
+//! then every gate report's notes end with the line "working tree dirty at run time"
+//! (the equity fixture has no notes field, so `equity-table` prints that line to
+//! standard error instead). The gate commands build the run context (machine block,
+//! commit, date, toolchain), then `validate::gates::write_gate_reports` runs every gate
+//! and writes both report files per gate before the verdict is read, so a failed gate
+//! still leaves its report. Exit codes: 0 when every gate passed, 1 when any gate
+//! failed, 2 on a usage error, a refused dirty tree, or when a fixture, a probe or a
+//! report write failed.
 
 #![forbid(unsafe_code)]
 
@@ -22,8 +29,8 @@ use std::process::ExitCode;
 use std::time::SystemTime;
 
 use validate::gates::{self, Gate};
-use validate::machine::{self, DEFAULT_MACHINE_NAME, MACHINE_ENV};
-use validate::report::{self, Context, REPORTS_RELATIVE_TO_REPO_ROOT};
+use validate::machine::{self, MACHINE_ENV, ResolvedCommit};
+use validate::report::{self, Context, DIRTY_TREE_NOTE, REPORTS_RELATIVE_TO_REPO_ROOT};
 
 /// The binary's package name.
 const BIN_NAME: &str = env!("CARGO_PKG_NAME");
@@ -37,11 +44,14 @@ const LINKS: &[&str] = &[gto_library::CRATE_NAME, gto_solve::CRATE_NAME];
 /// A gate failed its rule after every report was written.
 const EXIT_GATE_FAILED: u8 = 1;
 
-/// A usage error, or a fixture, probe or write failure.
+/// A usage error, a refused dirty tree, or a fixture, probe or write failure.
 const EXIT_ERROR: u8 = 2;
 
+/// The one option that takes no value.
+const ALLOW_DIRTY: &str = "--allow-dirty";
+
 const USAGE: &str = "\
-usage: validate [COMMAND] [--out DIR|FILE] [--machine NAME] [--commit SHA]
+usage: validate [COMMAND] [--out DIR|FILE] [--machine NAME] [--commit SHA] [--allow-dirty]
 
 commands
   g1 | g2 | g3   run one toy-game gate and write its JSON and Markdown report
@@ -50,12 +60,15 @@ commands
   help           print this text
 
 options
-  --out      the report directory (default validation/reports) or the fixture file
-             (default validation/fixtures/equity/preflop-169.json)
-  --machine  the machine name recorded in the report (default $VALIDATE_MACHINE, else zenbook)
-  --commit   the commit recorded in the report (default git rev-parse HEAD)
+  --out          the report directory (default validation/reports) or the fixture file
+                 (default validation/fixtures/equity/preflop-169.json)
+  --machine      the machine name recorded in the report (default $VALIDATE_MACHINE,
+                 else the host name lowercased with other characters turned into dashes)
+  --commit       the commit recorded in the report (default git rev-parse HEAD)
+  --allow-dirty  run on a working tree with changes; the reports' notes then say so
 
-With no command the tool prints its name and version. Exit 1 when a gate failed, 2 on an error.";
+With no command the tool prints its name and version. A dirty working tree is refused
+unless --allow-dirty is given. Exit 1 when a gate failed, 2 on an error.";
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,12 +83,13 @@ enum Command {
     EquityTable,
 }
 
-/// The `--flag value` pairs.
+/// The options: three `--flag value` pairs and the bare `--allow-dirty`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct Options {
     out: Option<PathBuf>,
     machine: Option<String>,
     commit: Option<String>,
+    allow_dirty: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,35 +111,44 @@ fn parse(args: &[String]) -> Result<Invocation, String> {
             None => return Err(format!("unknown command {name:?}")),
         },
     };
-    Ok(Invocation { command, options: parse_options(rest)? })
+    Ok(Invocation { command, options: parse_options(rest, Options::default())? })
 }
 
-fn parse_options(args: &[String]) -> Result<Options, String> {
-    if args.len() % 2 != 0 {
-        let last = &args[args.len() - 1];
-        return Err(format!("expected a value after {last:?}"));
+/// Read the options after the command into `options`, one token or pair at a time.
+fn parse_options(args: &[String], options: Options) -> Result<Options, String> {
+    match args {
+        [] => Ok(options),
+        [flag, rest @ ..] if flag == ALLOW_DIRTY => {
+            if options.allow_dirty {
+                return Err(format!("{flag} given twice"));
+            }
+            parse_options(rest, Options { allow_dirty: true, ..options })
+        }
+        [flag, value, rest @ ..] => parse_options(rest, with_value(options, flag, value)?),
+        [flag] => Err(format!("expected a value after {flag:?}")),
     }
-    args.chunks_exact(2).try_fold(Options::default(), |options, pair| {
-        let (flag, value) = (pair[0].as_str(), pair[1].as_str());
-        if value.is_empty() || value.starts_with("--") {
-            return Err(format!("{flag} needs a value, got {value:?}"));
+}
+
+/// `options` with `flag` set to `value`, or the usage error naming the flag.
+fn with_value(options: Options, flag: &str, value: &str) -> Result<Options, String> {
+    if value.is_empty() || value.starts_with("--") {
+        return Err(format!("{flag} needs a value, got {value:?}"));
+    }
+    match flag {
+        "--out" => {
+            let out = set_once(options.out.as_ref(), PathBuf::from(value), flag)?;
+            Ok(Options { out, ..options })
         }
-        match flag {
-            "--out" => {
-                let out = set_once(options.out.as_ref(), PathBuf::from(value), flag)?;
-                Ok(Options { out, ..options })
-            }
-            "--machine" => {
-                let machine = set_once(options.machine.as_ref(), value.to_owned(), flag)?;
-                Ok(Options { machine, ..options })
-            }
-            "--commit" => {
-                let commit = set_once(options.commit.as_ref(), value.to_owned(), flag)?;
-                Ok(Options { commit, ..options })
-            }
-            other => Err(format!("unknown option {other:?}")),
+        "--machine" => {
+            let machine = set_once(options.machine.as_ref(), value.to_owned(), flag)?;
+            Ok(Options { machine, ..options })
         }
-    })
+        "--commit" => {
+            let commit = set_once(options.commit.as_ref(), value.to_owned(), flag)?;
+            Ok(Options { commit, ..options })
+        }
+        other => Err(format!("unknown option {other:?}")),
+    }
 }
 
 /// `value` for a flag that has not been given yet; an error naming the flag otherwise.
@@ -162,19 +185,19 @@ fn main() -> ExitCode {
         Command::Gates(gates) => match run_gates(&gates, &invocation.options) {
             Ok(true) => ExitCode::SUCCESS,
             Ok(false) => ExitCode::from(EXIT_GATE_FAILED),
-            Err(message) => {
-                eprintln!("{BIN_NAME}: {message}");
-                ExitCode::from(EXIT_ERROR)
-            }
+            Err(message) => fail(&message),
         },
         Command::EquityTable => match run_equity_table(&invocation.options) {
             Ok(()) => ExitCode::SUCCESS,
-            Err(message) => {
-                eprintln!("{BIN_NAME}: {message}");
-                ExitCode::from(EXIT_ERROR)
-            }
+            Err(message) => fail(&message),
         },
     }
+}
+
+/// Print `message` under the binary's name and hand back the error exit code.
+fn fail(message: &str) -> ExitCode {
+    eprintln!("{BIN_NAME}: {message}");
+    ExitCode::from(EXIT_ERROR)
 }
 
 /// Run `gates`, write their reports, print one line per gate, and say whether all passed.
@@ -198,24 +221,30 @@ fn run_gates(gates: &[Gate], options: &Options) -> Result<bool, String> {
     Ok(written.iter().all(|report| report.pass))
 }
 
+/// The commit for this run through the one resolution path, `machine::resolve_commit`
+/// (the dirty-tree check included), with a warning on standard error when a dirty tree
+/// was allowed.
+fn resolve_commit(repo_root: &Path, options: &Options) -> Result<ResolvedCommit, String> {
+    let resolved =
+        machine::resolve_commit(repo_root, options.commit.as_deref(), options.allow_dirty)
+            .map_err(|error| error.to_string())?;
+    if resolved.tree_dirty {
+        eprintln!("{BIN_NAME}: {DIRTY_TREE_NOTE} ({ALLOW_DIRTY})");
+    }
+    Ok(resolved)
+}
+
 /// The machine block, the commit, the date and the toolchain for this run.
 fn run_context(repo_root: &Path, options: &Options) -> Result<Context, String> {
-    let name = options
-        .machine
-        .clone()
-        .or_else(|| std::env::var(MACHINE_ENV).ok())
-        .unwrap_or_else(|| DEFAULT_MACHINE_NAME.to_owned());
+    let env = std::env::var(MACHINE_ENV).ok();
+    let name =
+        machine::machine_name(options.machine.as_deref(), env.as_deref(), machine::host_name)
+            .map_err(|error| error.to_string())?;
     let machine = machine::detect(&name).map_err(|error| error.to_string())?;
-    let commit = match &options.commit {
-        Some(commit) => {
-            machine::check_commit(commit).map_err(|error| error.to_string())?;
-            commit.clone()
-        }
-        None => machine::git_head(repo_root).map_err(|error| error.to_string())?,
-    };
-    let toolchain = machine::rustc_version().map_err(|error| error.to_string())?;
+    let ResolvedCommit { commit, tree_dirty } = resolve_commit(repo_root, options)?;
+    let toolchain = machine::rustc_version().to_owned();
     let date = report::iso_8601_utc(SystemTime::now()).map_err(|error| error.to_string())?;
-    Ok(Context { machine, commit, date, toolchain })
+    Ok(Context { machine, commit, date, toolchain, tree_dirty })
 }
 
 /// Build the equity table, write the fixture, read it back and check that every number
@@ -225,13 +254,7 @@ fn run_equity_table(options: &Options) -> Result<(), String> {
 
     let repo_root = validate::repo_root();
     let out = options.out.clone().unwrap_or_else(|| repo_root.join(equity_fixture::DEFAULT_PATH));
-    let commit = match &options.commit {
-        Some(commit) => {
-            machine::check_commit(commit).map_err(|error| error.to_string())?;
-            commit.clone()
-        }
-        None => machine::git_head(&repo_root).map_err(|error| error.to_string())?,
-    };
+    let ResolvedCommit { commit, .. } = resolve_commit(&repo_root, options)?;
     let generated_at =
         report::iso_8601_utc(SystemTime::now()).map_err(|error| error.to_string())?;
     let started = std::time::Instant::now();
@@ -276,11 +299,31 @@ mod tests {
         assert_eq!(one.options.out, Some(PathBuf::from("reports")));
         assert_eq!(one.options.commit.as_deref(), Some("abc"));
         assert_eq!(one.options.machine, None);
+        assert!(!one.options.allow_dirty);
         let all = parse(&args(&["gates", "--machine", "github-ubuntu"])).expect("parses");
         assert_eq!(all.command, Command::Gates(Gate::ALL.to_vec()));
         assert_eq!(all.options.machine.as_deref(), Some("github-ubuntu"));
         assert_eq!(parse(&args(&["equity-table"])).map(|i| i.command), Ok(Command::EquityTable));
         assert_eq!(parse(&args(&["--help"])).map(|i| i.command), Ok(Command::Help));
+    }
+
+    /// R2.4, R2.5, R2.6: `--allow-dirty` takes no value and may sit anywhere among the
+    /// pairs, for the gates and for the equity table alike.
+    #[test]
+    fn r2_4_r2_5_r2_6_cli_reads_allow_dirty_as_a_bare_flag() {
+        let first = parse(&args(&["gates", "--allow-dirty", "--out", "target/gate-reports"]))
+            .expect("parses");
+        assert!(first.options.allow_dirty);
+        assert_eq!(first.options.out, Some(PathBuf::from("target/gate-reports")));
+        let last = parse(&args(&["g1", "--machine", "zenbook", "--allow-dirty"])).expect("parses");
+        assert!(last.options.allow_dirty);
+        assert_eq!(last.options.machine.as_deref(), Some("zenbook"));
+        let middle =
+            parse(&args(&["equity-table", "--out", "a", "--allow-dirty", "--commit", "c"]))
+                .expect("parses");
+        assert!(middle.options.allow_dirty);
+        assert_eq!(middle.options.commit.as_deref(), Some("c"));
+        assert_eq!(middle.command, Command::EquityTable);
     }
 
     /// R2.4, R2.5, R2.6: an unknown command, an unknown option, a missing or empty value
@@ -296,6 +339,9 @@ mod tests {
         rejects(&["gates", "--out"], "--out");
         rejects(&["gates", "--out", ""], "--out");
         rejects(&["gates", "--out", "--machine"], "--out");
+        rejects(&["gates", "--out", "--allow-dirty"], "--out");
         rejects(&["gates", "--out", "a", "--out", "b"], "twice");
+        rejects(&["gates", "--allow-dirty", "--allow-dirty"], "--allow-dirty given twice");
+        rejects(&["gates", "--allow-dirty=yes"], "--allow-dirty=yes");
     }
 }

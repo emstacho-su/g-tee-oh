@@ -31,6 +31,7 @@ const CONTRACT_RECIPES = [
   'hooks',
   'bench',
   'gates',
+  'gates-check',
   'equity-table',
   'report-check',
   'ci',

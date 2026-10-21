@@ -102,3 +102,33 @@ test("R0.11 rejects a bad commit", () => {
   assert.match(result.stderr, /g1-kuhn\.json/);
   assert.match(result.stderr, /commit/);
 });
+
+test("R0.11 rejects a report whose pass is true while a measurement carries pass false", () => {
+  const report = validGateReport();
+  const failing = { ...report.measurements[0], value: 0.01, pass: false };
+  writeReport(dir, "g1-kuhn.json", { ...report, measurements: [failing] });
+  const result = run(dir);
+  assert.equal(result.status, EXIT_FINDINGS);
+  assert.match(
+    result.stderr,
+    /g1-kuhn\.json: pass is true but measurement kuhn\/standard\/nash-conv carries pass false/,
+  );
+});
+
+test("R0.11 rejects a report whose pass is false while every judged measurement passes", () => {
+  writeReport(dir, "g1-kuhn.json", { ...validGateReport(), pass: false });
+  const result = run(dir);
+  assert.equal(result.status, EXIT_FINDINGS);
+  assert.match(result.stderr, /g1-kuhn\.json: pass is false but every judged measurement passes/);
+});
+
+test("R0.11 accepts a passing report whose informational measurements carry no pass", () => {
+  const report = validGateReport();
+  const informational = { id: "kuhn/standard/iterations", value: 5000, unit: "iterations" };
+  writeReport(dir, "g1-kuhn.json", {
+    ...report,
+    measurements: [...report.measurements, informational],
+  });
+  const result = run(dir);
+  assert.equal(result.status, EXIT_OK, result.stderr);
+});

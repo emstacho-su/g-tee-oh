@@ -146,8 +146,19 @@ impl<G: Game> PlainCfr<G> {
     }
 
     fn region(&self, node: u32) -> Region {
-        self.regions[node as usize].unwrap_or_else(|| panic!("node {node} is not a decision node"))
+        region_at(&self.regions, node)
     }
+}
+
+/// The region of the decision node `node`, the one lookup the solver and its walks
+/// share.
+///
+/// # Panics
+///
+/// When `node` is a chance or terminal node: the traversal only asks for decision nodes,
+/// so this is a bug in the walk, not a bad input.
+fn region_at(regions: &[Option<Region>], node: u32) -> Region {
+    regions[node as usize].unwrap_or_else(|| panic!("node {node} is not a decision node"))
 }
 
 /// One hero walk: the borrowed pieces of a [`PlainCfr`], split so the recursion can read
@@ -254,7 +265,7 @@ impl<'a, G: Game> Walk<'a, G> {
     }
 
     fn region_of(&self, node: u32) -> Region {
-        self.regions[node as usize].unwrap_or_else(|| panic!("node {node} is not a decision node"))
+        region_at(self.regions, node)
     }
 
     /// The snapshotted strategy at `node`, borrowed for the walk's lifetime.
@@ -341,10 +352,10 @@ mod tests {
         gain(0) + gain(1)
     }
 
-    /// The integration test `r2_6_plain_cfr_on_kuhn_converges` through the engine's
-    /// walks directly, independent of `measure::measure`.
+    /// R2.6: the integration test `r2_6_plain_cfr_on_kuhn_converges` through the
+    /// engine's walks directly, independent of `measure::measure`.
     #[test]
-    fn kuhn_nash_conv_falls_below_a_hundredth_by_ten_thousand_iterations() {
+    fn r2_6_kuhn_nash_conv_falls_below_a_hundredth_by_ten_thousand_iterations() {
         let mut solver = PlainCfr::new(Kuhn::new());
         solver.advance_to(1);
         let first = nash_conv(&solver);
@@ -357,10 +368,11 @@ mod tests {
         assert!((value - KUHN_VALUE_PLAYER_0).abs() < 0.01, "value to player 0 {value}");
     }
 
-    /// After one iteration every strategy sum is reach times uniform, so the average is
-    /// uniform: the first `OpenSpiel` checkpoint equals the profile before any iteration.
+    /// R2.6: after one iteration every strategy sum is reach times uniform, so the
+    /// average is uniform: the first `OpenSpiel` checkpoint equals the profile before any
+    /// iteration.
     #[test]
-    fn average_after_one_iteration_is_uniform() {
+    fn r2_6_average_after_one_iteration_is_uniform() {
         let mut solver = PlainCfr::new(Kuhn::new());
         let before = nash_conv(&solver);
         solver.advance_to(1);

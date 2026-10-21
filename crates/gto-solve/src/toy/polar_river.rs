@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn tree_has_the_akq_shape_with_one_catcher_and_two_polar_combos() {
+    fn r2_5_tree_has_the_akq_shape_with_one_catcher_and_two_polar_combos() {
         let game = build(1.0, 0.5);
         assert_eq!(game.root(), OPEN);
         assert_eq!(game.num_nodes(), 5);
@@ -257,7 +257,7 @@ mod tests {
     /// The payoff table at `P = B = 1`, per joint pair and in net chips: a check
     /// showdown moves 1/2, a call showdown 3/2, a fold 1/2 to player 1.
     #[test]
-    fn payoffs_at_pot_one_bet_one_are_half_three_halves_and_half() {
+    fn r2_5_payoffs_at_pot_one_bet_one_are_half_three_halves_and_half() {
         let game = pot_bet_one();
         let catcher = [1.0];
         for (node, stake) in [(CHECK_SHOWDOWN, 0.5), (CALL_SHOWDOWN, 1.5)] {
@@ -272,7 +272,7 @@ mod tests {
 
     /// `u0(catcher, x) + u1(x, catcher) == 0` at every terminal for both `x`.
     #[test]
-    fn every_terminal_is_zero_sum_per_joint_pair() {
+    fn r2_5_every_terminal_is_zero_sum_per_joint_pair() {
         let game = build(1.0, 0.25);
         for node in [CHECK_SHOWDOWN, FOLDED, CALL_SHOWDOWN] {
             let polar = utility(&game, node, 1, &[1.0]);
@@ -287,7 +287,7 @@ mod tests {
     /// its best response (always call) nets 0, player 1's best response (bet the nuts,
     /// either with air) nets `(1 - 0.5) / 2`, so both gains are 1/8.
     #[test]
-    fn uniform_profile_values_match_the_hand_computation() {
+    fn r2_5_uniform_profile_values_match_the_hand_computation() {
         let game = pot_bet_one();
         let uniform = UniformProfile(&game);
         assert_close(expected_value(&game, 0, &uniform), -0.125, "value to player 0");
@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn names_list_three_facts_and_three_holdings_on_their_slots() {
+    fn r2_5_names_list_three_facts_and_three_holdings_on_their_slots() {
         let names = names();
         assert_eq!(names.facts.len(), 3);
         assert_eq!(names.holdings.len(), 3);
@@ -314,7 +314,7 @@ mod tests {
     /// The engine's own solver on the game lands on the unique equilibrium: bet the nuts
     /// always, bet air half the time, call half the time.
     #[test]
-    fn engine_dcfr_reaches_the_half_half_equilibrium_at_pot_one_bet_one() {
+    fn r2_5_engine_dcfr_reaches_the_half_half_equilibrium_at_pot_one_bet_one() {
         let mut solver = Solver::new(pot_bet_one());
         solver.run(ITERATIONS, &DcfrParams::default(), 0, |_, _, _| {});
         let open = solver.average_strategy(OPEN);

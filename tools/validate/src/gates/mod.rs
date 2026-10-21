@@ -12,15 +12,21 @@
 //! Notation) file and the Markdown twin under the report id (`g1-kuhn`, `g2-akq`,
 //! `g3-leduc`; O-125). [`solve_case`] and [`solve_leduc_curve`] are the two helpers the
 //! pending tests in `tests/gates.rs` were written against; they dispatch per fixture id,
-//! so the tests and the binary share one code path per gate. Nothing here panics on a
-//! bad fixture: every failure is a [`GateError`] naming the fixture, the case or the fact.
+//! so the tests and the binary share one code path per gate. The helpers the gate files
+//! share live here too: [`required_tolerance`] reads a tolerance and refuses one in the
+//! wrong unit, [`resolve_frequencies`] reads every strategy fact of a case from a solved
+//! game, and `iterations_as_f64` turns an iteration count into a report value. Nothing
+//! here panics on a bad fixture: every failure is a [`GateError`] naming the fixture,
+//! the case, the field or the fact.
 
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use gto_solve::toy::ToySolution;
+
 use crate::fixtures::openspiel::OpenSpielCurve;
-use crate::fixtures::toy_game::{Case, ToyGameFixture};
+use crate::fixtures::toy_game::{Case, Tolerance, ToyGameFixture};
 use crate::fixtures::{FIXTURES_RELATIVE_TO_REPO_ROOT, FixtureError};
 use crate::report::{self, Context, Measurement, Report, ReportError, Threshold};
 
@@ -201,6 +207,82 @@ impl From<ReportError> for GateError {
     fn from(error: ReportError) -> Self {
         Self::Report(error)
     }
+}
+
+/// The repository-relative path of a toy-game fixture, for the errors that name it.
+pub(crate) fn fixture_path(fixture: &ToyGameFixture) -> PathBuf {
+    Path::new(FIXTURES_RELATIVE_TO_REPO_ROOT).join("toy-games").join(format!("{}.json", fixture.id))
+}
+
+/// The value of the tolerance `tolerances.<field>` that `gate` reads in `unit`.
+///
+/// # Errors
+///
+/// `GateError::Fixture` naming the field when the tolerance is `null` or stated in any
+/// other unit, so a gate never judges against a number it would misread.
+pub(crate) fn required_tolerance(
+    fixture: &ToyGameFixture,
+    tolerance: Option<&Tolerance>,
+    field: &str,
+    unit: &str,
+    gate: Gate,
+) -> Result<f64, GateError> {
+    let gate_name = gate.name().to_uppercase();
+    let invalid = |reason: String| {
+        GateError::Fixture(FixtureError::Invalid { path: fixture_path(fixture), reason })
+    };
+    let tolerance = tolerance
+        .ok_or_else(|| invalid(format!("tolerances.{field} is null; gate {gate_name} needs it")))?;
+    if tolerance.unit != unit {
+        return Err(invalid(format!(
+            "tolerances.{field}.unit is {}, gate {gate_name} reads {unit}",
+            tolerance.unit
+        )));
+    }
+    Ok(tolerance.value)
+}
+
+/// `GateError::UnknownCase` for `case` of `fixture`.
+pub(crate) fn unknown_case(fixture: &ToyGameFixture, case: &Case) -> GateError {
+    GateError::UnknownCase { fixture: fixture.id.clone(), case: case.id.clone() }
+}
+
+/// `GateError::MissingFact` for `fact` in `case` of `fixture`.
+pub(crate) fn missing_fact(fixture: &ToyGameFixture, case: &Case, fact: &str) -> GateError {
+    GateError::MissingFact {
+        fixture: fixture.id.clone(),
+        case: case.id.clone(),
+        fact: fact.to_owned(),
+    }
+}
+
+/// The solved frequency of every strategy fact of `case`, keyed by fact id, read through
+/// the solution's vocabulary (player, node, holding, action).
+///
+/// # Errors
+///
+/// `GateError::MissingFact` naming the first fact whose words resolve to nothing.
+pub(crate) fn resolve_frequencies(
+    fixture: &ToyGameFixture,
+    case: &Case,
+    solution: &ToySolution,
+) -> Result<BTreeMap<String, f64>, GateError> {
+    case.strategy_facts
+        .iter()
+        .map(|fact| {
+            solution
+                .frequency(fact.player, &fact.node, &fact.holding, &fact.action)
+                .map(|frequency| (fact.id.clone(), frequency))
+                .ok_or_else(|| missing_fact(fixture, case, &fact.id))
+        })
+        .collect()
+}
+
+/// An iteration count as a report value. The gates' stop rules cap it at 1,000,000, far
+/// inside the range `f64` represents exactly.
+#[allow(clippy::cast_precision_loss, reason = "iteration counts stay far below 2^53")]
+pub(crate) fn iterations_as_f64(iterations: u64) -> f64 {
+    iterations as f64
 }
 
 /// The fixture root under `repo_root`.
