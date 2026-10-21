@@ -184,3 +184,83 @@ describe("R0.7 node dump invariants", () => {
     expect(checkNodeDumpInvariants({ ...nodeDump, nodes: [{ node_key: "k", hands: [{ hand: 7 }] }] })).not.toEqual([]);
   });
 });
+
+/** The ajv errors of `data`, expected to name `path`. */
+function expectRejectedAt(validate: ValidateFunction, data: unknown, path: string): void {
+  expect(errorsOf(validate, data), path).toContainEqual(expect.stringContaining(path));
+}
+
+/** A copy of a JSON object without any of `keys`. */
+function withoutKeys(
+  record: Readonly<Record<string, unknown>>,
+  keys: readonly string[],
+): Readonly<Record<string, unknown>> {
+  return keys.reduce((rest, key) => withoutKey(rest, key), record);
+}
+
+// gto-model's GameConfig::config_id grammar (O-132); the Rust matcher in
+// crates/gto-library/src/manifest/validate.rs is tested on the same lists.
+const CONFIG_IDS_ACCEPTED = [
+  "cfg_6_online_100",
+  "cfg_9_live_13_150",
+  "cfg_9_live_25_300_straddle",
+  "cfg_6_online_100_ante25",
+  "cfg_9_live_13_1250cbb_straddle_ante50",
+];
+const CONFIG_IDS_REJECTED = [
+  "cfg_1_online_100",
+  "cfg_6_online",
+  "cfg_6_online_100_ante5_straddle",
+  "cfg_9_live_13_25_150",
+  "cfg_6_online__100",
+];
+const SOLVE_SETTINGS = ["seed", "iterations", "exploitability_pct_pot"];
+
+describe("R2.7 schema alignment with gto-model and the pack (O-131, O-132)", () => {
+  const ownPreflop = { ...preflopManifest, source: "own" };
+  const referencePreflop = withoutKeys(preflopManifest, SOLVE_SETTINGS);
+
+  it("R2.7 a reference preflop manifest needs no seed, iterations or exploitability", () => {
+    expect(errorsOf(validateManifest, referencePreflop)).toEqual([]);
+  });
+
+  it("R2.7 an own preflop manifest without its solve settings is rejected", () => {
+    expect(errorsOf(validateManifest, ownPreflop)).toEqual([]);
+    for (const key of SOLVE_SETTINGS) {
+      expectRejectedAt(validateManifest, withoutKey(ownPreflop, key), key);
+    }
+  });
+
+  it("R2.7 a preflop manifest still needs chunks and tree_hash", () => {
+    for (const key of ["chunks", "tree_hash"]) {
+      expectRejectedAt(validateManifest, withoutKey(referencePreflop, key), key);
+    }
+  });
+
+  it("R2.7 tree_hash is a 64-digit sha256", () => {
+    const shortHash = { ...preflopManifest, tree_hash: "7d2e4f6a8b0c9d1e3f5a7b9c0d2e4f6a" };
+    expectRejectedAt(validateManifest, shortHash, "/tree_hash");
+  });
+
+  it("R2.7 positions use the nine gto-model names: UTG1 accepted, UTG+1 rejected", () => {
+    expect(errorsOf(validateManifest, { ...flopBuildManifest, pair: "UTG1-BTN" })).toEqual([]);
+    expectRejectedAt(validateManifest, { ...flopBuildManifest, pair: "UTG+1-BTN" }, "/pair");
+    const plusPair = { ...nodeDump, position_pair: "UTG+1-BTN" };
+    expectRejectedAt(validateNodeDump, plusPair, "/position_pair");
+    const toActUtg1 = { ...nodeDump, nodes: [{ ...exampleNode, to_act: "UTG1" }] };
+    const toActPlus = { ...nodeDump, nodes: [{ ...exampleNode, to_act: "UTG+1" }] };
+    expect(errorsOf(validateNodeDump, toActUtg1)).toEqual([]);
+    expectRejectedAt(validateNodeDump, toActPlus, "/nodes/0/to_act");
+  });
+
+  it("R2.7 config_id follows the gto-model grammar with straddle, ante and cbb depths", () => {
+    for (const id of CONFIG_IDS_ACCEPTED) {
+      expect(errorsOf(validateManifest, { ...preflopManifest, config_id: id }), id).toEqual([]);
+      expect(errorsOf(validateNodeDump, { ...nodeDump, config_id: id }), id).toEqual([]);
+    }
+    for (const id of CONFIG_IDS_REJECTED) {
+      expectRejectedAt(validateManifest, { ...preflopManifest, config_id: id }, "/config_id");
+      expectRejectedAt(validateNodeDump, { ...nodeDump, config_id: id }, "/config_id");
+    }
+  });
+});
