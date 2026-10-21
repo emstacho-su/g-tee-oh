@@ -58,6 +58,16 @@ http-body-util = "0.1"
 # Property-based tests (A9 section 2): node-key round trip, suit-permutation invariance,
 # quantize then dequantize. Dev-dependency only, declared here so every crate pins one major.
 proptest = "1"
+# The canonical tree hash (R2.9, O-135): gto-tree hashes the integer bytes of a TreeConfig
+# with Secure Hash Algorithm 256 (SHA-256). 0.10 keeps the RustCrypto digest 0.10 line.
+# MIT OR Apache-2.0.
+sha2 = "0.10"
+# Golden snapshots (R2.9 tree hash, the library format of S14). One line for the workspace
+# by the S14 and S15 lead decision; dev-dependency only. Apache-2.0.
+insta = { version = "1", features = ["json", "redactions"] }
+# Peak heap bytes in the R2.10 estimate and refusal tests (O-139), installed as the global
+# allocator of those test binaries only; dev-dependency only.
+peak_alloc = "0.2"
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
@@ -75,6 +85,11 @@ gto-planner = { path = "crates/gto-planner" }
 # Groups carry priority -1 so an individual lint entry added later overrides them.
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+
+# The engine runs optimised even in debug test builds, so `just rust-test` solves the R2.10
+# test spots in seconds while debug assertions stay on (O-140).
+[profile.dev.package.engine]
+opt-level = 3
 
 [profile.release]
 lto = "thin"

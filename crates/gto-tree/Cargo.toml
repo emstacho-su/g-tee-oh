@@ -8,9 +8,20 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Edges (A1 section 2): gto-model only.
+# Edges (A1 section 2): gto-model is the only internal crate. The third party crates parse
+# the sizing convention spec (serde, serde_json), name the errors (thiserror) and hash the
+# canonical tree bytes (sha2).
 [dependencies]
 gto-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+
+# The R2.9 property tests and the tree hash golden.
+[dev-dependencies]
+proptest = { workspace = true }
+insta = { workspace = true }
 
 [lints]
 workspace = true
