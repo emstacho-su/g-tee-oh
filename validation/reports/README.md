@@ -9,14 +9,14 @@ S05 added the schema every JSON report follows and the table of report files (R0
 
 ## Benchmark reports: `bench-<machine>.json` (R0.10)
 
-Produced by `just bench`. `cargo bench -p gto-solve -p gto-library --features gto-library/synthetic` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read), five bench ids in all since S14, each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the five ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
+Produced by `just bench`. `cargo bench -p gto-solve -p gto-library -p solver-query --features gto-library/synthetic` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read) and the grade bench S16 added (one `POST /v1/grade` through the solver-query router, O-154), six bench ids in all since S16, each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` and `sample.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the six ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
 
 Top-level fields, in the order the file carries them:
 
 | Field | Type | Meaning |
 |---|---|---|
 | `report` | string | Always `bench`. |
-| `r_ids` | string array | The R IDs the file proves; `["R0.10"]`. |
+| `r_ids` | string array | The R IDs the file proves; `["R0.10", "R2.13"]` since the grade bench joined. |
 | `machine.name` | string | The machine label, also the file name suffix. |
 | `machine.os` | string | Node's `os.platform()` and `os.release()`, space separated (operating system and kernel release). |
 | `machine.cpu` | string | The model string of the first central processing unit (CPU) core. |
@@ -36,8 +36,9 @@ Each measurement:
 | `median_ns` | number | criterion's median point estimate of one routine call, nanoseconds. |
 | `unit` | string | Always `ns`. |
 | `stub` | boolean | True when the id ends in `/stub`: the routine is a placeholder and the number is not a product measurement. False for every v1 id since S14 replaced the two stubs; the field stays so a later placeholder is marked. |
+| `p95_ns` | number, when present | The nearest-rank 95th percentile of one routine call's time, nanoseconds: criterion's `new/sample.json` holds every sample's iteration count and total time, each sample's time over its count is one per-iteration time, and the value at rank `ceil(0.95 n)` of those sorted ascending is reported (O-154). Written for every id whose run left a `sample.json`, which every criterion run does; `scripts/check-reports.mjs` holds `grade/warm_cache` to 30,000,000 ns, the A9 section 6 grade budget (O-86). |
 
-The five ids in v1 (S14 replaced the `chunk_decode/stub` and `node_read/stub` placeholders with the library format, R2.7):
+The six ids in v1 (S14 replaced the `chunk_decode/stub` and `node_read/stub` placeholders with the library format, R2.7; S16 added the grade bench, R2.13):
 
 | id | Measures | Status |
 |---|---|---|
@@ -46,13 +47,14 @@ The five ids in v1 (S14 replaced the `chunk_decode/stub` and `node_read/stub` pl
 | `chunk_decode/postflop_1326_sparse` | The same for a frame of flop records that hold half of the live combos. | Real measurement, synthetic data. |
 | `node_read/warm_cache` | One `Reader::node` read of a preflop node whose frame sits in the least recently used (LRU) cache: key hash, index lookup and record decode; `crates/gto-library/benches/node_read.rs`. | Real measurement, synthetic data. |
 | `node_read/cold_cache` | The same read through a reader whose cache holds 0 bytes, so every read fetches the frame from the in-memory store and decompresses it: the cost of a cache miss. | Real measurement, synthetic data. |
+| `grade/warm_cache` | One `POST /v1/grade` through the solver-query router in process over the packed synthetic fixture of the integration tests (seed 7, 40 dense preflop nodes): the request-id and latency middleware, JSON parsing, key and hand parsing, the reader's warm-cache node read, the grade math and the serialization, no socket; `services/solver-query/benches/grade.rs`. Its `p95_ns` is held under 30 ms by `just report-check` (A9 section 6, O-154, O-86). | Real measurement, synthetic data. |
 
 Example, shortened:
 
 ```json
 {
   "report": "bench",
-  "r_ids": ["R0.10"],
+  "r_ids": ["R0.10", "R2.13"],
   "machine": { "name": "zenbook", "os": "win32 10.0.26200", "cpu": "...", "cores": 20, "memory_gb": 32 },
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "date": "2026-10-20T18:00:00.000Z",
@@ -60,6 +62,7 @@ Example, shortened:
   "measurements": [
     { "id": "chunk_decode/postflop_1326_sparse", "mean_ns": 9800.5, "median_ns": 9700.0, "unit": "ns", "stub": false },
     { "id": "chunk_decode/preflop_169", "mean_ns": 1500.2, "median_ns": 1480.0, "unit": "ns", "stub": false },
+    { "id": "grade/warm_cache", "mean_ns": 24000.0, "median_ns": 23500.0, "unit": "ns", "stub": false, "p95_ns": 26000.0 },
     { "id": "node_read/cold_cache", "mean_ns": 2200.0, "median_ns": 2100.0, "unit": "ns", "stub": false },
     { "id": "node_read/warm_cache", "mean_ns": 95.5, "median_ns": 95.0, "unit": "ns", "stub": false },
     { "id": "solve_iteration/simple_tree_flop", "mean_ns": 21500000.5, "median_ns": 21000000.0, "unit": "ns", "stub": false }
@@ -141,7 +144,7 @@ Where the committed files come from (O-125). Continuous integration regenerates 
 |---|---|---|---|
 | `phase-0-gate.md` | S06, started by S01 | Markdown | Phase 0 gate, repo part: R0.1 to R0.8 and R0.10 to R0.12, with the throwaway AGPL (GNU Affero General Public License) and guard runs linked and the private continuous integration (CI) result for R0.8 noted. |
 | `mac-bootstrap.md` | S04 | Markdown | Phase 0 gate, Mac part: R0.9 against O-50 (peak resident set size (RSS) under 5 GB and under 30 minutes to 0.3 percent pot per preflop line), the Docker memory per O-20, nothing left running per O-47. |
-| `bench-zenbook.json` | S02, `just bench` | JSON baseline | R0.10. The p95 guard baseline that O-40's thresholds are later measured against; the benchmark section above has the fields. |
+| `bench-zenbook.json` | S02, `just bench`; S16 adds the grade id | JSON baseline | R0.10 and R2.13 (the `grade/warm_cache` id under its 30 ms budget). The p95 guard baseline that O-40's thresholds are later measured against; the benchmark section above has the fields. |
 | `g1-kuhn.json`, `g1-kuhn.md` | S13, `just gates` on the Zenbook; CI uploads its own run as an artifact only (O-125) | JSON gate report with its tool-written Markdown twin | R2.4: Kuhn against minus 1/18 and the 0.001 chip floor, the 04 section 6 pass rules as thresholds. |
 | `g2-akq.json`, `g2-akq.md` | S13, `just gates` on the Zenbook; CI as above | JSON gate report with its tool-written Markdown twin | R2.5: the AKQ cases and the polar river game against their closed forms within 0.5 percentage points. |
 | `g3-leduc.json`, `g3-leduc.md` | S13, `just gates` on the Zenbook; CI as above | JSON gate report with its tool-written Markdown twin | R2.6: Leduc against the committed OpenSpiel exploitability curve (O-30) within the O-79 tolerance. |

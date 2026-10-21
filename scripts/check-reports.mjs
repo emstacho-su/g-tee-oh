@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Report schema check (R0.11): validates every JSON (JavaScript Object Notation) report
 // under validation/reports/ against validation/reports/report.schema.json with ajv (draft
-// 2020-12), checks that each gate report's verdict agrees with its measurements, and
-// requires pass: true on every report other than the bench baseline. `just report-check`
+// 2020-12), checks that each gate report's verdict agrees with its measurements, requires
+// pass: true on every report other than the bench baseline, and holds the bench baseline
+// to the budgets in BENCH_BUDGETS (grade/warm_cache p95_ns under 30 ms). `just report-check`
 // runs it on the committed reports locally and in the ts job; `just gates-check` runs it
 // on a fresh run under target/gate-reports; scripts/check-reports.test.mjs covers it under
 // `pnpm run test:scripts`.
@@ -47,6 +48,13 @@ const PREFIX = "check-reports:";
 const SCHEMA_FILE = "report.schema.json";
 const BENCH_REPORT_ID = "bench";
 const REPORT_EXTENSION = ".json";
+// The bench budgets (plan D.7, O-154, O-86): a bench baseline whose measurement of one of
+// these ids carries the named field above its limit is rejected, naming the id and the
+// field. A9 section 6 gives one grade 30 ms warm; the hosted check O-40 and O-86 describe
+// reads the committed baseline, so the limit is enforced here and nowhere else. A baseline
+// without the id passes (the id joins the report when `just bench` next runs); one with the
+// id but without the field is rejected, since the budget cannot be judged.
+export const BENCH_BUDGETS = { "grade/warm_cache": { p95_ns: 30_000_000 } };
 // Keywords whose error only says that a sub-schema failed; the nested error names the field.
 const WRAPPER_KEYWORDS = new Set(["if"]);
 
@@ -116,6 +124,25 @@ function passReasons(report) {
   return report.pass === true ? [] : ["pass is not true: a gate report on record must pass"];
 }
 
+/** The bench budgets of BENCH_BUDGETS applied to a bench baseline; nothing for a gate report. */
+export function budgetReasons(report, budgets = BENCH_BUDGETS) {
+  if (report.report !== BENCH_REPORT_ID) return [];
+  const reasons = [];
+  for (const measurement of report.measurements) {
+    const budget = budgets[measurement.id];
+    if (budget === undefined) continue;
+    for (const [field, limit] of Object.entries(budget)) {
+      const value = measurement[field];
+      if (typeof value !== "number") {
+        reasons.push(`measurement ${measurement.id} carries no ${field} to judge against ${limit}`);
+      } else if (value > limit) {
+        reasons.push(`measurement ${measurement.id} ${field} ${value} exceeds the budget ${limit}`);
+      }
+    }
+  }
+  return reasons;
+}
+
 function checkReport(validate, path) {
   let report;
   try {
@@ -124,7 +151,8 @@ function checkReport(validate, path) {
     return [`cannot be read as JSON: ${error.message}`];
   }
   const reasons = schemaReasons(validate, report);
-  return reasons.length > 0 ? reasons : [...consistencyReasons(report), ...passReasons(report)];
+  if (reasons.length > 0) return reasons;
+  return [...consistencyReasons(report), ...passReasons(report), ...budgetReasons(report)];
 }
 
 function listReports(dir) {

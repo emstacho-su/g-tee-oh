@@ -34,6 +34,8 @@ jobs:
         run: just ts-typecheck
       - name: Tests
         run: just ts-test
+      - name: Boundary (api never invokes the builder, R2.15)
+        run: just ts-boundary
       - name: Pending-test tags (R0.11)
         run: just test-tags
       - name: Report schema (R0.11)
