@@ -52,7 +52,8 @@ pub use error::LibraryError;
 pub use key_hash::key_hash;
 pub use manifest::{
     ChunkRef, FileRef, LineEntry, MANIFEST_FILE, MANIFEST_SCHEMA, MAX_CHUNKS, Manifest,
-    ManifestConfig, ManifestKind, Runout, Source, TurnRoot, is_timestamp, is_uuid,
+    ManifestConfig, ManifestKind, Runout, Source, TREE_FILE_SUFFIX, TurnRoot, is_timestamp,
+    is_uuid,
 };
 pub use quantize::{
     dequantize_frequencies, dequantize_reach, loss_bb, loss_bb_f64, loss_units, narrow_f32,
@@ -64,7 +65,9 @@ pub use store::{FsStore, MemStore, ObjectSink, ObjectStore};
 #[cfg(feature = "synthetic")]
 pub use synthetic::{SyntheticParams, synthetic_tree};
 pub use view::NodeView;
-pub use writer::{SolutionMeta, preflop_prefix, write_preflop, write_tree_file};
+pub use writer::{
+    PreparedPreflop, SolutionMeta, preflop_prefix, prepare_preflop, write_preflop, write_tree_file,
+};
 
 /// The crate's package name, used by the workspace link tests (R0.1).
 pub const CRATE_NAME: &str = "gto-library";

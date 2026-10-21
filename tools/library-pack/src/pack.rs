@@ -3,9 +3,11 @@
 //!
 //! Mechanism: every operation reads the dump through one size-capped read
 //! (`MAX_DUMP_BYTES`), parses it and runs both checkers. `pack` validates the config id and
-//! the solution id before it builds any output path and writes nothing when the dump is
-//! rejected; it then creates the library root if needed and writes
-//! `<out_root>/preflop/<config_id>/<id>/` through `gto_library::FsStore`. `verify` reads the
+//! the solution id before it builds any output path, has the writer build and validate the
+//! whole solution in memory (`gto_library::prepare_preflop`), and only then creates the
+//! library root if needed and writes `<out_root>/preflop/<config_id>/<id>/` through
+//! `gto_library::FsStore`, so a rejected dump leaves nothing on disk, not even an empty
+//! root. `verify` reads the
 //! manifest and every node back through `gto_library::Reader`, re-exports them under the
 //! manifest's metadata and compares the result with the dump (O-133), naming each
 //! difference once; it also checks the manifest's tree hash against the dump's and its node
@@ -19,7 +21,7 @@ use std::path::Path;
 
 use gto_library::{
     ChunkOptions, FsStore, LibraryError, MANIFEST_FILE, Manifest, ObjectStore, Reader,
-    ReaderOptions, SolutionMeta, SolvedNode, write_preflop,
+    ReaderOptions, SolutionMeta, SolvedNode, prepare_preflop,
 };
 
 use crate::MAX_DUMP_BYTES;
@@ -46,14 +48,16 @@ pub fn check_dump_file(dump: &Path) -> Result<NodeDump, PackError> {
 /// # Errors
 ///
 /// As `check_dump_file`, plus `PackError::Rejected` for options an own dump needs or an
-/// invalid id or timestamp, `PackError::Io` when the root cannot be created, and
-/// `PackError::Library` when the write fails. A rejected dump writes nothing.
+/// invalid id or timestamp, `PackError::Library` when the writer rejects the nodes or the
+/// write fails, and `PackError::Io` when the root cannot be created. A rejected dump writes
+/// nothing: the root is created only once the writer has validated everything in memory.
 pub fn pack(dump: &Path, out_root: &Path, o: &PackOptions) -> Result<Manifest, PackError> {
     let checked = check_dump_file(dump)?;
     let (meta, nodes) = convert_checked(&checked, o).map_err(PackError::Rejected)?;
+    let prepared = prepare_preflop(&meta, &nodes, &ChunkOptions::default())?;
     fs::create_dir_all(out_root).map_err(|source| io_error(out_root, source))?;
     let mut store = FsStore::new(out_root)?;
-    Ok(write_preflop(&mut store, &meta, &nodes, &ChunkOptions::default())?)
+    Ok(prepared.write(&mut store)?)
 }
 
 /// Reads the solution at `prefix` under `library_root` back and compares it with the dump

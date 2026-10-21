@@ -77,7 +77,8 @@ pub enum LibraryError {
     /// A manifest that does not parse or breaks a rule of the schema.
     #[error("invalid manifest: {0}")]
     Manifest(String),
-    /// A store path that is empty, absolute, holds a backslash or a `..` segment.
+    /// A store path that is empty, absolute, holds a backslash or a `..` segment, or names a
+    /// Windows device such as `CON` or `nul.json`.
     #[error("invalid store path {0:?}: expected a relative path with forward slashes")]
     InvalidPath(String),
     /// A `gto-model` value that failed its own checks.

@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use gto_library::{
     ChunkOptions, FORMAT_VERSION, FileRef, HandSpace, LibraryError, LineEntry, MANIFEST_SCHEMA,
     Manifest, ManifestConfig, ManifestKind, ObjectSink, Runout, SolutionMeta, SolvedHand,
-    SolvedNode, Source, write_preflop, write_tree_file,
+    SolvedNode, Source, TurnRoot, write_preflop, write_tree_file,
 };
 use gto_model::{
     ActionToken, Card, Cbb, ComboId, ConfigId, GameFormat, NodeKey, Position, PositionPair,
@@ -292,4 +292,46 @@ fn r2_7_manifest_rejects_format_version_2() {
         other => panic!("expected UnsupportedFormat(2), got {other:?}"),
     }
     assert!(!schema_errors(&value).is_empty(), "the schema rejects format_version 2 too");
+}
+
+#[test]
+fn r2_7_manifest_rejects_a_flop_file_off_the_writer_layout() {
+    let manifest = flop_build_manifest();
+    let entry = &manifest.lines.as_ref().expect("a flop build lists lines")[0];
+    for bad in ["../x.bin.zst", "flop.bin.zst", "flop/r250.c.bin", "flop/r300.c.bin.zst"] {
+        let off = LineEntry { flop_file: bad.to_owned(), ..entry.clone() };
+        let moved = Manifest { lines: Some(vec![off]), ..manifest.clone() };
+        let reason = manifest_error(bad, &moved);
+        assert!(reason.contains("flop_file") && reason.contains(bad), "{reason}");
+    }
+    manifest.validate().expect("the writer's flop/<line>.bin.zst validates");
+    Manifest::from_json(EXAMPLE_FLOP_BUILD.as_bytes()).expect("the committed example validates");
+}
+
+#[test]
+fn r2_7_manifest_rejects_runout_and_turn_root_files_off_the_writer_layout() {
+    let manifest = flop_build_manifest();
+    let runout = &manifest.runouts.as_ref().expect("a flop build lists runouts")[0];
+    let file = runout.files.get("r250.c").expect("the runout lists r250.c").clone();
+    let moved = FileRef { path: "runouts/Kh9s/r300.c.bin.zst".to_owned(), ..file.clone() };
+    let files = BTreeMap::from([("r250.c".to_owned(), moved)]);
+    let runouts = Some(vec![Runout { files, ..runout.clone() }]);
+    let reason =
+        manifest_error("a runout file of another line", &Manifest { runouts, ..manifest.clone() });
+    assert!(
+        reason.contains("runout Kh9s line r250.c path") && reason.contains("r300.c"),
+        "{reason}"
+    );
+    let root = |path: &str| TurnRoot {
+        line: "r250.c".to_owned(),
+        path: path.to_owned(),
+        sha256: file.sha256.clone(),
+    };
+    let turn_roots = Some(vec![root("turn-roots/r250.c.bin.zst")]);
+    Manifest { turn_roots, ..manifest.clone() }
+        .validate()
+        .expect("the A3 turn-roots path validates");
+    let turn_roots = Some(vec![root("flop/r250.c.bin.zst")]);
+    let reason = manifest_error("a turn root under flop/", &Manifest { turn_roots, ..manifest });
+    assert!(reason.contains("turn_roots line r250.c path") && reason.contains("flop/"), "{reason}");
 }

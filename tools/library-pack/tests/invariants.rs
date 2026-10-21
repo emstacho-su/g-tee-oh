@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+use gto_library::LibraryError;
 use library_pack::{
     PackError, PackOptions, Rule, Violation, check_invariants, check_structure, pack, parse_dump,
 };
@@ -184,6 +185,32 @@ fn r2_8_rejected_dump_writes_nothing() {
         other => panic!("expected a rejection, got {other:?}"),
     }
     assert_eq!(fs::read_dir(&out).expect("readable").count(), 0, "nothing was written");
+}
+
+#[test]
+fn r2_8_dump_the_writer_rejects_leaves_no_output_directory() {
+    // Reach on some hands only passes both checkers; the writer's record quantization
+    // refuses it, so this rejection comes after every check `pack` runs before the writer.
+    let scratch = tempfile::tempdir().expect("a scratch directory");
+    let mixed = edited(|d| {
+        d["nodes"][0]["hands"][1].as_object_mut().expect("an object").remove("reach");
+    });
+    let dump_path = scratch.path().join("mixed.json");
+    fs::write(&dump_path, serde_json::to_vec(&mixed).expect("serializes")).expect("write");
+    let out = scratch.path().join("library");
+    let options = PackOptions {
+        engine_version: Some("0.1.0".to_owned()),
+        seed: Some(1),
+        iterations: Some(1),
+        ..PackOptions::default()
+    };
+    match pack(&dump_path, &out, &options) {
+        Err(PackError::Library(LibraryError::Quantize(reason))) => {
+            assert!(reason.contains("reach"), "the writer names the reach rule: {reason}");
+        }
+        other => panic!("expected the writer's rejection, got {other:?}"),
+    }
+    assert!(!out.exists(), "no output directory exists before the writer has validated");
 }
 
 /// One row of `validation/fixtures/node-dump/cases.json`.

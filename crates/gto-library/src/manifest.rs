@@ -32,6 +32,9 @@ pub const MANIFEST_SCHEMA: &str = include_str!("../schemas/manifest.schema.json"
 /// The manifest's file name inside a solution directory.
 pub const MANIFEST_FILE: &str = "manifest.json";
 
+/// The suffix every chunk and tree file carries: a zstd-compressed binary file.
+pub const TREE_FILE_SUFFIX: &str = ".bin.zst";
+
 /// The most chunk files a preflop solution may list: the schema's four-digit chunk path.
 pub const MAX_CHUNKS: usize = 10_000;
 

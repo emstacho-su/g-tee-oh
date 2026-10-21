@@ -7,14 +7,17 @@
 //! Mechanism: `manifest` checks every field that is present first, whatever the kind, the way
 //! the schema's property definitions apply to every document, and then the kind's required
 //! list, the way the schema's `allOf` conditionals do. The first broken rule is reported as
-//! one sentence that names the field.
+//! one sentence that names the field. The tree file paths of a flop build are held to the
+//! writer's layout in `files`.
+
+mod files;
 
 use std::fmt;
 
 use crate::SUPPORTED_FORMAT_VERSIONS;
 use crate::error::LibraryError;
 
-use super::{ChunkRef, FileRef, LineEntry, MAX_CHUNKS, Manifest, ManifestKind, Runout, Source};
+use super::{ChunkRef, LineEntry, MAX_CHUNKS, Manifest, ManifestKind, Runout, Source};
 
 /// Digits in a sha256 or a tree hash (lead decision 2).
 const SHA256_HEX_DIGITS: usize = 64;
@@ -100,14 +103,7 @@ fn check_files(m: &Manifest) -> Result<(), LibraryError> {
         let names: Vec<String> = runouts.iter().map(|r| format!("{}{}", r.turn, r.river)).collect();
         listed_once("runout", &names)?;
     }
-    for root in m.turn_roots.iter().flatten() {
-        rule(is_line(&root.line), || format!("turn_roots line {:?} is malformed", root.line))?;
-        check_file_ref(
-            "turn_roots",
-            &FileRef { path: root.path.clone(), sha256: root.sha256.clone() },
-        )?;
-    }
-    Ok(())
+    m.turn_roots.iter().flatten().try_for_each(files::check_turn_root)
 }
 
 fn check_chunks(chunks: &[ChunkRef]) -> Result<(), LibraryError> {
@@ -134,10 +130,7 @@ fn check_line_entry(entry: &LineEntry) -> Result<(), LibraryError> {
         &format!("line {line} exploitability_pct_pot"),
         entry.exploitability_pct_pot,
     )?;
-    check_file_ref(
-        &format!("line {line}"),
-        &FileRef { path: entry.flop_file.clone(), sha256: entry.sha256.clone() },
-    )
+    files::check_flop_file(entry)
 }
 
 fn check_runout(runout: &Runout) -> Result<(), LibraryError> {
@@ -145,16 +138,7 @@ fn check_runout(runout: &Runout) -> Result<(), LibraryError> {
     rule(is_card(&runout.turn) && is_card(&runout.river), || {
         format!("{name} does not name a turn and a river card")
     })?;
-    for (line, file) in &runout.files {
-        rule(is_line(line), || format!("{name} lists the malformed line {line:?}"))?;
-        check_file_ref(&format!("{name} line {line}"), file)?;
-    }
-    Ok(())
-}
-
-fn check_file_ref(owner: &str, file: &FileRef) -> Result<(), LibraryError> {
-    rule(!file.path.is_empty(), || format!("{owner} has an empty file path"))?;
-    rule(is_sha256(&file.sha256), || format!("{owner} has a malformed sha256"))
+    runout.files.iter().try_for_each(|(line, file)| files::check_runout_file(runout, line, file))
 }
 
 /// `Ok` when no name repeats, else `Manifest` naming the first `what` listed twice. The

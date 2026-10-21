@@ -1,8 +1,9 @@
 //! Storage behind traits (architecture decision record (ADR) 0019): the reader fetches
 //! through `ObjectStore` and the writer puts through `ObjectSink`, so the S3 (Simple Storage
 //! Service) adapter of S16 and S18 slots in without touching either. Paths are relative,
-//! use forward slashes and never hold a `..` segment; both stores here reject anything else
-//! with `LibraryError::InvalidPath`.
+//! use forward slashes, never hold a `..` segment and never name a Windows device such as
+//! `CON` or `nul.json`; both stores here reject anything else with
+//! `LibraryError::InvalidPath`.
 //!
 //! - `FsStore`: files under a root directory. A put writes a sibling temporary file and
 //!   renames it over the target, so a reader never sees a half-written object.
@@ -23,6 +24,13 @@ const TEMP_SUFFIX: &str = ".partial";
 
 /// Characters no path segment may hold: a backslash, a drive colon or a NUL.
 const FORBIDDEN_CHARS: [char; 3] = ['\\', ':', '\0'];
+
+/// The device names Windows resolves before the file system, whatever the case and whatever
+/// extension follows: `CON`, `con.txt` and `nul.json` all name a device, not a file.
+const RESERVED_DEVICE_NAMES: [&str; 22] = [
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
 
 /// Read access to stored objects.
 pub trait ObjectStore: Send + Sync {
@@ -53,20 +61,29 @@ pub trait ObjectSink {
 }
 
 /// Checks a store path: every segment between forward slashes is a plain name (not empty,
-/// `.` or `..`, none of `FORBIDDEN_CHARS`). That rules out an empty path, an absolute path,
-/// a drive prefix and traversal, so no path can leave the store root.
+/// `.` or `..`, none of `FORBIDDEN_CHARS`, not a reserved device name). That rules out an
+/// empty path, an absolute path, a drive prefix, traversal and a Windows device, so no path
+/// can leave the store root or reach a device.
 fn check_path(path: &str) -> Result<(), LibraryError> {
     let plain = |segment: &str| {
         !segment.is_empty()
             && segment != "."
             && segment != ".."
             && !segment.contains(FORBIDDEN_CHARS)
+            && !is_reserved_device_name(segment)
     };
     if path.split('/').all(plain) {
         Ok(())
     } else {
         Err(LibraryError::InvalidPath(path.to_owned()))
     }
+}
+
+/// True when the segment, or its stem before the first dot, is one of
+/// `RESERVED_DEVICE_NAMES` in any case.
+fn is_reserved_device_name(segment: &str) -> bool {
+    let stem = segment.split_once('.').map_or(segment, |(stem, _)| stem);
+    RESERVED_DEVICE_NAMES.iter().any(|name| name.eq_ignore_ascii_case(stem))
 }
 
 /// `LibraryError::Io` for `path`.
@@ -208,5 +225,32 @@ impl ObjectSink for MemStore {
         check_path(path)?;
         self.files.insert(path.to_owned(), bytes.to_vec());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MemStore, ObjectSink, ObjectStore, check_path};
+    use crate::error::LibraryError;
+
+    #[test]
+    fn r2_7_check_path_rejects_windows_reserved_device_names() {
+        for bad in ["CON", "nul.json", "chunks/COM1.bin.zst", "prn/x.bin", "Lpt9.bin.zst"] {
+            assert!(matches!(check_path(bad), Err(LibraryError::InvalidPath(_))), "{bad:?}");
+        }
+        for good in ["console", "nullable.json", "chunks/0001.bin.zst", "com10.bin", "aux1"] {
+            check_path(good).unwrap_or_else(|err| panic!("{good:?} is a plain path: {err}"));
+        }
+    }
+
+    #[test]
+    fn r2_7_mem_store_rejects_windows_reserved_device_names() {
+        let mut store = MemStore::new();
+        for bad in ["CON", "nul.json", "chunks/COM1.bin.zst"] {
+            assert!(matches!(store.put(bad, b"x"), Err(LibraryError::InvalidPath(_))), "{bad:?}");
+            assert!(matches!(store.get(bad), Err(LibraryError::InvalidPath(_))), "{bad:?}");
+        }
+        store.put("chunks/0001.bin.zst", b"x").expect("a plain path stores");
+        assert_eq!(store.paths(), vec!["chunks/0001.bin.zst".to_owned()]);
     }
 }

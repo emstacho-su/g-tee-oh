@@ -27,6 +27,7 @@ use crate::error::LibraryError;
 use crate::key_hash::key_hash;
 use crate::manifest::{
     ChunkRef, FileRef, MANIFEST_FILE, MAX_CHUNKS, Manifest, ManifestConfig, ManifestKind, Source,
+    TREE_FILE_SUFFIX,
 };
 use crate::record::{NodeRecord, SolvedNode};
 use crate::store::ObjectSink;
@@ -35,9 +36,6 @@ use crate::store::ObjectSink;
 /// would exceed this, unless it holds a single record. A few thousand preflop nodes fit in
 /// one or two files, and the sha256 check at open reads each file once.
 pub const CHUNK_FILE_TARGET_BYTES: usize = 16 * 1024 * 1024;
-
-/// The suffix every tree file path carries.
-const TREE_FILE_SUFFIX: &str = ".bin.zst";
 
 /// Everything a preflop manifest carries besides its chunks.
 #[derive(Clone, Debug, PartialEq)]
@@ -74,21 +72,55 @@ pub fn preflop_prefix(config_id: &ConfigId, solution_id: &str) -> String {
     format!("preflop/{config_id}/{solution_id}")
 }
 
-/// Writes a preflop solution under `preflop_prefix(meta.config_id, meta.id)` and returns
-/// the manifest it stored. The manifest passes `Manifest::validate` before anything is put.
+/// A preflop solution built and checked in memory: its chunk files, its manifest and the
+/// prefix they go under. `prepare_preflop` builds one and `write` puts it, so a caller that
+/// must not touch storage until everything has been validated (library-pack creates its
+/// output directory in between) runs the two steps apart.
+#[derive(Debug)]
+pub struct PreparedPreflop {
+    prefix: String,
+    files: Vec<(ChunkRef, Vec<u8>)>,
+    manifest: Manifest,
+    json: String,
+}
+
+impl PreparedPreflop {
+    /// The manifest `write` stores.
+    #[must_use]
+    pub fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+
+    /// Puts every chunk file and then the manifest under the prefix, and returns the
+    /// manifest.
+    ///
+    /// # Errors
+    ///
+    /// The sink's error.
+    pub fn write(self, sink: &mut dyn ObjectSink) -> Result<Manifest, LibraryError> {
+        let prefix = &self.prefix;
+        for (chunk, bytes) in &self.files {
+            sink.put(&format!("{prefix}/{}", chunk.path), bytes)?;
+        }
+        sink.put(&format!("{prefix}/{MANIFEST_FILE}"), self.json.as_bytes())?;
+        Ok(self.manifest)
+    }
+}
+
+/// Builds a preflop solution in memory without putting anything: the membership, duplicate
+/// and collision checks, quantization, the chunk files, and a manifest that passes
+/// `Manifest::validate`.
 ///
 /// # Errors
 ///
 /// `LibraryError::DuplicateKey`, `LibraryError::KeyHashCollision`, a node whose key names
 /// another configuration or pair (`LibraryError::Manifest`), no nodes, more than
-/// `MAX_CHUNKS` files, any quantization or validation error, or the sink's error. Nothing is
-/// put when the nodes or the manifest are rejected.
-pub fn write_preflop(
-    sink: &mut dyn ObjectSink,
+/// `MAX_CHUNKS` files, or any quantization or validation error.
+pub fn prepare_preflop(
     meta: &SolutionMeta,
     nodes: &[SolvedNode],
     o: &ChunkOptions,
-) -> Result<Manifest, LibraryError> {
+) -> Result<PreparedPreflop, LibraryError> {
     check_membership(nodes, &meta.config_id, meta.pair)?;
     let records = quantize_nodes(nodes, meta.pair)?;
     let groups = file_groups(&records);
@@ -107,11 +139,23 @@ pub fn write_preflop(
     manifest.validate()?;
     let json = manifest.to_json_pretty()?;
     let prefix = preflop_prefix(&meta.config_id, &meta.id);
-    for (chunk, bytes) in &files {
-        sink.put(&format!("{prefix}/{}", chunk.path), bytes)?;
-    }
-    sink.put(&format!("{prefix}/{MANIFEST_FILE}"), json.as_bytes())?;
-    Ok(manifest)
+    Ok(PreparedPreflop { prefix, files, manifest, json })
+}
+
+/// Writes a preflop solution under `preflop_prefix(meta.config_id, meta.id)` and returns
+/// the manifest it stored: `prepare_preflop`, then `PreparedPreflop::write`.
+///
+/// # Errors
+///
+/// As `prepare_preflop`, or the sink's error. Nothing is put when the nodes or the manifest
+/// are rejected.
+pub fn write_preflop(
+    sink: &mut dyn ObjectSink,
+    meta: &SolutionMeta,
+    nodes: &[SolvedNode],
+    o: &ChunkOptions,
+) -> Result<Manifest, LibraryError> {
+    prepare_preflop(meta, nodes, o)?.write(sink)
 }
 
 /// Writes one tree file of a flop build at `<prefix>/<path>` and returns its `FileRef`,
