@@ -1,0 +1,26 @@
+---
+source: crates/gto-tree/tests/r2_9_hash.rs
+expression: report
+---
+g-tee-oh/tree-config/1
+allin_threshold_bp 6700
+raise_cap 3
+oop flop bet sizes_bp [3300, 7500] allin false
+oop flop raise sizes_bp [] allin true
+oop flop donk sizes_bp [] allin false
+oop turn bet sizes_bp [7500] allin false
+oop turn raise sizes_bp [] allin true
+oop turn donk sizes_bp [] allin false
+oop river bet sizes_bp [7500] allin false
+oop river raise sizes_bp [] allin true
+oop river donk sizes_bp [] allin false
+ip flop bet sizes_bp [3300, 7500] allin false
+ip flop raise sizes_bp [] allin true
+ip flop donk sizes_bp [] allin false
+ip turn bet sizes_bp [7500] allin false
+ip turn raise sizes_bp [] allin true
+ip turn donk sizes_bp [] allin false
+ip river bet sizes_bp [7500] allin false
+ip river raise sizes_bp [] allin true
+ip river donk sizes_bp [] allin false
+tree_hash_hex 9bb40617b56795ee417721bb992e2252f2c285158c8a9a2c17b1ea4dfe32d8bd
