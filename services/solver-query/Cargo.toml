@@ -26,6 +26,14 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# The query-role connection (O-28, O-146): a lazy pool as query_login with runtime-checked
+# queries (O-147). lru bounds the deal store (O-152) and sha2 derives deal ids from the seed
+# and the filter (plan C.4); both are already in the workspace graph through gto-library.
+# None of them leads to gto-solve, which just rust-boundary confirms.
+sqlx = { workspace = true }
+lru = { workspace = true }
+sha2 = { workspace = true }
+
 # In-process request tests (tower::ServiceExt::oneshot) and response body collection, plus the
 # packed synthetic fixture the integration tests build in a temporary directory (plan C.9, O-149):
 # gto-library's synthetic generator, library-pack's dump export and pack, and tempfile. None of

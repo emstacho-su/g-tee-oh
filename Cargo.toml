@@ -67,6 +67,15 @@ zstd = { version = "0.13", default-features = false }
 sha2 = "0.10"
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 lru = "0.19"
+# The query-role connection of solver-query (S16, O-28, O-146, O-147): runtime-checked
+# sqlx::query (no macros, so no DATABASE_URL at build and no .sqlx directory), the tokio
+# runtime, Postgres, and rustls over ring with the native root store. The ring variant is
+# chosen over aws-lc-rs because it builds with the C compiler alone, no cmake or NASM, on the
+# Windows MSVC toolchain of O-23; the native roots (the image installs ca-certificates) are
+# chosen over webpki-roots because that crate's data license, CDLA-Permissive-2.0, is outside
+# the deny.toml allow list (ADR 0002). Default features are off: no macros, migrate, any or
+# json.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "tls-rustls-ring-native-roots"] }
 # The library-pack command line (S14, R2.8).
 clap = { version = "4", features = ["derive"] }
 # Seeded generators for synthetic library data (the gto-library "synthetic" feature) and the size

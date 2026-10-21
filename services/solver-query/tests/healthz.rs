@@ -52,17 +52,20 @@ async fn r0_7_healthz_reports_the_fixture_library() {
     let existing = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let missing = existing.join("no-such-fixture-library");
 
-    let (router, _) = app_with(AppState { fixture_library_path: Some(existing.clone()) });
+    let with_path =
+        |path: Option<PathBuf>| AppState { fixture_library_path: path, ..AppState::empty() };
+
+    let (router, _) = app_with(with_path(Some(existing.clone())));
     let (_, _, json) = get_healthz(router).await;
     assert_eq!(json["fixture_library"]["path"], existing.to_string_lossy().as_ref());
     assert_eq!(json["fixture_library"]["present"], true, "body was {json}");
 
-    let (router, _) = app_with(AppState { fixture_library_path: Some(missing.clone()) });
+    let (router, _) = app_with(with_path(Some(missing.clone())));
     let (_, _, json) = get_healthz(router).await;
     assert_eq!(json["fixture_library"]["path"], missing.to_string_lossy().as_ref());
     assert_eq!(json["fixture_library"]["present"], false, "body was {json}");
 
-    let (router, _) = app_with(AppState { fixture_library_path: None });
+    let (router, _) = app_with(with_path(None));
     let (_, _, json) = get_healthz(router).await;
     assert!(json["fixture_library"]["path"].is_null(), "body was {json}");
     assert_eq!(json["fixture_library"]["present"], false, "body was {json}");

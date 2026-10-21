@@ -24,6 +24,22 @@ use crate::api::problem::{PROBLEM_JSON, PROBLEM_TYPE_PREFIX, Problem};
 /// The detail of an `Internal` problem body; the real message is logged, never sent.
 pub const INTERNAL_DETAIL: &str = "the service failed to answer; see the service log";
 
+/// How many characters of caller-supplied text a detail echoes back (see
+/// [`ApiError::quoted`]).
+pub const QUOTED_MAX_CHARS: usize = 64;
+
+/// `problem` as a response: its status, `application/problem+json`, and the problem itself
+/// in the response extensions, which is how the request-id middleware finds it to fill
+/// `instance` without parsing the body (O-158).
+#[must_use]
+pub fn problem_response(problem: Problem) -> Response {
+    let status = StatusCode::from_u16(problem.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let mut response = (status, Json(problem.clone())).into_response();
+    response.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_JSON));
+    response.extensions_mut().insert(problem);
+    response
+}
+
 /// Every failure a handler reports.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ApiError {
@@ -112,6 +128,18 @@ impl ApiError {
         }
     }
 
+    /// Caller-supplied text for a detail: quoted, and cut to [`QUOTED_MAX_CHARS`] characters
+    /// with an ellipsis, so an oversized key or hand never echoes back in full.
+    #[must_use]
+    pub fn quoted(text: &str) -> String {
+        if text.chars().count() <= QUOTED_MAX_CHARS {
+            format!("{text:?}")
+        } else {
+            let head: String = text.chars().take(QUOTED_MAX_CHARS).collect();
+            format!("{head:?}...")
+        }
+    }
+
     /// The problem body, with no request id attached.
     #[must_use]
     pub fn problem(&self) -> Problem {
@@ -141,9 +169,7 @@ impl IntoResponse for ApiError {
         if let ApiError::Internal(message) = &self {
             tracing::error!(%message, "internal error");
         }
-        let mut response = (self.status(), Json(self.problem())).into_response();
-        response.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_JSON));
-        response
+        problem_response(self.problem())
     }
 }
 
@@ -189,8 +215,8 @@ mod tests {
     use http_body_util::BodyExt;
     use serde_json::Value;
 
-    use super::{ApiError, INTERNAL_DETAIL};
-    use crate::api::problem::PROBLEM_JSON;
+    use super::{ApiError, INTERNAL_DETAIL, QUOTED_MAX_CHARS};
+    use crate::api::problem::{PROBLEM_JSON, Problem};
 
     #[test]
     fn r2_13_every_variant_maps_to_a_status_and_a_stable_type_tag() {
@@ -226,6 +252,23 @@ mod tests {
         assert_eq!(json["status"], 404);
         assert_eq!(json["detail"], "no such deal");
         assert!(json["instance"].is_null());
+    }
+
+    #[test]
+    fn r2_13_into_response_carries_the_problem_as_an_extension() {
+        let error = ApiError::BadRequest("bad key".into());
+        let response = error.clone().into_response();
+        let carried = response.extensions().get::<Problem>().expect("the problem extension");
+        assert_eq!(*carried, error.problem());
+    }
+
+    #[test]
+    fn r2_13_quoted_cuts_long_caller_text() {
+        assert_eq!(ApiError::quoted("AKs"), "\"AKs\"");
+        let long = "x".repeat(QUOTED_MAX_CHARS + 10);
+        let shown = ApiError::quoted(&long);
+        assert!(shown.ends_with("\"..."), "{shown}");
+        assert_eq!(shown.chars().count(), QUOTED_MAX_CHARS + 5, "quotes plus the ellipsis");
     }
 
     #[test]

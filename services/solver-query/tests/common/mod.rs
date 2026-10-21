@@ -8,8 +8,8 @@
 //! enumerate keys, so the fixture carries its node list.
 //!
 //! The router comes from the configuration path (`Config::from_lookup` with
-//! `FIXTURE_LIBRARY_PATH` set to the root), so these tests keep working when `AppState`
-//! grows the registry: only `router_over` changes then.
+//! `FIXTURE_LIBRARY_PATH` set to the root, then `AppState::from_config`, which runs the
+//! startup scan), so every test reads through the registry the server uses.
 //!
 //! Every test binary includes this module and uses a subset of it, hence the dead-code
 //! allowance.
@@ -194,7 +194,7 @@ pub fn router_over(root: &Path) -> Router {
     let value: OsString = root.as_os_str().to_owned();
     let config = Config::from_lookup(|name| (name == FIXTURE_LIBRARY_VAR).then(|| value.clone()))
         .expect("one well formed variable");
-    app_with(AppState::from(&config)).0
+    app_with(AppState::from_config(&config).expect("no database is configured")).0
 }
 
 /// A preflop node key under `config_id` and `pair` with the given dotted line.

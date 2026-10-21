@@ -12,7 +12,11 @@
 //! S06 lands the skeleton: `GET /healthz` (A5 section 2) and the document export that
 //! `just contracts` commits (R0.7, O-116). S16 adds the contract for every A5 section 2
 //! route (`api`, the data transfer objects (DTOs); `error`, the problem bodies; `routes`,
-//! one handler per path) and the implementations behind it (R2.13 to R2.15).
+//! one handler per path) and the implementations behind it (R2.13 to R2.15): the library
+//! registry over `FIXTURE_LIBRARY_PATH` (`library`), hand parsing (`hand`), the
+//! request-id and latency middleware (`middleware`), and one module per lane of the S16
+//! plan: `grade` (lane A), `equity` and `insights` (lane B), `rng` and `deal` (lane C),
+//! `db` and `metrics` (lane D). Every module is declared here so no lane edits this file.
 
 #![forbid(unsafe_code)]
 
@@ -20,10 +24,20 @@ pub mod api;
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod db;
+pub mod deal;
+pub mod equity;
 pub mod error;
+pub mod grade;
+pub mod hand;
+pub mod insights;
+pub mod library;
 pub mod logging;
+pub mod metrics;
+pub mod middleware;
 pub mod openapi;
 pub mod probe;
+pub mod rng;
 pub mod routes;
 pub mod server;
 

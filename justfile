@@ -190,10 +190,11 @@ FIXTURE_LIBRARY := "target/fixtures/library"
 # A seeded synthetic dump packed into target/fixtures/library for the dev profile (O-149);
 # set FIXTURE_LIBRARY_PATH=target/fixtures/library in .env to serve it. Nothing binary is
 # committed; S19 fills validation/fixtures/library. Release, as pack is slow in debug (O-134).
-# Synthetic fixture library: library-pack synthetic then pack into target/fixtures/library (R2.13, O-149)
+# Synthetic fixture library: library-pack synthetic, then pack into target/fixtures (R2.13, O-149)
 fixture-synthetic:
     cargo run --release -p library-pack -- synthetic --seed 7 --nodes 256 --out {{FIXTURE_DUMP}}
-    cargo run --release -p library-pack -- pack --dump {{FIXTURE_DUMP}} --out {{FIXTURE_LIBRARY}} --synthetic
+    cargo run --release -p library-pack -- pack --dump {{FIXTURE_DUMP}} \
+        --out {{FIXTURE_LIBRARY}} --synthetic
 
 # Line coverage of gto-library and library-pack at the 80% gate (O-134); needs cargo-llvm-cov
 coverage-library:
