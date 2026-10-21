@@ -1,16 +1,27 @@
 [package]
 name = "library-pack"
 version = "0.1.0"
-description = "Packaging tool that assembles a solutions library into a distributable pack"
+description = "Converts node dumps into the solutions library format and checks them (R2.8)"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+# Edges: gto-library and gto-model, never gto-solve (S14, plan G5). The tool converts a node dump
+# (packages/contracts/schemas/node-dump.schema.json) into library files and reads them back, so it
+# needs no solver; dropping the edge keeps every external-dump parser out of solver-query's graph
+# too. gto-library's synthetic feature is on because the estimate subcommand packs synthetic trees.
 [dependencies]
-gto-library = { workspace = true }
-gto-solve = { workspace = true }
+gto-library = { workspace = true, features = ["synthetic"] }
+gto-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

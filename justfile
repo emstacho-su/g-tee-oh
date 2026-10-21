@@ -175,7 +175,7 @@ hooks:
 
 # Benchmark harness: solve iteration, chunk decode, node read; writes validation/reports/bench-zenbook.json (R0.10)
 bench:
-    cargo bench -p gto-solve -p gto-library
+    cargo bench -p gto-solve -p gto-library --features gto-library/synthetic
     node scripts/bench-report.mjs
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
