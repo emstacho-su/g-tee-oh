@@ -24,8 +24,8 @@
 //! measure built from the engine's best-response and expected-value walks without the
 //! debug-only assertion in the engine's own measure (O-102) plus the copy of a profile
 //! into the `f64` tables, and `plain_cfr` (G3) is the reference traversal with
-//! simultaneous updates and uniform averaging that the `OpenSpiel` curve was produced
-//! with (O-109, O-124).
+//! alternating updates and uniform averaging that the `OpenSpiel` curve was produced
+//! with (O-109, O-124, O-128).
 //!
 //! No engine type appears in a public signature. Engine figures are `f32` and are
 //! widened to `f64` here, at the adapter boundary.
@@ -83,8 +83,9 @@ pub enum SolverMode {
         /// Clamp cumulative regret at zero after each update.
         floor_regrets_at_zero: bool,
     },
-    /// The reference plain CFR traversal: simultaneous updates, uniform averaging, no
-    /// discounting, no regret floor (O-124).
+    /// The reference plain CFR traversal: alternating updates as `OpenSpiel`'s
+    /// `CFRSolver` runs them (player 0 first, then player 1 against player 0's updated
+    /// strategy), uniform averaging, no discounting, no regret floor (O-124, O-128).
     PlainCfr,
 }
 

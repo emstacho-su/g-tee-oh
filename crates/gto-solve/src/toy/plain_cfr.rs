@@ -14,8 +14,8 @@
 //! decision node's regret-matching strategy is snapshotted, uniform where no regret is
 //! positive, so player 1's walk already sees player 0's regrets from the same iteration:
 //! alternating updates, which is what `OpenSpiel`'s `CFRSolver` runs (its constructor
-//! passes `alternating_updates=True` to the base solver whatever the fixture's
-//! `generator` block records; matching it reproduces the committed curve to about 1e-7
+//! passes `alternating_updates=True` to the base solver, which the fixture's `generator`
+//! block records since O-128; matching it reproduces the committed curve to about 1e-7
 //! at iterations 10 and 100, where simultaneous updates miss by 0.08 at 100). In a walk
 //! the opponent's reach is root weights times opponent strategy times chance weights,
 //! the hero's reach is the hero's own strategy only (chance weights excluded, as

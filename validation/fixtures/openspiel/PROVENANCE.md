@@ -1,12 +1,12 @@
 # Provenance of leduc_exploitability.json
 
-`leduc_exploitability.json` is the OpenSpiel Leduc hold'em exploitability curve that gate G3 compares the vendored engine against (open question identifier (O-ID) O-30; requirement identifiers (R IDs) R0.11 and R2.6). `leduc_curve.py` in this directory produced it in one run: it loads OpenSpiel's `leduc_poker`, runs the library's plain counterfactual regret minimization (CFR) solver for 5000 iterations, and at each checkpoint measures the exploitability of the average policy. The file was committed as written and has not been edited by hand. A rerun with the same version reproduces every number, because plain CFR is deterministic; the seed below is recorded for form.
+`leduc_exploitability.json` is the OpenSpiel Leduc hold'em exploitability curve that gate G3 compares the vendored engine against (open question identifier (O-ID) O-30; requirement identifiers (R IDs) R0.11 and R2.6). `leduc_curve.py` in this directory produced it in one run: it loads OpenSpiel's `leduc_poker`, runs the library's plain counterfactual regret minimization (CFR) solver, which updates the two players alternately, for 5000 iterations, and at each checkpoint measures the exploitability of the average policy. The file was committed as written; the one later hand edit is the metadata correction the erratum below records, and no number in the file has been edited. A rerun with the same version reproduces every number, because plain CFR is deterministic; the seed below is recorded for form.
 
 | Item | Value |
 |---|---|
 | Fixture | `validation/fixtures/openspiel/leduc_exploitability.json`, `schema_version` 1 |
 | OpenSpiel version | 2.0.2, the wheel `open_spiel==2.0.2` from the Python Package Index (Apache-2.0), installed with pip 25.0.1 into Python 3.12.15 |
-| Solver | `open_spiel.python.algorithms.cfr.CFRSolver` with `regret_matching_plus` false, `alternating_updates` false and `linear_averaging` false, that is plain CFR: simultaneous updates, uniform averaging, no discounting |
+| Solver | `open_spiel.python.algorithms.cfr.CFRSolver`, whose constructor passes `regret_matching_plus` false, `alternating_updates` true and `linear_averaging` false to its base solver, that is plain CFR: alternating updates (player 0's regrets and policy first, then player 1 against that updated policy), uniform averaging, no discounting |
 | Game | `leduc_poker` with default parameters (`players` 2, `starting_player` 0, `suit_isomorphism` false, `action_mapping` false): 936 information states, maximum game length 8 moves |
 | Measure | `exploitability` is `nash_conv` divided by 2 (the mean best-response gain, chips, ante 1); `nash_conv` is the sum over both players of best-response value minus policy value |
 | Checkpoints | 1, 10, 100, 1000 and 5000 iterations, one continuous run (the script's default schedule) |
@@ -42,3 +42,7 @@ Final average policy value after 5000 iterations: minus 0.0859431179350123 chips
 ## Determinism check
 
 Before the committed run, a probe run of the same script in the same image with `--checkpoints 1,10,50`, written to a scratch directory and not committed, gave exploitability 2.373611111 at iteration 1 and 0.888578983 at iteration 10, identical to the committed run at those checkpoints.
+
+## Erratum
+
+2026-10-20 (O-128). Mechanism: `leduc_curve.py` as first committed wrote the constant `False` into the `alternating_updates` field of the generator block instead of reading the solver, while `CFRSolver`'s constructor passes `alternating_updates=True` to its base solver, so every iteration of the committed run updated player 0 and then player 1 against player 0's updated policy. The S13 gate work confirmed it: the reference traversal in `gto_solve::toy::plain_cfr` reproduces the committed curve to about 1e-7 through iteration 100 with alternating updates and misses it by about 0.08 at iteration 100 with simultaneous ones. Correction: the generator block of `leduc_exploitability.json` now records `alternating_updates` true, edited by hand in that one field with no checkpoint, value or other field touched; the Solver row above, note 3 of `toy-games/leduc.json` and the R0.11 loading test were corrected to match, and `leduc_curve.py` now reads the three switches from the solver object. The switch was confirmed against OpenSpiel's master branch source rather than the 2.0.2 tag; O-128 records the assumption that 2.0.2 is the same.

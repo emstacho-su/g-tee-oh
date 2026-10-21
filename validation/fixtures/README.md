@@ -1,8 +1,8 @@
 # Validation fixtures
 
-This directory holds the public inputs of the engine validation gates G1 to G3 (04 Solver engine section 6): three toy games with their known answers, and one exploitability curve computed by a published reference implementation. They were written in session S05 as the red half of test-driven development (requirement identifier (R ID) R0.11): the files exist and parse now, and the gate tests that read them stay pending until S13 wires the engine (R2.4 to R2.6). Reports that the gates write go to `validation/reports/`; the format rules for those are in `validation/reports/README.md`. The split is fixed: a fixture is an input a person can read and check against its source, a report is written by a tool and never by hand.
+This directory holds the public inputs of the engine validation gates G1 to G3 (04 Solver engine section 6): three toy games with their known answers, and one exploitability curve computed by a published reference implementation. Beside them sits the 169 by 169 preflop equity table (R2.20), an exact enumeration the repository computes itself. The gate inputs were written in session S05 as the red half of test-driven development (requirement identifier (R ID) R0.11), and S13 wired the engine behind the gate tests that read them (R2.4 to R2.6). Reports that the gates write go to `validation/reports/`; the format rules for those are in `validation/reports/README.md`. The split is fixed: a fixture is an input a person can read and check against its source, a report is written by a tool and never by hand.
 
-Two rules bound what may be in here. Only toy games and published vectors enter this directory; nothing derived from any reference tool does (open question identifier (O-ID) O-26, architecture decision record (ADR) 0017, ADR 0021). And every number names its source, so a reviewer can go from a fixture value to the paper, the planning document or the run that produced it without trusting the person who typed it.
+Two rules bound what may be in here. Only toy games, published vectors and exact enumerations from the rules of hold'em enter this directory; nothing derived from any reference tool does (open question identifier (O-ID) O-26, architecture decision record (ADR) 0017, ADR 0021). And every number names its source, so a reviewer can go from a fixture value to the paper, the planning document or the run that produced it without trusting the person who typed it.
 
 ## Layout
 
@@ -13,7 +13,8 @@ Two rules bound what may be in here. Only toy games and published vectors enter 
 | `toy-games/leduc.json` | Leduc hold'em as OpenSpiel defines it, pointing at the committed curve and carrying the O-79 tolerance (gate G3, R2.6) | `tools/validate` |
 | `openspiel/leduc_curve.py` | The script that produced the curve: plain counterfactual regret minimization (CFR) from OpenSpiel on `leduc_poker`, measuring exploitability at fixed checkpoints | a person regenerating the curve |
 | `openspiel/leduc_exploitability.json` | The curve: one row per checkpoint iteration with exploitability and NashConv, plus the final average policy value (O-30) | `tools/validate` G3 |
-| `openspiel/PROVENANCE.md` | Version, exact command, seed, container digest, date and machine of the run that wrote the JSON (JavaScript Object Notation) file | a reviewer |
+| `openspiel/PROVENANCE.md` | Version, exact command, seed, container digest, date and machine of the run that wrote the JSON (JavaScript Object Notation) file, plus the O-128 erratum on its generator block | a reviewer |
+| `equity/` | `preflop-169.json`, the 169 by 169 preflop all-in equity table and its combo pair counts (R2.20, O-126), and `PROVENANCE.md`, the method, evaluator, commit, machine, elapsed time and spot-check values of the one run that wrote it | `tools/validate/tests/equity_table.rs`; S16 reads `equity` and `pairs` |
 
 Two more vectors of R0.11 are not here: the bucket-edge table (25, 50, 75, 110 and 150 percent of pot, upper edge inclusive, all-in separate, ADR 0008) and the node-key round trip. Both are `gto-model` vectors and live in `crates/gto-model`, written red first by S12 inside its own session (09 section 3), so S12 does not wait for S05.
 
@@ -21,7 +22,7 @@ Two more vectors of R0.11 are not here: the bucket-edge table (25, 50, 75, 110 a
 
 The loader lives in `tools/validate/src/fixtures/`. serde parses each file into a struct whose field set is closed (`deny_unknown_fields`), so a misspelled or extra field fails the parse instead of being ignored. The loader then checks the `schema_version` against the one it reads (1) and runs structural checks: at least one case, unique case and fact identifiers, and every `source` reference resolving to an entry of `sources`. A file that passes is returned as a fresh value; nothing is mutated afterwards.
 
-`tools/validate/tests/gates.rs` holds the tests. The `r0_11_*` tests are green: they load every file here and check the fields above, so a broken fixture fails continuous integration (CI) today. The `r2_4_*`, `r2_5_*` and `r2_6_*` tests are pending, each ignored with its R ID, and their bodies are the pass rules written as assertions against two helpers that S13 replaces with calls into the engine through `gto-solve`.
+`tools/validate/tests/gates.rs` holds the tests. The `r0_11_*` tests load every file here and check the fields above, so a broken fixture fails continuous integration (CI). The `r2_4_*`, `r2_5_*` and `r2_6_*` tests are the gates: their bodies are the pass rules written as assertions against two helpers that call `validate::gates`, which solves each game through `gto-solve`, the same code path `just gates` writes the reports in `validation/reports/` from.
 
 ## Toy-game schema, `schema_version` 1
 
@@ -84,7 +85,7 @@ Two range-level ratios follow. Bluffs as a share of all bets are b divided by (1
 | `pot1-bet-half` | 1/2 | 1/3 | 1/3 | 1/4 | 2/3 |
 | `pot1-bet-pot` | 1 | any value in [0, 1/2] | 0 | up to 1/3 | 1/2 |
 
-At B equal to P the closed form for c reaches 0, and there the Q indifference no longer pins b: every b in [0, 1/2] with c equal to 0 is an equilibrium. The file records that case with `segment` facts, and only the defense share of 1/2 is pinned there. The numbers 04 section 6 states for a pot-sized polar bet, bluffs are 1/3 of the betting range and the caller defends half of the bluff catchers, are unique in the polar river toy game, where player 1 holds the nuts or air in equal measure and player 0 holds only bluff catchers. That game is the case `polar-river-pot-bet`: with equal nuts and air, betting air half the time makes bluffs one third of the bets, and the bluff catchers call half the time. The engine models Kuhn and AKQ today, so S13 either adds the polar toy as a game or derives it from AKQ with asymmetric range weights. The G2 tolerance is 0.5 percentage points, which is 0.005 in frequency units, from 04 section 6 and R2.5.
+At B equal to P the closed form for c reaches 0, and there the Q indifference no longer pins b: every b in [0, 1/2] with c equal to 0 is an equilibrium. The file records that case with `segment` facts, and only the defense share of 1/2 is pinned there. The numbers 04 section 6 states for a pot-sized polar bet, bluffs are 1/3 of the betting range and the caller defends half of the bluff catchers, are unique in the polar river toy game, where player 1 holds the nuts or air in equal measure and player 0 holds only bluff catchers. That game is the case `polar-river-pot-bet`: with equal nuts and air, betting air half the time makes bluffs one third of the bets, and the bluff catchers call half the time. AKQ cannot stand in for it, because AKQ's card removal ties the bettor's range to the caller's card, so S13 added a small game of its own, `PolarRiver` in `gto_solve::toy`: player 1 holds air or the nuts with weight 1 each, player 0 holds one bluff catcher, there is no card removal, and the tree and payoffs are AKQ's (a check shows down for P/2, a call for P/2 plus B, a fold gives player 1 P/2). At P equal to B its equilibrium is unique: bet the nuts always, bet air half the time, call half the time. The G2 tolerance is 0.5 percentage points, which is 0.005 in frequency units, from 04 section 6 and R2.5.
 
 ### Leduc hold'em (G3, R2.6)
 
@@ -102,11 +103,11 @@ G3 compares curves, not a single value (04 section 6, O-30). The `game_value` in
 
 Units and the measure. Every chip figure uses the game's own ante as the unit, 1 chip in Kuhn and Leduc, 1/2 chip in the AKQ cases with a dead pot of 1. OpenSpiel's `exploitability` is `nash_conv` divided by the number of players: the mean of the two players' best-response gains. The vendored engine's `ExploitReport.chips` is the sum of the two gains, which is NashConv in a zero-sum game. The curve records both fields, so the G3 comparison is either the engine's `chips` divided by 2 against `exploitability`, or the engine's `chips` against `nash_conv` with the absolute part of the tolerance doubled. The fixture's `curve.measure` names `exploitability`, and the pending R2.6 test expects the mean. For G1 the fixture's `exploitability_max` applies to the engine's reported sum, the stricter reading.
 
-Matching the solver. The curve comes from plain CFR: simultaneous updates for both players, uniform averaging, no regret-matching-plus floor, no discounting. A run of discounted CFR (DCFR) converges faster and would sit below the curve at most checkpoints, which the 10 percent relative rule would reject. S13 therefore runs the engine with its discounting and floors switched off for G3, in one continuous run that reads the average strategy at 1, 10, 100, 1000 and 5000 iterations.
+Matching the solver. The curve comes from plain CFR as OpenSpiel's `CFRSolver` runs it: alternating updates (player 0's regrets and policy first, then player 1 against that updated policy), uniform averaging, no regret-matching-plus floor, no discounting. A run of discounted CFR (DCFR) converges faster and would sit below the curve at most checkpoints, which the 10 percent relative rule would reject, and the engine's own solver cannot switch its discounting off (O-124). G3 therefore runs the reference traversal `gto_solve::toy::plain_cfr` over the engine's Leduc model in one continuous run that reads the average strategy at 1, 10, 100, 1000 and 5000 iterations, and the engine's best-response calculator measures it; the engine's DCFR curve on the same model is reported for information only. The fixture first recorded simultaneous updates; the O-128 erratum in `openspiel/PROVENANCE.md` explains the correction, which changed no number.
 
 ## Regenerating the OpenSpiel curve
 
-The committed JSON is never edited by hand. To change it, rerun the script, commit what it wrote, and update `openspiel/PROVENANCE.md` with the new version, command, digest, date and machine. The OpenSpiel wheel on PyPI (the Python Package Index) is built for Linux only, so on the Windows machine the run happens inside a Linux container with this directory mounted at `/out`. The exact command of the committed run is in `openspiel/PROVENANCE.md`; the shape is:
+The committed JSON's numbers are never edited by hand; the one hand edit so far is the O-128 correction of the `alternating_updates` field in its generator block, recorded in `openspiel/PROVENANCE.md`. To change it, rerun the script, commit what it wrote, and update `openspiel/PROVENANCE.md` with the new version, command, digest, date and machine. The OpenSpiel wheel on PyPI (the Python Package Index) is built for Linux only, so on the Windows machine the run happens inside a Linux container with this directory mounted at `/out`. The exact command of the committed run is in `openspiel/PROVENANCE.md`; the shape is:
 
 ```text
 docker run --rm -v "<absolute path of validation/fixtures>:/out" python:3.12-slim sh -c "pip install --quiet open_spiel==2.0.2 && python -I /out/openspiel/leduc_curve.py --out /out/openspiel/leduc_exploitability.json --seed 20261020"
@@ -119,6 +120,22 @@ uv run --python 3.12 --with open_spiel==2.0.2 validation/fixtures/openspiel/ledu
 ```
 
 The script accepts `--checkpoints 1,10,100` to change the schedule; a changed schedule changes what G3 checks, so `CURVE_ITERATIONS` in `tools/validate/tests/gates.rs` must follow. Plain CFR is deterministic, so a rerun at the same OpenSpiel version reproduces every number exactly; a different version may move the later checkpoints slightly and is a reason to record a new provenance note.
+
+## Preflop equity table: `equity/preflop-169.json` (R2.20, O-126)
+
+`gto_solve::equity` enumerates, for every disjoint ordered pair of hole-card combos, every five-card board from the 48 cards left, C(48, 5) = 1,712,304 boards, and scores each showdown with the vendored engine's seven-card evaluator `eval7`. To keep that tractable it first groups the 1,624,350 disjoint ordered combo pairs into classes that are equal under the 24 suit permutations, enumerates one representative per class with rayon across the cores, and weights each by its multiplicity; it then sums the combo-pair results into the 169 by 169 hand-class grid. `tools/validate` only serialises the result, so it names no engine type.
+
+The file, `schema_version` 1:
+
+| Field | Meaning |
+|---|---|
+| `classes` | The 169 hand-class labels in `gto_model::HandClass` index order, `AA` at 0 to `32o` at 168. |
+| `equity` | `equity[i][j]` is (wins plus ties / 2) divided by total for hero class `i` against villain class `j`, over every disjoint combo pair of the two classes and every board. |
+| `pairs` | `pairs[i][j]` is the number of disjoint ordered combo pairs behind `equity[i][j]`, so a range-weighted equity stays exact. |
+| `method`, `evaluator`, `boards_per_pair` | The enumeration method, the evaluator (the vendored `eval7`) and 1,712,304. |
+| `generated_at`, `commit` | When the run wrote the file and the commit it ran at. |
+
+The table is generated once, on the Zenbook in release mode with `just equity-table` (`cargo run --release -p validate -- equity-table --out validation/fixtures/equity/preflop-169.json`), because the enumeration is about 1.6e11 evaluator calls; continuous integration never regenerates it and only runs the tests against the committed file. `equity/PROVENANCE.md` records the method, the evaluator, the commit, the machine, the elapsed time and the spot-check values of that run. The tests in `tools/validate/tests/equity_table.rs` check that the table is symmetric (`equity[i][j]` plus `equity[j][i]` is 1 within 1e-12, the diagonal is 0.5, `pairs` is symmetric and agrees with the 6, 4 and 12 combos of a pair, a suited and an offsuit class), that three class pairs regenerated through the library match the committed entries exactly, and that spot values hold: AA against KK in [0.81, 0.83], 22 against AKs in [0.49, 0.52], QQ against AKo in [0.56, 0.58], plus AsAh against KdKc enumerated by a plain loop. S16 reads `equity` and `pairs`.
 
 ## Later fixtures, names reserved by O-87
 
@@ -133,4 +150,4 @@ A later fixture follows the same two rules as the files above: it carries a `sch
 
 ## Ownership
 
-S05 wrote this directory and the loader. S13 consumes it, turns the pending gate tests green and writes the G1 to G3 reports under `validation/reports/`. S12 owns the two `gto-model` vectors named above.
+S05 wrote this directory and the loader. S13 consumes it, turned the pending gate tests green, writes the G1 to G3 reports under `validation/reports/`, added `equity/` and corrected the curve's generator metadata (O-128). S12 owns the two `gto-model` vectors named above.

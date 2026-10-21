@@ -10,8 +10,8 @@
 //! (counterfactual regret minimization) with alternating updates, uniform averaging,
 //! no discounting and no regret floor (O-109, O-124). Alternating, not simultaneous:
 //! `OpenSpiel`'s `CFRSolver` passes `alternating_updates=True` to its base solver, so
-//! that is what produced the curve, although the fixture's `generator` block records
-//! `alternating_updates` false (see `gto_solve::toy::plain_cfr`). Measure (O-108): exploitability
+//! that is what produced the curve; the fixture's `generator` block records it since the
+//! O-128 correction (see `gto_solve::toy::plain_cfr`). Measure (O-108): exploitability
 //! is `(gain_0 + gain_1) / 2`, `CurvePoint::exploitability.mean_chips`. Pass rule
 //! (O-79): at every checkpoint `|engine - fixture| <= max(curve_abs, curve_rel *
 //! fixture)`, allowed errors 0.2374, 0.0889, 0.00957, 0.00118 and 0.001. Report only:
@@ -45,9 +45,8 @@ const UNIT: &str = "chips";
 const COMPARED_MEASURE: &str = "exploitability";
 /// How the judged curve was produced, for the report's notes.
 const MODE_LINE: &str = "plain CFR: alternating updates as OpenSpiel's CFRSolver runs them \
-                         (the fixture's generator block records alternating_updates false), \
-                         uniform averaging, no discounting, no regret floor; exploitability = \
-                         NashConv / 2 per O-108, O-109";
+                         (O-128), uniform averaging, no discounting, no regret floor; \
+                         exploitability = NashConv / 2 per O-108, O-109";
 
 /// The plain CFR curve on the Leduc model: the mean gain in chips at each requested
 /// iteration, one continuous run.
