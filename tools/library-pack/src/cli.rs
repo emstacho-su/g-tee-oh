@@ -8,6 +8,9 @@
 //!   compares;
 //! - `library-pack estimate --seed <n> [--out <file>]` writes the size estimate, by default
 //!   to `ESTIMATE_REPORT_PATH`;
+//! - `library-pack synthetic --seed <n> --nodes <n> --out <file> [--pure-share <f>]
+//!   [--range-fraction <f>] [--min-actions <n>] [--max-actions <n>] [--exported-at <ts>]`
+//!   writes a seeded synthetic preflop dump that `pack` accepts (O-149);
 //! - `library-pack --version` prints `library-pack <version>`.
 //!
 //! Mechanism: clap parses the arguments; help and version go to `out` with `EXIT_OK`, and
@@ -29,6 +32,10 @@ use crate::convert::PackOptions;
 use crate::error::{EXIT_OK, EXIT_USAGE, PackError};
 use crate::estimate::{ESTIMATE_REPORT_PATH, estimate};
 use crate::pack::{check_dump_file, pack, verify};
+use crate::synthetic::{
+    DEFAULT_ACTIONS, DEFAULT_PURE_SHARE, DEFAULT_RANGE_FRACTION, SYNTHETIC_EXPORTED_AT,
+    SyntheticOptions, write_synthetic_dump,
+};
 
 /// Converts node dumps into the solutions library format and checks them (R2.8).
 #[derive(Debug, Parser)]
@@ -70,6 +77,49 @@ enum Command {
         #[arg(long, default_value = ESTIMATE_REPORT_PATH)]
         out: PathBuf,
     },
+    /// Writes a seeded synthetic preflop dump that `pack` accepts (O-149); never a solve.
+    Synthetic(SyntheticArgs),
+}
+
+#[derive(Debug, Args)]
+struct SyntheticArgs {
+    /// The generator seed.
+    #[arg(long)]
+    seed: u64,
+    /// How many preflop nodes, each with a distinct key.
+    #[arg(long)]
+    nodes: usize,
+    /// The dump file to write.
+    #[arg(long)]
+    out: PathBuf,
+    /// The share of hands that play one action at frequency 1, in [0, 1].
+    #[arg(long, default_value_t = DEFAULT_PURE_SHARE)]
+    pure_share: f64,
+    /// The share of the 169 classes each node holds, in (0, 1].
+    #[arg(long, default_value_t = DEFAULT_RANGE_FRACTION)]
+    range_fraction: f64,
+    /// The fewest actions per node.
+    #[arg(long, default_value_t = DEFAULT_ACTIONS.0)]
+    min_actions: u8,
+    /// The most actions per node.
+    #[arg(long, default_value_t = DEFAULT_ACTIONS.1)]
+    max_actions: u8,
+    /// The dump's `exported_at` timestamp, YYYY-MM-DDTHH:MM:SSZ.
+    #[arg(long, default_value = SYNTHETIC_EXPORTED_AT)]
+    exported_at: String,
+}
+
+impl SyntheticArgs {
+    fn options(&self) -> SyntheticOptions {
+        SyntheticOptions {
+            seed: self.seed,
+            nodes: self.nodes,
+            pure_share: self.pure_share,
+            range_fraction: self.range_fraction,
+            actions: (self.min_actions, self.max_actions),
+            exported_at: self.exported_at.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -152,6 +202,11 @@ fn execute(command: &Command) -> Result<String, PackError> {
             let report = estimate(*seed)?.to_markdown();
             write_report(out, &report)?;
             Ok(format!("wrote the size estimate for seed {seed} to {}", out.display()))
+        }
+        Command::Synthetic(args) => {
+            let nodes = write_synthetic_dump(&args.out, &args.options())?;
+            let (seed, out) = (args.seed, args.out.display());
+            Ok(format!("wrote {nodes} synthetic preflop nodes for seed {seed} to {out}"))
         }
     }
 }
