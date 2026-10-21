@@ -2,6 +2,19 @@
   "schema_version": 1,
   "cases": [
     { "file": "valid/example.json", "accept": true, "rules": [] },
-    { "file": "invalid/frequency-sum-off-by-0-0011.json", "accept": false, "rules": [2] }
+    { "file": "valid/frequency-sum-off-by-0-0009.json", "accept": true, "rules": [] },
+    { "file": "valid/no-config-id-no-reach.json", "accept": true, "rules": [] },
+    { "file": "invalid/duplicate-hand.json", "accept": false, "rules": [4] },
+    { "file": "invalid/duplicate-token.json", "accept": false, "rules": [4] },
+    { "file": "invalid/frequencies-for-two-of-three-actions.json", "accept": false, "rules": [1] },
+    { "file": "invalid/frequency-sum-below-by-0-0011.json", "accept": false, "rules": [2] },
+    { "file": "invalid/frequency-sum-off-by-0-0011.json", "accept": false, "rules": [2] },
+    { "file": "invalid/hand-label-combo-in-preflop-space.json", "accept": false, "rules": [3] },
+    { "file": "invalid/hand-label-low-rank-first.json", "accept": false, "rules": [3] },
+    { "file": "invalid/hand-label-suited-pair.json", "accept": false, "rules": [3] },
+    { "file": "invalid/missing-ev-for-an-action.json", "accept": false, "rules": [1] },
+    { "file": "invalid/missing-exported-at.json", "accept": false, "rules": [5] },
+    { "file": "invalid/missing-stake-label.json", "accept": false, "rules": [5] },
+    { "file": "invalid/unknown-hand-space.json", "accept": false, "rules": [5] }
   ]
 }

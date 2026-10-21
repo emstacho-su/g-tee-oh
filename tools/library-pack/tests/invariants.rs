@@ -24,7 +24,7 @@ const EXAMPLE_DUMP: &str = include_str!(concat!(
 const CORPUS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../validation/fixtures/node-dump");
 
 fn example() -> Value {
-    serde_json::from_str(EXAMPLE_DUMP).expect("the example is JSON")
+    serde_json::from_str(EXAMPLE_DUMP).expect("the example is JSON (JavaScript Object Notation)")
 }
 
 /// Every violation the tool finds in a dump: parse errors, invariants and structure.

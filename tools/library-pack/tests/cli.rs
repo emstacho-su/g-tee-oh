@@ -32,7 +32,11 @@ fn r2_8_cli_exit_codes_0_1_2() {
     assert_ne!(bad, example, "the edit applies");
     let bad_path = scratch.path().join("bad.json");
     fs::write(&bad_path, bad).expect("write");
-    let rejected = run(&["check", "--dump", bad_path.to_str().expect("a UTF-8 path")]);
+    let rejected = run(&[
+        "check",
+        "--dump",
+        bad_path.to_str().expect("a path in UTF-8 (Unicode Transformation Format, 8-bit)"),
+    ]);
     assert_eq!(code(&rejected), Some(1), "a rejected dump exits 1");
     let stderr = String::from_utf8_lossy(&rejected.stderr);
     assert!(stderr.contains("72o"), "the sentence names the hand: {stderr}");

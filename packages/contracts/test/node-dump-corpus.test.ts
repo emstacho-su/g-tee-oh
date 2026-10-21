@@ -40,6 +40,9 @@ function corpusCases(): readonly CorpusCase[] {
   return cases;
 }
 
+/** The criterion 2 rules of node-dump.ts, each of which the corpus must exercise. */
+const RULE_NUMBERS = [1, 2, 3, 4, 5] as const;
+
 describe("R2.8 the TypeScript checker agrees with the corpus", () => {
   for (const corpusCase of corpusCases()) {
     it(`R2.8 ${corpusCase.file} is ${corpusCase.accept ? "accepted" : "rejected"}`, () => {
@@ -47,4 +50,13 @@ describe("R2.8 the TypeScript checker agrees with the corpus", () => {
       expect(violations.length === 0).toBe(corpusCase.accept);
     });
   }
+
+  it("R2.8 the corpus rejects a dump for each of rules 1 to 5 and marks accepts rule-free", () => {
+    const cases = corpusCases();
+    const broken = new Set(cases.flatMap((corpusCase) => corpusCase.rules));
+    expect([...broken].sort((a, b) => a - b)).toEqual([...RULE_NUMBERS]);
+    for (const corpusCase of cases) {
+      expect(corpusCase.rules.length === 0).toBe(corpusCase.accept);
+    }
+  });
 });
