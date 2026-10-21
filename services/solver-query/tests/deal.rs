@@ -13,6 +13,7 @@ use gto_library::HandSpace;
 use gto_model::{Card, ComboId, NodeKey, Position};
 use serde_json::{Value, json};
 use solver_query::api::deal::Hex64;
+use solver_query::rng::SplitMix64;
 
 use common::equity::CLASSES;
 use common::plant::{
@@ -209,8 +210,78 @@ async fn r2_13_hex64_round_trips() {
     assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
 }
 
+/// The reference program's first outputs for seed 1234567: Sebastiano Vigna's
+/// `splitmix64.c` (public domain, `https://prng.di.unimi.it/splitmix64.c`), the seed the
+/// `rand_xoshiro` crate's reference test quotes; recomputed with an independent
+/// arbitrary-precision script before being pinned here (plan C.4).
+const SPLITMIX64_REFERENCE_SEED: u64 = 1_234_567;
+const SPLITMIX64_REFERENCE_OUTPUTS: [u64; 4] = [
+    6_457_827_717_110_365_317,
+    3_203_168_211_198_807_973,
+    9_817_491_932_198_370_423,
+    4_593_380_528_125_082_431,
+];
+
 #[test]
-#[ignore = "R2.13: rng.rs (SplitMix64 with the published reference vectors) lands with lane C"]
 fn r2_13_rng_splitmix64_reference_vectors() {
-    unimplemented!("seed 1234567 gives 6457827717110365317, 3203168211198807973, ... (plan C.4)");
+    let mut generator = SplitMix64::new(SPLITMIX64_REFERENCE_SEED);
+    for (position, expected) in SPLITMIX64_REFERENCE_OUTPUTS.iter().enumerate() {
+        assert_eq!(generator.next_u64(), *expected, "output {position}");
+    }
+    let mut replay = SplitMix64::new(SPLITMIX64_REFERENCE_SEED);
+    assert_eq!(replay.next_u64(), SPLITMIX64_REFERENCE_OUTPUTS[0], "a seed replays");
+}
+
+/// A spot-class key of the planted configuration (online, 100 bb) for the pair.
+fn class_key(family: &str) -> String {
+    format!("preflop/online/100/{family}/{PAIR}")
+}
+
+/// A deal request for `seed` starting at a spot-class key.
+fn class_body(seed: &str, key: &str) -> Value {
+    let mut body = deal_body(seed, None, None);
+    body["filter"]["spot_class_key"] = Value::from(key);
+    body
+}
+
+#[tokio::test]
+async fn r2_13_deal_resolves_a_spot_class_key_through_the_candidate_lines() {
+    let planted = deal_solution();
+    let router = planted.router();
+    let root_key = NodeKey::preflop(planted.config_id.clone(), planted.pair, vec![]).to_string();
+    let line_key = NodeKey::preflop(planted.config_id.clone(), planted.pair, line(250)).to_string();
+
+    let (status, _, json) = deal(router.clone(), &class_body(SEED, &class_key("rfi"))).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["start_node_key"], root_key, "{json}");
+    assert_eq!(json["hero_position"], "BTN", "{json}");
+    let by_root = deal(router.clone(), &deal_body(SEED, None, None)).await.2;
+    assert_eq!(json, by_root, "the class resolves to the root, so it is the same deal");
+
+    let (status, _, json) =
+        deal(router.clone(), &class_body(SEED, &class_key("facing-open"))).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["start_node_key"], line_key, "{json}");
+    assert_eq!(json["hero_position"], "BB", "{json}");
+
+    let (status, headers, json) =
+        deal(router.clone(), &class_body(SEED, &class_key("facing-3bet"))).await;
+    assert_problem(status, &headers, &json, StatusCode::NOT_FOUND, "not-found");
+
+    let other_pair = "preflop/online/100/rfi/BB-CO";
+    let (status, headers, json) = deal(router.clone(), &class_body(SEED, other_pair)).await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
+    let live = "preflop/live/100/rfi/BB-BTN";
+    let (status, headers, json) = deal(router.clone(), &class_body(SEED, live)).await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
+    let (status, headers, json) = deal(router.clone(), &class_body(SEED, "bogus")).await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
+
+    let mut both = class_body(SEED, &class_key("rfi"));
+    both["filter"]["line"] = Value::from("r250");
+    let (status, headers, json) = deal(router.clone(), &both).await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
+
+    let (status, headers, json) = reveal(router, "not-a-uuid", "flop").await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
 }

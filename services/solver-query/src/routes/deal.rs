@@ -1,12 +1,17 @@
-//! `POST /v1/deal` and `GET /v1/deal/{id}/reveal` (A5 section 2, R2.13, O-152). Stubs
-//! until the seeded deal of plan C.4 lands: both answer 501 with a problem body.
+//! `POST /v1/deal` and `GET /v1/deal/{id}/reveal` (A5 section 2, R2.13, O-145, O-152).
+//! The handlers are thin: `deal::resolve_start` turns the filter into a start node through
+//! the registry, `Deal::make` is the pure deal of plan C.4, and the store holds the deal
+//! and reveals one street at a time. No board card is in the deal answer (A5 rule two).
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use gto_library::is_uuid;
+use gto_model::Street;
 
-use crate::api::deal::{DealRequest, DealResponse, RevealQuery, RevealResponse};
+use crate::api::deal::{DealRequest, DealResponse, RevealQuery, RevealResponse, Revealed};
 use crate::api::problem::Problem;
 use crate::app::AppState;
+use crate::deal::{Deal, resolve_start};
 use crate::error::ApiError;
 
 /// Deals a scenario from a seed: the start node, both hands and the solutions in play.
@@ -14,7 +19,10 @@ use crate::error::ApiError;
 ///
 /// # Errors
 ///
-/// A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+/// `ApiError::BadRequest` for a configuration, pair, street, line, spot-class key or seed
+/// that does not parse, or a filter v1 does not take (a texture, a street other than
+/// preflop); `ApiError::NotFound` when no solution of the pair holds the start node;
+/// `ApiError::Unavailable` when a solution of the pair is marked unavailable.
 #[utoipa::path(
     post,
     path = "/v1/deal",
@@ -32,10 +40,30 @@ use crate::error::ApiError;
     )
 )]
 pub async fn deal(
-    State(_state): State<AppState>,
-    Json(_request): Json<DealRequest>,
+    State(state): State<AppState>,
+    Json(request): Json<DealRequest>,
 ) -> Result<Json<DealResponse>, ApiError> {
-    Err(ApiError::NotImplemented)
+    let start = resolve_start(&state.library, &request.filter).await?;
+    let made = Deal::make(request.seed, start).map_err(|err| {
+        ApiError::Internal(format!("the shuffled deck dealt a repeated card: {err}"))
+    })?;
+    let (held, revealed) = state.deals.hold(made);
+    Ok(Json(response(&held, revealed)))
+}
+
+/// The deal answer: the start, both hands and the streets revealed so far, never the
+/// board itself.
+fn response(deal: &Deal, revealed: Revealed) -> DealResponse {
+    DealResponse {
+        deal_id: deal.id.clone(),
+        solution_ids: deal.solution_ids.clone(),
+        start_node_key: deal.start_key.to_string(),
+        hero_position: deal.hero.as_str().to_owned(),
+        villain_position: deal.villain.as_str().to_owned(),
+        hero_hand: deal.hero_hand.to_string(),
+        villain_hand: deal.villain_hand.to_string(),
+        revealed,
+    }
 }
 
 /// Reveals the next street of a deal: the flop first, then the turn, then the river. A
@@ -43,7 +71,10 @@ pub async fn deal(
 ///
 /// # Errors
 ///
-/// A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+/// `ApiError::BadRequest` for an id that is not a lowercase UUID or a street other than
+/// flop, turn or river; `ApiError::NotFound` for a deal the store does not hold (post the
+/// seed and filter again to recreate it); `ApiError::Conflict` for a street revealed out
+/// of order.
 #[utoipa::path(
     get,
     path = "/v1/deal/{id}/reveal",
@@ -64,9 +95,22 @@ pub async fn deal(
     )
 )]
 pub async fn reveal(
-    State(_state): State<AppState>,
-    Path(_id): Path<String>,
-    Query(_query): Query<RevealQuery>,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<RevealQuery>,
 ) -> Result<Json<RevealResponse>, ApiError> {
-    Err(ApiError::NotImplemented)
+    if !is_uuid(&id) {
+        return Err(ApiError::BadRequest(format!(
+            "deal id {} is not a lowercase UUID",
+            ApiError::quoted(&id)
+        )));
+    }
+    let street: Street = query.street.parse()?;
+    let revealed = state.deals.reveal(&id, street)?;
+    Ok(Json(RevealResponse {
+        deal_id: id,
+        street: street.to_string(),
+        cards: revealed.cards.iter().map(ToString::to_string).collect(),
+        board: revealed.board,
+    }))
 }
