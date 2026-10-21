@@ -178,3 +178,35 @@ fn r2_9_same_pct_bucket_is_rejected() {
     let err = TreeConfig::from_spec(&support::spec(&json)).expect_err("the spec repeats small");
     assert!(matches!(err, TreeError::SameBucket { bucket: Bucket::Small, .. }), "{err:?}");
 }
+
+/// Tables for one street with the donk table set and the bet table empty, the rest default.
+fn donk_only(street: Street, donk: SizeTable) -> PlayerSizes {
+    let tables = StreetSizes { donk, ..StreetSizes::default() };
+    match street {
+        Street::Flop => PlayerSizes { flop: tables, ..PlayerSizes::default() },
+        Street::Turn => PlayerSizes { turn: tables, ..PlayerSizes::default() },
+        _ => PlayerSizes { river: tables, ..PlayerSizes::default() },
+    }
+}
+
+/// R2.9: an OOP donk table set beside an empty OOP bet table is rejected on any street,
+/// naming the street, whether the table holds sizes or only an all-in, while the same
+/// shape for IP passes because IP never leads from a donk table (O-137).
+#[test]
+fn r2_9_oop_donk_without_bet_is_rejected() {
+    let sized = SizeTable::new(&[2_500], false).expect("a non-zero size");
+    let jam_only = SizeTable::new(&[], true).expect("an all-in alone");
+    for street in [Street::Flop, Street::Turn, Street::River] {
+        for donk in [sized.clone(), jam_only.clone()] {
+            let oop = donk_only(street, donk.clone());
+            let err = TreeConfig::new(oop, PlayerSizes::default(), 3, 6_700)
+                .expect_err("OOP could not lead on the root street");
+            assert_eq!(err, TreeError::DonkWithoutBet { street }, "{street} {donk:?}");
+            let ip = donk_only(street, donk);
+            assert!(TreeConfig::new(PlayerSizes::default(), ip, 3, 6_700).is_ok(), "{street}");
+        }
+    }
+    let with_bet = StreetSizes { bet: sized.clone(), donk: sized, ..StreetSizes::default() };
+    let oop = PlayerSizes { flop: with_bet, ..PlayerSizes::default() };
+    assert!(TreeConfig::new(oop, PlayerSizes::default(), 3, 6_700).is_ok());
+}

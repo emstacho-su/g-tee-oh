@@ -143,8 +143,8 @@ impl PreflopTree {
 
     /// Every line that reaches the flop, in the depth-first order of the tree.
     #[must_use]
-    pub fn flop_lines(&self) -> Vec<PreflopLine> {
-        self.lines.clone()
+    pub fn flop_lines(&self) -> &[PreflopLine] {
+        &self.lines
     }
 }
 

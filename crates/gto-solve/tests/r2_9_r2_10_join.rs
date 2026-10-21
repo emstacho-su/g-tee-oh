@@ -63,8 +63,9 @@ fn r2_9_r2_10_seed_spec_tree_solves_and_hash_matches() {
     let preflop = PreflopTree::build(&spec, &config, pair).expect("the preflop tree builds");
     let line = preflop
         .flop_lines()
-        .into_iter()
+        .iter()
         .find(|line| line.text() == LINE_TEXT)
+        .cloned()
         .unwrap_or_else(|| panic!("no flop line {LINE_TEXT} for {pair}"));
     assert_eq!(line, common::opened_line(common::FLOP_POT, common::FLOP_STACK));
     assert_eq!(line.kind, LineKind::SingleRaised);

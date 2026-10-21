@@ -19,13 +19,12 @@ mod support;
 use gto_model::{ActionToken, Cbb, Position};
 use gto_tree::{LineKind, PreflopLine, PreflopTree};
 
-/// The flop lines of `pair` at configuration `config_id` under `spec_json`.
-fn flop_lines(spec_json: &str, config_id: &str, pair: &str) -> Vec<PreflopLine> {
+/// The preflop tree of `pair` at configuration `config_id` under `spec_json`.
+fn tree(spec_json: &str, config_id: &str, pair: &str) -> PreflopTree {
     let spec = support::spec(spec_json);
     let config = support::config(config_id);
     PreflopTree::build(&spec, &config, support::pair(pair))
         .unwrap_or_else(|err| panic!("{pair} at {config_id} builds: {err}"))
-        .flop_lines()
 }
 
 /// The (line text, flop pot, flop stack) of each line.
@@ -44,13 +43,14 @@ fn line<'a>(lines: &'a [PreflopLine], text: &str) -> &'a PreflopLine {
 /// R2.9: the online BB against BTN tree reaches the flop on exactly three lines.
 #[test]
 fn r2_9_preflop_shape_online_bb_btn() {
-    let lines = flop_lines(support::ONLINE_PLACEHOLDER_JSON, "cfg_6_online_100", "BB-BTN");
+    let tree = tree(support::ONLINE_PLACEHOLDER_JSON, "cfg_6_online_100", "BB-BTN");
+    let lines = tree.flop_lines();
     let expected = vec![
         ("r250.c".to_owned(), 550, 9_750),
         ("r250.r1000.c".to_owned(), 2_050, 9_000),
         ("r250.r1000.r2200.c".to_owned(), 4_450, 7_800),
     ];
-    let mut actual = shapes(&lines);
+    let mut actual = shapes(lines);
     actual.sort();
     assert_eq!(actual, expected);
 
@@ -58,7 +58,7 @@ fn r2_9_preflop_shape_online_bb_btn() {
         ["r250.c", "r250.r1000.c", "r250.r1000.r2200.c"]
             .iter()
             .map(|text| {
-                let found = line(&lines, text);
+                let found = line(lines, text);
                 (found.kind, found.aggressor)
             })
             .collect();
@@ -70,7 +70,7 @@ fn r2_9_preflop_shape_online_bb_btn() {
             (LineKind::FourBet, Some(Position::Btn)),
         ]
     );
-    let root = line(&lines, "r250.c").flop_root();
+    let root = line(lines, "r250.c").flop_root();
     assert_eq!((root.pot, root.stack), (Cbb(550), Cbb(9_750)));
 }
 
@@ -79,7 +79,8 @@ fn r2_9_preflop_shape_online_bb_btn() {
 /// in position and the 2.2x 4-bet.
 #[test]
 fn r2_9_preflop_shape_online_sb_bb() {
-    let lines = flop_lines(support::ONLINE_PLACEHOLDER_JSON, "cfg_6_online_100", "SB-BB");
+    let tree = tree(support::ONLINE_PLACEHOLDER_JSON, "cfg_6_online_100", "SB-BB");
+    let lines = tree.flop_lines();
     let expected = [
         ("l.x", 200, LineKind::Limped),
         ("l.r400.c", 800, LineKind::SingleRaised),
@@ -88,18 +89,19 @@ fn r2_9_preflop_shape_online_sb_bb() {
         ("r250.r750.r1650.c", 3_300, LineKind::FourBet),
     ];
     for (text, pot, kind) in expected {
-        let found = line(&lines, text);
+        let found = line(lines, text);
         assert_eq!((found.flop_pot, found.kind), (Cbb(pot), kind), "{text}");
     }
-    assert_eq!(line(&lines, "l.x").aggressor, None);
+    assert_eq!(line(lines, "l.x").aggressor, None);
 }
 
 /// R2.9: at live 1/3 the folded SB leaves 33 cbb of dead money, so BTN's 4 bb open called
 /// by the BB reaches the flop with 833 cbb.
 #[test]
 fn r2_9_preflop_live_1_3_small_blind_rounds() {
-    let lines = flop_lines(support::LIVE_PLACEHOLDER_JSON, "cfg_9_live_13_100", "BB-BTN");
-    let found = line(&lines, "r400.c");
+    let tree = tree(support::LIVE_PLACEHOLDER_JSON, "cfg_9_live_13_100", "BB-BTN");
+    let lines = tree.flop_lines();
+    let found = line(lines, "r400.c");
     assert_eq!((found.flop_pot, found.flop_stack), (Cbb(833), Cbb(9_600)));
 }
 

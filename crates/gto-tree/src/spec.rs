@@ -15,6 +15,11 @@
 //! bet carries no all-in unless `bet_allin` says so, the raise cap is
 //! `DEFAULT_RAISE_CAP`, the all-in threshold is `DEFAULT_ALLIN_THRESHOLD_BP`, there are no
 //! donk sizes, and limps come only from the small blind unless `limp_positions` names seats.
+//! The integer fields `raise_cap` and `spec_version` also take an integer-valued float such
+//! as `3.0`, which Postgres `jsonb` hands back for a row written that way, and refuse null,
+//! as the schema's `integer` type does (`integer`, O-132).
+
+mod integer;
 
 use gto_model::Position;
 use serde::{Deserialize, Serialize};
@@ -29,8 +34,9 @@ pub const SPEC_VERSION: u32 = 1;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SizingConventionSpec {
-    /// The spec version, `SPEC_VERSION` when absent.
+    /// The spec version, `SPEC_VERSION` when absent; an integer or an integer-valued float.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "integer::whole")]
     pub spec_version: Option<u32>,
     /// The configuration identifier a seed placeholder row stands in for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -85,8 +91,10 @@ pub struct PostflopSpec {
     /// True when an all-in raise is offered; `None` means true.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raise_allin: Option<bool>,
-    /// Raises allowed per street after the opening bet; `None` means `DEFAULT_RAISE_CAP`.
+    /// Raises allowed per street after the opening bet, an integer or an integer-valued
+    /// float; `None` means `DEFAULT_RAISE_CAP`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "integer::whole")]
     pub raise_cap: Option<u8>,
     /// A size that puts in at least this percent of the stack behind becomes an all-in;
     /// `None` means `DEFAULT_ALLIN_THRESHOLD_BP` (67 percent).

@@ -16,7 +16,7 @@ use std::fmt::Write as _;
 
 use gto_model::Street;
 use gto_tree::{
-    Player, PlayerSizes, SizeKind, SizeTable, StreetSizes, TREE_HASH_TAG, TreeConfig,
+    Player, PlayerSizes, SizeKind, SizeTable, StreetSizes, TREE_HASH_TAG, TreeConfig, TreeError,
     canonical_bytes, tree_hash, tree_hash_hex,
 };
 use proptest::prelude::*;
@@ -71,16 +71,23 @@ fn with_table(
     }
 }
 
-/// The configuration with `player`'s tables replaced.
-fn with_player(cfg: &TreeConfig, player: Player, sizes: PlayerSizes) -> TreeConfig {
+/// The configuration with `player`'s tables replaced, or `None` when they no longer form
+/// one: toggling the all-in of an OOP donk table beside an empty OOP bet table sets a donk
+/// table OOP could never lead from (`TreeError::DonkWithoutBet`).
+fn with_player(cfg: &TreeConfig, player: Player, sizes: PlayerSizes) -> Option<TreeConfig> {
     let (oop, ip) = match player {
         Player::Oop => (sizes, cfg.player(Player::Ip).clone()),
         Player::Ip => (cfg.player(Player::Oop).clone(), sizes),
     };
-    TreeConfig::new(oop, ip, cfg.raise_cap(), cfg.allin_threshold_bp()).expect("still valid")
+    match TreeConfig::new(oop, ip, cfg.raise_cap(), cfg.allin_threshold_bp()) {
+        Ok(changed) => Some(changed),
+        Err(TreeError::DonkWithoutBet { .. }) => None,
+        Err(err) => panic!("the changed tables no longer form a configuration: {err}"),
+    }
 }
 
-/// The mutated configuration, or `None` when the mutation would change nothing.
+/// The mutated configuration, or `None` when the mutation would change nothing or would
+/// leave no valid configuration.
 fn apply(cfg: &TreeConfig, mutation: &Mutation) -> Option<TreeConfig> {
     let oop = cfg.player(Player::Oop).clone();
     let ip = cfg.player(Player::Ip).clone();
@@ -92,7 +99,7 @@ fn apply(cfg: &TreeConfig, mutation: &Mutation) -> Option<TreeConfig> {
             let sizes = cfg.player(player);
             let table = sizes.street(street).expect("a postflop street").kind(kind);
             let toggled = SizeTable::new(table.sizes_bp(), !table.allin()).expect("same sizes");
-            Some(with_player(cfg, player, with_table(sizes, street, kind, toggled)))
+            with_player(cfg, player, with_table(sizes, street, kind, toggled))
         }
         Mutation::AddRaiseSize { player, street, size_bp } => {
             let sizes = cfg.player(player);
@@ -102,7 +109,7 @@ fn apply(cfg: &TreeConfig, mutation: &Mutation) -> Option<TreeConfig> {
             }
             let grown = [table.sizes_bp(), &[size_bp]].concat();
             let added = SizeTable::new(&grown, table.allin()).expect("non-zero sizes");
-            Some(with_player(cfg, player, with_table(sizes, street, SizeKind::Raise, added)))
+            with_player(cfg, player, with_table(sizes, street, SizeKind::Raise, added))
         }
         Mutation::SwapPlayers => {
             (oop != ip).then(|| TreeConfig::new(ip, oop, cap, threshold).expect("still valid"))

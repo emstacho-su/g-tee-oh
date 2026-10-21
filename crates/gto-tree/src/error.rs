@@ -38,6 +38,15 @@ pub enum TreeError {
         /// The bucket both sizes fall in.
         bucket: Bucket,
     },
+    /// Out of position (OOP) holds donk sizes but no bet sizes on a street. The donk table
+    /// applies only after a street the in-position player closed as the aggressor, never on
+    /// the root street, so from a root on that street OOP could not lead at all; the engine
+    /// refuses the same shape and the skeleton must not model it in silence (O-137).
+    #[error("OOP has donk sizes but no bet sizes on the {street}, so it could not lead there")]
+    DonkWithoutBet {
+        /// The street whose OOP donk table is set while its bet table is empty.
+        street: Street,
+    },
     /// Two sized actions at one node of the betting skeleton fall in one bucket (ADR 0020,
     /// O-137). Raises are bucketed by their raise-to total over the pot at the node.
     #[error("two sized actions after line {line:?} fall in the {bucket} bucket")]

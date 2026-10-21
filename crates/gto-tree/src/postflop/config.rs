@@ -8,6 +8,12 @@
 //! raise-to total over the pot at the node, outstanding bet included, which depends on the
 //! line, so raises are checked node by node when the skeleton is built.
 //!
+//! An out-of-position (OOP) donk table applies only after a street the in-position player
+//! closed as the aggressor, never on the root street, so an OOP donk table beside an empty
+//! OOP bet table would leave OOP unable to lead from a root on that street. The engine
+//! refuses that shape on its starting street; `TreeConfig::new` has no root, so it refuses
+//! it on every street (`TreeError::DonkWithoutBet`, O-137).
+//!
 //! Defaults for fields a spec leaves out follow O-136: raises are jam only, the raise cap
 //! is `DEFAULT_RAISE_CAP` and the all-in threshold is `DEFAULT_ALLIN_THRESHOLD_BP`, the
 //! engine's 67 percent of the stack behind.
@@ -194,7 +200,8 @@ impl TreeConfig {
     /// # Errors
     ///
     /// `TreeError::SameBucket` when two bet or two donk sizes of one table fall in one
-    /// bucket, and `TreeError::Spec` for an all-in threshold of zero or above 10,000 bp.
+    /// bucket, `TreeError::DonkWithoutBet` when OOP holds a donk table but no bet table on
+    /// a street, and `TreeError::Spec` for an all-in threshold of zero or above 10,000 bp.
     pub fn new(
         oop: PlayerSizes,
         ip: PlayerSizes,
@@ -208,6 +215,7 @@ impl TreeConfig {
         }
         check_buckets(Player::Oop, &oop)?;
         check_buckets(Player::Ip, &ip)?;
+        check_oop_lead(&oop)?;
         Ok(TreeConfig { oop, ip, raise_cap, allin_threshold_bp })
     }
 
@@ -308,6 +316,19 @@ impl PlayerSizes {
 /// `BP_PER_WHOLE` cbb, which is the same ratio in exact integers.
 fn bucket_of_bp(size_bp: u32) -> Result<Bucket, TreeError> {
     Ok(bucket_for(Cbb(size_bp), Cbb(BP_PER_WHOLE))?)
+}
+
+/// Rejects an OOP donk table set beside an empty OOP bet table on any street (O-137): the
+/// donk table applies only after a street IP closed as the aggressor, so from a root on
+/// that street OOP could never lead, the shape the engine's own validation refuses. A
+/// table with only an all-in counts as set, as it does in the engine.
+fn check_oop_lead(oop: &PlayerSizes) -> Result<(), TreeError> {
+    for (street, tables) in POSTFLOP_STREETS.into_iter().zip(oop.streets()) {
+        if !tables.donk.is_empty() && tables.bet.is_empty() {
+            return Err(TreeError::DonkWithoutBet { street });
+        }
+    }
+    Ok(())
 }
 
 /// Rejects two bet or two donk sizes of one table in one bucket (O-137). The sizes are

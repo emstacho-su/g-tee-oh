@@ -19,7 +19,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use gto_model::{GameConfig, v1_configs};
-use gto_tree::{PreflopTree, SizingConventionSpec, TreeConfig, TreeError};
+use gto_tree::{PreflopTree, SPEC_VERSION, SizingConventionSpec, TreeConfig, TreeError};
 use serde_json::{Value, json};
 
 /// The seed migration, relative to this crate's manifest directory.
@@ -232,6 +232,31 @@ fn r2_9_spec_rejects_unknown_and_off_grid_fields() {
         let result = SizingConventionSpec::from_json(&text);
         let named = matches!(&result, Err(TreeError::OffGrid { field: got, .. }) if *got == field);
         assert!(named, "{text}: {result:?}");
+    }
+}
+
+/// R2.9: the integer fields `raise_cap` and `spec_version` take an integer-valued float,
+/// as Postgres jsonb hands back a row written with 3.0 and as the schema's integer type
+/// does, and reject null and a float with a fractional part, as the schema does (O-132).
+#[test]
+fn r2_9_spec_integer_fields_take_whole_floats_and_reject_null() {
+    let capped = online_with(&["postflop", "raise_cap"], json!(3.0));
+    let spec = SizingConventionSpec::from_json(&capped).unwrap_or_else(|err| panic!("{err}"));
+    assert_eq!(spec.postflop.raise_cap, Some(3));
+    let versioned = online_with(&["spec_version"], json!(1.0));
+    let spec = SizingConventionSpec::from_json(&versioned).unwrap_or_else(|err| panic!("{err}"));
+    assert_eq!((spec.spec_version, spec.version()), (Some(SPEC_VERSION), SPEC_VERSION));
+    let rejected = [
+        online_with(&["postflop", "raise_cap"], json!(3.5)),
+        online_with(&["postflop", "raise_cap"], json!(256.0)),
+        online_with(&["postflop", "raise_cap"], json!(-1)),
+        online_with(&["postflop", "raise_cap"], Value::Null),
+        online_with(&["spec_version"], json!(1.5)),
+        online_with(&["spec_version"], Value::Null),
+    ];
+    for text in rejected {
+        let result = SizingConventionSpec::from_json(&text);
+        assert!(matches!(result, Err(TreeError::Spec(_))), "{text}: {result:?}");
     }
 }
 

@@ -56,9 +56,17 @@ pub struct RawTable {
 }
 
 impl RawTable {
+    /// The table with no size and no all-in.
+    pub const EMPTY: RawTable = RawTable { sizes_bp: Vec::new(), allin: false };
+
     /// The validated table.
     pub fn build(&self) -> Result<SizeTable, TreeError> {
         SizeTable::new(&self.sizes_bp, self.allin)
+    }
+
+    /// True when the table offers no size and no all-in, as `SizeTable::is_empty`.
+    pub fn is_empty(&self) -> bool {
+        self.sizes_bp.is_empty() && !self.allin
     }
 }
 
@@ -117,13 +125,18 @@ pub fn bucket_safe_table(max_sizes: usize) -> impl Strategy<Value = RawTable> + 
         .prop_map(|(sizes_bp, allin)| RawTable { sizes_bp, allin })
 }
 
-/// A player whose bet and donk tables come from `bets` and raise tables from `raises`.
+/// A player whose bet and donk tables come from `bets` and raise tables from `raises`. A
+/// donk table drawn beside an empty bet table is emptied, since `TreeConfig::new` refuses
+/// that shape for OOP (`TreeError::DonkWithoutBet`); both players get the rule so that
+/// swapping them keeps a valid configuration.
 pub fn raw_player(
     bets: impl Strategy<Value = RawTable> + Clone,
     raises: impl Strategy<Value = RawTable> + Clone,
 ) -> impl Strategy<Value = RawPlayer> {
-    let street =
-        (bets.clone(), raises, bets).prop_map(|(bet, raise, donk)| RawStreet { bet, raise, donk });
+    let street = (bets.clone(), raises, bets).prop_map(|(bet, raise, donk)| {
+        let donk = if bet.is_empty() { RawTable::EMPTY } else { donk };
+        RawStreet { bet, raise, donk }
+    });
     (street.clone(), street.clone(), street).prop_map(|(flop, turn, river)| RawPlayer {
         flop,
         turn,

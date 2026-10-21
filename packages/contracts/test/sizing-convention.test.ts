@@ -31,6 +31,7 @@ const INVALID_REASONS: Readonly<Record<string, string>> = {
   "flop-not-array.json": "/postflop/flop must be array",
   "iso-rule-missing-per-limper.json": "/iso_rule must have required property 'per_limper_bb'",
   "limp-position-lowercase.json": "/limp_positions/0 must match pattern",
+  "limp-position-not-a-seat.json": "/limp_positions/0 must match pattern",
   "missing-open-bb.json": " must have required property 'open_bb'",
   "open-bb-as-string.json": "/open_bb must be number",
   "raise-cap-over-u8.json": "/postflop/raise_cap must be <= 255",
@@ -164,6 +165,30 @@ describe("R2.9 sizing convention schema", () => {
     ];
     for (const [input, path] of cases) {
       expect(errorsOf(validate, input), path).toContainEqual(expect.stringContaining(path));
+    }
+  });
+
+  it("R2.9 config ids follow the gto-model grammar and seats are its nine names", () => {
+    const spec = readExample("valid", "seed-live.json") as Record<string, unknown>;
+    const accepted = [
+      "cfg_6_online_100",
+      "cfg_9_live_13_150_straddle",
+      "cfg_9_live_25_200_straddle_ante50",
+      "cfg_2_online_50cbb",
+    ];
+    for (const id of accepted) {
+      expect(errorsOf(validate, { ...spec, placeholder_for: id }), id).toEqual([]);
+    }
+    for (const id of ["cfg_6_online", "cfg_6_online_100_", "CFG_6_online_100", "cfg_1_live_100"]) {
+      expect(errorsOf(validate, { ...spec, placeholder_for: id }), id).toContainEqual(
+        expect.stringContaining("/placeholder_for must match pattern"),
+      );
+    }
+    expect(errorsOf(validate, { ...spec, limp_positions: ["UTG1", "LJ"] })).toEqual([]);
+    for (const seat of ["UTG+1", "utg", "MP", "BTN1"]) {
+      expect(errorsOf(validate, { ...spec, limp_positions: [seat] }), seat).toContainEqual(
+        expect.stringContaining("/limp_positions/0 must match pattern"),
+      );
     }
   });
 });
