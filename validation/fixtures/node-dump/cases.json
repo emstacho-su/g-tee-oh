@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "cases": [
+    { "file": "valid/example.json", "accept": true, "rules": [] },
+    { "file": "invalid/frequency-sum-off-by-0-0011.json", "accept": false, "rules": [2] }
+  ]
+}
