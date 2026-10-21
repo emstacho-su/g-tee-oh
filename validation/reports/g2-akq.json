@@ -1,0 +1,510 @@
+{
+  "report": "g2-akq",
+  "r_ids": [
+    "R2.5"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "Windows 11 (26200)",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 31
+  },
+  "commit": "48e1cb7bfdfd61dd7207f1e11f03f5d7b21df137",
+  "date": "2026-10-21T00:41:36Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "pass": true,
+  "thresholds": {
+    "akq/polar-river-pot-bet/bluff-share-of-bets": {
+      "min": 0.3283333333333333,
+      "max": 0.3383333333333333,
+      "unit": "frequency"
+    },
+    "akq/polar-river-pot-bet/defense-share-of-bluff-catchers": {
+      "min": 0.495,
+      "max": 0.505,
+      "unit": "frequency"
+    },
+    "akq/polar-river-pot-bet/p0-facing-bet-call-bluff-catcher": {
+      "min": 0.495,
+      "max": 0.505,
+      "unit": "frequency"
+    },
+    "akq/polar-river-pot-bet/p1-open-bet-air": {
+      "min": 0.495,
+      "max": 0.505,
+      "unit": "frequency"
+    },
+    "akq/polar-river-pot-bet/p1-open-bet-nuts": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/bluff-share-of-bets": {
+      "min": 0.245,
+      "max": 0.255,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/defense-share-of-range": {
+      "min": 0.6616666666666666,
+      "max": 0.6716666666666666,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p0-facing-bet-call-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p0-facing-bet-call-k": {
+      "min": 0.3283333333333333,
+      "max": 0.3383333333333333,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p0-facing-bet-call-q": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p1-open-bet-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p1-open-bet-k": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-half/p1-open-bet-q": {
+      "min": 0.3283333333333333,
+      "max": 0.3383333333333333,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/defense-share-of-range": {
+      "min": 0.495,
+      "max": 0.505,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p0-facing-bet-call-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p0-facing-bet-call-k": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p0-facing-bet-call-q": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p1-open-bet-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p1-open-bet-k": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-pot/p1-open-bet-q": {
+      "min": -0.005,
+      "max": 0.505,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/bluff-share-of-bets": {
+      "min": 0.16166666666666665,
+      "max": 0.17166666666666666,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/defense-share-of-range": {
+      "min": 0.795,
+      "max": 0.805,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p0-facing-bet-call-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p0-facing-bet-call-k": {
+      "min": 0.595,
+      "max": 0.605,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p0-facing-bet-call-q": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p1-open-bet-a": {
+      "min": 0.995,
+      "max": 1.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p1-open-bet-k": {
+      "min": -0.005,
+      "max": 0.005,
+      "unit": "frequency"
+    },
+    "akq/pot1-bet-quarter/p1-open-bet-q": {
+      "min": 0.195,
+      "max": 0.20500000000000002,
+      "unit": "frequency"
+    }
+  },
+  "measurements": [
+    {
+      "id": "akq/pot1-bet-quarter/p1-open-bet-q",
+      "value": 0.2000708431005478,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.195,
+        "max": 0.20500000000000002,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/p1-open-bet-k",
+      "value": 1.8735957230120448e-10,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/p1-open-bet-a",
+      "value": 1.0,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/p0-facing-bet-call-q",
+      "value": 1.873596000567801e-10,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/p0-facing-bet-call-k",
+      "value": 0.6000082492828369,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.595,
+        "max": 0.605,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/p0-facing-bet-call-a",
+      "value": 1.0,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/bluff-share-of-bets",
+      "value": 0.1667158603340462,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.16166666666666665,
+        "max": 0.17166666666666666,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/defense-share-of-range",
+      "value": 0.8000041246414185,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.795,
+        "max": 0.805,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-quarter/nash-conv",
+      "value": 6.237998604774475e-6,
+      "unit": "chips"
+    },
+    {
+      "id": "akq/pot1-bet-quarter/iterations",
+      "value": 2000.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "akq/pot1-bet-half/p1-open-bet-q",
+      "value": 0.33330008387565613,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.3283333333333333,
+        "max": 0.3383333333333333,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/p1-open-bet-k",
+      "value": 4.372269473557067e-12,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/p1-open-bet-a",
+      "value": 0.9999999403953552,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/p0-facing-bet-call-q",
+      "value": 4.372269473557067e-12,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/p0-facing-bet-call-k",
+      "value": 0.3333057165145874,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.3283333333333333,
+        "max": 0.3383333333333333,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/p0-facing-bet-call-a",
+      "value": 0.9999999403953552,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/bluff-share-of-bets",
+      "value": 0.24998130788814518,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.245,
+        "max": 0.255,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/defense-share-of-range",
+      "value": 0.6666528284549713,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.6616666666666666,
+        "max": 0.6716666666666666,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-half/nash-conv",
+      "value": 7.3909759521484375e-6,
+      "unit": "chips"
+    },
+    {
+      "id": "akq/pot1-bet-half/iterations",
+      "value": 7000.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "akq/pot1-bet-pot/p1-open-bet-q",
+      "value": 0.00008642899774713442,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.505,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/p1-open-bet-k",
+      "value": 1.4977492579504315e-9,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/p1-open-bet-a",
+      "value": 0.999951183795929,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/p0-facing-bet-call-q",
+      "value": 1.4977492579504315e-9,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/p0-facing-bet-call-k",
+      "value": 1.684968076176574e-8,
+      "unit": "frequency",
+      "threshold": {
+        "min": -0.005,
+        "max": 0.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/p0-facing-bet-call-a",
+      "value": 1.0,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/defense-share-of-range",
+      "value": 0.5000000084248404,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.495,
+        "max": 0.505,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/pot1-bet-pot/nash-conv",
+      "value": 0.0,
+      "unit": "chips"
+    },
+    {
+      "id": "akq/pot1-bet-pot/iterations",
+      "value": 1000.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "akq/polar-river-pot-bet/p1-open-bet-nuts",
+      "value": 1.0,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.995,
+        "max": 1.005,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/polar-river-pot-bet/p1-open-bet-air",
+      "value": 0.49999746680259705,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.495,
+        "max": 0.505,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/polar-river-pot-bet/p0-facing-bet-call-bluff-catcher",
+      "value": 0.5000174045562744,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.495,
+        "max": 0.505,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/polar-river-pot-bet/bluff-share-of-bets",
+      "value": 0.33333220746591957,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.3283333333333333,
+        "max": 0.3383333333333333,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/polar-river-pot-bet/defense-share-of-bluff-catchers",
+      "value": 0.5000174045562744,
+      "unit": "frequency",
+      "threshold": {
+        "min": 0.495,
+        "max": 0.505,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "akq/polar-river-pot-bet/nash-conv",
+      "value": 9.953975677490234e-6,
+      "unit": "chips"
+    },
+    {
+      "id": "akq/polar-river-pot-bet/iterations",
+      "value": 44000.0,
+      "unit": "iterations"
+    }
+  ],
+  "notes": "DCFR default schedule (alpha 1.5, beta 0, gamma 2, no regret floor) in chunks of 1000 iterations until NashConv < 0.00001 chips or 1000000 iterations; every strategy fact and ratio fact judged within 0.005 in frequency units (the fixture's 0.5 percentage points); bluff share = weighted bluff bets / weighted bets, defense share = weighted calls of the holdings facing a bluff / their weight; fixture validation/fixtures/toy-games/akq.json"
+}
