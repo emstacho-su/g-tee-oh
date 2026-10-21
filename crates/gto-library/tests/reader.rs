@@ -1,7 +1,9 @@
 //! R2.7 reader (A3 section 5): a corrupted checksum marks the build unavailable and stays
 //! so across a restart until the file is restored, an unavailable build refuses node reads,
 //! `open` decodes no frame, the frame cache never exceeds `QUERY_CACHE_BYTES` and evicts the
-//! least recently used frame, and only format version 1 opens.
+//! least recently used frame, and only format version 1 opens. Two more tests cover the
+//! refusals (unknown handle, absent key) and `FsStore` serving the reader and rejecting
+//! paths that could leave its root.
 //!
 //! Every library here is written in memory with the real writer, so these tests go green
 //! once lane W's writer and lane M's `Manifest::from_json` land beside lane R's reader.
@@ -12,10 +14,10 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
 
 use gto_library::{
-    Availability, ByteLru, ChunkOptions, FORMAT_VERSION, FileRef, HandSpace, LibraryError,
-    LineEntry, MANIFEST_FILE, Manifest, ManifestConfig, ManifestKind, MemStore, ObjectSink, Reader,
-    ReaderOptions, Runout, SolutionMeta, SolvedHand, SolvedNode, Source, sha256_hex, write_preflop,
-    write_tree_file,
+    Availability, ByteLru, ChunkOptions, FORMAT_VERSION, FileRef, FsStore, HandSpace, LibraryError,
+    LineEntry, MANIFEST_FILE, Manifest, ManifestConfig, ManifestKind, MemStore, ObjectSink,
+    ObjectStore, Reader, ReaderOptions, Runout, SolutionMeta, SolvedHand, SolvedNode, Source,
+    sha256_hex, write_preflop, write_tree_file,
 };
 use gto_model::{
     ActionToken, Cbb, ComboId, ConfigId, GameFormat, NodeKey, Position, PositionPair, TableSize,
@@ -302,6 +304,54 @@ fn r2_7_cache_evicts_least_recently_used() {
     assert!(cache.get(&5).is_none(), "a value above the cap is not cached");
     assert_eq!(cache.used_bytes(), 30);
     assert_eq!(cache.len(), 3);
+}
+
+#[test]
+fn r2_7_reader_refuses_unknown_handles_and_keys() {
+    let library = &*LIBRARY;
+    let reader = Reader::new(library.store.clone(), ROOMY);
+    let handle = reader.open(&library.prefix).expect("the solution opens");
+    assert_eq!(reader.open(&library.prefix).expect("opens again"), handle, "one handle per prefix");
+    let absent = NodeKey::preflop(config_id(), pair(), vec![ActionToken::Fold]);
+    assert!(matches!(reader.node(handle, &absent), Err(LibraryError::NodeNotFound(_))));
+    let (store, flop_key, _) = flop_build();
+    let builds = Reader::new(store, ROOMY);
+    let build = builds.open(BUILD_PREFIX).expect("the build opens");
+    let turn_key = flop_key.clone().with_turn("Kh".parse().expect("a card"), vec![]);
+    let turn_key = turn_key.expect("the turn is dealt");
+    for key in [&library.keys[0], &turn_key] {
+        assert!(matches!(builds.node(build, key), Err(LibraryError::NodeNotFound(_))));
+    }
+    builds.node(build, &flop_key).expect("the flop node reads");
+    let fresh = Reader::new(MemStore::new(), ROOMY);
+    assert!(matches!(fresh.node(handle, &flop_key), Err(LibraryError::UnknownHandle(0))));
+    assert!(matches!(fresh.availability(handle), Availability::Unavailable { .. }));
+    assert!(matches!(fresh.open(&library.prefix), Err(LibraryError::Io { .. })));
+}
+
+#[test]
+fn r2_7_fs_store_serves_the_reader_and_rejects_bad_paths() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let mut store = FsStore::new(dir.path()).expect("the directory is a root");
+    for path in LIBRARY.store.paths() {
+        store.put(&path, LIBRARY.store.bytes(&path).expect("listed")).expect("the put works");
+    }
+    let manifest = format!("{}/{MANIFEST_FILE}", LIBRARY.prefix);
+    let size =
+        u64::try_from(store.get(&manifest).expect("the manifest reads").len()).expect("fits");
+    assert_eq!(store.get_range(&manifest, 1, 2).expect("a range reads").len(), 2);
+    assert!(matches!(store.get_range(&manifest, size, 1), Err(LibraryError::Io { .. })));
+    assert!(matches!(LIBRARY.store.get_range(&manifest, size, 1), Err(LibraryError::Io { .. })));
+    let reader = Reader::new(store.clone(), ROOMY);
+    let handle = reader.open(&LIBRARY.prefix).expect("the solution opens from files");
+    reader.node(handle, &LIBRARY.keys[NODE_COUNT as usize - 1]).expect("the last node reads");
+    for bad in ["", "/abs", "../up", "a/../b", "a//b", "a\\b", "C:/x", "./a", "a/"] {
+        assert!(matches!(store.get(bad), Err(LibraryError::InvalidPath(_))), "{bad:?}");
+        assert!(matches!(store.put(bad, b"x"), Err(LibraryError::InvalidPath(_))), "{bad:?}");
+        assert!(matches!(MemStore::new().get(bad), Err(LibraryError::InvalidPath(_))));
+    }
+    assert!(matches!(FsStore::new(dir.path().join(&manifest)), Err(LibraryError::Io { .. })));
+    assert!(matches!(FsStore::new(dir.path().join("absent")), Err(LibraryError::Io { .. })));
 }
 
 #[test]

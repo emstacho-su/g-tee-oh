@@ -6,13 +6,6 @@
 //!
 //! Lane R (reader) owns this file.
 
-#![allow(
-    unused_variables,
-    dead_code,
-    clippy::needless_pass_by_value,
-    reason = "S14 red skeleton: lane R replaces the todo!() bodies"
-)]
-
 use std::hash::Hash;
 use std::sync::Arc;
 
@@ -25,45 +18,64 @@ pub struct ByteLru<K> {
     used_bytes: u64,
 }
 
+/// A value's length in bytes; a length past `u64` saturates, which no cap admits.
+fn byte_len(v: &[u8]) -> u64 {
+    u64::try_from(v.len()).unwrap_or(u64::MAX)
+}
+
 impl<K: Hash + Eq> ByteLru<K> {
     /// An empty cache holding at most `cap_bytes` of values.
     #[must_use]
     pub fn new(cap_bytes: u64) -> Self {
-        todo!("lane R: unbounded LruCache plus byte accounting")
+        ByteLru { entries: LruCache::unbounded(), cap_bytes, used_bytes: 0 }
     }
 
     /// The value for `k`, marking it most recently used.
     pub fn get(&mut self, k: &K) -> Option<Arc<[u8]>> {
-        todo!("lane R: lookup and promote")
+        self.entries.get(k).cloned()
     }
 
     /// Caches `v` under `k`, evicting least recently used entries until it fits; a value
-    /// larger than the cap is not cached.
+    /// larger than the cap is not cached. A value already under `k` is dropped first.
     pub fn insert(&mut self, k: K, v: Arc<[u8]>) {
-        todo!("lane R: insert with eviction")
+        if let Some(old) = self.entries.pop(&k) {
+            self.used_bytes -= byte_len(&old);
+        }
+        let len = byte_len(&v);
+        if len > self.cap_bytes {
+            return;
+        }
+        while self.used_bytes + len > self.cap_bytes {
+            match self.entries.pop_lru() {
+                Some((_, evicted)) => self.used_bytes -= byte_len(&evicted),
+                None => break,
+            }
+        }
+        self.used_bytes += len;
+        self.entries.put(k, v);
     }
 
     /// The total length of the cached values.
     #[must_use]
     pub fn used_bytes(&self) -> u64 {
-        todo!("lane R: running total")
+        self.used_bytes
     }
 
     /// The cap in bytes.
     #[must_use]
     pub fn cap_bytes(&self) -> u64 {
-        todo!("lane R: cap")
+        self.cap_bytes
     }
 
     /// How many entries are cached.
     #[must_use]
     pub fn len(&self) -> usize {
-        todo!("lane R: entry count")
+        self.entries.len()
     }
 
     /// True when nothing is cached.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        todo!("lane R: empty check")
+        self.entries.is_empty()
     }
 }
