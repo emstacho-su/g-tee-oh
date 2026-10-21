@@ -2,7 +2,7 @@
 
 This directory holds the reports that prove requirement identifiers (R IDs) for the public gates (A1 section 1 reserves `validation/reports/` for generated gate reports, public gates only). A report is evidence, so two rules apply:
 
-1. A report is written by the tool that measured it, never by hand. `just bench` writes `bench-zenbook.json` through `scripts/bench-report.mjs`; the Phase 2 validation gates G1 to G7 (04 section 6) will write theirs through `tools/validate` once S13 lands. To change a number, check out the commit you want on record, rerun the tool and commit what it wrote. The Markdown gate summaries (`phase-0-gate.md`, and `mac-bootstrap.md` once S04 lands) are the exception in form only: the session that closes a gate assembles them from tool output and run links, and they are not edited after the gate closes.
+1. A report is written by the tool that measured it, never by hand. `just bench` writes `bench-zenbook.json` through `scripts/bench-report.mjs`; `just library-size-estimate` writes `library-size-estimate.md` through `library-pack estimate` (S14); the Phase 2 validation gates G1 to G7 (04 section 6) will write theirs through `tools/validate` once S13 lands. To change a number, check out the commit you want on record, rerun the tool and commit what it wrote. The Markdown gate summaries (`phase-0-gate.md`, and `mac-bootstrap.md` once S04 lands) are the exception in form only: the session that closes a gate assembles them from tool output and run links, and they are not edited after the gate closes.
 2. Every report names the R IDs it proves: the `r_ids` field in a JSON (JavaScript Object Notation) report, the R ID column in a Markdown gate report. A reviewer can then go from a requirement to its evidence without reading the tool.
 
 S05 added the schema every JSON report follows and the table of report files (R0.11). Later sessions add their report kinds below as they write them: S13 the G1 to G3 gate reports, S29 the Phase 3 reports.
@@ -69,6 +69,28 @@ Example, shortened:
 
 Reading a baseline: compare `median_ns` of the same id across commits on the same machine; the mean is kept because criterion reports both and outliers move it first. Numbers from different machines are different baselines, never a regression.
 
+## Library size estimate: `library-size-estimate.md` (R2.7, R-19)
+
+Produced by `just library-size-estimate`, which runs `library-pack estimate --seed <n> --out
+validation/reports/library-size-estimate.md` (`tools/library-pack/src/estimate.rs`). Rule 1
+applies: the tool writes the whole file, and the committed report carries the seed, so rerunning
+the recipe at the recorded commit with that seed gives the same bytes.
+
+What the tool does, in order: `gto_library::synthetic_tree` builds one turn and river runout
+tree and one flop tree per scenario (pessimistic, central, optimistic: node counts, range share,
+pure share and action counts around the planning figures of 02 section 5.2) from the seed;
+`NodeRecord::from_solved` quantizes them into the records the writer stores; `encode_file`
+turns the records into a file at the writer's setting (zstd level 19, 64 KiB frames), at level 3
+and at 256 KiB frames (O-129). The report states that method, the inputs and the seed, then one
+table per tree kind (raw bytes, file bytes, ratio, bytes per node) and a last table that sets
+each scenario against the plan: 1 to 10 MB per runout, 40 KB to 342 KB per flop tree, one build
+of 4 lines with K = 20 runouts, and the 650 GB budget of O-51.
+
+The data is synthetic (O-57) and the report says so in its first line: it bounds the format's
+bytes per node, not a solver's output, and S20 replaces it with measured bytes (O-51). It is
+Markdown, not JSON, so `report.schema.json` does not apply; the R ID line in the report stands
+in for `r_ids`.
+
 ## Report schema: `report.schema.json` (R0.11)
 
 Every JSON report in this directory validates against `report.schema.json`, a JSON Schema (draft 2020-12). The schema fixes the envelope, so a reviewer or a tool (the `just v1-gate` check in S34, R4.17) reads every report the same way; the measurement ids and the thresholds inside the envelope are each report's own and are documented in that report's section of this file. Markdown gate summaries (`phase-0-gate.md` and the others in the table below) are assembled by hand from tool output and run links and do not use the schema; they carry the R ID column instead.
@@ -111,7 +133,7 @@ A report that fails the schema is not evidence.
 | `mac-bootstrap.md` | S04 | Markdown | Phase 0 gate, Mac part: R0.9 against O-50 (peak resident set size (RSS) under 5 GB and under 30 minutes to 0.3 percent pot per preflop line), the Docker memory per O-20, nothing left running per O-47. |
 | `bench-zenbook.json` | S02, `just bench` | JSON baseline | R0.10. The p95 guard baseline that O-40's thresholds are later measured against; the benchmark section above has the fields. |
 | G1, G2 and G3 reports | S13, `tools/validate`, then every CI run | JSON gate reports, named by S13 | R2.4 (Kuhn), R2.5 (AKQ (ace, king, queen) and the toy river games) and R2.6 (Leduc against the committed OpenSpiel exploitability curve, O-30) with the 04 section 6 pass rules as thresholds. |
-| `library-size-estimate.md` | S14 | Markdown | R2.7: bytes per runout and per flop tree with the method, judged against O-51; the chunk decode number moves into the bench JSON. |
+| `library-size-estimate.md` | S14, `just library-size-estimate` (`library-pack estimate`) | Markdown, tool-written | R2.7: bytes per runout and per flop tree on synthetic trees with the method and seed, set against 02 section 5.2 and O-51 (the section above); the chunk decode number lives in the bench JSON. |
 | `bench-flop-line-zenbook.md` | S18 | Markdown | R2.12 and R2.16 to R2.18: peak RSS, seconds per line, iterations and exploitability of `library-builder --once` under the 5 GB Docker limit (O-48) against O-50. |
 | `spike-preflop-zenbook.md` | S19 | Markdown | The push/fold spike on the Zenbook (R2.21, O-49): peak bytes and seconds, the 100 big blind figure measured or labeled extrapolated, and the O-4 answer. |
 | `spike-preflop-mac.md` | S20 | Markdown | R2.21 rerun in the builder container on the Mac against O-48 and O-49. |
