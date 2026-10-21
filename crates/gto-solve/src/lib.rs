@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod equity;
+mod exploit;
 pub mod postflop;
 pub mod toy;
 

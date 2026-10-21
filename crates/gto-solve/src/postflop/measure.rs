@@ -1,16 +1,15 @@
 //! Exact best response for a solved postflop game (R2.10, O-138).
 //!
-//! Mechanism: for each player `i`, the engine's `br::best_response_value(game, i, profile)`
-//! is the value of best-responding to the average strategy and `br::expected_value(game,
-//! i, profile)` the value of following it, both in big blinds (bb) per hand over the full
-//! tree with every runout dealt. Each `f32` figure is widened to `f64` before the
-//! subtraction, so the gain is the exact difference of the two engine figures; it is the
-//! same mechanism as S13's toy measure. The engine's `br::exploitability` is never called:
-//! it sums best-response values, which a raked game offsets by the expected rake, and its
+//! Mechanism: each player's figures come from the crate's shared `exploit` measure, the
+//! engine's best-response and expected-value walks over the full tree with every runout
+//! dealt, in big blinds (bb) per hand, each `f32` figure widened to `f64` before the
+//! subtraction so the gain is the exact difference of the two engine figures; S13's toy
+//! measure uses the same function. The engine's `br::exploitability` is never called: it
+//! sums best-response values, which a raked game offsets by the expected rake, and its
 //! debug assertion misfires on games with a negative value (O-102). A unilateral gain has
 //! neither problem, so it is the stop rule's figure, as a percent of the starting pot.
 
-use postflop_engine::br;
+use crate::exploit::unilateral_gain;
 
 use super::solve::SolvedGame;
 
@@ -37,10 +36,10 @@ pub fn best_response(solved: &SolvedGame) -> BestResponseReport {
     let game = cfr.game();
     let profile = cfr.average();
     let pot = game.config().starting_pot;
-    let best_response_bb =
-        [0, 1].map(|hero| f64::from(br::best_response_value(game, hero, &profile)));
-    let expected_value_bb = [0, 1].map(|hero| f64::from(br::expected_value(game, hero, &profile)));
-    let gain_bb = [0, 1].map(|player| best_response_bb[player] - expected_value_bb[player]);
+    let figures = [0, 1].map(|hero| unilateral_gain(game, hero, &profile));
+    let best_response_bb = figures.map(|player| player.best_response);
+    let expected_value_bb = figures.map(|player| player.expected);
+    let gain_bb = figures.map(|player| player.gain);
     let gain_pct_pot = gain_bb.map(|gain| PERCENT * gain / pot);
     BestResponseReport { best_response_bb, expected_value_bb, gain_bb, gain_pct_pot }
 }
