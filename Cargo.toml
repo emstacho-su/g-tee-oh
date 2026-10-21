@@ -40,6 +40,11 @@ thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
 rayon = "1"
+# The machine block of a gate report (R2.4 to R2.6, validation/reports/README.md): only
+# the `system` feature, for the central processing unit (CPU) model, the core count, the
+# memory and the operating system name. 0.36 is the newest release inside the 1.85
+# rust-version floor (0.39 needs 1.95). MIT.
+sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 # Web service stack for solver-query (S06, R0.7, ADR 0018). utoipa-axum 0.3 requires rustc 1.88,
 # above the workspace rust-version of 1.85, so the pair is pinned to utoipa 5 with utoipa-axum 0.2.
 axum = "0.8"

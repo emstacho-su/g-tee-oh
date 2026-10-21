@@ -1,0 +1,125 @@
+{
+  "report": "g1-kuhn",
+  "r_ids": [
+    "R2.4"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "Windows 11 (26200)",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 31
+  },
+  "commit": "48e1cb7bfdfd61dd7207f1e11f03f5d7b21df137",
+  "date": "2026-10-21T00:41:36Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "pass": true,
+  "thresholds": {
+    "kuhn/standard/nash-conv": {
+      "max": 0.001,
+      "unit": "chips"
+    },
+    "kuhn/standard/value-abs-error": {
+      "max": 0.001,
+      "unit": "chips"
+    }
+  },
+  "measurements": [
+    {
+      "id": "kuhn/standard/value-player-0",
+      "value": -0.05555558204650879,
+      "unit": "chips"
+    },
+    {
+      "id": "kuhn/standard/value-abs-error",
+      "value": 2.6490953236590897e-8,
+      "unit": "chips",
+      "threshold": {
+        "max": 0.001,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "kuhn/standard/nash-conv",
+      "value": 0.00006592646241188049,
+      "unit": "chips",
+      "threshold": {
+        "max": 0.001,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "kuhn/standard/iterations",
+      "value": 5000.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "kuhn/standard/parameter-a",
+      "value": 0.1892087757587433,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-facing-bet-after-check-call-j",
+      "value": 7.397937297481949e-12,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-facing-bet-after-check-call-k",
+      "value": 1.0,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-facing-bet-after-check-call-q",
+      "value": 0.5228664875030518,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-open-bet-j",
+      "value": 0.1892087757587433,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-open-bet-k",
+      "value": 0.5676799416542053,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p0-open-bet-q",
+      "value": 1.047003039822414e-9,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-after-check-bet-j",
+      "value": 0.33332559466362,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-after-check-bet-k",
+      "value": 1.0,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-after-check-bet-q",
+      "value": 3.598902009738225e-10,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-facing-bet-call-j",
+      "value": 1.1996304123684798e-11,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-facing-bet-call-k",
+      "value": 1.0,
+      "unit": "frequency"
+    },
+    {
+      "id": "kuhn/standard/p1-facing-bet-call-q",
+      "value": 0.3333888351917267,
+      "unit": "frequency"
+    }
+  ],
+  "notes": "engine DCFR with the default schedule (alpha 1.5, beta 0, gamma 2, regret floor off), chunks of 1000 iterations until NashConv < 0.0001 chips or 200000 iterations; NashConv = gain_0 + gain_1 of the average strategy, judged strictly below exploitability_max; the strategy facts are informational and document the one-parameter equilibrium family, parameter a = 0.1892087757587433 bound from p0-open-bet-j; fixture validation/fixtures/toy-games/kuhn.json"
+}

@@ -30,6 +30,10 @@ const CONTRACT_RECIPES = [
   'docs-mirror',
   'hooks',
   'bench',
+  'gates',
+  'gates-check',
+  'equity-table',
+  'report-check',
   'ci',
 ];
 

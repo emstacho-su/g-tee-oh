@@ -5,6 +5,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod equity;
+pub mod toy;
+
 /// The crate's package name, used by the workspace link tests (R0.1).
 pub const CRATE_NAME: &str = "gto-solve";
 

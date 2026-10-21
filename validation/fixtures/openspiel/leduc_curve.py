@@ -14,9 +14,15 @@ players of (best-response value against the policy minus the policy's own value)
 two-player zero-sum game that is the mean best-response gain, in chips, with the ante
 equal to 1. Both numbers are written so the comparison can use either.
 
-The solver is the plain one: no regret matching plus, simultaneous updates, uniform
-averaging, no discounting. Plain CFR is deterministic, so the seed changes nothing; it is
-set and recorded anyway so the run is reproducible by command line alone.
+The solver is OpenSpiel's CFRSolver, plain CFR: no regret matching plus, uniform
+averaging, no discounting, and alternating updates. CFRSolver's constructor passes
+alternating_updates=True to its base solver, so each iteration first updates player 0's
+regrets and policy, then walks the tree for player 1 against that updated policy. The
+report's generator block reads these three switches from the solver object instead of
+restating them; an earlier version of this script hard-coded alternating_updates False
+into the report, and the committed fixture's generator block was corrected by hand on
+2026-10-20 (O-128; numbers untouched). Plain CFR is deterministic, so the seed changes
+nothing; it is set and recorded anyway so the run is reproducible by command line alone.
 
 The OpenSpiel wheel is Linux-only, so this runs inside a Linux container on the Windows
 machine. PROVENANCE.md beside this file records the exact command, versions and digest.
@@ -45,6 +51,12 @@ DEFAULT_CHECKPOINTS = (1, 10, 100, 1000, 5000)
 DEFAULT_SEED = 20261020
 R_IDS = ("R0.11", "R2.6")
 O_IDS = ("O-30", "O-79")
+# The base-solver attributes OpenSpiel's _CFRSolverBase stores its three switches in.
+SOLVER_SWITCHES = {
+    "regret_matching_plus": "_regret_matching_plus",
+    "alternating_updates": "_alternating_updates",
+    "linear_averaging": "_linear_averaging",
+}
 
 
 def parse_checkpoints(text: str) -> tuple[int, ...]:
@@ -83,6 +95,24 @@ def game_parameters(game: pyspiel.Game) -> dict[str, Any]:
     return plain
 
 
+def solver_switches(solver: Any) -> dict[str, bool]:
+    """The solver's own switches, read from the object so the report cannot misstate them.
+
+    Raises RuntimeError when an attribute is missing or not a bool, which means the
+    OpenSpiel version stores them differently and SOLVER_SWITCHES must follow.
+    """
+    switches: dict[str, bool] = {}
+    for field, attribute in SOLVER_SWITCHES.items():
+        value = getattr(solver, attribute, None)
+        if not isinstance(value, bool):
+            raise RuntimeError(
+                f"{type(solver).__name__}.{attribute} is {value!r}, expected a bool; "
+                "update SOLVER_SWITCHES for this OpenSpiel version"
+            )
+        switches[field] = value
+    return switches
+
+
 def measure(game: pyspiel.Game, policy: Any) -> dict[str, float]:
     """Exploitability and NashConv of a policy, both in chips."""
     nash_conv = float(exploitability.nash_conv(game, policy))
@@ -94,14 +124,18 @@ def measure(game: pyspiel.Game, policy: Any) -> dict[str, float]:
 
 def run_curve(
     game: pyspiel.Game, checkpoints: tuple[int, ...], log: Any
-) -> tuple[list[dict[str, float]], Any]:
+) -> tuple[list[dict[str, float]], Any, dict[str, bool]]:
     """Run plain CFR to the last checkpoint, measuring at each one.
 
-    Returns the checkpoint rows and the final average policy. The solver is not reset
-    between checkpoints: iteration n in the output is the state after n updates in one
-    continuous run, which is what tools/validate G3 must reproduce.
+    Returns the checkpoint rows, the final average policy and the solver's switches as
+    solver_switches reads them right after construction, before any iteration, so the
+    report records the configuration the run started with and a missing attribute fails
+    before minutes of solving. The solver is not reset between checkpoints: iteration n in
+    the output is the state after n updates in one continuous run, which is what
+    tools/validate G3 must reproduce.
     """
     solver = cfr.CFRSolver(game)
+    switches = solver_switches(solver)
     rows: list[dict[str, float]] = []
     started = time.perf_counter()
     iteration = 0
@@ -122,13 +156,14 @@ def run_curve(
             f"  nash_conv {row['nash_conv']:.9f}  ({row['elapsed_seconds']:.1f} s)\n"
         )
         log.flush()
-    return rows, solver.average_policy()
+    return rows, solver.average_policy(), switches
 
 
 def build_report(
     game: pyspiel.Game,
     rows: list[dict[str, float]],
     average_policy: Any,
+    switches: dict[str, bool],
     seed: int,
     argv: list[str],
 ) -> dict[str, Any]:
@@ -155,9 +190,9 @@ def build_report(
             "version": importlib.metadata.version("open_spiel"),
             "module": "open_spiel.python.algorithms.cfr",
             "solver": "CFRSolver",
-            "regret_matching_plus": False,
-            "alternating_updates": False,
-            "linear_averaging": False,
+            "regret_matching_plus": switches["regret_matching_plus"],
+            "alternating_updates": switches["alternating_updates"],
+            "linear_averaging": switches["linear_averaging"],
             "python": platform.python_version(),
             "platform": platform.platform(),
             "script": "validation/fixtures/openspiel/leduc_curve.py",
@@ -192,8 +227,8 @@ def main(argv: list[str]) -> int:
     np.random.seed(args.seed)
     game = pyspiel.load_game(GAME_NAME)
     sys.stderr.write(f"{GAME_NAME}: {game.num_players()} players, seed {args.seed}\n")
-    rows, average_policy = run_curve(game, args.checkpoints, sys.stderr)
-    report = build_report(game, rows, average_policy, args.seed, argv)
+    rows, average_policy, switches = run_curve(game, args.checkpoints, sys.stderr)
+    report = build_report(game, rows, average_policy, switches, args.seed, argv)
     write_json(args.out, report)
     sys.stderr.write(f"wrote {args.out}\n")
     return 0

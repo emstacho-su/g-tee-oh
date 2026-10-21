@@ -178,6 +178,35 @@ bench:
     cargo bench -p gto-solve -p gto-library
     node scripts/bench-report.mjs
 
+# The validate tool solves the toy games and writes g1-kuhn, g2-akq and g3-leduc as JSON
+# (JavaScript Object Notation) with Markdown twins; --machine, else VALIDATE_MACHINE, else
+# the host name names the machine (O-125). It refuses a dirty working tree, so the commit
+# a committed report names is the code that ran. No database needed.
+# Validation gates G1 to G3 (R2.4 to R2.6); writes the six reports to validation/reports
+gates:
+    cargo run --release -p validate -- gates --out validation/reports
+
+GATE_CHECK_DIR := "target/gate-reports"
+
+# What ci runs instead of gates: the committed reports stay untouched, and --allow-dirty
+# lets a development tree run (the reports' notes then say the tree was dirty).
+# Gates G1 to G3 into target/gate-reports, then check-reports on that run (R2.4 to R2.6)
+gates-check:
+    cargo run --release -p validate -- gates --out {{GATE_CHECK_DIR}} --allow-dirty
+    node scripts/check-reports.mjs {{GATE_CHECK_DIR}}
+
+EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
+
+# Exact enumeration in gto_solve::equity, run once on the Zenbook from a clean tree and
+# committed, never in CI (O-126).
+# 169 by 169 preflop equity table (R2.20); writes validation/fixtures/equity/preflop-169.json
+equity-table:
+    cargo run --release -p validate -- equity-table --out {{EQUITY_TABLE}}
+
+# Report schema check (R0.11): validation/reports/*.json against the schema, gate reports pass
+report-check:
+    node scripts/check-reports.mjs
+
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary ts-lint ts-typecheck ts-test licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test report-check licenses security guard-test test-tags
