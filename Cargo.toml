@@ -58,6 +58,29 @@ http-body-util = "0.1"
 # Property-based tests (A9 section 2): node-key round trip, suit-permutation invariance,
 # quantize then dequantize. Dev-dependency only, declared here so every crate pins one major.
 proptest = "1"
+# Solutions library format (S14, R2.7, A3 sections 4 and 5). zstd compresses the chunk files;
+# default features are off because only the bundled C library is needed (zstd-sys builds it with
+# cl.exe on Windows MSVC and the C compiler in the Linux images). sha2 checks every file on first
+# open, xxhash-rust supplies the 64-bit xxhash that indexes node keys, and lru holds the decoded
+# frames, used unbounded with byte accounting so QUERY_CACHE_BYTES is the only bound.
+zstd = { version = "0.13", default-features = false }
+sha2 = "0.10"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+lru = "0.19"
+# The library-pack command line (S14, R2.8).
+clap = { version = "4", features = ["derive"] }
+# Seeded generators for synthetic library data (the gto-library "synthetic" feature) and the size
+# estimate; the same majors proptest already brings into the lock.
+rand = "0.9"
+rand_chacha = "0.9"
+# Snapshot tests (S14 and S15, one shared line): json for assert_json_snapshot, redactions so the
+# sha256 fields of a manifest do not churn on a zstd upgrade. Dev-dependency only.
+insta = { version = "1", features = ["json", "redactions"] }
+# Scratch directories for writer and pack tests. Dev-dependency only.
+tempfile = "3"
+# Validates Rust-written manifests against the committed JSON Schema in the gto-library tests.
+# Default features are off, which drops the remote reference resolver and its HTTP client.
+jsonschema = { version = "0.59", default-features = false }
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
