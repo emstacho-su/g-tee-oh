@@ -28,8 +28,8 @@ just is the single command surface and continuous integration (CI) calls the sam
 
 - rust-fmt, rust-clippy, rust-test, rust-boundary
 - ts-lint, ts-typecheck, ts-test
-- contracts, e2e, licenses, security, images, bench
 - gates, equity-table, report-check
+- contracts, contracts-check, e2e, e2e-web, licenses, security, images, bench
 - guard, guard-ci, guard-history, guard-paths DIR, guard-test, test-tags
 - docs-mirror, hooks, ci
 

@@ -61,8 +61,8 @@ COPY tools ./tools
 # BuildKit cache mounts keep the crate registry and the target directory between builds.
 # The target cache is keyed by service and architecture so parallel platform builds never
 # share one. Cache mounts are not part of the image, so the binary is copied to /out.
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git \
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target-${SERVICE}-${TARGETARCH},target=/app/target,sharing=locked \
     set -eu; \
     triple="$(cat /rust-target)"; \

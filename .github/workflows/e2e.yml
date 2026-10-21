@@ -1,7 +1,9 @@
-# e2e job (R0.3, R0.5, R0.6): end-to-end smoke through docker compose. just e2e runs the e2e-stack chain
-# now that infra/compose/compose.yaml exists: dev-up, db-migrate, db-test, smoke, dev-down. S06 adds the
-# Playwright flows and the real FIXTURE_LIBRARY_PATH on the dev profile (O-62). Docker Engine and Compose
-# v2 ship on ubuntu-latest, so nothing installs them.
+# e2e job (R0.3, R0.5, R0.6): end-to-end smoke through docker compose. just e2e runs the e2e-stack chain:
+# dev-up, db-migrate, db-test, smoke, e2e-web (the Playwright flow through Caddy), and dev-down whatever
+# happened before. The dev profile builds the solver-query, api and web images on the runner (O-121): a
+# cold Rust release build of solver-query for amd64 only plus the two Node builds, roughly five minutes
+# before the stack is up; cargo-chef (infra/docker/README.md) is adopted only if the job passes 15
+# minutes. Docker Engine and Compose v2 ship on ubuntu-latest, so nothing installs them.
 name: e2e
 
 on:
@@ -32,6 +34,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # just e2e-web drives Chromium against the stack; --with-deps also installs the browser's system
+      # libraries on the runner. Playwright downloads the browser once per run (an actions/cache on
+      # ~/.cache/ms-playwright keyed by the lockfile is optional).
+      - name: Install the Playwright Chromium browser (R0.3)
+        run: pnpm --filter @g-tee-oh/web exec playwright install --with-deps chromium
       - name: Install dbmate (architecture decision record (ADR) 0005)
         run: npm install -g dbmate@2.37.0
       - name: Create .env with per-run passwords
@@ -47,8 +54,19 @@ jobs:
             echo "a change-me placeholder survived the rewrite" >&2
             exit 1
           fi
+      # Builds the three images first (O-121, see the header), then runs the chain.
       - name: End-to-end smoke
         env:
-          # O-62: the dev profile reads the fixture library from this path; S06 sets the real one.
+          # O-62: the dev profile bind-mounts this directory read-only into solver-query at
+          # /fixtures/library; its placeholder README is what S19 replaces with the fixture sets.
           FIXTURE_LIBRARY_PATH: ${{ github.workspace }}/validation/fixtures/library
         run: just e2e
+      # The html report and traces of a failed Playwright run. A failure before e2e-web leaves no
+      # report, so a missing directory is not an error here.
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          if-no-files-found: ignore

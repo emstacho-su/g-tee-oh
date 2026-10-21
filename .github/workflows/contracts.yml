@@ -1,6 +1,8 @@
-# contracts job (R0.3, R0.6): the committed Kysely types must match the migrated database,
-# and the sqlx offline check runs once a crate carries a query. S06 adds the OpenAPI
-# generators (utoipa, Zod, openapi-typescript) to the same recipe.
+# contracts job (R0.3, R0.6, R0.7): just contracts regenerates every committed contract artifact
+# (the utoipa and Zod OpenAPI documents, the openapi-typescript clients, the Kysely types from the
+# migrated database, the schema copies under crates/gto-library) and the job fails on any diff or
+# untracked file, so a contract change is always a visible, committed diff (A1 section 3). The
+# sqlx offline check runs once a crate carries a query.
 name: contracts
 
 on:
@@ -39,8 +41,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v2
-      # The Rust toolchain joins this job with the first sqlx query (S16 or S18); until then
-      # just sqlx-check prints its notice without cargo.
+      # Step 1 of just contracts is cargo run -p solver-query, which writes the utoipa document
+      # (O-116); sqlx-check needs cargo once a crate carries a query (S16 or S18).
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -50,9 +54,12 @@ jobs:
       - run: npm install -g dbmate@2.37.0
       - name: Apply migrations
         run: just db-migrate
-      - name: Kysely types match the migrated database
+      - name: Regenerate the contracts (utoipa, Zod, openapi-typescript, Kysely, schema copies)
         run: just contracts
       - name: sqlx offline metadata
         run: just sqlx-check
       - name: Fail on an uncommitted diff
         run: git diff --exit-code
+      # git diff ignores untracked files, so a generated file that was never committed needs this.
+      - name: Fail on an untracked generated file
+        run: test -z "$(git status --porcelain)"

@@ -27,13 +27,67 @@ Both throwaway branches were closed and deleted after the runs above were record
 | R0.10 | `just bench` writes `validation/reports/bench-zenbook.json` | File present with `solve_iteration/simple_tree_flop` (mean 42.3 ms) and the two stubs | Pass |
 | R0.5 | `docker compose --profile dev up` reaches healthy; `just smoke` passes | Proven by the `e2e` job on pull request #4, run https://github.com/emstacho-su/g-tee-oh/actions/runs/39453172958: compose up with health checks, 11 migrations, 27 database tests, the smoke checks, then down. The Zenbook run is still owed: its Docker Desktop VM was out of memory from another project's container from 15:11Z on 2026-10-20 | Pass in CI and on the Zenbook (2026-10-20 after the Docker restart: every service healthy in 30 seconds, 11 migrations, 27 tests, 8 of 8 smoke checks) |
 | R0.3 | Dockerfiles build for one service | On the Zenbook after the Docker restart: `solver-query` (127 MB) built in 47 seconds and prints its version line; `web` (93 MB) and `api` (500 MB placeholder) build and start | Pass locally; the `images` job builds in CI once S06 lists a service in the matrix |
-## Conditions completed by S06
+## Evidence recorded by S06
 
-| Condition | Evidence | Result |
+| R ID | Condition | Evidence | Result |
+|---|---|---|---|
+| R0.7 | The contracts pipeline regenerates every artifact with no diff | Pull request #8 at commit 40110ad, contracts run https://github.com/emstacho-su/g-tee-oh/actions/runs/39518792843: migrations, `just contracts` (both OpenAPI documents, the openapi-typescript clients, the Kysely types, the schema copies), `just sqlx-check`, `git diff --exit-code` and the untracked-file check | Pass |
+| R0.7 | The contracts job fails on an uncommitted diff | Throwaway branch `p0/contracts-throwaway-diff` changed the api health schema without regenerating; pull request #9; contracts run https://github.com/emstacho-su/g-tee-oh/actions/runs/39511466269 failed at "Fail on an uncommitted diff" naming `packages/contracts/api.openapi.json` and `src/api.generated.ts`; the ts run https://github.com/emstacho-su/g-tee-oh/actions/runs/39511466579 failed on "R0.7 the committed packages/contracts/api.openapi.json equals the served document" | Failed as required; the branch and pull request were closed and deleted |
+| R0.7 | Skeleton and schema tests | `cargo test -p solver-query` (22 tests), `pnpm --filter @g-tee-oh/contracts test` (25), `pnpm --filter @g-tee-oh/api test` (12), `pnpm --filter @g-tee-oh/web test` (7), `node --test "scripts/**/*.test.mjs"` (58) | Pass |
+| R0.3 | The e2e job brings up the dev profile with FIXTURE_LIBRARY_PATH set, runs the smoke checks and the Playwright flow | e2e run https://github.com/emstacho-su/g-tee-oh/actions/runs/39518792688: six services healthy, 11 migrations, 27 database tests, 10 smoke checks including the fixture library mount seen from inside solver-query, the Playwright smoke flow | Pass |
+| R0.3 | The images job builds solver-query for amd64 and arm64 | Images run https://github.com/emstacho-su/g-tee-oh/actions/runs/39518792821 | Pass after the shared cargo cache mounts were locked (the first multi-arch run raced on the registry) |
+| R0.5 | `just e2e` on the Zenbook | 2026-10-20 evening at the review-fix commit: postgres, seaweedfs, solver-query, api, web and caddy healthy with api and web read only and without capabilities, 27 database tests, 10 of 10 smoke checks, Playwright 1 passed, in 28 seconds with built images | Pass |
+
+## Definition of Done, repo part
+
+| Condition | Evidence | Holds |
 |---|---|---|
-| CI green on `sprint/1-v1` on all seven jobs | pending S06 | |
-| `docker compose --profile dev up` reaches healthy on the Zenbook | pending S02 and S06 | |
-| Every vector is a pending test tagged with its R ID; zero untagged pending tests | pending S05 | |
-| The `contracts` job fails on an uncommitted diff | pending S06 | |
-| Private repo CI result for R0.8 | pending S03 | |
-| Mac part status (R0.9) | pending S04 | |
+| All seven jobs green on `sprint/1-v1` | All seven green on pull request #8 at 40110ad (runs above); the `sprint/1-v1` run after the merge is appended by a one-line `p0/gate-link` docs commit | Not yet: pending the merge |
+| `docker compose --profile dev up` reaches healthy on the Zenbook | The S02 row and the S06 `just e2e` row | Holds |
+| The guard rejects the planted path and the planted identifier locally and in CI | The S01 R0.4 rows | Holds |
+| Every vector is a pending test tagged with its R ID; zero untagged pending tests | `just test-tags` on `sprint/1-v1` after pull request #6 (S05): 83 pending tests, all tagged | Holds |
+| The contracts job fails on an uncommitted diff | The throwaway row above | Holds |
+| This file records R0.2, R0.8 and the Mac part status | This file | Holds |
+
+## Requirement artifacts R0.1 to R0.12
+
+| R ID | Where the evidence is | Holds |
+|---|---|---|
+| R0.1 | S01 rows (workspaces, task surface, hooks, template) | Holds |
+| R0.2 | S01 rows (AGPL throwaway, vendored engine builds and tests) | Holds |
+| R0.3 | S01 rows (seven jobs), S02 row (Dockerfiles), S06 rows (e2e with the fixture path, multi-arch images) | Holds |
+| R0.4 | S01 rows (planted inputs, history scan, guard tests) | Holds |
+| R0.5 | S02 row and the S06 Zenbook row | Holds |
+| R0.6 | S02 rows (migrations, roles, seed, codegen) | Holds |
+| R0.7 | S06 rows | Holds |
+| R0.8 | Private capture repository CI on its sprint branch after its pull request #1 merged: https://github.com/emstacho-su/g-tee-oh-capture/actions/runs/39463601602 (private). Result only: guard, lint, typecheck, unit tests, migrations and database tests green | Holds |
+| R0.9 | Mac bootstrap (S04) | Not yet: pending, deadline S20 (O-67) |
+| R0.10 | S02 row (`bench-zenbook.json`) | Holds |
+| R0.11 | S05 pull request #6: pending vectors tagged, toy-game fixtures, OpenSpiel curve, report schema, `just test-tags` | Holds |
+| R0.12 | S01 row (docs mirror) | Holds |
+
+## Merges
+
+| Session | Pull request | State |
+|---|---|---|
+| S01 foundations | #1 | Merged into `sprint/1-v1` |
+| S02 infra | #5 | Merged |
+| S03 capture repository | private #1 | Merged into the private sprint branch |
+| S05 test vectors | #6 | Merged |
+| S06 contracts | #8 | Open when this file was written; merges after review |
+| S04 Mac bootstrap | none yet | Pending (needs the owner at the Mac) |
+
+## Mac part
+
+Pending as of 2026-10-20. Deadline: S20, the first deploy (O-67). Its report will be `validation/reports/mac-bootstrap.md`.
+
+## Partial success criteria
+
+- Criterion 11 (keying data): seeded. Three stakes and eleven `game_config` rows, pinned by the R0.6 seed test and by the gto-model catalog test (O-112).
+- Criterion 10 (performance): the Zenbook baseline is in `bench-zenbook.json`; the Mac precondition waits on R0.9.
+- Criteria 1, 4, 6 and 7: scaffolded as pending tests tagged with their R IDs (R0.11).
+- No criterion closes in Phase 0, and nothing is deployed (O-20).
+
+## sprint/1-v1 run
+
+Appended by the `p0/gate-link` commit after pull request #8 merges.

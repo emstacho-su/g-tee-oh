@@ -1,0 +1,88 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "solver-query",
+    "description": "Read-only query service over the solutions library; it never solves (ADR 0018).",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Answers the health probe.",
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "The service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Healthz"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FixtureLibrary": {
+        "type": "object",
+        "description": "What the service knows about the fixture library directory.",
+        "required": [
+          "present"
+        ],
+        "properties": {
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`FIXTURE_LIBRARY_PATH` as configured, or null when unset.",
+            "example": "/fixtures/library"
+          },
+          "present": {
+            "type": "boolean",
+            "description": "Whether that directory exists right now."
+          }
+        }
+      },
+      "Healthz": {
+        "type": "object",
+        "description": "The health response body.",
+        "required": [
+          "status",
+          "service",
+          "version",
+          "fixture_library"
+        ],
+        "properties": {
+          "fixture_library": {
+            "$ref": "#/components/schemas/FixtureLibrary",
+            "description": "The fixture library mount (O-62)."
+          },
+          "service": {
+            "type": "string",
+            "description": "The service name, `solver-query`.",
+            "example": "solver-query"
+          },
+          "status": {
+            "type": "string",
+            "description": "Always `ok`.",
+            "example": "ok"
+          },
+          "version": {
+            "type": "string",
+            "description": "The crate version.",
+            "example": "0.1.0"
+          }
+        }
+      }
+    }
+  }
+}

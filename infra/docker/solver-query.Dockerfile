@@ -61,9 +61,11 @@ COPY tools ./tools
 
 # BuildKit cache mounts keep the crate registry and the target directory between builds.
 # The target cache is keyed by service and architecture so parallel platform builds never
-# share one. Cache mounts are not part of the image, so the binary is copied to /out.
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git \
+# share one. The registry and git caches are shared by both platforms, so they are locked:
+# two builds unpacking the same crate at once fail with "File exists". Cache mounts are
+# not part of the image, so the binary is copied to /out.
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target-${SERVICE}-${TARGETARCH},target=/app/target,sharing=locked \
     set -eu; \
     triple="$(cat /rust-target)"; \
@@ -96,10 +98,10 @@ WORKDIR /
 # A5 section 1: solver-query listens on 7070 inside the compose network only.
 EXPOSE 7070
 
-# No HEALTHCHECK yet. The S01 stub ignores its arguments, prints its version line and exits,
-# so a `--version` probe would prove nothing. S06 adds GET /healthz (A5 section 2) and with it
-# a probe such as: HEALTHCHECK CMD ["/usr/local/bin/solver-query", "healthz"] implemented as
-# a self-check subcommand, which keeps curl and wget out of the image.
+# Health probe (A5 section 2, S06): the binary's own `healthz` subcommand opens a loopback
+# TCP connection, sends GET /healthz and exits 0 on a 200 status line, so curl and wget
+# stay out of the image. start-period covers process start; six retries at 10s give a minute.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 CMD ["/usr/local/bin/solver-query", "healthz"]
 
 # Environment (names from .env.example): DATABASE_URL is not used here; the service reads
 # under the query role (O-28) through QUERY_DB_PASSWORD, the library bucket through

@@ -15,3 +15,8 @@ engineStrict: true
 # depends on, so it is allowed.
 allowBuilds:
   esbuild: true
+
+# GHSA-vfj7-8cjw-p6xm: stack exhaustion in braces, reachable only through the dev-only kysely-codegen (via micromatch), no patched version; pnpm audit (just audit-ts) reads this block, so the recipe passes no --ignore flag
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm

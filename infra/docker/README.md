@@ -9,7 +9,14 @@ One Dockerfile per service, multi-arch for linux/amd64 and linux/arm64, built wi
 | `api.Dockerfile` | TypeScript, Fastify product application programming interface (API) | `node:24-slim` | 8080 |
 | `web.Dockerfile` | Vite single-page app served by Caddy | `node:24-slim` then `caddy:2-alpine` | 8080 |
 
-Base image tags are pinned by major version. Every runtime stage runs as a non-root user with a fixed user id (10001 for the Rust and web images, the image's `node` user for the api), carries no writable state and sets Open Container Initiative (OCI) labels for the source repository and the Massachusetts Institute of Technology (MIT) license. Read-only root filesystems, dropped capabilities and memory limits are applied by the compose file, not by the images (A9 section 3).
+Base image tags are pinned by major version. Every runtime stage runs as a non-root user with a
+fixed user id (10001 for the Rust and web images, the image's `node` user for the api), carries no
+writable state and sets Open Container Initiative (OCI) labels for the source repository and the
+Massachusetts Institute of Technology (MIT) license. Read-only root filesystems, dropped
+capabilities, the `no-new-privileges` option and memory limits are applied by the compose file, not
+by the images (A9 section 3); the compose file also mounts a tmpfs on the only paths a process
+still writes under a read-only root, `/tmp` for the api's Node and `/data` plus `/config` for the
+web image's Caddy.
 
 ## Build one image locally
 
@@ -34,21 +41,34 @@ The builder stage is pinned to the build host's platform (`FROM --platform=$BUIL
 
 ## Caches in CI
 
-`images.yml` passes `cache-from` and `cache-to` of type `gha` with one scope per service, so image layers are reused between runs. The BuildKit cache mounts inside the Dockerfiles (the cargo registry and target directory, the pnpm store) are not part of that export, so a cold runner rebuilds the Rust dependency set from scratch. Two options when that becomes the slow step: `reproducible-containers/buildkit-cache-dance`, which saves and restores the cache mounts through `actions/cache`, or `cargo-chef`, which turns the dependency build into an ordinary image layer that the `gha` cache does keep. S06 picks one when it adds `solver-query` to the matrix.
+`images.yml` passes `cache-from` and `cache-to` of type `gha` with one scope per service, so image layers are reused between runs. The BuildKit cache mounts inside the Dockerfiles (the cargo registry and target directory, the pnpm store) are not part of that export, so a cold runner rebuilds the Rust dependency set from scratch. Two options when that becomes the slow step: `reproducible-containers/buildkit-cache-dance`, which saves and restores the cache mounts through `actions/cache`, or `cargo-chef`, which turns the dependency build into an ordinary image layer that the `gha` cache does keep. Neither is adopted yet (O-121): the e2e job builds `solver-query`, `api` and `web` on its runner through `just dev-up` (a cold amd64 release build, roughly five minutes) and the images job keeps the `gha` layer cache as it is; `cargo-chef` is the first option to take when either job passes 15 minutes.
 
-## Placeholders until S06 (R0.7)
+## What each image runs and how it reports health (R0.7)
 
-- `api.Dockerfile` runs the api build only when `services/api/package.json` declares a `build` script (pnpm exits 1 on a filtered run with no script, even with `--if-present`); until S06 the step prints a notice and exits 0. `web.Dockerfile` does the same for `web`. The runtime `CMD` runs `node services/api/dist/index.js` when that file exists and otherwise prints `api image placeholder, S06 adds the server` and exits 0.
-- `web.Dockerfile` runs the web build the same way and writes a placeholder `web/dist/index.html` when the build produced none. A real `web/dist/index.html` wins without any edit to the Dockerfile.
-- The Rust images carry no `HEALTHCHECK` yet. The S01 stubs ignore their arguments, print a version line and exit, so a `--version` probe would prove nothing. S06 adds `GET /healthz` (A5 section 2) and a self-check subcommand for the probe, which keeps `curl` and `wget` out of the images. The web image already probes `http://127.0.0.1:8080/` with busybox `wget`.
+- `api.Dockerfile` installs the `@g-tee-oh/api...` workspace slice, runs the api build script (esbuild bundles the workspace packages into `services/api/dist/index.js`, O-114) and starts it with `node services/api/dist/index.js`. Its `HEALTHCHECK` fetches `GET /healthz`, the root alias of `/api/v1/healthz`, with Node's own `fetch`, so the image carries no `curl`.
+- `web.Dockerfile` installs the `@g-tee-oh/web...` slice, runs the Vite build and serves `web/dist` from Caddy on 8080 with `try_files` for client routes. Its `HEALTHCHECK` probes `http://127.0.0.1:8080/` with busybox `wget`.
+- `solver-query.Dockerfile` carries `HEALTHCHECK CMD ["/usr/local/bin/solver-query", "healthz"]`:
+  the binary's own subcommand connects to the configured bind (through the loopback when the bind
+  is every interface), sends `GET /healthz` (A5 section 2), prints the health JSON and exits 0 on
+  a 200 status line, which keeps `curl` and `wget` out of the image. The JSON's `fixture_library`
+  block names the configured path and whether that directory exists inside the container. The
+  smoke script (`infra/compose/smoke.mjs`, run by `just smoke` and the e2e job) runs this same
+  subcommand through `docker compose exec`, parses the JSON it prints and fails unless `path` is
+  `/fixtures/library` and `present` is true, which is how the `FIXTURE_LIBRARY_PATH` bind mount
+  is proven (O-62).
+- `library-builder.Dockerfile` carries no `HEALTHCHECK` yet: its S01 stub ignores its arguments, prints a version line and exits. The session that gives it a server adds the same self-probe pattern.
+
+The compose dev profile (`infra/compose/compose.yaml`) relies on these image probes for `depends_on: condition: service_healthy` and `up --wait`; it repeats no healthcheck block for the three built images.
 
 ## The matrix file
 
-`images.json` holds `{"services": [...]}`. Each entry is `{"name", "dockerfile", "context"}`. The `plan` job reads it with `jq`; when the list is empty it prints a notice and the `build` job is skipped, otherwise `build` runs once per entry. The first entry S06 adds is:
+`images.json` holds `{"services": [...]}`. Each entry is `{"name", "dockerfile", "context"}`: `name` becomes the image name under `ghcr.io/<repository>/` and the `gha` cache scope, `dockerfile` is a path from the repo root and `context` is always `.`, the repo root, because every Dockerfile's `COPY` paths and `.dockerignore` are written against it. The `plan` job reads the file with `jq`; when the list is empty it prints a notice and the `build` job is skipped, otherwise `build` runs once per entry for both platforms. The first entry is `solver-query` (S06):
 
 ```json
 {"name": "solver-query", "dockerfile": "infra/docker/solver-query.Dockerfile", "context": "."}
 ```
+
+`api`, `web` and `library-builder` are added in the same shape when their sessions publish them. `scripts/images-matrix.test.mjs` (run by `pnpm run test:scripts`, R0.3) checks that `solver-query` is listed, that every entry carries exactly those three keys, names an existing Dockerfile and uses the repo root as context, and that no name repeats.
 
 ## Build context
 

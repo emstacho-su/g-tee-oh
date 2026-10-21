@@ -6,10 +6,10 @@
 #
 # Mechanism: the build stage enables pnpm through corepack, copies every workspace manifest
 # so pnpm can resolve the workspace graph, installs only the web package and its workspace
-# dependencies with --frozen-lockfile, copies the sources and runs the build script if one
-# exists. Until S06 lands the Vite skeleton (R0.7) there is no build script, so the stage
-# writes a placeholder web/dist/index.html instead; that branch disappears on its own once a
-# real build produces web/dist/index.html. The runtime stage is caddy:2-alpine with a
+# dependencies with --frozen-lockfile, copies the sources and runs the Vite build (R0.7),
+# which writes web/dist. vite and its React plugin are devDependencies of the web package
+# itself, so the filtered install brings them in without the root devDependencies. The
+# runtime stage is caddy:2-alpine with a
 # Caddyfile written inline: it serves /srv and falls back to index.html for client-side
 # routes, listens on the unprivileged port 8080 and runs as a non-root user. The edge Caddy
 # from infra/compose publishes the local area network (LAN) port and terminates Transport
@@ -42,42 +42,16 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/learning/package.json packages/learning/
 COPY web/package.json web/
 # "@g-tee-oh/web..." selects the web package and everything it depends on in the workspace.
-# The root package's devDependencies (vite, typescript) are not selected; S06 adds
-# --filter . here or moves vite into web/package.json when the real build lands.
+# The root package's devDependencies (vitest, typescript, eslint) are not selected; the build
+# needs none of them because vite.config.ts imports nothing from vitest at run time.
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@g-tee-oh/web..."
 
 COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY web web
-# No build script exists before S06. pnpm exits 1 when a filtered run finds no script even with
-# --if-present, so the step checks package.json first and skips with a notice until then.
-RUN if node -e "process.exit(require('./web/package.json').scripts?.build ? 0 : 1)"; then pnpm --filter @g-tee-oh/web run build; else echo "web: no build script yet (S06 adds the Vite build)"; fi
-
-# Placeholder until S06's Vite build writes web/dist/index.html. The check is on the file,
-# so a real build wins without any edit here.
-RUN <<'SH'
-set -eu
-if [ ! -f web/dist/index.html ]; then
-  mkdir -p web/dist
-  cat > web/dist/index.html <<'HTML'
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>g-tee-oh</title>
-  </head>
-  <body>
-    <main>
-      <h1>g-tee-oh</h1>
-      <p>web image placeholder, S06 adds the Vite build (R0.7).</p>
-    </main>
-  </body>
-</html>
-HTML
-fi
-SH
+# The Vite build writes web/dist (index.html plus hashed assets); the runtime stage copies it.
+RUN pnpm --filter @g-tee-oh/web run build
 
 # ---- runtime: Caddy serving the static build ---------------------------------------------
 FROM ${CADDY_IMAGE} AS runtime
@@ -108,7 +82,14 @@ COPY --from=build /app/web/dist /srv
 # Non-root with a fixed user id. /config and /data are the image's XDG_CONFIG_HOME and
 # XDG_DATA_HOME directories; they are owned by the user so Caddy can still write there if a
 # later Caddyfile needs it.
+# The base image grants /usr/bin/caddy the file capability cap_net_bind_service. Compose
+# drops every capability and sets no-new-privileges, and the kernel then refuses to exec a
+# binary that asks for one (exit 255). This Caddy listens on 8080 and never needs it, so the
+# binary is copied over itself: busybox cp keeps no extended attributes, which removes it.
 RUN set -eu; \
+    cp /usr/bin/caddy /tmp/caddy; \
+    mv /tmp/caddy /usr/bin/caddy; \
+    chmod 0755 /usr/bin/caddy; \
     addgroup -S -g 10001 gto; \
     adduser -S -D -H -u 10001 -G gto -s /sbin/nologin gto; \
     chown -R gto:gto /config /data /srv

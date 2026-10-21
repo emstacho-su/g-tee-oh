@@ -17,3 +17,7 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright output (web): the html report and the traces of a run
+web/playwright-report/
+web/test-results/
