@@ -3,13 +3,17 @@
 //! Mechanism, in order:
 //!
 //! 1. The problem, the stop rule and the options are checked.
-//! 2. The `gto-tree` betting skeleton is built and `estimate::memory_of` turns it into the
-//!    modeled peak. Above `SolveOptions::memory_cap_bytes` the solve returns
+//! 2. `estimate_memory` builds the `gto-tree` betting skeleton and models the peak from
+//!    it, unless the caller passes the estimate it already decided on
+//!    (`solve_postflop_with_estimate`), which spares the library builder a second
+//!    skeleton build per spot. Above `SolveOptions::memory_cap_bytes` the solve returns
 //!    `SolveError::OverMemoryCap` before the engine game or the solver exists, so a refused
 //!    problem allocates only the skeleton.
 //! 3. The engine game is built from the mapped configuration (`engine_map`) and the solver
 //!    with 16-bit storage unless the options say 32-bit.
-//! 4. One exact Discounted CFR iteration at a time: the sink hears every iteration, with
+//! 4. One exact Discounted CFR iteration at a time, on the schedule the mapped
+//!    configuration carries (`DcfrParams::from_config`), so the configuration the solved
+//!    game holds always describes the solve that ran: the sink hears every iteration, with
 //!    the measured exploitability every `measure_every` iterations (`None` between).
 //! 5. The solve stops when both players' unilateral gain, as a percent of the starting
 //!    pot, is at or below the target (O-138), or at the iteration or time cap. The report
@@ -24,140 +28,16 @@
 use std::fmt;
 use std::time::Instant;
 
-use gto_tree::ActionTree;
-use postflop_engine::cfr::{DcfrParams, Solver, StorageMode};
+use postflop_engine::cfr::{DcfrParams, Solver};
 use postflop_engine::game::Game;
 use postflop_engine::nlhe::NlheGame;
 
 use super::engine_map;
 use super::error::SolveError;
-use super::estimate::{MemoryEstimate, memory_of, worker_threads};
+use super::estimate::{MemoryEstimate, estimate_memory};
 use super::measure::best_response;
+use super::options::{ProgressSink, SolveOptions, SolveReport, StopReason, StopRule, StorageBits};
 use super::problem::PostflopProblem;
-
-/// The default memory cap: 5 GiB, Docker's `5g` limit that stands in for the 5 GB of the
-/// target Mac (O-20, O-48).
-pub const DEFAULT_MEMORY_CAP_BYTES: u64 = 5 * 1024 * 1024 * 1024;
-
-/// Iterations between exploitability measurements by default (O-138).
-pub const DEFAULT_MEASURE_EVERY: u32 = 10;
-
-/// When to stop.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StopRule {
-    /// Stop once both players' gain is at or below this percent of the starting pot.
-    pub target_exploitability_pct_pot: f32,
-    /// The most iterations to run. Zero builds the game and measures the uniform profile.
-    pub max_iterations: u32,
-    /// The most wall-clock seconds to iterate, checked after every iteration.
-    pub max_seconds: u32,
-}
-
-impl StopRule {
-    fn validate(self) -> Result<(), SolveError> {
-        let target = self.target_exploitability_pct_pot;
-        if !(target.is_finite() && target >= 0.0) {
-            return Err(SolveError::Problem(format!(
-                "the target {target} is not a finite percent at or above 0"
-            )));
-        }
-        if self.max_seconds == 0 {
-            return Err(SolveError::Problem("max_seconds must be at least 1".to_owned()));
-        }
-        Ok(())
-    }
-}
-
-/// How the solver stores its regret and strategy entries.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum StorageBits {
-    /// An `i16` per entry and an `f32` scale per node, about half the bytes of 32-bit.
-    #[default]
-    Sixteen,
-    /// An `f32` per entry.
-    ThirtyTwo,
-}
-
-impl StorageBits {
-    fn mode(self) -> StorageMode {
-        match self {
-            StorageBits::Sixteen => StorageMode::I16,
-            StorageBits::ThirtyTwo => StorageMode::F32,
-        }
-    }
-}
-
-/// Solve options beyond the stop rule.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SolveOptions {
-    /// Entry storage, 16-bit by default.
-    pub storage: StorageBits,
-    /// The most bytes the estimate may come to before the solve is refused.
-    pub memory_cap_bytes: u64,
-    /// Iterations between exploitability measurements; at least 1.
-    pub measure_every: u32,
-}
-
-impl Default for SolveOptions {
-    fn default() -> Self {
-        SolveOptions {
-            storage: StorageBits::Sixteen,
-            memory_cap_bytes: DEFAULT_MEMORY_CAP_BYTES,
-            measure_every: DEFAULT_MEASURE_EVERY,
-        }
-    }
-}
-
-/// Why a solve stopped.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum StopReason {
-    /// Both gains reached the target.
-    Target,
-    /// The iteration cap.
-    MaxIterations,
-    /// The time cap.
-    MaxSeconds,
-}
-
-/// What a solve did.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SolveReport {
-    /// Iterations run.
-    pub iterations: u32,
-    /// Each player's gain as a percent of the starting pot, `[oop, ip]`, for the final
-    /// profile.
-    pub exploitability_pct_pot: [f32; 2],
-    /// Accounted peak bytes (O-139).
-    pub peak_bytes: u64,
-    /// The estimate checked against the cap.
-    pub estimate_bytes: u64,
-    /// Wall-clock seconds from the start of the call to the final measurement.
-    pub seconds: f32,
-    /// Why the solve stopped.
-    pub stop_reason: StopReason,
-    /// The entry storage used.
-    pub storage: StorageBits,
-    /// `gto_tree::tree_hash` of the problem's tree configuration.
-    pub tree_hash: [u8; 32],
-}
-
-/// Hears a solve's progress.
-pub trait ProgressSink {
-    /// Called after every iteration, with each player's gain as a percent of the starting
-    /// pot on the iterations that measure it.
-    fn report(&self, iteration: u32, exploitability_pct_pot: Option<[f32; 2]>);
-
-    /// Called once with the final report.
-    fn finished(&self, _report: &SolveReport) {}
-}
-
-/// A sink that ignores everything.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct NoProgress;
-
-impl ProgressSink for NoProgress {
-    fn report(&self, _iteration: u32, _exploitability_pct_pot: Option<[f32; 2]>) {}
-}
 
 /// A solved game: the engine solver with its average strategy, the tree hash and the seed.
 pub struct SolvedGame {
@@ -259,7 +139,7 @@ pub fn solve_postflop(
     solve_postflop_with(problem, stop, seed, sink, &SolveOptions::default())
 }
 
-/// Solves with explicit options.
+/// Solves with explicit options, taking the memory estimate first.
 ///
 /// # Errors
 ///
@@ -275,12 +155,54 @@ pub fn solve_postflop_with(
     options: &SolveOptions,
 ) -> Result<(SolvedGame, SolveReport), SolveError> {
     let start = Instant::now();
+    validate_options(stop, options)?;
+    let estimate = estimate_memory(problem, options.storage)?;
+    solve_estimated(problem, &estimate, stop, seed, sink, options, start)
+}
+
+/// Solves with explicit options and the estimate the caller already took for this problem
+/// with `estimate_memory` and the options' storage, so the betting skeleton is built once
+/// per spot. The estimate is taken as this problem's: the cap check and the report's
+/// `estimate_bytes` read it as given.
+///
+/// # Errors
+///
+/// The errors of `solve_postflop_with` less `SolveError::Tree`, and `SolveError::Problem`
+/// when the estimate is for the other storage.
+pub fn solve_postflop_with_estimate(
+    problem: &PostflopProblem,
+    estimate: &MemoryEstimate,
+    stop: StopRule,
+    seed: u64,
+    sink: &dyn ProgressSink,
+    options: &SolveOptions,
+) -> Result<(SolvedGame, SolveReport), SolveError> {
+    let start = Instant::now();
+    validate_options(stop, options)?;
+    problem.validate()?;
+    solve_estimated(problem, estimate, stop, seed, sink, options, start)
+}
+
+/// Checks the stop rule and the options before anything is built.
+fn validate_options(stop: StopRule, options: &SolveOptions) -> Result<(), SolveError> {
     stop.validate()?;
     if options.measure_every == 0 {
         return Err(SolveError::Problem("measure_every must be at least 1".to_owned()));
     }
-    problem.validate()?;
-    let estimate = checked_estimate(problem, options)?;
+    Ok(())
+}
+
+/// Steps 2 (the cap) to 5 of the module docs, for a checked problem with its estimate.
+fn solve_estimated(
+    problem: &PostflopProblem,
+    estimate: &MemoryEstimate,
+    stop: StopRule,
+    seed: u64,
+    sink: &dyn ProgressSink,
+    options: &SolveOptions,
+    start: Instant,
+) -> Result<(SolvedGame, SolveReport), SolveError> {
+    check_estimate(estimate, options)?;
     let game = NlheGame::new(&engine_map::solve_config(problem)).map_err(SolveError::Engine)?;
     let cfr = Solver::new_with_storage(game, options.storage.mode());
     let tree_hash = gto_tree::tree_hash(&problem.tree);
@@ -289,7 +211,7 @@ pub fn solve_postflop_with(
     let report = SolveReport {
         iterations: outcome.iterations,
         exploitability_pct_pot: outcome.measured,
-        peak_bytes: accounted_peak(&estimate, &solved),
+        peak_bytes: accounted_peak(estimate, &solved),
         estimate_bytes: estimate.total_bytes,
         seconds: start.elapsed().as_secs_f32(),
         stop_reason: outcome.reason,
@@ -300,22 +222,21 @@ pub fn solve_postflop_with(
     Ok((solved, report))
 }
 
-/// Builds the skeleton, estimates, drops the skeleton and refuses a problem above the cap.
-fn checked_estimate(
-    problem: &PostflopProblem,
-    options: &SolveOptions,
-) -> Result<MemoryEstimate, SolveError> {
-    let estimate = {
-        let skeleton = ActionTree::build(&problem.tree, problem.root())?;
-        memory_of(&skeleton, problem, options.storage, worker_threads())
-    };
+/// Refuses an estimate taken for the other storage, and a problem above the cap.
+fn check_estimate(estimate: &MemoryEstimate, options: &SolveOptions) -> Result<(), SolveError> {
+    if estimate.storage != options.storage {
+        return Err(SolveError::Problem(format!(
+            "the estimate is for {:?} storage and the options ask for {:?}",
+            estimate.storage, options.storage
+        )));
+    }
     if estimate.total_bytes > options.memory_cap_bytes {
         return Err(SolveError::OverMemoryCap {
             estimate_bytes: estimate.total_bytes,
             cap_bytes: options.memory_cap_bytes,
         });
     }
-    Ok(estimate)
+    Ok(())
 }
 
 /// The engine's own storage and chance map figures plus the estimate's model of the rest.
@@ -342,7 +263,7 @@ fn iterate(
     sink: &dyn ProgressSink,
     start: Instant,
 ) -> Outcome {
-    let params = DcfrParams::default();
+    let params = dcfr_schedule(solved);
     let mut last: Option<(u32, [f32; 2])> = None;
     for iteration in 1..=stop.max_iterations {
         solved.solver.run(1, &params, 0, |_, _, _| {});
@@ -368,6 +289,12 @@ fn iterate(
     Outcome { iterations, measured, reason: StopReason::MaxIterations }
 }
 
+/// The DCFR schedule the solver runs: the one its game's configuration carries, so the
+/// configuration and the solve cannot disagree.
+fn dcfr_schedule(solved: &SolvedGame) -> DcfrParams {
+    DcfrParams::from_config(solved.solver.game().config())
+}
+
 /// The measurement of the final profile, reused when the last iteration measured it.
 fn final_measure(solved: &SolvedGame, last: Option<(u32, [f32; 2])>, iteration: u32) -> [f32; 2] {
     match last {
@@ -380,4 +307,83 @@ fn final_measure(solved: &SolvedGame, last: Option<(u32, [f32; 2])>, iteration: 
 #[allow(clippy::cast_possible_truncation, reason = "a report figure, read to a few digits")]
 fn gain_pct(solved: &SolvedGame) -> [f32; 2] {
     best_response(solved).gain_pct_pot.map(|gain| gain as f32)
+}
+
+#[cfg(test)]
+mod tests {
+    use gto_model::{
+        ActionToken, Board, Cbb, GameConfig, GameFormat, Position, PositionPair, Stake, TableSize,
+    };
+    use gto_tree::{
+        DEFAULT_ALLIN_THRESHOLD_BP, LineKind, PlayerSizes, PreflopLine, SizeTable, StreetSizes,
+        TreeConfig,
+    };
+    use postflop_engine::cfr::{DcfrParams, Solver};
+    use postflop_engine::config::SolveConfig;
+    use postflop_engine::nlhe::NlheGame;
+
+    use super::super::engine_map;
+    use super::super::problem::{PostflopProblem, Range};
+    use super::{SolvedGame, StorageBits, dcfr_schedule};
+
+    /// The schedule the module docs promise: DCFR 1.5 / 0 / 2 with no regret floor.
+    const DOCUMENTED_SCHEDULE: DcfrParams =
+        DcfrParams { alpha: 1.5, beta: 0.0, gamma: 2.0, floor_regrets_at_zero: false };
+
+    /// The dry flop with one bet size, one raise and one combo a side.
+    fn sample_problem() -> PostflopProblem {
+        let street = || StreetSizes {
+            bet: SizeTable::new(&[7_500], false).expect("a valid table"),
+            raise: SizeTable::new(&[], true).expect("a valid table"),
+            donk: SizeTable::default(),
+        };
+        let player = PlayerSizes { flop: street(), turn: street(), river: street() };
+        let tree = TreeConfig::new(player.clone(), player, 1, DEFAULT_ALLIN_THRESHOLD_BP)
+            .expect("a valid tree");
+        let line = PreflopLine {
+            pair: PositionPair::new(Position::Bb, Position::Btn).expect("two seats"),
+            actions: vec![ActionToken::Raise(Cbb(250)), ActionToken::Call],
+            kind: LineKind::SingleRaised,
+            flop_pot: Cbb(550),
+            flop_stack: Cbb(9_750),
+            aggressor: Some(Position::Btn),
+        };
+        let stake = Stake::online();
+        let config =
+            GameConfig::new(GameFormat::Online, TableSize::SIX_MAX, stake, Cbb::from_bb(100));
+        let board = Board::flop("Ks7d2c".parse().expect("a valid flop"));
+        let ranges =
+            [Range::parse("AhKh").expect("a range"), Range::parse("QsQd").expect("a range")];
+        PostflopProblem::from_line(config, line, board, ranges, tree).expect("a valid problem")
+    }
+
+    /// A solved game on an engine configuration, before any iteration.
+    fn solved_on(cfg: &SolveConfig) -> SolvedGame {
+        let game = NlheGame::new(cfg).expect("the engine builds the game");
+        let solver = Solver::new_with_storage(game, StorageBits::Sixteen.mode());
+        SolvedGame { solver, tree_hash: [0; 32], seed: 0, storage: StorageBits::Sixteen }
+    }
+
+    /// R2.10: the solver runs the schedule its game's configuration carries, not a default
+    /// of its own, so the stored configuration always describes the solve that ran.
+    #[test]
+    fn r2_10_solver_runs_the_schedule_of_its_config() {
+        let altered = SolveConfig {
+            alpha: 1.0,
+            beta: 0.25,
+            gamma: 3.0,
+            regret_floor: true,
+            ..engine_map::solve_config(&sample_problem())
+        };
+        let solved = solved_on(&altered);
+        assert_eq!(dcfr_schedule(&solved), DcfrParams::from_config(&altered));
+        assert_ne!(dcfr_schedule(&solved), DcfrParams::default());
+    }
+
+    /// R2.10: the configuration a problem maps to carries the documented schedule.
+    #[test]
+    fn r2_10_solve_config_carries_the_documented_schedule() {
+        let solved = solved_on(&engine_map::solve_config(&sample_problem()));
+        assert_eq!(dcfr_schedule(&solved), DOCUMENTED_SCHEDULE);
+    }
 }

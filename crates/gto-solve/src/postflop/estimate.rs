@@ -27,9 +27,9 @@ use super::layout::{
     ACTION, BOARD_CARDS, BOARD_DATA, CARD_MAP, CHANCE_CHILDREN, CHANCE_DATA, DECK, HAND, MAP_ENTRY,
     NODE, NODE_INFO, OUTCOME, TERM_DATA, WORD, hash_table_bytes, vec_capacity,
 };
-use super::problem::PostflopProblem;
+use super::options::StorageBits;
+use super::problem::{PostflopProblem, Range};
 use super::runouts::{LiveCounts, Runouts};
-use super::solve::StorageBits;
 
 /// A fixed allowance for the engine's parsing and set-up buffers (range expansion, the
 /// board id table) and the adapter's own small structures.
@@ -99,10 +99,12 @@ pub fn estimate_memory(
     Ok(memory_of(&skeleton, problem, storage, worker_threads()))
 }
 
-/// Worker threads the engine's parallel traversal may run on, read without starting the
-/// thread pool so that a refused problem allocates nothing for it.
+/// Worker threads the engine's parallel traversal forks onto: the rayon pool's count,
+/// which honours `RAYON_NUM_THREADS` and a pool the host built, where the machine's
+/// parallelism need not. Reading it starts the global pool when nothing has yet, a fixed
+/// one-time cost that every solve shares and no solve's peak is charged with.
 pub(crate) fn worker_threads() -> u64 {
-    std::thread::available_parallelism().map_or(1, |threads| threads.get() as u64)
+    rayon::current_num_threads() as u64
 }
 
 /// Engine node counts after the runout multipliers.
@@ -239,9 +241,10 @@ fn chance_map_bytes(skeleton: &ActionTree, runouts: &Runouts, live: &LiveCounts)
     (payload, held + hash_table_bytes(parents, MAP_ENTRY))
 }
 
-/// The range texts the adapter writes and the engine keeps a copy of.
+/// The range texts the adapter writes and the engine keeps a copy of, measured without
+/// building them.
 fn text_bytes(problem: &PostflopProblem) -> u64 {
-    let text: usize = problem.ranges.iter().map(|range| range.to_engine_notation().len()).sum();
+    let text: usize = problem.ranges.iter().map(Range::engine_notation_len).sum();
     2 * text as u64
 }
 
@@ -263,4 +266,20 @@ fn working_bytes(
     let codec = actions * combos * FLOAT;
     let fork = runouts.unseen() * combos * FLOAT;
     (threads + 1) * (per_walk + codec) + per_walk + fork + FIXED_BYTES
+}
+
+#[cfg(test)]
+mod tests {
+    use super::worker_threads;
+
+    /// R2.10 (O-139): the thread count the scratch term is charged for is the rayon pool's,
+    /// the pool the engine forks onto, not the machine's.
+    #[test]
+    fn r2_10_worker_threads_follow_the_rayon_pool() {
+        for threads in [2_usize, 3] {
+            let pool =
+                rayon::ThreadPoolBuilder::new().num_threads(threads).build().expect("a pool");
+            assert_eq!(pool.install(worker_threads), threads as u64);
+        }
+    }
 }

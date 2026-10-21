@@ -19,9 +19,11 @@
 //!   lower card then higher card, so a board is written card by card and a range as
 //!   explicit combos (`Range::to_engine_notation`).
 //! - Solve settings: exact chance (`turn_chance_sampling = false`, every turn and river
-//!   card, ADR 0023), no regret floor, and the Discounted CFR (DCFR) schedule 1.5 / 0 / 2.
-//!   The adapter runs its own stop rule, so the engine's own target and iteration fields
-//!   are set to values its validation accepts and are never read.
+//!   card, ADR 0023), no regret floor, and the Discounted CFR (DCFR) schedule 1.5 / 0 / 2,
+//!   written explicitly rather than left to the engine's defaults; the solve reads the
+//!   schedule back off this configuration, so the two cannot drift apart. The adapter
+//!   runs its own stop rule, so the engine's own target and iteration fields are set to
+//!   values its validation accepts and are never read.
 
 use gto_model::{Board, Cbb, GameConfig};
 use gto_tree::{Player, PlayerSizes, SizeTable, StreetSizes, TreeConfig};
@@ -41,6 +43,12 @@ const GRID_TOLERANCE: f64 = 1e-6;
 /// The engine's own target and iteration ceiling, which the adapter never reads.
 const UNUSED_ENGINE_TARGET: f64 = 0.0;
 const UNUSED_ENGINE_ITERATIONS: u64 = 1;
+
+/// The DCFR schedule 1.5 / 0 / 2 with no regret floor (the DCFR paper's recommendation).
+const DCFR_ALPHA: f64 = 1.5;
+const DCFR_BETA: f64 = 0.0;
+const DCFR_GAMMA: f64 = 2.0;
+const DCFR_REGRET_FLOOR: bool = false;
 
 /// Engine chips for an amount in cbb.
 pub(crate) fn chips(amount: Cbb) -> f64 {
@@ -83,8 +91,11 @@ pub(crate) fn solve_config(problem: &PostflopProblem) -> SolveConfig {
         raise_cap: u32::from(problem.tree.raise_cap()),
         target_exploitability: UNUSED_ENGINE_TARGET,
         max_iterations: UNUSED_ENGINE_ITERATIONS,
+        alpha: DCFR_ALPHA,
+        beta: DCFR_BETA,
+        gamma: DCFR_GAMMA,
         turn_chance_sampling: false,
-        regret_floor: false,
+        regret_floor: DCFR_REGRET_FLOOR,
         rake: rake(&problem.config),
         sizings: sizings(&problem.tree),
         ..SolveConfig::default()

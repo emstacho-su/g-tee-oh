@@ -176,14 +176,17 @@ impl LiveCounts {
         }
     }
 
-    /// One player's live combos once `dealt` (at most two cards) are dealt.
+    /// One player's live combos once `dealt` (at most two cards) are dealt: the root's
+    /// live combos less those holding a dealt card. The combo of both dealt cards is
+    /// tallied under each of them, so it is added back first; added last, a range whose
+    /// every live combo holds one of the two cards would take the subtraction below zero.
     fn live_on(&self, player: usize, dealt: &[u8]) -> u64 {
         let removed: u64 = dealt.iter().map(|&card| self.holding[player][usize::from(card)]).sum();
         let both = match dealt {
             [a, b] => self.pair_is_live(player, *a, *b),
             _ => false,
         };
-        self.root_live[player] - removed + u64::from(both)
+        self.root_live[player] + u64::from(both) - removed
     }
 
     /// True when the combo of the two cards is live for the player.

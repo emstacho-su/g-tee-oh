@@ -10,7 +10,7 @@
 //! combo with a positive weight as an explicit combo such as `AhKh:0.5`; `f32` display
 //! round-trips exactly, so the engine parses back the same weights.
 
-use std::fmt::Write as _;
+use std::fmt;
 
 use gto_model::{Board, Card, Cbb, ComboId, GameConfig, Street};
 use gto_tree::{PreflopLine, RootState, TreeConfig};
@@ -92,25 +92,55 @@ impl Range {
     /// Every combo with a positive weight as an explicit engine combo, lower card first,
     /// with `:weight` unless the weight is 1, joined by commas. The text is written into
     /// one string, so a solve refused for memory allocates little for it.
+    ///
+    /// # Panics
+    ///
+    /// Never: a `String` accepts every write.
     #[must_use]
     pub fn to_engine_notation(&self) -> String {
         let combos = self.weights.iter().filter(|&&weight| weight > 0.0).count();
         let mut text = String::with_capacity(combos * NOTATION_BYTES_PER_COMBO);
-        for combo in ComboId::all() {
-            let weight = self.weight(combo);
-            if weight <= 0.0 {
-                continue;
-            }
-            if !text.is_empty() {
-                text.push(',');
+        self.write_engine_notation(&mut text).expect("writing to a String cannot fail");
+        text
+    }
+
+    /// The byte length of `to_engine_notation`, counted without building the text, for
+    /// the memory estimate.
+    pub(crate) fn engine_notation_len(&self) -> usize {
+        let mut counter = ByteCounter::default();
+        self.write_engine_notation(&mut counter).expect("counting bytes cannot fail");
+        counter.bytes
+    }
+
+    /// Writes the engine notation into `out`: the one writer behind the text and its
+    /// length.
+    fn write_engine_notation(&self, out: &mut impl fmt::Write) -> fmt::Result {
+        let positive = ComboId::all().filter(|&combo| self.weight(combo) > 0.0);
+        for (index, combo) in positive.enumerate() {
+            if index > 0 {
+                out.write_char(',')?;
             }
             let (low, high) = combo.cards();
-            write!(text, "{low}{high}").expect("writing to a String cannot fail");
+            write!(out, "{low}{high}")?;
+            let weight = self.weight(combo);
             if weight < 1.0 {
-                write!(text, ":{weight}").expect("writing to a String cannot fail");
+                write!(out, ":{weight}")?;
             }
         }
-        text
+        Ok(())
+    }
+}
+
+/// A `fmt::Write` sink that counts the bytes written and keeps none of them.
+#[derive(Default)]
+struct ByteCounter {
+    bytes: usize,
+}
+
+impl fmt::Write for ByteCounter {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        self.bytes += text.len();
+        Ok(())
     }
 }
 
@@ -197,5 +227,34 @@ impl PostflopProblem {
     #[must_use]
     pub fn root(&self) -> RootState {
         RootState { street: self.street(), pot: self.pot, stack: self.effective_stack() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMBO_COUNT, Range};
+
+    /// R2.10 (O-139): the counted length of the engine notation is the length of the text,
+    /// whether the weights are whole, fractional or mixed, so the estimate's text term is
+    /// exact without building the text.
+    #[test]
+    fn r2_10_engine_notation_len_matches_the_text() {
+        let mixed: Vec<f32> = (0..COMBO_COUNT)
+            .map(|index| match index % 4 {
+                0 => 1.0,
+                1 => 0.5,
+                2 => 0.0,
+                _ => 1.0 / (f32::from(u16::try_from(index).expect("fits")) + 2.0),
+            })
+            .collect();
+        let ranges = [
+            Range::parse("AhKh").expect("a range"),
+            Range::parse("QQ+,AKs:0.25").expect("a range"),
+            Range::from_weights(&[1.0; COMBO_COUNT]).expect("valid weights"),
+            Range::from_weights(&mixed).expect("valid weights"),
+        ];
+        for range in ranges {
+            assert_eq!(range.engine_notation_len(), range.to_engine_notation().len());
+        }
     }
 }

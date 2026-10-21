@@ -21,6 +21,7 @@ mod error;
 mod estimate;
 mod layout;
 mod measure;
+mod options;
 mod problem;
 mod runouts;
 mod solve;
@@ -31,9 +32,9 @@ mod parity_tests;
 pub use error::SolveError;
 pub use estimate::{MemoryEstimate, estimate_bytes, estimate_bytes_with, estimate_memory};
 pub use measure::{BestResponseReport, best_response};
-pub use problem::{COMBO_COUNT, PostflopProblem, Range};
-pub use solve::{
+pub use options::{
     DEFAULT_MEASURE_EVERY, DEFAULT_MEMORY_CAP_BYTES, NoProgress, ProgressSink, SolveOptions,
-    SolveReport, SolvedGame, StopReason, StopRule, StorageBits, solve_postflop,
-    solve_postflop_with,
+    SolveReport, StopReason, StopRule, StorageBits,
 };
+pub use problem::{COMBO_COUNT, PostflopProblem, Range};
+pub use solve::{SolvedGame, solve_postflop, solve_postflop_with, solve_postflop_with_estimate};

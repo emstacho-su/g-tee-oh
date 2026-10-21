@@ -63,6 +63,18 @@ fn r2_10_estimate_is_exact_from_turn_and_river_roots() {
     }
 }
 
+/// R2.10: a range whose every live combo holds one of the two cards a river deals, with
+/// the pair of them live, removes more combos than it holds unless the pair is added back
+/// before the subtraction; the estimate must survive it and stay exact against the engine.
+#[test]
+fn r2_10_estimate_survives_ranges_pinned_to_the_dealt_cards() {
+    for oop in ["AhKh", "AhKh,AhQh,AhJh"] {
+        let board = flop_board(common::DRY_FLOP);
+        let problem = problem_with(board, narrow_tree(), [range(oop), range(IP_RANGE)]);
+        assert_estimate_matches_engine(&problem, StorageBits::Sixteen);
+    }
+}
+
 /// R2.10: `estimate_bytes` is the 16-bit estimate, and the 32-bit one is larger.
 #[test]
 fn r2_10_estimate_bytes_defaults_to_sixteen_bit() {

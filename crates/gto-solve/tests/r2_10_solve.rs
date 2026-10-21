@@ -11,9 +11,11 @@ mod common;
 use std::cell::{Cell, RefCell};
 
 use common::small_problem;
+use gto_model::Cbb;
 use gto_solve::postflop::{
     DEFAULT_MEASURE_EVERY, NoProgress, ProgressSink, SolveError, SolveOptions, SolveReport,
-    StopReason, StopRule, StorageBits, best_response, solve_postflop, solve_postflop_with,
+    StopReason, StopRule, StorageBits, best_response, estimate_memory, solve_postflop,
+    solve_postflop_with, solve_postflop_with_estimate,
 };
 
 /// Plan section D: 0.3 percent of the pot within 2,000 iterations. The time cap is 300
@@ -26,6 +28,14 @@ const TARGET_STOP: StopRule = StopRule {
     max_iterations: 2_000,
     max_seconds: 300,
 };
+
+/// Percent per whole.
+const PERCENT: f64 = 100.0;
+
+/// A strategy's entries bit for bit, for exact comparison.
+fn strategy_bits(strategy: Vec<f32>) -> Vec<u32> {
+    strategy.into_iter().map(f32::to_bits).collect()
+}
 
 /// A sink that records every call.
 #[derive(Default)]
@@ -90,8 +100,37 @@ fn r2_10_solve_is_deterministic() {
     let (first, a) = solve_postflop(&problem, stop, 1, &NoProgress).expect("solves");
     let (second, b) = solve_postflop(&problem, stop, 2, &NoProgress).expect("solves");
     assert_eq!((a.iterations, a.exploitability_pct_pot), (b.iterations, b.exploitability_pct_pot));
-    let bits = |strategy: Vec<f32>| strategy.into_iter().map(f32::to_bits).collect::<Vec<u32>>();
-    assert_eq!(bits(first.root_strategy()), bits(second.root_strategy()));
+    assert_eq!(strategy_bits(first.root_strategy()), strategy_bits(second.root_strategy()));
+}
+
+/// R2.10: a solve handed the estimate the caller decided on reports that estimate and
+/// gives the report and root strategy of the solve that estimates for itself; an estimate
+/// for the other storage is refused, and the cap still applies to a passed estimate.
+#[test]
+fn r2_10_solve_with_passed_estimate_matches_plain_solve() {
+    let problem = small_problem();
+    let stop = StopRule { target_exploitability_pct_pot: 0.0, max_iterations: 5, max_seconds: 120 };
+    let options = SolveOptions::default();
+    let estimate = estimate_memory(&problem, options.storage).expect("estimates");
+    let (plain, a) = solve_postflop_with(&problem, stop, 0, &NoProgress, &options).expect("solves");
+    let (given, b) =
+        solve_postflop_with_estimate(&problem, &estimate, stop, 0, &NoProgress, &options)
+            .expect("solves");
+    assert_eq!(b.estimate_bytes, estimate.total_bytes);
+    assert_eq!(SolveReport { seconds: 0.0, ..a }, SolveReport { seconds: 0.0, ..b });
+    assert_eq!(strategy_bits(plain.root_strategy()), strategy_bits(given.root_strategy()));
+
+    let other = SolveOptions { storage: StorageBits::ThirtyTwo, ..options };
+    let result = solve_postflop_with_estimate(&problem, &estimate, stop, 0, &NoProgress, &other)
+        .map(|(_, report)| report);
+    assert!(matches!(result, Err(SolveError::Problem(_))), "{result:?}");
+
+    let cap_bytes = estimate.total_bytes - 1;
+    let capped = SolveOptions { memory_cap_bytes: cap_bytes, ..options };
+    let result = solve_postflop_with_estimate(&problem, &estimate, stop, 0, &NoProgress, &capped)
+        .map(|(_, report)| report);
+    let refused = SolveError::OverMemoryCap { estimate_bytes: estimate.total_bytes, cap_bytes };
+    assert_eq!(result, Err(refused));
 }
 
 /// R2.10: an unreachable target stops at the iteration cap, measured on the last
@@ -115,7 +154,7 @@ fn r2_10_iteration_and_time_caps_stop() {
 }
 
 /// R2.10 (O-138): the gain is best response minus expected value exactly, never below
-/// -1e-4 big blinds in this raked game, as a percent of the 5.5 big blind pot; the
+/// -1e-4 big blinds in this raked game, as a percent of the fixture's flop pot; the
 /// uniform profile, before any iteration, gains for both players.
 #[test]
 fn r2_10_best_response_is_exact_and_rake_safe() {
@@ -124,11 +163,12 @@ fn r2_10_best_response_is_exact_and_rake_safe() {
         StopRule { target_exploitability_pct_pot: 0.0, max_iterations: 50, max_seconds: 120 };
     let (solved, _) = solve_postflop(&problem, stop, 0, &NoProgress).expect("solves");
     let response = best_response(&solved);
+    let pot_bb = f64::from(common::FLOP_POT.get()) / f64::from(Cbb::PER_BB);
     for player in 0..2 {
         let gain = response.best_response_bb[player] - response.expected_value_bb[player];
         assert_eq!(response.gain_bb[player].to_bits(), gain.to_bits());
         assert!(response.gain_bb[player] >= -1e-4, "{response:?}");
-        let pct = 100.0 * response.gain_bb[player] / 5.5;
+        let pct = PERCENT * response.gain_bb[player] / pot_bb;
         assert!((response.gain_pct_pot[player] - pct).abs() < 1e-9, "{response:?}");
     }
 

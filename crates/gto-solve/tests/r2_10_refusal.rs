@@ -2,8 +2,10 @@
 //! test's heap.
 //!
 //! Mechanism: a problem with every combo in one range has an estimate of several
-//! megabytes. Solved with a 1 KiB memory cap it must return `SolveError::OverMemoryCap`
-//! carrying that estimate, and the peak heap growth during the call, measured with
+//! megabytes. The thread pool the engine forks onto is started first, since the estimate
+//! reads its thread count, so its fixed allocations are not charged to the call. Solved
+//! with a 1 KiB memory cap the problem must return `SolveError::OverMemoryCap` carrying
+//! that estimate, and the peak heap growth during the call, measured with
 //! `peak_alloc::PeakAlloc` from a reset just before it, must stay under 64 KiB: the call
 //! built the betting skeleton and nothing of the engine game or the solver.
 
@@ -38,6 +40,7 @@ fn r2_10_problem_above_cap_refused_before_allocation() {
     let estimate = estimate_bytes(&problem).expect("the estimate builds");
     assert!(estimate >= MIN_ESTIMATE_BYTES, "estimate {estimate} is too small to test");
     let options = SolveOptions { memory_cap_bytes: CAP_BYTES, ..SolveOptions::default() };
+    rayon::broadcast(|_| ());
 
     let before = PEAK.current_usage() as u64;
     PEAK.reset_peak_usage();
