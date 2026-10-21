@@ -9,7 +9,7 @@ S05 added the schema every JSON report follows and the table of report files (R0
 
 ## Benchmark reports: `bench-<machine>.json` (R0.10)
 
-Produced by `just bench`. `cargo bench -p gto-solve -p gto-library` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read), each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the three ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
+Produced by `just bench`. `cargo bench -p gto-solve -p gto-library --features gto-library/synthetic` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read), five bench ids in all since S14, each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the five ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
 
 Top-level fields, in the order the file carries them:
 
@@ -35,15 +35,17 @@ Each measurement:
 | `mean_ns` | number | criterion's mean point estimate of one routine call, nanoseconds. |
 | `median_ns` | number | criterion's median point estimate of one routine call, nanoseconds. |
 | `unit` | string | Always `ns`. |
-| `stub` | boolean | True when the id ends in `/stub`: the routine is a placeholder and the number is not a product measurement. |
+| `stub` | boolean | True when the id ends in `/stub`: the routine is a placeholder and the number is not a product measurement. False for every v1 id since S14 replaced the two stubs; the field stays so a later placeholder is marked. |
 
-The three ids in v1:
+The five ids in v1 (S14 replaced the `chunk_decode/stub` and `node_read/stub` placeholders with the library format, R2.7):
 
 | id | Measures | Status |
 |---|---|---|
 | `solve_iteration/simple_tree_flop` | One discounted counterfactual regret minimization (DCFR) iteration of the vendored engine on a small simple-tree heads-up flop spot; the spot is described in `crates/gto-solve/benches/solve_iteration.rs`. | Real measurement. |
-| `chunk_decode/stub` | A `std::io::Read` copy of a 64 KiB buffer. | Stub until S14 lands the library format (R2.7), then a zstd chunk decode. |
-| `node_read/stub` | One `HashMap` lookup. | Stub until S14 lands the library format (R2.7), then a node read through the manifest index. |
+| `chunk_decode/preflop_169` | One data frame of a library file (about 64 KiB of dense 169-hand preflop records, seed 0 synthetic tree) decompressed with `decode_frame` and every record in it decoded; `crates/gto-library/benches/chunk_decode.rs`. | Real measurement, synthetic data. |
+| `chunk_decode/postflop_1326_sparse` | The same for a frame of flop records that hold half of the live combos. | Real measurement, synthetic data. |
+| `node_read/warm_cache` | One `Reader::node` read of a preflop node whose frame sits in the least recently used (LRU) cache: key hash, index lookup and record decode; `crates/gto-library/benches/node_read.rs`. | Real measurement, synthetic data. |
+| `node_read/cold_cache` | The same read through a reader whose cache holds 0 bytes, so every read fetches the frame from the in-memory store and decompresses it: the cost of a cache miss. | Real measurement, synthetic data. |
 
 Example, shortened:
 
@@ -56,8 +58,10 @@ Example, shortened:
   "date": "2026-10-20T18:00:00.000Z",
   "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "measurements": [
-    { "id": "chunk_decode/stub", "mean_ns": 1500.2, "median_ns": 1480.0, "unit": "ns", "stub": true },
-    { "id": "node_read/stub", "mean_ns": 12.5, "median_ns": 12.0, "unit": "ns", "stub": true },
+    { "id": "chunk_decode/postflop_1326_sparse", "mean_ns": 9800.5, "median_ns": 9700.0, "unit": "ns", "stub": false },
+    { "id": "chunk_decode/preflop_169", "mean_ns": 1500.2, "median_ns": 1480.0, "unit": "ns", "stub": false },
+    { "id": "node_read/cold_cache", "mean_ns": 2200.0, "median_ns": 2100.0, "unit": "ns", "stub": false },
+    { "id": "node_read/warm_cache", "mean_ns": 95.5, "median_ns": 95.0, "unit": "ns", "stub": false },
     { "id": "solve_iteration/simple_tree_flop", "mean_ns": 21500000.5, "median_ns": 21000000.0, "unit": "ns", "stub": false }
   ]
 }

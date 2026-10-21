@@ -1,42 +1,85 @@
-//! Node-read benchmark stub (R0.10, R2.7): a placeholder for reading one node from the
-//! library. Bench id `node_read/stub`.
+//! Node-read benchmark (R0.10, R2.7): one node read from an opened preflop solution through
+//! `Reader::node`. Ids `node_read/warm_cache`, where the node's frame sits in the least
+//! recently used (LRU) cache, and `node_read/cold_cache`, where a reader with a 0-byte cache
+//! fetches and decompresses the frame on every read: the cost of a cache miss.
 //!
-//! S14 replaces this file with the real library format (A3): a node key resolved through the
-//! manifest index and its record decoded from the chunk that holds it. Until that lands there
-//! is no index and no record, so the routine looks one key up in a `HashMap` of synthetic
-//! node records, the same shape of work (key in, record out) at a trivially small cost. The
-//! stub exists so `just bench` and `scripts/bench-report.mjs` exercise the full three-target
-//! path from day one; the report marks every id that ends in `/stub` with `stub: true`, so
-//! nobody reads the number as a node read time.
-//!
-//! Mechanism: the map is built once before the measurement, and the routine looks up a key
-//! passed through `black_box` so the compiler cannot hoist the hash out of the loop.
+//! Mechanism: a synthetic preflop tree (`gto_library::synthetic_tree`, seed 0, 256 dense
+//! 169-hand nodes) is written with `write_preflop` into a `MemStore`, so no disk is timed,
+//! and opened once per reader before the measurement, which checks the chunk's sha256 and
+//! parses its directory. The routine reads the middle node's key: with the default cache the
+//! first read decodes the frame and every later one decodes the record out of the cached
+//! frame; with a 0-byte cache `ByteLru` serves the frame without keeping it, so every read
+//! decompresses it again. The key passes through `black_box` so its hash is not hoisted.
 
 #![forbid(unsafe_code)]
 
-use std::collections::HashMap;
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
+use gto_library::synthetic::{SyntheticParams, synthetic_tree};
+use gto_library::{
+    ChunkOptions, DEFAULT_QUERY_CACHE_BYTES, ManifestConfig, MemStore, Reader, ReaderOptions,
+    SolutionMeta, Source, preflop_prefix, write_preflop,
+};
+use gto_model::{NodeKey, v1_configs};
 
-/// Synthetic node records in the placeholder index.
-const NODE_COUNT: u64 = 4096;
-/// The key the routine reads, somewhere in the middle of the index.
-const PROBE_KEY: u64 = NODE_COUNT / 2;
-/// A placeholder record: a uniform strategy over four actions.
-const UNIFORM: [f32; 4] = [0.25; 4];
+/// Nodes in the synthetic preflop solution.
+const NODES: usize = 256;
+/// A cache that keeps nothing, so every read is a miss.
+const COLD_CACHE_BYTES: u64 = 0;
+/// The synthetic solution's identifier and timestamp.
+const SOLUTION_ID: &str = "00000000-0000-4000-8000-000000000001";
+const CREATED_AT: &str = "2026-10-20T00:00:00Z";
+/// A tree hash for synthetic data: 64 zero digits.
+const SYNTHETIC_TREE_HASH_DIGITS: usize = 64;
 
-/// The placeholder index: one record per node key.
-fn index() -> HashMap<u64, [f32; 4]> {
-    (0..NODE_COUNT).map(|key| (key, UNIFORM)).collect()
+/// Writes the synthetic solution into `store`; returns its prefix and the middle node's key.
+fn write_solution(store: &mut MemStore) -> (String, NodeKey) {
+    let tree = synthetic_tree(&SyntheticParams { nodes: NODES, ..SyntheticParams::default() });
+    let key = tree[NODES / 2].key.clone();
+    let config = v1_configs()
+        .into_iter()
+        .find(|config| config.config_id() == key.config_id)
+        .expect("a synthetic tree uses a v1 configuration");
+    let meta = SolutionMeta {
+        id: SOLUTION_ID.to_owned(),
+        source: Source::Reference,
+        engine_version: "synthetic".to_owned(),
+        config: ManifestConfig {
+            format: config.format,
+            table_size: config.table_size,
+            stake: config.stake.label.clone(),
+            depth_cbb: config.depth_cbb,
+            straddle: config.straddle,
+            ante_cbb: config.ante_cbb,
+        },
+        config_id: key.config_id.clone(),
+        pair: key.pair,
+        tree_hash: "0".repeat(SYNTHETIC_TREE_HASH_DIGITS),
+        seed: None,
+        iterations: None,
+        exploitability_pct_pot: None,
+        synthetic: true,
+        created_at: CREATED_AT.to_owned(),
+    };
+    write_preflop(store, &meta, &tree, &ChunkOptions::default())
+        .expect("the synthetic solution writes");
+    (preflop_prefix(&key.config_id, SOLUTION_ID), key)
 }
 
 fn bench_node_read(c: &mut Criterion) {
-    let index = index();
+    let mut store = MemStore::new();
+    let (prefix, key) = write_solution(&mut store);
     let mut group = c.benchmark_group("node_read");
-    group.bench_function("stub", |b| {
-        b.iter(|| index.get(&black_box(PROBE_KEY)).copied());
-    });
+    let readers = [("warm_cache", DEFAULT_QUERY_CACHE_BYTES), ("cold_cache", COLD_CACHE_BYTES)];
+    for (name, cache_bytes) in readers {
+        let reader = Reader::new(store.clone(), ReaderOptions { cache_bytes });
+        let handle = reader.open(&prefix).expect("the synthetic solution opens");
+        reader.node(handle, &key).expect("the middle node reads");
+        group.bench_function(name, |b| {
+            b.iter(|| reader.node(handle, black_box(&key)).expect("the middle node reads"));
+        });
+    }
     group.finish();
 }
 
