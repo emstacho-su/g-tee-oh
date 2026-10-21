@@ -1649,6 +1649,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "gto-library",
+ "gto-model",
  "http-body-util",
  "serde",
  "serde_json",

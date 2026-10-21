@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "solver-query",
-    "description": "Read-only query service over the solutions library; it never solves (ADR 0018).",
+    "description": "Read-only query service over the solutions library; it never solves (ADR 0018). Errors are RFC 9457 problem details (application/problem+json).",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -12,6 +12,9 @@
   "paths": {
     "/healthz": {
       "get": {
+        "tags": [
+          "ops"
+        ],
         "summary": "Answers the health probe.",
         "operationId": "healthz",
         "responses": {
@@ -27,10 +30,959 @@
           }
         }
       }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "The request counters, the latency histogram and the library gauges as Prometheus text.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "metrics",
+        "responses": {
+          "200": {
+            "description": "The Prometheus exposition",
+            "content": {
+              "text/plain; version=0.0.4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The registry could not be read",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coverage": {
+      "get": {
+        "tags": [
+          "coverage"
+        ],
+        "summary": "What the library holds for a configuration and pair: preflop availability, flops by\ntexture family and the build queue.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "coverage",
+        "parameters": [
+          {
+            "name": "config_id",
+            "in": "query",
+            "description": "The configuration identifier.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cfg_6_online_100"
+          },
+          {
+            "name": "pair",
+            "in": "query",
+            "description": "The position pair, out of position first.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "BB-BTN"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The coverage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed configuration identifier or pair",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The query database did not answer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/deal": {
+      "post": {
+        "tags": [
+          "deal"
+        ],
+        "summary": "Deals a scenario from a seed: the start node, both hands and the solutions in play.\nThe board stays server-side until each street is revealed (A5 rule two).",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "deal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The deal, with no board card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed configuration, pair, line, seed or a filter v1 does not support (a texture, a street other than preflop)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No solution holds the start node",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/deal/{id}/reveal": {
+      "get": {
+        "tags": [
+          "deal"
+        ],
+        "summary": "Reveals the next street of a deal: the flop first, then the turn, then the river. A\nrepeat answers the same cards.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "reveal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The deal id from POST /v1/deal",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "street",
+            "in": "query",
+            "description": "The street to reveal: `flop`, `turn` or `river`, in that order.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "flop"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The street's cards and the board so far",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A street other than flop, turn or river",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal; post the seed again to recreate it",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The street is revealed out of order",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/grade": {
+      "post": {
+        "tags": [
+          "grade"
+        ],
+        "summary": "Grades one decision: expected value (EV) loss in big blinds and percent of the pot, the\nfloor (O-22), the bucket, the noise flags and the difficulty features.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "grade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The graded decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed solution id, node key or hand, an action index out of range, or a reference over 64 characters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such solution, node or hand",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/insights": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "The E3 insight data for one hand at one node: threshold card, equity distributions,\nrange and nut advantage, blockers, hand role and noise flags.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "insights",
+        "parameters": [
+          {
+            "name": "solution_id",
+            "in": "query",
+            "description": "The solution to read.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          },
+          {
+            "name": "node_key",
+            "in": "query",
+            "description": "The node key in the A3 section 1 grammar.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
+          {
+            "name": "hand",
+            "in": "query",
+            "description": "The hand: a class (`AKs`) or a combo (`AhKh`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "AKs"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The insight data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed solution id, node key or hand",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such solution, node or hand",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/nodes": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "One node of one solution with its actions, hand rows and range summaries.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "nodes",
+        "parameters": [
+          {
+            "name": "solution_id",
+            "in": "query",
+            "description": "The solution to read: a lowercase universally unique identifier (UUID) the library\nregistry indexed at startup (O-144).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          },
+          {
+            "name": "node_key",
+            "in": "query",
+            "description": "The node key in the A3 section 1 grammar.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
+          {
+            "name": "hands",
+            "in": "query",
+            "description": "Which hands to list: `all` (the default), `class`, or one hand given as a class\n(`AKs`) or a combo (`AhKh`, mapped to its class at a preflop node).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "all"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed solution id, node key or hand filter",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such solution or node",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sample-action": {
+      "post": {
+        "tags": [
+          "sample-action"
+        ],
+        "summary": "Draws the opponent's action at a node from the hand's frequencies and returns the\ngenerator state to send next.",
+        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "operationId": "sample_action",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SampleActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The drawn action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed solution id, node key, hand or state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such solution, node or hand",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActionKind": {
+        "type": "string",
+        "description": "The kind of an action, the token letter spelled out.",
+        "enum": [
+          "fold",
+          "check",
+          "call",
+          "limp",
+          "straddle",
+          "bet",
+          "raise",
+          "all_in"
+        ]
+      },
+      "ActionShare": {
+        "type": "object",
+        "description": "The reach-weighted share of the acting seat's range taking one action.",
+        "required": [
+          "index",
+          "share"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The action's index in the record.",
+            "minimum": 0
+          },
+          "share": {
+            "type": "number",
+            "format": "float",
+            "description": "The share of the acting seat's range taking it, 0 to 1."
+          }
+        }
+      },
+      "ActionView": {
+        "type": "object",
+        "description": "One action of the node in record order.",
+        "required": [
+          "index",
+          "token",
+          "kind",
+          "size_cbb",
+          "label"
+        ],
+        "properties": {
+          "bucket": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The bet-size bucket as `gto_model::Bucket::as_str` (`tiny`, `small`, `medium`, `pot`,\n`overbet-small`, `overbet-large`, `all-in`), computed at pack time and never\nrecomputed here (ADR 0004, O-120); null for a fold, check, call, limp or straddle.",
+            "example": "small"
+          },
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The action's index in the record, the one `/v1/grade` takes.",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ActionKind",
+            "description": "The kind of action."
+          },
+          "label": {
+            "type": "string",
+            "description": "The button label: the bucket's Grouped label postflop (`Overbet small`) and the exact\nsize at a preflop node, for example `Raise to 2.5bb` (O-22).",
+            "example": "Raise to 2.5bb"
+          },
+          "size_cbb": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The total wager in centi-big-blinds (cbb); 0 for a fold or a check.",
+            "minimum": 0
+          },
+          "token": {
+            "type": "string",
+            "description": "The action token text, for example `r250`.",
+            "example": "r250"
+          }
+        }
+      },
+      "BlockedClass": {
+        "type": "object",
+        "description": "One villain class the hand blocks.",
+        "required": [
+          "hand",
+          "reach_removed"
+        ],
+        "properties": {
+          "hand": {
+            "type": "string",
+            "description": "The villain class.",
+            "example": "AA"
+          },
+          "reach_removed": {
+            "type": "number",
+            "format": "float",
+            "description": "The villain reach the hand's cards remove from that class."
+          }
+        }
+      },
+      "Blockers": {
+        "type": "object",
+        "description": "What the hand's cards remove from the villain's range.",
+        "required": [
+          "hand",
+          "villain_combos_removed",
+          "villain_reach_removed_share",
+          "top_blocked"
+        ],
+        "properties": {
+          "hand": {
+            "type": "string",
+            "description": "The hand as given."
+          },
+          "top_blocked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedClass"
+            },
+            "description": "The five most blocked villain classes, most blocked first."
+          },
+          "villain_combos_removed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many villain combos the hand's cards remove.",
+            "minimum": 0
+          },
+          "villain_reach_removed_share": {
+            "type": "number",
+            "format": "float",
+            "description": "The removed reach as a share of the villain's reach-weighted combos (the mean over\nthe combos of a class when the hand was given as a class)."
+          }
+        }
+      },
+      "CoverageResponse": {
+        "type": "object",
+        "description": "The body of `GET /v1/coverage`.",
+        "required": [
+          "config_id",
+          "pair",
+          "preflop",
+          "flops",
+          "textures",
+          "queue",
+          "database"
+        ],
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "description": "The configuration identifier as given."
+          },
+          "database": {
+            "$ref": "#/components/schemas/DatabaseState",
+            "description": "Whether the database answered."
+          },
+          "flops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlopCoverage"
+            },
+            "description": "Flops held, from the database; empty without one."
+          },
+          "pair": {
+            "type": "string",
+            "description": "The pair as given."
+          },
+          "preflop": {
+            "$ref": "#/components/schemas/PreflopCoverage",
+            "description": "Preflop availability."
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueEntry"
+            },
+            "description": "Queued build jobs, from the database; empty without one."
+          },
+          "textures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TextureCoverage"
+            },
+            "description": "Texture families held, from the database; empty without one."
+          }
+        }
+      },
+      "CoverageSource": {
+        "type": "string",
+        "description": "Where a preflop solution was found.",
+        "enum": [
+          "fixture",
+          "library"
+        ]
+      },
+      "DatabaseHealth": {
+        "type": "object",
+        "description": "The query-role connection (O-28, O-146).",
+        "required": [
+          "configured",
+          "connected"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "True when `QUERY_DATABASE_URL` is set."
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "True when the role probe answered on this request."
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The role the probe reported, `query` when connected as expected; null otherwise.",
+            "example": "query"
+          }
+        }
+      },
+      "DatabaseState": {
+        "type": "string",
+        "description": "Whether the database answered.",
+        "enum": [
+          "connected",
+          "unconfigured",
+          "unavailable"
+        ]
+      },
+      "DealFilter": {
+        "type": "object",
+        "description": "What to deal (O-145 narrows A5's filters in v1).",
+        "required": [
+          "config_id",
+          "pair",
+          "start_street"
+        ],
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "description": "The configuration identifier.",
+            "example": "cfg_6_online_100"
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The dotted preflop action line to start at, for example `r250`; the pair's root\n(the empty line) when absent.",
+            "example": "r250"
+          },
+          "pair": {
+            "type": "string",
+            "description": "The position pair, out of position first.",
+            "example": "BB-BTN"
+          },
+          "spot_class_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A spot-class key to start at, resolved through a per-family candidate line table.",
+            "example": "preflop/online/100/facing-open/BB-BTN"
+          },
+          "start_street": {
+            "type": "string",
+            "description": "The street the deal starts on: `preflop` only in v1.",
+            "example": "preflop"
+          },
+          "texture": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A texture family; rejected with 400 in v1 (preflop only)."
+          }
+        }
+      },
+      "DealRequest": {
+        "type": "object",
+        "description": "The body of `POST /v1/deal`.",
+        "required": [
+          "filter",
+          "seed"
+        ],
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/DealFilter",
+            "description": "What to deal."
+          },
+          "seed": {
+            "$ref": "#/components/schemas/Hex64",
+            "description": "The seed of the deal."
+          }
+        }
+      },
+      "DealResponse": {
+        "type": "object",
+        "description": "The body of a `POST /v1/deal` answer. No board card is here (A5 rule two).",
+        "required": [
+          "deal_id",
+          "solution_ids",
+          "start_node_key",
+          "hero_position",
+          "villain_position",
+          "hero_hand",
+          "villain_hand",
+          "revealed"
+        ],
+        "properties": {
+          "deal_id": {
+            "type": "string",
+            "description": "The deal id, derived from the seed and the filter, as a UUID string (O-152).",
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          },
+          "hero_hand": {
+            "type": "string",
+            "description": "The hero's combo, for example `AhKd`.",
+            "example": "AhKd"
+          },
+          "hero_position": {
+            "type": "string",
+            "description": "The seat to act at the start node, as `gto_model::Position::as_str`.",
+            "example": "BB"
+          },
+          "revealed": {
+            "$ref": "#/components/schemas/Revealed",
+            "description": "What has been revealed, nothing at this point."
+          },
+          "solution_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The solutions the registry holds for the configuration and pair."
+          },
+          "start_node_key": {
+            "type": "string",
+            "description": "The node key the deal starts at."
+          },
+          "villain_hand": {
+            "type": "string",
+            "description": "The villain's combo.",
+            "example": "QsQc"
+          },
+          "villain_position": {
+            "type": "string",
+            "description": "The other seat.",
+            "example": "BTN"
+          }
+        }
+      },
+      "DifficultyFeatures": {
+        "type": "object",
+        "description": "How hard the decision was, for the trainer's scheduling (R4.4).",
+        "required": [
+          "ev_gap_pct_pot",
+          "purity",
+          "n_actions",
+          "mixed",
+          "all_within_floor"
+        ],
+        "properties": {
+          "all_within_floor": {
+            "type": "boolean",
+            "description": "True when every nonzero loss is under the floor, so no action can be graded wrong."
+          },
+          "ev_gap_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The best action's EV minus the second best, in percent of the pot; 0 with one action."
+          },
+          "mixed": {
+            "type": "boolean",
+            "description": "True when two or more actions are played at 5 percent or more."
+          },
+          "n_actions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many actions the node offers.",
+            "minimum": 0
+          },
+          "purity": {
+            "type": "number",
+            "format": "float",
+            "description": "The largest frequency of any action."
+          }
+        }
+      },
+      "EquityDistribution": {
+        "type": "object",
+        "description": "Each seat's range equity as a histogram of ten bins from 0 to 1.",
+        "required": [
+          "bin_edges",
+          "oop",
+          "ip"
+        ],
+        "properties": {
+          "bin_edges": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The eleven bin edges, 0.0 to 1.0."
+          },
+          "ip": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The in-position range's reach-weighted share per bin, summing to 1."
+          },
+          "oop": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The out-of-position range's reach-weighted share per bin, summing to 1."
+          }
+        }
+      },
       "FixtureLibrary": {
         "type": "object",
         "description": "What the service knows about the fixture library directory.",
@@ -52,6 +1004,317 @@
           }
         }
       },
+      "FloorSource": {
+        "type": "string",
+        "description": "Which source set the floor (O-22, O-150).",
+        "enum": [
+          "noise_floor",
+          "node_accuracy",
+          "exploitability",
+          "fallback_bb"
+        ]
+      },
+      "FlopCoverage": {
+        "type": "object",
+        "description": "One flop with its scenario count.",
+        "required": [
+          "flop",
+          "texture_family",
+          "scenarios",
+          "status"
+        ],
+        "properties": {
+          "flop": {
+            "type": "string",
+            "description": "The canonical flop text, for example `Ah7d2c`.",
+            "example": "Ah7d2c"
+          },
+          "scenarios": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many scenarios the library holds on the flop.",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "description": "The scenario status as the database records it.",
+            "example": "published"
+          },
+          "texture_family": {
+            "type": "string",
+            "description": "The texture family of the flop.",
+            "example": "rainbow-dry"
+          }
+        }
+      },
+      "GradeRequest": {
+        "type": "object",
+        "description": "The body of `POST /v1/grade`.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "hand",
+          "action_index"
+        ],
+        "properties": {
+          "action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The index of the action taken, in the node's record order.",
+            "minimum": 0
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand graded: a class (`AKs`) or a combo (`AhKh`).",
+            "example": "AKs"
+          },
+          "node_key": {
+            "type": "string",
+            "description": "The node key in the A3 section 1 grammar.",
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An opaque string of at most 64 characters, echoed back so the api service can\ncorrelate attempts (O-156).",
+            "maxLength": 64
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution to grade against.",
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          }
+        }
+      },
+      "GradeResponse": {
+        "type": "object",
+        "description": "The body of a `POST /v1/grade` answer.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "hand",
+          "action_index",
+          "ev_by_action",
+          "freq_by_action",
+          "best_action_index",
+          "ev_chosen_bb",
+          "ev_best_bb",
+          "loss_bb",
+          "loss_pct_pot",
+          "floor_pct_pot",
+          "floor_source",
+          "noise_flags",
+          "difficulty_features"
+        ],
+        "properties": {
+          "action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The action graded.",
+            "minimum": 0
+          },
+          "best_action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The first action with zero loss: the highest EV, the first on ties (O-130).",
+            "minimum": 0
+          },
+          "bucket": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The chosen action's bucket as `gto_model::Bucket::as_str`; null when it has none."
+          },
+          "difficulty_features": {
+            "$ref": "#/components/schemas/DifficultyFeatures",
+            "description": "How hard the decision was."
+          },
+          "ev_best_bb": {
+            "type": "number",
+            "format": "float",
+            "description": "The EV of the best action in bb."
+          },
+          "ev_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The EV of each action in big blinds (bb), in record order."
+          },
+          "ev_chosen_bb": {
+            "type": "number",
+            "format": "float",
+            "description": "The EV of the chosen action in bb."
+          },
+          "floor_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The floor in percent of the pot the policy subtracts (O-22)."
+          },
+          "floor_source": {
+            "$ref": "#/components/schemas/FloorSource",
+            "description": "Which term set the floor."
+          },
+          "freq_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The frequency of each action, in record order."
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand as given."
+          },
+          "loss_bb": {
+            "type": "number",
+            "format": "float",
+            "description": "The loss of the chosen action in bb, raw and never clamped."
+          },
+          "loss_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The loss of the chosen action in percent of the pot, raw and never clamped."
+          },
+          "node_key": {
+            "type": "string",
+            "description": "The node key in its canonical text."
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoiseFlag"
+            },
+            "description": "Hand-level flags: `close_ev_mix`, `rare_line`, `suit_mixing`."
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The request's `reference`, echoed."
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution graded against."
+          }
+        }
+      },
+      "HandPosition": {
+        "type": "object",
+        "description": "The queried hand's place in the acting seat's range.",
+        "required": [
+          "hand",
+          "equity_vs_villain",
+          "rank_in_range",
+          "relative"
+        ],
+        "properties": {
+          "equity_vs_villain": {
+            "type": "number",
+            "format": "float",
+            "description": "The hand's equity against the villain's reach-weighted range, 0 to 1."
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand as given."
+          },
+          "rank_in_range": {
+            "type": "number",
+            "format": "float",
+            "description": "The hand's reach-weighted percentile by equity in the range, 0 to 1, 1 strongest."
+          },
+          "relative": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelativePosition"
+            },
+            "description": "The hand against each aggressive action's threshold, in `actions` order."
+          }
+        }
+      },
+      "HandRole": {
+        "type": "string",
+        "description": "The role the hand plays at the node (O-153, plan C.3).",
+        "enum": [
+          "value",
+          "marginal",
+          "bluff",
+          "fold",
+          "trap"
+        ]
+      },
+      "HandRow": {
+        "type": "object",
+        "description": "One hand's row of the node.",
+        "required": [
+          "hand",
+          "strategy",
+          "ev_bb",
+          "loss_pct_pot",
+          "ev_best_bb"
+        ],
+        "properties": {
+          "ev_bb": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The EV of each action in big blinds (bb), in record order."
+          },
+          "ev_best_bb": {
+            "type": "number",
+            "format": "float",
+            "description": "The best action's EV in bb."
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand, a class name or a combo depending on the node's hand space.",
+            "example": "AKs"
+          },
+          "loss_pct_pot": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The loss of each action in percent of the pot, in record order; 0 for the best."
+          },
+          "reach": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "Reach per seat in pair order (out of position first); null when the record has none."
+          },
+          "strategy": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The frequency of each action in record order, summing to 1."
+          }
+        }
+      },
+      "HandSpaceName": {
+        "type": "string",
+        "description": "The hand space of a node: the 169 preflop classes or the 1,326 combos (A3 section 4).",
+        "enum": [
+          "preflop_169",
+          "postflop_1326"
+        ]
+      },
       "Healthz": {
         "type": "object",
         "description": "The health response body.",
@@ -59,12 +1322,22 @@
           "status",
           "service",
           "version",
-          "fixture_library"
+          "fixture_library",
+          "library",
+          "database"
         ],
         "properties": {
+          "database": {
+            "$ref": "#/components/schemas/DatabaseHealth",
+            "description": "The query-role database connection."
+          },
           "fixture_library": {
             "$ref": "#/components/schemas/FixtureLibrary",
             "description": "The fixture library mount (O-62)."
+          },
+          "library": {
+            "$ref": "#/components/schemas/LibraryHealth",
+            "description": "The solutions registry and the reader's cache."
           },
           "service": {
             "type": "string",
@@ -82,7 +1355,739 @@
             "example": "0.1.0"
           }
         }
+      },
+      "Hex64": {
+        "type": "string",
+        "description": "A 64-bit value written as sixteen lowercase hexadecimal digits (O-151).",
+        "example": "00000000deadbeef"
+      },
+      "InsightsResponse": {
+        "type": "object",
+        "description": "The body of `GET /v1/insights`.",
+        "required": [
+          "blockers",
+          "noise_flags"
+        ],
+        "properties": {
+          "blockers": {
+            "$ref": "#/components/schemas/Blockers",
+            "description": "The hand's blockers, present at every node."
+          },
+          "equity_distribution": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EquityDistribution",
+                "description": "Both ranges' equity histograms; null at a postflop node in v1."
+              }
+            ]
+          },
+          "hand_role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HandRole",
+                "description": "The hand's role; null at a postflop node in v1."
+              }
+            ]
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoiseFlag"
+            },
+            "description": "Hand-level flags, as `/v1/grade` reports them."
+          },
+          "nut_advantage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NutAdvantage",
+                "description": "The nut advantage; null at a postflop node in v1."
+              }
+            ]
+          },
+          "range_advantage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RangeAdvantage",
+                "description": "The range advantage; null at a postflop node in v1."
+              }
+            ]
+          },
+          "threshold_card": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThresholdCard",
+                "description": "The threshold card; null at a postflop node in v1."
+              }
+            ]
+          }
+        }
+      },
+      "LibraryHealth": {
+        "type": "object",
+        "description": "The registry scanned at startup and the reader's frame cache (A3 section 5).",
+        "required": [
+          "indexed",
+          "unavailable",
+          "cache_used_bytes",
+          "cache_bytes"
+        ],
+        "properties": {
+          "cache_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The cache budget, `QUERY_CACHE_BYTES` or the library default.",
+            "minimum": 0
+          },
+          "cache_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The bytes of decoded frames the cache holds now.",
+            "minimum": 0
+          },
+          "indexed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many solutions the startup scan indexed.",
+            "minimum": 0
+          },
+          "unavailable": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many solutions the reader has marked unavailable since startup.",
+            "minimum": 0
+          }
+        }
+      },
+      "NodeResponse": {
+        "type": "object",
+        "description": "The body of `GET /v1/nodes`.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "street",
+          "config_id",
+          "pair",
+          "to_act",
+          "pot_cbb",
+          "stacks_cbb",
+          "hand_space",
+          "floor_pct_pot",
+          "actions",
+          "hands",
+          "range_summary",
+          "noise_flags"
+        ],
+        "properties": {
+          "accuracy_pct_pot": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "The solve's accuracy at this node in percent of the pot, when the record carries it."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionView"
+            },
+            "description": "The actions in record order."
+          },
+          "config_id": {
+            "type": "string",
+            "description": "The configuration identifier of the key.",
+            "example": "cfg_6_online_100"
+          },
+          "floor_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The grading floor at this node in percent of the pot (O-22, O-150)."
+          },
+          "hand_space": {
+            "$ref": "#/components/schemas/HandSpaceName",
+            "description": "The hand space of the rows."
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HandRow"
+            },
+            "description": "The hand rows the filter selected."
+          },
+          "node_key": {
+            "type": "string",
+            "description": "The node key as given, in its canonical text."
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoiseFlag"
+            },
+            "description": "Node-level flags: `rare_line` only."
+          },
+          "pair": {
+            "type": "string",
+            "description": "The position pair of the key, out of position first.",
+            "example": "BB-BTN"
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The total pot at the node in cbb, including any outstanding bet.",
+            "minimum": 0
+          },
+          "range_summary": {
+            "$ref": "#/components/schemas/RangeSummary",
+            "description": "Both ranges and the split over the actions."
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution read."
+          },
+          "spot_class_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The spot-class key of a preflop node under a catalog configuration; null otherwise.",
+            "example": "preflop/online/100/facing-open/BB-BTN"
+          },
+          "stacks_cbb": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "Remaining stacks in cbb in pair order."
+          },
+          "street": {
+            "type": "string",
+            "description": "The street as `gto_model::Street::as_str`: `preflop`, `flop`, `turn` or `river`.",
+            "example": "preflop"
+          },
+          "to_act": {
+            "type": "string",
+            "description": "The seat to act as `gto_model::Position::as_str`.",
+            "example": "BB"
+          }
+        }
+      },
+      "NoiseFlag": {
+        "type": "string",
+        "description": "A warning that a number is near the solver's noise, at the node or for one hand\n(05 section 9, O-153).",
+        "enum": [
+          "close_ev_mix",
+          "rare_line",
+          "suit_mixing"
+        ]
+      },
+      "NutAdvantage": {
+        "type": "object",
+        "description": "Which range holds more hands at or above the nut threshold (O-153).",
+        "required": [
+          "threshold_equity",
+          "oop_share",
+          "ip_share",
+          "to_act_advantage"
+        ],
+        "properties": {
+          "ip_share": {
+            "type": "number",
+            "format": "float",
+            "description": "The in-position range's reach-weighted share at or above the threshold."
+          },
+          "oop_share": {
+            "type": "number",
+            "format": "float",
+            "description": "The out-of-position range's reach-weighted share at or above the threshold."
+          },
+          "threshold_equity": {
+            "type": "number",
+            "format": "float",
+            "description": "The equity a hand needs to count as a nut hand, 0.80."
+          },
+          "to_act_advantage": {
+            "type": "number",
+            "format": "float",
+            "description": "The acting seat's share minus the other seat's."
+          }
+        }
+      },
+      "PreflopCoverage": {
+        "type": "object",
+        "description": "Preflop availability for the configuration and pair.",
+        "required": [
+          "available",
+          "solution_ids",
+          "sources"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "True when at least one preflop solution is held."
+          },
+          "solution_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The solution ids held, registry first."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageSource"
+            },
+            "description": "Where each id in `solution_ids` was found, in the same order."
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "An RFC 9457 problem details body.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "What went wrong in this occurrence; never a path beyond the store prefix.",
+            "example": "invalid node key \"cfg/BB-BTN\": expected 3 path segments"
+          },
+          "instance": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The request id (the `x-request-id` header, echoed); null until the request-id\nmiddleware attaches it.",
+            "example": "0123456789abcdef"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The Hypertext Transfer Protocol (HTTP) status code of the response.",
+            "example": 400,
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "A short summary of the kind of problem, the same for every occurrence.",
+            "example": "Bad request"
+          },
+          "type": {
+            "type": "string",
+            "description": "A stable identifier of the kind of problem, `urn:g-tee-oh:problem:<tag>`.",
+            "example": "urn:g-tee-oh:problem:bad-request"
+          }
+        }
+      },
+      "QueueEntry": {
+        "type": "object",
+        "description": "One queued build job.",
+        "required": [
+          "job_id",
+          "flop",
+          "priority",
+          "status",
+          "position"
+        ],
+        "properties": {
+          "flop": {
+            "type": "string",
+            "description": "The flop the job builds."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "The job id."
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The job's place in the queue, 1 first.",
+            "minimum": 0
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The job's priority, higher first."
+          },
+          "status": {
+            "type": "string",
+            "description": "The job status as the database records it.",
+            "example": "queued"
+          }
+        }
+      },
+      "RangeAdvantage": {
+        "type": "object",
+        "description": "Which range has more equity.",
+        "required": [
+          "oop_mean_equity",
+          "ip_mean_equity",
+          "to_act_advantage_pct_points"
+        ],
+        "properties": {
+          "ip_mean_equity": {
+            "type": "number",
+            "format": "float",
+            "description": "The in-position range's reach-weighted mean equity."
+          },
+          "oop_mean_equity": {
+            "type": "number",
+            "format": "float",
+            "description": "The out-of-position range's reach-weighted mean equity."
+          },
+          "to_act_advantage_pct_points": {
+            "type": "number",
+            "format": "float",
+            "description": "The acting seat's mean minus one half, in percentage points."
+          }
+        }
+      },
+      "RangeSummary": {
+        "type": "object",
+        "description": "Both ranges and how the acting seat's range splits over the actions.",
+        "required": [
+          "oop",
+          "ip",
+          "by_action"
+        ],
+        "properties": {
+          "by_action": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionShare"
+            },
+            "description": "One entry per action in record order."
+          },
+          "ip": {
+            "$ref": "#/components/schemas/SeatRange",
+            "description": "The in-position seat's range."
+          },
+          "oop": {
+            "$ref": "#/components/schemas/SeatRange",
+            "description": "The out-of-position seat's range."
+          }
+        }
+      },
+      "Relative": {
+        "type": "string",
+        "description": "Where the queried hand sits against one action's threshold.",
+        "enum": [
+          "above",
+          "at",
+          "below"
+        ]
+      },
+      "RelativePosition": {
+        "type": "object",
+        "description": "The queried hand against one threshold.",
+        "required": [
+          "index",
+          "position"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The action's index in the record.",
+            "minimum": 0
+          },
+          "position": {
+            "$ref": "#/components/schemas/Relative",
+            "description": "Above, at or below the threshold."
+          }
+        }
+      },
+      "RevealResponse": {
+        "type": "object",
+        "description": "The body of a `GET /v1/deal/{id}/reveal` answer.",
+        "required": [
+          "deal_id",
+          "street",
+          "cards",
+          "board"
+        ],
+        "properties": {
+          "board": {
+            "type": "string",
+            "description": "The board revealed so far as text, for example `Ah7d2cKh`.",
+            "example": "Ah7d2c"
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The street's cards: three on the flop, one after.",
+            "example": [
+              "Ah",
+              "7d",
+              "2c"
+            ]
+          },
+          "deal_id": {
+            "type": "string",
+            "description": "The deal id."
+          },
+          "street": {
+            "type": "string",
+            "description": "The street revealed.",
+            "example": "flop"
+          }
+        }
+      },
+      "Revealed": {
+        "type": "object",
+        "description": "The streets revealed so far, as board text; every entry is null when the deal is made.",
+        "properties": {
+          "flop": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The flop once revealed, for example `Ah7d2c`."
+          },
+          "river": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The river once revealed."
+          },
+          "turn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The turn once revealed."
+          }
+        }
+      },
+      "SampleActionRequest": {
+        "type": "object",
+        "description": "The body of `POST /v1/sample-action`.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "hand",
+          "rng_state"
+        ],
+        "properties": {
+          "hand": {
+            "type": "string",
+            "description": "The opponent's hand: a class (`AKs`) or a combo (`AhKh`).",
+            "example": "AKs"
+          },
+          "node_key": {
+            "type": "string",
+            "description": "The node key in the A3 section 1 grammar.",
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
+          "rng_state": {
+            "$ref": "#/components/schemas/Hex64",
+            "description": "The generator state to draw from."
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution to read.",
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          }
+        }
+      },
+      "SampleActionResponse": {
+        "type": "object",
+        "description": "The body of a `POST /v1/sample-action` answer.",
+        "required": [
+          "action_index",
+          "token",
+          "roll",
+          "rng_state"
+        ],
+        "properties": {
+          "action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The drawn action's index in the node's record order.",
+            "minimum": 0
+          },
+          "rng_state": {
+            "$ref": "#/components/schemas/Hex64",
+            "description": "The generator state after the draw, to send with the next request."
+          },
+          "roll": {
+            "type": "number",
+            "format": "double",
+            "description": "The uniform draw in `[0, 1)` the action was picked with, for tests."
+          },
+          "token": {
+            "type": "string",
+            "description": "The drawn action's token text.",
+            "example": "c"
+          }
+        }
+      },
+      "SeatRange": {
+        "type": "object",
+        "description": "One seat's range at the node.",
+        "required": [
+          "combos",
+          "reach_weighted_combos"
+        ],
+        "properties": {
+          "combos": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many combos the seat's range holds at the node.",
+            "minimum": 0
+          },
+          "reach_weighted_combos": {
+            "type": "number",
+            "format": "float",
+            "description": "The reach-weighted combo count."
+          }
+        }
+      },
+      "TextureCoverage": {
+        "type": "object",
+        "description": "One texture family with its counts.",
+        "required": [
+          "family",
+          "flops",
+          "scenarios"
+        ],
+        "properties": {
+          "family": {
+            "type": "string",
+            "description": "The texture family."
+          },
+          "flops": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many flops of the family are held.",
+            "minimum": 0
+          },
+          "scenarios": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many scenarios across those flops.",
+            "minimum": 0
+          }
+        }
+      },
+      "ThresholdAction": {
+        "type": "object",
+        "description": "One aggressive action's threshold.",
+        "required": [
+          "index",
+          "token",
+          "share_taking"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The action's index in the record.",
+            "minimum": 0
+          },
+          "share_taking": {
+            "type": "number",
+            "format": "float",
+            "description": "The reach-weighted share of the range taking the action."
+          },
+          "token": {
+            "type": "string",
+            "description": "The action token text.",
+            "example": "r250"
+          },
+          "weakest_hand_taking_half": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The weakest hand playing the action at or above half its frequency; null when none.",
+            "example": "A5s"
+          }
+        }
+      },
+      "ThresholdCard": {
+        "type": "object",
+        "description": "The threshold card: which hands take each aggressive action and where the hand sits.",
+        "required": [
+          "actions",
+          "hand_position"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThresholdAction"
+            },
+            "description": "One entry per aggressive action (bet, raise, all-in), in record order."
+          },
+          "hand_position": {
+            "$ref": "#/components/schemas/HandPosition",
+            "description": "The queried hand's place."
+          },
+          "strongest_folding_hand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The strongest hand folding at or above half its frequency; null when none folds.",
+            "example": "K9o"
+          }
+        }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "nodes",
+      "description": "One node of one solution (GET /v1/nodes)"
+    },
+    {
+      "name": "grade",
+      "description": "Grade one decision with the preflop floor (POST /v1/grade)"
+    },
+    {
+      "name": "insights",
+      "description": "E3 insight data for one hand (GET /v1/insights)"
+    },
+    {
+      "name": "deal",
+      "description": "Seeded server-side deals and street reveals"
+    },
+    {
+      "name": "sample-action",
+      "description": "The opponent's action at a node"
+    },
+    {
+      "name": "coverage",
+      "description": "What the library holds (GET /v1/coverage)"
+    },
+    {
+      "name": "ops",
+      "description": "Health and metrics"
+    }
+  ]
 }

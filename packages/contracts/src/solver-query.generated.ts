@@ -21,10 +21,416 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The request counters, the latency histogram and the library gauges as Prometheus text.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        get: operations["metrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the library holds for a configuration and pair: preflop availability, flops by
+         *     texture family and the build queue.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        get: operations["coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deals a scenario from a seed: the start node, both hands and the solutions in play.
+         *     The board stays server-side until each street is revealed (A5 rule two).
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        post: operations["deal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deal/{id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reveals the next street of a deal: the flop first, then the turn, then the river. A
+         *     repeat answers the same cards.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        get: operations["reveal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grades one decision: expected value (EV) loss in big blinds and percent of the pot, the
+         *     floor (O-22), the bucket, the noise flags and the difficulty features.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        post: operations["grade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The E3 insight data for one hand at one node: threshold card, equity distributions,
+         *     range and nut advantage, blockers, hand role and noise flags.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        get: operations["insights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One node of one solution with its actions, hand rows and range summaries.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        get: operations["nodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sample-action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draws the opponent's action at a node from the hand's frequencies and returns the
+         *     generator state to send next.
+         * @description # Errors
+         *
+         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         */
+        post: operations["sample_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description The kind of an action, the token letter spelled out.
+         * @enum {string}
+         */
+        ActionKind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
+        /** @description The reach-weighted share of the acting seat's range taking one action. */
+        ActionShare: {
+            /**
+             * Format: int32
+             * @description The action's index in the record.
+             */
+            index: number;
+            /**
+             * Format: float
+             * @description The share of the acting seat's range taking it, 0 to 1.
+             */
+            share: number;
+        };
+        /** @description One action of the node in record order. */
+        ActionView: {
+            /**
+             * @description The bet-size bucket as `gto_model::Bucket::as_str` (`tiny`, `small`, `medium`, `pot`,
+             *     `overbet-small`, `overbet-large`, `all-in`), computed at pack time and never
+             *     recomputed here (ADR 0004, O-120); null for a fold, check, call, limp or straddle.
+             * @example small
+             */
+            bucket?: string | null;
+            /**
+             * Format: int32
+             * @description The action's index in the record, the one `/v1/grade` takes.
+             */
+            index: number;
+            /** @description The kind of action. */
+            kind: components["schemas"]["ActionKind"];
+            /**
+             * @description The button label: the bucket's Grouped label postflop (`Overbet small`) and the exact
+             *     size at a preflop node, for example `Raise to 2.5bb` (O-22).
+             * @example Raise to 2.5bb
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description The total wager in centi-big-blinds (cbb); 0 for a fold or a check.
+             */
+            size_cbb: number;
+            /**
+             * @description The action token text, for example `r250`.
+             * @example r250
+             */
+            token: string;
+        };
+        /** @description One villain class the hand blocks. */
+        BlockedClass: {
+            /**
+             * @description The villain class.
+             * @example AA
+             */
+            hand: string;
+            /**
+             * Format: float
+             * @description The villain reach the hand's cards remove from that class.
+             */
+            reach_removed: number;
+        };
+        /** @description What the hand's cards remove from the villain's range. */
+        Blockers: {
+            /** @description The hand as given. */
+            hand: string;
+            /** @description The five most blocked villain classes, most blocked first. */
+            top_blocked: components["schemas"]["BlockedClass"][];
+            /**
+             * Format: int32
+             * @description How many villain combos the hand's cards remove.
+             */
+            villain_combos_removed: number;
+            /**
+             * Format: float
+             * @description The removed reach as a share of the villain's reach-weighted combos (the mean over
+             *     the combos of a class when the hand was given as a class).
+             */
+            villain_reach_removed_share: number;
+        };
+        /** @description The body of `GET /v1/coverage`. */
+        CoverageResponse: {
+            /** @description The configuration identifier as given. */
+            config_id: string;
+            /** @description Whether the database answered. */
+            database: components["schemas"]["DatabaseState"];
+            /** @description Flops held, from the database; empty without one. */
+            flops: components["schemas"]["FlopCoverage"][];
+            /** @description The pair as given. */
+            pair: string;
+            /** @description Preflop availability. */
+            preflop: components["schemas"]["PreflopCoverage"];
+            /** @description Queued build jobs, from the database; empty without one. */
+            queue: components["schemas"]["QueueEntry"][];
+            /** @description Texture families held, from the database; empty without one. */
+            textures: components["schemas"]["TextureCoverage"][];
+        };
+        /**
+         * @description Where a preflop solution was found.
+         * @enum {string}
+         */
+        CoverageSource: "fixture" | "library";
+        /** @description The query-role connection (O-28, O-146). */
+        DatabaseHealth: {
+            /** @description True when `QUERY_DATABASE_URL` is set. */
+            configured: boolean;
+            /** @description True when the role probe answered on this request. */
+            connected: boolean;
+            /**
+             * @description The role the probe reported, `query` when connected as expected; null otherwise.
+             * @example query
+             */
+            role?: string | null;
+        };
+        /**
+         * @description Whether the database answered.
+         * @enum {string}
+         */
+        DatabaseState: "connected" | "unconfigured" | "unavailable";
+        /** @description What to deal (O-145 narrows A5's filters in v1). */
+        DealFilter: {
+            /**
+             * @description The configuration identifier.
+             * @example cfg_6_online_100
+             */
+            config_id: string;
+            /**
+             * @description The dotted preflop action line to start at, for example `r250`; the pair's root
+             *     (the empty line) when absent.
+             * @example r250
+             */
+            line?: string | null;
+            /**
+             * @description The position pair, out of position first.
+             * @example BB-BTN
+             */
+            pair: string;
+            /**
+             * @description A spot-class key to start at, resolved through a per-family candidate line table.
+             * @example preflop/online/100/facing-open/BB-BTN
+             */
+            spot_class_key?: string | null;
+            /**
+             * @description The street the deal starts on: `preflop` only in v1.
+             * @example preflop
+             */
+            start_street: string;
+            /** @description A texture family; rejected with 400 in v1 (preflop only). */
+            texture?: string | null;
+        };
+        /** @description The body of `POST /v1/deal`. */
+        DealRequest: {
+            /** @description What to deal. */
+            filter: components["schemas"]["DealFilter"];
+            /** @description The seed of the deal. */
+            seed: components["schemas"]["Hex64"];
+        };
+        /** @description The body of a `POST /v1/deal` answer. No board card is here (A5 rule two). */
+        DealResponse: {
+            /**
+             * @description The deal id, derived from the seed and the filter, as a UUID string (O-152).
+             * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+             */
+            deal_id: string;
+            /**
+             * @description The hero's combo, for example `AhKd`.
+             * @example AhKd
+             */
+            hero_hand: string;
+            /**
+             * @description The seat to act at the start node, as `gto_model::Position::as_str`.
+             * @example BB
+             */
+            hero_position: string;
+            /** @description What has been revealed, nothing at this point. */
+            revealed: components["schemas"]["Revealed"];
+            /** @description The solutions the registry holds for the configuration and pair. */
+            solution_ids: string[];
+            /** @description The node key the deal starts at. */
+            start_node_key: string;
+            /**
+             * @description The villain's combo.
+             * @example QsQc
+             */
+            villain_hand: string;
+            /**
+             * @description The other seat.
+             * @example BTN
+             */
+            villain_position: string;
+        };
+        /** @description How hard the decision was, for the trainer's scheduling (R4.4). */
+        DifficultyFeatures: {
+            /** @description True when every nonzero loss is under the floor, so no action can be graded wrong. */
+            all_within_floor: boolean;
+            /**
+             * Format: float
+             * @description The best action's EV minus the second best, in percent of the pot; 0 with one action.
+             */
+            ev_gap_pct_pot: number;
+            /** @description True when two or more actions are played at 5 percent or more. */
+            mixed: boolean;
+            /**
+             * Format: int32
+             * @description How many actions the node offers.
+             */
+            n_actions: number;
+            /**
+             * Format: float
+             * @description The largest frequency of any action.
+             */
+            purity: number;
+        };
+        /** @description Each seat's range equity as a histogram of ten bins from 0 to 1. */
+        EquityDistribution: {
+            /** @description The eleven bin edges, 0.0 to 1.0. */
+            bin_edges: number[];
+            /** @description The in-position range's reach-weighted share per bin, summing to 1. */
+            ip: number[];
+            /** @description The out-of-position range's reach-weighted share per bin, summing to 1. */
+            oop: number[];
+        };
         /** @description What the service knows about the fixture library directory. */
         FixtureLibrary: {
             /**
@@ -35,10 +441,176 @@ export interface components {
             /** @description Whether that directory exists right now. */
             present: boolean;
         };
+        /**
+         * @description Which source set the floor (O-22, O-150).
+         * @enum {string}
+         */
+        FloorSource: "noise_floor" | "node_accuracy" | "exploitability" | "fallback_bb";
+        /** @description One flop with its scenario count. */
+        FlopCoverage: {
+            /**
+             * @description The canonical flop text, for example `Ah7d2c`.
+             * @example Ah7d2c
+             */
+            flop: string;
+            /**
+             * Format: int32
+             * @description How many scenarios the library holds on the flop.
+             */
+            scenarios: number;
+            /**
+             * @description The scenario status as the database records it.
+             * @example published
+             */
+            status: string;
+            /**
+             * @description The texture family of the flop.
+             * @example rainbow-dry
+             */
+            texture_family: string;
+        };
+        /** @description The body of `POST /v1/grade`. */
+        GradeRequest: {
+            /**
+             * Format: int32
+             * @description The index of the action taken, in the node's record order.
+             */
+            action_index: number;
+            /**
+             * @description The hand graded: a class (`AKs`) or a combo (`AhKh`).
+             * @example AKs
+             */
+            hand: string;
+            /**
+             * @description The node key in the A3 section 1 grammar.
+             * @example cfg_6_online_100/BB-BTN/r250
+             */
+            node_key: string;
+            /**
+             * @description An opaque string of at most 64 characters, echoed back so the api service can
+             *     correlate attempts (O-156).
+             */
+            reference?: string | null;
+            /**
+             * @description The solution to grade against.
+             * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+             */
+            solution_id: string;
+        };
+        /** @description The body of a `POST /v1/grade` answer. */
+        GradeResponse: {
+            /**
+             * Format: int32
+             * @description The action graded.
+             */
+            action_index: number;
+            /**
+             * Format: int32
+             * @description The first action with zero loss: the highest EV, the first on ties (O-130).
+             */
+            best_action_index: number;
+            /** @description The chosen action's bucket as `gto_model::Bucket::as_str`; null when it has none. */
+            bucket?: string | null;
+            /** @description How hard the decision was. */
+            difficulty_features: components["schemas"]["DifficultyFeatures"];
+            /**
+             * Format: float
+             * @description The EV of the best action in bb.
+             */
+            ev_best_bb: number;
+            /** @description The EV of each action in big blinds (bb), in record order. */
+            ev_by_action: number[];
+            /**
+             * Format: float
+             * @description The EV of the chosen action in bb.
+             */
+            ev_chosen_bb: number;
+            /**
+             * Format: float
+             * @description The floor in percent of the pot the policy subtracts (O-22).
+             */
+            floor_pct_pot: number;
+            /** @description Which term set the floor. */
+            floor_source: components["schemas"]["FloorSource"];
+            /** @description The frequency of each action, in record order. */
+            freq_by_action: number[];
+            /** @description The hand as given. */
+            hand: string;
+            /**
+             * Format: float
+             * @description The loss of the chosen action in bb, raw and never clamped.
+             */
+            loss_bb: number;
+            /**
+             * Format: float
+             * @description The loss of the chosen action in percent of the pot, raw and never clamped.
+             */
+            loss_pct_pot: number;
+            /** @description The node key in its canonical text. */
+            node_key: string;
+            /** @description Hand-level flags: `close_ev_mix`, `rare_line`, `suit_mixing`. */
+            noise_flags: components["schemas"]["NoiseFlag"][];
+            /** @description The request's `reference`, echoed. */
+            reference?: string | null;
+            /** @description The solution graded against. */
+            solution_id: string;
+        };
+        /** @description The queried hand's place in the acting seat's range. */
+        HandPosition: {
+            /**
+             * Format: float
+             * @description The hand's equity against the villain's reach-weighted range, 0 to 1.
+             */
+            equity_vs_villain: number;
+            /** @description The hand as given. */
+            hand: string;
+            /**
+             * Format: float
+             * @description The hand's reach-weighted percentile by equity in the range, 0 to 1, 1 strongest.
+             */
+            rank_in_range: number;
+            /** @description The hand against each aggressive action's threshold, in `actions` order. */
+            relative: components["schemas"]["RelativePosition"][];
+        };
+        /**
+         * @description The role the hand plays at the node (O-153, plan C.3).
+         * @enum {string}
+         */
+        HandRole: "value" | "marginal" | "bluff" | "fold" | "trap";
+        /** @description One hand's row of the node. */
+        HandRow: {
+            /** @description The EV of each action in big blinds (bb), in record order. */
+            ev_bb: number[];
+            /**
+             * Format: float
+             * @description The best action's EV in bb.
+             */
+            ev_best_bb: number;
+            /**
+             * @description The hand, a class name or a combo depending on the node's hand space.
+             * @example AKs
+             */
+            hand: string;
+            /** @description The loss of each action in percent of the pot, in record order; 0 for the best. */
+            loss_pct_pot: number[];
+            /** @description Reach per seat in pair order (out of position first); null when the record has none. */
+            reach?: number[] | null;
+            /** @description The frequency of each action in record order, summing to 1. */
+            strategy: number[];
+        };
+        /**
+         * @description The hand space of a node: the 169 preflop classes or the 1,326 combos (A3 section 4).
+         * @enum {string}
+         */
+        HandSpaceName: "preflop_169" | "postflop_1326";
         /** @description The health response body. */
         Healthz: {
+            /** @description The query-role database connection. */
+            database: components["schemas"]["DatabaseHealth"];
             /** @description The fixture library mount (O-62). */
             fixture_library: components["schemas"]["FixtureLibrary"];
+            /** @description The solutions registry and the reader's cache. */
+            library: components["schemas"]["LibraryHealth"];
             /**
              * @description The service name, `solver-query`.
              * @example solver-query
@@ -54,6 +626,373 @@ export interface components {
              * @example 0.1.0
              */
             version: string;
+        };
+        /**
+         * @description A 64-bit value written as sixteen lowercase hexadecimal digits (O-151).
+         * @example 00000000deadbeef
+         */
+        Hex64: string;
+        /** @description The body of `GET /v1/insights`. */
+        InsightsResponse: {
+            /** @description The hand's blockers, present at every node. */
+            blockers: components["schemas"]["Blockers"];
+            equity_distribution?: null | components["schemas"]["EquityDistribution"];
+            hand_role?: null | components["schemas"]["HandRole"];
+            /** @description Hand-level flags, as `/v1/grade` reports them. */
+            noise_flags: components["schemas"]["NoiseFlag"][];
+            nut_advantage?: null | components["schemas"]["NutAdvantage"];
+            range_advantage?: null | components["schemas"]["RangeAdvantage"];
+            threshold_card?: null | components["schemas"]["ThresholdCard"];
+        };
+        /** @description The registry scanned at startup and the reader's frame cache (A3 section 5). */
+        LibraryHealth: {
+            /**
+             * Format: int64
+             * @description The cache budget, `QUERY_CACHE_BYTES` or the library default.
+             */
+            cache_bytes: number;
+            /**
+             * Format: int64
+             * @description The bytes of decoded frames the cache holds now.
+             */
+            cache_used_bytes: number;
+            /**
+             * Format: int32
+             * @description How many solutions the startup scan indexed.
+             */
+            indexed: number;
+            /**
+             * Format: int32
+             * @description How many solutions the reader has marked unavailable since startup.
+             */
+            unavailable: number;
+        };
+        /** @description The body of `GET /v1/nodes`. */
+        NodeResponse: {
+            /**
+             * Format: float
+             * @description The solve's accuracy at this node in percent of the pot, when the record carries it.
+             */
+            accuracy_pct_pot?: number | null;
+            /** @description The actions in record order. */
+            actions: components["schemas"]["ActionView"][];
+            /**
+             * @description The configuration identifier of the key.
+             * @example cfg_6_online_100
+             */
+            config_id: string;
+            /**
+             * Format: float
+             * @description The grading floor at this node in percent of the pot (O-22, O-150).
+             */
+            floor_pct_pot: number;
+            /** @description The hand space of the rows. */
+            hand_space: components["schemas"]["HandSpaceName"];
+            /** @description The hand rows the filter selected. */
+            hands: components["schemas"]["HandRow"][];
+            /** @description The node key as given, in its canonical text. */
+            node_key: string;
+            /** @description Node-level flags: `rare_line` only. */
+            noise_flags: components["schemas"]["NoiseFlag"][];
+            /**
+             * @description The position pair of the key, out of position first.
+             * @example BB-BTN
+             */
+            pair: string;
+            /**
+             * Format: int32
+             * @description The total pot at the node in cbb, including any outstanding bet.
+             */
+            pot_cbb: number;
+            /** @description Both ranges and the split over the actions. */
+            range_summary: components["schemas"]["RangeSummary"];
+            /** @description The solution read. */
+            solution_id: string;
+            /**
+             * @description The spot-class key of a preflop node under a catalog configuration; null otherwise.
+             * @example preflop/online/100/facing-open/BB-BTN
+             */
+            spot_class_key?: string | null;
+            /** @description Remaining stacks in cbb in pair order. */
+            stacks_cbb: number[];
+            /**
+             * @description The street as `gto_model::Street::as_str`: `preflop`, `flop`, `turn` or `river`.
+             * @example preflop
+             */
+            street: string;
+            /**
+             * @description The seat to act as `gto_model::Position::as_str`.
+             * @example BB
+             */
+            to_act: string;
+        };
+        /**
+         * @description A warning that a number is near the solver's noise, at the node or for one hand
+         *     (05 section 9, O-153).
+         * @enum {string}
+         */
+        NoiseFlag: "close_ev_mix" | "rare_line" | "suit_mixing";
+        /** @description Which range holds more hands at or above the nut threshold (O-153). */
+        NutAdvantage: {
+            /**
+             * Format: float
+             * @description The in-position range's reach-weighted share at or above the threshold.
+             */
+            ip_share: number;
+            /**
+             * Format: float
+             * @description The out-of-position range's reach-weighted share at or above the threshold.
+             */
+            oop_share: number;
+            /**
+             * Format: float
+             * @description The equity a hand needs to count as a nut hand, 0.80.
+             */
+            threshold_equity: number;
+            /**
+             * Format: float
+             * @description The acting seat's share minus the other seat's.
+             */
+            to_act_advantage: number;
+        };
+        /** @description Preflop availability for the configuration and pair. */
+        PreflopCoverage: {
+            /** @description True when at least one preflop solution is held. */
+            available: boolean;
+            /** @description The solution ids held, registry first. */
+            solution_ids: string[];
+            /** @description Where each id in `solution_ids` was found, in the same order. */
+            sources: components["schemas"]["CoverageSource"][];
+        };
+        /** @description An RFC 9457 problem details body. */
+        Problem: {
+            /**
+             * @description What went wrong in this occurrence; never a path beyond the store prefix.
+             * @example invalid node key "cfg/BB-BTN": expected 3 path segments
+             */
+            detail: string;
+            /**
+             * @description The request id (the `x-request-id` header, echoed); null until the request-id
+             *     middleware attaches it.
+             * @example 0123456789abcdef
+             */
+            instance?: string | null;
+            /**
+             * Format: int32
+             * @description The Hypertext Transfer Protocol (HTTP) status code of the response.
+             * @example 400
+             */
+            status: number;
+            /**
+             * @description A short summary of the kind of problem, the same for every occurrence.
+             * @example Bad request
+             */
+            title: string;
+            /**
+             * @description A stable identifier of the kind of problem, `urn:g-tee-oh:problem:<tag>`.
+             * @example urn:g-tee-oh:problem:bad-request
+             */
+            type: string;
+        };
+        /** @description One queued build job. */
+        QueueEntry: {
+            /** @description The flop the job builds. */
+            flop: string;
+            /** @description The job id. */
+            job_id: string;
+            /**
+             * Format: int32
+             * @description The job's place in the queue, 1 first.
+             */
+            position: number;
+            /**
+             * Format: int32
+             * @description The job's priority, higher first.
+             */
+            priority: number;
+            /**
+             * @description The job status as the database records it.
+             * @example queued
+             */
+            status: string;
+        };
+        /** @description Which range has more equity. */
+        RangeAdvantage: {
+            /**
+             * Format: float
+             * @description The in-position range's reach-weighted mean equity.
+             */
+            ip_mean_equity: number;
+            /**
+             * Format: float
+             * @description The out-of-position range's reach-weighted mean equity.
+             */
+            oop_mean_equity: number;
+            /**
+             * Format: float
+             * @description The acting seat's mean minus one half, in percentage points.
+             */
+            to_act_advantage_pct_points: number;
+        };
+        /** @description Both ranges and how the acting seat's range splits over the actions. */
+        RangeSummary: {
+            /** @description One entry per action in record order. */
+            by_action: components["schemas"]["ActionShare"][];
+            /** @description The in-position seat's range. */
+            ip: components["schemas"]["SeatRange"];
+            /** @description The out-of-position seat's range. */
+            oop: components["schemas"]["SeatRange"];
+        };
+        /**
+         * @description Where the queried hand sits against one action's threshold.
+         * @enum {string}
+         */
+        Relative: "above" | "at" | "below";
+        /** @description The queried hand against one threshold. */
+        RelativePosition: {
+            /**
+             * Format: int32
+             * @description The action's index in the record.
+             */
+            index: number;
+            /** @description Above, at or below the threshold. */
+            position: components["schemas"]["Relative"];
+        };
+        /** @description The streets revealed so far, as board text; every entry is null when the deal is made. */
+        Revealed: {
+            /** @description The flop once revealed, for example `Ah7d2c`. */
+            flop?: string | null;
+            /** @description The river once revealed. */
+            river?: string | null;
+            /** @description The turn once revealed. */
+            turn?: string | null;
+        };
+        /** @description The body of a `GET /v1/deal/{id}/reveal` answer. */
+        RevealResponse: {
+            /**
+             * @description The board revealed so far as text, for example `Ah7d2cKh`.
+             * @example Ah7d2c
+             */
+            board: string;
+            /**
+             * @description The street's cards: three on the flop, one after.
+             * @example [
+             *       "Ah",
+             *       "7d",
+             *       "2c"
+             *     ]
+             */
+            cards: string[];
+            /** @description The deal id. */
+            deal_id: string;
+            /**
+             * @description The street revealed.
+             * @example flop
+             */
+            street: string;
+        };
+        /** @description The body of `POST /v1/sample-action`. */
+        SampleActionRequest: {
+            /**
+             * @description The opponent's hand: a class (`AKs`) or a combo (`AhKh`).
+             * @example AKs
+             */
+            hand: string;
+            /**
+             * @description The node key in the A3 section 1 grammar.
+             * @example cfg_6_online_100/BB-BTN/r250
+             */
+            node_key: string;
+            /** @description The generator state to draw from. */
+            rng_state: components["schemas"]["Hex64"];
+            /**
+             * @description The solution to read.
+             * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+             */
+            solution_id: string;
+        };
+        /** @description The body of a `POST /v1/sample-action` answer. */
+        SampleActionResponse: {
+            /**
+             * Format: int32
+             * @description The drawn action's index in the node's record order.
+             */
+            action_index: number;
+            /** @description The generator state after the draw, to send with the next request. */
+            rng_state: components["schemas"]["Hex64"];
+            /**
+             * Format: double
+             * @description The uniform draw in `[0, 1)` the action was picked with, for tests.
+             */
+            roll: number;
+            /**
+             * @description The drawn action's token text.
+             * @example c
+             */
+            token: string;
+        };
+        /** @description One seat's range at the node. */
+        SeatRange: {
+            /**
+             * Format: int32
+             * @description How many combos the seat's range holds at the node.
+             */
+            combos: number;
+            /**
+             * Format: float
+             * @description The reach-weighted combo count.
+             */
+            reach_weighted_combos: number;
+        };
+        /** @description One texture family with its counts. */
+        TextureCoverage: {
+            /** @description The texture family. */
+            family: string;
+            /**
+             * Format: int32
+             * @description How many flops of the family are held.
+             */
+            flops: number;
+            /**
+             * Format: int32
+             * @description How many scenarios across those flops.
+             */
+            scenarios: number;
+        };
+        /** @description One aggressive action's threshold. */
+        ThresholdAction: {
+            /**
+             * Format: int32
+             * @description The action's index in the record.
+             */
+            index: number;
+            /**
+             * Format: float
+             * @description The reach-weighted share of the range taking the action.
+             */
+            share_taking: number;
+            /**
+             * @description The action token text.
+             * @example r250
+             */
+            token: string;
+            /**
+             * @description The weakest hand playing the action at or above half its frequency; null when none.
+             * @example A5s
+             */
+            weakest_hand_taking_half?: string | null;
+        };
+        /** @description The threshold card: which hands take each aggressive action and where the hand sits. */
+        ThresholdCard: {
+            /** @description One entry per aggressive action (bet, raise, all-in), in record order. */
+            actions: components["schemas"]["ThresholdAction"][];
+            /** @description The queried hand's place. */
+            hand_position: components["schemas"]["HandPosition"];
+            /**
+             * @description The strongest hand folding at or above half its frequency; null when none folds.
+             * @example K9o
+             */
+            strongest_folding_hand?: string | null;
         };
     };
     responses: never;
@@ -80,6 +1019,421 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Healthz"];
+                };
+            };
+        };
+    };
+    metrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Prometheus exposition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain; version=0.0.4": string;
+                };
+            };
+            /** @description The registry could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    coverage: {
+        parameters: {
+            query: {
+                /**
+                 * @description The configuration identifier.
+                 * @example cfg_6_online_100
+                 */
+                config_id: string;
+                /**
+                 * @description The position pair, out of position first.
+                 * @example BB-BTN
+                 */
+                pair: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The coverage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageResponse"];
+                };
+            };
+            /** @description A malformed configuration identifier or pair */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The query database did not answer */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DealRequest"];
+            };
+        };
+        responses: {
+            /** @description The deal, with no board card */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealResponse"];
+                };
+            };
+            /** @description A malformed configuration, pair, line, seed or a filter v1 does not support (a texture, a street other than preflop) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No solution holds the start node */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reveal: {
+        parameters: {
+            query: {
+                /**
+                 * @description The street to reveal: `flop`, `turn` or `river`, in that order.
+                 * @example flop
+                 */
+                street: string;
+            };
+            header?: never;
+            path: {
+                /** @description The deal id from POST /v1/deal */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The street's cards and the board so far */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealResponse"];
+                };
+            };
+            /** @description A street other than flop, turn or river */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such deal; post the seed again to recreate it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The street is revealed out of order */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    grade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeRequest"];
+            };
+        };
+        responses: {
+            /** @description The graded decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeResponse"];
+                };
+            };
+            /** @description A malformed solution id, node key or hand, an action index out of range, or a reference over 64 characters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such solution, node or hand */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    insights: {
+        parameters: {
+            query: {
+                /**
+                 * @description The hand: a class (`AKs`) or a combo (`AhKh`).
+                 * @example AKs
+                 */
+                hand: string;
+                /**
+                 * @description The node key in the A3 section 1 grammar.
+                 * @example cfg_6_online_100/BB-BTN/r250
+                 */
+                node_key: string;
+                /**
+                 * @description The solution to read.
+                 * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+                 */
+                solution_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The insight data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightsResponse"];
+                };
+            };
+            /** @description A malformed solution id, node key or hand */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such solution, node or hand */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    nodes: {
+        parameters: {
+            query: {
+                /**
+                 * @description Which hands to list: `all` (the default), `class`, or one hand given as a class
+                 *     (`AKs`) or a combo (`AhKh`, mapped to its class at a preflop node).
+                 * @example all
+                 */
+                hands?: string;
+                /**
+                 * @description The node key in the A3 section 1 grammar.
+                 * @example cfg_6_online_100/BB-BTN/r250
+                 */
+                node_key: string;
+                /**
+                 * @description The solution to read: a lowercase universally unique identifier (UUID) the library
+                 *     registry indexed at startup (O-144).
+                 * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+                 */
+                solution_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The node */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeResponse"];
+                };
+            };
+            /** @description A malformed solution id, node key or hand filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such solution or node */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    sample_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SampleActionRequest"];
+            };
+        };
+        responses: {
+            /** @description The drawn action */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SampleActionResponse"];
+                };
+            };
+            /** @description A malformed solution id, node key, hand or state */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such solution, node or hand */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

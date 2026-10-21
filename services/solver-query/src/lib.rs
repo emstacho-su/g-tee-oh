@@ -10,13 +10,17 @@
 //! health check runs (`probe`). `src/main.rs` only maps a parsed command to one of them.
 //!
 //! S06 lands the skeleton: `GET /healthz` (A5 section 2) and the document export that
-//! `just contracts` commits (R0.7, O-116).
+//! `just contracts` commits (R0.7, O-116). S16 adds the contract for every A5 section 2
+//! route (`api`, the data transfer objects (DTOs); `error`, the problem bodies; `routes`,
+//! one handler per path) and the implementations behind it (R2.13 to R2.15).
 
 #![forbid(unsafe_code)]
 
+pub mod api;
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod error;
 pub mod logging;
 pub mod openapi;
 pub mod probe;

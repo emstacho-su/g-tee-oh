@@ -2,7 +2,8 @@
 //! describes exactly the routes that are mounted (utoipa-axum, O-116). `app()` takes its
 //! state from the configuration that `Config::from_env` reads, so `config` stays the one
 //! module that touches the process environment; `app_with` takes explicit state, which is
-//! what the integration tests use.
+//! what the integration tests use. Every A5 section 2 route is mounted here (R2.13); one
+//! `routes!` call per path, since the macro groups the methods of one path.
 
 use std::path::PathBuf;
 
@@ -14,7 +15,7 @@ use utoipa_axum::routes;
 
 use crate::config::{self, Config};
 use crate::openapi::ApiDoc;
-use crate::routes::healthz;
+use crate::routes::{coverage, deal, grade, healthz, insights, metrics, nodes, sample_action};
 
 /// State every handler can read; cloned per request, so keep it small.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -46,6 +47,14 @@ pub fn app() -> Result<(Router, OpenApi), config::Error> {
 pub fn app_with(state: AppState) -> (Router, OpenApi) {
     let (router, document) = OpenApiRouter::<AppState>::with_openapi(ApiDoc::openapi())
         .routes(routes!(healthz::healthz))
+        .routes(routes!(metrics::metrics))
+        .routes(routes!(nodes::nodes))
+        .routes(routes!(grade::grade))
+        .routes(routes!(insights::insights))
+        .routes(routes!(deal::deal))
+        .routes(routes!(deal::reveal))
+        .routes(routes!(sample_action::sample_action))
+        .routes(routes!(coverage::coverage))
         .split_for_parts();
     (router.with_state(state), document)
 }
