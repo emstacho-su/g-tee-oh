@@ -9,9 +9,9 @@
 // This script walks target/criterion for every new/estimates.json, reads both files, adds
 // the machine, the commit and the toolchain, and writes the report. It refuses to write when
 // no estimate exists, so `just bench` cannot produce an empty report, and when one of the
-// three R0.10 targets is missing, so a partial run cannot overwrite a complete baseline.
-// `just bench` runs it after `cargo bench -p gto-solve -p gto-library`; Node only, no npm
-// packages.
+// five R0.10 ids is missing, so a partial run cannot overwrite a complete baseline.
+// `just bench` runs it after `cargo bench -p gto-solve -p gto-library --features
+// gto-library/synthetic`; Node only, no npm packages.
 //
 // BENCH_MACHINE=<name> changes the machine name and the output file name; the default is
 // zenbook (the Mac baseline from S20 onward uses another name).
@@ -25,8 +25,16 @@ import { fileURLToPath } from "node:url";
 export const REPORT_KIND = "bench";
 export const R_IDS = ["R0.10"];
 export const DEFAULT_MACHINE = "zenbook";
-// The three targets A9 section 1 names, by criterion id; the two stubs are replaced in S14.
-export const EXPECTED_IDS = ["chunk_decode/stub", "node_read/stub", "solve_iteration/simple_tree_flop"];
+// The three targets A9 section 1 names, by criterion id, sorted: S14 replaced the two stubs
+// with two chunk decode ids (R2.7, one dense preflop frame and one sparse flop frame) and two
+// node read ids (a cache hit and a cache miss).
+export const EXPECTED_IDS = [
+  "chunk_decode/postflop_1326_sparse",
+  "chunk_decode/preflop_169",
+  "node_read/cold_cache",
+  "node_read/warm_cache",
+  "solve_iteration/simple_tree_flop",
+];
 const STUB_SUFFIX = "/stub";
 const ESTIMATES_FILE = "estimates.json";
 const BENCHMARK_FILE = "benchmark.json";

@@ -2,14 +2,14 @@
 
 This directory holds the reports that prove requirement identifiers (R IDs) for the public gates (A1 section 1 reserves `validation/reports/` for generated gate reports, public gates only). A report is evidence, so two rules apply:
 
-1. A report is written by the tool that measured it, never by hand. `just bench` writes `bench-zenbook.json` through `scripts/bench-report.mjs`; the Phase 2 validation gates G1 to G7 (04 section 6) write theirs through `tools/validate`, G1 to G3 since S13 as JSON reports with tool-written Markdown twins (the gate reports section below). To change a number, check out the commit you want on record, rerun the tool and commit what it wrote. The phase summaries (`phase-0-gate.md`, and `mac-bootstrap.md` once S04 lands) are the exception in form only: the session that closes a phase gate writes them from tool output and run links, and they are not edited after the gate closes.
+1. A report is written by the tool that measured it, never by hand. `just bench` writes `bench-zenbook.json` through `scripts/bench-report.mjs`; `just library-size-estimate` writes `library-size-estimate.md` through `library-pack estimate` (S14); the Phase 2 validation gates G1 to G7 (04 section 6) write theirs through `tools/validate`, G1 to G3 since S13 as JSON reports with tool-written Markdown twins (the gate reports section below). To change a number, check out the commit you want on record, rerun the tool and commit what it wrote. The phase summaries (`phase-0-gate.md`, and `mac-bootstrap.md` once S04 lands) are the exception in form only: the session that closes a phase gate writes them from tool output and run links, and they are not edited after the gate closes.
 2. Every report names the R IDs it proves: the `r_ids` field in a JSON (JavaScript Object Notation) report, the R ID column in a Markdown gate report. A reviewer can then go from a requirement to its evidence without reading the tool.
 
 S05 added the schema every JSON report follows and the table of report files (R0.11). Later sessions add their report kinds below as they write them: S13 added the G1 to G3 gate reports, S29 adds the Phase 3 reports.
 
 ## Benchmark reports: `bench-<machine>.json` (R0.10)
 
-Produced by `just bench`. `cargo bench -p gto-solve -p gto-library` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read), each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the three ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
+Produced by `just bench`. `cargo bench -p gto-solve -p gto-library --features gto-library/synthetic` runs the three criterion targets A9 section 1 names (solve iteration, chunk decode, node read), five bench ids in all since S14, each writing `target/criterion/<group>/<function>/new/estimates.json`; `node scripts/bench-report.mjs` then reads every such file plus the `benchmark.json` beside it and writes the report. The script refuses to write when no estimate exists and when one of the five ids is missing, so the committed file is always one complete run. `BENCH_MACHINE=<name>` changes the machine name and the file name; the default is `zenbook`, the baseline the phase docs call the Zenbook baseline, which later becomes the 95th percentile latency (p95) guard baseline (O-40).
 
 Top-level fields, in the order the file carries them:
 
@@ -35,15 +35,17 @@ Each measurement:
 | `mean_ns` | number | criterion's mean point estimate of one routine call, nanoseconds. |
 | `median_ns` | number | criterion's median point estimate of one routine call, nanoseconds. |
 | `unit` | string | Always `ns`. |
-| `stub` | boolean | True when the id ends in `/stub`: the routine is a placeholder and the number is not a product measurement. |
+| `stub` | boolean | True when the id ends in `/stub`: the routine is a placeholder and the number is not a product measurement. False for every v1 id since S14 replaced the two stubs; the field stays so a later placeholder is marked. |
 
-The three ids in v1:
+The five ids in v1 (S14 replaced the `chunk_decode/stub` and `node_read/stub` placeholders with the library format, R2.7):
 
 | id | Measures | Status |
 |---|---|---|
 | `solve_iteration/simple_tree_flop` | One discounted counterfactual regret minimization (DCFR) iteration of the vendored engine on a small simple-tree heads-up flop spot; the spot is described in `crates/gto-solve/benches/solve_iteration.rs`. | Real measurement. |
-| `chunk_decode/stub` | A `std::io::Read` copy of a 64 KiB buffer. | Stub until S14 lands the library format (R2.7), then a zstd chunk decode. |
-| `node_read/stub` | One `HashMap` lookup. | Stub until S14 lands the library format (R2.7), then a node read through the manifest index. |
+| `chunk_decode/preflop_169` | One data frame of a library file (about 64 KiB of dense 169-hand preflop records, seed 0 synthetic tree) decompressed with `decode_frame` and every record in it decoded; `crates/gto-library/benches/chunk_decode.rs`. | Real measurement, synthetic data. |
+| `chunk_decode/postflop_1326_sparse` | The same for a frame of flop records that hold half of the live combos. | Real measurement, synthetic data. |
+| `node_read/warm_cache` | One `Reader::node` read of a preflop node whose frame sits in the least recently used (LRU) cache: key hash, index lookup and record decode; `crates/gto-library/benches/node_read.rs`. | Real measurement, synthetic data. |
+| `node_read/cold_cache` | The same read through a reader whose cache holds 0 bytes, so every read fetches the frame from the in-memory store and decompresses it: the cost of a cache miss. | Real measurement, synthetic data. |
 
 Example, shortened:
 
@@ -56,14 +58,38 @@ Example, shortened:
   "date": "2026-10-20T18:00:00.000Z",
   "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "measurements": [
-    { "id": "chunk_decode/stub", "mean_ns": 1500.2, "median_ns": 1480.0, "unit": "ns", "stub": true },
-    { "id": "node_read/stub", "mean_ns": 12.5, "median_ns": 12.0, "unit": "ns", "stub": true },
+    { "id": "chunk_decode/postflop_1326_sparse", "mean_ns": 9800.5, "median_ns": 9700.0, "unit": "ns", "stub": false },
+    { "id": "chunk_decode/preflop_169", "mean_ns": 1500.2, "median_ns": 1480.0, "unit": "ns", "stub": false },
+    { "id": "node_read/cold_cache", "mean_ns": 2200.0, "median_ns": 2100.0, "unit": "ns", "stub": false },
+    { "id": "node_read/warm_cache", "mean_ns": 95.5, "median_ns": 95.0, "unit": "ns", "stub": false },
     { "id": "solve_iteration/simple_tree_flop", "mean_ns": 21500000.5, "median_ns": 21000000.0, "unit": "ns", "stub": false }
   ]
 }
 ```
 
 Reading a baseline: compare `median_ns` of the same id across commits on the same machine; the mean is kept because criterion reports both and outliers move it first. Numbers from different machines are different baselines, never a regression.
+
+## Library size estimate: `library-size-estimate.md` (R2.7, R-19)
+
+Produced by `just library-size-estimate`, which runs `library-pack estimate --seed <n> --out
+validation/reports/library-size-estimate.md` (`tools/library-pack/src/estimate.rs`). Rule 1
+applies: the tool writes the whole file, and the committed report carries the seed, so rerunning
+the recipe at the recorded commit with that seed gives the same bytes.
+
+What the tool does, in order: `gto_library::synthetic_tree` builds one turn and river runout
+tree and one flop tree per scenario (pessimistic, central, optimistic: node counts, range share,
+pure share and action counts around the planning figures of 02 section 5.2) from the seed;
+`NodeRecord::from_solved` quantizes them into the records the writer stores; `encode_file`
+turns the records into a file at the writer's setting (zstd level 19, 64 KiB frames), at level 3
+and at 256 KiB frames (O-129). The report states that method, the inputs and the seed, then one
+table per tree kind (raw bytes, file bytes, ratio, bytes per node) and a last table that sets
+each scenario against the plan: 1 to 10 MB per runout, 40 KB to 342 KB per flop tree, one build
+of 4 lines with K = 20 runouts, and the 650 GB budget of O-51.
+
+The data is synthetic (O-57) and the report says so in its first line: it bounds the format's
+bytes per node, not a solver's output, and S20 replaces it with measured bytes (O-51). It is
+Markdown, not JSON, so `report.schema.json` does not apply; the R ID line in the report stands
+in for `r_ids`.
 
 ## Report schema: `report.schema.json` (R0.11)
 
@@ -119,7 +145,7 @@ Where the committed files come from (O-125). Continuous integration regenerates 
 | `g1-kuhn.json`, `g1-kuhn.md` | S13, `just gates` on the Zenbook; CI uploads its own run as an artifact only (O-125) | JSON gate report with its tool-written Markdown twin | R2.4: Kuhn against minus 1/18 and the 0.001 chip floor, the 04 section 6 pass rules as thresholds. |
 | `g2-akq.json`, `g2-akq.md` | S13, `just gates` on the Zenbook; CI as above | JSON gate report with its tool-written Markdown twin | R2.5: the AKQ cases and the polar river game against their closed forms within 0.5 percentage points. |
 | `g3-leduc.json`, `g3-leduc.md` | S13, `just gates` on the Zenbook; CI as above | JSON gate report with its tool-written Markdown twin | R2.6: Leduc against the committed OpenSpiel exploitability curve (O-30) within the O-79 tolerance. |
-| `library-size-estimate.md` | S14 | Markdown | R2.7: bytes per runout and per flop tree with the method, judged against O-51; the chunk decode number moves into the bench JSON. |
+| `library-size-estimate.md` | S14, `just library-size-estimate` (`library-pack estimate`) | Markdown, tool-written | R2.7: bytes per runout and per flop tree on synthetic trees with the method and seed, set against 02 section 5.2 and O-51 (the section above); the chunk decode number lives in the bench JSON. |
 | `bench-flop-line-zenbook.md` | S18 | Markdown | R2.12 and R2.16 to R2.18: peak RSS, seconds per line, iterations and exploitability of `library-builder --once` under the 5 GB Docker limit (O-48) against O-50. |
 | `spike-preflop-zenbook.md` | S19 | Markdown | The push/fold spike on the Zenbook (R2.21, O-49): peak bytes and seconds, the 100 big blind figure measured or labeled extrapolated, and the O-4 answer. |
 | `spike-preflop-mac.md` | S20 | Markdown | R2.21 rerun in the builder container on the Mac against O-48 and O-49. |

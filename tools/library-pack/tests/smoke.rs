@@ -1,10 +1,12 @@
 //! Smoke test for the `library-pack` binary (R0.1): the workspace builds it and it runs.
+//! Since S14 the binary is a subcommand tool, so the smoke run asks for its version.
 
 use std::process::Command;
 
 #[test]
 fn r0_1_library_pack_runs() {
     let output = Command::new(env!("CARGO_BIN_EXE_library-pack"))
+        .arg("--version")
         .output()
         .expect("the library-pack binary built by cargo should start");
     assert!(output.status.success(), "exit status was {:?}", output.status);

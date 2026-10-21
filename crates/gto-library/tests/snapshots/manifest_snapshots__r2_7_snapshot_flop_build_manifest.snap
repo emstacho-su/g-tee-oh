@@ -1,0 +1,51 @@
+---
+source: crates/gto-library/tests/manifest_snapshots.rs
+expression: manifest
+---
+{
+  "format_version": 1,
+  "kind": "flop_build",
+  "source": "own",
+  "id": "6f1d2c3a-4b5e-4f70-8a9b-0c1d2e3f4a5b",
+  "engine_version": "0.1.0",
+  "config": {
+    "format": "online",
+    "table_size": 6,
+    "stake": "0.5/1",
+    "depth_cbb": 10000,
+    "straddle": false,
+    "ante_cbb": 0
+  },
+  "config_id": "cfg_6_online_100",
+  "pair": "BB-BTN",
+  "flop": "Ah7d2c",
+  "flop_weight": 12,
+  "lines": [
+    {
+      "line": "r250.c",
+      "tree_hash": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "seed": 42,
+      "iterations": 2000,
+      "exploitability_pct_pot": [
+        0.31,
+        0.28
+      ],
+      "flop_file": "flop/r250.c.bin.zst",
+      "sha256": "[sha256]"
+    }
+  ],
+  "runouts": [
+    {
+      "turn": "Kh",
+      "river": "9s",
+      "files": {
+        "r250.c": {
+          "path": "runouts/Kh9s/r250.c.bin.zst",
+          "sha256": "[sha256]"
+        }
+      }
+    }
+  ],
+  "synthetic": true,
+  "created_at": "2026-10-20T12:00:00Z"
+}

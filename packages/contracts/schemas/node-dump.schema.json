@@ -91,18 +91,18 @@
     },
     "config_id": {
       "type": "string",
-      "pattern": "^cfg_[2-9]_(online|live)(_[0-9]+)+$",
-      "description": "A seeded game_config identifier: cfg_, the table size, the format and the numeric parts of the stake and depth (O-112)."
+      "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+      "description": "A game_config identifier in gto-model's grammar (O-112, O-132): cfg_, the table size, the format, the stake slug unless it repeats the format, the depth in whole big blinds or as <n>cbb, then _straddle and _ante<cbb> when they apply, for example cfg_9_live_13_150."
     },
     "position_pair": {
       "type": "string",
-      "pattern": "^[A-Z][A-Z0-9+]{0,4}-[A-Z][A-Z0-9+]{0,4}$",
-      "description": "Two position labels joined by a hyphen, out of position first, for example BB-BTN."
+      "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+      "description": "Two of the nine gto-model position names (UTG, UTG1, UTG2, LJ, HJ, CO, BTN, SB, BB) joined by a hyphen, out of position first, for example BB-BTN (O-132)."
     },
     "position": {
       "type": "string",
-      "pattern": "^[A-Z][A-Z0-9+]{0,4}$",
-      "description": "One position label, for example BTN or UTG+1."
+      "enum": ["UTG", "UTG1", "UTG2", "LJ", "HJ", "CO", "BTN", "SB", "BB"],
+      "description": "One of the nine gto-model position names, for example BTN or UTG1 (O-132)."
     },
     "timestamp": {
       "type": "string",
@@ -117,8 +117,8 @@
       "properties": {
         "node_key": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9_]+/[A-Z0-9+]+-[A-Z0-9+]+/\\S*$",
-          "description": "The node key (A3): a tree identifier, the position pair and the action line so far, separated by slashes, with an empty line at the root."
+          "pattern": "^[a-z0-9_]+/[A-Z0-9]+-[A-Z0-9]+/\\S*$",
+          "description": "The node key (A3 section 1): the configuration identifier, the position pair and the action line so far, separated by slashes, with an empty line at the root."
         },
         "street": {
           "type": "string",
@@ -137,7 +137,7 @@
         "pot_cbb": {
           "type": "integer",
           "minimum": 0,
-          "description": "The pot before the action at this node, in centi-big-blinds (cbb)."
+          "description": "The pot at this node in centi-big-blinds (cbb), including any outstanding bet the actor faces (O-137); the pack buckets the node's actions against this pot and stores it unchanged."
         },
         "stacks_cbb": {
           "type": "array",

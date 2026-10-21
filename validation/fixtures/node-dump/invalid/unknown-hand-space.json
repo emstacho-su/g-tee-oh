@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "source": "own",
+  "exported_at": "2026-10-20T12:00:00Z",
+  "config": {
+    "format": "online",
+    "table_size": 6,
+    "stake_label": "0.5/1",
+    "depth_cbb": 10000,
+    "straddle": false,
+    "ante_cbb": 0
+  },
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "hand_space": "preflop_1326",
+  "exploitability_pct_pot": [0.2, 0.2],
+  "nodes": [
+    {
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "street": "preflop",
+      "board": "",
+      "to_act": "BTN",
+      "pot_cbb": 150,
+      "stacks_cbb": [9900, 10000],
+      "actions": [
+        { "token": "f", "size_cbb": 0 },
+        { "token": "c", "size_cbb": 100 },
+        { "token": "r300", "size_cbb": 300 }
+      ],
+      "hands": [
+        {
+          "hand": "AKs",
+          "reach": [1, 1],
+          "frequencies": [0, 0, 1],
+          "ev_bb": [0, 0.62, 1.38]
+        },
+        {
+          "hand": "72o",
+          "reach": [1, 1],
+          "frequencies": [0.85, 0.05, 0.1],
+          "ev_bb": [0, -0.41, -0.22]
+        }
+      ],
+      "accuracy_pct_pot": 0.25
+    }
+  ]
+}
