@@ -37,3 +37,17 @@ jobs:
         run: just rust-test
       - name: Boundary (solver-query never depends on gto-solve, ADR 0018)
         run: just rust-boundary
+      # The gate reports are regenerated here and uploaded as an artifact only; continuous
+      # integration (CI) never commits them (contents: read); the committed files are the
+      # Zenbook run (O-125).
+      - name: Gates G1 to G3 (R2.4 to R2.6)
+        run: just gates
+        env:
+          VALIDATE_MACHINE: github-ubuntu
+      - name: Upload gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-reports
+          path: validation/reports/g*-*.*
+          if-no-files-found: error

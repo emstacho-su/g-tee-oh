@@ -1,14 +1,17 @@
-//! Gate tests for `tools/validate` (R0.11, the red half; 04 section 6 gates G1 to G3).
+//! Gate tests for `tools/validate`: the fixture loading tests of requirement identifier
+//! (R ID) R0.11 and the toy-game gates G1 to G3 of 04 section 6 (R2.4 to R2.6).
 //!
-//! Two kinds of test live here. The loading tests are green now: they prove the fixture
-//! files under `validation/fixtures/` exist, parse through serde with the closed field
-//! set the fixtures README documents, and carry `schema_version` 1. The gate tests are
-//! pending: each is ignored with its R ID until S13 wires the engine through `gto-solve`,
-//! and its body is the pass rule written as assertions against a result type that S13
-//! fills in by replacing the two `unimplemented!` helpers.
+//! Two kinds of test live here. The loading tests prove the fixture files under
+//! `validation/fixtures/` exist, parse through serde with the closed field set the
+//! fixtures README documents, and carry `schema_version` 1. The gate tests run the
+//! engine through `gto-solve`: two helpers call `validate::gates::solve_case` and
+//! `validate::gates::solve_leduc_curve`, the same code path the `validate gates`
+//! subcommand writes its reports from, and each test body is the gate's pass rule
+//! written as assertions against what they return.
 //!
 //! Identifiers cited: O-30 (the `OpenSpiel` curve fixture), O-79 (the G3 tolerance),
-//! R2.4 to R2.6 (09 section 6) and success criterion 1 (09 section 7, row 1).
+//! O-128 (the curve's alternating updates), R2.4 to R2.6 (09 section 6) and success
+//! criterion 1 (09 section 7, row 1). CFR is counterfactual regret minimization.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -132,8 +135,10 @@ fn r0_11_leduc_fixture_references_the_curve_and_the_o79_tolerance() {
     assert_eq!(rel.unit, "ratio");
 }
 
-/// R0.11 and O-30: the `OpenSpiel` curve parses, is plain CFR at the recorded
-/// schedule, and the provenance note names the version and the seed the file carries.
+/// R0.11 and O-30: the `OpenSpiel` curve parses, is plain CFR with alternating updates
+/// (O-128: `CFRSolver` alternates whatever the first generator block said) at the
+/// recorded schedule, and the provenance note names the version and the seed the file
+/// carries.
 #[test]
 fn r0_11_openspiel_curve_parses_with_schema_version_1_and_provenance() {
     let fixture = load_toy_game("leduc");
@@ -144,10 +149,9 @@ fn r0_11_openspiel_curve_parses_with_schema_version_1_and_provenance() {
     assert!(!curve.generator.version.is_empty(), "version recorded");
     assert_eq!(curve.iterations(), CURVE_ITERATIONS);
     let generator = &curve.generator;
-    let plain = !generator.regret_matching_plus
-        && !generator.alternating_updates
-        && !generator.linear_averaging;
+    let plain = !generator.regret_matching_plus && !generator.linear_averaging;
     assert!(plain, "the curve must come from plain CFR");
+    assert!(generator.alternating_updates, "CFRSolver alternates its updates (O-128)");
     assert_eq!(curve.final_state.iterations, CURVE_ITERATIONS[CURVE_ITERATIONS.len() - 1]);
     assert!(curve.r_ids.iter().any(|r| r == "R2.6"), "curve serves R2.6");
     assert!(curve.o_ids.iter().any(|o| o == "O-30"), "curve answers O-30");
@@ -168,12 +172,12 @@ fn r0_11_fixtures_readme_names_every_fixture_file() {
     assert!(readme.contains("validation/reports/README.md"), "README.md links the reports");
 }
 
-// Pending gate tests: ignored with their R IDs until S13 wires the engine.
+// Gate tests: the pass rules of G1 to G3 against the engine through `validate::gates`.
 
-/// What `tools/validate` reports for one solved toy-game case once S13 lands (R2.4,
-/// R2.5): the game value to player 0, the exploitability of the average strategy in
-/// chips, and the solved frequency of every strategy fact and ratio fact the fixture
-/// names, keyed by fact id.
+/// What `tools/validate` reports for one solved toy-game case (R2.4, R2.5): the game
+/// value to player 0, the exploitability of the average strategy in chips, and the
+/// solved frequency of every strategy fact and ratio fact the fixture names, keyed by
+/// fact id.
 struct SolvedCase {
     game_value_player_0: f64,
     exploitability_chips: f64,
@@ -181,19 +185,29 @@ struct SolvedCase {
     ratios: BTreeMap<String, f64>,
 }
 
-/// S13 replaces the body: build the case's game through `gto-solve`, run the engine to
-/// convergence and read the average strategy. The polar river case needs a game the
-/// vendored engine does not model yet (its games are Kuhn and AKQ).
+/// Solves one case through `validate::gates::solve_case`: the case's game is built in
+/// `gto-solve` (Kuhn and AKQ wrap the engine's games, the polar river case is a game
+/// `gto-solve` adds), solved with the engine's discounted CFR to the gate's stop rule,
+/// and its average strategy read back in the fixture's vocabulary. A solve error panics
+/// with its message.
 fn solve_case(fixture: &ToyGameFixture, case: &Case) -> SolvedCase {
-    unimplemented!("pending S13: solve {} case {} through gto-solve", fixture.id, case.id)
+    let solved =
+        validate::gates::solve_case(fixture, case).unwrap_or_else(|error| panic!("{error}"));
+    SolvedCase {
+        game_value_player_0: solved.game_value_player_0,
+        exploitability_chips: solved.exploitability_chips,
+        frequencies: solved.frequencies,
+        ratios: solved.ratios,
+    }
 }
 
-/// S13 replaces the body: model Leduc in the engine, run plain CFR with the switches
-/// the curve records (no regret matching plus, simultaneous updates, uniform averaging,
-/// no discounting) in one continuous run, and report the mean best-response gain of the
-/// average strategy in chips, ante 1, at each requested iteration.
+/// Runs `validate::gates::solve_leduc_curve`: the Leduc model in `gto-solve`, plain CFR
+/// as `OpenSpiel`'s `CFRSolver` runs it (no regret matching plus, alternating updates,
+/// uniform averaging, no discounting, O-124, O-128) in one continuous run, and the mean
+/// best-response gain of the average strategy in chips, ante 1, at each requested
+/// iteration.
 fn solve_leduc_curve(iterations: &[u64]) -> Vec<(u64, f64)> {
-    unimplemented!("pending S13: Leduc through gto-solve at iterations {iterations:?}")
+    validate::gates::solve_leduc_curve(iterations)
 }
 
 /// The free parameters of an equilibrium family, bound from the solved frequencies.
@@ -243,7 +257,6 @@ fn fact_error(
 /// 0.001 of minus 1/18 and the exploitability of the average strategy is below 0.001
 /// chips. Both numbers and both tolerances come from the fixture.
 #[test]
-#[ignore = "R2.4 pending S13"]
 fn r2_4_g1_kuhn_value_within_tolerance_and_exploitability_below_floor() {
     let fixture = load_toy_game("kuhn");
     let case = fixture.case("standard").expect("kuhn has the standard case");
@@ -273,7 +286,6 @@ fn r2_4_g1_kuhn_value_within_tolerance_and_exploitability_below_floor() {
 /// Exact facts pin a value; at the pot sized AKQ bet the segment facts accept any point
 /// of the equilibrium segment, and the range-level defense ratio is still exactly 1/2.
 #[test]
-#[ignore = "R2.5 pending S13"]
 fn r2_5_g2_akq_frequencies_match_closed_forms_within_half_a_point() {
     let fixture = load_toy_game("akq");
     let points = fixture.tolerances.frequency_points.as_ref().expect("G2 states it").value;
@@ -317,7 +329,6 @@ fn r2_5_g2_akq_frequencies_match_closed_forms_within_half_a_point() {
 /// committed `OpenSpiel` curve, the engine's exploitability of its average strategy is
 /// within the larger of 0.001 absolute and 10 percent relative of the recorded value.
 #[test]
-#[ignore = "R2.6 pending S13"]
 fn r2_6_g3_leduc_exploitability_within_o79_tolerance_at_every_checkpoint() {
     let fixture = load_toy_game("leduc");
     let curve = load_curve(&fixture);
@@ -334,7 +345,8 @@ fn r2_6_g3_leduc_exploitability_within_o79_tolerance_at_every_checkpoint() {
         let error = (actual - expected.exploitability).abs();
         assert!(
             error <= allowed,
-            "G3: iteration {iteration}: engine {actual} and OpenSpiel {} differ by {error}, allowed {allowed}",
+            "G3: iteration {iteration}: engine {actual} and OpenSpiel {} differ by {error}, \
+             allowed {allowed}",
             expected.exploitability
         );
     }

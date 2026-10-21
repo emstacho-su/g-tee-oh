@@ -1,0 +1,132 @@
+{
+  "report": "g3-leduc",
+  "r_ids": [
+    "R2.6"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "Windows 11 (26200)",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 31
+  },
+  "commit": "48e1cb7bfdfd61dd7207f1e11f03f5d7b21df137",
+  "date": "2026-10-21T00:41:36Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "pass": true,
+  "thresholds": {
+    "leduc/plain-cfr/exploitability@1": {
+      "min": 2.13625,
+      "max": 2.610972222222222,
+      "unit": "chips"
+    },
+    "leduc/plain-cfr/exploitability@10": {
+      "min": 0.7997210848518921,
+      "max": 0.977436881485646,
+      "unit": "chips"
+    },
+    "leduc/plain-cfr/exploitability@100": {
+      "min": 0.08614471770413785,
+      "max": 0.10528798830505738,
+      "unit": "chips"
+    },
+    "leduc/plain-cfr/exploitability@1000": {
+      "min": 0.010636029233807659,
+      "max": 0.012999591285764917,
+      "unit": "chips"
+    },
+    "leduc/plain-cfr/exploitability@5000": {
+      "min": 0.002552366213441127,
+      "max": 0.004552366213441127,
+      "unit": "chips"
+    }
+  },
+  "measurements": [
+    {
+      "id": "leduc/plain-cfr/exploitability@1",
+      "value": 2.373611196875572,
+      "unit": "chips",
+      "threshold": {
+        "min": 2.13625,
+        "max": 2.610972222222222,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "leduc/plain-cfr/exploitability@10",
+      "value": 0.8885789960622787,
+      "unit": "chips",
+      "threshold": {
+        "min": 0.7997210848518921,
+        "max": 0.977436881485646,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "leduc/plain-cfr/exploitability@100",
+      "value": 0.09571578353643417,
+      "unit": "chips",
+      "threshold": {
+        "min": 0.08614471770413785,
+        "max": 0.10528798830505738,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "leduc/plain-cfr/exploitability@1000",
+      "value": 0.012098122388124466,
+      "unit": "chips",
+      "threshold": {
+        "min": 0.010636029233807659,
+        "max": 0.012999591285764917,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "leduc/plain-cfr/exploitability@5000",
+      "value": 0.0032889991998672485,
+      "unit": "chips",
+      "threshold": {
+        "min": 0.002552366213441127,
+        "max": 0.004552366213441127,
+        "unit": "chips"
+      },
+      "pass": true
+    },
+    {
+      "id": "leduc/plain-cfr/value-player-0@5000",
+      "value": -0.08592837303876877,
+      "unit": "chips"
+    },
+    {
+      "id": "leduc/dcfr-default/exploitability@1",
+      "value": 2.373611196875572,
+      "unit": "chips"
+    },
+    {
+      "id": "leduc/dcfr-default/exploitability@10",
+      "value": 0.7788012027740479,
+      "unit": "chips"
+    },
+    {
+      "id": "leduc/dcfr-default/exploitability@100",
+      "value": 0.00683227926492691,
+      "unit": "chips"
+    },
+    {
+      "id": "leduc/dcfr-default/exploitability@1000",
+      "value": 0.0001696273684501648,
+      "unit": "chips"
+    },
+    {
+      "id": "leduc/dcfr-default/exploitability@5000",
+      "value": 9.838491678237915e-6,
+      "unit": "chips"
+    }
+  ],
+  "notes": "plain CFR: alternating updates as OpenSpiel's CFRSolver runs them (O-128), uniform averaging, no discounting, no regret floor; exploitability = NashConv / 2 per O-108, O-109. Fixture average-policy value to player 0 at iteration 5000: -0.0859431179350123 chips (reports only). Curve openspiel/leduc_exploitability.json with provenance openspiel/PROVENANCE.md."
+}

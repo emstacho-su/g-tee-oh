@@ -20,6 +20,23 @@ function just(recipe) {
   return result.status ?? 1;
 }
 
+// The same project arguments as the justfile's compose recipes.
+const COMPOSE_ARGS = [
+  'compose', '--project-directory', '.', '-f', 'infra/compose/compose.yaml', '--profile', 'dev',
+];
+const LOG_TAIL_LINES = '80';
+
+// After a failed step, the container states and the last log lines of every service are
+// printed before teardown removes them, so a failure in CI shows its cause in the job log.
+function printDiagnostics() {
+  for (const args of [['ps', '-a'], ['logs', '--no-color', '--tail', LOG_TAIL_LINES]]) {
+    console.error(`e2e: docker ${[...COMPOSE_ARGS, ...args].join(' ')}`);
+    const options = { stdio: 'inherit', shell: false, windowsHide: true };
+    const result = spawnSync('docker', [...COMPOSE_ARGS, ...args], options);
+    if (result.error) console.error(`e2e: could not collect diagnostics: ${result.error.message}`);
+  }
+}
+
 function main() {
   let status = 0;
   try {
@@ -28,6 +45,7 @@ function main() {
       status = just(step);
       if (status !== 0) {
         console.error(`e2e: just ${step} failed with exit ${status}`);
+        printDiagnostics();
         break;
       }
     }
