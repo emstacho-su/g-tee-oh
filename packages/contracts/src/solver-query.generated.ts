@@ -32,7 +32,7 @@ export interface paths {
          * The request counters, the latency histogram and the library gauges as Prometheus text.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     None today: the registry's lock is reused when poisoned, so every scrape answers.
          */
         get: operations["metrics"];
         put?: never;
@@ -55,7 +55,8 @@ export interface paths {
          *     texture family and the build queue.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` (400) for a configuration identifier or a pair that does not
+         *     parse. A database that does not answer is reported in the body, not as an error.
          */
         get: operations["coverage"];
         put?: never;
@@ -80,7 +81,10 @@ export interface paths {
          *     The board stays server-side until each street is revealed (A5 rule two).
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for a configuration, pair, street, line, spot-class key or seed
+         *     that does not parse, or a filter v1 does not take (a texture, a street other than
+         *     preflop); `ApiError::NotFound` when no solution of the pair holds the start node;
+         *     `ApiError::Unavailable` when a solution of the pair is marked unavailable.
          */
         post: operations["deal"];
         delete?: never;
@@ -101,7 +105,10 @@ export interface paths {
          *     repeat answers the same cards.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for an id that is not a lowercase UUID or a street other than
+         *     flop, turn or river; `ApiError::NotFound` for a deal the store does not hold (post the
+         *     seed and filter again to recreate it); `ApiError::Conflict` for a street revealed out
+         *     of order.
          */
         get: operations["reveal"];
         put?: never;
@@ -126,7 +133,10 @@ export interface paths {
          *     floor (O-22), the bucket, the noise flags and the difficulty features.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for a malformed solution id, node key or hand, an action index
+         *     out of range or a reference over 64 characters; `ApiError::NotFound` for a solution,
+         *     node or hand that does not exist; `ApiError::Unavailable` for a solution the reader
+         *     marked unavailable.
          */
         post: operations["grade"];
         delete?: never;
@@ -147,7 +157,10 @@ export interface paths {
          *     range and nut advantage, blockers, hand role and noise flags.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for a key, solution id or hand that does not parse (or a class
+         *     at a 1,326-combo node); `ApiError::NotFound` for a solution or node the library does
+         *     not hold or a hand the node does not hold; `ApiError::Unavailable` when the solution
+         *     is marked unavailable.
          */
         get: operations["insights"];
         put?: never;
@@ -169,7 +182,9 @@ export interface paths {
          * One node of one solution with its actions, hand rows and range summaries.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for a malformed node key, solution id or hand filter;
+         *     `ApiError::NotFound` for a solution, node or hand that does not exist;
+         *     `ApiError::Unavailable` for a solution the reader marked unavailable.
          */
         get: operations["nodes"];
         put?: never;
@@ -194,7 +209,10 @@ export interface paths {
          *     generator state to send next.
          * @description # Errors
          *
-         *     A stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.
+         *     `ApiError::BadRequest` for a key, solution id, hand or state that does not parse;
+         *     `ApiError::NotFound` for a solution, node or hand the library does not hold;
+         *     `ApiError::Unavailable` when the solution is marked unavailable; `ApiError::Internal`
+         *     for a record without an action, which no request can cause.
          */
         post: operations["sample_action"];
         delete?: never;

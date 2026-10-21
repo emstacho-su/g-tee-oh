@@ -37,7 +37,7 @@
           "ops"
         ],
         "summary": "The request counters, the latency histogram and the library gauges as Prometheus text.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\nNone today: the registry's lock is reused when poisoned, so every scrape answers.",
         "operationId": "metrics",
         "responses": {
           "200": {
@@ -69,7 +69,7 @@
           "coverage"
         ],
         "summary": "What the library holds for a configuration and pair: preflop availability, flops by\ntexture family and the build queue.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` (400) for a configuration identifier or a pair that does not\nparse. A database that does not answer is reported in the body, not as an error.",
         "operationId": "coverage",
         "parameters": [
           {
@@ -133,7 +133,7 @@
           "deal"
         ],
         "summary": "Deals a scenario from a seed: the start node, both hands and the solutions in play.\nThe board stays server-side until each street is revealed (A5 rule two).",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a configuration, pair, street, line, spot-class key or seed\nthat does not parse, or a filter v1 does not take (a texture, a street other than\npreflop); `ApiError::NotFound` when no solution of the pair holds the start node;\n`ApiError::Unavailable` when a solution of the pair is marked unavailable.",
         "operationId": "deal",
         "requestBody": {
           "content": {
@@ -195,7 +195,7 @@
           "deal"
         ],
         "summary": "Reveals the next street of a deal: the flop first, then the turn, then the river. A\nrepeat answers the same cards.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for an id that is not a lowercase UUID or a street other than\nflop, turn or river; `ApiError::NotFound` for a deal the store does not hold (post the\nseed and filter again to recreate it); `ApiError::Conflict` for a street revealed out\nof order.",
         "operationId": "reveal",
         "parameters": [
           {
@@ -268,7 +268,7 @@
           "grade"
         ],
         "summary": "Grades one decision: expected value (EV) loss in big blinds and percent of the pot, the\nfloor (O-22), the bucket, the noise flags and the difficulty features.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a malformed solution id, node key or hand, an action index\nout of range or a reference over 64 characters; `ApiError::NotFound` for a solution,\nnode or hand that does not exist; `ApiError::Unavailable` for a solution the reader\nmarked unavailable.",
         "operationId": "grade",
         "requestBody": {
           "content": {
@@ -330,7 +330,7 @@
           "insights"
         ],
         "summary": "The E3 insight data for one hand at one node: threshold card, equity distributions,\nrange and nut advantage, blockers, hand role and noise flags.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a key, solution id or hand that does not parse (or a class\nat a 1,326-combo node); `ApiError::NotFound` for a solution or node the library does\nnot hold or a hand the node does not hold; `ApiError::Unavailable` when the solution\nis marked unavailable.",
         "operationId": "insights",
         "parameters": [
           {
@@ -414,7 +414,7 @@
           "nodes"
         ],
         "summary": "One node of one solution with its actions, hand rows and range summaries.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a malformed node key, solution id or hand filter;\n`ApiError::NotFound` for a solution, node or hand that does not exist;\n`ApiError::Unavailable` for a solution the reader marked unavailable.",
         "operationId": "nodes",
         "parameters": [
           {
@@ -498,7 +498,7 @@
           "sample-action"
         ],
         "summary": "Draws the opponent's action at a node from the hand's frequencies and returns the\ngenerator state to send next.",
-        "description": "# Errors\n\nA stub: every call answers `ApiError::NotImplemented` (501) until the lane lands.",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a key, solution id, hand or state that does not parse;\n`ApiError::NotFound` for a solution, node or hand the library does not hold;\n`ApiError::Unavailable` when the solution is marked unavailable; `ApiError::Internal`\nfor a record without an action, which no request can cause.",
         "operationId": "sample_action",
         "requestBody": {
           "content": {
