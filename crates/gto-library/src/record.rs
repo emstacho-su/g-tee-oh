@@ -15,20 +15,22 @@
 //! is 0 for none and 1 to 7 in `Bucket::ALL` order, from `Bucket::of_action` against
 //! `pot_cbb`, the total pot at the node including any outstanding bet (lead decision 4);
 //! the best action is the one with the highest expected value (EV), the first on ties, and
-//! its loss is exactly 0. Absent reach is a cleared flag, never an invented 1.0.
+//! its loss is exactly 0. Absent reach is a cleared flag, never an invented 1.0. Street
+//! codes are 0 to 3 in `Street::ALL` order. A sized token (straddle, bet, raise) stores its
+//! own size in `size_cbb`, which is how the decoder rebuilds the token.
 //!
-//! Lane W (writer) owns this file and `view.rs`.
+//! Lane W (writer) owns this file, its `codec` submodule and `view.rs`. The byte layout above
+//! is implemented in `codec` (`encoded_len`, `encode`, `decode`); this file holds the types
+//! and the quantization of a `SolvedNode` into a `NodeRecord`.
 
-#![allow(
-    unused_variables,
-    clippy::ptr_arg,
-    reason = "S14 red skeleton: lane W replaces the todo!() bodies"
-)]
+mod codec;
 
 use gto_model::{ActionToken, Bucket, Cbb, NodeKey, Position, PositionPair, Street};
 use serde::{Deserialize, Serialize};
 
 use crate::error::LibraryError;
+use crate::key_hash::key_hash;
+use crate::quantize::{loss_units, quantize_frequencies, quantize_reach};
 
 /// Flag bit 0: the record lists its hands (`hand_ids` present).
 pub const FLAG_SPARSE: u8 = 1;
@@ -142,6 +144,13 @@ pub struct NodeRecord {
     pub accuracy_pct_pot: Option<f32>,
 }
 
+/// One hand quantized: its strategy column, best EV and loss column.
+struct HandColumn {
+    strategy: Vec<u8>,
+    ev_best: f32,
+    loss: Vec<u16>,
+}
+
 impl NodeRecord {
     /// Quantizes a solved node. Hands are stored in ascending index order; a node that lists
     /// every hand of its space is stored dense.
@@ -149,43 +158,157 @@ impl NodeRecord {
     /// # Errors
     ///
     /// `LibraryError::Quantize` for a number that cannot be quantized, a frequency or EV row
-    /// whose length differs from the action count, more than 255 actions, a hand index
-    /// outside the space or listed twice; `LibraryError::Model` when the seat to act is not
-    /// in `pair` or a bucket needs a pot of zero.
+    /// whose length differs from the action count, no actions or more than 255, a sized
+    /// token whose size differs from the action's, reach given for some hands only, a hand
+    /// index outside the space or listed twice, or a seat to act that is not in `pair`;
+    /// `LibraryError::Model` when a bet or raise needs a bucket against a pot of zero.
     pub fn from_solved(n: &SolvedNode, pair: PositionPair) -> Result<Self, LibraryError> {
-        todo!("lane W: quantize a solved node (O-130)")
+        let actions = record_actions(n)?;
+        let hands = sorted_hands(n)?;
+        let columns = hands
+            .iter()
+            .map(|hand| quantize_hand(hand, actions.len(), n.pot))
+            .collect::<Result<Vec<HandColumn>, LibraryError>>()?;
+        let dense = hands.len() == usize::from(n.hand_space.size());
+        Ok(NodeRecord {
+            key_hash: key_hash(&n.key),
+            street: n.key.street(),
+            to_act: seat_index(n.to_act, pair)?,
+            pot: n.pot,
+            stacks: n.stacks,
+            hand_space: n.hand_space,
+            hand_ids: (!dense).then(|| hands.iter().map(|hand| hand.hand).collect()),
+            reach: reach_table(&hands)?,
+            strategy: transpose(columns.iter().map(|c| c.strategy.as_slice()), actions.len()),
+            ev_best: columns.iter().map(|c| c.ev_best).collect(),
+            loss: transpose(columns.iter().map(|c| c.loss.as_slice()), actions.len()),
+            accuracy_pct_pot: finite_f32(n.accuracy_pct_pot, "accuracy_pct_pot")?,
+            actions,
+        })
     }
 
     /// The record's flag byte, derived from its fields.
     #[must_use]
     pub fn flags(&self) -> u8 {
-        todo!("lane W: flag byte from the fields")
+        [
+            (self.hand_ids.is_some(), FLAG_SPARSE),
+            (self.hand_space == HandSpace::Postflop1326, FLAG_POSTFLOP_1326),
+            (self.reach.is_some(), FLAG_REACH),
+            (self.accuracy_pct_pot.is_some(), FLAG_ACCURACY),
+        ]
+        .into_iter()
+        .filter(|(on, _)| *on)
+        .fold(0, |flags, (_, bit)| flags | bit)
     }
 
-    /// How many bytes `encode` appends.
-    #[must_use]
-    pub fn encoded_len(&self) -> usize {
-        todo!("lane W: encoded size")
+    /// How many hands the tables hold: the listed hands, or the whole space when dense.
+    fn hand_count(&self) -> usize {
+        self.hand_ids.as_ref().map_or(usize::from(self.hand_space.size()), Vec::len)
     }
+}
 
-    /// Appends the record's little-endian bytes to `out`.
-    ///
-    /// # Errors
-    ///
-    /// `LibraryError::Quantize` when a table's shape disagrees with the action or hand
-    /// count, so the bytes would not decode.
-    pub fn encode(&self, out: &mut Vec<u8>) -> Result<(), LibraryError> {
-        todo!("lane W: little-endian encoding")
+/// The node's actions with their buckets, checked against the record's limits.
+fn record_actions(n: &SolvedNode) -> Result<Vec<RecordAction>, LibraryError> {
+    if n.actions.is_empty() || n.actions.len() > usize::from(u8::MAX) {
+        return Err(LibraryError::Quantize(format!(
+            "node {} has {} actions; a record holds 1 to 255",
+            n.key,
+            n.actions.len()
+        )));
     }
+    n.actions
+        .iter()
+        .map(|&(token, size)| {
+            if token.size().is_some_and(|carried| carried != size) {
+                return Err(LibraryError::Quantize(format!(
+                    "action {token} at node {} is listed with size {size}",
+                    n.key
+                )));
+            }
+            Ok(RecordAction { token, size, bucket: Bucket::of_action(token, n.pot)? })
+        })
+        .collect()
+}
 
-    /// Decodes one record from the front of `b`, returning it with the bytes it used.
-    /// Every length is bounds-checked, so malformed input is an error and never a panic.
-    ///
-    /// # Errors
-    ///
-    /// `LibraryError::Decode` for truncated input, an unknown street, action code or bucket
-    /// byte, a reserved flag bit set, or a hand index outside the space.
-    pub fn decode(b: &[u8]) -> Result<(Self, usize), LibraryError> {
-        todo!("lane W: bounds-checked decoding")
+/// The node's hands in ascending index order, each inside the space and listed once.
+fn sorted_hands(n: &SolvedNode) -> Result<Vec<&SolvedHand>, LibraryError> {
+    let size = n.hand_space.size();
+    if let Some(hand) = n.hands.iter().find(|hand| hand.hand >= size) {
+        return Err(LibraryError::Quantize(format!(
+            "hand {} at node {} is outside the {size} hands of its space",
+            hand.hand, n.key
+        )));
+    }
+    let mut hands: Vec<&SolvedHand> = n.hands.iter().collect();
+    hands.sort_by_key(|hand| hand.hand);
+    match hands.windows(2).find(|pair| pair[0].hand == pair[1].hand) {
+        Some(pair) => Err(LibraryError::Quantize(format!(
+            "hand {} is listed twice at node {}",
+            pair[0].hand, n.key
+        ))),
+        None => Ok(hands),
+    }
+}
+
+/// One hand's strategy column, best EV and loss column.
+fn quantize_hand(hand: &SolvedHand, actions: usize, pot: Cbb) -> Result<HandColumn, LibraryError> {
+    if hand.frequencies.len() != actions || hand.ev_bb.len() != actions {
+        return Err(LibraryError::Quantize(format!(
+            "hand {} needs one frequency and one EV for each of {actions} actions",
+            hand.hand
+        )));
+    }
+    let strategy = quantize_frequencies(&hand.frequencies)?;
+    let best = hand.ev_bb.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let loss =
+        hand.ev_bb.iter().map(|ev| loss_units(best, *ev, pot)).collect::<Result<Vec<_>, _>>()?;
+    let ev_best = finite_f32(Some(narrow(best)), "ev_best")?.unwrap_or_default();
+    Ok(HandColumn { strategy, ev_best, loss })
+}
+
+/// Per-seat reach columns when every hand gives reach, `None` when none does.
+fn reach_table(hands: &[&SolvedHand]) -> Result<Option<[Vec<u16>; 2]>, LibraryError> {
+    let given: Vec<[f64; 2]> = hands.iter().filter_map(|hand| hand.reach).collect();
+    if given.is_empty() {
+        return Ok(None);
+    }
+    if given.len() != hands.len() {
+        return Err(LibraryError::Quantize(format!(
+            "reach is given for {} of {} hands; give it for every hand or none",
+            given.len(),
+            hands.len()
+        )));
+    }
+    let seat = |s: usize| given.iter().map(|r| quantize_reach(r[s])).collect::<Result<_, _>>();
+    Ok(Some([seat(0)?, seat(1)?]))
+}
+
+/// Per-hand columns of `rows` entries each, as `[row][hand]`.
+fn transpose<'a, T: Copy + 'a>(columns: impl Iterator<Item = &'a [T]>, rows: usize) -> Vec<Vec<T>> {
+    let columns: Vec<&[T]> = columns.collect();
+    (0..rows).map(|row| columns.iter().map(|column| column[row]).collect()).collect()
+}
+
+/// The seat's index in the pair: 0 out of position, 1 in position.
+fn seat_index(to_act: Position, pair: PositionPair) -> Result<u8, LibraryError> {
+    match (to_act == pair.oop(), to_act == pair.ip()) {
+        (true, _) => Ok(0),
+        (_, true) => Ok(1),
+        _ => Err(LibraryError::Quantize(format!("seat {to_act} is not in the pair {pair}"))),
+    }
+}
+
+#[allow(clippy::cast_possible_truncation, reason = "f32 is the stored precision")]
+fn narrow(x: f64) -> f32 {
+    x as f32
+}
+
+/// `value` when it is absent or finite; an error naming `what` otherwise.
+fn finite_f32(value: Option<f32>, what: &str) -> Result<Option<f32>, LibraryError> {
+    match value {
+        Some(v) if !v.is_finite() => {
+            Err(LibraryError::Quantize(format!("{what} {v} is not a finite f32")))
+        }
+        _ => Ok(value),
     }
 }

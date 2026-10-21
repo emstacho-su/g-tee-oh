@@ -162,7 +162,8 @@ fn meta() -> SolutionMeta {
     }
 }
 
-/// A solved preflop node with random actions, hands and numbers.
+/// A solved preflop node with random actions, hands and numbers. Reach is present for every
+/// hand or for none, because the record keeps one reach flag per node (O-130).
 fn solved_node() -> impl Strategy<Value = SolvedNode> {
     let shape = (1_usize..=4, prop::collection::btree_set(0_u16..169, 1..=24), 100_u32..=5_000);
     shape
@@ -170,12 +171,13 @@ fn solved_node() -> impl Strategy<Value = SolvedNode> {
             let row = (
                 prop::collection::vec(0.01_f64..=1.0, actions),
                 prop::collection::vec(-10.0_f64..10.0, actions),
-                prop::option::of((0.0_f64..=1.0, 0.0_f64..=1.0)),
+                (0.0_f64..=1.0, 0.0_f64..=1.0),
             );
             let rows = prop::collection::vec(row, hands.len());
-            (Just((actions, hands, raise_to)), rows, prop::option::of(0.0_f32..5.0))
+            let extras = (prop::option::of(0.0_f32..5.0), any::<bool>());
+            (Just((actions, hands, raise_to)), rows, extras)
         })
-        .prop_map(|((actions, hands, raise_to), rows, accuracy)| {
+        .prop_map(|((actions, hands, raise_to), rows, (accuracy, with_reach))| {
             let base = preflop_node(raise_to);
             let menu = [
                 (ActionToken::Fold, Cbb(0)),
@@ -190,7 +192,7 @@ fn solved_node() -> impl Strategy<Value = SolvedNode> {
                     let total: f64 = weights.iter().sum();
                     SolvedHand {
                         hand,
-                        reach: reach.map(|(a, b)| [a, b]),
+                        reach: with_reach.then_some([reach.0, reach.1]),
                         frequencies: weights.iter().map(|w| w / total).collect(),
                         ev_bb,
                     }

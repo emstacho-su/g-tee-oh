@@ -4,9 +4,8 @@
 //!
 //! Lane W (writer) owns this file.
 
-#![allow(unused_variables, reason = "S14 red skeleton: lane W replaces the todo!() body")]
-
 use gto_model::NodeKey;
+use xxhash_rust::xxh64::xxh64;
 
 /// The xxh64 seed. Fixed, because stored records carry the hash.
 pub const KEY_HASH_SEED: u64 = 0;
@@ -14,5 +13,5 @@ pub const KEY_HASH_SEED: u64 = 0;
 /// xxh64 of `key.to_string()` with `KEY_HASH_SEED`.
 #[must_use]
 pub fn key_hash(key: &NodeKey) -> u64 {
-    todo!("lane W: xxh64 of the key text")
+    xxh64(key.to_string().as_bytes(), KEY_HASH_SEED)
 }
