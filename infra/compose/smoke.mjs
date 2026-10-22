@@ -317,7 +317,7 @@ function checkFixtureLibraryMount() {
 }
 
 // The query-role connection (O-28, O-146), proven from inside the container: the database block of
-// the health JSON says whether QUERY_DATABASE_URL is set (configured), whether the pool reached
+// the health JSON says whether QUERY_DB_PASSWORD is set (configured), whether the pool reached
 // postgres on that request (connected) and which group role the login holds (role). All three are
 // asserted, so a missing variable, a wrong password or a login outside the query role fails here.
 function checkQueryRoleConnection() {
@@ -325,7 +325,9 @@ function checkQueryRoleConnection() {
   const database = body?.database;
   if (database?.configured !== true) {
     const configured = JSON.stringify(database?.configured);
-    throw new Error(`database.configured is ${configured}: QUERY_DATABASE_URL is not set in the container`);
+    throw new Error(
+      `database.configured is ${configured}: QUERY_DB_PASSWORD is not set in the container`,
+    );
   }
   if (database.connected !== true) {
     const connected = JSON.stringify(database.connected);

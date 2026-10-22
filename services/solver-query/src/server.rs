@@ -81,7 +81,7 @@ pub async fn serve(config: &Config) -> Result<(), Error> {
         bind = %config.bind,
         fixture_library_path = ?config.fixture_library_path,
         query_cache_bytes = config.cache_bytes(),
-        query_database_url = ?config.query_database_url,
+        database = ?config.database,
         "starting {}",
         crate::version_line()
     );

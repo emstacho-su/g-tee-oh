@@ -1,31 +1,34 @@
 //! The query-role database connection (R2.13, O-28, O-146, O-147, plan C.6): a lazy
 //! sqlx pool as `query_login`, the coverage reads and the role probe.
 //!
-//! Mechanism: `Db::connect_lazy` parses `QUERY_DATABASE_URL` and opens nothing, so the
-//! service starts before Postgres is healthy (compose gives solver-query no `depends_on`);
-//! the first query opens a connection, up to `MAX_CONNECTIONS`. Every read is a
-//! runtime-checked `sqlx::query` (no macros, so no `DATABASE_URL` at build and no `.sqlx`
-//! directory, O-147) over the tables the query role may select
-//! (`db/migrations/20261020001000_grants.sql`): preflop availability from `solution`, flops
-//! and scenario counts from `scenario` joined to the solution's status, and queue
-//! positions from `build_job`. The role probe behind `/healthz` and `/metrics` runs
-//! `select current_user, pg_has_role(current_user, 'query', 'member')`, bounded by
-//! `PROBE_TIMEOUT` so a database that is down never holds the liveness answer.
+//! Mechanism: `Db::connect_lazy` builds sqlx's connect options from the `QUERY_DB_*` parts
+//! (`config::DatabaseConfig`) and opens nothing, so the service starts before Postgres is
+//! healthy (compose gives solver-query no `depends_on`); the first query opens a
+//! connection, up to `MAX_CONNECTIONS`. Every read is a runtime-checked `sqlx::query` (no
+//! macros, so no `DATABASE_URL` at build and no `.sqlx` directory, O-147) over the tables
+//! the query role may select (`db/migrations/20261020001000_grants.sql`): preflop
+//! availability from `solution`, flops and scenario counts from `scenario` joined to the
+//! solution's status, and queue positions from `build_job`; the three are independent and
+//! run concurrently, each on its own pooled connection. The role probe behind `/healthz`
+//! and `/metrics` runs `select current_user, pg_has_role(current_user, 'query', 'member')`,
+//! bounded by `PROBE_TIMEOUT` so a database that is down never holds the liveness answer.
 //!
 //! A failure of any kind is `ApiError::DatabaseUnavailable` (503), never a 500. Its detail
 //! names the failure class only; the server's text goes to the log, and no path carries
-//! the connection string or its password (A9 section 3; `config::DatabaseUrl` redacts it
-//! wherever it is shown).
+//! the password: there is no connection string to redact, `config::Password` prints
+//! redacted, and `Db`'s `Debug` shows the pool's size only (A9 section 3).
 
 use std::fmt;
 use std::time::Duration;
 
 use gto_model::{ConfigId, PositionPair};
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
 
+use crate::config::{DatabaseConfig, SslMode};
 use crate::error::ApiError;
 
-/// The most connections the lazy pool opens (plan C.6).
+/// The most connections the lazy pool opens (plan C.6): the three coverage reads side by
+/// side and the role probe.
 pub const MAX_CONNECTIONS: u32 = 4;
 
 /// How long a query waits for a connection before the answer is `database-unavailable`
@@ -133,24 +136,24 @@ pub struct DbCoverage {
 }
 
 impl Db {
-    /// A pool over `url` that connects on first use.
-    ///
-    /// # Errors
-    ///
-    /// `ApiError::DatabaseUnavailable` when the string is not a Postgres connection
-    /// string; the parse error is logged, the detail never carries the value.
-    pub fn connect_lazy(url: &str) -> Result<Db, ApiError> {
+    /// A pool over the parts of `database` that connects on first use. The parts go
+    /// through sqlx's builder, never a connection string, so a password may hold any
+    /// character. The libpq `PG*` variables fill only what no part covers (certificates,
+    /// the application name, `PGOPTIONS`), as they would for libpq itself.
+    #[must_use]
+    pub fn connect_lazy(database: &DatabaseConfig) -> Db {
+        let options = PgConnectOptions::new_without_pgpass()
+            .host(&database.host)
+            .port(database.port)
+            .database(&database.name)
+            .username(&database.user)
+            .password(database.password.expose())
+            .ssl_mode(pg_ssl_mode(database.ssl_mode));
         let pool = PgPoolOptions::new()
             .max_connections(MAX_CONNECTIONS)
             .acquire_timeout(ACQUIRE_TIMEOUT)
-            .connect_lazy(url)
-            .map_err(|err| {
-                tracing::error!(error = %err, "QUERY_DATABASE_URL is not a connection string");
-                ApiError::DatabaseUnavailable(
-                    "QUERY_DATABASE_URL is not a Postgres connection string".to_owned(),
-                )
-            })?;
-        Ok(Db { pool })
+            .connect_lazy_with(options);
+        Db { pool }
     }
 
     /// The pool, for the queries.
@@ -185,19 +188,23 @@ impl Db {
 
     /// Everything the database holds for `config_id` and `pair`: published preflop
     /// solutions, flops with their scenario counts, and queued jobs with their positions.
+    /// The three reads are independent and run concurrently.
     ///
     /// # Errors
     ///
-    /// `ApiError::DatabaseUnavailable` on the first read that fails.
+    /// `ApiError::DatabaseUnavailable` from the first read that fails; the other reads are
+    /// dropped.
     pub async fn coverage(
         &self,
         config_id: &ConfigId,
         pair: PositionPair,
     ) -> Result<DbCoverage, ApiError> {
-        let pair = pair.to_string();
-        let preflop_ids = self.preflop_ids(config_id.as_str(), &pair).await?;
-        let flops = self.flops(config_id.as_str(), &pair).await?;
-        let queue = self.queue(config_id.as_str(), &pair).await?;
+        let (config_id, pair) = (config_id.as_str(), pair.to_string());
+        let (preflop_ids, flops, queue) = tokio::try_join!(
+            self.preflop_ids(config_id, &pair),
+            self.flops(config_id, &pair),
+            self.queue(config_id, &pair),
+        )?;
         Ok(DbCoverage { preflop_ids, flops, queue })
     }
 
@@ -249,12 +256,24 @@ impl Db {
 }
 
 impl fmt::Debug for Db {
-    /// The pool's size only: its options hold the connection string.
+    /// The pool's size only: its options hold the password.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Db")
             .field("connections", &self.pool.size())
             .field("max_connections", &MAX_CONNECTIONS)
             .finish_non_exhaustive()
+    }
+}
+
+/// sqlx's value for a configured mode; the variants carry the same names.
+fn pg_ssl_mode(mode: SslMode) -> PgSslMode {
+    match mode {
+        SslMode::Disable => PgSslMode::Disable,
+        SslMode::Allow => PgSslMode::Allow,
+        SslMode::Prefer => PgSslMode::Prefer,
+        SslMode::Require => PgSslMode::Require,
+        SslMode::VerifyCa => PgSslMode::VerifyCa,
+        SslMode::VerifyFull => PgSslMode::VerifyFull,
     }
 }
 
@@ -301,10 +320,24 @@ fn failure_class(err: &sqlx::Error) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{Db, QUERY_ROLE, RoleProbe, failure_class, saturated};
+    use sqlx::postgres::PgSslMode;
 
-    /// A connection string with a dev placeholder password, never a real secret.
-    const URL: &str = "postgres://query_login:change-me-query@localhost:5432/gto?sslmode=disable";
+    use super::{Db, QUERY_ROLE, RoleProbe, failure_class, pg_ssl_mode, saturated};
+    use crate::config::{DatabaseConfig, Password, SslMode};
+
+    /// A dev placeholder password, never a real secret.
+    const PASSWORD: &str = "change-me-query";
+
+    fn database() -> DatabaseConfig {
+        DatabaseConfig {
+            host: "db.internal".to_owned(),
+            port: 5433,
+            name: "gto".to_owned(),
+            user: "query_login".to_owned(),
+            password: Password::new(PASSWORD.to_owned()),
+            ssl_mode: SslMode::Disable,
+        }
+    }
 
     #[test]
     fn r2_13_role_probe_reports_the_group_role_or_the_login() {
@@ -338,12 +371,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn r2_13_db_debug_and_a_refused_connection_never_show_the_connection_string() {
-        let db = Db::connect_lazy(URL).expect("a lazy pool opens nothing");
+    async fn r2_13_pool_options_carry_every_part_and_db_debug_hides_the_password() {
+        let db = Db::connect_lazy(&database());
+        let options = db.pool().connect_options();
+        assert_eq!(options.get_host(), "db.internal");
+        assert_eq!(options.get_port(), 5433);
+        assert_eq!(options.get_database(), Some("gto"));
+        assert_eq!(options.get_username(), "query_login");
+        let ssl_mode = options.get_ssl_mode();
+        assert!(matches!(ssl_mode, PgSslMode::Disable), "{ssl_mode:?}");
+        assert!(format!("{options:?}").contains(PASSWORD), "the pool holds the password");
         let shown = format!("{db:?}");
-        assert!(!shown.contains("change-me-query"), "{shown}");
+        assert!(!shown.contains(PASSWORD), "{shown}");
         assert!(shown.starts_with("Db {"), "{shown}");
-        let error = Db::connect_lazy("postgres://u:p@h:not-a-port/d").expect_err("rejected");
-        assert!(!error.to_string().contains("not-a-port"), "{error}");
+    }
+
+    #[test]
+    fn r2_13_every_ssl_mode_maps_to_the_sqlx_variant_of_the_same_name() {
+        for mode in SslMode::ALL {
+            assert_eq!(format!("{:?}", pg_ssl_mode(mode)), format!("{mode:?}"));
+        }
     }
 }

@@ -8,7 +8,7 @@
 //!
 //! `AppState` is what every handler reads (plan A.7): the library registry scanned from
 //! `FIXTURE_LIBRARY_PATH` at startup (O-144), the query-role pool when
-//! `QUERY_DATABASE_URL` is set (O-146), the deal store (O-152), the metrics registry, the
+//! `QUERY_DB_PASSWORD` is set (O-146), the deal store (O-152), the metrics registry, the
 //! embedded equity table (O-148) and the fixture path `/healthz` reports (O-62). It is
 //! cloned per request, so every field is shared behind an `Arc`. `from_config` builds it
 //! for the server: a fixture path that is unset, missing or empty gives an empty library,
@@ -36,7 +36,6 @@ use crate::config::{self, Config};
 use crate::db::Db;
 use crate::deal::{DEAL_STORE_CAPACITY, DealStore};
 use crate::equity::EquityTable;
-use crate::error::ApiError;
 use crate::library::Library;
 use crate::metrics::Metrics;
 use crate::middleware::{latency, request_id};
@@ -52,7 +51,7 @@ pub const REQUEST_BODY_LIMIT_BYTES: usize = 64 * 1024;
 pub struct AppState {
     /// The solutions registry and the reader (O-144).
     pub library: Arc<Library>,
-    /// The query-role pool, when `QUERY_DATABASE_URL` is set (O-146).
+    /// The query-role pool, when `QUERY_DB_PASSWORD` is set (O-146).
     pub db: Option<Arc<Db>>,
     /// The deals made since startup (O-152).
     pub deals: Arc<DealStore>,
@@ -83,9 +82,7 @@ impl fmt::Debug for AppState {
 pub enum StartError {
     /// A configuration variable is malformed.
     Config(config::Error),
-    /// `QUERY_DATABASE_URL` is set but is not a connection string the pool accepts.
-    DatabaseUrl(ApiError),
-    /// `QUERY_DATABASE_URL` is set but the state was built outside the async runtime, where
+    /// `QUERY_DB_PASSWORD` is set but the state was built outside the async runtime, where
     /// the lazy pool cannot spawn its reaper task.
     NoRuntime,
 }
@@ -94,11 +91,10 @@ impl fmt::Display for StartError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Config(source) => write!(f, "configuration: {source}"),
-            Self::DatabaseUrl(source) => write!(f, "{}: {}", config::DATABASE_URL_VAR, source),
             Self::NoRuntime => write!(
                 f,
                 "{} is set, so the state must be built inside the tokio runtime",
-                config::DATABASE_URL_VAR
+                config::DATABASE_PASSWORD_VAR
             ),
         }
     }
@@ -108,7 +104,6 @@ impl std::error::Error for StartError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Config(source) => Some(source),
-            Self::DatabaseUrl(source) => Some(source),
             Self::NoRuntime => None,
         }
     }
@@ -122,8 +117,6 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// [`StartError::DatabaseUrl`] when the configured connection string is rejected by the
-    /// pool, so the service refuses to start on a database it could never reach, and
     /// [`StartError::NoRuntime`] when a database is configured outside the runtime.
     pub fn from_config(config: &Config) -> Result<AppState, StartError> {
         let cache_bytes = config.cache_bytes();
@@ -131,8 +124,8 @@ impl AppState {
             Some(root) => scan_or_empty(root, cache_bytes),
             None => Library::empty(cache_bytes),
         };
-        let db = match &config.query_database_url {
-            Some(url) => Some(Arc::new(open_pool(url)?)),
+        let db = match &config.database {
+            Some(database) => Some(Arc::new(open_pool(database)?)),
             None => None,
         };
         Ok(AppState {
@@ -160,12 +153,13 @@ impl AppState {
     }
 }
 
-/// The lazy pool over `url`, refused outside the runtime (see `AppState::from_config`).
-fn open_pool(url: &config::DatabaseUrl) -> Result<Db, StartError> {
+/// The lazy pool over the parts of `database`, refused outside the runtime (see
+/// `AppState::from_config`).
+fn open_pool(database: &config::DatabaseConfig) -> Result<Db, StartError> {
     if tokio::runtime::Handle::try_current().is_err() {
         return Err(StartError::NoRuntime);
     }
-    Db::connect_lazy(url.as_str()).map_err(StartError::DatabaseUrl)
+    Ok(Db::connect_lazy(database))
 }
 
 /// The scanned library, or an empty one when the root cannot be scanned (O-62: the mount
@@ -190,7 +184,7 @@ fn scan_or_empty(root: &std::path::Path, cache_bytes: u64) -> Library {
 /// # Errors
 ///
 /// [`StartError::Config`] when a `solver-query` variable is set but malformed, and
-/// [`StartError::DatabaseUrl`] when the pool rejects the connection string.
+/// [`StartError::NoRuntime`] when a database is configured outside the tokio runtime.
 pub fn app() -> Result<(Router, OpenApi), StartError> {
     let config = Config::from_env().map_err(StartError::Config)?;
     Ok(app_with(AppState::from_config(&config)?))
@@ -227,7 +221,7 @@ mod tests {
     use gto_library::DEFAULT_QUERY_CACHE_BYTES;
 
     use super::{AppState, StartError};
-    use crate::config::{CACHE_BYTES_VAR, Config, DATABASE_URL_VAR, FIXTURE_LIBRARY_VAR};
+    use crate::config::{CACHE_BYTES_VAR, Config, DATABASE_PASSWORD_VAR, FIXTURE_LIBRARY_VAR};
     use crate::deal::DEAL_STORE_CAPACITY;
 
     fn config(pairs: &[(&str, &str)]) -> Config {
@@ -245,7 +239,7 @@ mod tests {
         assert_eq!(state.fixture_library_path, Some(PathBuf::from(missing)));
         let figures = state.library.stats();
         assert_eq!((figures.indexed, figures.cache_bytes), (0, DEFAULT_QUERY_CACHE_BYTES));
-        assert!(state.db.is_none(), "no QUERY_DATABASE_URL, no pool");
+        assert!(state.db.is_none(), "no QUERY_DB_PASSWORD, no pool");
         assert_eq!(state.deals.capacity(), DEAL_STORE_CAPACITY);
         assert_eq!(state.metrics.requests_observed(), 0);
         assert_eq!(state.equity.classes.len(), 169);
@@ -255,29 +249,25 @@ mod tests {
         assert!(sized.fixture_library_path.is_none());
     }
 
-    /// A connection string with a dev placeholder password, never a real secret.
-    const URL: &str = "postgres://query_login:change-me-query@localhost:5432/gto?sslmode=disable";
+    /// A dev placeholder password, never a real secret.
+    const PASSWORD: &str = "change-me-query";
 
     #[tokio::test]
-    async fn r2_13_app_state_opens_a_lazy_pool_and_refuses_a_bad_connection_string() {
-        let state = AppState::from_config(&config(&[(DATABASE_URL_VAR, URL)]))
+    async fn r2_13_app_state_opens_a_lazy_pool_from_the_database_parts() {
+        let state = AppState::from_config(&config(&[(DATABASE_PASSWORD_VAR, PASSWORD)]))
             .expect("a lazy pool opens nothing");
         assert!(state.db.is_some());
-        assert!(format!("{state:?}").contains("db: true"), "{state:?}");
-
-        let bad = "postgres://query_login:x@localhost:not-a-port/gto";
-        let error =
-            AppState::from_config(&config(&[(DATABASE_URL_VAR, bad)])).expect_err("rejected");
-        assert!(matches!(error, StartError::DatabaseUrl(_)), "{error}");
-        assert!(!error.to_string().contains("not-a-port"), "the value is not shown: {error}");
+        let shown = format!("{state:?}");
+        assert!(shown.contains("db: true"), "{shown}");
+        assert!(!shown.contains(PASSWORD), "the state Debug leaks: {shown}");
     }
 
     #[test]
     fn r2_13_app_state_refuses_a_database_outside_the_runtime() {
-        let error = AppState::from_config(&config(&[(DATABASE_URL_VAR, URL)]))
+        let error = AppState::from_config(&config(&[(DATABASE_PASSWORD_VAR, PASSWORD)]))
             .expect_err("no runtime here, so the pool cannot spawn its reaper");
         assert!(matches!(error, StartError::NoRuntime), "{error}");
-        assert!(error.to_string().contains(DATABASE_URL_VAR), "{error}");
+        assert!(error.to_string().contains(DATABASE_PASSWORD_VAR), "{error}");
     }
 
     #[test]

@@ -75,7 +75,11 @@ lru = "0.19"
 # chosen over webpki-roots because that crate's data license, CDLA-Permissive-2.0, is outside
 # the deny.toml allow list (ADR 0002). Default features are off: no macros, migrate, any or
 # json.
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "tls-rustls-ring-native-roots"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "postgres",
+    "tls-rustls-ring-native-roots",
+] }
 # The library-pack command line (S14, R2.8).
 clap = { version = "4", features = ["derive"] }
 # Seeded generators for synthetic library data (the gto-library "synthetic" feature) and the size

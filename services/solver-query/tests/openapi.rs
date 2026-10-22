@@ -1,5 +1,7 @@
 //! Tests for the `OpenAPI` document `solver-query` publishes (R0.7, O-116). The document
-//! is produced in process by `app()`, written by the `openapi --out <path>` subcommand
+//! is produced in process by `app_with` over `AppState::empty` (the routes describe
+//! themselves, so no environment, library, pool or runtime is involved, exactly as the
+//! subcommand builds it), written by the `openapi --out <path>` subcommand
 //! (the process writes the file itself, never a shell redirection), and committed at
 //! `packages/contracts/solver-query.openapi.json`, where `just contracts` regenerates it
 //! and the contracts job fails on a diff.
@@ -10,7 +12,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
-use solver_query::app::app;
+use solver_query::app::{AppState, app_with};
 use solver_query::openapi::document_json;
 use utoipa::openapi::OpenApi;
 
@@ -44,10 +46,11 @@ fn pretty(value: &Value) -> String {
     serde_json::to_string_pretty(value).expect("a JSON value pretty prints")
 }
 
-/// The in-process document; `app()` reads the configuration, which the test environment
-/// leaves well formed.
+/// The in-process document over an empty state, as `main.rs` builds it for the
+/// subcommand: it never reads the environment, so a `QUERY_DB_PASSWORD` in the test
+/// environment cannot make it need a database or a runtime.
 fn generated_document() -> OpenApi {
-    let (_router, document) = app().expect("no malformed solver-query variable in the test env");
+    let (_router, document) = app_with(AppState::empty());
     document
 }
 

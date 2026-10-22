@@ -34,7 +34,7 @@ async fn r2_13_healthz_reports_library_and_database_blocks() {
         "no QUERY_CACHE_BYTES set: {json}"
     );
     let database = &json["database"];
-    assert_eq!(database["configured"], false, "no QUERY_DATABASE_URL set: {json}");
+    assert_eq!(database["configured"], false, "no QUERY_DB_PASSWORD set: {json}");
     assert_eq!(database["connected"], false, "{json}");
     assert!(database["role"].is_null(), "{json}");
 

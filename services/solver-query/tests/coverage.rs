@@ -1,9 +1,10 @@
 //! `GET /v1/coverage` (R2.13, plan D.4, O-28, O-146). The first test needs no database:
 //! the registry over the packed fixture answers the preflop block and `database` says
 //! `unconfigured`. The role test runs only against the compose dev profile with
-//! `QUERY_DATABASE_URL` set (`cargo test -p solver-query --test coverage -- --ignored`):
-//! it proves the pool connects as `query_login`, a member of the `query` group role, that
-//! the role cannot write, and that coverage and `/healthz` report the connection.
+//! `QUERY_DB_PASSWORD` exported; the other `QUERY_DB_*` parts default to the published
+//! port (`cargo test -p solver-query --test coverage -- --ignored`). It proves the pool
+//! connects as `query_login`, a member of the `query` group role, that the role cannot
+//! write, and that coverage and `/healthz` report the connection.
 
 mod common;
 
@@ -13,7 +14,7 @@ use axum::Router;
 use axum::http::StatusCode;
 use serde_json::json;
 use solver_query::app::{AppState, app_with};
-use solver_query::config::{Config, DATABASE_URL_VAR, FIXTURE_LIBRARY_VAR};
+use solver_query::config::{Config, DATABASE_PASSWORD_VAR, FIXTURE_LIBRARY_VAR};
 use solver_query::db::{Db, INSUFFICIENT_PRIVILEGE, QUERY_ROLE};
 
 use common::{Fixture, assert_problem, get, packed_fixture};
@@ -67,20 +68,21 @@ async fn r2_13_coverage_without_a_database_reports_fixture_preflop_availability(
 }
 
 #[tokio::test]
-#[ignore = "R2.13: needs QUERY_DATABASE_URL from the dev profile (just dev-up, just db-migrate)"]
+#[ignore = "R2.13: needs QUERY_DB_PASSWORD from the dev profile (just dev-up, just db-migrate)"]
 async fn r2_13_coverage_reads_under_the_query_role() {
-    let url = std::env::var_os(DATABASE_URL_VAR)
-        .expect("QUERY_DATABASE_URL names the dev profile's query login (see .env.example)");
     let fixture = packed_fixture();
     let root: OsString = fixture.root.as_os_str().to_owned();
     let config = Config::from_lookup(|name| match name {
         FIXTURE_LIBRARY_VAR => Some(root.clone()),
-        DATABASE_URL_VAR => Some(url.clone()),
-        _ => None,
+        other => std::env::var_os(other),
     })
-    .expect("two well formed variables");
+    .expect("well formed QUERY_DB_* variables");
+    assert!(
+        config.database.is_some(),
+        "{DATABASE_PASSWORD_VAR} holds the dev profile's query password (see .env.example)"
+    );
     let state = AppState::from_config(&config).expect("the lazy pool opens inside the runtime");
-    let db = state.db.clone().expect("QUERY_DATABASE_URL opens a pool");
+    let db = state.db.clone().expect("QUERY_DB_PASSWORD opens a pool");
     let router = app_with(state).0;
 
     let probe = db.probe_role().await.expect("the role probe answers");
