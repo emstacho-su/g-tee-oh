@@ -58,16 +58,18 @@ pub(super) fn render(report: &Report) -> String {
     text
 }
 
-/// A threshold in words: `at most 0.001 chips`, `at least 0.5 ratio`, `0.1 to 0.2
-/// frequency`, or `at most 0.3` for the bare-number form.
+/// A threshold in words: `at most 0.001 chips`, `under 2 percentage_points` for a strict
+/// upper bound, `at least 0.5 ratio`, `0.1 to 0.2 frequency`, or `at most 0.3` for the
+/// bare-number form.
 fn describe(threshold: &Threshold) -> String {
     match threshold {
         Threshold::Number(limit) => format!("at most {limit}"),
-        Threshold::Bound { min, max, unit } => {
+        Threshold::Bound { min, max, unit, strict } => {
+            let at_most = if *strict { "under" } else { "at most" };
             let bound = match (min, max) {
                 (Some(low), Some(high)) => format!("{low} to {high}"),
                 (Some(low), None) => format!("at least {low}"),
-                (None, Some(high)) => format!("at most {high}"),
+                (None, Some(high)) => format!("{at_most} {high}"),
                 (None, None) => "unbounded".to_owned(),
             };
             match unit {
@@ -88,6 +90,17 @@ mod tests {
     use super::super::{Machine, Measurement, Report, Threshold};
     use super::{describe, render};
 
+    /// R2.11 (review finding F7): a strict upper bound renders as `under`, so the twin
+    /// tells `under 2 percentage_points` from `at most 0.3 pct_pot`.
+    #[test]
+    fn r2_11_markdown_twin_renders_a_strict_bound_as_under() {
+        assert_eq!(
+            describe(&Threshold::under(2.0, "percentage_points")),
+            "under 2 percentage_points"
+        );
+        assert_eq!(describe(&Threshold::at_most(0.3, "pct_pot")), "at most 0.3 pct_pot");
+    }
+
     /// R2.4: thresholds render in words, and the twin carries the report id, the R IDs,
     /// the commit, the machine line with its pipe escaped, the verdict, the notes and one
     /// row per measurement, LF only.
@@ -97,7 +110,7 @@ mod tests {
         assert_eq!(describe(&Threshold::at_most(0.001, "chips")), "at most 0.001 chips");
         assert_eq!(describe(&Threshold::at_least(0.5, "ratio")), "at least 0.5 ratio");
         assert_eq!(describe(&Threshold::between(0.1, 0.2, "frequency")), "0.1 to 0.2 frequency");
-        let bare = Threshold::Bound { min: Some(1.0), max: None, unit: None };
+        let bare = Threshold::Bound { min: Some(1.0), max: None, unit: None, strict: false };
         assert_eq!(describe(&bare), "at least 1");
 
         let report = Report {

@@ -26,7 +26,7 @@ use validate::fixtures::g4_spots::{
 use validate::fixtures::{FIXTURES_RELATIVE_TO_REPO_ROOT, SCHEMA_VERSION};
 use validate::gates::g4::{self, R_ID, REPORT_ID};
 use validate::gates::{GateError, GateReport};
-use validate::report::Measurement;
+use validate::report::{Measurement, Threshold};
 
 /// The committed spot list (O-87) and the tiny pair, relative to the fixture root.
 const SPOT_LIST: &str = "g4-spots.json";
@@ -71,7 +71,7 @@ fn load_spots(relative: &str) -> G4Spots {
 
 fn load_dump(relative: &str) -> NodeDump {
     let path = fixtures_dir().join(relative);
-    g4::load_dump(&path).unwrap_or_else(|error| panic!("{error}"))
+    g4::load_dump(&path).unwrap_or_else(|error| panic!("{error}")).dump
 }
 
 fn measurement<'a>(report: &'a GateReport, id: &str) -> &'a Measurement {
@@ -214,12 +214,13 @@ fn r2_11_g4_compare_passes_on_the_tiny_pair() {
     assert_close(&report, &tiny_id("root/frequency-max-abs-diff"), 0.02);
     assert_close(&report, &tiny_id("x/frequency-mad"), 0.5);
     assert_eq!(measurement(&report, &tiny_id("x/frequency-mad")).threshold, None);
-    assert!(report.notes.contains("O-138"), "{}", report.notes);
+    assert!(report.notes.contains("O-162"), "{}", report.notes);
 }
 
 /// R2.11: the failing twin fails exactly its three edited measurements, and the rule
 /// boundaries hold: exploitability of exactly 0.3 passes, a frequency-mad of exactly 2.0
-/// fails (strict), an EV error of exactly 0.3 passes.
+/// fails (strict), an EV error of exactly 0.3 passes; the strict rule's threshold reads
+/// 2.0 as failing too, so the verdict and the threshold agree (review finding F7).
 #[test]
 fn r2_11_g4_compare_fails_each_rule_on_the_failing_twin() {
     let spots = load_spots(TINY_SPOTS);
@@ -242,6 +243,12 @@ fn r2_11_g4_compare_fails_each_rule_on_the_failing_twin() {
     assert_eq!(g4::judge(&rules.frequency_mad_max, "x", 1.99).pass, Some(true));
     assert_eq!(g4::judge(&rules.root_ev_max, "x", 0.3).pass, Some(true));
     assert_eq!(g4::judge(&rules.root_ev_max, "x", 0.31).pass, Some(false));
+    let strict = g4::judge(&rules.frequency_mad_max, "x", 2.0).threshold.expect("judged");
+    assert!(!strict.admits(2.0), "the strict threshold must read 2.0 as failing: {strict:?}");
+    assert_eq!(strict, Threshold::under(2.0, "percentage_points"));
+    let inclusive = g4::judge(&rules.root_ev_max, "x", 0.3).threshold.expect("judged");
+    assert_eq!(inclusive, Threshold::at_most(0.3, "pct_pot"));
+    assert!(inclusive.admits(0.3));
 }
 
 /// R2.11: an oracle dump whose root offers a renamed action, or lacks one of the engine's

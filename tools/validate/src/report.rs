@@ -58,7 +58,9 @@ pub struct Machine {
 }
 
 /// A limit a measurement is judged against: a bare number, read as an upper bound in
-/// the measurement's unit, or an object naming the bound.
+/// the measurement's unit, or an object naming the bound. An upper bound is inclusive
+/// unless built with [`Threshold::under`]; the schema has no field for that, so the JSON
+/// carries the bound and the verdict while the Markdown twin says `under` or `at most`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Threshold {
@@ -69,12 +71,16 @@ pub enum Threshold {
         /// Lower bound, inclusive.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         min: Option<f64>,
-        /// Upper bound, inclusive.
+        /// Upper bound, inclusive unless `strict`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         max: Option<f64>,
         /// The unit of both bounds.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         unit: Option<String>,
+        /// True when the upper bound itself fails (`under 2.0`); not in the schema, so
+        /// never written and read back as false.
+        #[serde(skip)]
+        strict: bool,
     },
 }
 
@@ -82,30 +88,36 @@ impl Threshold {
     /// An inclusive upper bound.
     #[must_use]
     pub fn at_most(max: f64, unit: &str) -> Self {
-        Self::Bound { min: None, max: Some(max), unit: Some(unit.to_owned()) }
+        Self::Bound { min: None, max: Some(max), unit: Some(unit.to_owned()), strict: false }
+    }
+
+    /// A strict upper bound: the bound itself fails.
+    #[must_use]
+    pub fn under(max: f64, unit: &str) -> Self {
+        Self::Bound { min: None, max: Some(max), unit: Some(unit.to_owned()), strict: true }
     }
 
     /// An inclusive lower bound.
     #[must_use]
     pub fn at_least(min: f64, unit: &str) -> Self {
-        Self::Bound { min: Some(min), max: None, unit: Some(unit.to_owned()) }
+        Self::Bound { min: Some(min), max: None, unit: Some(unit.to_owned()), strict: false }
     }
 
     /// An inclusive range.
     #[must_use]
     pub fn between(min: f64, max: f64, unit: &str) -> Self {
-        Self::Bound { min: Some(min), max: Some(max), unit: Some(unit.to_owned()) }
+        Self::Bound { min: Some(min), max: Some(max), unit: Some(unit.to_owned()), strict: false }
     }
 
-    /// Whether `value` meets the threshold, bounds inclusive. A rule that is strict, such
-    /// as the G1 exploitability floor, is judged by its gate; the report then carries the
-    /// inclusive bound beside the verdict the gate made.
+    /// Whether `value` meets the threshold: the lower bound inclusive, the upper bound
+    /// inclusive unless the threshold is strict.
     #[must_use]
     pub fn admits(&self, value: f64) -> bool {
         match self {
             Self::Number(limit) => value <= *limit,
-            Self::Bound { min, max, .. } => {
-                min.is_none_or(|low| value >= low) && max.is_none_or(|high| value <= high)
+            Self::Bound { min, max, strict, .. } => {
+                let below = |high: f64| if *strict { value < high } else { value <= high };
+                min.is_none_or(|low| value >= low) && max.is_none_or(below)
             }
         }
     }
@@ -297,8 +309,13 @@ pub fn write_markdown(report: &Report, path: &Path) -> Result<(), ReportError> {
     write_text(path, &markdown::render(report))
 }
 
-/// Write `text` to `path` as is (LF stays LF), creating the parent directory first.
-fn write_text(path: &Path, text: &str) -> Result<(), ReportError> {
+/// Write `text` to `path` as is (LF stays LF), creating the parent directory first. The
+/// one file writer of the tool: the two report writers and the G4 engine dump use it.
+///
+/// # Errors
+///
+/// `ReportError::Write` when the directory or the file cannot be written.
+pub fn write_text(path: &Path, text: &str) -> Result<(), ReportError> {
     let write_error = |source| ReportError::Write { path: path.to_path_buf(), source };
     if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent).map_err(write_error)?;

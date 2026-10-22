@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use gto_model::NodeKey;
+use gto_model::{Cbb, NodeKey};
 use gto_solve::postflop::{NoProgress, ProgressSink, Range, StopReason};
 use library_pack::{check_dump_structure, check_invariants, parse_dump};
 use validate::fixtures::FIXTURES_RELATIVE_TO_REPO_ROOT;
@@ -87,15 +87,32 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), EXPORTED_AT)
         .unwrap_or_else(|error| panic!("{error}"));
     let path = scratch("engine-tiny-solved.json");
-    g4_engine::write_dump(&dump, &path).unwrap_or_else(|error| panic!("{error}"));
+    let digest = g4_engine::write_dump(&dump, &path).unwrap_or_else(|error| panic!("{error}"));
     let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(digest, g4::sha256_hex(&bytes), "write_dump digests the bytes it wrote (F9)");
     let reread = parse_dump(&bytes).unwrap_or_else(|violations| panic!("{violations:?}"));
     assert_eq!(check_invariants(&reread), Vec::new(), "the written dump keeps every invariant");
     assert_eq!(check_dump_structure(&reread), Vec::new(), "and every node check (F4)");
     g4::check_dump(&dump, "the solved dump").unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(reread, dump);
 
-    let extras = RunExtras { facts: vec![solve.facts.clone()], ..RunExtras::default() };
+    let facts = solve.facts();
+    let (report_of, response) = (&solve.report, &solve.best_response);
+    assert_eq!(
+        (facts.iterations, facts.seconds, facts.estimate_bytes, facts.peak_bytes),
+        (report_of.iterations, report_of.seconds, report_of.estimate_bytes, report_of.peak_bytes),
+        "the facts are the solve report's figures (F10)"
+    );
+    assert_eq!(
+        (facts.stop_reason.as_str(), facts.gains_pct_pot),
+        ("target", response.gain_pct_pot)
+    );
+    let half_pot_bb = f64::from(spot.pot_cbb) / f64::from(Cbb::PER_BB) / 2.0;
+    assert_eq!(facts.best_response_root_ev_bb, response.expected_value_bb[0] + half_pot_bb);
+    let mode = solve.mode_line();
+    assert!(mode.contains("16-bit") && mode.contains("every 10 iterations"), "{mode}");
+    assert!(mode.contains("O-138"), "{mode}");
+    let extras = RunExtras { facts: vec![facts], engine_mode: Some(mode), ..RunExtras::default() };
     let report = g4::run_with(&spots, &reread, &reread, &extras).unwrap_or_else(|e| panic!("{e}"));
     assert!(report.pass, "{:?}", failing_ids(&report));
     assert_close(&report, &tiny_id("root/frequency-mad"), 0.0);
@@ -103,6 +120,7 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let check = measurement(&report, &tiny_id("root/ev-engine-vs-best-response-bb")).value;
     assert!(check.abs() < EV_CHECK_BB, "root EV against best response: {check}");
     assert!(report.notes.contains("stopped on target"), "{}", report.notes);
+    assert!(report.notes.contains("16-bit") && report.notes.contains("O-138"), "{}", report.notes);
 
     let key: NodeKey = TINY_ROOT_KEY.parse().expect("the root key");
     let board = key.board().expect("a river board").cards();
@@ -151,7 +169,7 @@ fn r2_11_g4_engine_turn_root_keys_rake_and_errors() {
     let problem = g4_engine::problem_for(&spots, spot).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(problem.config.stake.rake.percent_bp, ONLINE_RAKE_PERCENT_BP, "raked twin");
     let solve = g4_engine::solve_spot(&spots, spot, &NoProgress).unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(solve.facts.stop_reason, "max-iterations");
+    assert_eq!(solve.facts().stop_reason, "max-iterations");
     assert_eq!(solve.report.stop_reason, StopReason::MaxIterations);
     let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), EXPORTED_AT)
         .unwrap_or_else(|error| panic!("{error}"));

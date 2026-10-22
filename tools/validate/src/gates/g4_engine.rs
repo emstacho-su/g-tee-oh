@@ -17,27 +17,29 @@
 //! (zero for fold and check, the opponent's street total for a call, the label's total for
 //! a bet or raise, the root stack for an all-in), `accuracy_pct_pot` on every node of a
 //! spot as the larger of its two seat gains, and the dump-level `exploitability_pct_pot`
-//! as the per-seat maximum over the spots. [`write_dump`] writes it pretty-printed with a
-//! trailing newline; [`sha256_hex_of`] digests a file for the report notes (O-169).
+//! as the per-seat maximum over the spots. A [`SpotSolve`] keeps the solve's options,
+//! report and best response; [`SpotSolve::facts`] derives the report's informational
+//! rows from them and [`SpotSolve::mode_line`] the notes' engine mode line (O-138), so
+//! the report describes the solve that ran. [`write_dump`] writes a dump pretty-printed
+//! with a trailing newline through the report writer and hands back the sha256 of the
+//! bytes written (O-169).
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use gto_model::{Cbb, GameConfig, NodeKey, RakeModel, Stake, Street, format_cards};
 use gto_solve::postflop::{
     BestResponseReport, NodeStrategy, PostflopProblem, ProgressSink, Range, SolveOptions,
-    SolveReport, StopReason, best_response, estimate_memory, root_street_nodes,
+    SolveReport, StopReason, StorageBits, best_response, estimate_memory, root_street_nodes,
     solve_postflop_with_estimate,
 };
 use gto_tree::{LineKind, PreflopLine};
 use library_pack::{DumpAction, DumpConfig, DumpHand, DumpNode, NodeDump};
-use sha2::{Digest, Sha256};
 
 use crate::fixtures::g4_spots::{G4Spots, RAKE_NONE, Spot};
-use crate::report::ReportError;
+use crate::report::{self, ReportError};
 
 use super::GateError;
-use super::g4::SpotFacts;
+use super::g4::{SpotFacts, sha256_hex};
 
 /// The dump's `source` for the engine side (O-163) and its hand space.
 pub const SOURCE_OWN: &str = "own";
@@ -54,20 +56,68 @@ const NO_RAKE: RakeModel = RakeModel { percent_bp: 0, cap_cents: 0, no_flop_no_d
 /// rounding can put it a hair below, and the schema asks for at or above zero.
 const GAIN_FLOOR: f64 = 0.0;
 
-/// One solved spot: its dump nodes, the solve report, the best response and the facts
-/// the compare reports.
+/// One solved spot: its dump nodes, the options the solve ran under, the solve report
+/// and the best response; the facts and the mode line are derived from these.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpotSolve {
     /// The spot id.
     pub id: String,
+    /// The spot's root pot in cbb, for the pot-inclusive EV convention.
+    pub pot_cbb: u32,
+    /// The options the solve ran under.
+    pub options: SolveOptions,
     /// The root-street nodes in dump form.
     pub nodes: Vec<DumpNode>,
     /// What the solve did.
     pub report: SolveReport,
     /// The exact best response of the final profile.
     pub best_response: BestResponseReport,
-    /// The facts for the report's informational rows.
-    pub facts: SpotFacts,
+}
+
+impl SpotSolve {
+    /// The facts for the report's informational rows, read from the solve report and
+    /// the best response: iterations, seconds, bytes, the stop reason, both gains, and the
+    /// out-of-position seat's expected value plus half the pot.
+    #[must_use]
+    pub fn facts(&self) -> SpotFacts {
+        let pot_bb = f64::from(self.pot_cbb) / f64::from(Cbb::PER_BB);
+        SpotFacts {
+            id: self.id.clone(),
+            iterations: self.report.iterations,
+            seconds: self.report.seconds,
+            estimate_bytes: self.report.estimate_bytes,
+            peak_bytes: self.report.peak_bytes,
+            stop_reason: stop_reason_name(self.report.stop_reason).to_owned(),
+            gains_pct_pot: self.best_response.gain_pct_pot,
+            best_response_root_ev_bb: self.best_response.expected_value_bb[0] + HALF * pot_bb,
+        }
+    }
+
+    /// How the engine side was solved, from the options and the report of this solve:
+    /// the adapter's fixed DCFR schedule (O-138), the storage the report records, the
+    /// measurement cadence and the memory cap the options asked for.
+    #[must_use]
+    pub fn mode_line(&self) -> String {
+        format!(
+            "engine: {DCFR_SCHEDULE}, {} storage, exact chance, measured every {} iterations \
+             under a {} byte cap (O-138)",
+            storage_name(self.report.storage),
+            self.options.measure_every,
+            self.options.memory_cap_bytes
+        )
+    }
+}
+
+/// The schedule the gto-solve adapter runs, which it does not expose as a value: exact
+/// DCFR with alpha 1.5, beta 0 and gamma 2 and no regret floor (R2.10, O-138).
+const DCFR_SCHEDULE: &str = "exact DCFR 1.5/0/2 with no regret floor";
+
+/// The storage width in the words of the notes.
+fn storage_name(storage: StorageBits) -> &'static str {
+    match storage {
+        StorageBits::Sixteen => "16-bit",
+        StorageBits::ThirtyTwo => "32-bit",
+    }
 }
 
 /// A sink that prints every measured iteration of one spot to standard error.
@@ -173,18 +223,14 @@ pub fn solve_spot(
     let key = spot.key().map_err(|err| solve_error(err.to_string()))?;
     let accuracy = response.gain_pct_pot[0].max(response.gain_pct_pot[1]).max(GAIN_FLOOR);
     let nodes = walked.iter().map(|node| dump_node(&key, spot, node, accuracy)).collect();
-    let pot_bb = f64::from(spot.pot_cbb) / f64::from(Cbb::PER_BB);
-    let facts = SpotFacts {
+    Ok(SpotSolve {
         id: spot.id.clone(),
-        iterations: report.iterations,
-        seconds: report.seconds,
-        estimate_bytes: report.estimate_bytes,
-        peak_bytes: report.peak_bytes,
-        stop_reason: stop_reason_name(report.stop_reason).to_owned(),
-        gains_pct_pot: response.gain_pct_pot,
-        best_response_root_ev_bb: response.expected_value_bb[0] + HALF * pot_bb,
-    };
-    Ok(SpotSolve { id: spot.id.clone(), nodes, report, best_response: response, facts })
+        pot_cbb: spot.pot_cbb,
+        options,
+        nodes,
+        report,
+        best_response: response,
+    })
 }
 
 /// The stop reason in the words the report notes use.
@@ -304,38 +350,17 @@ pub fn engine_dump(
     })
 }
 
-/// Write `dump` as pretty-printed JSON with a trailing newline, creating the parent
-/// directory when it is missing.
+/// Write `dump` as pretty-printed JSON with a trailing newline through the report
+/// writer (the parent directory is created when missing) and hand back the sha256 of
+/// the bytes written, for the report notes (O-169).
 ///
 /// # Errors
 ///
 /// `GateError::Report` wrapping the serialise or write failure.
-pub fn write_dump(dump: &NodeDump, path: &Path) -> Result<(), GateError> {
-    let mut text = serde_json::to_string_pretty(dump)
+pub fn write_dump(dump: &NodeDump, path: &Path) -> Result<String, GateError> {
+    let text = serde_json::to_string_pretty(dump)
         .map_err(|source| ReportError::Serialize { path: path.to_path_buf(), source })?;
-    text.push('\n');
-    let write_error =
-        |source| GateError::Report(ReportError::Write { path: path.to_path_buf(), source });
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent).map_err(write_error)?;
-    }
-    std::fs::write(path, text).map_err(write_error)
-}
-
-/// The SHA-256 digest of a file as 64 lowercase hex digits, for the report notes.
-///
-/// # Errors
-///
-/// `GateError::Fixture` when the file cannot be read.
-pub fn sha256_hex_of(path: &Path) -> Result<String, GateError> {
-    let bytes = std::fs::read(path).map_err(|source| crate::fixtures::FixtureError::Read {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let digest = Sha256::digest(bytes);
-    let mut hex = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        write!(hex, "{byte:02x}").expect("writing to a String cannot fail");
-    }
-    Ok(hex)
+    let text = format!("{text}\n");
+    report::write_text(path, &text)?;
+    Ok(sha256_hex(text.as_bytes()))
 }

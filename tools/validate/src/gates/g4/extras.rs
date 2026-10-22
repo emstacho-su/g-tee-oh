@@ -2,14 +2,15 @@
 //! the engine run's facts per solved spot and the provenance lines, with the rows and the
 //! notes they turn into. Child module of `g4`.
 //!
-//! Mechanism. [`RunExtras`] is empty by default (the report id `g4-oracle`, no facts, no
-//! inputs), which is what a compare of two committed dumps uses; the command fills the
-//! facts from each engine solve and the inputs from the dump paths and digests. [`facts_rows`]
-//! turns one spot's facts into informational rows (iterations, seconds, bytes, and the
-//! dump's root EV against the best-response walk, a consistency check of the reach and EV
-//! conventions); [`dump_rows`] reads the dump-level exploitability pair; [`notes`] writes
-//! the mode line, the oracle target, the list, the tree hash, the inputs, the per-spot
-//! stop reasons and gains and the skipped nodes as one paragraph.
+//! Mechanism. [`RunExtras`] is empty by default (the report id `g4-oracle`, no engine
+//! mode, no facts, no inputs), which is what a compare of two committed dumps uses; the
+//! command fills the engine mode line and the facts from each engine solve and the inputs
+//! from the dump paths and digests. [`facts_rows`] turns one spot's facts into
+//! informational rows (iterations, seconds, bytes, and the dump's root EV against the
+//! best-response walk, a consistency check of the reach and EV conventions);
+//! [`dump_rows`] reads the dump-level exploitability pair; [`notes`] writes the engine
+//! mode line when there is one, the oracle target, the list, the tree hash, the inputs,
+//! the per-spot stop reasons and gains and the skipped nodes as one paragraph.
 
 use gto_tree::tree_hash_hex;
 use library_pack::NodeDump;
@@ -25,9 +26,6 @@ const DUMP: &str = "dump";
 const ITERATIONS: &str = "iterations";
 const SECONDS: &str = "seconds";
 const BYTES: &str = "bytes";
-/// How the engine side was solved (O-138).
-const ENGINE_MODE_LINE: &str = "engine: exact DCFR 1.5/0/2, no regret floor, 16-bit storage, \
-                                exact chance, measured every 10 iterations (O-138)";
 
 /// What the engine run knows about one spot beyond its dump, for the informational rows.
 #[derive(Debug, Clone, PartialEq)]
@@ -50,12 +48,15 @@ pub struct SpotFacts {
     pub best_response_root_ev_bb: f64,
 }
 
-/// What the command adds to a compare: the report id, the engine run's facts and the
-/// provenance lines.
+/// What the command adds to a compare: the report id, how the engine side was solved,
+/// the engine run's facts and the provenance lines.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunExtras {
     /// The report id, also the file stem: [`REPORT_ID`] for the gated list.
     pub report_id: String,
+    /// The engine mode line, derived from the options and report of the solve, when the
+    /// engine side was solved in this run; none when a committed engine dump was read.
+    pub engine_mode: Option<String>,
     /// One entry per spot the engine solved in this run.
     pub facts: Vec<SpotFacts>,
     /// Lines for the notes: input paths and digests.
@@ -65,7 +66,12 @@ pub struct RunExtras {
 impl Default for RunExtras {
     /// The gated list's report id with nothing from a run.
     fn default() -> Self {
-        RunExtras { report_id: REPORT_ID.to_owned(), facts: Vec::new(), inputs: Vec::new() }
+        RunExtras {
+            report_id: REPORT_ID.to_owned(),
+            engine_mode: None,
+            facts: Vec::new(),
+            inputs: Vec::new(),
+        }
     }
 }
 
@@ -102,14 +108,16 @@ pub(super) fn dump_rows(dump: &NodeDump, side: &str) -> Vec<Measurement> {
         .collect()
 }
 
-/// The notes: the mode, the oracle target, the list, the tree hash, the inputs, the
-/// per-spot facts and the skipped nodes, one sentence each.
+/// The notes: the engine mode when the engine side was solved in this run, the oracle
+/// target, the list, the tree hash, the inputs, the per-spot facts and the skipped nodes,
+/// one sentence each.
 pub(super) fn notes(spots: &G4Spots, extras: &RunExtras, skipped: &[String]) -> String {
     let gated = spots.spots.iter().filter(|spot| spot.gated).count();
     let tree = spots.tree.tree_config().map_or_else(|err| err.to_string(), |t| tree_hash_hex(&t));
+    let mode = extras.engine_mode.as_deref().map_or_else(String::new, |mode| format!("{mode}; "));
     let head = format!(
-        "G4 oracle compare (R2.11). {ENGINE_MODE_LINE}; oracle solved to a mean gain of {} \
-         percent of the pot (O-162). Spot list {}: {} spots, {gated} gated; tree hash {tree}.",
+        "G4 oracle compare (R2.11). {mode}oracle solved to a mean gain of {} percent of the \
+         pot (O-162). Spot list {}: {} spots, {gated} gated; tree hash {tree}.",
         spots.stop.oracle_target_pct_pot,
         spots.id,
         spots.spots.len()

@@ -9,6 +9,7 @@
 use std::path::{Path, PathBuf};
 
 use library_pack::{DumpAction, DumpNode, NodeDump};
+use sha2::{Digest, Sha256};
 use validate::fixtures::FIXTURES_RELATIVE_TO_REPO_ROOT;
 use validate::fixtures::g4_spots::{G4Spots, Spot};
 use validate::gates::g4::{self, REPORT_ID, RunExtras};
@@ -46,7 +47,7 @@ fn load_spots() -> G4Spots {
 
 fn load_dump(relative: &str) -> NodeDump {
     let path = fixtures_dir().join(relative);
-    g4::load_dump(&path).unwrap_or_else(|error| panic!("{error}"))
+    g4::load_dump(&path).unwrap_or_else(|error| panic!("{error}")).dump
 }
 
 fn run(spots: &G4Spots, engine: &NodeDump, oracle: &NodeDump) -> GateReport {
@@ -261,6 +262,40 @@ fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("g4-compare");
     std::fs::create_dir_all(&dir).unwrap_or_else(|error| panic!("{}: {error}", dir.display()));
     dir.join(name)
+}
+
+/// R2.11 (review finding F6): the notes carry an engine mode line only when the engine
+/// side was solved in this run, and then the line the extras carry, derived from the
+/// options and the report of that solve; a compare of two committed dumps says nothing
+/// about how the engine dump was solved.
+#[test]
+fn r2_11_g4_notes_carry_the_engine_mode_only_when_solved() {
+    let spots = load_spots();
+    let engine = load_dump(ENGINE_TINY);
+    let oracle = load_dump(ORACLE_TINY);
+    let plain = run(&spots, &engine, &oracle);
+    assert!(!plain.notes.contains("DCFR"), "{}", plain.notes);
+    assert!(!plain.notes.contains("storage"), "{}", plain.notes);
+    assert!(plain.notes.contains("O-162"), "{}", plain.notes);
+    let mode = "engine: test mode line (O-138)".to_owned();
+    let extras = RunExtras { engine_mode: Some(mode.clone()), ..RunExtras::default() };
+    let solved =
+        g4::run_with(&spots, &engine, &oracle, &extras).unwrap_or_else(|error| panic!("{error}"));
+    assert!(solved.notes.contains(&mode), "{}", solved.notes);
+}
+
+/// R2.11 (review finding F9): `load_dump` reads a dump file once and hands back the
+/// sha256 of the bytes it parsed, the digest the report notes record (O-169).
+#[test]
+fn r2_11_g4_load_dump_digests_the_bytes_it_parsed() {
+    let path = fixtures_dir().join(ENGINE_TINY);
+    let loaded = g4::load_dump(&path).unwrap_or_else(|error| panic!("{error}"));
+    let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
+    let expected = format!("{:x}", Sha256::digest(&bytes));
+    assert_eq!(loaded.sha256, expected);
+    assert_eq!(loaded.sha256.len(), 64);
+    assert_eq!(g4::sha256_hex(&bytes), expected);
+    assert_eq!(loaded.dump.nodes.len(), 2);
 }
 
 /// R2.11 (review finding F1): the report id is `g4-oracle` by default and the one the

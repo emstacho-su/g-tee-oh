@@ -3,12 +3,11 @@
 //! written by `g4_engine` and the oracle side by the private program, judged per gated
 //! spot of the spot list.
 //!
-//! Mechanism, in order. [`load_dump`] reads a dump under library-pack's size cap and
-//! parses it; [`check_dump`] then runs the criterion 2 invariants and library-pack's node
-//! checks (unique and parseable keys, a pot above zero, two stacks, reach within [0, 1]
-//! with one entry per seat, a sized token equal to its `size_cbb`) on it, as it does on
-//! the engine dump the command solves in memory; a violation is [`GateError::Dump`]
-//! naming the dump and the node. [`run_with`] checks both dumps name the list's
+//! Mechanism, in order. [`load_dump`] reads a dump once under library-pack's size cap,
+//! digests and parses it; [`check_dump`] then runs the criterion 2 invariants and
+//! library-pack's node checks on it, as it does on the engine dump the command solves in
+//! memory, and a violation is [`GateError::Dump`] naming the dump and the node (the
+//! `dumps` child module). [`run_with`] checks both dumps name the list's
 //! configuration and pair, then per spot finds the root node by its key in both dumps and
 //! every deeper root-street node both carry: a key that adds actions to the root key with
 //! no further street section, so a turn spot never absorbs the nodes of the river spot
@@ -36,24 +35,22 @@
 //! adds (paths and sha256), the per-spot stop reasons and gains, and the skipped nodes.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use gto_model::Cbb;
 use gto_model::keys::SECTION_SEPARATOR;
-use library_pack::{
-    DumpNode, MAX_DUMP_BYTES, NodeDump, check_dump_structure, check_invariants, parse_dump,
-};
+use library_pack::{DumpNode, NodeDump};
 
-use crate::fixtures::FixtureError;
 use crate::fixtures::g4_spots::{G4Spots, PERCENTAGE_POINTS, Rule, Spot};
 use crate::report::{Measurement, Threshold};
 
 use super::{GateError, GateReport};
 
 mod diff;
+mod dumps;
 mod extras;
 
 use diff::{NodeCompare, NodeDiff, actor_index, check_pair, node_diff};
+pub use dumps::{LoadedDump, check_dump, load_dump, sha256_hex};
 pub use extras::{RunExtras, SpotFacts};
 use extras::{dump_rows, facts_rows, notes};
 
@@ -86,50 +83,16 @@ struct SpotRows {
     notes: Vec<String>,
 }
 
-/// Read a dump file: the size cap, the parse, then [`check_dump`].
-///
-/// # Errors
-///
-/// `GateError::Fixture` when the file cannot be read or is above the cap,
-/// `GateError::Dump` with every violation when it breaks the invariants.
-pub fn load_dump(path: &Path) -> Result<NodeDump, GateError> {
-    let read_error = |source| FixtureError::Read { path: path.to_path_buf(), source };
-    let bytes = std::fs::metadata(path).map_err(read_error)?.len();
-    if bytes > MAX_DUMP_BYTES {
-        let reason = format!("{bytes} bytes is above the {MAX_DUMP_BYTES} byte dump cap");
-        return Err(FixtureError::Invalid { path: path.to_path_buf(), reason }.into());
-    }
-    let text = std::fs::read(path).map_err(read_error)?;
-    let what = path.display().to_string();
-    let dump = parse_dump(&text)
-        .map_err(|violations| GateError::Dump { dump: what.clone(), violations })?;
-    check_dump(&dump, &what)?;
-    Ok(dump)
-}
-
-/// Hold `dump` to the criterion 2 invariants (rules 1 to 5) and to library-pack's node
-/// checks, which apply to any dump whatever its hand space; `what` names the dump in the
-/// error: its path, or the engine dump solved in this run.
-///
-/// # Errors
-///
-/// `GateError::Dump` with every violation, each naming its node.
-pub fn check_dump(dump: &NodeDump, what: &str) -> Result<(), GateError> {
-    let violations = [check_invariants(dump), check_dump_structure(dump)].concat();
-    if violations.is_empty() {
-        Ok(())
-    } else {
-        Err(GateError::Dump { dump: what.to_owned(), violations })
-    }
-}
-
-/// A measurement judged by `rule`: at most the bound, inclusive or strict as the rule
-/// says; the report records the inclusive bound beside the verdict the gate made.
+/// A measurement judged by `rule`: at most the bound when the rule is inclusive, under it
+/// when strict, through a threshold that reads the bound the same way the verdict does.
 #[must_use]
 pub fn judge(rule: &Rule, id: &str, value: f64) -> Measurement {
-    let pass = if rule.inclusive { value <= rule.value } else { value < rule.value };
-    let threshold = Threshold::at_most(rule.value, &rule.unit);
-    Measurement::judged_as(id, value, &rule.unit, threshold, pass)
+    let threshold = if rule.inclusive {
+        Threshold::at_most(rule.value, &rule.unit)
+    } else {
+        Threshold::under(rule.value, &rule.unit)
+    };
+    Measurement::judged(id, value, &rule.unit, threshold)
 }
 
 /// Compare `engine` against `oracle` over the spots of `spots`, with nothing from a run.

@@ -24,10 +24,12 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::SystemTime;
 
+use library_pack::NodeDump;
 use validate::cli::{ALLOW_DIRTY, Command, G4Options, Options, USAGE, parse};
 use validate::fixtures::g4_spots::{self, G4Spots};
 use validate::gates::g4::{self, RunExtras};
-use validate::gates::{self, Gate, g4_engine};
+use validate::gates::g4_engine::{self, SpotSolve};
+use validate::gates::{self, Gate};
 use validate::machine::{self, MACHINE_ENV, ResolvedCommit};
 use validate::report::{self, Context, DIRTY_TREE_NOTE, REPORTS_RELATIVE_TO_REPO_ROOT, Report};
 
@@ -131,21 +133,29 @@ fn run_g4(g4: &G4Options, options: &Options) -> Result<bool, String> {
     let spots = G4Spots::load(&spots_path).map_err(|error| error.to_string())?;
     let context = run_context(&repo_root, options)?;
     let oracle = g4::load_dump(&g4.oracle).map_err(|error| error.to_string())?;
-    let mut extras = RunExtras {
-        report_id: g4.report_id.clone().unwrap_or_else(|| g4::REPORT_ID.to_owned()),
-        ..RunExtras::default()
-    };
-    extras.inputs.push(format!("Spot list {}.", spots_path.display()));
-    extras.inputs.push(digest_line("Oracle dump", &g4.oracle)?);
-    let engine = match &g4.engine {
+    let (engine, run) = match &g4.engine {
         Some(path) => {
-            extras.inputs.push(digest_line("Engine dump", path)?);
-            g4::load_dump(path).map_err(|error| error.to_string())?
+            let loaded = g4::load_dump(path).map_err(|error| error.to_string())?;
+            let inputs = vec![digest_line("Engine dump", path, &loaded.sha256)];
+            (loaded.dump, RunExtras { inputs, ..RunExtras::default() })
         }
-        None => engine_side(&spots, g4.write_engine.as_deref(), &context, &mut extras)?,
+        None => engine_side(&spots, g4.write_engine.as_deref(), &context)?,
+    };
+    let inputs = [
+        vec![
+            format!("Spot list {}.", spots_path.display()),
+            digest_line("Oracle dump", &g4.oracle, &oracle.sha256),
+        ],
+        run.inputs,
+    ]
+    .concat();
+    let extras = RunExtras {
+        report_id: g4.report_id.clone().unwrap_or_else(|| g4::REPORT_ID.to_owned()),
+        inputs,
+        ..run
     };
     let gate_report =
-        g4::run_with(&spots, &engine, &oracle, &extras).map_err(|error| error.to_string())?;
+        g4::run_with(&spots, &engine, &oracle.dump, &extras).map_err(|error| error.to_string())?;
     let out_dir =
         options.out.clone().unwrap_or_else(|| repo_root.join(G4_OUT_RELATIVE_TO_REPO_ROOT));
     let envelope = Report::from_gate(&gate_report, &context);
@@ -163,42 +173,51 @@ fn run_g4(g4: &G4Options, options: &Options) -> Result<bool, String> {
     Ok(gate_report.pass)
 }
 
-/// Solve every spot of the list with the engine, build the engine dump, write it when a
-/// path is given, and record the facts and the provenance lines.
+/// Solve every spot of the list with the engine, build and check the engine dump, write
+/// it when a path is given, and hand back the dump with the run's part of the extras:
+/// the engine mode line, the facts and the provenance line of the dump.
 fn engine_side(
     spots: &G4Spots,
     write_engine: Option<&Path>,
     context: &Context,
-    extras: &mut RunExtras,
-) -> Result<library_pack::NodeDump, String> {
-    let mut solves = Vec::with_capacity(spots.spots.len());
-    for spot in &spots.spots {
-        let sink = g4_engine::SpotProgress { spot: spot.id.clone() };
-        let solve = g4_engine::solve_spot(spots, spot, &sink).map_err(|error| error.to_string())?;
-        eprintln!(
-            "{BIN_NAME}: g4 {}: {} after {} iterations in {:.1} s",
-            spot.id, solve.facts.stop_reason, solve.facts.iterations, solve.facts.seconds
-        );
-        extras.facts.push(solve.facts.clone());
-        solves.push(solve);
-    }
+) -> Result<(NodeDump, RunExtras), String> {
+    let solves: Vec<SpotSolve> = spots
+        .spots
+        .iter()
+        .map(|spot| {
+            let sink = g4_engine::SpotProgress { spot: spot.id.clone() };
+            let solve =
+                g4_engine::solve_spot(spots, spot, &sink).map_err(|error| error.to_string())?;
+            let facts = solve.facts();
+            eprintln!(
+                "{BIN_NAME}: g4 {}: {} after {} iterations in {:.1} s",
+                spot.id, facts.stop_reason, facts.iterations, facts.seconds
+            );
+            Ok(solve)
+        })
+        .collect::<Result<_, String>>()?;
     let dump =
         g4_engine::engine_dump(spots, &solves, &context.date).map_err(|error| error.to_string())?;
     g4::check_dump(&dump, ENGINE_DUMP_OF_THIS_RUN).map_err(|error| error.to_string())?;
-    match write_engine {
+    let input = match write_engine {
         Some(path) => {
-            g4_engine::write_dump(&dump, path).map_err(|error| error.to_string())?;
-            extras.inputs.push(digest_line("Engine dump", path)?);
+            let sha256 = g4_engine::write_dump(&dump, path).map_err(|error| error.to_string())?;
+            digest_line("Engine dump", path, &sha256)
         }
-        None => extras.inputs.push("Engine dump solved in this run, not written.".to_owned()),
-    }
-    Ok(dump)
+        None => "Engine dump solved in this run, not written.".to_owned(),
+    };
+    let extras = RunExtras {
+        engine_mode: solves.first().map(SpotSolve::mode_line),
+        facts: solves.iter().map(SpotSolve::facts).collect(),
+        inputs: vec![input],
+        ..RunExtras::default()
+    };
+    Ok((dump, extras))
 }
 
-/// A notes line naming an input file and its SHA-256 digest.
-fn digest_line(what: &str, path: &Path) -> Result<String, String> {
-    let digest = g4_engine::sha256_hex_of(path).map_err(|error| error.to_string())?;
-    Ok(format!("{what} {} sha256 {digest}.", path.display()))
+/// A notes line naming an input file and the SHA-256 digest of the bytes read or written.
+fn digest_line(what: &str, path: &Path, sha256: &str) -> String {
+    format!("{what} {} sha256 {sha256}.", path.display())
 }
 
 /// The commit for this run through the one resolution path, `machine::resolve_commit`

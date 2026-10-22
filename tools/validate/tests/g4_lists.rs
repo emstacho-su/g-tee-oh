@@ -182,6 +182,54 @@ fn r2_11_g4_loader_refuses_a_repeated_or_nested_key_within_a_street() {
     assert_eq!(loaded.spots.len(), 2);
 }
 
+/// One edit of the tiny list as JSON.
+type EditList = fn(&mut Value);
+
+/// Lists broken in one field each, with the word the loader's reason must carry.
+fn broken_lists() -> Vec<(&'static str, EditList, &'static str)> {
+    vec![
+        ("gate", |l| l["gate"] = json!("G5"), "gate"),
+        ("source twice", |l| l["sources"][1]["id"] = json!("hand-made"), "duplicate source"),
+        ("tree source", |l| l["tree"]["source"] = json!("nowhere"), "tree"),
+        ("config", |l| l["config_id"] = json!("cfg_6_online_999"), "config_id"),
+        ("pair", |l| l["position_pair"] = json!("BB-CO-BTN"), "position_pair"),
+        ("tree", |l| l["tree"]["bet_sizes_bp"] = json!([]), "tree"),
+        ("engine target", |l| l["stop"]["engine_target_pct_pot"] = json!(-1.0), "engine_target"),
+        ("oracle target", |l| l["stop"]["oracle_target_pct_pot"] = json!(-1.0), "oracle_target"),
+        ("caps", |l| l["stop"]["max_seconds"] = json!(0), "max_seconds"),
+        ("rule value", |l| l["rules"]["root_ev_max"]["value"] = json!(0.5), "root_ev_max"),
+        ("rule source", |l| l["rules"]["root_ev_max"]["source"] = json!("x"), "root_ev_max"),
+        ("no spots", |l| l["spots"] = json!([]), "no spots"),
+        ("spot source", |l| l["spots"][0]["source"] = json!("x"), "source"),
+        ("street", |l| l["spots"][0]["street"] = json!("flop"), "turn or river"),
+        ("board", |l| l["spots"][0]["board"] = json!("Ah7d2cKs"), "board"),
+        ("pot", |l| l["spots"][0]["pot_cbb"] = json!(0), "pot_cbb"),
+        ("rake", |l| l["spots"][0]["rake"] = json!("live"), "rake"),
+        ("preflop line", |l| l["spots"][0]["preflop"]["actions"] = json!("r300.c"), "preflop"),
+        ("preflop kind", |l| l["spots"][0]["preflop"]["kind"] = json!("odd"), "kind"),
+        ("aggressor", |l| l["spots"][0]["preflop"]["aggressor"] = json!("CO"), "aggressor"),
+        ("range", |l| l["spots"][0]["ranges"]["ip"] = json!(["ZZ"]), "ip range"),
+        ("dead range", |l| l["spots"][0]["ranges"]["oop"] = json!(["AhAs"]), "live combo"),
+    ]
+}
+
+/// R2.11: every structural rule of the loader refuses a list broken in that one field,
+/// naming the field in its reason, so a hand-edited list fails loudly.
+#[test]
+fn r2_11_g4_loader_names_the_broken_field_of_a_list() {
+    for (name, edit, needle) in broken_lists() {
+        let mut list = tiny_json();
+        edit(&mut list);
+        let Err(error) = load_edited(&format!("broken-{name}.json"), &list) else {
+            panic!("{name}: the loader accepted the list");
+        };
+        let FixtureError::Invalid { reason, .. } = error else {
+            panic!("{name}: expected an invalid list, got {error}");
+        };
+        assert!(reason.contains(needle), "{name}: {reason:?} does not name {needle:?}");
+    }
+}
+
 /// R2.11 (review finding F5): a spot's key must be a root, its last street section
 /// carrying no action; a key with actions after the river card is refused naming the
 /// spot.
