@@ -110,7 +110,7 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let half_pot_bb = f64::from(spot.pot_cbb) / f64::from(Cbb::PER_BB) / 2.0;
     assert_eq!(facts.best_response_root_ev_bb, response.expected_value_bb[0] + half_pot_bb);
     let mode = solve.mode_line();
-    assert!(mode.contains("16-bit") && mode.contains("every 10 iterations"), "{mode}");
+    assert!(mode.contains("32-bit") && mode.contains("every 10 iterations"), "{mode}");
     assert!(mode.contains("O-138"), "{mode}");
     let extras = RunExtras { facts: vec![facts], engine_mode: Some(mode), ..RunExtras::default() };
     let report = g4::run_with(&spots, &reread, &reread, &extras).unwrap_or_else(|e| panic!("{e}"));
@@ -120,7 +120,7 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let check = measurement(&report, &tiny_id("root/ev-engine-vs-best-response-bb")).value;
     assert!(check.abs() < EV_CHECK_BB, "root EV against best response: {check}");
     assert!(report.notes.contains("stopped on target"), "{}", report.notes);
-    assert!(report.notes.contains("16-bit") && report.notes.contains("O-138"), "{}", report.notes);
+    assert!(report.notes.contains("32-bit") && report.notes.contains("O-138"), "{}", report.notes);
 
     let key: NodeKey = TINY_ROOT_KEY.parse().expect("the root key");
     let board = key.board().expect("a river board").cards();

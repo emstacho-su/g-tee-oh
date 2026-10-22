@@ -6,8 +6,9 @@
 //! fixed allocations are not charged to the solve; then the peak is reset to the current
 //! bytes and the test spot is solved for 20 iterations, two of them measured, which
 //! exercises the parallel traversal and the best-response walk. The growth of the peak
-//! over the bytes held before the call is the measured peak. The estimate must be at or
-//! above it, and at most 1.3 times it.
+//! over the bytes held before the call is the measured peak. The estimate, taken for the
+//! default storage the solve runs in (32-bit, O-194), must be at or above it, and at most
+//! 1.3 times it.
 
 #[path = "r2_10_support/mod.rs"]
 mod common;
@@ -35,7 +36,7 @@ fn ratio(numerator: u64, denominator: u64) -> f64 {
 #[test]
 fn r2_10_estimate_bounds_allocator_peak() {
     let problem = common::small_problem();
-    let estimate = estimate_memory(&problem, StorageBits::Sixteen).expect("the estimate builds");
+    let estimate = estimate_memory(&problem, StorageBits::default()).expect("the estimate builds");
     rayon::broadcast(|_| ());
 
     let before = PEAK.current_usage() as u64;

@@ -7,11 +7,12 @@
 //! engine memory is touched, `estimate_bytes` builds only the `gto-tree` betting skeleton
 //! and models the engine's peak heap from it (O-139); a solve above the cap is refused
 //! there. The solve maps the problem onto the engine's configuration (exact chance, no
-//! sampling, ADR 0023), runs Discounted CFR (DCFR) one iteration at a time with 16-bit
-//! storage by default, reports progress to a `ProgressSink`, and stops when both players'
-//! exact best-response gain is at or below the target percent of the starting pot, or at
-//! an iteration or time cap (O-138). The report carries the canonical tree hash of the
-//! configuration, which the solved game cross-checks against the engine's own tables.
+//! sampling, ADR 0023), runs Discounted CFR (DCFR) one iteration at a time with 32-bit
+//! storage by default (16-bit is an opt-in with a stated floor, O-194), reports progress
+//! to a `ProgressSink`, and stops when both players' exact best-response gain is at or
+//! below the target percent of the starting pot, or at an iteration or time cap (O-138).
+//! The report carries the canonical tree hash of the configuration, which the solved game
+//! cross-checks against the engine's own tables.
 //! `root_street_nodes` reads the solved game's root-street decision nodes back with
 //! per-hand frequencies, reach and per-action values, what gate G4 compares (R2.11).
 //!

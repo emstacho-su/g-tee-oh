@@ -7,20 +7,21 @@
 //! the tree from the list's `tree` block, the board and the preflop line from the spot's
 //! root key (the line is descriptive, O-164), both ranges through `Range::parse`, and the
 //! spot's pot and equal stacks. [`solve_spot`] takes the memory estimate first, runs
-//! `solve_postflop_with_estimate` with the default options (16-bit storage, the 5 GiB cap,
-//! a measurement every 10 iterations, O-138), measures the exact best response and walks
-//! `root_street_nodes`. [`engine_dump`] turns the walked nodes of every solved spot into
-//! one dump: `source` `own` (O-163), the catalog configuration as the config block, the
-//! root key of each spot with the node's line appended to its last street section as the
-//! node key, `to_act` the actor's seat in the pair, hands labelled by `ComboId`'s canonical
-//! spelling, `reach` and `ev_bb` as the walk defines them, `size_cbb` the street total
-//! (zero for fold and check, the opponent's street total for a call, the label's total for
-//! a bet or raise, the root stack for an all-in), `accuracy_pct_pot` on every node of a
-//! spot as the larger of its two seat gains, and the dump-level `exploitability_pct_pot`
-//! as the per-seat maximum over the spots. A [`SpotSolve`] keeps the solve's options,
-//! report and best response; [`SpotSolve::facts`] derives the report's informational
-//! rows from them and [`SpotSolve::mode_line`] the notes' engine mode line (O-138), so
-//! the report describes the solve that ran. [`write_dump`] writes a dump pretty-printed
+//! `solve_postflop_with_estimate` with the default options (32-bit storage, O-194; the
+//! 5 GiB cap; a measurement every 10 iterations, O-138), measures the exact best response
+//! and walks `root_street_nodes`. [`engine_dump`] turns the walked nodes of every solved
+//! spot into one dump: `source` `own` (O-163), the catalog configuration as the config
+//! block, the root key of each spot with the node's line appended to its last street
+//! section as the node key, `to_act` the actor's seat in the pair, hands labelled by
+//! `ComboId`'s canonical spelling, `reach` and `ev_bb` as the walk defines them,
+//! `size_cbb` the street total (zero for fold and check, the opponent's street total for
+//! a call, the label's total for a bet or raise, the root stack for an all-in),
+//! `accuracy_pct_pot` on every node of a spot as the larger of its two seat gains, and the
+//! dump-level `exploitability_pct_pot` as the per-seat maximum over the spots. A
+//! [`SpotSolve`] keeps the solve's options, report and best response;
+//! [`SpotSolve::facts`] derives the report's informational rows from them and
+//! [`SpotSolve::mode_line`] the notes' engine mode line (O-138), so the report describes
+//! the solve that ran. [`write_dump`] writes a dump pretty-printed
 //! with a trailing newline through the report writer and hands back the sha256 of the
 //! bytes written (O-169).
 

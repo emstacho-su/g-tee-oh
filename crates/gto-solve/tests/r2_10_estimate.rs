@@ -75,13 +75,14 @@ fn r2_10_estimate_survives_ranges_pinned_to_the_dealt_cards() {
     }
 }
 
-/// R2.10: `estimate_bytes` is the 16-bit estimate, and the 32-bit one is larger.
+/// R2.10 (O-194): `estimate_bytes` is the 32-bit estimate, the default storage, and the
+/// 16-bit opt-in's estimate is smaller.
 #[test]
-fn r2_10_estimate_bytes_defaults_to_sixteen_bit() {
+fn r2_10_estimate_bytes_defaults_to_thirty_two_bit() {
     let problem = small_problem();
     let default = estimate_bytes(&problem).expect("estimate");
-    assert_eq!(default, estimate_bytes_with(&problem, StorageBits::Sixteen).expect("estimate"));
-    assert!(default < estimate_bytes_with(&problem, StorageBits::ThirtyTwo).expect("estimate"));
-    assert_eq!(StorageBits::default(), StorageBits::Sixteen);
-    assert_eq!(SolveOptions::default().storage, StorageBits::Sixteen);
+    assert_eq!(default, estimate_bytes_with(&problem, StorageBits::ThirtyTwo).expect("estimate"));
+    assert!(default > estimate_bytes_with(&problem, StorageBits::Sixteen).expect("estimate"));
+    assert_eq!(StorageBits::default(), StorageBits::ThirtyTwo);
+    assert_eq!(SolveOptions::default().storage, StorageBits::ThirtyTwo);
 }

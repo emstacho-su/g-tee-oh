@@ -10,7 +10,8 @@
 //!    `SolveError::OverMemoryCap` before the engine game or the solver exists, so a refused
 //!    problem allocates only the skeleton.
 //! 3. The engine game is built from the mapped configuration (`engine_map`) and the solver
-//!    with 16-bit storage unless the options say 32-bit.
+//!    with 32-bit storage unless the options opt into 16-bit, whose floor `StorageBits`
+//!    states (O-194).
 //! 4. One exact Discounted CFR iteration at a time, on the schedule the mapped
 //!    configuration carries (`DcfrParams::from_config`), so the configuration the solved
 //!    game holds always describes the solve that ran: the sink hears every iteration, with
@@ -124,8 +125,8 @@ impl fmt::Debug for SolvedGame {
     }
 }
 
-/// Solves with the default options: 16-bit storage, the 5 GiB cap and a measurement every
-/// 10 iterations.
+/// Solves with the default options: 32-bit storage (O-194), the 5 GiB cap and a
+/// measurement every 10 iterations.
 ///
 /// # Errors
 ///
