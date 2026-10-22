@@ -13,6 +13,15 @@ gto-library = { workspace = true }
 gto-solve = { workspace = true }
 # Hand class labels and combo arithmetic for the equity table fixture (R2.20).
 gto-model = { workspace = true }
+# The G4 spot list's tree (TreeConfig, the size tables) and its canonical hash for the
+# report notes (R2.11, O-135).
+gto-tree = { workspace = true }
+# The node-dump types and the criterion 2 invariants gate G4 reads both dumps through
+# (R2.11, O-171); library-pack never links gto-solve, so the solver-query boundary stays.
+library-pack = { workspace = true }
+# The sha256 of each dump file in the G4 report notes, since the node-dump schema has no
+# free-text field for provenance (R2.11, O-169).
+sha2 = { workspace = true }
 # Fixture loading for the toy-game gates G1 to G3 (R0.11, 04 section 6): the files under
 # validation/fixtures/ are JSON and the lib parses them through serde. The gate reports
 # are written back through the same structs (report.schema.json).

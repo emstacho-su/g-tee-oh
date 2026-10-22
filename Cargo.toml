@@ -109,6 +109,9 @@ gto-tree = { path = "crates/gto-tree" }
 gto-solve = { path = "crates/gto-solve" }
 gto-library = { path = "crates/gto-library" }
 gto-planner = { path = "crates/gto-planner" }
+# A tool on a tool (O-171): validate reads both G4 dumps through library-pack's node-dump
+# types and criterion 2 invariants; library-pack never links gto-solve (O-101).
+library-pack = { path = "tools/library-pack" }
 
 [workspace.lints.clippy]
 # Groups carry priority -1 so an individual lint entry added later overrides them.

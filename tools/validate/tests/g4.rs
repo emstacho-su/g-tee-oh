@@ -1,5 +1,6 @@
 //! Gate G4 tests (R2.11, 04 section 6): the public compare step of `validate g4` over two
-//! node dumps, the hand-made spot list, and the engine-side dump of one tiny river solve.
+//! node dumps and the hand-made spot list; the engine-side dump of one tiny river solve
+//! is tested in `g4_engine.rs`, a binary of its own.
 //!
 //! Mechanism. The compare reads an engine dump and an oracle dump in the node-dump
 //! schema (`packages/contracts/schemas/node-dump.schema.json`), refuses a dump that
@@ -17,14 +18,14 @@ use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 
 use gto_model::{NodeKey, Street};
-use gto_solve::postflop::{NoProgress, Range, StopReason};
-use library_pack::{NodeDump, check_invariants, parse_dump};
+use gto_solve::postflop::Range;
+use library_pack::NodeDump;
 use validate::fixtures::g4_spots::{
     EXPLOITABILITY_MAX_PCT_POT, FREQUENCY_MAD_MAX_POINTS, G4Spots, ROOT_EV_MAX_PCT_POT, Spot,
 };
 use validate::fixtures::{FIXTURES_RELATIVE_TO_REPO_ROOT, SCHEMA_VERSION};
-use validate::gates::g4::{self, R_ID, REPORT_ID, RunExtras};
-use validate::gates::{GateError, GateReport, g4_engine};
+use validate::gates::g4::{self, R_ID, REPORT_ID};
+use validate::gates::{GateError, GateReport};
 use validate::report::Measurement;
 
 /// The committed spot list (O-87) and the tiny pair, relative to the fixture root.
@@ -58,8 +59,6 @@ const FAILING_EV_ABS_ERROR_PCT_POT: f64 = 1.868;
 
 /// Closeness for numbers the fixtures state in decimal and the compare recomputes.
 const CLOSE: f64 = 1e-9;
-/// Closeness of the dump's root EV to the engine's best-response walk (f32 figures).
-const EV_CHECK_BB: f64 = 1e-3;
 
 fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(FIXTURES_RELATIVE_TO_REPO_ROOT)
@@ -251,22 +250,24 @@ fn r2_11_g4_refuses_a_mismatched_action_set_or_hand_set() {
     let spots = load_spots(TINY_SPOTS);
     let engine = load_dump(ENGINE_TINY);
     let oracle = load_dump(ORACLE_TINY);
-    let root = |dump: &mut NodeDump| {
-        let index = dump.nodes.iter().position(|node| node.node_key == TINY_ROOT_KEY);
-        &mut dump.nodes[index.expect("the root node")]
-    };
     let mut renamed = oracle.clone();
     let bet = root(&mut renamed).actions.iter_mut().find(|action| action.token == "b1875");
     let bet = bet.expect("the bet action");
     bet.token = "b1900".to_owned();
     bet.size_cbb = 1_900;
-    let error = g4::run(&spots, &engine, &renamed).err().expect("a renamed token is refused");
+    let error = g4::run(&spots, &engine, &renamed).expect_err("a renamed token is refused");
     assert_mismatch(&error, "token");
 
     let mut short = oracle;
     root(&mut short).hands.retain(|hand| hand.hand != "6s5s");
-    let error = g4::run(&spots, &engine, &short).err().expect("a missing hand is refused");
+    let error = g4::run(&spots, &engine, &short).expect_err("a missing hand is refused");
     assert_mismatch(&error, "hand");
+}
+
+/// The tiny spot's root node of `dump`, to edit.
+fn root(dump: &mut NodeDump) -> &mut library_pack::DumpNode {
+    let index = dump.nodes.iter().position(|node| node.node_key == TINY_ROOT_KEY);
+    &mut dump.nodes[index.expect("the root node")]
 }
 
 fn assert_mismatch(error: &GateError, needle: &str) {
@@ -290,7 +291,7 @@ fn r2_11_g4_refuses_a_dump_that_breaks_the_node_dump_invariants() {
     let broken = text.replace(sound, "\"frequencies\": [0.61, 0.4]");
     let bad = scratch("engine-bad-sum.json");
     std::fs::write(&bad, broken).unwrap_or_else(|error| panic!("{error}"));
-    let error = g4::load_dump(&bad).err().expect("a broken dump is refused");
+    let error = g4::load_dump(&bad).expect_err("a broken dump is refused");
     match &error {
         GateError::Dump { path, violations } => {
             assert_eq!(path, &bad);
@@ -300,41 +301,4 @@ fn r2_11_g4_refuses_a_dump_that_breaks_the_node_dump_invariants() {
         other => panic!("expected a dump error, got {other}"),
     }
     assert!(error.to_string().contains("1.01"), "{error}");
-}
-
-/// R2.11: the engine side solves the tiny river spot to the list's stop rule, writes a
-/// dump that parses back with no invariant violation, whose root hands are the actor's
-/// live combos, and that compares with itself at zero frequency-mad and zero EV error;
-/// its root EV agrees with the best-response walk within 1e-3 bb.
-#[test]
-fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
-    let spots = load_spots(TINY_SPOTS);
-    let spot = spots.spots.first().expect("the tiny list has one spot");
-    let solve = g4_engine::solve_spot(&spots, spot, &NoProgress).unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(solve.report.stop_reason, StopReason::Target, "{:?}", solve.report);
-    let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), "2026-10-21T00:00:00Z");
-    let path = scratch("engine-tiny-solved.json");
-    g4_engine::write_dump(&dump, &path).unwrap_or_else(|error| panic!("{error}"));
-    let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
-    let reread = parse_dump(&bytes).unwrap_or_else(|violations| panic!("{violations:?}"));
-    assert!(check_invariants(&reread).is_empty());
-    assert_eq!(reread, dump);
-
-    let extras = RunExtras { facts: vec![solve.facts.clone()], ..RunExtras::default() };
-    let report = g4::run_with(&spots, &reread, &reread, &extras).unwrap_or_else(|e| panic!("{e}"));
-    assert!(report.pass, "{:?}", failing_ids(&report));
-    assert_close(&report, &tiny_id("root/frequency-mad"), 0.0);
-    assert_close(&report, &tiny_id("root/ev-abs-error"), 0.0);
-    let check = measurement(&report, &tiny_id("root/ev-engine-vs-best-response-bb")).value;
-    assert!(check.abs() < EV_CHECK_BB, "root EV against best response: {check}");
-
-    let key: NodeKey = TINY_ROOT_KEY.parse().expect("the root key");
-    let board = key.board().expect("a river board").cards();
-    let range = Range::parse(&spot.ranges.oop_notation()).expect("the oop range");
-    let live: BTreeSet<String> =
-        range.live_combos(&board).iter().map(ToString::to_string).collect();
-    let root = reread.nodes.iter().find(|node| node.node_key == TINY_ROOT_KEY).expect("root");
-    let hands: BTreeSet<String> = root.hands.iter().map(|hand| hand.hand.clone()).collect();
-    assert_eq!(hands, live);
-    assert_eq!(root.to_act, "BB");
 }

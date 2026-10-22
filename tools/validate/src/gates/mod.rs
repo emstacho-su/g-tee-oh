@@ -4,7 +4,10 @@
 //! hands back a [`GateReport`], its own data only. This file is shared: it dispatches to
 //! the gate files and attaches the run context when the reports are written. `g1.rs`
 //! (Kuhn), `g2.rs` (AKQ, ace king queen, and the polar river toy) and `g3.rs` (Leduc
-//! against the committed `OpenSpiel` curve, O-30) are each owned by one agent.
+//! against the committed `OpenSpiel` curve, O-30) are each owned by one agent. `g4.rs` is
+//! the oracle gate G4 (R2.11): a compare of two node dumps rather than a toy solve, run
+//! by the `g4` subcommand and never by `gates`, since its report is private (O-170); the
+//! `Gate` enum therefore stays G1 to G3.
 //!
 //! Mechanism. [`run_gate`] loads the fixtures a gate needs and calls its `run`;
 //! [`write_gate_reports`] does that for a list of gates, wraps each [`GateReport`] in the
@@ -33,6 +36,7 @@ use crate::report::{self, Context, Measurement, Report, ReportError, Threshold};
 pub mod g1;
 pub mod g2;
 pub mod g3;
+pub mod g4;
 
 /// One of the three toy-game gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,6 +164,24 @@ pub enum GateError {
         /// The fixture id.
         fixture: String,
     },
+    /// A node dump breaks the criterion 2 invariants (R2.8 rules 1 to 5), so gate G4
+    /// refuses it before any number is judged (R2.11).
+    Dump {
+        /// The dump file.
+        path: PathBuf,
+        /// Every violation library-pack reported, each one sentence.
+        violations: Vec<library_pack::Violation>,
+    },
+    /// The two G4 dumps disagree on a node's shape, or a dump lacks what the compare
+    /// needs at a node: never a silent partial compare (R2.11).
+    Mismatch {
+        /// The spot id.
+        spot: String,
+        /// The node key, or `header` for the dump header.
+        node: String,
+        /// What differs, in plain words.
+        reason: String,
+    },
     /// A report could not be written.
     Report(ReportError),
 }
@@ -179,6 +201,19 @@ impl fmt::Display for GateError {
                 "fixture {fixture}: case {case}: fact {fact} resolves to nothing in the solved game"
             ),
             Self::NoCurve { fixture } => write!(f, "fixture {fixture} names no curve"),
+            Self::Dump { path, violations } => {
+                let sentences: Vec<String> = violations.iter().map(ToString::to_string).collect();
+                write!(
+                    f,
+                    "dump {} breaks the node-dump invariants ({} found): {}",
+                    path.display(),
+                    violations.len(),
+                    sentences.join(" ")
+                )
+            }
+            Self::Mismatch { spot, node, reason } => {
+                write!(f, "G4 spot {spot}, node {node}: {reason}")
+            }
             Self::Report(error) => write!(f, "{error}"),
         }
     }
@@ -192,7 +227,9 @@ impl std::error::Error for GateError {
             Self::UnsupportedFixture { .. }
             | Self::UnknownCase { .. }
             | Self::MissingFact { .. }
-            | Self::NoCurve { .. } => None,
+            | Self::NoCurve { .. }
+            | Self::Dump { .. }
+            | Self::Mismatch { .. } => None,
         }
     }
 }
