@@ -7,8 +7,9 @@ failing twin of the oracle dump. Every number here is synthetic and written by h
 compare's three rules can be exercised in milliseconds; nothing comes from a solver, from
 the oracle crate or from any reference tool (open question identifier (O-ID) O-26,
 architecture decision record (ADR) 0017). The real G4 inputs are the spot list
-`../g4-spots.json` (public, O-87) and the two dumps the Zenbook run writes into the private
-repository (09 section 7, O-170).
+`../g4-spots.json` (public, O-87), its informational twin `../g4-spots-raked.json` (the two
+raked spots, O-161) and the dumps the Zenbook runs write into the private repository (09
+section 7, O-170).
 
 ## Files
 

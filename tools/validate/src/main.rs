@@ -51,6 +51,9 @@ const EXIT_ERROR: u8 = 2;
 /// public reports, since the G4 report is private (O-170).
 const G4_OUT_RELATIVE_TO_REPO_ROOT: &str = "target/gate-reports/g4";
 
+/// How a `Dump` error names the engine dump this run solved, which has no path.
+const ENGINE_DUMP_OF_THIS_RUN: &str = "the engine dump solved in this run";
+
 fn main() -> ExitCode {
     let args: Result<Vec<String>, _> =
         std::env::args_os().skip(1).map(std::ffi::OsString::into_string).collect();
@@ -128,7 +131,10 @@ fn run_g4(g4: &G4Options, options: &Options) -> Result<bool, String> {
     let spots = G4Spots::load(&spots_path).map_err(|error| error.to_string())?;
     let context = run_context(&repo_root, options)?;
     let oracle = g4::load_dump(&g4.oracle).map_err(|error| error.to_string())?;
-    let mut extras = RunExtras::default();
+    let mut extras = RunExtras {
+        report_id: g4.report_id.clone().unwrap_or_else(|| g4::REPORT_ID.to_owned()),
+        ..RunExtras::default()
+    };
     extras.inputs.push(format!("Spot list {}.", spots_path.display()));
     extras.inputs.push(digest_line("Oracle dump", &g4.oracle)?);
     let engine = match &g4.engine {
@@ -143,14 +149,14 @@ fn run_g4(g4: &G4Options, options: &Options) -> Result<bool, String> {
     let out_dir =
         options.out.clone().unwrap_or_else(|| repo_root.join(G4_OUT_RELATIVE_TO_REPO_ROOT));
     let envelope = Report::from_gate(&gate_report, &context);
-    let json = out_dir.join(format!("{}.json", g4::REPORT_ID));
-    let markdown = out_dir.join(format!("{}.md", g4::REPORT_ID));
+    let json = out_dir.join(format!("{}.json", gate_report.report));
+    let markdown = out_dir.join(format!("{}.md", gate_report.report));
     report::write_json(&envelope, &json).map_err(|error| error.to_string())?;
     report::write_markdown(&envelope, &markdown).map_err(|error| error.to_string())?;
     let verdict = if gate_report.pass { "pass" } else { "FAIL" };
     println!(
         "{BIN_NAME}: {} {verdict} ({}, {})",
-        g4::REPORT_ID,
+        gate_report.report,
         json.display(),
         markdown.display()
     );
@@ -178,6 +184,7 @@ fn engine_side(
     }
     let dump =
         g4_engine::engine_dump(spots, &solves, &context.date).map_err(|error| error.to_string())?;
+    g4::check_dump(&dump, ENGINE_DUMP_OF_THIS_RUN).map_err(|error| error.to_string())?;
     match write_engine {
         Some(path) => {
             g4_engine::write_dump(&dump, path).map_err(|error| error.to_string())?;

@@ -12,7 +12,9 @@
 //! the largest single difference; and each side's root expected value (EV), its own
 //! reach-weighted sum over hands of the frequency-weighted per-action EVs, with each
 //! side's reach normalised to sum 1 so a dump that writes unnormalised reach still gives
-//! a per-hand expectation.
+//! a per-hand expectation. When the actor's reach sums to zero on a side there is no
+//! such mean, and [`node_diff`] says which side instead of dividing by zero: the caller
+//! refuses an unreached root and skips an unreached deeper node with a note.
 
 use std::collections::BTreeMap;
 
@@ -22,9 +24,22 @@ use library_pack::{DumpHand, DumpNode};
 use crate::fixtures::g4_spots::{G4Spots, Spot};
 
 use super::super::GateError;
+use super::{ENGINE, ORACLE};
 
 /// Percent per whole.
 const PERCENT: f64 = 100.0;
+
+/// What a node pair yields: its figures, or the side on which the actor is unreached.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum NodeCompare {
+    /// Both sides reach the actor; the figures.
+    Figures(NodeDiff),
+    /// The actor's reach sums to zero on this side, so there is nothing to average.
+    Unreached {
+        /// `engine` or `oracle`.
+        side: &'static str,
+    },
+}
 
 /// The figures of one node pair.
 #[derive(Debug, Clone, PartialEq)]
@@ -89,19 +104,21 @@ pub(super) fn check_pair(
         let only_engine: Vec<&str> = engine_hands.difference(&oracle_hands).copied().collect();
         let only_oracle: Vec<&str> = oracle_hands.difference(&engine_hands).copied().collect();
         return Err(mismatch(format!(
-            "hand sets differ: only the engine has {only_engine:?}, only the oracle has {only_oracle:?}"
+            "hand sets differ: only the engine has {only_engine:?}, only the oracle has \
+             {only_oracle:?}"
         )));
     }
     Ok(())
 }
 
-/// The figures of one node pair whose shape `check_pair` accepted.
+/// The figures of one node pair whose shape `check_pair` accepted, or the side whose
+/// actor reach sums to zero.
 pub(super) fn node_diff(
     spot: &Spot,
     engine: &DumpNode,
     oracle: &DumpNode,
     actor: usize,
-) -> Result<NodeDiff, GateError> {
+) -> Result<NodeCompare, GateError> {
     let by_label: BTreeMap<&str, &DumpHand> =
         oracle.hands.iter().map(|hand| (hand.hand.as_str(), hand)).collect();
     let mut sums = Sums::default();
@@ -109,14 +126,17 @@ pub(super) fn node_diff(
         let other = by_label.get(hand.hand.as_str()).copied().ok_or_else(|| {
             mismatch(spot, engine, format!("the oracle has no hand {}", hand.hand))
         })?;
-        let weight = reach_of(spot, engine, hand, actor, "engine")?;
-        let other_weight = reach_of(spot, engine, other, actor, "oracle")?;
+        let weight = reach_of(spot, engine, hand, actor, ENGINE)?;
+        let other_weight = reach_of(spot, engine, other, actor, ORACLE)?;
         sums.add(hand, other, weight, other_weight);
     }
-    if sums.weight <= 0.0 || sums.other_weight <= 0.0 {
-        return Err(mismatch(spot, engine, "the actor's reach sums to zero".to_owned()));
+    if sums.weight <= 0.0 {
+        return Ok(NodeCompare::Unreached { side: ENGINE });
     }
-    Ok(sums.finish())
+    if sums.other_weight <= 0.0 {
+        return Ok(NodeCompare::Unreached { side: ORACLE });
+    }
+    Ok(NodeCompare::Figures(sums.finish()))
 }
 
 /// The running sums over the hands of a node pair.

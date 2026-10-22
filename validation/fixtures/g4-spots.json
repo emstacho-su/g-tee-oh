@@ -203,40 +203,6 @@
       "gated": true,
       "source": "hand-made",
       "notes": "Paired flop with heavy card removal of kings from both ranges; a blank river."
-    },
-    {
-      "id": "turn-01-dry-ace-raked",
-      "street": "turn",
-      "board": "Ah7d2cKs",
-      "pot_cbb": 1100,
-      "stack_cbb": 9475,
-      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|",
-      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
-      "rake": "online",
-      "ranges": {
-        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
-        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
-      },
-      "gated": false,
-      "source": "hand-made",
-      "notes": "turn-01 at the online rake (5 percent, 3 bb cap, O-112); informational (O-161)."
-    },
-    {
-      "id": "river-01-dry-ace-raked",
-      "street": "river",
-      "board": "Ah7d2cKs9h",
-      "pot_cbb": 2750,
-      "stack_cbb": 8650,
-      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b825.c|9h|",
-      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
-      "rake": "online",
-      "ranges": {
-        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
-        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
-      },
-      "gated": false,
-      "source": "hand-made",
-      "notes": "river-01 at the online rake, informational (O-161): S18 learns the rake gap here."
     }
   ],
   "notes": [
@@ -248,7 +214,8 @@
     "A range is its pieces joined by commas, in the notation both parsers read: pairs with",
     "plus, suited and offsuit classes with plus, dash ranges, explicit combos written high",
     "rank first, and :weight. Each side holds 100 to 300 live combos on its board.",
-    "The eight gated spots are rake-free; the two raked twins are informational (O-161).",
+    "All eight spots are gated and rake-free; the two informational raked twins live in",
+    "g4-spots-raked.json (O-161), a list of its own because a node dump holds each key once.",
     "The preflop block is descriptive (O-164): the engine mapping never reads it.",
     "The configuration is cfg_6_online_100, BB against BTN after r250.c (O-52); no number",
     "comes from a reference tool (O-26, ADR 0017)."

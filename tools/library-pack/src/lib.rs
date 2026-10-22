@@ -31,7 +31,10 @@ pub use dump::{DumpAction, DumpConfig, DumpHand, DumpNode, NodeDump, parse_dump}
 pub use error::PackError;
 pub use estimate::{SizeEstimate, estimate};
 pub use export::{compare_dumps, export_dump};
-pub use invariants::{FREQUENCY_SUM_TOLERANCE, Rule, Violation, check_invariants, check_structure};
+pub use invariants::{
+    FREQUENCY_SUM_TOLERANCE, Rule, Violation, check_dump_structure, check_invariants,
+    check_pack_hand_space, check_structure,
+};
 pub use pack::{check_dump_file, pack, verify};
 pub use synthetic::{SyntheticOptions, synthetic_dump, write_synthetic_dump};
 

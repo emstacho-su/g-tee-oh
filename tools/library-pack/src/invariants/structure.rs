@@ -1,19 +1,23 @@
-//! The structural checks only Rust can make (R2.8, O-132): `check_structure` parses every
-//! key, seat, token and configuration field with `gto-model` and checks that they agree with
-//! each other. Every sentence is a `Rule::Structural` violation, so these checks never change
-//! the rule numbers the corpus compares with the TypeScript checker.
+//! The structural checks only Rust can make (R2.8, O-132): `check_dump_structure` parses
+//! every key, seat, token and configuration field with `gto-model` and checks that they
+//! agree with each other, on any dump; `check_pack_hand_space` is the one rule that holds
+//! for a dump the pack writes and not for a dump a gate reads (R2.11, S17 review F4); and
+//! `check_structure`, what `pack` runs, is the two together. Every sentence is a
+//! `Rule::Structural` violation, so these checks never change the rule numbers the corpus
+//! compares with the TypeScript checker.
 //!
-//! Header checks: schema version 1, a known source, a Coordinated Universal Time (UTC)
-//! timestamp in the schema's pattern, a known format, 2 to 9 seats, a stake label, a depth
-//! above zero, a parsable config id and pair, a `preflop_169` hand space (O-132), two
-//! exploitability values at or above zero, at least one node, no key twice and one
-//! configuration across the keys. Node checks: the key parses, names the dump's config id and
-//! pair and a configuration of the dump's seat count and format, and agrees with the node's
-//! street and board; `to_act` is a seat of the pair; two stacks; a pot above zero; 1 to 255
-//! actions, each token parsable with a sized token equal to its `size_cbb` and a fold or check
-//! at 0; at least one hand (schema `minItems`), so the pack never writes a record the library
-//! claims to hold but has no hands for; reach and frequencies within `[0, 1]`; accuracy at or
-//! above zero.
+//! Header checks (any dump): schema version 1, a known source, a Coordinated Universal Time
+//! (UTC) timestamp in the schema's pattern, a known format, 2 to 9 seats, a stake label, a
+//! depth above zero, a parsable config id and pair, two exploitability values at or above
+//! zero, at least one node, no key twice and one configuration across the keys. Node checks
+//! (any dump): the key parses, names the dump's config id and pair and a configuration of
+//! the dump's seat count and format, and agrees with the node's street and board; `to_act`
+//! is a seat of the pair; two stacks; a pot above zero; 1 to 255 actions, each token
+//! parsable with a sized token equal to its `size_cbb` and a fold or check at 0; at least
+//! one hand (schema `minItems`), so the pack never writes a record the library claims to
+//! hold but has no hands for; reach within `[0, 1]` with one entry per seat, frequencies
+//! within `[0, 1]`; accuracy at or above zero. Pack only: a `preflop_169` hand space
+//! (O-132).
 
 use std::collections::BTreeSet;
 
@@ -45,9 +49,27 @@ struct Expected {
     config_prefix: Option<String>,
 }
 
-/// The structural checks of the module docs; empty when the dump holds.
+/// Every structural check of the module docs, the pack-only hand-space rule first; empty
+/// when the dump holds. What `pack` and `check` run.
 #[must_use]
 pub fn check_structure(d: &NodeDump) -> Vec<Violation> {
+    [check_pack_hand_space(d), check_dump_structure(d)].concat()
+}
+
+/// The pack-only rule: v1 packs `preflop_169` dumps only (O-132). A gate that reads a
+/// postflop dump skips this one and runs [`check_dump_structure`] alone.
+#[must_use]
+pub fn check_pack_hand_space(d: &NodeDump) -> Vec<Violation> {
+    let wrong = (d.hand_space != PREFLOP_169).then(|| {
+        format!("The dump's hand_space is {}; v1 packs preflop_169 only (O-132).", d.hand_space)
+    });
+    wrong.into_iter().map(|message| Violation::new(Rule::Structural, message)).collect()
+}
+
+/// The header, key and node checks of the module docs that hold for any dump, whatever
+/// its hand space; empty when the dump holds.
+#[must_use]
+pub fn check_dump_structure(d: &NodeDump) -> Vec<Violation> {
     let expected = Expected {
         pair: d.position_pair.parse().ok(),
         config_id: d.config_id.as_deref().and_then(|id| ConfigId::new(id).ok()),
@@ -89,9 +111,6 @@ fn check_header(d: &NodeDump) -> Vec<String> {
             .parse::<PositionPair>()
             .err()
             .map(|err| format!("The dump's position_pair: {err}.")),
-        (d.hand_space != PREFLOP_169).then(|| {
-            format!("The dump's hand_space is {}; v1 packs preflop_169 only (O-132).", d.hand_space)
-        }),
         d.exploitability_pct_pot.as_deref().and_then(check_exploitability),
         d.nodes.is_empty().then(|| "The dump has no nodes.".to_owned()),
     ];

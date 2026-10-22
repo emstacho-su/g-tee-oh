@@ -28,7 +28,7 @@ just is the single command surface and continuous integration (CI) calls the sam
 
 - rust-fmt, rust-clippy, rust-test, rust-boundary
 - ts-lint, ts-typecheck, ts-test
-- gates, gates-check, g4 ORACLE OUT, g4-smoke, g4-check, equity-table, report-check
+- gates, gates-check, g4 ORACLE OUT, g4-raked ORACLE OUT, g4-smoke, g4-check, equity-table, report-check
 - contracts, contracts-check, e2e, e2e-web, licenses, security, images, bench
 - library-size-estimate, coverage-library
 - guard, guard-ci, guard-history, guard-paths DIR, guard-test, test-tags

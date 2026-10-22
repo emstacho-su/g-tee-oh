@@ -5,7 +5,6 @@
 //! and nothing here panics.
 
 use std::fmt;
-use std::path::PathBuf;
 
 use crate::fixtures::FixtureError;
 use crate::report::ReportError;
@@ -41,12 +40,12 @@ pub enum GateError {
         /// The fixture id.
         fixture: String,
     },
-    /// A node dump breaks the criterion 2 invariants (R2.8 rules 1 to 5), so gate G4
-    /// refuses it before any number is judged (R2.11).
+    /// A node dump breaks the criterion 2 invariants (R2.8 rules 1 to 5) or library-pack's
+    /// node checks, so gate G4 refuses it before any number is judged (R2.11).
     Dump {
-        /// The dump file.
-        path: PathBuf,
-        /// Every violation library-pack reported, each one sentence.
+        /// The dump: its file path, or the engine dump solved in this run.
+        dump: String,
+        /// Every violation library-pack reported, each one sentence naming its node.
         violations: Vec<library_pack::Violation>,
     },
     /// The two G4 dumps disagree on a node's shape, or a dump lacks what the compare
@@ -86,12 +85,11 @@ impl fmt::Display for GateError {
                 "fixture {fixture}: case {case}: fact {fact} resolves to nothing in the solved game"
             ),
             Self::NoCurve { fixture } => write!(f, "fixture {fixture} names no curve"),
-            Self::Dump { path, violations } => {
+            Self::Dump { dump, violations } => {
                 let sentences: Vec<String> = violations.iter().map(ToString::to_string).collect();
                 write!(
                     f,
-                    "dump {} breaks the node-dump invariants ({} found): {}",
-                    path.display(),
+                    "dump {dump} breaks the node-dump invariants ({} found): {}",
                     violations.len(),
                     sentences.join(" ")
                 )

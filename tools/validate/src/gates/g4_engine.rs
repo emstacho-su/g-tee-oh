@@ -50,6 +50,9 @@ const SEED: u64 = 0;
 const HALF: f64 = 0.5;
 /// The rake of a rake-free spot: no percent and no cap (O-161).
 const NO_RAKE: RakeModel = RakeModel { percent_bp: 0, cap_cents: 0, no_flop_no_drop: false };
+/// The least gain a dump records: a best-response gain is at or above zero by definition,
+/// rounding can put it a hair below, and the schema asks for at or above zero.
+const GAIN_FLOOR: f64 = 0.0;
 
 /// One solved spot: its dump nodes, the solve report, the best response and the facts
 /// the compare reports.
@@ -78,7 +81,8 @@ impl ProgressSink for SpotProgress {
     fn report(&self, iteration: u32, exploitability_pct_pot: Option<[f32; 2]>) {
         if let Some([oop, ip]) = exploitability_pct_pot {
             eprintln!(
-                "validate: g4 {}: iteration {iteration}, gains oop {oop} ip {ip} percent of the pot",
+                "validate: g4 {}: iteration {iteration}, gains oop {oop} ip {ip} percent of \
+                 the pot",
                 self.spot
             );
         }
@@ -167,7 +171,7 @@ pub fn solve_spot(
     let response = best_response(&solved);
     let walked = root_street_nodes(&solved).map_err(|err| solve_error(err.to_string()))?;
     let key = spot.key().map_err(|err| solve_error(err.to_string()))?;
-    let accuracy = response.gain_pct_pot[0].max(response.gain_pct_pot[1]);
+    let accuracy = response.gain_pct_pot[0].max(response.gain_pct_pot[1]).max(GAIN_FLOOR);
     let nodes = walked.iter().map(|node| dump_node(&key, spot, node, accuracy)).collect();
     let pot_bb = f64::from(spot.pot_cbb) / f64::from(Cbb::PER_BB);
     let facts = SpotFacts {
@@ -277,7 +281,7 @@ pub fn engine_dump(
         message: format!("config_id {} names no v1 configuration", spots.config_id),
     })?;
     let worst = |seat: usize| {
-        solves.iter().map(|solve| solve.best_response.gain_pct_pot[seat]).fold(f64::MIN, f64::max)
+        solves.iter().map(|solve| solve.best_response.gain_pct_pot[seat]).fold(GAIN_FLOOR, f64::max)
     };
     let exploitability = (!solves.is_empty()).then(|| vec![worst(0), worst(1)]);
     Ok(NodeDump {

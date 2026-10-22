@@ -129,7 +129,8 @@ fn assert_ranges(spot: &Spot) {
 }
 
 /// R2.11 (O-87): the committed spot list parses with `schema_version` 1, names at least
-/// four gated river and four gated turn spots, every node key parses with a board and a
+/// four gated river and four gated turn spots and nothing informational (the raked twins
+/// live in `g4-spots-raked.json`, O-161), every node key parses with a board and a
 /// street equal to the spot's, both ranges parse with 100 to 300 live combos, the one
 /// source entry says hand-made, and the three rules carry the 04 section 6 values.
 #[test]
@@ -154,7 +155,7 @@ fn r2_11_g4_spots_fixture_parses_with_schema_version_1() {
         "{} gated turn spots",
         gated(Street::Turn)
     );
-    assert!(spots.spots.iter().any(|spot| !spot.gated), "the raked twins are informational");
+    assert!(spots.spots.iter().all(|spot| spot.gated), "the raked twins have their own list");
     for spot in &spots.spots {
         let key: NodeKey = spot.node_key.parse().unwrap_or_else(|error| panic!("{error}"));
         let board = key.board().expect("a postflop key has a board");
@@ -293,8 +294,8 @@ fn r2_11_g4_refuses_a_dump_that_breaks_the_node_dump_invariants() {
     std::fs::write(&bad, broken).unwrap_or_else(|error| panic!("{error}"));
     let error = g4::load_dump(&bad).expect_err("a broken dump is refused");
     match &error {
-        GateError::Dump { path, violations } => {
-            assert_eq!(path, &bad);
+        GateError::Dump { dump, violations } => {
+            assert_eq!(dump, &bad.display().to_string());
             let sentence = "has frequencies summing to 1.01, not 1 within 0.001.";
             assert!(violations.iter().any(|v| v.message.contains(sentence)), "{violations:?}");
         }

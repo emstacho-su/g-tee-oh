@@ -240,6 +240,18 @@ g4 ORACLE OUT:
     cargo run --release -p validate -- g4 --oracle {{ORACLE}} --out {{OUT}} \
         --write-engine {{OUT}}/engine-dump.json
 
+G4_SPOTS_RAKED := "validation/fixtures/g4-spots-raked.json"
+
+# The informational rake comparison (O-161): the two raked twins of g4-spots-raked.json
+# against the oracle dump ORACLE the private program wrote for that list, written into OUT
+# as g4-oracle-raked.json, g4-oracle-raked.md and engine-dump-raked.json beside the G4
+# report. A list and a report of its own because a node dump holds each key once; nothing
+# in it is gated, so the rows are read, not judged. Clean tree, VALIDATE_MACHINE=zenbook.
+# Rake comparison: validate g4 --spots g4-spots-raked.json --report-id g4-oracle-raked ...
+g4-raked ORACLE OUT:
+    cargo run --release -p validate -- g4 --spots {{G4_SPOTS_RAKED}} --oracle {{ORACLE}} \
+        --out {{OUT}} --report-id g4-oracle-raked --write-engine {{OUT}}/engine-dump-raked.json
+
 # The compare half of the G4 smoke: the committed synthetic tiny pair, no solve, into target
 # (O-168); the committed reports stay untouched. The rust job runs this one, because it has
 # cargo but no node_modules (check-reports needs ajv, which the ts job installs).

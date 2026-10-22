@@ -13,10 +13,12 @@
 //! feed the same `NodeFacts`, in which an absent field is `None` and its checks are skipped
 //! exactly where node-dump.ts skips them.
 //!
-//! Structural (Rust only, in the `structure` submodule): every key parses, its config id and
-//! pair match the dump's, its street and board match the node's, `to_act` is in the pair, two
-//! stacks, a pot above zero, at most 255 actions, a sized token equal to its `size_cbb`, reach
-//! within `[0, 1]`, and a `preflop_169` hand space (O-132).
+//! Structural (Rust only, in the `structure` submodule): `check_dump_structure` for any
+//! dump (every key parses and is listed once, its config id and pair match the dump's, its
+//! street and board match the node's, `to_act` is in the pair, two stacks, a pot above
+//! zero, at most 255 actions, a sized token equal to its `size_cbb`, reach within `[0, 1]`
+//! with one entry per seat), `check_pack_hand_space` for the pack's `preflop_169` rule
+//! (O-132), and `check_structure` for both, what `pack` runs.
 //!
 //! Lane P (pack) owns this file.
 
@@ -30,8 +32,8 @@ use crate::dump::{DumpHand, DumpNode, NodeDump};
 
 mod structure;
 
-pub use structure::check_structure;
 pub(crate) use structure::is_timestamp;
+pub use structure::{check_dump_structure, check_pack_hand_space, check_structure};
 
 /// How far from 1 one hand's frequencies may sum (criterion 2, node-dump.ts).
 pub const FREQUENCY_SUM_TOLERANCE: f64 = 0.001;

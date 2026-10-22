@@ -2,10 +2,12 @@
 //! crate): the first token is the command, the rest are `--flag value` pairs and the bare
 //! `--allow-dirty`, each given at most once. Commands: `g1`, `g2`, `g3` and `gates` (the
 //! toy-game gates, R2.4 to R2.6), `equity-table` (R2.20) and `g4` (the oracle gate,
-//! R2.11), whose own options `--spots`, `--oracle`, `--engine` and `--write-engine` are
-//! refused on any other command. A missing `--oracle` on `g4`, and `--write-engine`
-//! beside `--engine` (nothing is solved, so there is no engine dump to write), are usage
-//! errors naming the option. `main.rs` dispatches on the result.
+//! R2.11), whose own options `--spots`, `--oracle`, `--engine`, `--write-engine` and
+//! `--report-id` are refused on any other command. A missing `--oracle` on `g4`,
+//! `--write-engine` beside `--engine` (nothing is solved, so there is no engine dump to
+//! write), and a `--report-id` outside the report schema's id pattern are usage errors
+//! naming the option. `main.rs` dispatches on the result. The unit tests live in the
+//! `tests` child module.
 
 use std::path::PathBuf;
 
@@ -17,7 +19,8 @@ pub const ALLOW_DIRTY: &str = "--allow-dirty";
 /// The usage text `help` prints and every usage error repeats.
 pub const USAGE: &str = "\
 usage: validate [COMMAND] [--out DIR|FILE] [--machine NAME] [--commit SHA] [--allow-dirty]
-       validate g4 --oracle PATH [--spots PATH] [--engine PATH] [--write-engine PATH] ...
+       validate g4 --oracle PATH [--spots PATH] [--engine PATH] [--write-engine PATH]
+                   [--report-id ID] ...
 
 commands
   g1 | g2 | g3   run one toy-game gate and write its JSON and Markdown report
@@ -39,6 +42,8 @@ g4 options
   --oracle       the oracle node dump to compare against (required)
   --engine       a committed engine node dump to compare instead of solving
   --write-engine where to write the engine dump this run solves (not with --engine)
+  --report-id    the report id and file stem (default g4-oracle; g4-oracle-raked for the
+                 raked list): lowercase words of letters and digits joined by dashes
 
 With no command the tool prints its name and version. A dirty working tree is refused
 unless --allow-dirty is given. Exit 1 when a gate failed, 2 on an error.";
@@ -52,8 +57,11 @@ const SPOTS: &str = "--spots";
 const ORACLE: &str = "--oracle";
 const ENGINE: &str = "--engine";
 const WRITE_ENGINE: &str = "--write-engine";
+const REPORT_ID: &str = "--report-id";
 /// The `g4` command name, for its usage errors.
 const G4: &str = "g4";
+/// The character between the words of a report id (report.schema.json).
+const ID_WORD_SEPARATOR: char = '-';
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +102,8 @@ pub struct G4Options {
     pub engine: Option<PathBuf>,
     /// `--write-engine`: where the solved engine dump goes.
     pub write_engine: Option<PathBuf>,
+    /// `--report-id`: the report id and file stem, else the gate's default.
+    pub report_id: Option<String>,
 }
 
 /// A parsed command line.
@@ -113,6 +123,7 @@ struct Raw {
     oracle: Option<PathBuf>,
     engine: Option<PathBuf>,
     write_engine: Option<PathBuf>,
+    report_id: Option<String>,
 }
 
 /// Parse the arguments after the program name.
@@ -121,7 +132,7 @@ struct Raw {
 ///
 /// A usage message naming the offending token: an unknown command or option, a missing,
 /// empty or repeated value, a `g4` option on another command, a `g4` without `--oracle`,
-/// or `--write-engine` beside `--engine`.
+/// `--write-engine` beside `--engine`, or a `--report-id` outside the id pattern.
 pub fn parse(args: &[String]) -> Result<Invocation, String> {
     let Some((first, rest)) = args.split_first() else {
         return Ok(Invocation { command: Command::Version, options: Options::default() });
@@ -154,6 +165,7 @@ fn g4_options(raw: &Raw) -> Result<G4Options, String> {
         oracle,
         engine: raw.engine.clone(),
         write_engine: raw.write_engine.clone(),
+        report_id: raw.report_id.clone(),
     })
 }
 
@@ -164,6 +176,7 @@ fn refuse_g4_flags(raw: &Raw) -> Result<(), String> {
         (ORACLE, raw.oracle.is_some()),
         (ENGINE, raw.engine.is_some()),
         (WRITE_ENGINE, raw.write_engine.is_some()),
+        (REPORT_ID, raw.report_id.is_some()),
     ];
     match given.into_iter().find(|(_, is_given)| *is_given) {
         Some((flag, _)) => Err(format!("{flag} is an option of {G4} only")),
@@ -216,8 +229,27 @@ fn with_value(raw: Raw, flag: &str, value: &str) -> Result<Raw, String> {
         WRITE_ENGINE => {
             Ok(Raw { write_engine: set_once(raw.write_engine.as_ref(), path, flag)?, ..raw })
         }
+        REPORT_ID => {
+            if !is_report_id(value) {
+                return Err(format!(
+                    "{flag} must be lowercase words of letters and digits joined by dashes, \
+                     got {value:?}"
+                ));
+            }
+            Ok(Raw { report_id: set_once(raw.report_id.as_ref(), text, flag)?, ..raw })
+        }
         other => Err(format!("unknown option {other:?}")),
     }
+}
+
+/// Whether `id` matches the report schema's id pattern: words of lowercase letters and
+/// digits, the first starting with a letter, joined by single dashes.
+fn is_report_id(id: &str) -> bool {
+    let starts_with_letter = id.chars().next().is_some_and(|c| c.is_ascii_lowercase());
+    let word = |word: &str| {
+        !word.is_empty() && word.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    };
+    starts_with_letter && id.split(ID_WORD_SEPARATOR).all(word)
 }
 
 /// `value` for a flag that has not been given yet; an error naming the flag otherwise.
@@ -229,126 +261,4 @@ fn set_once<T>(given: Option<&T>, value: T, flag: &str) -> Result<Option<T>, Str
 }
 
 #[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use crate::gates::Gate;
-
-    use super::{Command, G4Options, Invocation, Options, parse};
-
-    fn args(words: &[&str]) -> Vec<String> {
-        words.iter().map(|word| (*word).to_owned()).collect()
-    }
-
-    /// R2.4, R2.5, R2.6 (the command line the gate reports are written through): no
-    /// argument is the version line, a gate name selects one gate, `gates` all three,
-    /// and the three options are read as pairs in any order.
-    #[test]
-    fn r2_4_r2_5_r2_6_cli_parses_gate_commands_and_options() {
-        assert_eq!(
-            parse(&[]),
-            Ok(Invocation { command: Command::Version, options: Options::default() })
-        );
-        let one = parse(&args(&["g2", "--commit", "abc", "--out", "reports"])).expect("parses");
-        assert_eq!(one.command, Command::Gates(vec![Gate::G2]));
-        assert_eq!(one.options.out, Some(PathBuf::from("reports")));
-        assert_eq!(one.options.commit.as_deref(), Some("abc"));
-        assert_eq!(one.options.machine, None);
-        assert!(!one.options.allow_dirty);
-        let all = parse(&args(&["gates", "--machine", "github-ubuntu"])).expect("parses");
-        assert_eq!(all.command, Command::Gates(Gate::ALL.to_vec()));
-        assert_eq!(all.options.machine.as_deref(), Some("github-ubuntu"));
-        assert_eq!(parse(&args(&["equity-table"])).map(|i| i.command), Ok(Command::EquityTable));
-        assert_eq!(parse(&args(&["--help"])).map(|i| i.command), Ok(Command::Help));
-    }
-
-    /// R2.4, R2.5, R2.6: `--allow-dirty` takes no value and may sit anywhere among the
-    /// pairs, for the gates and for the equity table alike.
-    #[test]
-    fn r2_4_r2_5_r2_6_cli_reads_allow_dirty_as_a_bare_flag() {
-        let first = parse(&args(&["gates", "--allow-dirty", "--out", "target/gate-reports"]))
-            .expect("parses");
-        assert!(first.options.allow_dirty);
-        assert_eq!(first.options.out, Some(PathBuf::from("target/gate-reports")));
-        let last = parse(&args(&["g1", "--machine", "zenbook", "--allow-dirty"])).expect("parses");
-        assert!(last.options.allow_dirty);
-        assert_eq!(last.options.machine.as_deref(), Some("zenbook"));
-        let middle =
-            parse(&args(&["equity-table", "--out", "a", "--allow-dirty", "--commit", "c"]))
-                .expect("parses");
-        assert!(middle.options.allow_dirty);
-        assert_eq!(middle.options.commit.as_deref(), Some("c"));
-        assert_eq!(middle.command, Command::EquityTable);
-    }
-
-    /// R2.4, R2.5, R2.6: an unknown command, an unknown option, a missing or empty value
-    /// and a repeated option are usage errors that name the offending token.
-    #[test]
-    fn r2_4_r2_5_r2_6_cli_rejects_bad_arguments() {
-        let rejects = |words: &[&str], needle: &str| {
-            let error = parse(&args(words)).expect_err("rejected");
-            assert!(error.contains(needle), "{error:?} does not name {needle:?}");
-        };
-        rejects(&["g5"], "g5");
-        rejects(&["gates", "--seed", "1"], "--seed");
-        rejects(&["gates", "--out"], "--out");
-        rejects(&["gates", "--out", ""], "--out");
-        rejects(&["gates", "--out", "--machine"], "--out");
-        rejects(&["gates", "--out", "--allow-dirty"], "--out");
-        rejects(&["gates", "--out", "a", "--out", "b"], "twice");
-        rejects(&["gates", "--allow-dirty", "--allow-dirty"], "--allow-dirty given twice");
-        rejects(&["gates", "--allow-dirty=yes"], "--allow-dirty=yes");
-    }
-
-    /// R2.11: `g4` is a known command that reads its four options and the four shared
-    /// ones in any order; a missing `--oracle` is a usage error naming it, a `g4` option
-    /// on another command names the option, and `--write-engine` beside `--engine` is
-    /// refused.
-    #[test]
-    fn r2_11_cli_parses_g4_and_its_options() {
-        let words = [
-            "g4",
-            "--spots",
-            "s.json",
-            "--oracle",
-            "o.json",
-            "--engine",
-            "e.json",
-            "--out",
-            "dir",
-            "--machine",
-            "zenbook",
-            "--commit",
-            "abc",
-            "--allow-dirty",
-        ];
-        let parsed = parse(&args(&words)).expect("parses");
-        let expected = G4Options {
-            spots: Some(PathBuf::from("s.json")),
-            oracle: PathBuf::from("o.json"),
-            engine: Some(PathBuf::from("e.json")),
-            write_engine: None,
-        };
-        assert_eq!(parsed.command, Command::G4(expected));
-        assert_eq!(parsed.options.out, Some(PathBuf::from("dir")));
-        assert_eq!(parsed.options.machine.as_deref(), Some("zenbook"));
-        assert_eq!(parsed.options.commit.as_deref(), Some("abc"));
-        assert!(parsed.options.allow_dirty);
-        let solve = parse(&args(&["g4", "--oracle", "o.json", "--write-engine", "w.json"]));
-        let solve = solve.expect("parses").command;
-        let Command::G4(options) = solve else { panic!("not g4: {solve:?}") };
-        assert_eq!(options.write_engine, Some(PathBuf::from("w.json")));
-        assert_eq!((options.spots, options.engine), (None, None));
-
-        let rejects = |words: &[&str], needle: &str| {
-            let error = parse(&args(words)).expect_err("rejected");
-            assert!(error.contains(needle), "{error:?} does not name {needle:?}");
-        };
-        rejects(&["g4"], "--oracle");
-        rejects(&["g4", "--spots", "s.json"], "--oracle");
-        rejects(&["gates", "--oracle", "o.json"], "--oracle");
-        rejects(&["g1", "--write-engine", "w.json"], "--write-engine");
-        rejects(&["g4", "--oracle", "o", "--engine", "e", "--write-engine", "w"], "--write-engine");
-        rejects(&["g4", "--oracle", "o", "--oracle", "p"], "twice");
-    }
-}
+mod tests;

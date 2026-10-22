@@ -1,12 +1,16 @@
 //! The structural checks of a G4 spot list (R2.11), run by `G4Spots::load` after the
 //! parse: every source reference resolves, the configuration is in the v1 catalog, the
 //! pair parses, the tree builds, the stop rule can stop, the rules are the 04 section 6
-//! values in their units, and every spot's street, key, pot, stack, rake, preflop line and
-//! ranges agree with each other. Child module of `g4_spots`; every failure is one reason
-//! in plain words, which the loader wraps in `FixtureError::Invalid`.
+//! values in their units, no spot's key repeats or extends another's within the same
+//! street (a node dump holds each key once, so two spots at one root would read one
+//! node), and every spot's street, key, pot, stack, rake, preflop line and ranges agree
+//! with each other, the key being a root (its last street section carries no action).
+//! Child module of `g4_spots`; every failure is one reason in plain words, which the
+//! loader wraps in `FixtureError::Invalid`.
 
 use std::collections::BTreeSet;
 
+use gto_model::keys::SECTION_SEPARATOR;
 use gto_model::{NodeKey, Position, PositionPair, Street, format_cards, parse_line};
 use gto_solve::postflop::Range;
 use gto_tree::LineKind;
@@ -42,11 +46,36 @@ pub(super) fn check_structure(spots: &G4Spots) -> Result<(), String> {
     if spots.spots.is_empty() {
         return Err("no spots".to_owned());
     }
+    check_keys_distinct(&spots.spots)?;
     for spot in &spots.spots {
         check_spot(spot, &source_ids, &spots.config_id, pair)
             .map_err(|reason| format!("spot {}: {reason}", spot.id))?;
     }
     Ok(())
+}
+
+/// No spot's key equals or extends an earlier spot's key within the same street, in either
+/// direction: each list's dump then holds each root once and no root is another's deeper
+/// node. A river root extending a turn root is on the next street and is allowed.
+fn check_keys_distinct(spots: &[Spot]) -> Result<(), String> {
+    for (index, spot) in spots.iter().enumerate() {
+        let clash = spots[..index].iter().find(|other| {
+            within_street(&spot.node_key, &other.node_key)
+                || within_street(&other.node_key, &spot.node_key)
+        });
+        if let Some(other) = clash {
+            return Err(format!(
+                "spot {}: key {} repeats or extends the key of spot {} within the same street",
+                spot.id, spot.node_key, other.id
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// `key` equals `root` or adds actions to it with no further street section.
+fn within_street(key: &str, root: &str) -> bool {
+    key.strip_prefix(root).is_some_and(|rest| !rest.contains(SECTION_SEPARATOR))
 }
 
 /// Both targets are percents at or above zero and both caps are at least 1.
@@ -130,7 +159,8 @@ fn check_spot(
     Ok(())
 }
 
-/// The key names the list's configuration and pair and the spot's street and board.
+/// The key names the list's configuration and pair and the spot's street and board, and
+/// is a root: no action on its last street.
 fn check_key(
     spot: &Spot,
     key: &NodeKey,
@@ -146,6 +176,9 @@ fn check_key(
     }
     if key.street() != street {
         return Err(format!("the key is on the {}, not the {street}", key.street()));
+    }
+    if !key.actions_on(street).is_empty() {
+        return Err(format!("the key carries actions on the {street}, so it is not a root"));
     }
     let board = key.board().map(|board| format_cards(&board.cards())).unwrap_or_default();
     if board != spot.board {

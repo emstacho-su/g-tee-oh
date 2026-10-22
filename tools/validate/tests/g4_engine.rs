@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use gto_model::NodeKey;
 use gto_solve::postflop::{NoProgress, ProgressSink, Range, StopReason};
-use library_pack::{check_invariants, parse_dump};
+use library_pack::{check_dump_structure, check_invariants, parse_dump};
 use validate::fixtures::FIXTURES_RELATIVE_TO_REPO_ROOT;
 use validate::fixtures::g4_spots::{G4Spots, RAKE_ONLINE, Spot};
 use validate::gates::g4::{self, RunExtras};
@@ -91,6 +91,8 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
     let reread = parse_dump(&bytes).unwrap_or_else(|violations| panic!("{violations:?}"));
     assert_eq!(check_invariants(&reread), Vec::new(), "the written dump keeps every invariant");
+    assert_eq!(check_dump_structure(&reread), Vec::new(), "and every node check (F4)");
+    g4::check_dump(&dump, "the solved dump").unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(reread, dump);
 
     let extras = RunExtras { facts: vec![solve.facts.clone()], ..RunExtras::default() };

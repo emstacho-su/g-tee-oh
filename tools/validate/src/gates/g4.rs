@@ -3,50 +3,68 @@
 //! written by `g4_engine` and the oracle side by the private program, judged per gated
 //! spot of the spot list.
 //!
-//! Mechanism, in order. [`load_dump`] reads a dump under library-pack's size cap, parses
-//! it and runs the criterion 2 invariants; a violation is [`GateError::Dump`]. [`run_with`]
-//! checks both dumps name the list's configuration and pair, then per spot finds the root
-//! node by its key in both dumps and every deeper root-street node both carry (a key that
-//! starts with the root key). At each node pair the `diff` child module requires the same
-//! actor, pot, stacks, action tokens with sizes and hand label set, else
-//! [`GateError::Mismatch`] names the spot and the node, and computes the reach-weighted
-//! mean absolute frequency difference (O-160) and both sides' reach-weighted expected
-//! value (EV). A gated spot is judged on four measurements through [`judge`]: the engine
-//! root's `accuracy_pct_pot` and the oracle root's (the larger of that spot's two seat
-//! gains, since the schema's dump-level `exploitability_pct_pot` holds one pair for every
-//! spot of a dump) at most 0.3 percent of the pot, the root frequency-mad strictly under
-//! 2.0 points, and the root EV error at most 0.3 percent of the pot. Everything else is
-//! informational: the unweighted and the largest frequency difference, the hands
-//! compared, both root EVs, every deeper node's frequency-mad, the nodes compared, the
-//! dump-level exploitability pairs, and the engine run's iterations, seconds, bytes and
-//! the root EV against the best-response walk when the engine side was solved in this run.
+//! Mechanism, in order. [`load_dump`] reads a dump under library-pack's size cap and
+//! parses it; [`check_dump`] then runs the criterion 2 invariants and library-pack's node
+//! checks (unique and parseable keys, a pot above zero, two stacks, reach within [0, 1]
+//! with one entry per seat, a sized token equal to its `size_cbb`) on it, as it does on
+//! the engine dump the command solves in memory; a violation is [`GateError::Dump`]
+//! naming the dump and the node. [`run_with`] checks both dumps name the list's
+//! configuration and pair, then per spot finds the root node by its key in both dumps and
+//! every deeper root-street node both carry: a key that adds actions to the root key with
+//! no further street section, so a turn spot never absorbs the nodes of the river spot
+//! that extends it. At each node pair the `diff` child module requires the same actor,
+//! pot, stacks, action tokens with sizes and hand label set, else [`GateError::Mismatch`]
+//! names the spot and the node, and computes the reach-weighted mean absolute frequency
+//! difference (O-160) and both sides' reach-weighted expected value (EV). A root nobody
+//! reaches is a mismatch too (the root is always reached); a deeper node whose actor has
+//! zero reach on either side is a node the engine's 16-bit walk writes for a never-taken
+//! action, so its rows are skipped and a note names it. A gated spot is judged on four
+//! measurements through [`judge`]: the engine root's `accuracy_pct_pot` and the oracle
+//! root's (the larger of that spot's two seat gains, since the schema's dump-level
+//! `exploitability_pct_pot` holds one pair for every spot of a dump) at most 0.3 percent
+//! of the pot, the root frequency-mad strictly under 2.0 points, and the root EV error at
+//! most 0.3 percent of the pot. Everything else is informational: the unweighted and the
+//! largest frequency difference, the hands compared, both root EVs, every deeper node's
+//! frequency-mad, the nodes compared, the dump-level exploitability pairs, and the engine
+//! run's iterations, seconds, bytes and the root EV against the best-response walk when
+//! the engine side was solved in this run (the `extras` child module).
 //!
-//! Report: id `g4-oracle`, `r_ids` `["R2.11"]`, written through the shared envelope
-//! (`Report::from_gate`); `notes` carries the mode line, the oracle target, the spot list,
-//! the tree hash, the input provenance lines the command adds (paths and sha256) and the
-//! per-spot stop reasons and gains.
+//! Report: id `g4-oracle` for the gated list, or the id the command passes for another
+//! list (`g4-oracle-raked` for the raked twins, O-161), `r_ids` `["R2.11"]`, written
+//! through the shared envelope (`Report::from_gate`); `notes` carries the mode line, the
+//! oracle target, the spot list, the tree hash, the input provenance lines the command
+//! adds (paths and sha256), the per-spot stop reasons and gains, and the skipped nodes.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use gto_model::Cbb;
-use gto_tree::tree_hash_hex;
-use library_pack::{DumpNode, MAX_DUMP_BYTES, NodeDump, check_invariants, parse_dump};
+use gto_model::keys::SECTION_SEPARATOR;
+use library_pack::{
+    DumpNode, MAX_DUMP_BYTES, NodeDump, check_dump_structure, check_invariants, parse_dump,
+};
 
 use crate::fixtures::FixtureError;
-use crate::fixtures::g4_spots::{G4Spots, PCT_POT, PERCENTAGE_POINTS, Rule, Spot};
+use crate::fixtures::g4_spots::{G4Spots, PERCENTAGE_POINTS, Rule, Spot};
 use crate::report::{Measurement, Threshold};
 
 use super::{GateError, GateReport};
 
 mod diff;
+mod extras;
 
-use diff::{NodeDiff, actor_index, check_pair, node_diff};
+use diff::{NodeCompare, NodeDiff, actor_index, check_pair, node_diff};
+pub use extras::{RunExtras, SpotFacts};
+use extras::{dump_rows, facts_rows, notes};
 
-/// The report id (O-170), also the file stem of the two report files.
+/// The report id of the gated list (O-170), also the file stem of the two report files.
 pub const REPORT_ID: &str = "g4-oracle";
 /// The requirement the gate closes.
 pub const R_ID: &str = "R2.11";
+
+/// The two sides of a compare, as the rows, the errors and the notes name them.
+pub(super) const ENGINE: &str = "engine";
+pub(super) const ORACLE: &str = "oracle";
 
 /// The first segment of every measurement id.
 const ID_PREFIX: &str = "g4";
@@ -54,52 +72,21 @@ const ID_PREFIX: &str = "g4";
 const ROOT: &str = "root";
 /// The node name in a `Mismatch` about the dump header.
 const HEADER: &str = "header";
-/// The spot segment of the dump-level rows.
-const DUMP: &str = "dump";
 /// Units of the informational rows.
 const BB: &str = "bb";
 const FREQUENCY: &str = "frequency";
 const COUNT: &str = "count";
-const ITERATIONS: &str = "iterations";
-const SECONDS: &str = "seconds";
-const BYTES: &str = "bytes";
 /// Percent per whole.
 const PERCENT: f64 = 100.0;
-/// How the engine side was solved (O-138).
-const ENGINE_MODE_LINE: &str = "engine: exact DCFR 1.5/0/2, no regret floor, 16-bit storage, \
-                                exact chance, measured every 10 iterations (O-138)";
 
-/// What the engine run knows about one spot beyond its dump, for the informational rows.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpotFacts {
-    /// The spot id.
-    pub id: String,
-    /// Iterations run.
-    pub iterations: u32,
-    /// Wall-clock seconds of the solve.
-    pub seconds: f32,
-    /// The memory estimate checked against the cap.
-    pub estimate_bytes: u64,
-    /// The accounted peak.
-    pub peak_bytes: u64,
-    /// Why the solve stopped.
-    pub stop_reason: String,
-    /// Each seat's gain as a percent of the pot, `[oop, ip]`.
-    pub gains_pct_pot: [f64; 2],
-    /// The best-response walk's expected value of the actor plus half the pot, in bb.
-    pub best_response_root_ev_bb: f64,
+/// The rows of one spot, the root figures the engine run's rows need, and the notes.
+struct SpotRows {
+    rows: Vec<Measurement>,
+    root: NodeDiff,
+    notes: Vec<String>,
 }
 
-/// What the command adds to a compare: the engine run's facts and provenance lines.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct RunExtras {
-    /// One entry per spot the engine solved in this run.
-    pub facts: Vec<SpotFacts>,
-    /// Lines for the notes: input paths and digests.
-    pub inputs: Vec<String>,
-}
-
-/// Read a dump file: the size cap, the parse and the criterion 2 invariants.
+/// Read a dump file: the size cap, the parse, then [`check_dump`].
 ///
 /// # Errors
 ///
@@ -113,10 +100,27 @@ pub fn load_dump(path: &Path) -> Result<NodeDump, GateError> {
         return Err(FixtureError::Invalid { path: path.to_path_buf(), reason }.into());
     }
     let text = std::fs::read(path).map_err(read_error)?;
-    let dump_error = |violations| GateError::Dump { path: path.to_path_buf(), violations };
-    let dump = parse_dump(&text).map_err(dump_error)?;
-    let violations = check_invariants(&dump);
-    if violations.is_empty() { Ok(dump) } else { Err(dump_error(violations)) }
+    let what = path.display().to_string();
+    let dump = parse_dump(&text)
+        .map_err(|violations| GateError::Dump { dump: what.clone(), violations })?;
+    check_dump(&dump, &what)?;
+    Ok(dump)
+}
+
+/// Hold `dump` to the criterion 2 invariants (rules 1 to 5) and to library-pack's node
+/// checks, which apply to any dump whatever its hand space; `what` names the dump in the
+/// error: its path, or the engine dump solved in this run.
+///
+/// # Errors
+///
+/// `GateError::Dump` with every violation, each naming its node.
+pub fn check_dump(dump: &NodeDump, what: &str) -> Result<(), GateError> {
+    let violations = [check_invariants(dump), check_dump_structure(dump)].concat();
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(GateError::Dump { dump: what.to_owned(), violations })
+    }
 }
 
 /// A measurement judged by `rule`: at most the bound, inclusive or strict as the rule
@@ -137,33 +141,35 @@ pub fn run(spots: &G4Spots, engine: &NodeDump, oracle: &NodeDump) -> Result<Gate
     run_with(spots, engine, oracle, &RunExtras::default())
 }
 
-/// Compare `engine` against `oracle` over the spots of `spots`, with the engine run's
-/// facts and the provenance lines of `extras`.
+/// Compare `engine` against `oracle` over the spots of `spots`, with the report id, the
+/// engine run's facts and the provenance lines of `extras`.
 ///
 /// # Errors
 ///
 /// `GateError::Mismatch` when a dump names another configuration or pair, lacks a spot's
-/// root, lacks a root's `accuracy_pct_pot` or a hand's reach, or differs from the other
-/// dump in a node's actor, pot, stacks, actions or hand set.
+/// root, lacks a root's `accuracy_pct_pot` or a hand's reach, reaches no hand at a root,
+/// or differs from the other dump in a node's actor, pot, stacks, actions or hand set.
 pub fn run_with(
     spots: &G4Spots,
     engine: &NodeDump,
     oracle: &NodeDump,
     extras: &RunExtras,
 ) -> Result<GateReport, GateError> {
-    check_header(spots, engine, "engine")?;
-    check_header(spots, oracle, "oracle")?;
+    check_header(spots, engine, ENGINE)?;
+    check_header(spots, oracle, ORACLE)?;
     let mut measurements = Vec::new();
+    let mut skipped = Vec::new();
     for spot in &spots.spots {
-        let (rows, root) = spot_measurements(spots, spot, engine, oracle)?;
+        let SpotRows { rows, root, notes } = spot_measurements(spots, spot, engine, oracle)?;
         measurements.extend(rows);
+        skipped.extend(notes);
         if let Some(facts) = extras.facts.iter().find(|facts| facts.id == spot.id) {
             measurements.extend(facts_rows(spot, facts, &root));
         }
     }
-    measurements.extend(dump_rows(engine, "engine"));
-    measurements.extend(dump_rows(oracle, "oracle"));
-    Ok(assemble(spots, measurements, extras))
+    measurements.extend(dump_rows(engine, ENGINE));
+    measurements.extend(dump_rows(oracle, ORACLE));
+    Ok(assemble(spots, measurements, extras, &skipped))
 }
 
 /// The dump names the list's configuration and pair.
@@ -189,21 +195,50 @@ fn check_header(spots: &G4Spots, dump: &NodeDump, side: &str) -> Result<(), Gate
 }
 
 /// The rows of one spot (the judged four when gated, the root's informational rows, one
-/// frequency-mad row per deeper node both dumps carry, the nodes compared) and the root
-/// diff for the engine run's rows.
+/// frequency-mad row per deeper node both dumps carry and reach, the nodes compared),
+/// the root diff for the engine run's rows, and a note per skipped node.
 fn spot_measurements(
     spots: &G4Spots,
     spot: &Spot,
     engine: &NodeDump,
     oracle: &NodeDump,
-) -> Result<(Vec<Measurement>, NodeDiff), GateError> {
-    let root_key = spot.node_key.as_str();
-    let engine_root = root_of(engine, spot, "engine")?;
-    let oracle_root = root_of(oracle, spot, "oracle")?;
+) -> Result<SpotRows, GateError> {
+    let engine_root = root_of(engine, spot, ENGINE)?;
+    let oracle_root = root_of(oracle, spot, ORACLE)?;
     check_pair(spot, engine_root, oracle_root)?;
-    let root = node_diff(spot, engine_root, oracle_root, actor_index(spots, spot, engine_root)?)?;
-    let mut rows = root_rows(spots, spot, &root, engine_root, oracle_root)?;
-    let mut compared = 1.0;
+    let actor = actor_index(spots, spot, engine_root)?;
+    let root = match node_diff(spot, engine_root, oracle_root, actor)? {
+        NodeCompare::Figures(diff) => diff,
+        NodeCompare::Unreached { side } => {
+            return Err(GateError::Mismatch {
+                spot: spot.id.clone(),
+                node: spot.node_key.clone(),
+                reason: format!("the {side} dump's actor reach sums to zero at the root"),
+            });
+        }
+    };
+    let (deeper, notes) = deeper_rows(spots, spot, engine, oracle)?;
+    let compared = 1.0 + count_as_f64(deeper.len());
+    let rows = [
+        root_rows(spots, spot, &root, engine_root, oracle_root)?,
+        deeper,
+        vec![informational(spot, "nodes", "compared", compared, COUNT)],
+    ]
+    .concat();
+    Ok(SpotRows { rows, root, notes })
+}
+
+/// One frequency-mad row per deeper root-street node both dumps carry and reach, and a
+/// note for each deeper node one side does not reach.
+fn deeper_rows(
+    spots: &G4Spots,
+    spot: &Spot,
+    engine: &NodeDump,
+    oracle: &NodeDump,
+) -> Result<(Vec<Measurement>, Vec<String>), GateError> {
+    let root_key = spot.node_key.as_str();
+    let mut rows = Vec::new();
+    let mut notes = Vec::new();
     let deeper = engine.nodes.iter().filter(|node| is_deeper(&node.node_key, root_key));
     for engine_node in deeper {
         let Some(oracle_node) = oracle.nodes.iter().find(|n| n.node_key == engine_node.node_key)
@@ -212,13 +247,20 @@ fn spot_measurements(
         };
         check_pair(spot, engine_node, oracle_node)?;
         let actor = actor_index(spots, spot, engine_node)?;
-        let diff = node_diff(spot, engine_node, oracle_node, actor)?;
         let line = &engine_node.node_key[root_key.len()..];
-        rows.push(informational(spot, line, "frequency-mad", diff.mad_points, PERCENTAGE_POINTS));
-        compared += 1.0;
+        match node_diff(spot, engine_node, oracle_node, actor)? {
+            NodeCompare::Figures(diff) => {
+                let mad = diff.mad_points;
+                rows.push(informational(spot, line, "frequency-mad", mad, PERCENTAGE_POINTS));
+            }
+            NodeCompare::Unreached { side } => notes.push(format!(
+                "Spot {}: node {} is unreached on the {side} side (the actor's reach sums \
+                 to zero), so its rows are skipped.",
+                spot.id, engine_node.node_key
+            )),
+        }
     }
-    rows.push(informational(spot, "nodes", "compared", compared, COUNT));
-    Ok((rows, root))
+    Ok((rows, notes))
 }
 
 /// The four rule rows of a spot, judged when gated and informational for a raked twin,
@@ -233,11 +275,11 @@ fn root_rows(
     let rules = &spots.rules;
     let pot_bb = f64::from(engine_root.pot_cbb) / f64::from(Cbb::PER_BB);
     let ev_error = PERCENT * (root.ev_engine_bb - root.ev_oracle_bb).abs() / pot_bb;
-    let engine_accuracy = accuracy_of(spot, engine_root, "engine")?;
-    let oracle_accuracy = accuracy_of(spot, oracle_root, "oracle")?;
+    let engine_accuracy = accuracy_of(spot, engine_root, ENGINE)?;
+    let oracle_accuracy = accuracy_of(spot, oracle_root, ORACLE)?;
     let quartet = [
-        (id(spot, "engine", "exploitability"), engine_accuracy, &rules.exploitability_max),
-        (id(spot, "oracle", "exploitability"), oracle_accuracy, &rules.exploitability_max),
+        (id(spot, ENGINE, "exploitability"), engine_accuracy, &rules.exploitability_max),
+        (id(spot, ORACLE, "exploitability"), oracle_accuracy, &rules.exploitability_max),
         (id(spot, ROOT, "frequency-mad"), root.mad_points, &rules.frequency_mad_max),
         (id(spot, ROOT, "ev-abs-error"), ev_error, &rules.root_ev_max),
     ];
@@ -262,87 +304,42 @@ fn root_rows(
     Ok(rows)
 }
 
-/// The engine run's rows for one spot, with the dump's root EV against the best-response
-/// walk's figure: a consistency check of the reach and EV conventions.
-fn facts_rows(spot: &Spot, facts: &SpotFacts, root: &NodeDiff) -> Vec<Measurement> {
-    let against = root.ev_engine_bb - facts.best_response_root_ev_bb;
-    vec![
-        informational(spot, "engine", "iterations", f64::from(facts.iterations), ITERATIONS),
-        informational(spot, "engine", "seconds", f64::from(facts.seconds), SECONDS),
-        informational(spot, "engine", "estimate-bytes", bytes_as_f64(facts.estimate_bytes), BYTES),
-        informational(spot, "engine", "peak-bytes", bytes_as_f64(facts.peak_bytes), BYTES),
-        informational(spot, ROOT, "ev-engine-vs-best-response-bb", against, BB),
-    ]
-}
-
-/// The dump-level exploitability pair as informational rows, when the dump carries it.
-fn dump_rows(dump: &NodeDump, side: &str) -> Vec<Measurement> {
-    let Some(pair) = dump.exploitability_pct_pot.as_deref() else {
-        return Vec::new();
-    };
-    ["oop", "ip"]
-        .iter()
-        .zip(pair)
-        .map(|(seat, value)| {
-            let row_id = format!("{ID_PREFIX}/{DUMP}/{side}/exploitability/{seat}");
-            Measurement::informational(&row_id, *value, PCT_POT)
-        })
-        .collect()
-}
-
-/// The report: thresholds and verdict from the judged rows, the notes from the list, the
-/// extras and the spot facts.
-fn assemble(spots: &G4Spots, measurements: Vec<Measurement>, extras: &RunExtras) -> GateReport {
+/// The report: the id and verdict from the extras and the judged rows, the notes from the
+/// list, the extras, the spot facts and the skipped nodes.
+fn assemble(
+    spots: &G4Spots,
+    measurements: Vec<Measurement>,
+    extras: &RunExtras,
+    skipped: &[String],
+) -> GateReport {
     let thresholds: BTreeMap<String, Threshold> = measurements
         .iter()
         .filter_map(|m| m.threshold.clone().map(|threshold| (m.id.clone(), threshold)))
         .collect();
     let pass = measurements.iter().filter(|m| m.threshold.is_some()).all(|m| m.pass == Some(true));
     GateReport {
-        report: REPORT_ID.to_owned(),
+        report: extras.report_id.clone(),
         r_ids: vec![R_ID.to_owned()],
         pass,
         thresholds,
         measurements,
-        notes: notes(spots, extras),
+        notes: notes(spots, extras, skipped),
     }
 }
 
-/// The notes: the mode, the oracle target, the list, the tree hash, the inputs and the
-/// per-spot facts, one sentence each.
-fn notes(spots: &G4Spots, extras: &RunExtras) -> String {
-    let gated = spots.spots.iter().filter(|spot| spot.gated).count();
-    let tree = spots.tree.tree_config().map_or_else(|err| err.to_string(), |t| tree_hash_hex(&t));
-    let mut lines = vec![format!(
-        "G4 oracle compare (R2.11). {ENGINE_MODE_LINE}; oracle solved to a mean gain of {} \
-         percent of the pot (O-162). Spot list {}: {} spots, {gated} gated; tree hash {tree}.",
-        spots.stop.oracle_target_pct_pot,
-        spots.id,
-        spots.spots.len()
-    )];
-    lines.extend(extras.inputs.iter().cloned());
-    lines.extend(extras.facts.iter().map(|facts| {
-        format!(
-            "Spot {}: stopped on {} after {} iterations in {:.1} s; gains oop {} ip {} percent \
-             of the pot.",
-            facts.id,
-            facts.stop_reason,
-            facts.iterations,
-            facts.seconds,
-            facts.gains_pct_pot[0],
-            facts.gains_pct_pot[1]
-        )
-    }));
-    lines.join(" ")
-}
-
 /// A measurement id: `g4/<spot>/<node>/<name>`.
-fn id(spot: &Spot, node: &str, name: &str) -> String {
+pub(super) fn id(spot: &Spot, node: &str, name: &str) -> String {
     format!("{ID_PREFIX}/{}/{node}/{name}", spot.id)
 }
 
 /// An informational row of a spot.
-fn informational(spot: &Spot, node: &str, name: &str, value: f64, unit: &str) -> Measurement {
+pub(super) fn informational(
+    spot: &Spot,
+    node: &str,
+    name: &str,
+    value: f64,
+    unit: &str,
+) -> Measurement {
     Measurement::informational(&id(spot, node, name), value, unit)
 }
 
@@ -366,13 +363,16 @@ fn accuracy_of(spot: &Spot, root: &DumpNode, side: &str) -> Result<f64, GateErro
     })
 }
 
-/// A key below the root on the root street: the root key followed by actions.
+/// A key below the root on the root street: the root key followed by actions and by no
+/// further street section. The river root that extends a turn root carries a section
+/// separator after it, so it is the river spot's root, not a deeper node of the turn spot.
 fn is_deeper(key: &str, root_key: &str) -> bool {
-    key.len() > root_key.len() && key.starts_with(root_key)
+    key.strip_prefix(root_key)
+        .is_some_and(|rest| !rest.is_empty() && !rest.contains(SECTION_SEPARATOR))
 }
 
-/// A byte count as a report value.
-#[allow(clippy::cast_precision_loss, reason = "byte counts stay far below 2^53")]
-fn bytes_as_f64(bytes: u64) -> f64 {
-    bytes as f64
+/// A node count as a report value.
+#[allow(clippy::cast_precision_loss, reason = "a spot's root street holds a few dozen nodes")]
+fn count_as_f64(count: usize) -> f64 {
+    count as f64
 }
