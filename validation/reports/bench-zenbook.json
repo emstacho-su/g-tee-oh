@@ -1,7 +1,8 @@
 {
   "report": "bench",
   "r_ids": [
-    "R0.10"
+    "R0.10",
+    "R2.13"
   ],
   "machine": {
     "name": "zenbook",
@@ -10,44 +11,57 @@
     "cores": 20,
     "memory_gb": 31
   },
-  "commit": "1f755251d1131755daee6c0a80066a816069c8e5",
-  "date": "2026-10-21T18:30:35.513Z",
+  "commit": "15a8c4da966ab62e01a3015b56f7f07575add407",
+  "date": "2026-10-22T00:26:44.039Z",
   "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "measurements": [
     {
       "id": "chunk_decode/postflop_1326_sparse",
-      "mean_ns": 170618.76092533732,
-      "median_ns": 164624.63037634408,
+      "mean_ns": 99366.58883235272,
+      "median_ns": 96530.68181818182,
       "unit": "ns",
-      "stub": false
+      "stub": false,
+      "p95_ns": 143631.81818181818
     },
     {
       "id": "chunk_decode/preflop_169",
-      "mean_ns": 170012.1904157447,
-      "median_ns": 169522.31805466948,
+      "mean_ns": 93948.52310279114,
+      "median_ns": 94299.33426151071,
       "unit": "ns",
-      "stub": false
+      "stub": false,
+      "p95_ns": 103317.04545454546
+    },
+    {
+      "id": "grade/warm_cache",
+      "mean_ns": 24836.052082575403,
+      "median_ns": 24092.04081632653,
+      "unit": "ns",
+      "stub": false,
+      "p95_ns": 31345.833333333332
     },
     {
       "id": "node_read/cold_cache",
-      "mean_ns": 152384.47667972575,
-      "median_ns": 152781.74603174604,
+      "mean_ns": 50236.60497389192,
+      "median_ns": 48556.27217329605,
       "unit": "ns",
-      "stub": false
+      "stub": false,
+      "p95_ns": 57740.350877192985
     },
     {
       "id": "node_read/warm_cache",
-      "mean_ns": 4652.185506074584,
-      "median_ns": 4420.249632404861,
+      "mean_ns": 2058.467134481679,
+      "median_ns": 2127.9292353310148,
       "unit": "ns",
-      "stub": false
+      "stub": false,
+      "p95_ns": 2292.5438596491226
     },
     {
       "id": "solve_iteration/simple_tree_flop",
-      "mean_ns": 45138197.5,
-      "median_ns": 43940050,
+      "mean_ns": 19815438.903746624,
+      "median_ns": 19766919.230769232,
       "unit": "ns",
-      "stub": false
+      "stub": false,
+      "p95_ns": 21000500
     }
   ]
 }

@@ -64,3 +64,49 @@ fn r2_8_cli_exit_codes_0_1_2() {
     assert_eq!(code(&packed), Some(0), "stderr: {}", String::from_utf8_lossy(&packed.stderr));
     assert!(out.join("preflop").join("cfg_6_online_100").is_dir(), "the solution was written");
 }
+
+/// The synthetic subcommand (R2.13, O-149): one seed writes one file, `pack` accepts it
+/// with `--synthetic`, and `verify` reads the packed library back within tolerance.
+#[test]
+fn r2_13_synthetic_dump_packs_and_reads_back() {
+    let scratch = tempfile::tempdir().expect("a scratch directory");
+    let dump = scratch.path().join("fixtures").join("synthetic-dump.json");
+    let dump_text = dump.to_str().expect("UTF-8");
+    let written = run(&["synthetic", "--seed", "7", "--nodes", "8", "--out", dump_text]);
+    assert_eq!(code(&written), Some(0), "stderr: {}", String::from_utf8_lossy(&written.stderr));
+    let stdout = String::from_utf8_lossy(&written.stdout);
+    assert!(stdout.contains("wrote 8 synthetic preflop nodes"), "stdout was {stdout}");
+    let first = fs::read(&dump).expect("the dump was written");
+    assert!(first.ends_with(b"\n"), "one trailing newline");
+    assert_eq!(
+        code(&run(&["synthetic", "--seed", "7", "--nodes", "8", "--out", dump_text])),
+        Some(0)
+    );
+    assert_eq!(fs::read(&dump).expect("rewritten"), first, "one seed, one file");
+
+    let bad = run(&[
+        "synthetic",
+        "--seed",
+        "7",
+        "--nodes",
+        "8",
+        "--out",
+        dump_text,
+        "--exported-at",
+        "x",
+    ]);
+    assert_eq!(code(&bad), Some(1), "a malformed timestamp is a rejection");
+
+    let out = scratch.path().join("library");
+    let out_text = out.to_str().expect("UTF-8");
+    let packed = run(&["pack", "--dump", dump_text, "--out", out_text, "--synthetic"]);
+    assert_eq!(code(&packed), Some(0), "stderr: {}", String::from_utf8_lossy(&packed.stderr));
+    let stdout = String::from_utf8_lossy(&packed.stdout);
+    let prefix = stdout.trim().rsplit(" as ").next().expect("the pack line names the prefix");
+    assert!(prefix.starts_with("preflop/"), "stdout was {stdout}");
+    let manifest = fs::read_to_string(out.join(prefix).join("manifest.json")).expect("a manifest");
+    assert!(manifest.contains("\"synthetic\": true"), "the library is marked synthetic (O-57)");
+
+    let verified = run(&["verify", "--library", out_text, "--prefix", prefix, "--dump", dump_text]);
+    assert_eq!(code(&verified), Some(0), "stderr: {}", String::from_utf8_lossy(&verified.stderr));
+}

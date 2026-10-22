@@ -1,21 +1,39 @@
 //! Environment configuration for `solver-query`. Nothing is required: `SOLVER_QUERY_BIND`
-//! defaults to `0.0.0.0:7070` (A5 section 1), `FIXTURE_LIBRARY_PATH` names the fixture
-//! library directory the health response reports (O-62), `QUERY_CACHE_BYTES` is the
-//! chunk cache budget a later session consumes, and `SOLVER_QUERY_LOG` selects the log
-//! format. A variable that is set but malformed is an error at startup that names the
-//! variable, so a typo never runs on a silent default. A variable set to the empty string
-//! counts as unset: that is what a blank `.env` line and compose's `${VAR:-}` interpolation
-//! produce, and the documented fallback (the default bind, no fixture library, no cache
-//! budget, text logs) is what an operator who left the value blank expects.
+//! defaults to `0.0.0.0:7070` (A5 section 1), `FIXTURE_LIBRARY_PATH` names the library
+//! directory the registry scans at startup and the health response reports (O-62, O-144),
+//! `QUERY_CACHE_BYTES` is the reader's chunk cache budget (`DEFAULT_QUERY_CACHE_BYTES`
+//! when unset), the `QUERY_DB_*` parts describe the query-role connection (`database`,
+//! O-146; without `QUERY_DB_PASSWORD` the database is `unconfigured`), and
+//! `SOLVER_QUERY_LOG` selects the log format. A variable that is set but malformed is an
+//! error at startup that names the variable, so a typo never runs on a silent default. A
+//! variable set to the empty string counts as unset: that is what a blank `.env` line and
+//! compose's `${VAR:-}` interpolation produce, and the documented fallback is what an
+//! operator who left the value blank expects.
+//!
+//! The password is the one secret and lives in `Password`, whose `Debug` shows
+//! `REDACTED_PASSWORD` (A9 section 3: the password is never logged); only
+//! `Password::expose` hands it to the pool, and no connection string is ever built or
+//! parsed here, so there is no form in which the password could escape the redaction.
 //!
 //! The reader takes a lookup function so unit tests never touch the process environment
 //! (mutating it is unsound across threads, and edition 2024 marks it unsafe).
+
+mod database;
 
 use std::ffi::OsString;
 use std::fmt;
 use std::net::{AddrParseError, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::num::ParseIntError;
 use std::path::PathBuf;
+
+use gto_library::DEFAULT_QUERY_CACHE_BYTES;
+
+pub use database::{
+    DATABASE_HOST_VAR, DATABASE_NAME_VAR, DATABASE_PASSWORD_VAR, DATABASE_PORT_VAR,
+    DATABASE_SSL_MODE_VAR, DATABASE_USER_VAR, DEFAULT_DATABASE_HOST, DEFAULT_DATABASE_NAME,
+    DEFAULT_DATABASE_PORT, DEFAULT_DATABASE_USER, DatabaseConfig, Password, REDACTED_PASSWORD,
+    SslMode,
+};
 
 /// Variable naming the listen address, `host:port`.
 pub const BIND_VAR: &str = "SOLVER_QUERY_BIND";
@@ -44,8 +62,10 @@ pub struct Config {
     pub bind: SocketAddr,
     /// The fixture library directory, when configured.
     pub fixture_library_path: Option<PathBuf>,
-    /// The chunk cache budget in bytes, when configured.
+    /// The chunk cache budget in bytes, when configured; see [`Config::cache_bytes`].
     pub query_cache_bytes: Option<u64>,
+    /// The query-role connection parts, when `QUERY_DB_PASSWORD` is set (O-146).
+    pub database: Option<DatabaseConfig>,
     /// Whether logs are emitted as JSON lines.
     pub log_json: bool,
 }
@@ -66,6 +86,18 @@ pub enum Error {
         value: String,
         /// The parse failure.
         source: ParseIntError,
+    },
+    /// `QUERY_DB_PORT` is not a port number.
+    InvalidDatabasePort {
+        /// The value as set.
+        value: String,
+        /// The parse failure.
+        source: ParseIntError,
+    },
+    /// `QUERY_DB_SSLMODE` is not one of libpq's `sslmode` words (see [`SslMode`]).
+    InvalidDatabaseSslMode {
+        /// The value as set.
+        value: String,
     },
     /// `SOLVER_QUERY_LOG` is neither `json` nor `text`.
     InvalidLogFormat {
@@ -88,6 +120,13 @@ impl fmt::Display for Error {
             Self::InvalidCacheBytes { value, source } => {
                 write!(f, "{CACHE_BYTES_VAR}={value:?} is not a byte count: {source}")
             }
+            Self::InvalidDatabasePort { value, source } => {
+                write!(f, "{DATABASE_PORT_VAR}={value:?} is not a port number: {source}")
+            }
+            Self::InvalidDatabaseSslMode { value } => {
+                let words = SslMode::words();
+                write!(f, "{DATABASE_SSL_MODE_VAR}={value:?} is not one of {words}")
+            }
             Self::InvalidLogFormat { value } => {
                 write!(f, "{LOG_FORMAT_VAR}={value:?} is neither json nor text")
             }
@@ -100,8 +139,12 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::InvalidBind { source, .. } => Some(source),
-            Self::InvalidCacheBytes { source, .. } => Some(source),
-            Self::InvalidLogFormat { .. } | Self::NotUnicode { .. } => None,
+            Self::InvalidCacheBytes { source, .. } | Self::InvalidDatabasePort { source, .. } => {
+                Some(source)
+            }
+            Self::InvalidDatabaseSslMode { .. }
+            | Self::InvalidLogFormat { .. }
+            | Self::NotUnicode { .. } => None,
         }
     }
 }
@@ -137,12 +180,19 @@ impl Config {
             }
             None => None,
         };
+        let database = database::read(&lookup)?;
         let log_json = match unicode(&lookup, LOG_FORMAT_VAR)?.as_deref() {
             Some("json") => true,
             None | Some("text") => false,
             Some(other) => return Err(Error::InvalidLogFormat { value: other.to_owned() }),
         };
-        Ok(Self { bind, fixture_library_path, query_cache_bytes, log_json })
+        Ok(Self { bind, fixture_library_path, query_cache_bytes, database, log_json })
+    }
+
+    /// The chunk cache budget: `QUERY_CACHE_BYTES`, or the library default when unset.
+    #[must_use]
+    pub fn cache_bytes(&self) -> u64 {
+        self.query_cache_bytes.unwrap_or(DEFAULT_QUERY_CACHE_BYTES)
     }
 }
 
@@ -170,9 +220,15 @@ mod tests {
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
+    use gto_library::DEFAULT_QUERY_CACHE_BYTES;
+
     use super::{
-        BIND_VAR, CACHE_BYTES_VAR, Config, DEFAULT_BIND, Error, FIXTURE_LIBRARY_VAR, LOG_FORMAT_VAR,
+        BIND_VAR, CACHE_BYTES_VAR, Config, DATABASE_PASSWORD_VAR, DEFAULT_BIND,
+        DEFAULT_DATABASE_HOST, Error, FIXTURE_LIBRARY_VAR, LOG_FORMAT_VAR,
     };
+
+    /// A dev placeholder password, never a real secret.
+    const PASSWORD: &str = "change-me-query";
 
     fn lookup<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<OsString> + 'a {
         move |name| {
@@ -187,6 +243,8 @@ mod tests {
         assert_eq!(config.bind.to_string(), "0.0.0.0:7070");
         assert_eq!(config.fixture_library_path, None);
         assert_eq!(config.query_cache_bytes, None);
+        assert_eq!(config.cache_bytes(), DEFAULT_QUERY_CACHE_BYTES);
+        assert_eq!(config.database, None);
         assert!(!config.log_json);
     }
 
@@ -196,6 +254,7 @@ mod tests {
             (BIND_VAR, "127.0.0.1:7071"),
             (FIXTURE_LIBRARY_VAR, "/fixtures/library"),
             (CACHE_BYTES_VAR, "268435456"),
+            (DATABASE_PASSWORD_VAR, PASSWORD),
             (LOG_FORMAT_VAR, "json"),
         ]))
         .expect("every value is well formed");
@@ -203,6 +262,10 @@ mod tests {
         assert_eq!(config.bind, expected);
         assert_eq!(config.fixture_library_path, Some(PathBuf::from("/fixtures/library")));
         assert_eq!(config.query_cache_bytes, Some(268_435_456));
+        assert_eq!(config.cache_bytes(), 268_435_456);
+        let database = config.database.expect("a password configures the database");
+        assert_eq!(database.password.expose(), PASSWORD);
+        assert_eq!(database.host, DEFAULT_DATABASE_HOST, "the other parts default");
         assert!(config.log_json);
     }
 
@@ -212,12 +275,14 @@ mod tests {
             (BIND_VAR, ""),
             (FIXTURE_LIBRARY_VAR, ""),
             (CACHE_BYTES_VAR, ""),
+            (DATABASE_PASSWORD_VAR, ""),
             (LOG_FORMAT_VAR, ""),
         ]))
         .expect("an empty value is the documented fallback, not a malformed value");
         assert_eq!(config.bind, DEFAULT_BIND);
         assert_eq!(config.fixture_library_path, None);
         assert_eq!(config.query_cache_bytes, None);
+        assert_eq!(config.database, None);
         assert!(!config.log_json);
     }
 

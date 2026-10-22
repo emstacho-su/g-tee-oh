@@ -11,9 +11,10 @@ use std::ffi::OsString;
 use std::path::Path;
 use std::process::ExitCode;
 
+use solver_query::app::{AppState, app_with};
 use solver_query::cli::{self, Command, USAGE};
 use solver_query::config::Config;
-use solver_query::{app, openapi, probe, server};
+use solver_query::{openapi, probe, server};
 
 /// Exit status for a usage error, the value shell conventions reserve for it.
 const EXIT_USAGE: u8 = 2;
@@ -47,16 +48,11 @@ fn serve() -> ExitCode {
 }
 
 /// Writes the `OpenAPI` document to `out` from this process (O-116: never a redirection).
-/// The document comes from the same `app()` the server mounts, so a malformed environment
-/// variable fails here the way it would fail `serve`.
+/// The document comes from the same `app_with` the server mounts, over an empty state: the
+/// routes describe themselves, so no library scan, pool or environment is needed (plan
+/// A.7), and `just contracts` runs without a fixture library or a database.
 fn write_openapi(out: &Path) -> ExitCode {
-    let (_router, document) = match app::app() {
-        Ok(parts) => parts,
-        Err(error) => {
-            eprintln!("solver-query openapi: {error}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let (_router, document) = app_with(AppState::empty());
     match openapi::write_document(&document, out) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

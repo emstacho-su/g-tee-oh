@@ -8,11 +8,13 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Edges (A1 section 2): gto-library only. The library has no path to gto-solve or the vendored
-# engine (O-101), so this read service cannot start a solve (ADR 0018); just rust-boundary proves
-# it on the package alone and on the workspace-wide graph.
+# Edges (A1 section 2): gto-library and gto-model only. The library has no path to gto-solve or
+# the vendored engine (O-101), so this read service cannot start a solve (ADR 0018); just
+# rust-boundary proves it on the package alone and on the workspace-wide graph. gto-model is the
+# vocabulary of the contract (node keys, hands, positions, buckets, the grading floor constants).
 [dependencies]
 gto-library = { workspace = true }
+gto-model = { workspace = true }
 
 # Web service stack (S06, R0.7): axum on tokio, utoipa for the OpenAPI document, tracing for logs.
 axum = { workspace = true }
@@ -24,10 +26,35 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# In-process request tests (tower::ServiceExt::oneshot) and response body collection.
+# The query-role connection (O-28, O-146): a lazy pool as query_login with runtime-checked
+# queries (O-147). lru bounds the deal store (O-152) and sha2 derives deal ids from the seed
+# and the filter (plan C.4); both are already in the workspace graph through gto-library.
+# None of them leads to gto-solve, which just rust-boundary confirms.
+sqlx = { workspace = true }
+lru = { workspace = true }
+sha2 = { workspace = true }
+
+# In-process request tests (tower::ServiceExt::oneshot) and response body collection, plus the
+# packed synthetic fixture the integration tests build in a temporary directory (plan C.9, O-149):
+# gto-library's synthetic generator, library-pack's dump export and pack, and tempfile. None of
+# them reaches gto-solve, and dev-dependencies are outside the normal graph rust-boundary checks.
 [dev-dependencies]
 tower = { workspace = true }
 http-body-util = { workspace = true }
+gto-library = { workspace = true, features = ["synthetic"] }
+library-pack = { path = "../../tools/library-pack" }
+tempfile = { workspace = true }
+# Benchmark harness (R0.10, O-154): the same criterion line as gto-library, 0.7 inside the
+# 1.85 rust-version floor, default features off since only the `cargo bench` argument
+# handling is wanted.
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+
+# criterion supplies its own main, so the libtest harness is off (just bench, R0.10). The
+# bench grades through the router over the packed synthetic fixture (plan D.7), which the
+# dev-dependency on gto-library's synthetic feature already provides.
+[[bench]]
+name = "grade"
+harness = false
 
 [lints]
 workspace = true

@@ -7,7 +7,7 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
-use crate::app::{AppState, app_with};
+use crate::app::{AppState, StartError, app_with};
 use crate::config::{self, Config};
 use crate::logging;
 
@@ -18,6 +18,8 @@ pub enum Error {
     Config(config::Error),
     /// The log subscriber could not be installed.
     Logging(logging::Error),
+    /// The application state could not be built (a rejected database part or no runtime).
+    Start(StartError),
     /// The async runtime could not be built.
     Runtime(io::Error),
     /// The listen address could not be bound.
@@ -36,6 +38,7 @@ impl fmt::Display for Error {
         match self {
             Self::Config(source) => write!(f, "configuration: {source}"),
             Self::Logging(source) => write!(f, "logging: {source}"),
+            Self::Start(source) => write!(f, "startup: {source}"),
             Self::Runtime(source) => write!(f, "cannot start the async runtime: {source}"),
             Self::Bind { address, source } => write!(f, "cannot bind {address}: {source}"),
             Self::Serve(source) => write!(f, "server failed: {source}"),
@@ -48,6 +51,7 @@ impl std::error::Error for Error {
         match self {
             Self::Config(source) => Some(source),
             Self::Logging(source) => Some(source),
+            Self::Start(source) => Some(source),
             Self::Runtime(source) | Self::Serve(source) | Self::Bind { source, .. } => Some(source),
         }
     }
@@ -70,17 +74,18 @@ pub fn run() -> Result<(), Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Bind`] when the address cannot be bound and [`Error::Serve`] when
-/// the accept loop fails.
+/// Returns [`Error::Start`] when the state cannot be built, [`Error::Bind`] when the
+/// address cannot be bound and [`Error::Serve`] when the accept loop fails.
 pub async fn serve(config: &Config) -> Result<(), Error> {
     tracing::info!(
         bind = %config.bind,
         fixture_library_path = ?config.fixture_library_path,
-        query_cache_bytes = ?config.query_cache_bytes,
+        query_cache_bytes = config.cache_bytes(),
+        database = ?config.database,
         "starting {}",
         crate::version_line()
     );
-    let (router, _document) = app_with(AppState::from(config));
+    let (router, _document) = app_with(AppState::from_config(config).map_err(Error::Start)?);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|source| Error::Bind { address: config.bind, source })?;

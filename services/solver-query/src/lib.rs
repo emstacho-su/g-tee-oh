@@ -10,16 +10,34 @@
 //! health check runs (`probe`). `src/main.rs` only maps a parsed command to one of them.
 //!
 //! S06 lands the skeleton: `GET /healthz` (A5 section 2) and the document export that
-//! `just contracts` commits (R0.7, O-116).
+//! `just contracts` commits (R0.7, O-116). S16 adds the contract for every A5 section 2
+//! route (`api`, the data transfer objects (DTOs); `error`, the problem bodies; `routes`,
+//! one handler per path) and the implementations behind it (R2.13 to R2.15): the library
+//! registry over `FIXTURE_LIBRARY_PATH` (`library`), hand parsing (`hand`), the
+//! request-id and latency middleware (`middleware`), and one module per lane of the S16
+//! plan: `grade` (lane A), `equity` and `insights` (lane B), `rng` and `deal` (lane C),
+//! `db` and `metrics` (lane D). Every module is declared here so no lane edits this file.
 
 #![forbid(unsafe_code)]
 
+pub mod api;
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod db;
+pub mod deal;
+pub mod equity;
+pub mod error;
+pub mod grade;
+pub mod hand;
+pub mod insights;
+pub mod library;
 pub mod logging;
+pub mod metrics;
+pub mod middleware;
 pub mod openapi;
 pub mod probe;
+pub mod rng;
 pub mod routes;
 pub mod server;
 
@@ -29,8 +47,11 @@ pub const SERVICE_NAME: &str = env!("CARGO_PKG_NAME");
 /// The binary's package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Internal crates this binary links (A1 section 2), named so the edges are exercised.
-pub const LINKS: &[&str] = &[gto_library::CRATE_NAME];
+/// The workspace crates this binary links (A1 section 2), named so the edges are
+/// exercised: the read-only face of `gto-library` and the contract vocabulary of
+/// `gto-model`. Third-party crates (sqlx, lru, sha2) are not workspace links, and
+/// `tests/boundary.rs` holds this list to the manifest.
+pub const LINKS: &[&str] = &[gto_library::CRATE_NAME, gto_model::CRATE_NAME];
 
 /// The one line `solver-query version` prints (the R0.1 smoke test reads it).
 #[must_use]
@@ -46,7 +67,7 @@ mod tests {
     fn r0_1_version_line_names_the_crate_and_its_links() {
         let line = version_line();
         assert!(line.starts_with(&format!("{SERVICE_NAME} {VERSION} ")), "line was {line}");
-        assert!(line.contains("gto-library"), "line was {line}");
+        assert!(line.ends_with("(links gto-library, gto-model)"), "line was {line}");
         assert!(!line.contains('\n'), "line was {line}");
     }
 }

@@ -58,6 +58,10 @@ COPY crates ./crates
 COPY services/solver-query ./services/solver-query
 COPY services/library-builder ./services/library-builder
 COPY tools ./tools
+# O-148: solver-query embeds the 169 by 169 preflop equity table at build time (include_str!
+# in services/solver-query/src/equity.rs), so this one directory of validation/ enters the
+# context; .dockerignore keeps the reports out and nothing else of validation/ is copied.
+COPY validation/fixtures/equity ./validation/fixtures/equity
 
 # BuildKit cache mounts keep the crate registry and the target directory between builds.
 # The target cache is keyed by service and architecture so parallel platform builds never
@@ -104,7 +108,9 @@ EXPOSE 7070
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 CMD ["/usr/local/bin/solver-query", "healthz"]
 
 # Environment (names from .env.example): DATABASE_URL is not used here; the service reads
-# under the query role (O-28) through QUERY_DB_PASSWORD, the library bucket through
-# S3_ENDPOINT and S3_LIBRARY_*, the fixture library through FIXTURE_LIBRARY_PATH (O-62) and
-# its chunk cache budget through QUERY_CACHE_BYTES. Compose supplies them; nothing is baked in.
+# under the query role (O-28) from the QUERY_DB_* parts (host, port, name, user, password,
+# sslmode; O-146), the library bucket through S3_ENDPOINT and S3_LIBRARY_* (unused
+# until the S3 adapter of O-144), the fixture library through FIXTURE_LIBRARY_PATH (O-62)
+# and its chunk cache budget through QUERY_CACHE_BYTES. Compose supplies them; nothing is
+# baked in.
 ENTRYPOINT ["/usr/local/bin/solver-query"]

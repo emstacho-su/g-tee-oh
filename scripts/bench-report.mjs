@@ -5,13 +5,17 @@
 //
 // Mechanism: criterion writes target/criterion/<group>/<function>/new/estimates.json after
 // every run, with the mean and the median of the measured time as point estimates in
-// nanoseconds, and benchmark.json beside it carrying the full bench id "<group>/<function>".
-// This script walks target/criterion for every new/estimates.json, reads both files, adds
-// the machine, the commit and the toolchain, and writes the report. It refuses to write when
-// no estimate exists, so `just bench` cannot produce an empty report, and when one of the
-// five R0.10 ids is missing, so a partial run cannot overwrite a complete baseline.
-// `just bench` runs it after `cargo bench -p gto-solve -p gto-library --features
-// gto-library/synthetic`; Node only, no npm packages.
+// nanoseconds, benchmark.json beside it carrying the full bench id "<group>/<function>", and
+// sample.json with every sample's iteration count and total time. This script walks
+// target/criterion for every new/estimates.json, reads the three files, adds the machine,
+// the commit and the toolchain, and writes the report. A measurement carries p95_ns, the
+// nearest-rank 95th percentile of the per-iteration times, whenever sample.json is there
+// (plan D.7, O-154): scripts/check-reports.mjs holds grade/warm_cache to the 30 ms budget
+// of A9 section 6 (O-86). It refuses to write when no estimate exists, so `just bench`
+// cannot produce an empty report, and when one of the six ids (five R0.10, one R2.13) is
+// missing, so a partial run cannot overwrite a complete baseline. `just bench` runs it after
+// `cargo bench -p gto-solve -p gto-library -p solver-query --features gto-library/synthetic`;
+// Node only, no npm packages.
 //
 // BENCH_MACHINE=<name> changes the machine name and the output file name; the default is
 // zenbook (the Mac baseline from S20 onward uses another name).
@@ -23,14 +27,16 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const REPORT_KIND = "bench";
-export const R_IDS = ["R0.10"];
+export const R_IDS = ["R0.10", "R2.13"];
 export const DEFAULT_MACHINE = "zenbook";
-// The three targets A9 section 1 names, by criterion id, sorted: S14 replaced the two stubs
-// with two chunk decode ids (R2.7, one dense preflop frame and one sparse flop frame) and two
-// node read ids (a cache hit and a cache miss).
+// The three targets A9 section 1 names plus the grade bench, by criterion id, sorted: S14
+// replaced the two stubs with two chunk decode ids (R2.7, one dense preflop frame and one
+// sparse flop frame) and two node read ids (a cache hit and a cache miss); S16 added one
+// POST /v1/grade through the solver-query router (R2.13, O-154).
 export const EXPECTED_IDS = [
   "chunk_decode/postflop_1326_sparse",
   "chunk_decode/preflop_169",
+  "grade/warm_cache",
   "node_read/cold_cache",
   "node_read/warm_cache",
   "solve_iteration/simple_tree_flop",
@@ -38,7 +44,10 @@ export const EXPECTED_IDS = [
 const STUB_SUFFIX = "/stub";
 const ESTIMATES_FILE = "estimates.json";
 const BENCHMARK_FILE = "benchmark.json";
+const SAMPLE_FILE = "sample.json";
 const LATEST_RUN_DIR = "new";
+/** The percentile the p95 field reports, as a fraction of the sorted sample. */
+const P95_FRACTION = 0.95;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const BYTES_PER_GIB = 2 ** 30;
 const NS_PER_US = 1e3;
@@ -97,23 +106,60 @@ function pointEstimate(estimates, field, path) {
   return value;
 }
 
-/** One measurement from an estimates.json and the benchmark.json beside it. */
+/**
+ * The nearest-rank 95th percentile of the per-iteration times of a criterion sample.json
+ * ({ iters: number[], times: number[] }, each sample's iteration count and its total time
+ * in nanoseconds), so one iteration's time is times[k] / iters[k]. Nearest rank: the value at
+ * position ceil(0.95 n) of the ascending sorted times, the 19th of 20. Throws on a sample
+ * with no entries or with mismatched arrays, since no percentile exists then.
+ */
+export function p95Ns(sample) {
+  const iters = sample?.iters;
+  const times = sample?.times;
+  if (!Array.isArray(iters) || !Array.isArray(times) || iters.length !== times.length) {
+    throw new ReportError("sample.json: iters and times must be arrays of the same length");
+  }
+  if (times.length === 0) {
+    throw new ReportError("sample.json: no sample to take a percentile of");
+  }
+  const perIteration = times.map((total, k) => {
+    const count = iters[k];
+    if (typeof total !== "number" || typeof count !== "number" || !(count > 0)) {
+      throw new ReportError(`sample.json: sample ${k} is not a time over a positive count`);
+    }
+    return total / count;
+  });
+  perIteration.sort((a, b) => a - b);
+  const rank = Math.ceil(P95_FRACTION * perIteration.length);
+  return perIteration[rank - 1];
+}
+
+/**
+ * One measurement from an estimates.json and the benchmark.json beside it, with p95_ns when
+ * criterion's sample.json sits beside them too.
+ */
 export function readMeasurement(estimatesPath, root) {
   const estimates = readJson(estimatesPath);
-  const benchmarkPath = join(dirname(estimatesPath), BENCHMARK_FILE);
+  const runDir = dirname(estimatesPath);
+  const benchmarkPath = join(runDir, BENCHMARK_FILE);
   const id = existsSync(benchmarkPath)
     ? readJson(benchmarkPath).full_id
     : idFromPath(estimatesPath, root);
   if (typeof id !== "string" || id.length === 0) {
     throw new ReportError(`${benchmarkPath}: full_id is missing`);
   }
-  return {
+  const measurement = {
     id,
     mean_ns: pointEstimate(estimates, "mean", estimatesPath),
     median_ns: pointEstimate(estimates, "median", estimatesPath),
     unit: "ns",
     stub: id.endsWith(STUB_SUFFIX),
   };
+  const samplePath = join(runDir, SAMPLE_FILE);
+  if (!existsSync(samplePath)) {
+    return measurement;
+  }
+  return { ...measurement, p95_ns: p95Ns(readJson(samplePath)) };
 }
 
 /**
@@ -235,7 +281,10 @@ function main() {
 
   for (const m of measurements) {
     const tag = m.stub ? " (stub)" : "";
-    console.log(`bench-report: ${m.id}${tag} mean ${formatDuration(m.mean_ns)} median ${formatDuration(m.median_ns)}`);
+    const p95 = typeof m.p95_ns === "number" ? ` p95 ${formatDuration(m.p95_ns)}` : "";
+    const mean = formatDuration(m.mean_ns);
+    const median = formatDuration(m.median_ns);
+    console.log(`bench-report: ${m.id}${tag} mean ${mean} median ${median}${p95}`);
   }
   console.log(`bench-report: wrote ${displayPath(outPath)} at ${report.commit.slice(0, 7)} (${R_IDS.join(", ")})`);
 }

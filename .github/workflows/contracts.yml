@@ -2,7 +2,7 @@
 # (the utoipa and Zod OpenAPI documents, the openapi-typescript clients, the Kysely types from the
 # migrated database, the schema copies under crates/gto-library) and the job fails on any diff or
 # untracked file, so a contract change is always a visible, committed diff (A1 section 3). The
-# sqlx offline check runs once a crate carries a query.
+# sqlx offline check runs once a crate calls a query macro; sqlx-cli is installed for it (O-147).
 name: contracts
 
 on:
@@ -56,6 +56,13 @@ jobs:
         run: just db-migrate
       - name: Regenerate the contracts (utoipa, Zod, openapi-typescript, Kysely, schema copies)
         run: just contracts
+      # O-147: scripts/sqlx-check.mjs runs cargo sqlx prepare --check once a crate calls a
+      # query macro, so the tool is on the runner before that day comes; solver-query's queries
+      # are runtime-checked today and the step reports that and passes.
+      - name: Install sqlx-cli (O-147)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
       - name: sqlx offline metadata
         run: just sqlx-check
       - name: Fail on an uncommitted diff

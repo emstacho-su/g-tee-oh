@@ -42,6 +42,7 @@
 //!   `ConfigId` grammar and the eleven-row v1 catalog, mirrored from the database seed.
 //! - `buckets` (R2.3; ADR 0008, 05 section 6.4, ADR 0020): `Bucket` and the percent-of-pot
 //!   edge table.
+//! - `grading` (R2.13; ADR 0004, O-22, O-150): the grading floor beside its constants.
 //!
 //! The two R0.11 vectors, the bucket-edge table and the node-key round trip, live under
 //! `tests/r0_11_vectors.rs`; the property tests live under `tests/props.rs`.
@@ -56,6 +57,7 @@
 pub mod buckets;
 pub mod cards;
 pub mod config;
+pub mod grading;
 pub mod index;
 pub mod iso;
 pub mod iso_table;
@@ -68,6 +70,7 @@ pub mod types;
 pub use buckets::{Bucket, bucket_for};
 pub use cards::{Board, Card, Flop, Rank, Suit, format_cards, parse_cards};
 pub use config::v1_configs;
+pub use grading::{Floor, FloorSource, NOISE_FLOOR_PCT_POT, floor_pct_pot};
 pub use index::{ComboId, HandClass, HandClassKind};
 pub use iso::{SuitPermutation, TextureFamily, canonical_board, canonical_flop, is_canonical_flop};
 pub use iso_table::{

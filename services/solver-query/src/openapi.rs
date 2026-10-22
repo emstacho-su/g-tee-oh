@@ -1,6 +1,7 @@
-//! The `OpenAPI` document `solver-query` publishes (R0.7, O-116). `ApiDoc` carries the info
-//! block; the paths come from the router in `app`, so the two cannot drift. The committed
-//! copy lives at `packages/contracts/solver-query.openapi.json`, written by
+//! The `OpenAPI` document `solver-query` publishes (R0.7, R2.13, O-38, O-116). `ApiDoc`
+//! carries the info block and the tags; the paths come from the router in `app`, so the
+//! two cannot drift. The committed copy lives at
+//! `packages/contracts/solver-query.openapi.json`, written by
 //! `solver-query openapi --out <path>` from this process. The pipeline never shell
 //! redirects, because PowerShell `>` emits UTF-16.
 
@@ -11,13 +12,28 @@ use std::path::{Path, PathBuf};
 
 use utoipa::OpenApi;
 
-/// The info block of the document. The version is `CARGO_PKG_VERSION`, which the derive
-/// reads from the crate manifest.
+/// The info block and the tags of the document. The version is `CARGO_PKG_VERSION`,
+/// which the derive reads from the crate manifest. One tag per A5 section 2 area.
 #[derive(OpenApi)]
-#[openapi(info(
-    title = "solver-query",
-    description = "Read-only query service over the solutions library; it never solves (ADR 0018)."
-))]
+#[openapi(
+    info(
+        title = "solver-query",
+        description = "Read-only query service over the solutions library; it never solves \
+            (ADR 0018). Errors are RFC 9457 problem details (application/problem+json)."
+    ),
+    tags(
+        (name = "nodes", description = "One node of one solution (GET /v1/nodes)"),
+        (
+            name = "grade",
+            description = "Grade one decision with the preflop floor (POST /v1/grade)"
+        ),
+        (name = "insights", description = "E3 insight data for one hand (GET /v1/insights)"),
+        (name = "deal", description = "Seeded server-side deals and street reveals"),
+        (name = "sample-action", description = "The opponent's action at a node"),
+        (name = "coverage", description = "What the library holds (GET /v1/coverage)"),
+        (name = "ops", description = "Health and metrics"),
+    )
+)]
 pub struct ApiDoc;
 
 /// Why the document could not be written.
@@ -93,5 +109,14 @@ mod tests {
         assert!(json.ends_with('\n'));
         assert!(!json.ends_with("\n\n"));
         assert!(json.starts_with("{\n"), "pretty printed, got {json:.20}");
+    }
+
+    #[test]
+    fn r2_13_openapi_declares_one_tag_per_a5_area() {
+        let document = ApiDoc::openapi();
+        let tags: Vec<String> =
+            document.tags.iter().flatten().map(|tag| tag.name.clone()).collect();
+        let expected = ["nodes", "grade", "insights", "deal", "sample-action", "coverage", "ops"];
+        assert_eq!(tags, expected.map(str::to_owned).to_vec());
     }
 }

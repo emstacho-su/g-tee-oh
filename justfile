@@ -31,6 +31,10 @@ rust-test:
 rust-boundary:
     node scripts/check-boundary.mjs
 
+# TypeScript boundary: api never resolves, names or spawns the builder (R2.15, O-157)
+ts-boundary:
+    node scripts/check-api-boundary.mjs
+
 # ESLint across the pnpm workspace, then the root scripts (guard/, scripts/) that pnpm -r does not reach
 ts-lint:
     pnpm -r --if-present lint
@@ -173,9 +177,9 @@ docs-mirror:
 hooks:
     git config core.hooksPath .githooks
 
-# Benchmark harness: solve iteration, chunk decode, node read; writes validation/reports/bench-zenbook.json (R0.10)
+# Benchmark harness: solve iteration, chunk decode, node read, grade; writes validation/reports/bench-zenbook.json (R0.10, R2.13)
 bench:
-    cargo bench -p gto-solve -p gto-library --features gto-library/synthetic
+    cargo bench -p gto-solve -p gto-library -p solver-query --features gto-library/synthetic
     node scripts/bench-report.mjs
 
 # Release build: the three scenarios pack in seconds there and in minutes in debug (O-134).
@@ -184,10 +188,27 @@ library-size-estimate:
     cargo run --release -p library-pack -- estimate --seed 7 \
         --out validation/reports/library-size-estimate.md
 
+FIXTURE_DUMP := "target/fixtures/synthetic-dump.json"
+FIXTURE_LIBRARY := "target/fixtures/library"
+
+# A seeded synthetic dump packed into target/fixtures/library for the dev profile (O-149);
+# set FIXTURE_LIBRARY_PATH=target/fixtures/library in .env to serve it. Nothing binary is
+# committed; S19 fills validation/fixtures/library. Release, as pack is slow in debug (O-134).
+# Synthetic fixture library: library-pack synthetic, then pack into target/fixtures (R2.13, O-149)
+fixture-synthetic:
+    cargo run --release -p library-pack -- synthetic --seed 7 --nodes 256 --out {{FIXTURE_DUMP}}
+    cargo run --release -p library-pack -- pack --dump {{FIXTURE_DUMP}} \
+        --out {{FIXTURE_LIBRARY}} --synthetic
+
 # Line coverage of gto-library and library-pack at the 80% gate (O-134); needs cargo-llvm-cov
 coverage-library:
     cargo llvm-cov -p gto-library -p library-pack --features gto-library/synthetic \
         --ignore-filename-regex "(gto-model|vendor|gto-solve)" --fail-under-lines 80
+
+# Line coverage of solver-query at the 80% gate (O-134, plan D.9); needs cargo-llvm-cov
+coverage-solver-query:
+    cargo llvm-cov -p solver-query --features gto-library/synthetic \
+        --ignore-filename-regex "(gto-model|gto-library|library-pack|vendor|gto-solve)" --fail-under-lines 80
 
 # The validate tool solves the toy games and writes g1-kuhn, g2-akq and g3-leduc as JSON
 # (JavaScript Object Notation) with Markdown twins; --machine, else VALIDATE_MACHINE, else
@@ -220,4 +241,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test ts-boundary report-check licenses security guard-test test-tags

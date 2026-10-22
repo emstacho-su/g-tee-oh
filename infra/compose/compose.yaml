@@ -120,7 +120,17 @@ x-solver-query: &solver-query
     # The container path is fixed; the host side of the bind mount below comes from FIXTURE_LIBRARY_PATH
     FIXTURE_LIBRARY_PATH: /fixtures/library
     QUERY_CACHE_BYTES: ${QUERY_CACHE_BYTES:?set QUERY_CACHE_BYTES in .env}
+    # O-146: the query-role connection from its parts, never a connection string. The service
+    # builds the connection with sqlx's options builder, so .env keeps one password per role
+    # (O-28), a password with a URL-significant character (@ / ? # %) needs no percent-encoding
+    # and nothing that holds the password is ever logged. The host is this service's name (the
+    # binary's default, 127.0.0.1, fits a run on the host) and sslmode is off on the private
+    # network gto; port, database and login keep the binary's defaults (5432, gto, query_login).
+    # The service opens its pool lazily, so no depends_on postgres is needed: it starts before
+    # Postgres is healthy and /healthz reports the database block once it answers.
+    QUERY_DB_HOST: postgres
     QUERY_DB_PASSWORD: ${QUERY_DB_PASSWORD:?set QUERY_DB_PASSWORD in .env}
+    QUERY_DB_SSLMODE: disable
   volumes:
     # O-62: the host directory from .env, read-only; empty or unset falls back to the placeholder directory
     # (its README says what S19 puts there). Relative to the project directory, which is the repo root.
