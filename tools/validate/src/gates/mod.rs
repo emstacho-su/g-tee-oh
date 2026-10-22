@@ -4,7 +4,10 @@
 //! hands back a [`GateReport`], its own data only. This file is shared: it dispatches to
 //! the gate files and attaches the run context when the reports are written. `g1.rs`
 //! (Kuhn), `g2.rs` (AKQ, ace king queen, and the polar river toy) and `g3.rs` (Leduc
-//! against the committed `OpenSpiel` curve, O-30) are each owned by one agent.
+//! against the committed `OpenSpiel` curve, O-30) are each owned by one agent. `g4.rs` is
+//! the oracle gate G4 (R2.11): a compare of two node dumps rather than a toy solve, run
+//! by the `g4` subcommand and never by `gates`, since its report is private (O-170); the
+//! `Gate` enum therefore stays G1 to G3.
 //!
 //! Mechanism. [`run_gate`] loads the fixtures a gate needs and calls its `run`;
 //! [`write_gate_reports`] does that for a list of gates, wraps each [`GateReport`] in the
@@ -16,11 +19,10 @@
 //! share live here too: [`required_tolerance`] reads a tolerance and refuses one in the
 //! wrong unit, [`resolve_frequencies`] reads every strategy fact of a case from a solved
 //! game, and `iterations_as_f64` turns an iteration count into a report value. Nothing
-//! here panics on a bad fixture: every failure is a [`GateError`] naming the fixture,
-//! the case, the field or the fact.
+//! here panics on a bad fixture: every failure is a [`GateError`] (the `error` child
+//! module) naming the fixture, the case, the field, the fact, the dump or the spot.
 
 use std::collections::BTreeMap;
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use gto_solve::toy::ToySolution;
@@ -28,11 +30,16 @@ use gto_solve::toy::ToySolution;
 use crate::fixtures::openspiel::OpenSpielCurve;
 use crate::fixtures::toy_game::{Case, Tolerance, ToyGameFixture};
 use crate::fixtures::{FIXTURES_RELATIVE_TO_REPO_ROOT, FixtureError};
-use crate::report::{self, Context, Measurement, Report, ReportError, Threshold};
+use crate::report::{self, Context, Measurement, Report, Threshold};
 
+mod error;
 pub mod g1;
 pub mod g2;
 pub mod g3;
+pub mod g4;
+pub mod g4_engine;
+
+pub use error::GateError;
 
 /// One of the three toy-game gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,86 +134,6 @@ pub struct SolvedCase {
     pub frequencies: BTreeMap<String, f64>,
     /// The solved value of each ratio fact, keyed by the fact id.
     pub ratios: BTreeMap<String, f64>,
-}
-
-/// Why a gate could not run.
-#[derive(Debug)]
-pub enum GateError {
-    /// A fixture failed to load.
-    Fixture(FixtureError),
-    /// The fixture id names no gate this crate solves.
-    UnsupportedFixture {
-        /// The fixture id.
-        fixture: String,
-    },
-    /// The case id names no game the gate models.
-    UnknownCase {
-        /// The fixture id.
-        fixture: String,
-        /// The case id.
-        case: String,
-    },
-    /// A fact of the fixture resolves to nothing in the solved game's vocabulary.
-    MissingFact {
-        /// The fixture id.
-        fixture: String,
-        /// The case id.
-        case: String,
-        /// The fact id.
-        fact: String,
-    },
-    /// The fixture names no curve to compare against.
-    NoCurve {
-        /// The fixture id.
-        fixture: String,
-    },
-    /// A report could not be written.
-    Report(ReportError),
-}
-
-impl fmt::Display for GateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Fixture(error) => write!(f, "{error}"),
-            Self::UnsupportedFixture { fixture } => {
-                write!(f, "fixture {fixture} belongs to no gate this tool solves")
-            }
-            Self::UnknownCase { fixture, case } => {
-                write!(f, "fixture {fixture}: case {case} names no game the gate models")
-            }
-            Self::MissingFact { fixture, case, fact } => write!(
-                f,
-                "fixture {fixture}: case {case}: fact {fact} resolves to nothing in the solved game"
-            ),
-            Self::NoCurve { fixture } => write!(f, "fixture {fixture} names no curve"),
-            Self::Report(error) => write!(f, "{error}"),
-        }
-    }
-}
-
-impl std::error::Error for GateError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Fixture(error) => Some(error),
-            Self::Report(error) => Some(error),
-            Self::UnsupportedFixture { .. }
-            | Self::UnknownCase { .. }
-            | Self::MissingFact { .. }
-            | Self::NoCurve { .. } => None,
-        }
-    }
-}
-
-impl From<FixtureError> for GateError {
-    fn from(error: FixtureError) -> Self {
-        Self::Fixture(error)
-    }
-}
-
-impl From<ReportError> for GateError {
-    fn from(error: ReportError) -> Self {
-        Self::Report(error)
-    }
 }
 
 /// The repository-relative path of a toy-game fixture, for the errors that name it.

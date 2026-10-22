@@ -166,6 +166,55 @@ fn r2_8_rejects_structural_mismatch() {
     assert!(!violations(&postflop).is_empty(), "v1 packs preflop_169 dumps only (O-132)");
 }
 
+/// One edit of the example dump as JSON.
+type EditDump = fn(&mut Value);
+
+/// The example dump parsed, which the structural checkers take.
+fn parsed(dump: &Value) -> library_pack::NodeDump {
+    let bytes = serde_json::to_vec(dump).expect("the value serializes");
+    parse_dump(&bytes).unwrap_or_else(|found| panic!("{found:?}"))
+}
+
+/// R2.11 (review finding F4 of S17): the structural checks split into the node checks any
+/// dump must meet (`check_dump_structure`: parseable keys naming the dump's config and
+/// pair, no key twice, a seat of the pair, two stacks, a pot above zero, a sized token
+/// equal to its `size_cbb`, reach within [0, 1] with one entry per seat) and the pack-only
+/// hand-space rule (`check_pack_hand_space`, O-132); `check_structure` is their union, so
+/// `pack` keeps refusing a postflop dump while gate G4 can check one.
+#[test]
+fn r2_11_dump_structure_checks_apply_to_a_postflop_dump_without_the_hand_space_rule() {
+    let postflop = parsed(&edited(|d| d["hand_space"] = json!("postflop_1326")));
+    assert_eq!(library_pack::check_dump_structure(&postflop), Vec::<Violation>::new());
+    let pack_only = library_pack::check_pack_hand_space(&postflop);
+    assert_eq!(pack_only.len(), 1, "{pack_only:?}");
+    assert!(pack_only[0].message.contains("preflop_169"), "{pack_only:?}");
+    assert_eq!(
+        check_structure(&postflop),
+        [pack_only, library_pack::check_dump_structure(&postflop)].concat()
+    );
+    let cases: [(&str, EditDump); 7] = [
+        ("unparsable key", |d| d["nodes"][0]["node_key"] = json!("cfg_6_online_100/BTN-BB/")),
+        ("key twice", |d| {
+            let twin = d["nodes"][0].clone();
+            d["nodes"].as_array_mut().expect("an array").push(twin);
+        }),
+        ("seat outside the pair", |d| d["nodes"][0]["to_act"] = json!("CO")),
+        ("one stack", |d| d["nodes"][0]["stacks_cbb"] = json!([9900])),
+        ("empty pot", |d| d["nodes"][0]["pot_cbb"] = json!(0)),
+        ("size differs from token", |d| d["nodes"][0]["actions"][2]["size_cbb"] = json!(400)),
+        ("one reach entry", |d| d["nodes"][0]["hands"][0]["reach"] = json!([0.5])),
+    ];
+    for (name, edit) in cases {
+        let dump = parsed(&edited(|d| {
+            d["hand_space"] = json!("postflop_1326");
+            edit(d);
+        }));
+        let found = library_pack::check_dump_structure(&dump);
+        assert!(rules(&found).contains(&Rule::Structural), "{name}: found {found:?}");
+        assert!(found.iter().all(|v| !v.message.contains("preflop_169")), "{name}: {found:?}");
+    }
+}
+
 #[test]
 fn r2_8_rejected_dump_writes_nothing() {
     let scratch = tempfile::tempdir().expect("a scratch directory");

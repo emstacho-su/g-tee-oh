@@ -4,8 +4,37 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, UNIX_EPOCH};
 
-use super::{Context, DIRTY_TREE_NOTE, Machine, Report, ReportError, iso_8601_utc};
+use super::{
+    Context, DIRTY_TREE_NOTE, Machine, Measurement, Report, ReportError, Threshold, iso_8601_utc,
+};
 use crate::gates::GateReport;
+
+/// R2.11 (review finding F7): a strict upper bound refuses the bound itself while an
+/// inclusive one admits it, a measurement judged by the strict bound fails at the bound,
+/// and both bounds serialise to the same schema object, since `report.schema.json` has no
+/// field for strictness: the JSON carries the bound and the verdict, the Markdown twin
+/// the word, and a read-back is inclusive.
+#[test]
+fn r2_11_strict_threshold_refuses_its_bound_and_serialises_within_the_schema() {
+    let strict = Threshold::under(2.0, "percentage_points");
+    let inclusive = Threshold::at_most(2.0, "percentage_points");
+    assert!(!strict.admits(2.0) && strict.admits(1.999) && !strict.admits(2.001));
+    assert!(inclusive.admits(2.0) && !inclusive.admits(2.001));
+    assert_ne!(strict, inclusive);
+    assert_eq!(
+        Measurement::judged("x", 2.0, "percentage_points", strict.clone()).pass,
+        Some(false)
+    );
+    assert_eq!(
+        Measurement::judged("x", 2.0, "percentage_points", inclusive.clone()).pass,
+        Some(true)
+    );
+    let json = serde_json::to_value(&strict).expect("serialises");
+    assert_eq!(json, serde_json::json!({ "max": 2.0, "unit": "percentage_points" }));
+    assert_eq!(json, serde_json::to_value(&inclusive).expect("serialises"));
+    let back: Threshold = serde_json::from_value(json).expect("deserialises");
+    assert_eq!(back, inclusive, "the schema has no strict field, so a read-back is inclusive");
+}
 
 fn context(tree_dirty: bool) -> Context {
     let machine = Machine {

@@ -8,9 +8,10 @@
 //! that gives `N`, the engine's node count. The solver's storage holds one entry per action
 //! per live combo of the acting player at every decision node, `E` in all; a combo is live
 //! on every runout that misses its two cards, which is `(n - 2) (n - 3) ...` of them, so
-//! `E` is exact without enumerating runouts. The engine stores 16-bit entries as `2 (2E +
-//! 4N)` bytes (an `i16` per entry and an `f32` scale per node, in two arrays) and 32-bit
-//! entries as `8E` bytes; the estimate reproduces both exactly.
+//! `E` is exact without enumerating runouts. The engine stores 32-bit entries, the
+//! default (O-194), as `8E` bytes (an `f32` per entry, in two arrays) and 16-bit entries as
+//! `2 (2E + 4N)` bytes (an `i16` per entry and an `f32` scale per node, in two arrays);
+//! the estimate reproduces both exactly, so it is exact in either mode.
 //!
 //! On top of storage the estimate models the rest of the engine's heap from its layout
 //! (`layout`): the tree arena, the action lists and chance child tables, the per-node
@@ -63,13 +64,13 @@ pub struct MemoryEstimate {
     pub total_bytes: u64,
 }
 
-/// The estimated peak bytes of a solve with 16-bit storage, the default.
+/// The estimated peak bytes of a solve with the default storage, 32-bit (O-194).
 ///
 /// # Errors
 ///
 /// The errors of `estimate_memory`.
 pub fn estimate_bytes(problem: &PostflopProblem) -> Result<u64, SolveError> {
-    estimate_bytes_with(problem, StorageBits::Sixteen)
+    estimate_bytes_with(problem, StorageBits::default())
 }
 
 /// The estimated peak bytes of a solve with the given storage.

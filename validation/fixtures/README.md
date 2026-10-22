@@ -1,8 +1,8 @@
 # Validation fixtures
 
-This directory holds the public inputs of the engine validation gates G1 to G3 (04 Solver engine section 6): three toy games with their known answers, and one exploitability curve computed by a published reference implementation. Beside them sits the 169 by 169 preflop equity table (R2.20), an exact enumeration the repository computes itself. The gate inputs were written in session S05 as the red half of test-driven development (requirement identifier (R ID) R0.11), and S13 wired the engine behind the gate tests that read them (R2.4 to R2.6). Reports that the gates write go to `validation/reports/`; the format rules for those are in `validation/reports/README.md`. The split is fixed: a fixture is an input a person can read and check against its source, a report is written by a tool and never by hand.
+This directory holds the public inputs of the engine validation gates G1 to G4 (04 Solver engine section 6): three toy games with their known answers, one exploitability curve computed by a published reference implementation, and the hand-made spot list of the oracle gate G4 with the tiny pair its compare step is tested on. Beside them sits the 169 by 169 preflop equity table (R2.20), an exact enumeration the repository computes itself. The gate inputs were written in session S05 as the red half of test-driven development (requirement identifier (R ID) R0.11), and S13 wired the engine behind the gate tests that read them (R2.4 to R2.6). Reports that the gates write go to `validation/reports/`; the format rules for those are in `validation/reports/README.md`. The split is fixed: a fixture is an input a person can read and check against its source, a report is written by a tool and never by hand.
 
-Two rules bound what may be in here. Only toy games, published vectors and exact enumerations from the rules of hold'em enter this directory; nothing derived from any reference tool does (open question identifier (O-ID) O-26, architecture decision record (ADR) 0017, ADR 0021). And every number names its source, so a reviewer can go from a fixture value to the paper, the planning document or the run that produced it without trusting the person who typed it.
+Two rules bound what may be in here. Only toy games, published vectors and exact enumerations from the rules of hold'em enter this directory; nothing derived from any reference tool does (open question identifier (O-ID) O-26, architecture decision record (ADR) 0017, ADR 0021). And every number names its source, so a reviewer can go from a fixture value to the paper, the planning document or the run that produced it without trusting the person who typed it. The G4 spot list and the tiny pair under `g4/` follow both rules: every spot, range, pot and stack is hand-made from the rules of hold'em and the catalog configuration, every number of the tiny pair is synthetic, and nothing in them is derived from the oracle or from reference data; the oracle's own output never enters this directory (09 section 7).
 
 ## Layout
 
@@ -15,6 +15,9 @@ Two rules bound what may be in here. Only toy games, published vectors and exact
 | `openspiel/leduc_exploitability.json` | The curve: one row per checkpoint iteration with exploitability and NashConv, plus the final average policy value (O-30) | `tools/validate` G3 |
 | `openspiel/PROVENANCE.md` | Version, exact command, seed, container digest, date and machine of the run that wrote the JSON (JavaScript Object Notation) file, plus the O-128 erratum on its generator block | a reviewer |
 | `equity/` | `preflop-169.json`, the 169 by 169 preflop all-in equity table and its combo pair counts (R2.20, O-126), and `PROVENANCE.md`, the method, evaluator, commit, machine, elapsed time and spot-check values of the one run that wrote it | `tools/validate/tests/equity_table.rs`; S16 reads `equity` and `pairs` |
+| `g4-spots.json` | The G4 spot list (O-87, R2.11): the catalog configuration, the position pair, one postflop tree, the stop rule of both solvers, the 04 section 6 rules, and eight hand-made heads-up turn and river spots, four gated of each street, all rake-free (O-161), with their root node keys, pots, stacks and ranges; `tools/validate/src/fixtures/g4_spots.rs` loads it and refuses a key that repeats or extends another's within its street or is not a root | `tools/validate` G4 (`just g4`); the private oracle program reads it by path |
+| `g4-spots-raked.json` | The raked twins (O-161): the same layout and loader, two informational spots with the root keys, boards, pots, stacks and ranges of `turn-01-dry-ace` and `river-01-dry-ace` at the online rake, in a list of their own because a node dump holds each key once | `tools/validate` G4 (`just g4-raked`, report `g4-oracle-raked`); the private oracle program reads it by path |
+| `g4/` | `tiny-spots.json`, `engine-tiny.json`, `oracle-tiny.json` and `oracle-tiny-failing.json`, the synthetic tiny pair the G4 compare step is tested and smoked on, with a README stating its margins and the failing twin's three edits (R2.11) | `tools/validate/tests/g4.rs` and `g4_engine.rs`, `just g4-check` |
 
 Two more vectors of R0.11 are not here: the bucket-edge table (25, 50, 75, 110 and 150 percent of pot, upper edge inclusive, all-in separate, ADR 0008) and the node-key round trip. Both are `gto-model` vectors and live in `crates/gto-model`, written red first by S12 inside its own session (09 section 3), so S12 does not wait for S05.
 
@@ -139,15 +142,14 @@ The table is generated once, on the Zenbook in release mode with `just equity-ta
 
 ## Later fixtures, names reserved by O-87
 
-O-87 fixes two more fixture names that later sessions write here, so `validation/reports/README.md` can point at them now. Neither exists yet.
+O-87 fixed two more fixture names so `validation/reports/README.md` could point at them early. S17 wrote `g4-spots.json` (the layout table above); the other does not exist yet.
 
 | Path | What it will be | Session |
 |---|---|---|
 | `PROVENANCE-g6a.md` | The provenance note of the G6a heads-up push/fold solution: the chart source, the engine parameters and the run that produced the end-to-end fixture library (O-30, O-63, R2.19) | S19 |
-| `g4-spots.json` | The generic heads-up river and turn spot definitions the public `tools/validate g4` step runs on; the oracle comparison itself stays in the private repo (R2.11, 09 section 7) | S17 |
 
 A later fixture follows the same two rules as the files above: it carries a `schema_version`, and every number names its source.
 
 ## Ownership
 
-S05 wrote this directory and the loader. S13 consumes it, turned the pending gate tests green, writes the G1 to G3 reports under `validation/reports/`, added `equity/` and corrected the curve's generator metadata (O-128). S12 owns the two `gto-model` vectors named above.
+S05 wrote this directory and the loader. S13 consumes it, turned the pending gate tests green, writes the G1 to G3 reports under `validation/reports/`, added `equity/` and corrected the curve's generator metadata (O-128). S12 owns the two `gto-model` vectors named above. S17 added `g4-spots.json`, `g4-spots-raked.json` and `g4/` with their loader `tools/validate/src/fixtures/g4_spots.rs`.

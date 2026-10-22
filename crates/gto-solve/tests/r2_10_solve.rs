@@ -1,4 +1,5 @@
-//! R2.10 solve tests: the small flop test spot reaches 0.3 percent of the pot, solves are
+//! R2.10 solve tests: the small flop test spot reaches 0.3 percent of the pot in the
+//! default 32-bit storage and 0.5 percent in the 16-bit opt-in (O-194), solves are
 //! deterministic, the iteration and time caps stop a solve, and the best response is the
 //! exact difference of the engine's two values whatever the rake.
 //!
@@ -28,6 +29,13 @@ const TARGET_STOP: StopRule = StopRule {
     max_iterations: 2_000,
     max_seconds: 300,
 };
+
+/// The loosest target the 16-bit opt-in is documented for (O-194): the storage's floor
+/// sits near 0.12 percent of the pot on a turn spot, so a target under about 0.5 is
+/// forbidden with it, and the opt-in test stops there.
+const SIXTEEN_BIT_TARGET_PCT_POT: f32 = 0.5;
+const SIXTEEN_BIT_STOP: StopRule =
+    StopRule { target_exploitability_pct_pot: SIXTEEN_BIT_TARGET_PCT_POT, ..TARGET_STOP };
 
 /// Percent per whole.
 const PERCENT: f64 = 100.0;
@@ -68,7 +76,8 @@ impl Recorder {
 }
 
 /// R2.10: the small flop solve stops on the target with both gains at or below 0.3
-/// percent of the pot, in 16-bit storage, telling the sink every iteration in order.
+/// percent of the pot, in the default 32-bit storage (O-194), telling the sink every
+/// iteration in order.
 #[test]
 fn r2_10_small_flop_solve_reaches_target() {
     let problem = small_problem();
@@ -77,8 +86,9 @@ fn r2_10_small_flop_solve_reaches_target() {
     println!("R2.10 small flop solve: {report:?}");
     assert_eq!(report.stop_reason, StopReason::Target, "{report:?}");
     assert!(report.exploitability_pct_pot.iter().all(|&gain| gain <= TARGET_PCT_POT));
-    assert_eq!(report.storage, StorageBits::Sixteen);
-    assert_eq!(solved.storage(), StorageBits::Sixteen);
+    assert_eq!(report.storage, StorageBits::ThirtyTwo);
+    assert_eq!(solved.storage(), StorageBits::ThirtyTwo);
+    assert_eq!(SolveOptions::default().storage, StorageBits::ThirtyTwo);
     assert_eq!(report.tree_hash, gto_tree::tree_hash(&problem.tree));
     assert_eq!(solved.engine_tree_hash().expect("maps back"), report.tree_hash);
     assert_eq!(solved.seed(), 7);
@@ -88,6 +98,22 @@ fn r2_10_small_flop_solve_reaches_target() {
     let last = sink.reports.borrow().last().copied();
     assert_eq!(last, Some((report.iterations, Some(report.exploitability_pct_pot))));
     assert_eq!(sink.finished.get(), 1);
+}
+
+/// R2.10 (O-194): the 16-bit opt-in still solves the small flop spot to the loose 0.5
+/// percent target it is documented for, and the report and the solved game both say so.
+#[test]
+fn r2_10_sixteen_bit_opt_in_reaches_its_loose_target() {
+    let problem = small_problem();
+    let options = SolveOptions { storage: StorageBits::Sixteen, ..SolveOptions::default() };
+    let (solved, report) =
+        solve_postflop_with(&problem, SIXTEEN_BIT_STOP, 7, &NoProgress, &options).expect("solves");
+    println!("R2.10 small flop solve, 16-bit opt-in: {report:?}");
+    assert_eq!(report.stop_reason, StopReason::Target, "{report:?}");
+    assert!(report.exploitability_pct_pot.iter().all(|&gain| gain <= SIXTEEN_BIT_TARGET_PCT_POT));
+    assert_eq!(report.storage, StorageBits::Sixteen);
+    assert_eq!(solved.storage(), StorageBits::Sixteen);
+    assert_eq!(u64::from(report.iterations), solved.iterations());
 }
 
 /// R2.10: two solves of one problem give the same report figures and the same root
@@ -120,7 +146,7 @@ fn r2_10_solve_with_passed_estimate_matches_plain_solve() {
     assert_eq!(SolveReport { seconds: 0.0, ..a }, SolveReport { seconds: 0.0, ..b });
     assert_eq!(strategy_bits(plain.root_strategy()), strategy_bits(given.root_strategy()));
 
-    let other = SolveOptions { storage: StorageBits::ThirtyTwo, ..options };
+    let other = SolveOptions { storage: StorageBits::Sixteen, ..options };
     let result = solve_postflop_with_estimate(&problem, &estimate, stop, 0, &NoProgress, &other)
         .map(|(_, report)| report);
     assert!(matches!(result, Err(SolveError::Problem(_))), "{result:?}");

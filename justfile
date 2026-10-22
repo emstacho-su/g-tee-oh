@@ -222,10 +222,49 @@ GATE_CHECK_DIR := "target/gate-reports"
 
 # What ci runs instead of gates: the committed reports stay untouched, and --allow-dirty
 # lets a development tree run (the reports' notes then say the tree was dirty).
-# Gates G1 to G3 into target/gate-reports, then check-reports on that run (R2.4 to R2.6)
+# Gates G1 to G3 into target/gate-reports, check-reports, then g4-check (R2.4 to R2.6, R2.11)
 gates-check:
     cargo run --release -p validate -- gates --out {{GATE_CHECK_DIR}} --allow-dirty
     node scripts/check-reports.mjs {{GATE_CHECK_DIR}}
+    just g4-check
+
+G4_CHECK_DIR := "target/gate-reports/g4"
+G4_TINY := "validation/fixtures/g4"
+
+# The Zenbook run of gate G4 (R2.11, O-168, O-170): solves validation/fixtures/g4-spots.json
+# with the engine, compares against the oracle dump ORACLE the private program wrote, and
+# writes g4-oracle.json, g4-oracle.md and engine-dump.json into OUT, the private repository's
+# validation/reports/g4 (09 section 7). Clean tree, VALIDATE_MACHINE=zenbook.
+# Gate G4 oracle compare: validate g4 --oracle ORACLE --out OUT --write-engine OUT/engine-dump.json
+g4 ORACLE OUT:
+    cargo run --release -p validate -- g4 --oracle {{ORACLE}} --out {{OUT}} \
+        --write-engine {{OUT}}/engine-dump.json
+
+G4_SPOTS_RAKED := "validation/fixtures/g4-spots-raked.json"
+
+# The informational rake comparison (O-161): the two raked twins of g4-spots-raked.json
+# against the oracle dump ORACLE the private program wrote for that list, written into OUT
+# as g4-oracle-raked.json, g4-oracle-raked.md and engine-dump-raked.json beside the G4
+# report. A list and a report of its own because a node dump holds each key once; nothing
+# in it is gated, so the rows are read, not judged. Clean tree, VALIDATE_MACHINE=zenbook.
+# Rake comparison: validate g4 --spots g4-spots-raked.json --report-id g4-oracle-raked ...
+g4-raked ORACLE OUT:
+    cargo run --release -p validate -- g4 --spots {{G4_SPOTS_RAKED}} --oracle {{ORACLE}} \
+        --out {{OUT}} --report-id g4-oracle-raked --write-engine {{OUT}}/engine-dump-raked.json
+
+# The compare half of the G4 smoke: the committed synthetic tiny pair, no solve, into target
+# (O-168); the committed reports stay untouched. The rust job runs this one, because it has
+# cargo but no node_modules (check-reports needs ajv, which the ts job installs).
+# Gate G4 compare smoke on the tiny pair into target/gate-reports/g4 (R2.11)
+g4-smoke:
+    cargo run --release -p validate -- g4 --spots {{G4_TINY}}/tiny-spots.json \
+        --engine {{G4_TINY}}/engine-tiny.json --oracle {{G4_TINY}}/oracle-tiny.json \
+        --out {{G4_CHECK_DIR}} --allow-dirty
+
+# What gates-check and so just ci run for G4: the smoke, then check-reports on its report
+# Gate G4 smoke, then check-reports on target/gate-reports/g4 (R2.11)
+g4-check: g4-smoke
+    node scripts/check-reports.mjs {{G4_CHECK_DIR}}
 
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
 

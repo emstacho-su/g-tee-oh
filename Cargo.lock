@@ -2762,8 +2762,11 @@ dependencies = [
  "gto-library",
  "gto-model",
  "gto-solve",
+ "gto-tree",
+ "library-pack",
  "serde",
  "serde_json",
+ "sha2",
  "sysinfo",
 ]
 

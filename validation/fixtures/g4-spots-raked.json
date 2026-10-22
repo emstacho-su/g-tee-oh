@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "id": "g4-spots-raked",
+  "gate": "G4",
+  "r_id": "R2.11",
+  "sources": [
+    {
+      "id": "hand-made",
+      "citation": "hand-made by S17 from the rules of hold'em at the O-52 catalog configuration",
+      "url": null
+    },
+    {
+      "id": "04-section-6",
+      "citation": "04 Solver engine section 6: the G4 pass rules",
+      "url": null
+    }
+  ],
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "tree": {
+    "bet_sizes_bp": [7500],
+    "raise_sizes_bp": [],
+    "raise_allin": true,
+    "donk_sizes_bp": [7500],
+    "raise_cap": 3,
+    "allin_threshold_bp": 6700,
+    "source": "hand-made"
+  },
+  "stop": {
+    "engine_target_pct_pot": 0.1,
+    "oracle_target_pct_pot": 0.05,
+    "max_iterations": 50000,
+    "max_seconds": 600
+  },
+  "rules": {
+    "exploitability_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    },
+    "frequency_mad_max": {
+      "value": 2.0,
+      "unit": "percentage_points",
+      "inclusive": false,
+      "source": "04-section-6"
+    },
+    "root_ev_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    }
+  },
+  "spots": [
+    {
+      "id": "turn-01-dry-ace-raked",
+      "street": "turn",
+      "board": "Ah7d2cKs",
+      "pot_cbb": 1100,
+      "stack_cbb": 9475,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "online",
+      "ranges": {
+        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
+        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
+      },
+      "gated": false,
+      "source": "hand-made",
+      "notes": "turn-01-dry-ace at the online rake (5 percent, 3 bb cap, O-112); informational (O-161)."
+    },
+    {
+      "id": "river-01-dry-ace-raked",
+      "street": "river",
+      "board": "Ah7d2cKs9h",
+      "pot_cbb": 2750,
+      "stack_cbb": 8650,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b825.c|9h|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "online",
+      "ranges": {
+        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
+        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
+      },
+      "gated": false,
+      "source": "hand-made",
+      "notes": "river-01-dry-ace at the online rake, informational (O-161): S18 reads the rake gap here."
+    }
+  ],
+  "notes": [
+    "The two raked twins of g4-spots.json (O-161): the same root keys, boards, pots, stacks",
+    "and ranges as turn-01-dry-ace and river-01-dry-ace, solved at the online stake's rake",
+    "(5 percent capped at 3 bb, O-112) on both sides. Nothing here is gated: the rows are",
+    "informational, so S18 learns the rake gap before the builder publishes raked solves.",
+    "A list of its own because a node dump holds each key once: a raked twin beside its",
+    "rake-free spot in one list would make the compare read the rake-free nodes for both.",
+    "Run with just g4-raked ORACLE OUT, which writes the report g4-oracle-raked beside the",
+    "gated list's g4-oracle; the oracle dump ORACLE is the private program's run of this list.",
+    "Configuration, pair, tree, stop rule and rules are the gated list's; the preflop block",
+    "is descriptive (O-164); no number comes from a reference tool (O-26, ADR 0017)."
+  ]
+}

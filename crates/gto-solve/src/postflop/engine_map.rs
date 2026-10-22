@@ -55,9 +55,9 @@ pub(crate) fn chips(amount: Cbb) -> f64 {
     f64::from(amount.get()) / HUNDRED
 }
 
-/// The cbb amount for engine chips on the 0.01 grid. The parity and mapping tests read
-/// engine amounts back; the adapter itself only writes them.
-#[cfg(test)]
+/// The cbb amount for engine chips on the 0.01 grid. The root-street walk of `nodes` reads
+/// the engine's pots, stacks and bet totals back through it (R2.11); the parity and
+/// mapping tests read engine amounts back too.
 pub(crate) fn cbb_of_chips(chips: f64) -> Result<Cbb, SolveError> {
     on_grid(chips * HUNDRED, "chip amount").map(Cbb::new)
 }

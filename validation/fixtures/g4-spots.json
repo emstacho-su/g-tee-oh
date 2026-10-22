@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "id": "g4-spots",
+  "gate": "G4",
+  "r_id": "R2.11",
+  "sources": [
+    {
+      "id": "hand-made",
+      "citation": "hand-made by S17 from the rules of hold'em at the O-52 catalog configuration",
+      "url": null
+    },
+    {
+      "id": "04-section-6",
+      "citation": "04 Solver engine section 6: the G4 pass rules",
+      "url": null
+    }
+  ],
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "tree": {
+    "bet_sizes_bp": [7500],
+    "raise_sizes_bp": [],
+    "raise_allin": true,
+    "donk_sizes_bp": [7500],
+    "raise_cap": 3,
+    "allin_threshold_bp": 6700,
+    "source": "hand-made"
+  },
+  "stop": {
+    "engine_target_pct_pot": 0.1,
+    "oracle_target_pct_pot": 0.05,
+    "max_iterations": 50000,
+    "max_seconds": 600
+  },
+  "rules": {
+    "exploitability_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    },
+    "frequency_mad_max": {
+      "value": 2.0,
+      "unit": "percentage_points",
+      "inclusive": false,
+      "source": "04-section-6"
+    },
+    "root_ev_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    }
+  },
+  "spots": [
+    {
+      "id": "turn-01-dry-ace",
+      "street": "turn",
+      "board": "Ah7d2cKs",
+      "pot_cbb": 1100,
+      "stack_cbb": 9475,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
+        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Dry ace-high flop, king turn; the 75 percent bet is 825 cbb into 9475 behind."
+    },
+    {
+      "id": "turn-02-wet-broadway",
+      "street": "turn",
+      "board": "QsJh2h8d",
+      "pot_cbb": 1100,
+      "stack_cbb": 9475,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|QsJh2h|x.b275.c|8d|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": [
+          "TT-22,AJs-A2s,KJs-K7s,QJs-Q8s,JTs-J8s,T9s,T8s,98s,97s,87s,76s,65s,54s",
+          "AJo-A9o,KQo:0.5,KJo:0.5,QJo:0.5"
+        ],
+        "ip": ["55+,A5s+,K9s+,Q9s+,J9s+,T9s,98s,87s,76s", "A9o+,KTo+,QTo+,JTo:0.5"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Two broadway cards with a flush draw, blank turn; weighted offsuit broadways."
+    },
+    {
+      "id": "turn-03-mid-connected",
+      "street": "turn",
+      "board": "Td9d4s2c",
+      "pot_cbb": 1100,
+      "stack_cbb": 9475,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Td9d4s|x.b275.c|2c|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": [
+          "88-22,AKs-A2s,KQs-K8s,QJs-Q9s,JTs,J9s,T9s,T8s,98s,87s,76s",
+          "AKo:0.5,AQo-ATo,KQo,KJo:0.5"
+        ],
+        "ip": ["66+,A9s+,KTs+,QTs+,JTs,T9s,98s,87s", "AJo+,KQo,KJo:0.5,Ah5h:0.5,As5s:0.5"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Connected middling flop with a flush draw; explicit weighted combos for IP."
+    },
+    {
+      "id": "turn-04-low-overcard",
+      "street": "turn",
+      "board": "8c5d3dQh",
+      "pot_cbb": 1100,
+      "stack_cbb": 9475,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|8c5d3d|x.b275.c|Qh|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": [
+          "TT-22,AJs-A2s,KJs-K7s,QJs-Q8s,JTs-J8s,T9s,T8s,98s,97s,87s,76s,65s,54s",
+          "AJo-A9o,KQo:0.5,KJo:0.5,QJo:0.5"
+        ],
+        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Low flop, queen overcard turn; the wide defending range against the tight opener."
+    },
+    {
+      "id": "river-01-dry-ace",
+      "street": "river",
+      "board": "Ah7d2cKs9h",
+      "pot_cbb": 2750,
+      "stack_cbb": 8650,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b825.c|9h|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
+        "ip": ["66+,A8s+,KTs+,QTs+,JTs,T9s,98s", "ATo+,KJo+,QJo"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "turn-01 one street on: IP bet 825 and was called; the river bet is 2063 cbb."
+    },
+    {
+      "id": "river-02-wet-broadway",
+      "street": "river",
+      "board": "QsJh2h8d5c",
+      "pot_cbb": 2750,
+      "stack_cbb": 8650,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|QsJh2h|x.b275.c|8d|x.b825.c|5c|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": [
+          "TT-22,AJs-A2s,KJs-K7s,QJs-Q8s,JTs-J8s,T9s,T8s,98s,97s,87s,76s,65s,54s",
+          "AJo-A9o,KQo:0.5,KJo:0.5,QJo:0.5"
+        ],
+        "ip": ["55+,A5s+,K9s+,Q9s+,J9s+,T9s,98s,87s,76s", "A9o+,KTo+,QTo+,JTo:0.5"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "The turn-02 line one street on; the flush draw missed on a blank river."
+    },
+    {
+      "id": "river-03-mid-connected",
+      "street": "river",
+      "board": "Td9d4s2c7h",
+      "pot_cbb": 2750,
+      "stack_cbb": 8650,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Td9d4s|x.b275.c|2c|x.b825.c|7h|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": [
+          "88-22,AKs-A2s,KQs-K8s,QJs-Q9s,JTs,J9s,T9s,T8s,98s,87s,76s",
+          "AKo:0.5,AQo-ATo,KQo,KJo:0.5"
+        ],
+        "ip": ["66+,A9s+,KTs+,QTs+,JTs,T9s,98s,87s", "AJo+,KQo,KJo:0.5,Ah5h:0.5,As5s:0.5"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "The turn-03 line one street on; a seven completes straights for both ranges."
+    },
+    {
+      "id": "river-04-paired-kings",
+      "street": "river",
+      "board": "KcKd6sJh3s",
+      "pot_cbb": 2750,
+      "stack_cbb": 8650,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|KcKd6s|x.b275.c|Jh|x.b825.c|3s|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": ["99-22,AQs-A2s,KQs-K9s,QJs-Q9s,JTs,T9s,98s,87s,76s,65s", "AQo-ATo,KQo,KJo,QJo"],
+        "ip": ["66+,A9s+,KTs+,QTs+,JTs,T9s,98s,87s", "AJo+,KQo,KJo:0.5,Ah5h:0.5,As5s:0.5"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Paired flop with heavy card removal of kings from both ranges; a blank river."
+    }
+  ],
+  "notes": [
+    "Pots and stacks follow each key's line at 100 big blinds: 550 after r250.c and 9750",
+    "behind; 1100 and 9475 after the flop x.b275.c; 2750 and 8650 after the turn x.b825.c.",
+    "Every sized bet stays under half the stack behind at every root-street node (825 of",
+    "9475 on the turn, 2063 of 8650 on the river), so neither the engine's 67 percent",
+    "all-in threshold nor the oracle's thresholds (set to 0, disabled) reshape the tree.",
+    "A range is its pieces joined by commas, in the notation both parsers read: pairs with",
+    "plus, suited and offsuit classes with plus, dash ranges, explicit combos written high",
+    "rank first, and :weight. Each side holds 100 to 300 live combos on its board.",
+    "All eight spots are gated and rake-free; the two informational raked twins live in",
+    "g4-spots-raked.json (O-161), a list of its own because a node dump holds each key once.",
+    "The preflop block is descriptive (O-164): the engine mapping never reads it.",
+    "The configuration is cfg_6_online_100, BB against BTN after r250.c (O-52); no number",
+    "comes from a reference tool (O-26, ADR 0017)."
+  ]
+}
