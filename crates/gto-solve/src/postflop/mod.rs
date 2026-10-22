@@ -12,6 +12,8 @@
 //! exact best-response gain is at or below the target percent of the starting pot, or at
 //! an iteration or time cap (O-138). The report carries the canonical tree hash of the
 //! configuration, which the solved game cross-checks against the engine's own tables.
+//! `root_street_nodes` reads the solved game's root-street decision nodes back with
+//! per-hand frequencies, reach and per-action values, what gate G4 compares (R2.11).
 //!
 //! The adapter is heads-up only: the v1 scope keeps postflop at two players, with
 //! multiway as extension E7 in v2 (04 section 3).
@@ -21,6 +23,7 @@ mod error;
 mod estimate;
 mod layout;
 mod measure;
+mod nodes;
 mod options;
 mod problem;
 mod runouts;
@@ -32,6 +35,7 @@ mod parity_tests;
 pub use error::SolveError;
 pub use estimate::{MemoryEstimate, estimate_bytes, estimate_bytes_with, estimate_memory};
 pub use measure::{BestResponseReport, best_response};
+pub use nodes::{HandStrategy, NodeStrategy, root_street_nodes};
 pub use options::{
     DEFAULT_MEASURE_EVERY, DEFAULT_MEMORY_CAP_BYTES, NoProgress, ProgressSink, SolveOptions,
     SolveReport, StopReason, StopRule, StorageBits,
