@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "tiny-spots",
+  "gate": "G4",
+  "r_id": "R2.11",
+  "sources": [
+    {
+      "id": "hand-made",
+      "citation": "hand-made by S17 from the rules of hold'em: one river spot, three combos a side",
+      "url": null
+    },
+    {
+      "id": "04-section-6",
+      "citation": "04 Solver engine section 6: the G4 pass rules",
+      "url": null
+    }
+  ],
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "tree": {
+    "bet_sizes_bp": [7500],
+    "raise_sizes_bp": [],
+    "raise_allin": true,
+    "donk_sizes_bp": [7500],
+    "raise_cap": 3,
+    "allin_threshold_bp": 6700,
+    "source": "hand-made"
+  },
+  "stop": {
+    "engine_target_pct_pot": 0.3,
+    "oracle_target_pct_pot": 0.05,
+    "max_iterations": 2000,
+    "max_seconds": 60
+  },
+  "rules": {
+    "exploitability_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    },
+    "frequency_mad_max": {
+      "value": 2.0,
+      "unit": "percentage_points",
+      "inclusive": false,
+      "source": "04-section-6"
+    },
+    "root_ev_max": {
+      "value": 0.3,
+      "unit": "pct_pot",
+      "inclusive": true,
+      "source": "04-section-6"
+    }
+  },
+  "spots": [
+    {
+      "id": "tiny-river",
+      "street": "river",
+      "board": "Ah7d2cKs9h",
+      "pot_cbb": 2500,
+      "stack_cbb": 8775,
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b700.c|9h|",
+      "preflop": { "actions": "r250.c", "kind": "single-raised", "aggressor": "BTN" },
+      "rake": "none",
+      "ranges": {
+        "oop": ["AdAs,KcKh,6s5s"],
+        "ip": ["JdJh,TdTh,8c8s"]
+      },
+      "gated": true,
+      "source": "hand-made",
+      "notes": "Two sets and one air hand lead into three pairs; the 75 percent bet is 1875 cbb."
+    }
+  ],
+  "notes": [
+    "The pot and the stack follow the key's line at 100 big blinds: 550 after r250.c,",
+    "1100 after x.b275.c, 2500 after x.b700.c, and 9750 - 275 - 700 = 8775 behind.",
+    "The smoke input of validate g4 and the spot the R2.11 tests solve (README.md here).",
+    "engine-tiny.json and oracle-tiny.json are synthetic: nothing in them comes from a solver."
+  ]
+}

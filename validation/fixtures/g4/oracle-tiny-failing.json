@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "source": "reference",
+  "exported_at": "2026-10-21T00:00:00Z",
+  "config": {
+    "format": "online",
+    "table_size": 6,
+    "stake_label": "online",
+    "depth_cbb": 10000,
+    "straddle": false,
+    "ante_cbb": 0
+  },
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "hand_space": "postflop_1326",
+  "exploitability_pct_pot": [0.04, 0.31],
+  "nodes": [
+    {
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b700.c|9h|",
+      "street": "river",
+      "board": "Ah7d2cKs9h",
+      "to_act": "BB",
+      "pot_cbb": 2500,
+      "stacks_cbb": [8775, 8775],
+      "actions": [
+        { "token": "x", "size_cbb": 0 },
+        { "token": "b1875", "size_cbb": 1875 }
+      ],
+      "hands": [
+        {
+          "hand": "AdAs",
+          "reach": [0.5, 0.0],
+          "frequencies": [0.03, 0.97],
+          "ev_bb": [24.75, 31.75]
+        },
+        {
+          "hand": "KcKh",
+          "reach": [0.3, 0.0],
+          "frequencies": [0.04, 0.96],
+          "ev_bb": [24.75, 30.75]
+        },
+        {
+          "hand": "6s5s",
+          "reach": [0.2, 0.0],
+          "frequencies": [0.65, 0.35],
+          "ev_bb": [-0.25, 3.75]
+        }
+      ],
+      "accuracy_pct_pot": 0.31
+    },
+    {
+      "node_key": "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|x.b700.c|9h|x",
+      "street": "river",
+      "board": "Ah7d2cKs9h",
+      "to_act": "BTN",
+      "pot_cbb": 2500,
+      "stacks_cbb": [8775, 8775],
+      "actions": [
+        { "token": "x", "size_cbb": 0 },
+        { "token": "b1875", "size_cbb": 1875 }
+      ],
+      "hands": [
+        {
+          "hand": "JdJh",
+          "reach": [0.0, 0.4],
+          "frequencies": [1.0, 0.0],
+          "ev_bb": [10.0, 8.0]
+        },
+        {
+          "hand": "TdTh",
+          "reach": [0.0, 0.35],
+          "frequencies": [1.0, 0.0],
+          "ev_bb": [9.0, 7.0]
+        },
+        {
+          "hand": "8c8s",
+          "reach": [0.0, 0.25],
+          "frequencies": [0.92, 0.08],
+          "ev_bb": [8.0, 7.0]
+        }
+      ],
+      "accuracy_pct_pot": 0.31
+    }
+  ]
+}
