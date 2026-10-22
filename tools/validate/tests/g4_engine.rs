@@ -7,13 +7,23 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use gto_model::NodeKey;
-use gto_solve::postflop::{NoProgress, Range, StopReason};
+use gto_solve::postflop::{NoProgress, ProgressSink, Range, StopReason};
 use library_pack::{check_invariants, parse_dump};
 use validate::fixtures::FIXTURES_RELATIVE_TO_REPO_ROOT;
-use validate::fixtures::g4_spots::G4Spots;
+use validate::fixtures::g4_spots::{G4Spots, RAKE_ONLINE, Spot};
 use validate::gates::g4::{self, RunExtras};
-use validate::gates::{GateReport, g4_engine};
+use validate::gates::{GateError, GateReport, g4_engine};
 use validate::report::Measurement;
+
+/// The tiny spot one street earlier, a turn root, and the online rake's percent in basis
+/// points (O-112).
+const TINY_TURN_KEY: &str = "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x.b275.c|Ks|";
+const TINY_TURN_BOARD: &str = "Ah7d2cKs";
+const TURN_POT_CBB: u32 = 1_100;
+const TURN_STACK_CBB: u32 = 9_475;
+const ONLINE_RAKE_PERCENT_BP: u16 = 500;
+/// A few iterations: the turn test checks keys and conventions, not convergence.
+const FEW_ITERATIONS: u32 = 5;
 
 /// The tiny list, relative to the fixture root, its one spot and that spot's root key.
 const TINY_SPOTS: &str = "g4/tiny-spots.json";
@@ -102,4 +112,68 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     assert_eq!(hands, live);
     assert_eq!(root.to_act, "BB");
     assert_eq!(reread.nodes.len(), 6, "every decision node of the river tree is dumped");
+}
+
+/// The tiny spot as a raked turn root (O-161), with the list's stop rule cut to a few
+/// iterations.
+fn raked_turn_list() -> G4Spots {
+    let mut spots =
+        G4Spots::load(&fixtures_dir().join(TINY_SPOTS)).unwrap_or_else(|e| panic!("{e}"));
+    let base = spots.spots.first().expect("the tiny list has one spot");
+    let spot = Spot {
+        id: "tiny-turn-raked".to_owned(),
+        street: "turn".to_owned(),
+        board: TINY_TURN_BOARD.to_owned(),
+        pot_cbb: TURN_POT_CBB,
+        stack_cbb: TURN_STACK_CBB,
+        node_key: TINY_TURN_KEY.to_owned(),
+        rake: RAKE_ONLINE.to_owned(),
+        gated: false,
+        ..base.clone()
+    };
+    spots.spots = vec![spot];
+    spots.stop.engine_target_pct_pot = 0.0;
+    spots.stop.max_iterations = FEW_ITERATIONS;
+    spots
+}
+
+/// R2.11 (O-135, O-161, O-164): a turn root solves to the iteration cap with the online
+/// rake on the stake, its deeper node keys append the line to the turn section, every
+/// node sits on the turn board, the dump carries the exploitability pair, a preflop kind
+/// the tree does not know is a solve error naming the spot, and the progress sink prints
+/// only measured iterations.
+#[test]
+fn r2_11_g4_engine_turn_root_keys_rake_and_errors() {
+    let spots = raked_turn_list();
+    let spot = &spots.spots[0];
+    let problem = g4_engine::problem_for(&spots, spot).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(problem.config.stake.rake.percent_bp, ONLINE_RAKE_PERCENT_BP, "raked twin");
+    let solve = g4_engine::solve_spot(&spots, spot, &NoProgress).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(solve.facts.stop_reason, "max-iterations");
+    assert_eq!(solve.report.stop_reason, StopReason::MaxIterations);
+    let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), EXPORTED_AT)
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(dump.exploitability_pct_pot.as_ref().map(Vec::len), Some(2));
+    assert_eq!(dump.nodes[0].node_key, TINY_TURN_KEY);
+    assert!(dump.nodes.iter().any(|node| node.node_key == format!("{TINY_TURN_KEY}x")));
+    for node in &dump.nodes {
+        assert_eq!((node.street.as_str(), node.board.as_str()), ("turn", TINY_TURN_BOARD));
+        assert!(node.node_key.starts_with(TINY_TURN_KEY), "{}", node.node_key);
+    }
+    let report = g4::run(&spots, &dump, &dump).unwrap_or_else(|e| panic!("{e}"));
+    assert!(report.pass, "a raked twin is informational, so nothing is judged");
+    assert!(report.thresholds.is_empty());
+
+    let mut odd = spots.clone();
+    odd.spots[0].preflop.kind = "weird".to_owned();
+    let error = g4_engine::problem_for(&odd, &odd.spots[0]).expect_err("an unknown kind");
+    assert!(
+        matches!(&error, GateError::Solve { spot, .. } if spot == "tiny-turn-raked"),
+        "{error}"
+    );
+    assert!(error.to_string().contains("weird"), "{error}");
+
+    let sink = g4_engine::SpotProgress { spot: spot.id.clone() };
+    sink.report(1, None);
+    sink.report(10, Some([0.5, 0.25]));
 }

@@ -222,10 +222,32 @@ GATE_CHECK_DIR := "target/gate-reports"
 
 # What ci runs instead of gates: the committed reports stay untouched, and --allow-dirty
 # lets a development tree run (the reports' notes then say the tree was dirty).
-# Gates G1 to G3 into target/gate-reports, then check-reports on that run (R2.4 to R2.6)
+# Gates G1 to G3 into target/gate-reports, check-reports, then g4-check (R2.4 to R2.6, R2.11)
 gates-check:
     cargo run --release -p validate -- gates --out {{GATE_CHECK_DIR}} --allow-dirty
     node scripts/check-reports.mjs {{GATE_CHECK_DIR}}
+    just g4-check
+
+G4_CHECK_DIR := "target/gate-reports/g4"
+G4_TINY := "validation/fixtures/g4"
+
+# The Zenbook run of gate G4 (R2.11, O-168, O-170): solves validation/fixtures/g4-spots.json
+# with the engine, compares against the oracle dump ORACLE the private program wrote, and
+# writes g4-oracle.json, g4-oracle.md and engine-dump.json into OUT, the private repository's
+# validation/reports/g4 (09 section 7). Clean tree, VALIDATE_MACHINE=zenbook.
+# Gate G4 oracle compare: validate g4 --oracle ORACLE --out OUT --write-engine OUT/engine-dump.json
+g4 ORACLE OUT:
+    cargo run --release -p validate -- g4 --oracle {{ORACLE}} --out {{OUT}} \
+        --write-engine {{OUT}}/engine-dump.json
+
+# What ci runs for G4: the compare on the committed synthetic tiny pair, no solve, into
+# target (O-168), then check-reports on it; the committed reports stay untouched.
+# Gate G4 compare smoke on the tiny pair into target/gate-reports/g4, then check-reports (R2.11)
+g4-check:
+    cargo run --release -p validate -- g4 --spots {{G4_TINY}}/tiny-spots.json \
+        --engine {{G4_TINY}}/engine-tiny.json --oracle {{G4_TINY}}/oracle-tiny.json \
+        --out {{G4_CHECK_DIR}} --allow-dirty
+    node scripts/check-reports.mjs {{G4_CHECK_DIR}}
 
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
 
