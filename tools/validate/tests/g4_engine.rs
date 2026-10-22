@@ -74,12 +74,13 @@ fn r2_11_g4_engine_dump_from_a_river_solve_compares_with_itself() {
     let spot = spots.spots.first().expect("the tiny list has one spot");
     let solve = g4_engine::solve_spot(&spots, spot, &NoProgress).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(solve.report.stop_reason, StopReason::Target, "{:?}", solve.report);
-    let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), EXPORTED_AT);
+    let dump = g4_engine::engine_dump(&spots, std::slice::from_ref(&solve), EXPORTED_AT)
+        .unwrap_or_else(|error| panic!("{error}"));
     let path = scratch("engine-tiny-solved.json");
     g4_engine::write_dump(&dump, &path).unwrap_or_else(|error| panic!("{error}"));
     let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
     let reread = parse_dump(&bytes).unwrap_or_else(|violations| panic!("{violations:?}"));
-    assert!(check_invariants(&reread).is_empty());
+    assert_eq!(check_invariants(&reread), Vec::new(), "the written dump keeps every invariant");
     assert_eq!(reread, dump);
 
     let extras = RunExtras { facts: vec![solve.facts.clone()], ..RunExtras::default() };

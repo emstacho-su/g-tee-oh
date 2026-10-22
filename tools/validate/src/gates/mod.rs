@@ -37,6 +37,7 @@ pub mod g1;
 pub mod g2;
 pub mod g3;
 pub mod g4;
+pub mod g4_engine;
 
 /// One of the three toy-game gates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,6 +183,14 @@ pub enum GateError {
         /// What differs, in plain words.
         reason: String,
     },
+    /// The engine side of G4 could not build or solve a spot (R2.11); the message is the
+    /// adapter's.
+    Solve {
+        /// The spot id.
+        spot: String,
+        /// What failed, in the adapter's words.
+        message: String,
+    },
     /// A report could not be written.
     Report(ReportError),
 }
@@ -214,6 +223,9 @@ impl fmt::Display for GateError {
             Self::Mismatch { spot, node, reason } => {
                 write!(f, "G4 spot {spot}, node {node}: {reason}")
             }
+            Self::Solve { spot, message } => {
+                write!(f, "G4 spot {spot} could not be solved: {message}")
+            }
             Self::Report(error) => write!(f, "{error}"),
         }
     }
@@ -229,7 +241,8 @@ impl std::error::Error for GateError {
             | Self::MissingFact { .. }
             | Self::NoCurve { .. }
             | Self::Dump { .. }
-            | Self::Mismatch { .. } => None,
+            | Self::Mismatch { .. }
+            | Self::Solve { .. } => None,
         }
     }
 }
