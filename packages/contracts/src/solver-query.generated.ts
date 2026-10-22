@@ -1059,15 +1059,6 @@ export interface operations {
                     "text/plain; version=0.0.4": string;
                 };
             };
-            /** @description The registry could not be read */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
         };
     };
     coverage: {
@@ -1101,15 +1092,6 @@ export interface operations {
             };
             /** @description A malformed configuration identifier or pair */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The query database did not answer */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };

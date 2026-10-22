@@ -49,8 +49,6 @@ pub const UNKNOWN_TEXTURE_FAMILY: &str = "unknown";
         (status = 200, description = "The coverage", body = CoverageResponse),
         (status = 400, description = "A malformed configuration identifier or pair",
             body = Problem, content_type = "application/problem+json"),
-        (status = 503, description = "The query database did not answer",
-            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn coverage(

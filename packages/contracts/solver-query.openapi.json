@@ -49,16 +49,6 @@
                 }
               }
             }
-          },
-          "503": {
-            "description": "The registry could not be read",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
           }
         }
       }
@@ -106,16 +96,6 @@
           },
           "400": {
             "description": "A malformed configuration identifier or pair",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The query database did not answer",
             "content": {
               "application/problem+json": {
                 "schema": {

@@ -11,6 +11,10 @@
 //! blockers (`blockers`) and the noise flags (`crate::grade::noise_flags`, the one set of
 //! 05 section 9 rules shared with `/v1/grade`) are filled at every node.
 //!
+//! The acting seat comes from `crate::grade::acting_seat_or_internal`, the one decoder of
+//! the record's seat byte, so a record naming neither seat answers 500 here as it does on
+//! `/v1/nodes` and `/v1/deal`.
+//!
 //! Two weightings follow plan C.3: a share of a range and a rank in it weight a class by
 //! reach times its combo count; a distribution, a mean equity and a nut share weight a
 //! class by reach times its live matchups against the other range, so identical ranges
@@ -22,7 +26,7 @@ mod ranges;
 mod tests;
 mod threshold;
 
-use gto_library::{HandSpace, NodeRecord, NodeView};
+use gto_library::{HandSpace, NodeView};
 
 pub use blockers::blockers;
 pub use ranges::{SeatRange, equity_distribution, nut_advantage, range_advantage, seat_ranges};
@@ -32,7 +36,8 @@ use crate::api::insights::{
     EquityDistribution, HandRole, InsightsResponse, NutAdvantage, RangeAdvantage, ThresholdCard,
 };
 use crate::equity::EquityTable;
-use crate::grade::noise_flags;
+use crate::error::ApiError;
+use crate::grade::{acting_seat_or_internal, noise_flags, other_seat};
 use crate::hand::HandRef;
 
 /// A hand takes an action, folds, or is dominated by a passive action, at or above this
@@ -65,48 +70,76 @@ struct EquityBlocks {
     hand_role: HandRole,
 }
 
+/// The response's optional blocks in field order: every one `Some` at a `preflop_169`
+/// node, every one `None` at a `postflop_1326` node (O-32).
+type OptionalBlocks = (
+    Option<ThresholdCard>,
+    Option<EquityDistribution>,
+    Option<RangeAdvantage>,
+    Option<NutAdvantage>,
+    Option<HandRole>,
+);
+
+/// The optional blocks of a node that has none.
+const NO_BLOCKS: OptionalBlocks = (None, None, None, None, None);
+
+impl EquityBlocks {
+    /// The blocks as the response's optional fields, every one `Some`.
+    fn into_fields(self) -> OptionalBlocks {
+        (
+            Some(self.threshold_card),
+            Some(self.equity_distribution),
+            Some(self.range_advantage),
+            Some(self.nut_advantage),
+            Some(self.hand_role),
+        )
+    }
+}
+
 /// The insight data of `hand` (written as `text`) at the node `view`, with `floor_pct_pot`
 /// the grading floor of plan C.2 step 5 for the noise flags.
-#[must_use]
+///
+/// # Errors
+///
+/// `ApiError::Internal` for a record whose seat byte names neither seat of the pair, the
+/// answer every route gives such a record (`grade::acting_seat_or_internal`).
 pub fn compute(
     table: &EquityTable,
     view: &NodeView,
     hand: HandRef,
     text: &str,
     floor_pct_pot: f32,
-) -> InsightsResponse {
-    let blockers = blockers(view, hand, text);
+) -> Result<InsightsResponse, ApiError> {
+    let to_act = acting_seat_or_internal(view)?;
+    let blockers = blockers(view, other_seat(to_act), hand, text);
     let noise_flags = noise_flags(view, hand.index, floor_pct_pot);
     let blocks = match view.record().hand_space {
-        HandSpace::Preflop169 => Some(equity_blocks(table, view, hand, text)),
+        HandSpace::Preflop169 => Some(equity_blocks(table, view, to_act, hand, text)),
         HandSpace::Postflop1326 => None,
     };
-    match blocks {
-        Some(blocks) => InsightsResponse {
-            threshold_card: Some(blocks.threshold_card),
-            equity_distribution: Some(blocks.equity_distribution),
-            range_advantage: Some(blocks.range_advantage),
-            nut_advantage: Some(blocks.nut_advantage),
-            blockers,
-            hand_role: Some(blocks.hand_role),
-            noise_flags,
-        },
-        None => InsightsResponse {
-            threshold_card: None,
-            equity_distribution: None,
-            range_advantage: None,
-            nut_advantage: None,
-            blockers,
-            hand_role: None,
-            noise_flags,
-        },
-    }
+    let (threshold_card, equity_distribution, range_advantage, nut_advantage, hand_role) =
+        blocks.map_or(NO_BLOCKS, EquityBlocks::into_fields);
+    Ok(InsightsResponse {
+        threshold_card,
+        equity_distribution,
+        range_advantage,
+        nut_advantage,
+        blockers,
+        hand_role,
+        noise_flags,
+    })
 }
 
-/// Every equity-based block of a `preflop_169` node.
-fn equity_blocks(table: &EquityTable, view: &NodeView, hand: HandRef, text: &str) -> EquityBlocks {
+/// Every equity-based block of a `preflop_169` node, `to_act` being the acting seat's
+/// index in the pair.
+fn equity_blocks(
+    table: &EquityTable,
+    view: &NodeView,
+    to_act: usize,
+    hand: HandRef,
+    text: &str,
+) -> EquityBlocks {
     let seats = seat_ranges(table, view);
-    let to_act = acting_seat(view.record());
     let acting = &seats[to_act];
     let class = usize::from(hand.index);
     let rank = rank_in_range(acting, class);
@@ -117,18 +150,6 @@ fn equity_blocks(table: &EquityTable, view: &NodeView, hand: HandRef, text: &str
         nut_advantage: nut_advantage(&seats, to_act),
         hand_role: hand_role(view, hand.index, rank),
     }
-}
-
-/// The acting seat's index in the pair, 0 out of position and 1 in position (O-130).
-#[must_use]
-pub fn acting_seat(record: &NodeRecord) -> usize {
-    usize::from(record.to_act != 0)
-}
-
-/// The other seat's index in the pair.
-#[must_use]
-pub fn villain_seat(record: &NodeRecord) -> usize {
-    usize::from(record.to_act == 0)
 }
 
 /// One hand's frequencies in record order as f64, `None` when the node does not hold it.

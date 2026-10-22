@@ -13,7 +13,7 @@ use super::{
 use crate::api::NoiseFlag;
 use crate::api::insights::{HandRole, Relative};
 use crate::equity::{CLASSES, EquityTable};
-use crate::grade::{best_action, hand_numbers, noise_flags};
+use crate::grade::{IP_SEAT, best_action, hand_numbers, noise_flags};
 use crate::hand::{HandRef, parse_hand};
 
 /// The O-22 floor the insights route applies (`routes::insights::floor_for`): the node's
@@ -263,14 +263,14 @@ fn r2_14_blockers_remove_villain_combos_for_a_combo_and_a_class() {
         pure(class("KK"), [0.0, 1.0], RAISE),
     ];
     let view = node(HandSpace::Preflop169, hands);
-    let by_combo = super::blockers(&view, hand_ref("AhKh", HandSpace::Preflop169), "AhKh");
+    let by_combo = super::blockers(&view, IP_SEAT, hand_ref("AhKh", HandSpace::Preflop169), "AhKh");
     assert_eq!(by_combo.hand, "AhKh");
     assert_eq!(by_combo.villain_combos_removed, 6, "{by_combo:?}");
     assert!(close(by_combo.villain_reach_removed_share, 0.5), "{by_combo:?}");
     let top: Vec<(&str, f32)> =
         by_combo.top_blocked.iter().map(|b| (b.hand.as_str(), b.reach_removed)).collect();
     assert_eq!(top, vec![("AA", 3.0), ("KK", 3.0)], "{by_combo:?}");
-    let by_class = super::blockers(&view, hand_ref("AKs", HandSpace::Preflop169), "AKs");
+    let by_class = super::blockers(&view, IP_SEAT, hand_ref("AKs", HandSpace::Preflop169), "AKs");
     assert_eq!(by_class.villain_combos_removed, 6, "the mean over four combos");
     assert!(close(by_class.villain_reach_removed_share, 0.5), "{by_class:?}");
 }
@@ -284,7 +284,8 @@ fn r2_14_blockers_at_a_1326_node_count_held_villain_combos() {
         pure(combo("7c2d"), [0.0, 1.0], FOLD),
     ];
     let view = node(HandSpace::Postflop1326, hands);
-    let blockers = super::blockers(&view, hand_ref("AhKh", HandSpace::Postflop1326), "AhKh");
+    let blockers =
+        super::blockers(&view, IP_SEAT, hand_ref("AhKh", HandSpace::Postflop1326), "AhKh");
     assert_eq!(blockers.villain_combos_removed, 1, "{blockers:?}");
     assert!(close(blockers.villain_reach_removed_share, 0.5 / 2.5), "{blockers:?}");
     assert_eq!(blockers.top_blocked.len(), 1);
@@ -362,7 +363,8 @@ fn r2_14_compute_fills_every_block_at_preflop_and_nulls_equity_blocks_postflop()
     let hands = vec![pure(class("AA"), [1.0, 1.0], RAISE), pure(class("72o"), [1.0, 1.0], FOLD)];
     let view = node(HandSpace::Preflop169, hands);
     let floor = floor_pct_pot(POT, Some(ACCURACY));
-    let preflop = compute(&table, &view, hand_ref("AA", HandSpace::Preflop169), "AA", floor);
+    let hand = hand_ref("AA", HandSpace::Preflop169);
+    let preflop = compute(&table, &view, hand, "AA", floor).expect("the big blind acts");
     assert!(preflop.threshold_card.is_some() && preflop.equity_distribution.is_some());
     assert!(preflop.range_advantage.is_some() && preflop.nut_advantage.is_some());
     assert_eq!(preflop.hand_role, Some(HandRole::Value), "AA raises and ranks 1");
@@ -375,7 +377,7 @@ fn r2_14_compute_fills_every_block_at_preflop_and_nulls_equity_blocks_postflop()
         vec![pure(combo("AhKh"), [1.0, 1.0], RAISE), pure(combo("AsKs"), [1.0, 1.0], CALL)];
     let view = node(HandSpace::Postflop1326, combos);
     let hand = hand_ref("AhKh", HandSpace::Postflop1326);
-    let postflop = compute(&table, &view, hand, "AhKh", floor);
+    let postflop = compute(&table, &view, hand, "AhKh", floor).expect("the big blind acts");
     assert!(postflop.threshold_card.is_none() && postflop.equity_distribution.is_none());
     assert!(postflop.range_advantage.is_none() && postflop.nut_advantage.is_none());
     assert_eq!(postflop.hand_role, None);

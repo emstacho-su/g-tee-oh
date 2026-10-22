@@ -9,7 +9,7 @@
 use gto_library::{HandSpace, NodeView, narrow_f32};
 use gto_model::{Card, ComboId, HandClass};
 
-use super::{TOP_BLOCKED, reach_of, villain_seat};
+use super::{TOP_BLOCKED, reach_of};
 use crate::api::insights::{BlockedClass, Blockers};
 use crate::equity::CLASSES;
 use crate::hand::HandRef;
@@ -41,11 +41,11 @@ impl Removal {
     }
 }
 
-/// The blockers block of `hand` (written as `text`) at the node.
+/// The blockers block of `hand` (written as `text`) at the node, `villain` being the other
+/// seat's index in the pair (`grade::other_seat` of the acting seat).
 #[must_use]
-pub fn blockers(view: &NodeView, hand: HandRef, text: &str) -> Blockers {
+pub fn blockers(view: &NodeView, villain: usize, hand: HandRef, text: &str) -> Blockers {
     let hero: Vec<ComboId> = hand.combo.map_or_else(|| hand.class.combos(), |combo| vec![combo]);
-    let villain = villain_seat(view.record());
     let removal = match view.record().hand_space {
         HandSpace::Preflop169 => class_removal(view, villain, &hero),
         HandSpace::Postflop1326 => combo_removal(view, villain, &hero),

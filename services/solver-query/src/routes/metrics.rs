@@ -9,7 +9,6 @@ use axum::extract::State;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 
-use crate::api::problem::Problem;
 use crate::app::AppState;
 use crate::error::ApiError;
 use crate::metrics::Gauges;
@@ -29,8 +28,6 @@ pub const METRICS_CONTENT_TYPE: &str = "text/plain; version=0.0.4";
     responses(
         (status = 200, description = "The Prometheus exposition",
             body = String, content_type = "text/plain; version=0.0.4"),
-        (status = 503, description = "The registry could not be read",
-            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn metrics(State(state): State<AppState>) -> Result<Response, ApiError> {

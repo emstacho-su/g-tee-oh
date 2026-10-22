@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use gto_library::NodeView;
 use gto_model::{
     ActionFamily, ActionToken, ConfigId, DepthBand, NodeKey, Position, PositionPair, SpotClass,
     SpotClassKey, Street, parse_line, v1_configs,
@@ -15,11 +16,8 @@ use gto_model::{
 
 use crate::api::deal::DealFilter;
 use crate::error::ApiError;
+use crate::grade::{OOP_SEAT, acting_seat_or_internal};
 use crate::library::Library;
-
-/// A record's `to_act` seat indexes: 0 out of position, 1 in position (A3 section 4).
-const OOP_SEAT: u8 = 0;
-const IP_SEAT: u8 = 1;
 
 /// Candidate preflop lines for a `spot_class_key`, tried in this order and kept when
 /// `ActionFamily::classify` puts them in the key's family (O-145). The sizes follow the
@@ -195,8 +193,8 @@ pub async fn resolve_start(library: &Arc<Library>, filter: &DealFilter) -> Resul
     };
     for line in candidates {
         let key = NodeKey::preflop(config_id.clone(), pair, line);
-        if let Some(to_act) = first_holding(library, &solution_ids, &key).await? {
-            let (hero, villain) = seats(pair, to_act)?;
+        if let Some(view) = first_holding(library, &solution_ids, &key).await? {
+            let (hero, villain) = seats(pair, &view)?;
             return Ok(Start { street, key, solution_ids, hero, villain });
         }
     }
@@ -205,16 +203,16 @@ pub async fn resolve_start(library: &Arc<Library>, filter: &DealFilter) -> Resul
     )))
 }
 
-/// The seat to act at `key` in the first of `solution_ids` that holds it, `None` when
-/// none does; an unavailable solution or an internal failure stops the search.
+/// The node at `key` in the first of `solution_ids` that holds it, `None` when none does;
+/// an unavailable solution or an internal failure stops the search.
 async fn first_holding(
     library: &Arc<Library>,
     solution_ids: &[String],
     key: &NodeKey,
-) -> Result<Option<u8>, ApiError> {
+) -> Result<Option<NodeView>, ApiError> {
     for id in solution_ids {
         match Arc::clone(library).node_blocking(id.clone(), key.clone()).await {
-            Ok(view) => return Ok(Some(view.record().to_act)),
+            Ok(view) => return Ok(Some(view)),
             Err(ApiError::NotFound(_)) => {}
             Err(other) => return Err(other),
         }
@@ -222,15 +220,12 @@ async fn first_holding(
     Ok(None)
 }
 
-/// Hero (the seat to act) and villain for a record's `to_act` index.
-fn seats(pair: PositionPair, to_act: u8) -> Result<(Position, Position), ApiError> {
-    match to_act {
-        OOP_SEAT => Ok((pair.oop(), pair.ip())),
-        IP_SEAT => Ok((pair.ip(), pair.oop())),
-        other => Err(ApiError::Internal(format!(
-            "record seat index {other} is neither {OOP_SEAT} nor {IP_SEAT}"
-        ))),
-    }
+/// Hero (the seat to act) and villain at the node, through the one decoder of the record's
+/// seat byte every route shares (`grade::acting_seat_or_internal`), so a malformed record
+/// answers here as it does on `/v1/nodes` and `/v1/insights`.
+fn seats(pair: PositionPair, view: &NodeView) -> Result<(Position, Position), ApiError> {
+    let seat = acting_seat_or_internal(view)?;
+    Ok(if seat == OOP_SEAT { (pair.oop(), pair.ip()) } else { (pair.ip(), pair.oop()) })
 }
 
 /// A line as its dotted text, for a detail.
@@ -240,11 +235,19 @@ fn line_text(line: &[ActionToken]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use gto_model::{ActionFamily, Position, PositionPair, format_line, parse_line};
+    use gto_library::{HandSpace, NodeRecord, NodeView, SolvedHand, SolvedNode};
+    use gto_model::{
+        ActionFamily, ActionToken, Cbb, ConfigId, NodeKey, Position, PositionPair, format_line,
+        parse_line,
+    };
 
-    use super::{CANDIDATE_LINES, StartAt, candidate_lines, parse_filter};
+    use super::{CANDIDATE_LINES, StartAt, candidate_lines, parse_filter, seats};
     use crate::api::deal::DealFilter;
     use crate::error::ApiError;
+    use crate::grade::acting_seat_or_internal;
+
+    /// A seat byte outside the pair (A3 section 4: 0 out of position, 1 in position).
+    const MALFORMED_SEAT: u8 = 2;
 
     fn filter() -> DealFilter {
         DealFilter {
@@ -266,6 +269,27 @@ mod tests {
             Err(ApiError::BadRequest(detail)) => detail,
             other => panic!("expected a bad request, got {other:?}"),
         }
+    }
+
+    /// The pair's root node with `to_act` to act and one hand, as the reader returns it.
+    fn record(to_act: Position) -> NodeRecord {
+        let config_id = ConfigId::new("cfg_6_online_100").expect("a catalog configuration");
+        let solved = SolvedNode {
+            key: NodeKey::preflop(config_id, pair(), Vec::new()),
+            to_act,
+            pot: Cbb(150),
+            stacks: [Cbb(10_000), Cbb(10_000)],
+            actions: vec![(ActionToken::Fold, Cbb::ZERO), (ActionToken::Call, Cbb(100))],
+            hand_space: HandSpace::Preflop169,
+            hands: vec![SolvedHand {
+                hand: 0,
+                reach: Some([1.0, 1.0]),
+                frequencies: vec![0.0, 1.0],
+                ev_bb: vec![-0.5, 1.0],
+            }],
+            accuracy_pct_pot: None,
+        };
+        NodeRecord::from_solved(&solved, pair()).expect("the node quantizes")
     }
 
     #[test]
@@ -296,9 +320,8 @@ mod tests {
         let key = "preflop/online/100/facing-open/BB-BTN".to_owned();
         let class = DealFilter { spot_class_key: Some(key), ..filter() };
         let parsed = parse_filter(&class).expect("a class parses");
-        assert!(
-            matches!(parsed.start, StartAt::Class(class) if class.family == ActionFamily::FacingOpen)
-        );
+        let facing_open = ActionFamily::FacingOpen;
+        assert!(matches!(parsed.start, StartAt::Class(class) if class.family == facing_open));
     }
 
     #[test]
@@ -329,5 +352,24 @@ mod tests {
         assert!(bad_request(&bad_pair).contains("BB-BTN"));
         let bad_config = DealFilter { config_id: "Cfg!".to_owned(), ..filter() };
         assert_ne!(bad_request(&bad_config), "");
+    }
+
+    #[test]
+    fn r2_13_seats_follow_the_record_and_a_malformed_seat_byte_is_the_shared_internal_error() {
+        let oop = NodeView::from(record(Position::Bb));
+        let hero_oop = seats(pair(), &oop).expect("the big blind acts");
+        assert_eq!(hero_oop, (Position::Bb, Position::Btn));
+        let ip = NodeView::from(record(Position::Btn));
+        let hero_ip = seats(pair(), &ip).expect("the button acts");
+        assert_eq!(hero_ip, (Position::Btn, Position::Bb));
+        let mut malformed = record(Position::Bb);
+        malformed.to_act = MALFORMED_SEAT;
+        let view = NodeView::from(malformed);
+        let error = seats(pair(), &view).expect_err("neither seat of the pair");
+        let shared = acting_seat_or_internal(&view).expect_err("the one decoder refuses");
+        assert_eq!(error, shared, "deal answers as nodes and insights do");
+        let names_the_byte =
+            matches!(error, ApiError::Internal(ref m) if m.contains("seat index 2"));
+        assert!(names_the_byte, "{error}");
     }
 }

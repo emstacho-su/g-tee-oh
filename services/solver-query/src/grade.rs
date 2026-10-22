@@ -22,6 +22,7 @@ use gto_model::grading::{self, Floor};
 use gto_model::{ComboId, HandClass};
 
 use crate::api::{DifficultyFeatures, FloorSource, NoiseFlag};
+use crate::error::ApiError;
 
 /// An action counts as played when its frequency is at or above this: the mixing epsilon
 /// of O-153 (05 section 9), shared by `close_ev_mix` and `DifficultyFeatures::mixed`.
@@ -35,7 +36,13 @@ pub const RARE_LINE_REACH: f32 = 0.005;
 pub const UNITS_PER_PCT: f32 = 100.0;
 
 /// The seats of a pair, out of position first (A3 section 1).
-const SEATS: usize = 2;
+pub const SEATS: usize = 2;
+
+/// The out-of-position seat's index in the pair (A3 section 4).
+pub const OOP_SEAT: usize = 0;
+
+/// The in-position seat's index in the pair (A3 section 4).
+pub const IP_SEAT: usize = 1;
 
 /// One hand's numbers at a node, read once from the view.
 #[derive(Clone, Debug, PartialEq)]
@@ -115,11 +122,32 @@ pub const fn floor_source(source: grading::FloorSource) -> FloorSource {
 }
 
 /// The acting seat's index in the pair: 0 out of position, 1 in position; `None` for a
-/// record whose seat byte is neither.
+/// record whose seat byte is neither. The one decoder of the record's seat byte: the
+/// nodes, insights and deal routes all read it here, so a malformed record answers the
+/// same way on every route (`acting_seat_or_internal`).
 #[must_use]
 pub fn acting_seat(view: &NodeView) -> Option<usize> {
     let seat = usize::from(view.record().to_act);
     (seat < SEATS).then_some(seat)
+}
+
+/// The acting seat's index, or the `ApiError::Internal` every route answers for a record
+/// whose seat byte names neither seat: a malformed record, never the caller's fault.
+///
+/// # Errors
+///
+/// `ApiError::Internal` naming the seat byte.
+pub fn acting_seat_or_internal(view: &NodeView) -> Result<usize, ApiError> {
+    acting_seat(view).ok_or_else(|| {
+        let seat = view.record().to_act;
+        ApiError::Internal(format!("record seat index {seat} is neither {OOP_SEAT} nor {IP_SEAT}"))
+    })
+}
+
+/// The other seat's index in the pair.
+#[must_use]
+pub const fn other_seat(seat: usize) -> usize {
+    SEATS - 1 - seat
 }
 
 /// How many combos `hand` stands for: its class's combos at a `preflop_169` node, one at a
