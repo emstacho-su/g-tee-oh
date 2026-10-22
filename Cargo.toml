@@ -90,6 +90,9 @@ tempfile = "3"
 # Validates Rust-written manifests against the committed JSON Schema in the gto-library tests.
 # Default features are off, which drops the remote reference resolver and its HTTP client.
 jsonschema = { version = "0.59", default-features = false }
+# Peak heap bytes in the R2.10 estimate and refusal tests (O-139), installed as the global
+# allocator of those test binaries only; dev-dependency only.
+peak_alloc = "0.2"
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
@@ -107,6 +110,11 @@ gto-planner = { path = "crates/gto-planner" }
 # Groups carry priority -1 so an individual lint entry added later overrides them.
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+
+# The engine runs optimised even in debug test builds, so `just rust-test` solves the R2.10
+# test spots in seconds while debug assertions stay on (O-140).
+[profile.dev.package.engine]
+opt-level = 3
 
 [profile.release]
 lto = "thin"

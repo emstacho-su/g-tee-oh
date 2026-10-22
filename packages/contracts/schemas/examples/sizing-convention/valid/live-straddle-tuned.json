@@ -1,0 +1,20 @@
+{
+  "spec_version": 1,
+  "open_bb": 4.0,
+  "iso_rule": { "base_bb": 4.0, "per_limper_bb": 1.0 },
+  "threebet_ip": 3.0,
+  "threebet_oop": 3.5,
+  "fourbet": 2.3,
+  "straddle_bb": 2.0,
+  "limp_positions": ["SB", "BTN"],
+  "postflop": {
+    "flop": [0.33, 0.75],
+    "turn": [0.75],
+    "river": [0.75],
+    "raise": { "flop": [0.5], "turn": [0.5], "river": [] },
+    "bet_allin": true,
+    "raise_allin": true,
+    "raise_cap": 3,
+    "allin_threshold_pct": 67
+  }
+}

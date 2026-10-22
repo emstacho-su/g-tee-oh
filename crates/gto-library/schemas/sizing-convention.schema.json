@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/emstacho-su/g-tee-oh/packages/contracts/schemas/sizing-convention.schema.json",
+  "title": "g-tee-oh sizing convention spec",
+  "description": "One sizing_convention spec (R2.9, O-76, O-136), sizes in big blinds (bb).",
+  "$comment": "gto-tree converts to centi-big-blinds (cbb) and basis points (bp) on a grid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["open_bb", "iso_rule", "threebet_ip", "threebet_oop", "fourbet", "postflop"],
+  "properties": {
+    "spec_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "The version of this spec format; absent means 1 (O-136)."
+    },
+    "placeholder_for": {
+      "$ref": "#/$defs/config_id",
+      "description": "The game_config a seed placeholder stands in for (R0.6); absent on real rows."
+    },
+    "open_bb": {
+      "$ref": "#/$defs/positive_bb",
+      "description": "The open raise size in bb, for example 2.5 (a raise to 250 cbb)."
+    },
+    "iso_rule": {
+      "$ref": "#/$defs/iso_rule",
+      "description": "The isolation raise over limpers: a base plus an amount per limper."
+    },
+    "threebet_ip": {
+      "$ref": "#/$defs/multiplier",
+      "description": "The 3-bet in position (IP), as a multiple of the raise it answers."
+    },
+    "threebet_oop": {
+      "$ref": "#/$defs/multiplier",
+      "description": "The 3-bet out of position (OOP), as a multiple of the raise it answers."
+    },
+    "fourbet": {
+      "$ref": "#/$defs/multiplier",
+      "description": "The 4-bet as a multiple of the 3-bet it answers; the 5-bet is all-in (O-136)."
+    },
+    "straddle_bb": {
+      "type": ["number", "null"],
+      "exclusiveMinimum": 0,
+      "description": "The straddle in bb, or null (or absent) when the game has no straddle."
+    },
+    "limp_positions": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "The seats that may open limp; absent means the small blind only (O-136).",
+      "items": { "$ref": "#/$defs/position" }
+    },
+    "postflop": {
+      "$ref": "#/$defs/postflop",
+      "description": "The postflop sizes per street and the tree tuning fields."
+    }
+  },
+  "$defs": {
+    "config_id": {
+      "type": "string",
+      "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+      "description": "A game_config id in gto-model's grammar (O-112, O-132), as in the manifest."
+    },
+    "position": {
+      "type": "string",
+      "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+      "description": "One of gto-model's nine seat names, as in the manifest (O-132)."
+    },
+    "positive_bb": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "An amount in bb above zero, on the 0.01 bb (1 cbb) grid."
+    },
+    "multiplier": {
+      "type": "number",
+      "exclusiveMinimum": 1,
+      "description": "A multiple of the raise answered, above 1, on the 0.01 grid."
+    },
+    "fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "A size as a fraction of the pot above zero, such as 0.75, on the 1 bp grid."
+    },
+    "fractions": {
+      "type": "array",
+      "description": "Pot fractions; empty offers none. gto-tree rejects two in one bucket.",
+      "items": { "$ref": "#/$defs/fraction" }
+    },
+    "iso_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_bb", "per_limper_bb"],
+      "description": "Isolation raise size: base_bb plus per_limper_bb for each limper.",
+      "properties": {
+        "base_bb": {
+          "$ref": "#/$defs/positive_bb",
+          "description": "The raise size in bb over one limper, before the per limper part."
+        },
+        "per_limper_bb": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The bb added for each limper, zero or more."
+        }
+      }
+    },
+    "street_fractions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flop", "turn", "river"],
+      "description": "One list of fractions of the pot per postflop street.",
+      "properties": {
+        "flop": { "$ref": "#/$defs/fractions", "description": "The flop sizes." },
+        "turn": { "$ref": "#/$defs/fractions", "description": "The turn sizes." },
+        "river": { "$ref": "#/$defs/fractions", "description": "The river sizes." }
+      }
+    },
+    "postflop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flop", "turn", "river"],
+      "description": "Bet sizes per street, plus the optional raise and tree tuning fields.",
+      "properties": {
+        "flop": { "$ref": "#/$defs/fractions", "description": "The flop bet sizes." },
+        "turn": { "$ref": "#/$defs/fractions", "description": "The turn bet sizes." },
+        "river": { "$ref": "#/$defs/fractions", "description": "The river bet sizes." },
+        "raise": {
+          "$ref": "#/$defs/street_fractions",
+          "description": "Raise sizes per street; absent means raises are all-in only (O-136)."
+        },
+        "bet_allin": {
+          "type": "boolean",
+          "description": "Offer an all-in bet beside the sized bets; absent means false (O-136)."
+        },
+        "raise_allin": {
+          "type": "boolean",
+          "description": "Offer an all-in raise beside the sized raises; absent means true (O-136)."
+        },
+        "raise_cap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Raises allowed per street, the opening bet not counted; absent means 3."
+        },
+        "allin_threshold_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "description": "A size putting in this percent of the stack or more becomes all-in (67)."
+        }
+      }
+    }
+  }
+}
