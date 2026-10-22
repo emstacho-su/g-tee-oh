@@ -1,6 +1,6 @@
 //! `GET /v1/coverage` (A5 section 2, R2.13, O-28, O-146): what the library holds for a
 //! configuration and pair. Preflop availability comes from the fixture registry and, when
-//! `QUERY_DATABASE_URL` is set, from the `solution` table under the read-only query role;
+//! `QUERY_DB_PASSWORD` is set, from the `solution` table under the read-only query role;
 //! flops, textures and queue positions come from the database only, so without one they
 //! are empty and `database` says `unconfigured`.
 
@@ -35,7 +35,7 @@ pub enum CoverageSource {
 pub enum DatabaseState {
     /// The query role answered.
     Connected,
-    /// No `QUERY_DATABASE_URL` is set.
+    /// No `QUERY_DB_PASSWORD` is set, so no database is configured.
     Unconfigured,
     /// The connection or a query failed.
     Unavailable,

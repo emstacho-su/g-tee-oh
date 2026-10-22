@@ -108,8 +108,8 @@ EXPOSE 7070
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 CMD ["/usr/local/bin/solver-query", "healthz"]
 
 # Environment (names from .env.example): DATABASE_URL is not used here; the service reads
-# under the query role (O-28) through QUERY_DATABASE_URL, which compose composes from
-# QUERY_DB_PASSWORD (O-146), the library bucket through S3_ENDPOINT and S3_LIBRARY_* (unused
+# under the query role (O-28) from the QUERY_DB_* parts (host, port, name, user, password,
+# sslmode; O-146), the library bucket through S3_ENDPOINT and S3_LIBRARY_* (unused
 # until the S3 adapter of O-144), the fixture library through FIXTURE_LIBRARY_PATH (O-62)
 # and its chunk cache budget through QUERY_CACHE_BYTES. Compose supplies them; nothing is
 # baked in.

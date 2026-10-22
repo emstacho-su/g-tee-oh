@@ -331,7 +331,7 @@ export interface components {
         CoverageSource: "fixture" | "library";
         /** @description The query-role connection (O-28, O-146). */
         DatabaseHealth: {
-            /** @description True when `QUERY_DATABASE_URL` is set. */
+            /** @description True when `QUERY_DB_PASSWORD` is set (the query-role connection is configured). */
             configured: boolean;
             /** @description True when the role probe answered on this request. */
             connected: boolean;

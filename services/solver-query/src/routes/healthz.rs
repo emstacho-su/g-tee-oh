@@ -5,7 +5,7 @@
 //! late shows up without a restart. The `library` block is `Library::stats` (the startup
 //! scan's count, the solutions the reader marked unavailable, the cache in use and its
 //! budget, O-144). The `database` block is the query-role connection (O-146): `configured`
-//! when `QUERY_DATABASE_URL` is set, `connected` and the `role` when the probe of
+//! when `QUERY_DB_PASSWORD` is set, `connected` and the `role` when the probe of
 //! `Db::probe_role` answered on this request, within its timeout, so a database that is
 //! down lowers nothing but this block. `status` stays `ok` whatever the blocks say: the
 //! process answering is what the probe measures. The body is JavaScript Object Notation

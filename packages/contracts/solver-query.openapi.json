@@ -743,7 +743,7 @@
         "properties": {
           "configured": {
             "type": "boolean",
-            "description": "True when `QUERY_DATABASE_URL` is set."
+            "description": "True when `QUERY_DB_PASSWORD` is set (the query-role connection is configured)."
           },
           "connected": {
             "type": "boolean",

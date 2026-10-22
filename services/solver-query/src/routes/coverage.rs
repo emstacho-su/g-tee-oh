@@ -8,7 +8,7 @@
 //! read (source `library`, ids the registry lacks). Flops, textures and the queue come from
 //! the database only: each flop's texture family is `gto_model::TextureFamily::of` over
 //! `Flop::from_str`, and the textures block groups the flops by family. Without
-//! `QUERY_DATABASE_URL` those blocks are empty and `database` is `unconfigured`; when the
+//! `QUERY_DB_PASSWORD` those blocks are empty and `database` is `unconfigured`; when the
 //! connection or a read fails, the registry side is still served, those blocks are empty
 //! and `database` is `unavailable`, never a 500 (the failure is logged by `db`).
 

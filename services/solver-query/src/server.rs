@@ -18,7 +18,7 @@ pub enum Error {
     Config(config::Error),
     /// The log subscriber could not be installed.
     Logging(logging::Error),
-    /// The application state could not be built (a rejected connection string).
+    /// The application state could not be built (a rejected database part or no runtime).
     Start(StartError),
     /// The async runtime could not be built.
     Runtime(io::Error),

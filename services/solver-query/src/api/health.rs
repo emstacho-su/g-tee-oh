@@ -53,7 +53,7 @@ pub struct LibraryHealth {
 /// The query-role connection (O-28, O-146).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DatabaseHealth {
-    /// True when `QUERY_DATABASE_URL` is set.
+    /// True when `QUERY_DB_PASSWORD` is set (the query-role connection is configured).
     pub configured: bool,
     /// True when the role probe answered on this request.
     pub connected: bool,
