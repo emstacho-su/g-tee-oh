@@ -240,13 +240,18 @@ g4 ORACLE OUT:
     cargo run --release -p validate -- g4 --oracle {{ORACLE}} --out {{OUT}} \
         --write-engine {{OUT}}/engine-dump.json
 
-# What ci runs for G4: the compare on the committed synthetic tiny pair, no solve, into
-# target (O-168), then check-reports on it; the committed reports stay untouched.
-# Gate G4 compare smoke on the tiny pair into target/gate-reports/g4, then check-reports (R2.11)
-g4-check:
+# The compare half of the G4 smoke: the committed synthetic tiny pair, no solve, into target
+# (O-168); the committed reports stay untouched. The rust job runs this one, because it has
+# cargo but no node_modules (check-reports needs ajv, which the ts job installs).
+# Gate G4 compare smoke on the tiny pair into target/gate-reports/g4 (R2.11)
+g4-smoke:
     cargo run --release -p validate -- g4 --spots {{G4_TINY}}/tiny-spots.json \
         --engine {{G4_TINY}}/engine-tiny.json --oracle {{G4_TINY}}/oracle-tiny.json \
         --out {{G4_CHECK_DIR}} --allow-dirty
+
+# What gates-check and so just ci run for G4: the smoke, then check-reports on its report
+# Gate G4 smoke, then check-reports on target/gate-reports/g4 (R2.11)
+g4-check: g4-smoke
     node scripts/check-reports.mjs {{G4_CHECK_DIR}}
 
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"

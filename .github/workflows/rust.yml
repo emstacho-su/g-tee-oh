@@ -46,9 +46,10 @@ jobs:
         env:
           VALIDATE_MACHINE: github-ubuntu
       # The G4 compare on the committed synthetic tiny pair, no solve and no artifact: the
-      # real G4 run and its report are private (R2.11, O-168, O-170).
+      # real G4 run and its report are private (R2.11, O-168, O-170). The compare half only:
+      # check-reports on its output needs the ts job's node_modules, so just ci runs that.
       - name: Gate G4 smoke on the tiny pair (R2.11)
-        run: just g4-check
+        run: just g4-smoke
         env:
           VALIDATE_MACHINE: github-ubuntu
       - name: Upload gate reports
