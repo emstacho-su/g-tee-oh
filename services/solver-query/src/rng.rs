@@ -53,6 +53,14 @@ impl SplitMix64 {
         self.state
     }
 
+    /// The generator `draws` draws ahead of this one, without making them: the state
+    /// advances by one gamma per draw, so the jump is one multiplication. The request-id
+    /// middleware takes draw `n` of a process-wide stream this way (`middleware`).
+    #[must_use]
+    pub const fn jump(self, draws: u64) -> SplitMix64 {
+        SplitMix64 { state: self.state.wrapping_add(GOLDEN_GAMMA.wrapping_mul(draws)) }
+    }
+
     /// The next 64-bit draw.
     pub fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(GOLDEN_GAMMA);
@@ -144,6 +152,16 @@ mod tests {
             REFERENCE_SEED.wrapping_add(GOLDEN_GAMMA.wrapping_mul(draws)),
             "the state advances by one gamma per draw"
         );
+    }
+
+    #[test]
+    fn r2_13_rng_jump_lands_on_the_reference_vectors_without_drawing() {
+        for (position, expected) in REFERENCE_OUTPUTS.iter().enumerate() {
+            let draws = u64::try_from(position).expect("a small count");
+            let mut jumped = SplitMix64::new(REFERENCE_SEED).jump(draws);
+            assert_eq!(jumped.next_u64(), *expected, "draw {draws} after the jump");
+        }
+        assert_eq!(SplitMix64::new(REFERENCE_SEED).jump(0), SplitMix64::new(REFERENCE_SEED));
     }
 
     #[test]

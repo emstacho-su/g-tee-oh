@@ -1,11 +1,15 @@
 //! The dependency boundary of solver-query (R2.15, ADR 0018, A1 section 2, plan D.5):
-//! the manifest declares no edge to a solver, and the crate's `LINKS` names gto-library
-//! only. The compile-time proof stays `just rust-boundary` (cargo tree, O-101); this test
-//! reads the manifest text so a forbidden edge fails the test suite as well as the script.
+//! the manifest declares no edge to a solver, and the crate's `LINKS` names exactly the
+//! workspace crates it links, gto-library and gto-model. The compile-time proof stays
+//! `just rust-boundary` (cargo tree, O-101); this test reads the manifest text so a
+//! forbidden edge fails the test suite as well as the script.
 
 use std::fs;
 use std::path::Path;
 
+/// The workspace crates the manifest lists and `LINKS` names, in the banner's order.
+/// Third-party crates (sqlx, lru, sha2) are not workspace links.
+const WORKSPACE_LINKS: [&str; 2] = ["gto-library", "gto-model"];
 /// Crates the manifest must never list (the solver, the vendored engine, the builder).
 const FORBIDDEN: [&str; 4] = ["gto-solve", "engine", "postflop-engine", "library-builder"];
 /// The sections whose keys are dependency names.
@@ -31,14 +35,19 @@ fn r2_15_solver_query_manifest_declares_no_solver_edge() {
     let manifest = fs::read_to_string(&path).expect("the manifest reads");
 
     let dependencies = section_keys(&manifest, "[dependencies]");
-    assert!(dependencies.contains(&"gto-library".to_owned()), "{dependencies:?}");
+    for link in WORKSPACE_LINKS {
+        assert!(dependencies.contains(&link.to_owned()), "{link} missing: {dependencies:?}");
+    }
     for section in DEPENDENCY_SECTIONS {
         let keys = section_keys(&manifest, section);
         for forbidden in FORBIDDEN {
             assert!(!keys.contains(&forbidden.to_owned()), "{section} lists {forbidden}: {keys:?}");
         }
     }
-    assert_eq!(solver_query::LINKS, &["gto-library"], "LINKS names gto-library only");
+    assert_eq!(solver_query::LINKS, &WORKSPACE_LINKS, "LINKS names the workspace crates");
+    for forbidden in FORBIDDEN {
+        assert!(!solver_query::LINKS.contains(&forbidden), "LINKS names {forbidden}");
+    }
 }
 
 #[test]

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Json};
-use axum::http::{Request, StatusCode, header};
+use axum::http::{HeaderName, Request, StatusCode, header};
 use axum::middleware::{from_fn, from_fn_with_state};
 use axum::routing::{get, post};
 use axum::{Router, response::IntoResponse};
@@ -22,6 +22,7 @@ use super::{
     generate_request_id, latency, request_id,
 };
 use crate::api::problem::{PROBLEM_JSON, PROBLEM_TYPE_PREFIX};
+use crate::app::{AppState, app_with};
 use crate::error::ApiError;
 use crate::metrics::Metrics;
 
@@ -120,7 +121,7 @@ async fn r2_13_request_id_is_echoed_or_generated_and_fills_the_problem_instance(
 }
 
 #[tokio::test]
-async fn r2_13_axum_rejections_and_router_answers_become_problem_bodies() {
+async fn r2_13_extractor_rejections_become_400_or_413_problem_bodies() {
     let metrics = Arc::new(Metrics::new());
 
     let (status, meta, json) = send(router(&metrics), post_json("/json", "{ not json")).await;
@@ -141,6 +142,11 @@ async fn r2_13_axum_rejections_and_router_answers_become_problem_bodies() {
     let long = format!(r#"{{"seed":"{}"}}"#, "7".repeat(BODY_LIMIT));
     let (status, meta, json) = send(router(&metrics), post_json("/json", &long)).await;
     assert_problem(status, meta.as_deref(), &json, 413, PAYLOAD_TOO_LARGE_TAG);
+}
+
+#[tokio::test]
+async fn r2_13_router_404_and_405_answers_become_problem_bodies() {
+    let metrics = Arc::new(Metrics::new());
 
     let (status, meta, json) = send(router(&metrics), get_request("/nowhere", None)).await;
     assert_problem(status, meta.as_deref(), &json, 404, "not-found");
@@ -165,6 +171,23 @@ async fn r2_13_latency_middleware_observes_the_matched_route_and_final_status() 
     assert_eq!(metrics.requests_observed(), before + 3);
     metrics.observe("/x", 200, Duration::from_millis(3));
     assert_eq!(metrics.request_count("/x", 200), 1);
+}
+
+#[tokio::test]
+async fn r2_13_a_405_keeps_its_allow_header_on_the_problem_body() {
+    let (app, _) = app_with(AppState::empty());
+    let response = app.oneshot(get_request("/v1/grade", None)).await.expect("the app answers");
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    let header_text = |name: HeaderName| {
+        response.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_owned)
+    };
+    let allow = header_text(header::ALLOW);
+    assert_eq!(allow.as_deref(), Some("POST"), "Request for Comments (RFC) 9110 section 15.5.6");
+    assert_eq!(header_text(header::CONTENT_TYPE).as_deref(), Some(PROBLEM_JSON));
+    let bytes = response.into_body().collect().await.expect("a body").to_bytes();
+    let json: Value = serde_json::from_slice(&bytes).expect("a problem body");
+    assert_eq!(json["type"], format!("{PROBLEM_TYPE_PREFIX}{METHOD_NOT_ALLOWED_TAG}"), "{json}");
+    assert_eq!(json["status"], 405, "{json}");
 }
 
 #[test]

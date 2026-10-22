@@ -193,28 +193,39 @@ fn r2_13_library_answers_400_404_and_503() {
     assert_eq!(marked[0].0, fixture.prefix);
 }
 
-#[test]
-fn r2_13_library_scan_skips_what_is_not_a_solution() {
-    let fixture = packed();
+/// Four things under the packed root that are not solutions (plan C.7): a directory with
+/// no manifest, a manifest that does not parse, the packed manifest under another id's
+/// directory, and a preflop manifest under `builds/`.
+fn plant_non_solutions(fixture: &Packed) {
     let first = &fixture.nodes[0].key;
     let preflop = fixture.root.join("preflop").join(first.config_id.as_str());
     fs::create_dir_all(preflop.join("no-manifest-here")).expect("an empty directory");
     let bogus = preflop.join("00000000-0000-4000-8000-000000000000");
     fs::create_dir_all(&bogus).expect("a directory");
     fs::write(bogus.join(MANIFEST_FILE), b"{ not json").expect("a bogus manifest");
+    let original = fs::read(fixture.root.join(&fixture.prefix).join(MANIFEST_FILE)).expect("read");
     let renamed = preflop.join("11111111-0000-4000-8000-000000000000");
     fs::create_dir_all(&renamed).expect("a directory");
-    let original = fs::read(fixture.root.join(&fixture.prefix).join(MANIFEST_FILE)).expect("read");
     fs::write(renamed.join(MANIFEST_FILE), &original).expect("a manifest under another name");
     let wrong_kind = fixture.root.join("builds").join("x").join("y").join("z").join(SOLUTION_ID);
     fs::create_dir_all(&wrong_kind).expect("a directory");
     fs::write(wrong_kind.join(MANIFEST_FILE), &original).expect("a preflop manifest under builds");
+}
+
+#[test]
+fn r2_13_library_scan_skips_what_is_not_a_solution() {
+    let fixture = packed();
+    plant_non_solutions(&fixture);
 
     let library = Library::scan(&fixture.root, CACHE_BYTES).expect("the root scans");
 
     assert_eq!(library.stats().indexed, 1, "only the packed solution is indexed");
     assert!(library.info(SOLUTION_ID).is_some());
+}
 
+#[test]
+fn r2_13_library_scan_of_a_missing_root_is_an_error() {
+    let fixture = packed();
     let missing = fixture.root.join("no-such-root");
     let error = Library::scan(&missing, CACHE_BYTES).expect_err("a missing root is an error");
     assert!(error.to_string().contains("no-such-root"), "{error}");

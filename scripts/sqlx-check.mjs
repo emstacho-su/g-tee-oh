@@ -53,12 +53,53 @@ function rustFiles(dir, out = []) {
   return out;
 }
 
-// The text without its line comments, so a macro named in a comment never counts.
+// A char literal at the regex's lastIndex: one character or one escape between quotes.
+// Rust also writes lifetimes and labels with a quote ('a, 'static), which this never
+// matches, so such a quote is plain text.
+const CHAR_LITERAL = /'(?:\\(?:u\{[0-9A-Fa-f]{1,6}\}|.)|[^'\\\n])'/y;
+
+// The index just past the string literal that opens at `start`, or the text's end when it
+// never closes; a backslash escapes the character after it, and a newline is kept inside,
+// as a Rust string may span lines.
+function stringEnd(text, start) {
+  let at = start + 1;
+  while (at < text.length) {
+    if (text[at] === '\\') at += 2;
+    else if (text[at] === '"') return at + 1;
+    else at += 1;
+  }
+  return text.length;
+}
+
+// The text without its line comments, so a macro named in a comment never counts. A small
+// tokenizer walks the characters, so a `//` inside a string literal ("https://x") or a char
+// literal ('/') never starts a comment, which a line-wise cut would turn into a check that
+// stays silently off. A comment is dropped up to its newline, which stays, so lines keep
+// their numbers. A raw string's hashes are plain text, so a raw string is read as a string.
 export function withoutLineComments(text) {
-  return text
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n');
+  let kept = '';
+  let at = 0;
+  while (at < text.length) {
+    const char = text[at];
+    if (char === '"') {
+      const end = stringEnd(text, at);
+      kept += text.slice(at, end);
+      at = end;
+    } else if (char === "'") {
+      CHAR_LITERAL.lastIndex = at;
+      const literal = CHAR_LITERAL.exec(text);
+      const end = literal === null ? at + 1 : at + literal[0].length;
+      kept += text.slice(at, end);
+      at = end;
+    } else if (char === '/' && text[at + 1] === '/') {
+      const newline = text.indexOf('\n', at);
+      at = newline === -1 ? text.length : newline;
+    } else {
+      kept += char;
+      at += 1;
+    }
+  }
+  return kept;
 }
 
 // Every Rust source under `root` that calls a sqlx query macro, as absolute paths.

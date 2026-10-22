@@ -10,16 +10,26 @@
 //! should be able to cause (an unknown handle, a manifest the startup scan accepted and the
 //! reader then rejects) is 500. `From<ModelError>` is 400: a `gto-model` parse failure on a
 //! request path means the caller's key, hand, pair or configuration was malformed.
+//!
+//! A 503 detail names the solution's store prefix and a fixed failure class
+//! (`UnavailableClass`) and nothing else: the reader's reason, which holds an object path
+//! under the prefix, two sha256 digests or an operating system's error text, goes to the
+//! log at warn level and never to the caller (`Problem::detail` promises no path beyond
+//! the store prefix).
 
 use std::fmt;
 
 use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use gto_library::LibraryError;
+use gto_library::{LibraryError, is_uuid};
 use gto_model::ModelError;
 
 use crate::api::problem::{PROBLEM_JSON, PROBLEM_TYPE_PREFIX, Problem};
+
+/// The separator of store paths (`gto_library::LibraryError::InvalidPath`: forward
+/// slashes only).
+const PATH_SEPARATOR: char = '/';
 
 /// The detail of an `Internal` problem body; the real message is logged, never sent.
 pub const INTERNAL_DETAIL: &str = "the service failed to answer; see the service log";
@@ -40,6 +50,33 @@ pub fn problem_response(problem: Problem) -> Response {
     response
 }
 
+/// Why a solution cannot serve reads, as a 503 detail names it: one of four fixed classes
+/// and never the reader's reason, which is logged instead (see the module docs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnavailableClass {
+    /// A file's sha256 differs from the manifest's.
+    ChecksumMismatch,
+    /// A file that does not decode.
+    CorruptFile,
+    /// A file that cannot be read.
+    UnreadableFile,
+    /// The reader marked the solution unavailable, on this request or an earlier one.
+    Marked,
+}
+
+impl UnavailableClass {
+    /// The words the detail uses for this class.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            UnavailableClass::ChecksumMismatch => "checksum mismatch",
+            UnavailableClass::CorruptFile => "corrupt file",
+            UnavailableClass::UnreadableFile => "unreadable file",
+            UnavailableClass::Marked => "marked unavailable by the reader",
+        }
+    }
+}
+
 /// Every failure a handler reports.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ApiError {
@@ -51,12 +88,12 @@ pub enum ApiError {
     /// The request is well formed but out of order with the deal's state: a street
     /// revealed before the one that precedes it (409, plan C.4).
     Conflict(String),
-    /// The solution is marked unavailable by the reader (503).
+    /// The solution cannot serve reads (503).
     Unavailable {
         /// The solution's store prefix.
         prefix: String,
-        /// Why, as the reader reported it.
-        reason: String,
+        /// Why, as one of the fixed classes; the reader's reason is in the log.
+        class: UnavailableClass,
     },
     /// The query-role database did not answer (503).
     DatabaseUnavailable(String),
@@ -117,8 +154,8 @@ impl ApiError {
             ApiError::BadRequest(message)
             | ApiError::NotFound(message)
             | ApiError::Conflict(message) => message.clone(),
-            ApiError::Unavailable { prefix, reason } => {
-                format!("solution {prefix} is unavailable: {reason}")
+            ApiError::Unavailable { prefix, class } => {
+                format!("solution {prefix} is unavailable: {}", class.as_str())
             }
             ApiError::DatabaseUnavailable(message) => {
                 format!("the query database did not answer: {message}")
@@ -180,12 +217,16 @@ impl From<LibraryError> for ApiError {
                 ApiError::NotFound(format!("node {key} is not in this solution"))
             }
             LibraryError::Unavailable { prefix, reason } => {
-                ApiError::Unavailable { prefix, reason }
+                unavailable(prefix, UnavailableClass::Marked, &reason)
             }
-            LibraryError::ChecksumMismatch { ref path, .. }
-            | LibraryError::Corrupt { ref path, .. }
-            | LibraryError::Io { ref path, .. } => {
-                ApiError::Unavailable { prefix: path.clone(), reason: err.to_string() }
+            LibraryError::ChecksumMismatch { ref path, .. } => {
+                unavailable_under(path, UnavailableClass::ChecksumMismatch, &err)
+            }
+            LibraryError::Corrupt { ref path, .. } => {
+                unavailable_under(path, UnavailableClass::CorruptFile, &err)
+            }
+            LibraryError::Io { ref path, .. } => {
+                unavailable_under(path, UnavailableClass::UnreadableFile, &err)
             }
             LibraryError::Decode(_)
             | LibraryError::UnsupportedFormat(_)
@@ -206,8 +247,41 @@ impl From<ModelError> for ApiError {
     }
 }
 
+/// `Unavailable` for the solution at `prefix`, with the reader's full `reason` logged.
+fn unavailable(prefix: String, class: UnavailableClass, reason: &dyn fmt::Display) -> ApiError {
+    tracing::warn!(%prefix, class = class.as_str(), %reason, "solution unavailable");
+    ApiError::Unavailable { prefix, class }
+}
+
+/// `Unavailable` for the solution the object at `path` belongs to; an object under no
+/// solution is a failure no request should be able to cause.
+fn unavailable_under(path: &str, class: UnavailableClass, reason: &dyn fmt::Display) -> ApiError {
+    match solution_prefix(path) {
+        Some(prefix) => unavailable(prefix.to_owned(), class, reason),
+        None => ApiError::Internal(reason.to_string()),
+    }
+}
+
+/// The store prefix of the solution an object path is under: the path through its solution
+/// id, the first segment that is a universally unique identifier (UUID), in
+/// `preflop/<config_id>/<id>/...` and `builds/<config_id>/<pair>/<flop>/<id>/...` alike
+/// (A3 section 5); `None` when no segment is one.
+fn solution_prefix(path: &str) -> Option<&str> {
+    let mut end = 0;
+    for segment in path.split(PATH_SEPARATOR) {
+        end += segment.len();
+        if is_uuid(segment) {
+            return Some(&path[..end]);
+        }
+        end += PATH_SEPARATOR.len_utf8();
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use axum::http::{StatusCode, header};
     use axum::response::IntoResponse;
     use gto_library::LibraryError;
@@ -215,16 +289,20 @@ mod tests {
     use http_body_util::BodyExt;
     use serde_json::Value;
 
-    use super::{ApiError, INTERNAL_DETAIL, QUOTED_MAX_CHARS};
+    use super::{ApiError, INTERNAL_DETAIL, QUOTED_MAX_CHARS, UnavailableClass};
     use crate::api::problem::{PROBLEM_JSON, Problem};
+
+    /// A lowercase UUID, the last segment of a solution's store prefix.
+    const SOLUTION_ID: &str = "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d";
 
     #[test]
     fn r2_13_every_variant_maps_to_a_status_and_a_stable_type_tag() {
+        let marked = UnavailableClass::Marked;
         let cases = [
             (ApiError::BadRequest("x".into()), 400, "bad-request"),
             (ApiError::NotFound("x".into()), 404, "not-found"),
             (ApiError::Conflict("x".into()), 409, "conflict"),
-            (ApiError::Unavailable { prefix: "p".into(), reason: "r".into() }, 503, "unavailable"),
+            (ApiError::Unavailable { prefix: "p".into(), class: marked }, 503, "unavailable"),
             (ApiError::DatabaseUnavailable("x".into()), 503, "database-unavailable"),
             (ApiError::NotImplemented, 501, "not-implemented"),
             (ApiError::Internal("secret".into()), 500, "internal"),
@@ -272,15 +350,40 @@ mod tests {
     }
 
     #[test]
+    fn r2_13_unavailable_detail_names_the_prefix_and_a_failure_class_only() {
+        let prefix = format!("preflop/cfg_6_online_100/{SOLUTION_ID}");
+        let chunk = format!("{prefix}/chunks/0000.bin.zst");
+        let digest = "ab".repeat(32);
+        let reason = format!("checksum mismatch on {chunk}: expected {digest}, found 0");
+        let mismatch = LibraryError::ChecksumMismatch {
+            path: chunk.clone(),
+            expected: digest,
+            actual: "cd".repeat(32),
+        };
+        let corrupt = LibraryError::Corrupt { path: chunk.clone(), reason: "bad magic".into() };
+        let unreadable = LibraryError::Io { path: chunk, source: io::Error::other("denied") };
+        let marked = LibraryError::Unavailable { prefix: prefix.clone(), reason };
+        let cases = [
+            (mismatch, "checksum mismatch"),
+            (corrupt, "corrupt file"),
+            (unreadable, "unreadable file"),
+            (marked, "marked unavailable by the reader"),
+        ];
+        for (library_error, class) in cases {
+            let error = ApiError::from(library_error);
+            assert_eq!(error.status(), StatusCode::SERVICE_UNAVAILABLE, "{error}");
+            assert_eq!(error.detail(), format!("solution {prefix} is unavailable: {class}"));
+            assert!(matches!(error, ApiError::Unavailable { prefix: ref p, .. } if *p == prefix));
+        }
+    }
+
+    #[test]
     fn r2_13_library_and_model_errors_map_to_their_statuses() {
         let not_found = ApiError::from(LibraryError::NodeNotFound("k".into()));
         assert!(matches!(not_found, ApiError::NotFound(_)));
-        let unavailable =
-            ApiError::from(LibraryError::Unavailable { prefix: "p".into(), reason: "r".into() });
-        assert_eq!(unavailable, ApiError::Unavailable { prefix: "p".into(), reason: "r".into() });
-        let corrupt =
-            ApiError::from(LibraryError::Corrupt { path: "p/x".into(), reason: "r".into() });
-        assert!(matches!(corrupt, ApiError::Unavailable { ref prefix, .. } if prefix == "p/x"));
+        let source = io::Error::other("x");
+        let stray = ApiError::from(LibraryError::Io { path: "manifest.json".into(), source });
+        assert!(matches!(stray, ApiError::Internal(_)), "an object under no solution: {stray}");
         let internal = ApiError::from(LibraryError::UnknownHandle(3));
         assert!(matches!(internal, ApiError::Internal(_)));
         let bad = ApiError::from(ModelError::InvalidPosition("XX".into()));

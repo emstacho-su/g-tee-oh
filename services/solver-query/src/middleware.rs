@@ -19,9 +19,15 @@
 //!   every other client error becomes 400 `bad-request`, which is what the contract
 //!   promises for a malformed request whatever the extractor said (415, 422).
 //!
-//! Generated ids come from a process-wide counter mixed by the `SplitMix64` finalizer, so
-//! they are distinct within a process and never reveal the counter. The integrator of S16
-//! owns this file.
+//! A rebuilt answer is a fresh response, which is safe for the `Allow` header of a 405
+//! (Request for Comments (RFC) 9110 section 15.5.6): axum's method router sets it on the
+//! way out, after the layered fallback has answered, so it lands on the rebuilt response;
+//! `tests` pins this on the real router.
+//!
+//! Generated ids are draws of `rng::SplitMix64`: the id of call `n` is draw `n` of a stream
+//! seeded once per process from the clock and the process id, reached by jumping the state,
+//! so ids are distinct within a process and never reveal the counter. The integrator of
+//! S16 owns this file.
 
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -38,6 +44,7 @@ use tracing::Instrument as _;
 use crate::api::problem::{PROBLEM_TYPE_PREFIX, Problem};
 use crate::error::{ApiError, problem_response};
 use crate::metrics::Metrics;
+use crate::rng::SplitMix64;
 
 /// The header a caller sets to name the request and the service echoes.
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
@@ -57,16 +64,12 @@ pub const PAYLOAD_TOO_LARGE_TAG: &str = "payload-too-large";
 /// How much of a rejection body is read as the detail.
 const MAX_REJECTION_BODY_BYTES: usize = 64 * 1024;
 
-/// The `SplitMix64` increment and finalizer constants (Steele, Lea and Flood 2014).
-const GOLDEN_GAMMA: u64 = 0x9e37_79b9_7f4a_7c15;
-const MIX_1: u64 = 0xbf58_476d_1ce4_e5b9;
-const MIX_2: u64 = 0x94d0_49bb_1331_11eb;
-
-/// The process-wide seed of generated ids: the clock and the process id, mixed once.
+/// The process-wide seed of generated ids: the clock and the process id, drawn through
+/// the generator once.
 static ID_SEED: LazyLock<u64> = LazyLock::new(|| {
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let folded = u64::try_from(nanos & u128::from(u64::MAX)).unwrap_or(0);
-    mix(folded ^ u64::from(std::process::id()).rotate_left(32))
+    SplitMix64::new(folded ^ u64::from(std::process::id()).rotate_left(32)).next_u64()
 });
 
 /// How many ids this process generated.
@@ -109,18 +112,12 @@ fn incoming_request_id(headers: &HeaderMap) -> Option<String> {
     acceptable.then(|| value.to_owned())
 }
 
-/// Sixteen hexadecimal digits, distinct for every call within the process.
+/// Sixteen hexadecimal digits, distinct for every call within the process: draw `n` of the
+/// stream seeded by `ID_SEED`, where `n` counts the calls so far.
 #[must_use]
 pub fn generate_request_id() -> String {
     let n = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("{:016x}", mix(ID_SEED.wrapping_add(n.wrapping_mul(GOLDEN_GAMMA))))
-}
-
-/// The `SplitMix64` output function.
-fn mix(mut z: u64) -> u64 {
-    z = (z ^ (z >> 30)).wrapping_mul(MIX_1);
-    z = (z ^ (z >> 27)).wrapping_mul(MIX_2);
-    z ^ (z >> 31)
+    format!("{:016x}", SplitMix64::new(*ID_SEED).jump(n).next_u64())
 }
 
 /// The response with `id` in its problem body: a handler's problem gets its `instance`,

@@ -47,8 +47,11 @@ pub const SERVICE_NAME: &str = env!("CARGO_PKG_NAME");
 /// The binary's package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Internal crates this binary links (A1 section 2), named so the edges are exercised.
-pub const LINKS: &[&str] = &[gto_library::CRATE_NAME];
+/// The workspace crates this binary links (A1 section 2), named so the edges are
+/// exercised: the read-only face of `gto-library` and the contract vocabulary of
+/// `gto-model`. Third-party crates (sqlx, lru, sha2) are not workspace links, and
+/// `tests/boundary.rs` holds this list to the manifest.
+pub const LINKS: &[&str] = &[gto_library::CRATE_NAME, gto_model::CRATE_NAME];
 
 /// The one line `solver-query version` prints (the R0.1 smoke test reads it).
 #[must_use]
@@ -64,7 +67,7 @@ mod tests {
     fn r0_1_version_line_names_the_crate_and_its_links() {
         let line = version_line();
         assert!(line.starts_with(&format!("{SERVICE_NAME} {VERSION} ")), "line was {line}");
-        assert!(line.contains("gto-library"), "line was {line}");
+        assert!(line.ends_with("(links gto-library, gto-model)"), "line was {line}");
         assert!(!line.contains('\n'), "line was {line}");
     }
 }

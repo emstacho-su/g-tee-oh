@@ -20,6 +20,9 @@ const MANIFEST = '[package]\nname = "x"\n[dependencies]\nsqlx = "0.8"\n';
 const RUNTIME_CHECKED =
   'let rows = sqlx::query("select 1").fetch_all(pool).await?;\n// query!("not a call")\n';
 const MACRO_CHECKED = 'let row = sqlx::query_as!(Row, "select 1").fetch_one(pool).await?;\n';
+// A string holding `//` before the macro on the same line: the `//` is not a comment.
+const URL_THEN_MACRO =
+  'let u = "https://x"; let row = sqlx::query!("select 1").fetch_one(pool).await?;\n';
 
 let root;
 
@@ -60,6 +63,31 @@ test("R0.6 findMacroUses reports the file calling a macro and ignores the depend
   assert.deepEqual(findMacroUses(root), []);
   const macro = crate("macro", MACRO_CHECKED);
   assert.deepEqual(findMacroUses(root), [macro]);
+});
+
+test("R0.6 withoutLineComments keeps a // inside a string or char literal", () => {
+  // A string holding a uniform resource locator (URL) before the macro on one line: the
+  // macro after it is still seen.
+  const urlThenMacro = 'let u = "https://x"; sqlx::query!("select 1")';
+  assert.equal(withoutLineComments(urlThenMacro), urlThenMacro);
+  assert.ok(MACRO_USE.test(withoutLineComments(urlThenMacro)));
+  // A URL inside the macro's own string stays whole; the comment after it still goes.
+  const urlInMacro = `sqlx::query!("select 'https://x'") // query_as!(\nnext`;
+  assert.equal(withoutLineComments(urlInMacro), `sqlx::query!("select 'https://x'") \nnext`);
+  // An escaped quote does not end a string, and a string spans lines as a Rust string does.
+  assert.equal(withoutLineComments('"a\\"//b" // c'), '"a\\"//b" ');
+  assert.equal(withoutLineComments('"a\n// b"\n// c'), '"a\n// b"\n');
+  // A char literal is a string of one; a lifetime or a label is plain text.
+  const chars = "let c = '/'; let d = '\\''; // query!(";
+  assert.equal(withoutLineComments(chars), "let c = '/'; let d = '\\''; ");
+  const lifetimes = "fn f<'a>(x: &'a str) -> &'static str { x } // query!(";
+  assert.equal(withoutLineComments(lifetimes), "fn f<'a>(x: &'a str) -> &'static str { x } ");
+  assert.equal(withoutLineComments("a // query!(\nb"), "a \nb");
+});
+
+test("R0.6 findMacroUses sees a macro after a string holding // on the same line", () => {
+  const file = crate("url", URL_THEN_MACRO);
+  assert.deepEqual(findMacroUses(root), [file]);
 });
 
 test("R0.6 the committed tree calls no query macro, so the check passes without sqlx-cli", () => {
