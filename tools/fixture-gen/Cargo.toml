@@ -18,7 +18,12 @@ gto-tree = { workspace = true }
 gto-library = { workspace = true }
 library-pack = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+# float_roundtrip on purpose: tools/validate turns it on, and cargo unifies features across every
+# package of one invocation, so without it here a workspace build (just rust-test) parsed the
+# equity table's floats differently from `cargo run -p fixture-gen` alone, which changed every
+# dump's sha256 and so every synthetic solution id. With the feature named here the generator
+# writes the same bytes under any package selection (O-131, O-225).
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 thiserror = { workspace = true }
