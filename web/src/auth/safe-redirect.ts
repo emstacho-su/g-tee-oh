@@ -7,8 +7,10 @@
  * Rejected: anything not a string, empty or over the length cap; anything not starting with "/";
  * a second leading "/" (protocol-relative "//host"); any backslash (browsers treat "\" as "/");
  * any whitespace or control character (browsers strip tabs and newlines, so "/\t/host" becomes
- * "//host"); percent-encoded "/", "\", "%" (double encoding) and control characters; text that
- * does not percent-decode; and, as a last check, anything the URL parser resolves to another origin.
+ * "//host"); percent-encoded "/", "\", "%" (double encoding) and control characters in the path
+ * part (before the first "?" or "#"; in the query and the fragment they are values, not path
+ * structure, so "/study?line=r250%2Fc" survives); text that does not percent-decode; and, as a
+ * last check, anything the URL parser resolves to another origin.
  */
 
 export const SAFE_REDIRECT_FALLBACK = "/";
@@ -46,11 +48,17 @@ function staysOnOrigin(value: string): boolean {
   }
 }
 
+/** The path part of a redirect value: everything before the first "?" or "#". */
+function pathPart(value: string): string {
+  const end = value.search(/[?#]/u);
+  return end === -1 ? value : value.slice(0, end);
+}
+
 function isSafePath(value: string): boolean {
   if (value.length === 0 || value.length > MAX_REDIRECT_LENGTH) return false;
   if (!value.startsWith("/") || value.startsWith("//")) return false;
   if (WHITESPACE_OR_BACKSLASH.test(value) || hasControlCharacter(value)) return false;
-  if (ENCODED_FORBIDDEN.test(value) || !decodesCleanly(value)) return false;
+  if (ENCODED_FORBIDDEN.test(pathPart(value)) || !decodesCleanly(value)) return false;
   return staysOnOrigin(value);
 }
 

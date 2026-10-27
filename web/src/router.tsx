@@ -2,12 +2,14 @@
  * Route tree for the web app (R0.7, R3.13, A7 sections 1 and 2). Routes are code based: no
  * file-route plugin and no generated route tree to diff-check.
  *
- * Shape: the root route (RootLayout, <main data-testid="shell">) holds /login and a pathless
+ * Shape: the root route (RootLayout, <div data-testid="shell">) holds /login and a pathless
  * authenticated layout route ("app") that holds every other A7 section 2 route. The layout's
  * beforeLoad ensures the me query through the router context's QueryClient; signed out (null), it
  * redirects to /login?redirect=<current path>. /login's beforeLoad does the reverse: a signed-in
- * user goes to the safe redirect target (safe-redirect.ts) or "/". A /me failure on /login is
- * ignored so the form still renders; on the layout it shows SessionError with a retry.
+ * user goes to the safe redirect target (safe-redirect.ts) or "/". On /login a 401 is simply
+ * signed out; a network or server failure of /me still renders the form, with a visible "service
+ * unavailable" note (sessionUnavailable in the route context) and one console.error naming only
+ * the status and problem slug. On the layout a /me failure shows SessionError with a retry.
  *
  * createAppRouter takes the QueryClient and api client (the router context) and an optional
  * history, so main.tsx uses the browser history and tests use createMemoryHistory. The Register
@@ -19,11 +21,12 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { RouterHistory } from "@tanstack/react-router";
 
 import type { AppApi } from "./api/index.js";
+import { describeFailureForLog } from "./api/http-status.js";
 import { AuthLayout } from "./app/AuthLayout.js";
 import { RootLayout } from "./app/RootLayout.js";
 import type { RouterContext } from "./app/router-context.js";
 import { SessionError } from "./app/SessionError.js";
-import { meQueryOptions, safeRedirect } from "./auth/index.js";
+import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
 import { placeholderRoute } from "./routes/placeholders.js";
@@ -33,6 +36,11 @@ export interface LoginSearch {
   redirect?: string;
 }
 
+/** What /login's beforeLoad adds to the route context: whether the session check itself failed. */
+export interface LoginRouteContext {
+  sessionUnavailable: boolean;
+}
+
 export const rootRoute = createRootRouteWithContext<RouterContext>()({ component: RootLayout });
 
 export const loginRoute = createRoute({
@@ -40,12 +48,20 @@ export const loginRoute = createRoute({
   path: "/login",
   validateSearch: (search: Record<string, unknown>): LoginSearch =>
     typeof search["redirect"] === "string" ? { redirect: search["redirect"] } : {},
-  beforeLoad: async ({ context, search }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions(context.api)).catch(() => null);
+  beforeLoad: async ({ context, search }): Promise<LoginRouteContext> => {
+    let me: Awaited<ReturnType<typeof fetchMe>>;
+    try {
+      // A 401 resolves to null (signed out) inside fetchMe; only a network or server failure throws.
+      me = await context.queryClient.ensureQueryData(meQueryOptions(context.api));
+    } catch (error: unknown) {
+      console.error(`g-tee-oh: the session check failed (${describeFailureForLog(error)}); showing the login form`);
+      return { sessionUnavailable: true };
+    }
     if (me !== null) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
       throw redirect({ href: safeRedirect(search.redirect), replace: true });
     }
+    return { sessionUnavailable: false };
   },
   component: LoginPage,
 });

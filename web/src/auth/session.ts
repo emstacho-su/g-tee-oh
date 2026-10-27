@@ -7,6 +7,7 @@
  */
 import { queryOptions } from "@tanstack/react-query";
 
+import { HTTP_STATUS } from "../api/http-status.js";
 import { API_PATHS, problemFromBody } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
 import type { SessionInfo } from "../contracts.js";
@@ -14,7 +15,7 @@ import type { SessionInfo } from "../contracts.js";
 export const ME_QUERY_KEY = ["auth", "me"] as const;
 
 const ME_STALE_MS = 5 * 60 * 1000;
-const HTTP_UNAUTHORIZED = 401;
+
 
 export interface LoginInput {
   email: string;
@@ -23,7 +24,7 @@ export interface LoginInput {
 
 export async function fetchMe(api: AppApi): Promise<SessionInfo | null> {
   const { data, error, response } = await api.client.GET(API_PATHS.me);
-  if (response.status === HTTP_UNAUTHORIZED) {
+  if (response.status === HTTP_STATUS.unauthorized) {
     api.tokens.clear();
     return null;
   }

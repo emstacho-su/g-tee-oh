@@ -51,6 +51,10 @@ test('r3_13 ownerEmail defaults to e2e-owner@example.com and honors E2E_OWNER_EM
   assert.equal(ownerEmail({ [OWNER_EMAIL_VARIABLE]: ' me@example.org ' }), 'me@example.org');
 });
 
+test('r3_13 ownerEmail lowercases the address the way the api normalizes it', () => {
+  assert.equal(ownerEmail({ [OWNER_EMAIL_VARIABLE]: ' Owner.E2E@Example.ORG ' }), 'owner.e2e@example.org');
+});
+
 test('r3_13 ownerEmail refuses a value that is not an address or reads as a flag', () => {
   for (const bad of ['not-an-email', '--email=x@example.com', 'a b@example.com']) {
     assert.throws(() => ownerEmail({ [OWNER_EMAIL_VARIABLE]: bad }), OwnerSetupError, bad);

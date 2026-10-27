@@ -41,6 +41,11 @@ export function problemResponse(status: number, slug: string, detail = "server d
     );
 }
 
+/** A request that never reaches a server: fetch rejects with a TypeError, as browsers do. */
+export function networkFailure(): ResponseFactory {
+  return () => Promise.reject(new TypeError("Failed to fetch"));
+}
+
 export function noContent(): ResponseFactory {
   return () => new Response(null, { status: 204 });
 }

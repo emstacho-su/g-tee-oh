@@ -46,7 +46,7 @@ export function generateOwnerPassword(random = randomBytes) {
 }
 
 /**
- * The owner email: E2E_OWNER_EMAIL when set and not blank, else e2e-owner@example.com. A value
+ * The owner email, lowercased: E2E_OWNER_EMAIL when set and not blank, else e2e-owner@example.com. A value
  * that does not look like an address, or that starts with a dash and would read as a flag, is
  * refused here rather than by the command inside the container.
  */
@@ -56,7 +56,9 @@ export function ownerEmail(env) {
   if (email.startsWith(FLAG_PREFIX) || !EMAIL_SHAPE.test(email)) {
     throw new OwnerSetupError(`${OWNER_EMAIL_VARIABLE} is not an email address`);
   }
-  return email;
+  // The api stores emails trimmed and lowercased (services/api/src/auth/users.ts normalizeEmail),
+  // so the address the Playwright flow expects in the header is the lowercased one.
+  return email.toLowerCase();
 }
 
 /** The docker arguments for the create-owner step: the email only, never the password. */

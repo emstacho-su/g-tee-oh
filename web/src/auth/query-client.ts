@@ -7,13 +7,14 @@
  */
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
+import { HTTP_STATUS } from "../api/http-status.js";
 import { isApiProblem } from "../api/index.js";
 import { ME_QUERY_KEY } from "./session.js";
 
 const MAX_QUERY_RETRIES = 2;
 const HTTP_CLIENT_ERROR_MIN = 400;
 const HTTP_CLIENT_ERROR_MAX = 499;
-const HTTP_UNAUTHORIZED = 401;
+
 
 function isClientError(error: unknown): boolean {
   return isApiProblem(error) && error.status >= HTTP_CLIENT_ERROR_MIN && error.status <= HTTP_CLIENT_ERROR_MAX;
@@ -26,7 +27,7 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
 
 export function createQueryClient(): QueryClient {
   const markSignedOut = (error: unknown): void => {
-    if (isApiProblem(error) && error.status === HTTP_UNAUTHORIZED) {
+    if (isApiProblem(error) && error.status === HTTP_STATUS.unauthorized) {
       queryClient.setQueryData(ME_QUERY_KEY, null);
     }
   };

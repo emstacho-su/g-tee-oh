@@ -51,9 +51,23 @@ const REJECTED: readonly unknown[] = [
   "/%",
   "/%zz",
   `/${"a".repeat(3000)}`,
+  "/%2Fevil.example?x=1",
+  "/%5Cevil.example#top",
+  "/a%2F%2Fevil.example?q=%2F",
 ];
 
-const ACCEPTED: readonly string[] = ["/", "/study", "/drills/abc/run?x=1", "/drills/new#top", "/progress?range=30d&x=a%20b"];
+const ACCEPTED: readonly string[] = [
+  "/",
+  "/study",
+  "/drills/abc/run?x=1",
+  "/drills/new#top",
+  "/progress?range=30d&x=a%20b",
+  // Encoded characters in the query or the fragment are values, not path structure, so they survive.
+  "/study?line=r250%2Fc",
+  "/drills?q=50%25",
+  "/drills?q=a%5Cb",
+  "/study#part%2F2",
+];
 
 describe("safeRedirect", () => {
   it("R3.13 the fallback is the home path", () => {

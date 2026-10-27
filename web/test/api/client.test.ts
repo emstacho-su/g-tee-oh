@@ -7,12 +7,13 @@
 import { describe, expect, it } from "vitest";
 
 import { AUTO_CSRF_HEADER, createAppApi, createCsrfTokenHolder, getAppApi } from "../../src/api/index.js";
-import { createFakeFetch, jsonResponse, noContent, problemResponse, sessionResponse } from "./fake-fetch.js";
+import { createFakeFetch, jsonResponse, networkFailure, noContent, problemResponse, sessionResponse } from "./fake-fetch.js";
 
 const ORIGIN = "http://localhost:4173";
 const DRILL_PATH = "/api/v1/drills/{id}";
 const DRILL_ID = "00000000-0000-4000-8000-0000000000aa";
 const DRILL_URL_PATH = `/api/v1/drills/${DRILL_ID}`;
+const DELETE_KEY = `DELETE ${DRILL_URL_PATH}`;
 
 function deleteDrill(api: ReturnType<typeof createAppApi>) {
   return api.client.DELETE(DRILL_PATH, { params: { path: { id: DRILL_ID }, header: AUTO_CSRF_HEADER } });
@@ -207,6 +208,39 @@ describe("app api client, 403 csrf retry", () => {
     expect(result.response.status).toBe(403);
     expect(fake.keys()).toEqual([`DELETE ${DRILL_URL_PATH}`, "GET /api/v1/me"]);
     expect(api.tokens.get()).toBeNull();
+  });
+});
+
+describe("app api client, /me network failures", () => {
+  it("R3.13 a /me network failure after a reload still sends the mutation, without a token", async () => {
+    const fake = createFakeFetch({
+      "GET /api/v1/me": [networkFailure()],
+      [DELETE_KEY]: [problemResponse(403, "csrf")],
+    });
+    const api = createAppApi({ baseUrl: ORIGIN, fetch: fake.fetch });
+
+    const result = await deleteDrill(api);
+
+    expect(result.response.status).toBe(403);
+    expect(fake.keys()).toEqual(["GET /api/v1/me", DELETE_KEY, "GET /api/v1/me"]);
+    expect(fake.calls[1]?.csrf).toBeNull();
+    expect(api.tokens.get()).toBeNull();
+  });
+
+  it("R3.13 a /me network failure on the retry path returns the first 403 csrf, body intact, with no retry", async () => {
+    const fake = createFakeFetch({
+      "GET /api/v1/me": [networkFailure()],
+      [DELETE_KEY]: [problemResponse(403, "csrf")],
+    });
+    const api = createAppApi({ baseUrl: ORIGIN, fetch: fake.fetch });
+    api.tokens.set("stale-token");
+
+    const result = await deleteDrill(api);
+
+    expect(result.response.status).toBe(403);
+    expect(fake.keys()).toEqual([DELETE_KEY, "GET /api/v1/me"]);
+    // openapi-fetch parsed the first 403's body into error, so the body reached the caller intact.
+    expect(result.error).toMatchObject({ type: "urn:g-tee-oh:problem:csrf", status: 403 });
   });
 });
 

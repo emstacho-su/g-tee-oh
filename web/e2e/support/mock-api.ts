@@ -18,14 +18,18 @@
 import type { ApiPaths } from "@g-tee-oh/contracts";
 import type { Page, Request, Route } from "@playwright/test";
 
+import { HTTP_STATUS } from "../../src/api/http-status.js";
+import { API_PATHS, CSRF_HEADER } from "../../src/api/paths.js";
 import type { Problem, SessionInfo } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL, fixtureSession } from "../../src/fixtures/index.js";
 
+// The paths and the header come from the app's own module, so the mock and the app can never
+// disagree on a name.
+export { CSRF_HEADER };
 export const API_ROUTE_PATTERN = "**/api/v1/**";
-export const CSRF_HEADER = "x-csrf-token";
-export const LOGIN_PATH = "/api/v1/auth/login";
-export const LOGOUT_PATH = "/api/v1/auth/logout";
-export const ME_PATH = "/api/v1/me";
+export const LOGIN_PATH = API_PATHS.login;
+export const LOGOUT_PATH = API_PATHS.logout;
+export const ME_PATH = API_PATHS.me;
 
 const JSON_TYPE = "application/json";
 const PROBLEM_TYPE = "application/problem+json";
@@ -35,8 +39,8 @@ const STATUS = {
   ok: 200,
   noContent: 204,
   badRequest: 400,
-  unauthorized: 401,
-  forbidden: 403,
+  unauthorized: HTTP_STATUS.unauthorized,
+  forbidden: HTTP_STATUS.forbidden,
   notImplemented: 501,
 } as const;
 

@@ -6,15 +6,16 @@
  * The selectors are the app's accessible names (Lane A, S24): the login page's h1 "Sign in",
  * inputs labeled "Email" and "Password" and the "Sign in" button; the home shell's h1 "Home",
  * the nav named "Main", the signed-in email in the header and the "Sign out" button; all inside
- * <main data-testid="shell">. A signed-out visit to / redirects to /login (with a redirect query
+ * <div data-testid="shell">. A signed-out visit to / redirects to /login (with a redirect query
  * back to /), and a sign-in lands on /.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import type { OwnerCredentials } from "./owner-credentials.js";
 
 export const HOME_PATH = "/";
 export const LOGIN_PATH = "/login";
+export const PASSWORD_STEP_TITLE = "fill the password";
 const SHELL_TEST_ID = "shell";
 
 function onPath(path: string): (url: URL) => boolean {
@@ -31,7 +32,15 @@ export async function expectRedirectToLogin(page: Page): Promise<void> {
 /** Fills the login form and submits it; the caller asserts where that leads. */
 export async function submitLogin(page: Page, credentials: OwnerCredentials): Promise<void> {
   await page.getByLabel("Email").fill(credentials.email);
-  await page.getByLabel("Password").fill(credentials.password);
+  // A boxed step with a fixed title: the Playwright report and the list reporter show only
+  // "fill the password", never the fill call with its value (O-263).
+  await test.step(
+    PASSWORD_STEP_TITLE,
+    async () => {
+      await page.getByLabel("Password").fill(credentials.password);
+    },
+    { box: true },
+  );
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 

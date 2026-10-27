@@ -6,17 +6,19 @@
  *
  * Mechanism, for POST, PUT, PATCH and DELETE except login (login has no session yet):
  * 1. If the in-memory holder is empty (after a page reload), GET /me first and keep its
- *    csrf_token; concurrent mutations share that one /me request. A /me that fails leaves the
- *    holder empty and the mutation goes out without a token, so the server answers for itself.
+ *    csrf_token; concurrent mutations share that one /me request. A /me that fails, by status or
+ *    by a network error, leaves the holder without a token and the mutation goes out without
+ *    one, so the server answers for itself (a 403 csrf).
  * 2. Send the request with x-csrf-token set from the holder.
  * 3. If the answer is a 403 problem with slug csrf (the token rotated or expired), refetch /me
  *    once and resend a copy of the original request, body included, with the new token. Whatever
  *    that retry answers goes back to the caller: there is no second refetch and no loop. Any other
- *    403, forbidden-origin included, is returned as is. If the refetch fails, the first 403 is
- *    returned.
+ *    403, forbidden-origin included, is returned as is. If the refetch fails, by status or by a
+ *    network error, the first 403 is returned with its body intact.
  * GET and HEAD pass straight through untouched.
  */
 import type { CsrfTokenHolder } from "./csrf-token.js";
+import { HTTP_STATUS } from "./http-status.js";
 import { API_PATHS, CSRF_HEADER } from "./paths.js";
 import { PROBLEM_SLUG, problemFromResponse } from "./problem.js";
 
@@ -29,7 +31,7 @@ export interface CsrfFetchOptions {
 
 const MUTATING_METHODS: ReadonlySet<string> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const TOKEN_EXEMPT_PATHS: ReadonlySet<string> = new Set([API_PATHS.login]);
-const HTTP_FORBIDDEN = 403;
+
 
 function needsToken(request: Request): boolean {
   if (!MUTATING_METHODS.has(request.method.toUpperCase())) return false;
@@ -58,7 +60,7 @@ function withToken(request: Request, token: string | null): Request {
 }
 
 async function isCsrfFailure(response: Response): Promise<boolean> {
-  if (response.status !== HTTP_FORBIDDEN) return false;
+  if (response.status !== HTTP_STATUS.forbidden) return false;
   const problem = await problemFromResponse(response);
   return problem.slug === PROBLEM_SLUG.csrf;
 }
@@ -67,9 +69,16 @@ export function createCsrfFetch({ fetch: baseFetch, tokens }: CsrfFetchOptions):
   let inFlight: Promise<string | null> | null = null;
 
   async function loadToken(origin: string): Promise<string | null> {
-    const response = await baseFetch(
-      new Request(new URL(API_PATHS.me, origin), { method: "GET", headers: { accept: "application/json" } }),
-    );
+    let response: Response;
+    try {
+      response = await baseFetch(
+        new Request(new URL(API_PATHS.me, origin), { method: "GET", headers: { accept: "application/json" } }),
+      );
+    } catch {
+      // A network failure of /me must not kill the mutation (header, steps 1 and 3): the holder is
+      // left as it was and the caller goes on without a fresh token.
+      return null;
+    }
     const body: unknown = response.ok ? await response.json().catch(() => null) : null;
     const token = csrfTokenOf(body);
     if (token === null) tokens.clear();

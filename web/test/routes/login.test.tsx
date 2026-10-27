@@ -5,7 +5,7 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { fixtureSession } from "../../src/fixtures/index.js";
 import { problemResponse, sessionResponse } from "../api/fake-fetch.js";
@@ -14,6 +14,7 @@ import { renderApp } from "../app/render-app.js";
 
 const PASSWORD = "a-very-secret-passphrase";
 const SERVER_DETAIL = "server detail text";
+const SERVICE_NOTE = "The service is unavailable right now. You can still try to sign in.";
 
 function signedOutWith(login: readonly ResponseFactory[]): FetchScript {
   return {
@@ -75,6 +76,33 @@ describe("login page", () => {
     expect(alert).toHaveTextContent(message);
     expect(document.body).not.toHaveTextContent(SERVER_DETAIL);
     expect(document.body).not.toHaveTextContent(PASSWORD);
+  });
+
+  it("R3.13 a 401 from /me renders the form with no service note", async () => {
+    await openLogin(signedOutWith([]));
+
+    expect(screen.queryByText(SERVICE_NOTE)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["a 503", problemResponse(503, "unavailable", SERVER_DETAIL)],
+    ["a 500", problemResponse(500, "internal", SERVER_DETAIL)],
+    ["a network failure", (() => Promise.reject(new TypeError("network down")))],
+  ])("R3.13 %s from /me still renders the form, with a service note and a console error", async (_label, me) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await openLogin({ "GET /api/v1/me": [me], "POST /api/v1/auth/login": [] });
+
+      expect(await screen.findByText(SERVICE_NOTE)).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent(SERVER_DETAIL);
+      expect(consoleError).toHaveBeenCalled();
+      const logged = consoleError.mock.calls.flat().map(String).join(" ");
+      expect(logged).not.toContain(SERVER_DETAIL);
+      expect(logged).not.toContain(fixtureSession.csrf_token);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("R3.13 a network failure shows the generic message", async () => {
