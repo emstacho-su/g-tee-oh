@@ -48,7 +48,8 @@ sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 # Web service stack for solver-query (S06, R0.7, ADR 0018). utoipa-axum 0.3 requires rustc 1.88,
 # above the workspace rust-version of 1.85, so the pair is pinned to utoipa 5 with utoipa-axum 0.2.
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+# tokio 1.54.1 is the floor for RUSTSEC-2026-0384 (1.54.0 is yanked).
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
 utoipa = "5"
 utoipa-axum = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
@@ -63,7 +64,9 @@ proptest = "1"
 # cl.exe on Windows MSVC and the C compiler in the Linux images). sha2 checks every file on first
 # open, xxhash-rust supplies the 64-bit xxhash that indexes node keys, and lru holds the decoded
 # frames, used unbounded with byte accounting so QUERY_CACHE_BYTES is the only bound.
-zstd = { version = "0.13", default-features = false }
+# zstd 0.14.3 (zstd-safe 8.2) is the floor for RUSTSEC-2026-0391, 0398 and 0403. Its license is
+# BSD-3-Clause, inside the deny.toml allow list; the bundled C library (zstd-sys) is unchanged.
+zstd ={ version = "0.14.3", default-features = false }
 sha2 = "0.10"
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 lru = "0.19"
