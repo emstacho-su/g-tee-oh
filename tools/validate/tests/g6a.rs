@@ -19,7 +19,8 @@ use validate::report::Report;
 /// Depths the debug tests run.
 const TEST_DEPTHS_BB: [u32; 3] = [5, 10, 15];
 
-/// A three-hand chart in the transcription's shape, with a gap like 63s's.
+/// A three-hand chart in the transcription's shape, with one hand played on two stack
+/// ranges. The numbers are invented for the parser test, not taken from any chart (O-221).
 const SAMPLE_CHART: &str = r#"{
   "source": "sample chart for the parser test",
   "url": "https://example.invalid/chart",
@@ -27,8 +28,8 @@ const SAMPLE_CHART: &str = r#"{
   "parameters": "heads-up, small blind 0.5, big blind 1, no ante, no rake",
   "hands": [
     { "hand": "AA", "push": [{ "from_bb": 0.0, "to_bb": 1000.0 }], "call": [{ "from_bb": 0.0, "to_bb": 1000.0 }] },
-    { "hand": "63s", "push": [{ "from_bb": 0.0, "to_bb": 2.3 }, { "from_bb": 5.1, "to_bb": 7.1 }], "call": [{ "from_bb": 0.0, "to_bb": 3.0 }] },
-    { "hand": "32o", "push": [{ "from_bb": 0.0, "to_bb": 1.4 }], "call": [{ "from_bb": 0.0, "to_bb": 2.6 }] }
+    { "hand": "63s", "push": [{ "from_bb": 0.0, "to_bb": 2.5 }, { "from_bb": 5.0, "to_bb": 7.5 }], "call": [{ "from_bb": 0.0, "to_bb": 3.5 }] },
+    { "hand": "32o", "push": [{ "from_bb": 0.0, "to_bb": 1.5 }], "call": [{ "from_bb": 0.0, "to_bb": 2.5 }] }
   ]
 }"#;
 
@@ -80,7 +81,7 @@ fn r2_19_chart_reads_intervals_with_gaps() {
 fn r2_19_chart_rejects_malformed_input() {
     assert!(Chart::from_json("{}").is_err());
     let reversed =
-        SAMPLE_CHART.replace(r#""from_bb": 5.1, "to_bb": 7.1"#, r#""from_bb": 7.1, "to_bb": 5.1"#);
+        SAMPLE_CHART.replace(r#""from_bb": 5.0, "to_bb": 7.5"#, r#""from_bb": 7.5, "to_bb": 5.0"#);
     assert!(Chart::from_json(&reversed).is_err(), "an interval must be ordered");
 }
 

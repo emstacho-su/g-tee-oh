@@ -61,7 +61,7 @@ than the row rank (above the diagonal), and to the offsuit class otherwise, and 
 write anything when a cell's class disagreed with that mapping. It wrote "20+" as the
 interval from 0 to 1000 bb, every other number t as the interval from 0 to t, and the three
 gap hands as two intervals each from the footnote below the charts. It then checked the
-page's own worked example (T3s pushes up to 7.7 bb, Q2o calls up to 5.6 bb), that AA is
+page's own worked example and two other cells read by hand, that AA is
 "20+" on both charts and that all 169 classes are present once, before writing the
 JavaScript Object Notation (JSON) file in the shape `tools/validate/src/fixtures/g6a_chart.rs` reads (`Chart::load` refuses
 a file without all 169 classes).
