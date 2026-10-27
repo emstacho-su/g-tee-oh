@@ -164,5 +164,98 @@ fn r2_18_each_attempt_runs_longer() {
     assert_eq!(settings.stop_rule(3).max_iterations, 60_000);
     assert_eq!(settings.stop_rule(2).max_seconds, 1_800);
     assert_eq!(settings.stop_rule(2).target_exploitability_pct_pot, 0.3);
-    assert_eq!(settings.solve_options().memory_cap_bytes, 5 * 1024 * 1024 * 1024);
+    // 4 GiB, not the 5 GiB container limit: the cap leaves 1 GiB of headroom for the
+    // runtime, extraction and staging (S18 review HIGH 4).
+    assert_eq!(settings.solve_options().memory_cap_bytes, 4 * 1024 * 1024 * 1024);
+}
+
+/// Every bounded key with a value one past its ceiling, and the ceiling itself, which is
+/// kept (S18 review MEDIUM 7, M2).
+#[test]
+fn r2_18_every_key_above_its_ceiling_falls_back_and_is_named() {
+    use library_builder::settings::{
+        MAX_ATTEMPTS, MAX_BYTES_PER_ITEM, MAX_ITERATIONS, MAX_K_FREQUENT_PAIRS, MAX_K_RUNOUTS,
+        MAX_PLAN_INTERVAL_MINUTES, MAX_POLL_SECONDS, MAX_SECONDS_PER_LINE, MAX_STALE_HOURS,
+        MAX_TARGET_PCT_POT, MAX_VERIFY_INTERVAL_HOURS,
+    };
+    assert_eq!(usize::from(MAX_K_RUNOUTS), gto_library::ORDERED_RUNOUTS);
+    let ceilings: [(&str, u64); 12] = [
+        ("k_runouts", u64::from(MAX_K_RUNOUTS)),
+        ("k_runouts_rare", u64::from(MAX_K_RUNOUTS)),
+        ("k_frequent_pairs", u64::from(MAX_K_FREQUENT_PAIRS)),
+        ("max_seconds_per_line", u64::from(MAX_SECONDS_PER_LINE)),
+        ("max_iterations", u64::from(MAX_ITERATIONS)),
+        ("poll_seconds", u64::from(MAX_POLL_SECONDS)),
+        ("stale_hours", u64::from(MAX_STALE_HOURS)),
+        ("verify_interval_hours", u64::from(MAX_VERIFY_INTERVAL_HOURS)),
+        ("plan_interval_minutes", u64::from(MAX_PLAN_INTERVAL_MINUTES)),
+        ("max_attempts", u64::try_from(MAX_ATTEMPTS).expect("positive")),
+        ("bytes_per_runout", MAX_BYTES_PER_ITEM),
+        ("bytes_per_flop_tree", MAX_BYTES_PER_ITEM),
+    ];
+    let defaults = BuilderSettings::default();
+    for (key, ceiling) in ceilings {
+        let (above, errors) = BuilderSettings::from_rows(&rows(&[(key, json!(ceiling + 1))]));
+        assert_eq!(above, defaults, "{key}: one past the ceiling keeps the default");
+        assert_eq!(errors.len(), 1, "{key}: {errors:?}");
+        assert_eq!(errors[0].key, key);
+        assert!(errors[0].reason.contains("ceiling"), "{key}: {}", errors[0].reason);
+        assert!(errors[0].reason.contains("default"), "{key}: {}", errors[0].reason);
+        let (_, errors) = BuilderSettings::from_rows(&rows(&[(key, json!(ceiling))]));
+        assert_eq!(errors, Vec::new(), "{key}: the ceiling itself is allowed");
+    }
+    let (above, errors) =
+        BuilderSettings::from_rows(&rows(&[("target_pct_pot", json!(MAX_TARGET_PCT_POT * 2.0))]));
+    assert_eq!(above.target_pct_pot, 0.3);
+    assert_eq!(errors[0].key, "target_pct_pot");
+    for share in [json!(0), json!(-0.1), json!(1.0001)] {
+        let (settings, errors) = BuilderSettings::from_rows(&rows(&[("cpu_share", share)]));
+        assert_eq!(settings.cpu_share, 0.5);
+        assert_eq!(errors.len(), 1);
+    }
+}
+
+/// The default memory cap is 4 GiB: the 5 GiB container limit (O-139) less 1 GiB of
+/// headroom for the runtime, extraction and staging (S18 review HIGH 4).
+#[test]
+fn r2_18_the_default_memory_cap_leaves_headroom_under_the_container() {
+    use library_builder::settings::DEFAULT_MEMORY_CAP_BYTES;
+    assert_eq!(DEFAULT_MEMORY_CAP_BYTES, 4 * 1024 * 1024 * 1024);
+    assert_eq!(BuilderSettings::default().memory_cap_bytes, DEFAULT_MEMORY_CAP_BYTES);
+}
+
+/// The environment ceilings clamp `memory_cap_bytes` and `budget_bytes`, and a clamp is
+/// reported (S18 review M1, M2).
+#[test]
+fn r2_18_the_environment_ceilings_clamp_and_are_reported() {
+    use library_builder::settings::Limits;
+    let limits = Limits { memory_ceiling_bytes: 2_000_000_000, budget_ceiling_bytes: 1_000_000 };
+    let (settings, errors) = BuilderSettings::from_rows_with(
+        &rows(&[
+            ("memory_cap_bytes", json!(3_000_000_000_u64)),
+            ("budget_bytes", json!(5_000_000)),
+            ("k_runouts", json!(7)),
+        ]),
+        &limits,
+    );
+    assert_eq!(settings.memory_cap_bytes, 2_000_000_000);
+    assert_eq!(settings.planner.budget_bytes, 1_000_000);
+    assert_eq!(settings.planner.k_runouts, 7);
+    let keys: Vec<&str> = errors.iter().map(|error| error.key.as_str()).collect();
+    assert_eq!(keys, ["memory_cap_bytes", "budget_bytes"]);
+    assert!(errors.iter().all(|error| error.reason.contains("ceiling")), "{errors:?}");
+
+    let (within, errors) = BuilderSettings::from_rows_with(
+        &rows(&[("memory_cap_bytes", json!(1_000_000_000_u64))]),
+        &limits,
+    );
+    assert_eq!(within.memory_cap_bytes, 1_000_000_000, "under the ceiling, kept");
+    // A default above its ceiling is clamped and reported as well: the ceiling is the
+    // operator's bound whatever the rows say.
+    let keys: Vec<&str> = errors.iter().map(|error| error.key.as_str()).collect();
+    assert_eq!(keys, ["budget_bytes"]);
+    assert_eq!(within.planner.budget_bytes, 1_000_000);
+    let (defaults, errors) = BuilderSettings::from_rows_with(&[], &Limits::default());
+    assert_eq!(errors, Vec::new(), "the default limits never clamp the defaults");
+    assert_eq!(defaults, BuilderSettings::default());
 }

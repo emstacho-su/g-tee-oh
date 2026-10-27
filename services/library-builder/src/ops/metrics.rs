@@ -53,9 +53,10 @@ fn labelled<V: ToString>(
         .collect()
 }
 
-/// The Prometheus text for `view` and the peak resident set size.
+/// The Prometheus text for `view` and the peak resident set size; `None` (no true peak on
+/// this platform) leaves `builder_peak_rss_bytes` with its HELP and TYPE lines and no sample.
 #[must_use]
-pub fn render_metrics(view: &StatusView, peak_rss_bytes: u64) -> String {
+pub fn render_metrics(view: &StatusView, peak_rss_bytes: Option<u64>) -> String {
     let mut out = String::new();
     family(
         &mut out,
@@ -113,7 +114,7 @@ pub fn render_metrics(view: &StatusView, peak_rss_bytes: u64) -> String {
             kind: "gauge",
             help: "The process's peak resident set size in bytes.",
         },
-        &bare(&peak_rss_bytes),
+        &peak_rss_bytes.map(|bytes| bare(&bytes)).unwrap_or_default(),
     );
     out
 }
@@ -174,7 +175,7 @@ mod tests {
 
     #[test]
     fn r2_18_an_empty_view_still_names_every_family() {
-        let text = render_metrics(&Status::default().view(), 0);
+        let text = render_metrics(&Status::default().view(), Some(0));
         for name in METRIC_FAMILIES {
             assert!(text.contains(&format!("# HELP {name} ")), "{name}");
         }

@@ -1,11 +1,17 @@
 //! Environment configuration for `library-builder` (S18, A5 section 1, plan section A).
-//! Nothing is required to start: `BUILDER_BIND` defaults to `0.0.0.0:7071`, `BUILDER_THREADS`
-//! to the machine's parallelism, `BUILDER_SCRATCH_DIR` to the system temporary directory
-//! (the compose tmpfs at `/tmp`), `BUILDER_WORKER_ID` to the host name and the process id,
-//! the `BUILDER_DB_*` parts describe the builder-role connection (`database`, O-146;
-//! without `BUILDER_DB_PASSWORD` the database is `unconfigured`), `LIBRARY_ROOT` or the
-//! `S3_*` variables select the library target (`store`, ADR 0019), and
-//! `BUILDER_RANGES_FIXTURE` names the hand-made ranges file a job solves from before the
+//! Nothing is required to start: `BUILDER_BIND` defaults to the loopback `127.0.0.1:7071`
+//! (S18 review L2; compose sets `0.0.0.0:7071` so the container network reaches it),
+//! `BUILDER_THREADS` to the machine's parallelism, `BUILDER_SCRATCH_DIR` to the system
+//! temporary directory (the compose tmpfs at `/tmp`), `BUILDER_WORKER_ID` to the host name
+//! alone so it is stable across restarts (see the `worker` submodule for the per-process
+//! nonce, the ban on `#` and why two live processes must not share an id), the
+//! `BUILDER_DB_*` parts describe the builder-role connection (`database`, O-146; without
+//! `BUILDER_DB_PASSWORD` the database is `unconfigured`), `LIBRARY_ROOT` or the `S3_*`
+//! variables select the library target (`store`, ADR 0019),
+//! `BUILDER_MEMORY_CEILING_BYTES` and `BUILDER_BUDGET_CEILING_BYTES` set the deploy-time
+//! [`Limits`] no setting row can exceed (the `limits` submodule; the memory ceiling
+//! defaults from the cgroup limit), and `BUILDER_RANGES_FIXTURE` names the hand-made
+//! ranges file a job solves from before the
 //! first packed preflop solution (O-181). A variable that is set but malformed is an error
 //! at startup that names the variable, so a typo never runs on a silent default. A variable
 //! set to the empty string counts as unset: that is what a blank `.env` line and compose's
@@ -19,7 +25,9 @@
 //! it unsafe).
 
 mod database;
+mod limits;
 mod store;
+mod worker;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -32,10 +40,17 @@ pub use database::{
     DATABASE_SSL_MODE_VAR, DATABASE_USER_VAR, DEFAULT_DATABASE_HOST, DEFAULT_DATABASE_NAME,
     DEFAULT_DATABASE_PORT, DEFAULT_DATABASE_USER, DatabaseConfig, Password, REDACTED, SslMode,
 };
-pub use store::{
-    DEFAULT_LIBRARY_BUCKET, LIBRARY_BUCKET_VAR, LIBRARY_ROOT_VAR, S3_ACCESS_KEY_VAR,
-    S3_ENDPOINT_VAR, S3_SECRET_KEY_VAR, S3Config, StoreConfig,
+pub use limits::{
+    BUDGET_CEILING_VAR, CGROUP_HEADROOM_BYTES, CGROUP_MEMORY_MAX_PATH, MEMORY_CEILING_VAR,
+    parse_cgroup_memory_max, read_cgroup_memory_max,
 };
+pub use store::{
+    DEFAULT_LIBRARY_BUCKET, EndpointError, LIBRARY_BUCKET_VAR, LIBRARY_ROOT_VAR, S3_ACCESS_KEY_VAR,
+    S3_ALLOW_HTTP_VAR, S3_ENDPOINT_VAR, S3_SECRET_KEY_VAR, S3Config, StoreConfig,
+};
+pub use worker::{NONCE_SEPARATOR, process_worker_id};
+
+use crate::settings::Limits;
 
 /// Variable holding the thread count the solve pool is sized from (A2 section 5).
 pub const THREADS_VAR: &str = "BUILDER_THREADS";
@@ -55,9 +70,10 @@ pub const RANGES_FIXTURE_VAR: &str = "BUILDER_RANGES_FIXTURE";
 /// The port the operations surface listens on when `BUILDER_BIND` is unset (A5 section 1).
 pub const DEFAULT_PORT: u16 = 7071;
 
-/// The listen address when `BUILDER_BIND` is unset: every interface, port 7071.
+/// The listen address when `BUILDER_BIND` is unset: the loopback, port 7071, so a builder
+/// run outside compose is not reachable from the network (S18 review L2).
 pub const DEFAULT_BIND: SocketAddr =
-    SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_PORT));
+    SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_PORT));
 
 /// The worker name when neither `BUILDER_WORKER_ID` nor a host name variable is set.
 pub const DEFAULT_WORKER_NAME: &str = "builder";
@@ -78,10 +94,13 @@ pub struct Config {
     pub bind: SocketAddr,
     /// The staging directory.
     pub scratch_dir: PathBuf,
-    /// This worker's name in `build_job.locked_by`.
+    /// This worker's stable name, without `#`; [`process_worker_id`] adds the per-process
+    /// nonce a claim writes to `build_job.locked_by`.
     pub worker_id: String,
     /// The hand-made ranges fixture, when configured.
     pub ranges_fixture: Option<PathBuf>,
+    /// The deploy-time ceilings on `memory_cap_bytes` and `budget_bytes`.
+    pub limits: Limits,
 }
 
 /// A variable that is set but cannot be used.
@@ -123,6 +142,21 @@ pub enum Error {
         /// The variable name.
         name: &'static str,
     },
+    /// The worker id (`BUILDER_WORKER_ID`, or the host name it defaults to) contains `#`,
+    /// the separator of the per-process nonce.
+    InvalidWorkerId {
+        /// The id as read.
+        value: String,
+    },
+    /// A ceiling variable is not a positive byte count.
+    InvalidCeiling {
+        /// The variable name.
+        name: &'static str,
+        /// The value as set.
+        value: String,
+        /// The parse failure, `None` for a well formed zero.
+        source: Option<ParseIntError>,
+    },
 }
 
 impl fmt::Display for Error {
@@ -148,6 +182,17 @@ impl fmt::Display for Error {
                 write!(f, "{S3_ENDPOINT_VAR} is set but {name} is not")
             }
             Self::NotUnicode { name } => write!(f, "{name} is set but is not valid Unicode"),
+            Self::InvalidWorkerId { value } => write!(
+                f,
+                "the worker id {value:?} ({WORKER_ID_VAR} or the host name) contains \
+                 {NONCE_SEPARATOR:?}, which separates the process nonce"
+            ),
+            Self::InvalidCeiling { name, value, source: Some(source) } => {
+                write!(f, "{name}={value:?} is not a byte count: {source}")
+            }
+            Self::InvalidCeiling { name, value, source: None } => {
+                write!(f, "{name}={value:?} must be at least 1")
+            }
         }
     }
 }
@@ -157,11 +202,14 @@ impl std::error::Error for Error {
         match self {
             Self::InvalidBind { source, .. } => Some(source),
             Self::InvalidThreads { source: Some(source), .. }
+            | Self::InvalidCeiling { source: Some(source), .. }
             | Self::InvalidDatabasePort { source, .. } => Some(source),
             Self::InvalidThreads { source: None, .. }
+            | Self::InvalidCeiling { source: None, .. }
             | Self::InvalidDatabaseSslMode { .. }
             | Self::MissingS3Variable { .. }
-            | Self::NotUnicode { .. } => None,
+            | Self::NotUnicode { .. }
+            | Self::InvalidWorkerId { .. } => None,
         }
     }
 }
@@ -173,16 +221,30 @@ impl Config {
     ///
     /// Returns the first variable that is set but malformed; see [`Error`].
     pub fn from_env() -> Result<Self, Error> {
-        Self::from_lookup(|name| std::env::var_os(name))
+        Self::from_sources(|name| std::env::var_os(name), read_cgroup_memory_max())
     }
 
-    /// Reads the configuration through `lookup`, which answers like `std::env::var_os`. A
-    /// variable that is unset or set to the empty string takes its fallback.
+    /// Reads the configuration through `lookup`, which answers like `std::env::var_os`, with
+    /// no cgroup limit known. A variable that is unset or set to the empty string takes its
+    /// fallback.
     ///
     /// # Errors
     ///
     /// Returns the first variable that is set but malformed; see [`Error`].
     pub fn from_lookup<F>(lookup: F) -> Result<Self, Error>
+    where
+        F: Fn(&str) -> Option<OsString>,
+    {
+        Self::from_sources(lookup, None)
+    }
+
+    /// [`Config::from_lookup`] with `cgroup_memory_max`, the container's memory limit in
+    /// bytes when known, as the fallback source of the memory ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first variable that is set but malformed; see [`Error`].
+    pub fn from_sources<F>(lookup: F, cgroup_memory_max: Option<u64>) -> Result<Self, Error>
     where
         F: Fn(&str) -> Option<OsString>,
     {
@@ -202,8 +264,12 @@ impl Config {
             Some(value) => value,
             None => default_worker_id(&lookup),
         };
+        if worker_id.contains(NONCE_SEPARATOR) {
+            return Err(Error::InvalidWorkerId { value: worker_id });
+        }
         let ranges_fixture = present(&lookup, RANGES_FIXTURE_VAR).map(PathBuf::from);
-        Ok(Self { database, store, threads, bind, scratch_dir, worker_id, ranges_fixture })
+        let limits = limits::read(&lookup, cgroup_memory_max)?;
+        Ok(Self { database, store, threads, bind, scratch_dir, worker_id, ranges_fixture, limits })
     }
 }
 
@@ -221,17 +287,16 @@ fn default_threads() -> usize {
     std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
 }
 
-/// `<host name>-<process id>`: the host name from the first set host name variable,
-/// `DEFAULT_WORKER_NAME` when none is.
+/// The host name from the first set host name variable, `DEFAULT_WORKER_NAME` when none
+/// is; no process id, so the id is stable across restarts (S18 review MEDIUM 8).
 fn default_worker_id<F>(lookup: &F) -> String
 where
     F: Fn(&str) -> Option<OsString>,
 {
-    let host = HOST_NAME_VARS
+    HOST_NAME_VARS
         .iter()
         .find_map(|name| present(lookup, name))
-        .map_or_else(|| DEFAULT_WORKER_NAME.to_owned(), |v| v.to_string_lossy().into_owned());
-    format!("{host}-{}", std::process::id())
+        .map_or_else(|| DEFAULT_WORKER_NAME.to_owned(), |v| v.to_string_lossy().into_owned())
 }
 
 /// Looks `name` up; a variable set to the empty string counts as unset (see the module docs).
@@ -259,10 +324,12 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        BIND_VAR, Config, DATABASE_PASSWORD_VAR, DEFAULT_BIND, DEFAULT_DATABASE_HOST,
-        DEFAULT_WORKER_NAME, Error, LIBRARY_ROOT_VAR, RANGES_FIXTURE_VAR, SCRATCH_DIR_VAR,
-        StoreConfig, THREADS_VAR, WORKER_ID_VAR,
+        BIND_VAR, BUDGET_CEILING_VAR, CGROUP_HEADROOM_BYTES, Config, DATABASE_PASSWORD_VAR,
+        DEFAULT_BIND, DEFAULT_DATABASE_HOST, DEFAULT_WORKER_NAME, Error, LIBRARY_ROOT_VAR,
+        MEMORY_CEILING_VAR, RANGES_FIXTURE_VAR, SCRATCH_DIR_VAR, StoreConfig, THREADS_VAR,
+        WORKER_ID_VAR, parse_cgroup_memory_max, process_worker_id,
     };
+    use crate::settings::{DEFAULT_BUDGET_CEILING_BYTES, DEFAULT_MEMORY_CEILING_BYTES, Limits};
 
     /// A dev placeholder password, never a real secret.
     const PASSWORD: &str = "change-me-builder";
@@ -277,18 +344,72 @@ mod tests {
     fn r2_18_config_defaults_when_nothing_is_set() {
         let config = Config::from_lookup(lookup(&[])).expect("no variable is required");
         assert_eq!(config.bind, DEFAULT_BIND);
-        assert_eq!(config.bind.to_string(), "0.0.0.0:7071");
+        // Loopback only (S18 review L2); compose sets 0.0.0.0:7071 for the container network.
+        assert_eq!(config.bind.to_string(), "127.0.0.1:7071");
         assert_eq!(config.database, None);
         assert_eq!(config.store, StoreConfig::Unconfigured);
         assert!(config.threads >= 1);
         assert_eq!(config.scratch_dir, std::env::temp_dir());
-        let suffix = format!("-{}", std::process::id());
-        assert!(config.worker_id.ends_with(&suffix), "worker id was {}", config.worker_id);
-        assert!(!config.worker_id.starts_with('-'), "worker id was {}", config.worker_id);
+        // The default worker id is stable across restarts: the host name alone, no process
+        // id (S18 review MEDIUM 8).
+        assert_eq!(config.worker_id, DEFAULT_WORKER_NAME);
         assert_eq!(config.ranges_fixture, None);
-        let bare = Config::from_lookup(lookup(&[("COMPUTERNAME", ""), ("HOSTNAME", "")]))
-            .expect("no host name set");
-        assert_eq!(bare.worker_id, format!("{DEFAULT_WORKER_NAME}{suffix}"));
+        assert_eq!(config.limits, Limits::default());
+        let hosted = Config::from_lookup(lookup(&[("COMPUTERNAME", ""), ("HOSTNAME", "zenbook")]))
+            .expect("a host name");
+        assert_eq!(hosted.worker_id, "zenbook");
+    }
+
+    #[test]
+    fn r2_18_a_worker_id_with_a_hash_is_refused() {
+        let error = Config::from_lookup(lookup(&[(WORKER_ID_VAR, "zenbook#2")]))
+            .expect_err("# separates the process nonce");
+        assert_eq!(error, Error::InvalidWorkerId { value: "zenbook#2".to_owned() });
+        assert!(error.to_string().contains(WORKER_ID_VAR), "message was {error}");
+        let error = Config::from_lookup(lookup(&[("HOSTNAME", "odd#host")]))
+            .expect_err("a host name with # is refused too");
+        assert!(matches!(error, Error::InvalidWorkerId { .. }), "{error:?}");
+    }
+
+    #[test]
+    fn r2_18_the_process_worker_id_appends_a_stable_nonce() {
+        let id = process_worker_id("zenbook");
+        let (stable, nonce) = id.split_once('#').expect("a # separator");
+        assert_eq!(stable, "zenbook");
+        let (pid, started) = nonce.split_once('-').expect("pid and start time");
+        assert_eq!(u32::from_str_radix(pid, 16).expect("hex pid"), std::process::id());
+        assert!(u64::from_str_radix(started, 16).expect("hex start time") > 0);
+        assert_eq!(process_worker_id("zenbook"), id, "the same within one process");
+    }
+
+    #[test]
+    fn r2_18_the_ceilings_come_from_the_environment_or_the_cgroup() {
+        let gib = 1024 * 1024 * 1024;
+        let from_cgroup = Config::from_sources(lookup(&[]), Some(5 * gib)).expect("defaults");
+        assert_eq!(from_cgroup.limits.memory_ceiling_bytes, 5 * gib - CGROUP_HEADROOM_BYTES);
+        assert_eq!(from_cgroup.limits.budget_ceiling_bytes, DEFAULT_BUDGET_CEILING_BYTES);
+        let tiny = Config::from_sources(lookup(&[]), Some(gib / 2)).expect("defaults");
+        assert_eq!(tiny.limits.memory_ceiling_bytes, gib / 4, "half a limit under the headroom");
+        let no_cgroup = Config::from_sources(lookup(&[]), None).expect("defaults");
+        assert_eq!(no_cgroup.limits.memory_ceiling_bytes, DEFAULT_MEMORY_CEILING_BYTES);
+        let set = Config::from_sources(
+            lookup(&[(MEMORY_CEILING_VAR, "3000000000"), (BUDGET_CEILING_VAR, "1000000")]),
+            Some(5 * gib),
+        )
+        .expect("well formed");
+        assert_eq!(set.limits.memory_ceiling_bytes, 3_000_000_000, "the variable wins");
+        assert_eq!(set.limits.budget_ceiling_bytes, 1_000_000);
+        for bad in ["lots", "0", "-1"] {
+            let error = Config::from_lookup(lookup(&[(MEMORY_CEILING_VAR, bad)]))
+                .expect_err("not a positive byte count");
+            assert!(
+                matches!(error, Error::InvalidCeiling { name, .. } if name == MEMORY_CEILING_VAR)
+            );
+            assert!(error.to_string().contains(MEMORY_CEILING_VAR), "message was {error}");
+        }
+        assert_eq!(parse_cgroup_memory_max("5368709120\n"), Some(5 * gib));
+        assert_eq!(parse_cgroup_memory_max("max\n"), None);
+        assert_eq!(parse_cgroup_memory_max(""), None);
     }
 
     #[test]

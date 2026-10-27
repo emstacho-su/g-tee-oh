@@ -195,7 +195,7 @@ The library builder reads every `builder_setting` row on every claim (A1 section
 | `max_iterations` | `20000` | positive integer | Iterations per line on the first attempt; attempt n runs n times as many. |
 | `max_seconds_per_line` | `1800` | positive integer | Wall seconds per line (O-178). |
 | `storage_bits` | `32` | 16 or 32; 16 only with `target_pct_pot` at least 0.5 | Solver storage (O-194). |
-| `memory_cap_bytes` | `5368709120` | positive integer | A solve whose estimate is above it is refused before allocation (O-139, O-187). |
+| `memory_cap_bytes` | `4294967296` | positive integer, clamped to `BUILDER_MEMORY_CEILING_BYTES` | A solve whose estimate plus one runout walk is above it is refused before allocation (O-139, O-187); 4 GiB leaves headroom under the 5 GiB container limit for runtime, extraction and staging (PR #22 review). |
 | `max_attempts` | `3` | integer from 1 to 32,767 | Failures before a job parks (A5 section 4, O-176). |
 | `stale_hours` | `6` | positive integer | Age of a `running` row the stale reclaim re-queues (O-185). |
 | `verify_interval_hours` | `24` | positive integer | Hours between verify passes (O-186). |

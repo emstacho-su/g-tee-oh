@@ -11,7 +11,10 @@
 //! `select current_user, pg_has_role(current_user, 'builder', 'member')` answers true
 //! within the probe timeout) or `unavailable`; `store` carries the target kind and whether
 //! it answered. The status is 200 when every configured dependency answers and 503 when
-//! one does not; an unconfigured dependency is not a failure.
+//! one does not; an unconfigured dependency is not a failure. The two probes run at the
+//! same time, each cut at [`PROBE_TIMEOUT`], and their answer is shared by concurrent
+//! requests and reused for [`PROBE_CACHE_TTL`] (the `health` submodule, S18 review
+//! MEDIUM 9 and L3).
 //!
 //! `/metrics` is Prometheus text, hand-rolled (the O-155 pattern): `builder_up`,
 //! `builder_state`, `builder_jobs_total{outcome}`, `builder_queue_depth{status}`,
@@ -20,6 +23,7 @@
 //! `builder_line_iterations_total`, `builder_last_exploitability_pct_pot{seat}` and
 //! `builder_peak_rss_bytes`.
 
+mod health;
 mod metrics;
 mod probe;
 
@@ -40,6 +44,7 @@ use crate::notify::BuilderState;
 use crate::settings::SettingError;
 use crate::store::LibraryTarget;
 
+pub use health::{LiveProbes, PROBE_CACHE_TTL, ProbeCache, ProbeReport, Probes, run_probes};
 pub use metrics::render_metrics;
 
 /// The content type of `/metrics`: the Prometheus text exposition format 0.0.4.
@@ -51,12 +56,11 @@ pub const STATUS_OK: &str = "ok";
 /// The `/healthz` status when a configured dependency does not answer.
 pub const STATUS_DEGRADED: &str = "degraded";
 
-/// The database probe: the login and whether it holds the builder role (O-28).
-const DATABASE_PROBE_SQL: &str =
-    "select current_user::text, pg_has_role(current_user, 'builder', 'member')";
-
 /// A dependency that is not configured.
 const UNCONFIGURED: &str = "unconfigured";
+
+/// A configured dependency that did not answer, or answered wrongly, within the timeout.
+const UNAVAILABLE: &str = "unavailable";
 
 /// The state's name as `/healthz` and `builder_state{state}` write it, the `snake_case`
 /// form `notify` serializes.
@@ -124,6 +128,8 @@ pub struct StatusView {
 #[derive(Debug)]
 pub struct Status {
     view: Mutex<StatusView>,
+    /// The last dependency probe answer, shared by concurrent `/healthz` requests.
+    probes: ProbeCache,
 }
 
 impl Default for Status {
@@ -143,6 +149,7 @@ impl Default for Status {
                 line_count: 0,
                 line_iterations: 0,
             }),
+            probes: ProbeCache::default(),
         }
     }
 }
@@ -250,72 +257,33 @@ async fn healthz(State(state): State<OpsState>) -> impl IntoResponse {
     (code, Json(body))
 }
 
-/// The `/healthz` body for `state`, with both probes run.
+/// The `/healthz` body for `state`, from the live probes (see [`health_body_with`]).
 pub async fn health_body(state: &OpsState) -> HealthBody {
+    let probes = LiveProbes { database: state.database.as_ref(), target: state.target.as_ref() };
+    health_body_with(state, &probes).await
+}
+
+/// The `/healthz` body for `state` with `probes` as the dependency checks: the answer
+/// cached in `state.status` when fresh, else one concurrent, bounded run of `probes`
+/// shared by every request waiting on it.
+pub async fn health_body_with<P: Probes>(state: &OpsState, probes: &P) -> HealthBody {
+    let report = state.status.probes.get_or_probe(probes).await;
     let view = state.status.view();
-    let database = match &state.database {
-        None => UNCONFIGURED.to_owned(),
-        Some(pool) => probe_database(pool).await.to_owned(),
-    };
-    let store = match &state.target {
-        None => StoreHealth { kind: UNCONFIGURED.to_owned(), reachable: false },
-        Some(target) => {
-            StoreHealth { kind: target.kind().to_owned(), reachable: probe_store(target).await }
-        }
-    };
-    let database_failed = state.database.is_some() && database != STATUS_OK;
-    let store_failed = state.target.is_some() && !store.reachable;
-    let status = if database_failed || store_failed { STATUS_DEGRADED } else { STATUS_OK };
+    let status = if report.degraded() { STATUS_DEGRADED } else { STATUS_OK };
     HealthBody {
         status: status.to_owned(),
         version: crate::VERSION.to_owned(),
         worker_id: state.worker_id.clone(),
         state: state_name(view.state).to_owned(),
         reason: view.reason,
-        database,
-        store,
+        database: report.database,
+        store: report.store,
         current_job: view.current_job,
         settings_errors: view
             .settings_errors
             .iter()
             .map(|error| format!("{}: {}", error.key, error.reason))
             .collect(),
-    }
-}
-
-/// `ok` when the probe query answers within [`PROBE_TIMEOUT`] and the login holds the
-/// builder role, `unavailable` otherwise; the failure is logged without the password.
-async fn probe_database(pool: &PgPool) -> &'static str {
-    let query = sqlx::query_as::<_, (String, bool)>(DATABASE_PROBE_SQL).fetch_one(pool);
-    match tokio::time::timeout(PROBE_TIMEOUT, query).await {
-        Ok(Ok((_, true))) => STATUS_OK,
-        Ok(Ok((login, false))) => {
-            tracing::warn!(login, "the database login does not hold the builder role");
-            "unavailable"
-        }
-        Ok(Err(error)) => {
-            tracing::warn!(%error, "database probe failed");
-            "unavailable"
-        }
-        Err(_) => {
-            tracing::warn!(timeout = ?PROBE_TIMEOUT, "database probe timed out");
-            "unavailable"
-        }
-    }
-}
-
-/// Whether the target answers within [`PROBE_TIMEOUT`]; a failure is logged.
-async fn probe_store(target: &LibraryTarget) -> bool {
-    match tokio::time::timeout(PROBE_TIMEOUT, target.probe()).await {
-        Ok(Ok(())) => true,
-        Ok(Err(error)) => {
-            tracing::warn!(%error, kind = target.kind(), "store probe failed");
-            false
-        }
-        Err(_) => {
-            tracing::warn!(timeout = ?PROBE_TIMEOUT, kind = target.kind(), "store probe timed out");
-            false
-        }
     }
 }
 

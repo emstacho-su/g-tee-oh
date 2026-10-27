@@ -6,7 +6,11 @@ use gto_model::v1_configs;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{BuilderSettings, Overnight};
+use super::{
+    BuilderSettings, MAX_ATTEMPTS, MAX_BYTES_PER_ITEM, MAX_ITERATIONS, MAX_K_FREQUENT_PAIRS,
+    MAX_K_RUNOUTS, MAX_PLAN_INTERVAL_MINUTES, MAX_POLL_SECONDS, MAX_SECONDS_PER_LINE,
+    MAX_STALE_HOURS, MAX_TARGET_PCT_POT, MAX_VERIFY_INTERVAL_HOURS, Overnight,
+};
 
 /// The largest UTC offset the boost window accepts, in minutes: just under a day.
 const MAX_UTC_OFFSET_MINUTES: i32 = 24 * 60 - 1;
@@ -53,21 +57,30 @@ pub(super) fn apply(
         "overnight" => BuilderSettings { overnight: overnight(value)?, ..base },
         "plan_configs" => BuilderSettings { plan_configs: plan_configs(value)?, ..base },
         "target_pct_pot" => BuilderSettings { target_pct_pot: target(value)?, ..base },
-        "max_iterations" => BuilderSettings { max_iterations: positive_u32(value)?, ..base },
-        "max_seconds_per_line" => {
-            BuilderSettings { max_seconds_per_line: positive_u32(value)?, ..base }
+        "max_iterations" => {
+            BuilderSettings { max_iterations: bounded_u32(value, MAX_ITERATIONS)?, ..base }
         }
+        "max_seconds_per_line" => BuilderSettings {
+            max_seconds_per_line: bounded_u32(value, MAX_SECONDS_PER_LINE)?,
+            ..base
+        },
         "storage_bits" => BuilderSettings { storage_bits: storage_bits(value)?, ..base },
         "memory_cap_bytes" => BuilderSettings { memory_cap_bytes: positive_u64(value)?, ..base },
         "max_attempts" => BuilderSettings { max_attempts: max_attempts(value)?, ..base },
-        "stale_hours" => BuilderSettings { stale_hours: positive_u32(value)?, ..base },
-        "verify_interval_hours" => {
-            BuilderSettings { verify_interval_hours: positive_u32(value)?, ..base }
+        "stale_hours" => {
+            BuilderSettings { stale_hours: bounded_u32(value, MAX_STALE_HOURS)?, ..base }
         }
-        "plan_interval_minutes" => {
-            BuilderSettings { plan_interval_minutes: positive_u32(value)?, ..base }
+        "verify_interval_hours" => BuilderSettings {
+            verify_interval_hours: bounded_u32(value, MAX_VERIFY_INTERVAL_HOURS)?,
+            ..base
+        },
+        "plan_interval_minutes" => BuilderSettings {
+            plan_interval_minutes: bounded_u32(value, MAX_PLAN_INTERVAL_MINUTES)?,
+            ..base
+        },
+        "poll_seconds" => {
+            BuilderSettings { poll_seconds: bounded_u32(value, MAX_POLL_SECONDS)?, ..base }
         }
-        "poll_seconds" => BuilderSettings { poll_seconds: positive_u32(value)?, ..base },
         "budget_bytes"
         | "bytes_per_runout"
         | "bytes_per_flop_tree"
@@ -90,11 +103,17 @@ fn apply_planner(
     use gto_planner::PlannerSettings as P;
     match key {
         "budget_bytes" => Ok(P { budget_bytes: positive_u64(value)?, ..planner }),
-        "bytes_per_runout" => Ok(P { bytes_per_runout: positive_u64(value)?, ..planner }),
-        "bytes_per_flop_tree" => Ok(P { bytes_per_flop_tree: positive_u64(value)?, ..planner }),
-        "k_runouts" => Ok(P { k_runouts: positive_u16(value)?, ..planner }),
-        "k_runouts_rare" => Ok(P { k_runouts_rare: positive_u16(value)?, ..planner }),
-        "k_frequent_pairs" => Ok(P { k_frequent_pairs: positive_u16(value)?, ..planner }),
+        "bytes_per_runout" => {
+            Ok(P { bytes_per_runout: bounded_u64(value, MAX_BYTES_PER_ITEM)?, ..planner })
+        }
+        "bytes_per_flop_tree" => {
+            Ok(P { bytes_per_flop_tree: bounded_u64(value, MAX_BYTES_PER_ITEM)?, ..planner })
+        }
+        "k_runouts" => Ok(P { k_runouts: bounded_u16(value, MAX_K_RUNOUTS)?, ..planner }),
+        "k_runouts_rare" => Ok(P { k_runouts_rare: bounded_u16(value, MAX_K_RUNOUTS)?, ..planner }),
+        "k_frequent_pairs" => {
+            Ok(P { k_frequent_pairs: bounded_u16(value, MAX_K_FREQUENT_PAIRS)?, ..planner })
+        }
         _ => Err(Problem::Unknown),
     }
 }
@@ -155,15 +174,24 @@ fn share(value: &Value) -> Result<f64, Problem> {
     }
 }
 
-/// A stop target in percent of the pot: finite and above 0.
+/// A stop target in percent of the pot: finite, above 0 and at most
+/// [`MAX_TARGET_PCT_POT`].
 fn target(value: &Value) -> Result<f32, Problem> {
     let number = value.as_f64().ok_or_else(|| invalid(format!("{value} is not a number")))?;
     let narrowed = format!("{number}").parse::<f32>().unwrap_or(f32::NAN);
-    if narrowed.is_finite() && narrowed > 0.0 {
-        Ok(narrowed)
-    } else {
-        Err(invalid(format!("{number} is not a positive percent of the pot")))
+    if !(narrowed.is_finite() && narrowed > 0.0) {
+        return Err(invalid(format!("{number} is not a positive percent of the pot")));
     }
+    if narrowed > MAX_TARGET_PCT_POT {
+        return Err(above_ceiling(number, MAX_TARGET_PCT_POT));
+    }
+    Ok(narrowed)
+}
+
+/// The problem of a value above its key's ceiling; the word "ceiling" is what `/healthz`
+/// readers search for.
+fn above_ceiling(number: impl std::fmt::Display, ceiling: impl std::fmt::Display) -> Problem {
+    invalid(format!("{number} is above the ceiling {ceiling}"))
 }
 
 fn positive_u64(value: &Value) -> Result<u64, Problem> {
@@ -173,14 +201,22 @@ fn positive_u64(value: &Value) -> Result<u64, Problem> {
     }
 }
 
-fn positive_u32(value: &Value) -> Result<u32, Problem> {
+/// A positive whole number at most `ceiling`.
+fn bounded_u64(value: &Value, ceiling: u64) -> Result<u64, Problem> {
     let number = positive_u64(value)?;
-    u32::try_from(number).map_err(|_| invalid(format!("{number} is above {}", u32::MAX)))
+    if number > ceiling { Err(above_ceiling(number, ceiling)) } else { Ok(number) }
 }
 
-fn positive_u16(value: &Value) -> Result<u16, Problem> {
-    let number = positive_u64(value)?;
-    u16::try_from(number).map_err(|_| invalid(format!("{number} is above {}", u16::MAX)))
+/// A positive whole number at most `ceiling`, as a `u32`.
+fn bounded_u32(value: &Value, ceiling: u32) -> Result<u32, Problem> {
+    let number = bounded_u64(value, u64::from(ceiling))?;
+    u32::try_from(number).map_err(|_| above_ceiling(number, ceiling))
+}
+
+/// A positive whole number at most `ceiling`, as a `u16`.
+fn bounded_u16(value: &Value, ceiling: u16) -> Result<u16, Problem> {
+    let number = bounded_u64(value, u64::from(ceiling))?;
+    u16::try_from(number).map_err(|_| above_ceiling(number, ceiling))
 }
 
 /// 16 or 32; the 16-bit floor on the target is checked once every row is read.
@@ -192,10 +228,12 @@ fn storage_bits(value: &Value) -> Result<u8, Problem> {
     }
 }
 
-/// Failures before a job parks: at least 1 (A5 section 4, O-176).
+/// Failures before a job parks: at least 1 and at most [`MAX_ATTEMPTS`] (A5 section 4,
+/// O-176).
 fn max_attempts(value: &Value) -> Result<i16, Problem> {
-    let number = positive_u64(value)?;
-    i16::try_from(number).map_err(|_| invalid(format!("{number} is above {}", i16::MAX)))
+    let ceiling = MAX_ATTEMPTS.unsigned_abs();
+    let number = bounded_u16(value, ceiling)?;
+    i16::try_from(number).map_err(|_| above_ceiling(number, ceiling))
 }
 
 /// A list of configuration ids, each in `gto_model::v1_configs` (O-182). An empty list is

@@ -7,6 +7,12 @@
 //! alone falls back to its default; an unknown key is reported the same way. Nothing is
 //! skipped silently.
 //!
+//! Every number has a ceiling named by a `MAX_*` constant (S18 review MEDIUM 7, M2), and a
+//! value above it is malformed in the same way. The two keys that bound real resources,
+//! `memory_cap_bytes` and `budget_bytes`, are also held under the deploy-time [`Limits`]
+//! from the environment: [`BuilderSettings::from_rows_with`] lowers a value above its
+//! ceiling to the ceiling and reports that too.
+//!
 //! | key | default | meaning |
 //! |---|---|---|
 //! | `paused` | false | claim nothing |
@@ -23,7 +29,7 @@
 //! | `max_iterations` | 20000 | per attempt, times the attempt number |
 //! | `max_seconds_per_line` | 1800 | O-178 |
 //! | `storage_bits` | 32 | O-194; 16 only with a target of at least 0.5 |
-//! | `memory_cap_bytes` | 5368709120 | O-139, O-187 |
+//! | `memory_cap_bytes` | 4294967296 | O-139, O-187; 4 GiB under the 5 GiB container |
 //! | `max_attempts` | 3 | A5 section 4, O-176 |
 //! | `stale_hours` | 6 | O-185 |
 //! | `verify_interval_hours` | 24 | O-186 |
@@ -42,6 +48,63 @@ pub const SIXTEEN_BIT_TARGET_FLOOR_PCT_POT: f32 = 0.5;
 
 /// Minutes in a day, for the boost window.
 pub const MINUTES_PER_DAY: u32 = 24 * 60;
+
+/// One gibibyte (GiB), 2 to the 30th bytes.
+const GIB: u64 = 1024 * 1024 * 1024;
+
+/// The default `memory_cap_bytes`: 4 GiB, leaving 1 GiB of headroom under the 5 GiB
+/// container limit (O-139) for the runtime, the runout extraction and the staging buffers
+/// that live beside the solve (S18 review HIGH 4).
+pub const DEFAULT_MEMORY_CAP_BYTES: u64 = 4 * GIB;
+
+/// The default memory ceiling when neither `BUILDER_MEMORY_CEILING_BYTES` nor a cgroup
+/// limit is known: the 5 GiB container limit of O-139.
+pub const DEFAULT_MEMORY_CEILING_BYTES: u64 = 5 * GIB;
+
+/// The default budget ceiling when `BUILDER_BUDGET_CEILING_BYTES` is unset: the 650 GB
+/// library budget of ADR 0018.
+pub const DEFAULT_BUDGET_CEILING_BYTES: u64 = 650_000_000_000;
+
+/// The largest `k_runouts` and `k_runouts_rare`: every ordered turn and river pair of a
+/// flop (`gto_library::ORDERED_RUNOUTS`, 2,352), which also fits the `smallint` column.
+// 2,352 fits a u16; the test `r2_18_every_key_above_its_ceiling_falls_back_and_is_named`
+// pins the two equal.
+#[allow(clippy::cast_possible_truncation)]
+pub const MAX_K_RUNOUTS: u16 = gto_library::ORDERED_RUNOUTS as u16;
+
+/// The largest `k_frequent_pairs`: 1,326 is every two-card pair of a 52-card deck, so no
+/// configuration has more pairs to rank.
+pub const MAX_K_FREQUENT_PAIRS: u16 = 1_326;
+
+/// The largest `max_seconds_per_line`: one day; a line that needs longer is a broken
+/// setting, not a slow solve.
+pub const MAX_SECONDS_PER_LINE: u32 = 86_400;
+
+/// The largest `max_iterations` on the first attempt: one million, fifty times the default;
+/// later attempts multiply it by the attempt number.
+pub const MAX_ITERATIONS: u32 = 1_000_000;
+
+/// The largest `poll_seconds`: one hour, so a paused or idle builder still looks again.
+pub const MAX_POLL_SECONDS: u32 = 3_600;
+
+/// The largest `stale_hours`: one week (168 hours).
+pub const MAX_STALE_HOURS: u32 = 168;
+
+/// The largest `verify_interval_hours`: 30 days (720 hours).
+pub const MAX_VERIFY_INTERVAL_HOURS: u32 = 720;
+
+/// The largest `plan_interval_minutes`: one week (10,080 minutes).
+pub const MAX_PLAN_INTERVAL_MINUTES: u32 = 10_080;
+
+/// The largest `max_attempts`: 100 failures before a job parks.
+pub const MAX_ATTEMPTS: i16 = 100;
+
+/// The largest `bytes_per_runout` and `bytes_per_flop_tree`: one GiB, about 70 times the
+/// O-180 runout measurement.
+pub const MAX_BYTES_PER_ITEM: u64 = GIB;
+
+/// The largest `target_pct_pot`: the whole pot.
+pub const MAX_TARGET_PCT_POT: f32 = 100.0;
 
 /// Every key the builder reads.
 pub const KEYS: [&str; 20] = [
@@ -143,7 +206,7 @@ impl Default for BuilderSettings {
             max_iterations: 20_000,
             max_seconds_per_line: 1_800,
             storage_bits: 32,
-            memory_cap_bytes: 5 * 1024 * 1024 * 1024,
+            memory_cap_bytes: DEFAULT_MEMORY_CAP_BYTES,
             max_attempts: 3,
             stale_hours: 6,
             verify_interval_hours: 24,
@@ -166,24 +229,42 @@ pub struct Limits {
 }
 
 impl Default for Limits {
-    /// No tighter than the defaults: the 5 GiB memory cap of O-139 and the 650 GB budget.
+    /// [`DEFAULT_MEMORY_CEILING_BYTES`] and [`DEFAULT_BUDGET_CEILING_BYTES`], neither below the
+    /// matching default setting, so the defaults are never clamped.
     fn default() -> Self {
         Limits {
-            memory_ceiling_bytes: 5 * 1024 * 1024 * 1024,
-            budget_ceiling_bytes: 650_000_000_000,
+            memory_ceiling_bytes: DEFAULT_MEMORY_CEILING_BYTES,
+            budget_ceiling_bytes: DEFAULT_BUDGET_CEILING_BYTES,
         }
     }
 }
 impl BuilderSettings {
-    /// [`BuilderSettings::from_rows`], then every value clamped to `limits` (see [`Limits`]);
-    /// a clamped key is reported as a [`SettingError`].
+    /// [`BuilderSettings::from_rows`], then `memory_cap_bytes` and `budget_bytes` clamped to
+    /// `limits` (see [`Limits`]). A clamped key is reported as a [`SettingError`] after the
+    /// row errors, the memory cap first. The value in force is then the ceiling, not the
+    /// default: the ceiling is the operator's deploy-time bound, and the default may itself
+    /// be above it.
     #[must_use]
     pub fn from_rows_with(
         rows: &[(String, Value)],
         limits: &Limits,
     ) -> (BuilderSettings, Vec<SettingError>) {
-        let _ = limits;
-        BuilderSettings::from_rows(rows)
+        let (settings, mut errors) = BuilderSettings::from_rows(rows);
+        let (memory_cap_bytes, memory_clamp) = clamp(
+            "memory_cap_bytes",
+            settings.memory_cap_bytes,
+            limits.memory_ceiling_bytes,
+            "BUILDER_MEMORY_CEILING_BYTES",
+        );
+        let (budget_bytes, budget_clamp) = clamp(
+            "budget_bytes",
+            settings.planner.budget_bytes,
+            limits.budget_ceiling_bytes,
+            "BUILDER_BUDGET_CEILING_BYTES",
+        );
+        errors.extend(memory_clamp.into_iter().chain(budget_clamp));
+        let planner = PlannerSettings { budget_bytes, ..settings.planner };
+        (BuilderSettings { planner, memory_cap_bytes, ..settings }, errors)
     }
 
     /// The settings from `builder_setting` rows, with the errors of the keys that fell
@@ -287,4 +368,16 @@ impl BuilderSettings {
             ..SolveOptions::default()
         }
     }
+}
+
+/// `value` clamped to `ceiling`, with the [`SettingError`] of `key` when it was above it;
+/// `variable` names the environment variable that sets the ceiling.
+fn clamp(key: &str, value: u64, ceiling: u64, variable: &str) -> (u64, Option<SettingError>) {
+    if value <= ceiling {
+        return (value, None);
+    }
+    let reason = format!(
+        "{value} is above the ceiling {ceiling} ({variable}); the ceiling {ceiling} is used"
+    );
+    (ceiling, Some(SettingError { key: key.to_owned(), reason }))
 }
