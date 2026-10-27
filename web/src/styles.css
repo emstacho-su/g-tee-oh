@@ -1,0 +1,88 @@
+/*
+ * Global styles for the web app (S24). Tailwind 4 with Radix primitives is the component layer
+ * (O-44, the A7 fallback, since the S07 stack note does not exist).
+ *
+ * Mechanism: semantic colors are CSS custom properties on :root (light) and on .dark (dark).
+ * The @theme inline block exposes them to Tailwind as utilities (bg-surface, text-muted and so
+ * on), so a component names the role, never a raw color, and both themes follow from the one
+ * class on <html> (O-266). The dark variant is class based, so the theme toggle wins over the
+ * operating system preference once set; src/app/theme.ts decides the initial class.
+ * The action colors here match src/theme/action-style.ts, which the canvas matrix reads,
+ * because a canvas cannot resolve CSS variables per pixel.
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --surface: #f8fafc;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e2e8f0;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --danger: #b91c1c;
+  --success: #15803d;
+  --warning: #b45309;
+  --felt: #166534;
+  --felt-edge: #14532d;
+  --focus: #f59e0b;
+  color-scheme: light;
+}
+
+.dark {
+  --surface: #0b1120;
+  --surface-raised: #111827;
+  --surface-sunken: #1f2937;
+  --border: #334155;
+  --text: #e5e7eb;
+  --text-muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent-text: #0b1120;
+  --danger: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --felt: #14532d;
+  --felt-edge: #052e16;
+  --focus: #fbbf24;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-felt: var(--felt);
+  --color-felt-edge: var(--felt-edge);
+  --color-focus: var(--focus);
+}
+
+html,
+body {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

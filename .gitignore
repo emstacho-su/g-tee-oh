@@ -3,6 +3,8 @@
 **/target/
 node_modules/
 dist/
+# The web harness build (gallery and bench pages, O-267)
+dist-harness/
 
 # Local configuration and secrets
 .env
