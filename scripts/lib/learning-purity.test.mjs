@@ -43,6 +43,18 @@ const VIOLATIONS = [
   ["setTimeout", "export const x = setTimeout(() => 0, 1);", "no-restricted-globals"],
   ["console", "export const x = () => console.log('x');", "no-restricted-globals"],
   ["crypto", "export const x = crypto.randomUUID();", "no-restricted-globals"],
+  ["globalThis.Math.random", "export const x = globalThis.Math.random();", "no-restricted-globals"],
+  ["new globalThis.Date", "export const x = new globalThis.Date();", "no-restricted-globals"],
+  ["globalThis.fetch", "export const x = globalThis.fetch('https://example.invalid');", "no-restricted-globals"],
+  ["Intl.DateTimeFormat", "export const x = new Intl.DateTimeFormat('en').format();", "no-restricted-properties"],
+  ["Temporal.Now", "export const x = Temporal.Now.instant();", "no-restricted-properties"],
+  ["Reflect.construct with Date", "export const x = Reflect.construct(Date, []);", "no-restricted-syntax"],
+  ["the module specifier", "import { createRequire } from 'module';\nexport const x = createRequire;", "no-restricted-imports"],
+  [
+    "createRequire from node:module",
+    "import { createRequire } from 'node:module';\nexport const x = createRequire;",
+    "no-restricted-imports",
+  ],
 ];
 
 for (const [name, code, rule] of VIOLATIONS) {

@@ -8,7 +8,14 @@
 // no-restricted-properties refuses the clock and random members of otherwise allowed globals
 // (Math and Date stay usable for arithmetic and for copying a Date the caller passed in).
 // no-restricted-syntax refuses reading the clock through the Date constructor or function with no
-// argument, and dynamic import. Each refusal names the injected alternative.
+// argument, Reflect.construct with Date, and dynamic import. globalThis, global and self are refused
+// outright, so the globalThis.Math.random, new globalThis.Date and globalThis.fetch spellings cannot
+// reach around the rules above. Each refusal names the injected alternative.
+//
+// Limits: a lint is best-effort. Aliasing (const D = Date; new D()), computed member access and
+// values passed in from outside are beyond what these syntax rules can see. The rule catches the
+// common and accidental forms; code review and the tests (fixed vectors, seeded replays and the
+// "never reads a clock" rows under fake timers) are the backstop.
 
 /** The files the purity block applies to, relative to the repo root that holds eslint.config.js. */
 export const LEARNING_PURITY_FILES = ["packages/learning/src/**/*.ts"];
@@ -19,6 +26,7 @@ const PURE_HINT = "packages/learning is pure (A1 section 2)";
 const IO_MODULES = [
   "fs",
   "fs/promises",
+  "module",
   "path",
   "os",
   "http",
@@ -43,8 +51,14 @@ const IO_MODULES = [
   "vm",
 ];
 
-/** Host globals that do I/O, read time or the environment, or draw randomness. */
+/**
+ * Host globals that do I/O, read time or the environment, or draw randomness, and the global-object
+ * aliases (globalThis, global, self) that would reach every other global around these rules.
+ */
 const IO_GLOBALS = [
+  "globalThis",
+  "global",
+  "self",
   "fetch",
   "process",
   "require",
@@ -71,6 +85,8 @@ const CLOCK_AND_RANDOM_PROPERTIES = [
   { object: "Math", property: "random", message: `${PURE_HINT}: take a RandomSource argument instead.` },
   { object: "Date", property: "now", message: `${PURE_HINT}: take the time as an argument instead.` },
   { object: "performance", property: "now", message: `${PURE_HINT}: take the time as an argument instead.` },
+  { object: "Intl", property: "DateTimeFormat", message: `${PURE_HINT}: date formatting reads the clock and locale.` },
+  { object: "Temporal", property: "Now", message: `${PURE_HINT}: take the time as an argument instead.` },
 ];
 
 /** The rule set, one object so the config and the test share the same reference. */
@@ -96,6 +112,10 @@ export const LEARNING_PURITY_RULES = Object.freeze({
     {
       selector: "CallExpression[callee.name='Date']",
       message: `${PURE_HINT}: Date() reads the clock; take the time as an argument.`,
+    },
+    {
+      selector: "CallExpression[callee.object.name='Reflect'][callee.property.name='construct'][arguments.0.name='Date']",
+      message: `${PURE_HINT}: Reflect.construct(Date) can read the clock; take the time as an argument.`,
     },
     { selector: "ImportExpression", message: `${PURE_HINT}: no dynamic import.` },
   ],
