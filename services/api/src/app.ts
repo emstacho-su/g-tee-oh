@@ -24,9 +24,18 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 
+import "./auth/session-context.js";
+import { type AppConfig, defaultAppConfig } from "./config.js";
+import type { Database } from "./db.js";
+import "./http/database.js";
 import { SECURITY_SCHEMES } from "./http/openapi.js";
 import { problemErrorHandler, problemNotFoundHandler } from "./http/problem.js";
 import { RATE_LIMIT_EXEMPT } from "./http/rate-limits.js";
+import { serverOptions } from "./http/server-options.js";
+import { authentication } from "./plugins/authenticate.js";
+import { csrfGuard } from "./plugins/csrf.js";
+import { idempotency } from "./plugins/idempotency.js";
+import { security } from "./plugins/security.js";
 import { authRoutes } from "./routes/auth.js";
 import { catalogRoutes } from "./routes/catalog.js";
 import { drillRoutes } from "./routes/drills.js";
@@ -51,15 +60,30 @@ export type ApiApp = FastifyInstance<
 export interface BuildAppOptions {
   /** Turns the pino logger on; off by default so tests stay quiet. */
   logger?: boolean;
+  /** Origin, session lifetime and proxy trust; the dev profile's values when absent. */
+  config?: AppConfig;
+  /**
+   * The Kysely handle the handlers use. Absent for the OpenAPI export and the HTTP-layer unit
+   * tests: every route still registers, and a handler that needs the database answers 503.
+   */
+  database?: Database;
 }
 
 export function buildApp(options: BuildAppOptions = {}): ApiApp {
-  const app = Fastify({ logger: options.logger ?? false }).withTypeProvider<ZodTypeProvider>();
+  const config = options.config ?? defaultAppConfig();
+  const app = Fastify(serverOptions(config, options.logger ?? false)).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   app.setErrorHandler(problemErrorHandler);
   app.setNotFoundHandler(problemNotFoundHandler);
+  app.decorate("database", options.database ?? null);
+
+  // Order matters: each plugin's hooks run in registration order, before any route below.
+  void app.register(security, { config });
+  void app.register(authentication);
+  void app.register(csrfGuard, { config });
+  void app.register(idempotency);
 
   void app.register(fastifySwagger, {
     openapi: {

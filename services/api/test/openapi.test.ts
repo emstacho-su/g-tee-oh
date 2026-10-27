@@ -115,16 +115,12 @@ describe("@g-tee-oh/api openapi.json", () => {
     expect(served).toEqual(expect.arrayContaining(expected));
   });
 
-  it("R3.1 a route a later session builds answers a 501 problem naming its owner", async () => {
+  it("R3.1 a planned route asks for a session before anything else (401 problem)", async () => {
     const response = await app.inject({ method: "GET", url: "/api/v1/progress/streak" });
 
-    expect(response.statusCode).toBe(501);
+    expect(response.statusCode).toBe(401);
     expect(response.headers["content-type"]).toMatch(/^application\/problem\+json/);
-    expect(response.json<{ type: string; status: number; detail: string }>()).toMatchObject({
-      type: "urn:g-tee-oh:problem:not-implemented",
-      status: 501,
-      detail: expect.stringContaining("S31") as unknown,
-    });
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:unauthenticated");
   });
 
   it("R0.7 the committed packages/contracts/api.openapi.json equals the served document", async () => {

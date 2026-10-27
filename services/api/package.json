@@ -27,6 +27,7 @@
     "@g-tee-oh/contracts": "workspace:*",
     "@g-tee-oh/learning": "workspace:*",
     "fastify": "^5.12.7",
+    "fastify-plugin": "^6.0.1",
     "fastify-type-provider-zod": "^7.0.0",
     "kysely": "^0.29.7",
     "pg": "^8.23.1",
