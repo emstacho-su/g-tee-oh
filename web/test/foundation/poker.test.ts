@@ -78,6 +78,16 @@ describe("R3.13 action styles", () => {
     expect(actionColor(small, both, "light")).not.toBe(actionColor(large, both, "light"));
     expect(actionColor(fixtureActions[0]!, fixtureActions, "dark")).toBe(ACTION_STYLES.fold.color.dark);
   });
+
+  it("R3.13 caps the shade at the darkest one past four sizes and treats a missing size as 0", () => {
+    const sizes = [100, 200, 300, 400, 500, 600];
+    const raises = sizes.map(
+      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "" }) as const,
+    );
+    expect(actionColor(raises[5]!, raises, "light")).toBe(actionColor(raises[3]!, raises, "light"));
+    const unsized = { index: 0, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "" } as const;
+    expect(actionColor(unsized, [unsized], "dark")).toMatch(/^#[0-9a-f]{6}$/);
+  });
 });
 
 describe("R3.13 grade action mapping (O-213)", () => {
