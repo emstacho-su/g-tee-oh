@@ -97,25 +97,40 @@ pub async fn nodes(
     let key: NodeKey = query.node_key.parse()?;
     let filter = HandsFilter::parse(query.hands.as_deref())?;
     let library = Arc::clone(&state.library);
-    let view = library.node_blocking(query.solution_id.clone(), key.clone()).await?;
-    let exploitability = state
-        .library
-        .info(&query.solution_id)
-        .map(|info| info.exploitability_pct_pot)
-        .ok_or_else(|| {
-            ApiError::Internal(format!("solution {} read but is not indexed", query.solution_id))
-        })?;
-    Ok(Json(node_response(query.solution_id, &key, &view, exploitability, &filter)?))
+    let view = Arc::clone(&library).node_blocking(query.solution_id.clone(), key.clone()).await?;
+    let tokens: Vec<ActionToken> = view.actions().iter().map(|action| action.token).collect();
+    let next_keys =
+        library.next_node_keys_blocking(query.solution_id.clone(), key.clone(), tokens).await?;
+    let info = state.library.info(&query.solution_id).ok_or_else(|| {
+        ApiError::Internal(format!("solution {} read but is not indexed", query.solution_id))
+    })?;
+    let solution = SolutionFacts {
+        id: query.solution_id.clone(),
+        exploitability_pct_pot: info.exploitability_pct_pot,
+        synthetic: info.synthetic,
+    };
+    Ok(Json(node_response(solution, &key, &view, &next_keys, &filter)?))
 }
 
-/// The response body for `view` read under `key`.
+/// What the response needs to know about the solution beyond the node itself.
+struct SolutionFacts {
+    /// The solution id.
+    id: String,
+    /// The manifest exploitability per seat, for the floor (O-150).
+    exploitability_pct_pot: Option<[f64; 2]>,
+    /// The manifest's synthetic flag (O-57, O-229).
+    synthetic: bool,
+}
+
+/// The response body for `view` read under `key`; `next_keys` holds each action's child.
 fn node_response(
-    solution_id: String,
+    solution: SolutionFacts,
     key: &NodeKey,
     view: &NodeView,
-    exploitability_pct_pot: Option<[f64; 2]>,
+    next_keys: &[Option<NodeKey>],
     filter: &HandsFilter,
 ) -> Result<NodeResponse, ApiError> {
+    let SolutionFacts { id: solution_id, exploitability_pct_pot, synthetic } = solution;
     let record = view.record();
     let to_act = match acting_seat(view) {
         Some(0) => key.pair.oop(),
@@ -138,10 +153,11 @@ fn node_response(
         accuracy_pct_pot: record.accuracy_pct_pot,
         floor_pct_pot: grade::floor(view, exploitability_pct_pot).pct_pot,
         spot_class_key: spot_class_key(key),
-        actions: action_views(view),
+        actions: action_views(view, next_keys),
         hands: hand_rows(view, filter)?,
         range_summary: range_summary(view),
         noise_flags: grade::node_noise_flags(view),
+        synthetic,
     })
 }
 
@@ -153,13 +169,14 @@ fn spot_class_key(key: &NodeKey) -> Option<String> {
     class.key().ok().map(|class_key| class_key.as_str().to_owned())
 }
 
-/// The actions in record order with their pack-time buckets and labels.
-fn action_views(view: &NodeView) -> Vec<ActionView> {
+/// The actions in record order with their pack-time buckets, labels and child keys.
+fn action_views(view: &NodeView, next_keys: &[Option<NodeKey>]) -> Vec<ActionView> {
     let street = view.record().street;
     view.actions()
         .iter()
         .enumerate()
         .map(|(index, action)| ActionView {
+            next_node_key: next_keys.get(index).cloned().flatten().map(|key| key.to_string()),
             index: u8::try_from(index).unwrap_or(u8::MAX),
             token: action.token.to_string(),
             kind: action_kind(action.token),

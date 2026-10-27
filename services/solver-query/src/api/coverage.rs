@@ -50,6 +50,9 @@ pub struct PreflopCoverage {
     pub solution_ids: Vec<String>,
     /// Where each id in `solution_ids` was found, in the same order.
     pub sources: Vec<CoverageSource>,
+    /// True when a held preflop solution is synthetic test data, so the web shows the
+    /// synthetic banner (O-57, O-229); additive, from the manifest flag.
+    pub synthetic: bool,
 }
 
 /// One flop with its scenario count.

@@ -87,6 +87,10 @@ pub struct GradeResponse {
     pub loss_bb: f32,
     /// The loss of the chosen action in percent of the pot, raw and never clamped.
     pub loss_pct_pot: f32,
+    /// The loss of every action in percent of the pot, in record order, raw and never
+    /// clamped; 0 for the best. Grouped and Simple modes grade a group by its smallest
+    /// member loss, so they need every action's loss from Rust (O-210, ADR 0004); additive.
+    pub loss_pct_pot_by_action: Vec<f32>,
     /// The floor in percent of the pot the policy subtracts (O-22).
     pub floor_pct_pot: f32,
     /// Which term set the floor.

@@ -116,6 +116,30 @@ async fn r2_13_grade_reports_loss_in_bb_and_pct_pot_with_the_floor() {
 }
 
 #[tokio::test]
+async fn r3_7_grade_returns_the_loss_of_every_action_for_grouped_and_simple_modes() {
+    // O-210: the per-action losses come from Rust so packages/learning never recomputes one
+    // (ADR 0004); the entry at the chosen index equals the scalar loss_pct_pot.
+    let fixture = packed_fixture();
+    let (reader, handle) = open(&fixture.root, &fixture.prefix);
+    let node = &fixture.nodes[0];
+    let key = node.key.to_string();
+    let view = reader.node(handle, &node.key).expect("the node reads");
+    let (hand, action, _) = losing_decision(&view);
+
+    let (status, _, json) =
+        grade(fixture.router(), &fixture.solution_id, &key, &class_name(hand), action).await;
+
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    let by_action = json["loss_pct_pot_by_action"].as_array().expect("an array");
+    assert_eq!(by_action.len(), view.actions().len(), "{json}");
+    for (index, value) in by_action.iter().enumerate() {
+        let units = view.loss_units(hand, index).expect("a loss");
+        assert_eq!(f32_of(value).to_bits(), (f32::from(units) / UNITS_PER_PCT).to_bits());
+    }
+    assert_eq!(by_action[action], json["loss_pct_pot"], "{json}");
+}
+
+#[tokio::test]
 async fn r2_13_grade_floor_falls_back_to_0_02_bb_without_accuracy() {
     let (_dir, root) = empty_root();
     let (config_id, pair) = ids();

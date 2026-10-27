@@ -68,6 +68,11 @@ pub struct ActionView {
     /// size at a preflop node, for example `Raise to 2.5bb` (O-22).
     #[schema(example = "Raise to 2.5bb")]
     pub label: String,
+    /// The node this action leads to when the solution holds it; null when the action
+    /// ends the solution (a fold, or the action that closes its last street). The api walks
+    /// trees through it and never builds a child key itself (O-245, ADR 0004); additive.
+    #[schema(example = "cfg_6_online_100/BB-BTN/r250")]
+    pub next_node_key: Option<String>,
 }
 
 /// One hand's row of the node.
@@ -157,4 +162,7 @@ pub struct NodeResponse {
     pub range_summary: RangeSummary,
     /// Node-level flags: `rare_line` only.
     pub noise_flags: Vec<NoiseFlag>,
+    /// True when the solution is synthetic test data, from its manifest flag, so the web
+    /// shows the synthetic banner (O-57, O-229); additive.
+    pub synthetic: bool,
 }

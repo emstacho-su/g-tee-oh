@@ -116,6 +116,10 @@ fn preflop_coverage(registry: &[SolutionInfo], database_ids: &[String]) -> Prefl
         .filter(|info| info.kind == ManifestKind::Preflop)
         .map(|info| info.id.clone())
         .collect();
+    // O-229, O-57: the banner flag follows the manifests the registry scanned; ids known only
+    // to the database are own or reference publishes, never synthetic.
+    let synthetic =
+        registry.iter().any(|info| info.kind == ManifestKind::Preflop && info.synthetic);
     let mut sources = vec![CoverageSource::Fixture; solution_ids.len()];
     for id in database_ids {
         if !solution_ids.contains(id) {
@@ -123,7 +127,7 @@ fn preflop_coverage(registry: &[SolutionInfo], database_ids: &[String]) -> Prefl
             sources.push(CoverageSource::Library);
         }
     }
-    PreflopCoverage { available: !solution_ids.is_empty(), solution_ids, sources }
+    PreflopCoverage { available: !solution_ids.is_empty(), solution_ids, sources, synthetic }
 }
 
 /// The flops block: each stored row with the texture family of its flop.
@@ -224,6 +228,17 @@ mod tests {
         let none = preflop_coverage(&[info("b", ManifestKind::FlopBuild)], &[]);
         assert!(!none.available);
         assert!(none.solution_ids.is_empty() && none.sources.is_empty());
+    }
+
+    #[test]
+    fn r3_3_preflop_coverage_is_synthetic_when_a_held_preflop_solution_is_synthetic() {
+        let synthetic = preflop_coverage(&[info("a", ManifestKind::Preflop)], &[]);
+        assert!(synthetic.synthetic, "a synthetic manifest raises the O-57 banner flag");
+
+        let real = SolutionInfo { synthetic: false, ..info("a", ManifestKind::Preflop) };
+        let flop_build = info("b", ManifestKind::FlopBuild);
+        let own = preflop_coverage(&[real, flop_build], &["c".to_owned()]);
+        assert!(!own.synthetic, "a synthetic flop build or a database id raises nothing");
     }
 
     #[test]

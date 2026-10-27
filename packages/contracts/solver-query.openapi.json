@@ -606,6 +606,14 @@
             "description": "The button label: the bucket's Grouped label postflop (`Overbet small`) and the exact\nsize at a preflop node, for example `Raise to 2.5bb` (O-22).",
             "example": "Raise to 2.5bb"
           },
+          "next_node_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The node this action leads to when the solution holds it; null when the action\nends the solution (a fold, or the action that closes its last street). The api walks\ntrees through it and never builds a child key itself (O-245, ADR 0004); additive.",
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
           "size_cbb": {
             "type": "integer",
             "format": "int32",
@@ -1083,6 +1091,7 @@
           "ev_best_bb",
           "loss_bb",
           "loss_pct_pot",
+          "loss_pct_pot_by_action",
           "floor_pct_pot",
           "floor_source",
           "noise_flags",
@@ -1160,6 +1169,14 @@
             "type": "number",
             "format": "float",
             "description": "The loss of the chosen action in percent of the pot, raw and never clamped."
+          },
+          "loss_pct_pot_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "description": "The loss of every action in percent of the pot, in record order, raw and never\nclamped; 0 for the best. Grouped and Simple modes grade a group by its smallest\nmember loss, so they need every action's loss from Rust (O-210, ADR 0004); additive."
           },
           "node_key": {
             "type": "string",
@@ -1470,7 +1487,8 @@
           "actions",
           "hands",
           "range_summary",
-          "noise_flags"
+          "noise_flags",
+          "synthetic"
         ],
         "properties": {
           "accuracy_pct_pot": {
@@ -1561,6 +1579,10 @@
             "description": "The street as `gto_model::Street::as_str`: `preflop`, `flop`, `turn` or `river`.",
             "example": "preflop"
           },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the solution is synthetic test data, from its manifest flag, so the web\nshows the synthetic banner (O-57, O-229); additive."
+          },
           "to_act": {
             "type": "string",
             "description": "The seat to act as `gto_model::Position::as_str`.",
@@ -1615,7 +1637,8 @@
         "required": [
           "available",
           "solution_ids",
-          "sources"
+          "sources",
+          "synthetic"
         ],
         "properties": {
           "available": {
@@ -1635,6 +1658,10 @@
               "$ref": "#/components/schemas/CoverageSource"
             },
             "description": "Where each id in `solution_ids` was found, in the same order."
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when a held preflop solution is synthetic test data, so the web shows the\nsynthetic banner (O-57, O-229); additive, from the manifest flag."
           }
         }
       },

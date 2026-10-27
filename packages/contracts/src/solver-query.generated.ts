@@ -266,6 +266,13 @@ export interface components {
              */
             label: string;
             /**
+             * @description The node this action leads to when the solution holds it; null when the action
+             *     ends the solution (a fold, or the action that closes its last street). The api walks
+             *     trees through it and never builds a child key itself (O-245, ADR 0004); additive.
+             * @example cfg_6_online_100/BB-BTN/r250
+             */
+            next_node_key?: string | null;
+            /**
              * Format: int32
              * @description The total wager in centi-big-blinds (cbb); 0 for a fold or a check.
              */
@@ -564,6 +571,12 @@ export interface components {
              * @description The loss of the chosen action in percent of the pot, raw and never clamped.
              */
             loss_pct_pot: number;
+            /**
+             * @description The loss of every action in percent of the pot, in record order, raw and never
+             *     clamped; 0 for the best. Grouped and Simple modes grade a group by its smallest
+             *     member loss, so they need every action's loss from Rust (O-210, ADR 0004); additive.
+             */
+            loss_pct_pot_by_action: number[];
             /** @description The node key in its canonical text. */
             node_key: string;
             /** @description Hand-level flags: `close_ev_mix`, `rare_line`, `suit_mixing`. */
@@ -739,6 +752,11 @@ export interface components {
              */
             street: string;
             /**
+             * @description True when the solution is synthetic test data, from its manifest flag, so the web
+             *     shows the synthetic banner (O-57, O-229); additive.
+             */
+            synthetic: boolean;
+            /**
              * @description The seat to act as `gto_model::Position::as_str`.
              * @example BB
              */
@@ -781,6 +799,11 @@ export interface components {
             solution_ids: string[];
             /** @description Where each id in `solution_ids` was found, in the same order. */
             sources: components["schemas"]["CoverageSource"][];
+            /**
+             * @description True when a held preflop solution is synthetic test data, so the web shows the
+             *     synthetic banner (O-57, O-229); additive, from the manifest flag.
+             */
+            synthetic: boolean;
         };
         /** @description An RFC 9457 problem details body. */
         Problem: {

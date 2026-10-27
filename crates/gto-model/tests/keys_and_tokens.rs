@@ -167,6 +167,24 @@ fn r2_1_node_key_root_preflop_and_first_flop_decision() {
 }
 
 #[test]
+fn r3_3_node_key_with_action_appends_to_the_street_the_node_is_on() {
+    // O-245: the child key solver-query names as an action's next_node_key.
+    let root = key("cfg_6_online_100/BB-BTN/");
+    let open = root.with_action(ActionToken::Raise(Cbb(250)));
+    assert_eq!(open.to_string(), "cfg_6_online_100/BB-BTN/r250");
+    assert_eq!(open.with_action(ActionToken::Call).to_string(), "cfg_6_online_100/BB-BTN/r250.c");
+    let flop_node = key("cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|");
+    assert_eq!(
+        flop_node.with_action(ActionToken::Check).to_string(),
+        "cfg_6_online_100/BB-BTN/r250.c|Ah7d2c|x"
+    );
+    let turn_node = key(A3_EXAMPLE);
+    let bet = turn_node.clone().with_action(ActionToken::Bet(Cbb(500)));
+    assert_eq!(bet.turn.map(|section| section.actions.len()), Some(2));
+    assert_eq!(bet.flop, turn_node.flop, "earlier streets are untouched");
+}
+
+#[test]
 fn r2_1_node_key_river() {
     let text = "cfg_9_live_13_150/BB-BTN/r300.c|Ah7d2c|x.b250.c|Kh|x.x|3s|b1000";
     let river = key(text);
