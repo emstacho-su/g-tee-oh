@@ -21,6 +21,8 @@ import { learningPurityBlock } from "./scripts/lib/learning-purity.mjs";
 
 const IGNORED_PATHS = [
   "**/dist/**",
+  "**/dist-harness/**",
+  "**/coverage/**",
   "**/node_modules/**",
   "**/target/**",
   "crates/**",

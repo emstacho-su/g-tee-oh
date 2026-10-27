@@ -49,6 +49,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
+# The roller calls packages/learning for the RNG bands (O-213, O-262); it is pure TypeScript.
+COPY packages/learning packages/learning
 COPY web web
 # The Vite build writes web/dist (index.html plus hashed assets); the runtime stage copies it.
 RUN pnpm --filter @g-tee-oh/web run build

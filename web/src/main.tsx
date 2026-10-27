@@ -8,6 +8,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { createAppRouter } from "./router.js";
+import "./styles.css";
 
 const MOUNT_ELEMENT_ID = "root";
 
