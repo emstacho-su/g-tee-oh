@@ -205,6 +205,10 @@ coverage-library:
     cargo llvm-cov -p gto-library -p library-pack --features gto-library/synthetic \
         --ignore-filename-regex "(gto-model|vendor|gto-solve)" --fail-under-lines 80
 
+# Statement, branch, function and line coverage of packages/learning at the 80% gate (S22, A9 section 1)
+coverage-learning:
+    pnpm --filter @g-tee-oh/learning coverage
+
 # Line coverage of solver-query at the 80% gate (O-134, plan D.9); needs cargo-llvm-cov
 coverage-solver-query:
     cargo llvm-cov -p solver-query --features gto-library/synthetic \
