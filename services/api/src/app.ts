@@ -97,7 +97,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
 
   void app.register(healthzRoutes, { prefix: API_PREFIX, documented: true });
   void app.register(healthzRoutes, { documented: false });
-  void app.register(authRoutes, { prefix: API_PREFIX });
+  void app.register(authRoutes, { prefix: API_PREFIX, config });
   void app.register(catalogRoutes, { prefix: API_PREFIX });
   void app.register(drillRoutes, { prefix: API_PREFIX });
   void app.register(plannedRoutes, { prefix: API_PREFIX });
