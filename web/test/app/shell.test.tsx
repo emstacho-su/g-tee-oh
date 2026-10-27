@@ -9,6 +9,7 @@ import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureSession } from "../../src/fixtures/index.js";
+import { defaultHotkeyStore } from "../../src/hotkeys/index.js";
 import { useThemeStore } from "../../src/store/index.js";
 import { noContent, problemResponse, sessionResponse } from "../api/fake-fetch.js";
 import { renderApp, SIGNED_IN } from "./render-app.js";
@@ -28,13 +29,34 @@ const NAV_LINKS: readonly (readonly [string, string])[] = [
 
 beforeEach(() => {
   useThemeStore.getState().setTheme("light");
+  // The app-wide hotkey store outlives a test; an overlay left open would hide the page from queries.
+  defaultHotkeyStore.getState().setOverlayOpen(false);
 });
 
 describe("home shell", () => {
+  it("R3.13 the header, the Main navigation and the main region are top-level landmarks inside the shell", async () => {
+    renderApp("/", SIGNED_IN);
+
+    const shell = await screen.findByTestId("shell");
+    const banner = await screen.findByRole("banner");
+    const main = screen.getByRole("main");
+    expect(shell.contains(banner)).toBe(true);
+    expect(main.contains(banner)).toBe(false);
+    expect(within(main).getByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
+  });
+
+  it("R3.13 ? opens the keyboard shortcuts overlay on a signed-in screen", async () => {
+    const user = userEvent.setup();
+    renderApp("/", SIGNED_IN);
+
+    await screen.findByRole("navigation", { name: "Main" });
+    await user.keyboard("?");
+    expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+  });
+
   it("R3.13 the header shows the app name, the signed-in email and the shortcuts hint", async () => {
     renderApp("/", SIGNED_IN);
 
-    // The header sits inside <main data-testid="shell"> (kept for R0.7), so it is not a banner landmark.
     const header = await screen.findByTestId("app-header");
     expect(within(header).getByText("g-tee-oh")).toBeInTheDocument();
     expect(await within(header).findByText(fixtureSession.user.email)).toBeInTheDocument();

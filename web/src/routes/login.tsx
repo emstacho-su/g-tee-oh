@@ -70,7 +70,7 @@ export function LoginPage() {
   }
 
   return (
-    <section className="mx-auto mt-16 max-w-sm space-y-4 rounded-lg border border-border bg-surface-raised p-6">
+    <main className="mx-auto mt-16 max-w-sm space-y-4 rounded-lg border border-border bg-surface-raised p-6">
       <h1 className="text-2xl font-semibold">Sign in</h1>
       <form noValidate className="space-y-3" onSubmit={(event) => void submit(event)}>
         <div className="space-y-1">
@@ -110,6 +110,6 @@ export function LoginPage() {
           Sign in
         </Button>
       </form>
-    </section>
+    </main>
   );
 }

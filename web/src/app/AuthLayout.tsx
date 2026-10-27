@@ -1,5 +1,5 @@
 /**
- * The authenticated layout (R3.13, A7 section 2): header, the Main navigation as a sidebar on
+ * The authenticated layout (R3.13, A7 section 2): the hotkey root, header, the Main navigation as a sidebar on
  * desktop (stacked at narrow widths, which are a sanity view only, O-266), the route content and
  * the shortcuts hint. The route's beforeLoad (router.tsx) already proved a session; if the me
  * query later turns null (a 401 anywhere, see query-client.ts), this layout sends the user to
@@ -8,6 +8,7 @@
 import { Navigate, Outlet, useLocation } from "@tanstack/react-router";
 
 import { useMe } from "../auth/index.js";
+import { HotkeyRoot } from "../hotkeys/index.js";
 import { AppHeader } from "./AppHeader.js";
 import { MainNav } from "./MainNav.js";
 
@@ -25,13 +26,14 @@ export function AuthLayout() {
   }
   return (
     <div className="flex min-h-screen flex-col">
-      {/* S24 lead: hotkey root mounts here */}
+      {/* One window keydown listener and the ? shortcuts overlay for every signed-in screen (A7 section 4) */}
+      <HotkeyRoot />
       <AppHeader />
       <div className="flex flex-1 flex-col gap-4 p-4 md:flex-row">
         <MainNav />
-        <div className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1">
           <Outlet />
-        </div>
+        </main>
       </div>
       <p className="border-t border-border px-4 py-2 text-sm text-muted">{SHORTCUTS_HINT}</p>
     </div>
