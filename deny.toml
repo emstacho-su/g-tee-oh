@@ -13,8 +13,18 @@
 # first two; `cargo deny check` with no argument runs all four.
 
 [graph]
-# An empty list means "the host target", which is what CI and dev machines build.
-targets = []
+# The targets the repository builds: CI and the images on Linux (amd64 and arm64), the Zenbook on
+# Windows, the Mac on Apple silicon (and Intel macOS for completeness). An empty list makes cargo-deny walk every target cfg in the
+# graph, wasm32 included, which reached webpki-root-certs, a wasm32-only edge of
+# rustls-platform-verifier that no binary here links (O-208). The license and ban rules are
+# unchanged.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+]
 all-features = false
 no-default-features = false
 

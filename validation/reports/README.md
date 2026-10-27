@@ -146,6 +146,62 @@ The rake comparison (O-161) is a run of its own: `just g4-raked ORACLE OUT` runs
 
 `just g4-smoke` runs the compare on the committed synthetic tiny pair under `validation/fixtures/g4/` with no solve into `target/gate-reports/g4` with `--allow-dirty`; the rust job runs it after the G1 to G3 gates. `just g4-check`, called by `just gates-check` and so by `just ci`, runs the smoke and then validates its report with `scripts/check-reports.mjs`, so the envelope and the pass rule are checked locally without touching this directory (the rust job cannot run check-reports, which needs the ajv package the ts job installs). The R2.11 tests in `tools/validate/tests/g4.rs` and `g4_engine.rs` call the same `validate::gates::g4` functions.
 
+## Flop-line benchmark: `bench-flop-line-<machine>` (R2.12, R2.16 to R2.18, O-50, O-190, O-200)
+
+The library builder solves one flop of the O-52 line (online 6-max 100 big blinds, button versus big blind single-raised pot) on hand-made ranges (O-201) and the report judges that run against O-50: peak resident set size (RSS) under 5 GB and every preflop line at most 30 minutes to 0.3 percent of the pot for both seats. Three steps produce it, each through `library-builder` (`services/library-builder/src/spec.rs` and `bench.rs`):
+
+1. `library-builder estimate --job-spec /fixtures/builder/bench-bb-btn-srp.json --out sweep.json` estimates the memory of every line of the spec on all 1,755 canonical flops at the spec's storage, building the betting skeleton only (the O-194 recheck), and writes the largest and smallest estimate per line.
+2. `library-builder --once --job-spec <spec> --summary-out <file>` runs one job without a database (O-205) through the same staging, upload and read-back verification as the loop, inside `docker run --memory 5g --memory-swap 5g` with `LIBRARY_ROOT` on a volume, once for `bench-bb-btn-srp.json` (32-bit storage, target 0.3 percent, the judged run) and once for `bench-bb-btn-srp.16bit.json` (16-bit storage at the 0.5 percent floor of O-194, informational per O-200). Each prints one JSON summary line: outcome (`staged` or `failed`), per line seconds, iterations, both seats' gains, stop reason, memory estimate, flop file bytes and runout file bytes, bytes written, peak RSS (`VmHWM` from `/proc/self/status`) and wall seconds. A run that fails still writes its summary with outcome `failed`, so the miss reaches the report (O-178).
+3. `library-builder bench-report --judged <summary> --informational <summary> --sweep sweep.json --out validation/reports` writes `bench-flop-line-<machine>.json` and its Markdown twin `bench-flop-line-<machine>.md` from one value, so they cannot disagree. The machine name comes from `VALIDATE_MACHINE` (default `zenbook`) and must match the schema's name pattern, the commit from `git rev-parse HEAD`, the date is now in UTC, and the machine block comes from sysinfo (long operating system name, first CPU brand, logical cores, memory rounded to whole gibibytes). The command exits 1 when the report fails, after writing both files.
+
+The report id is `bench-flop-line`, not `bench`, so the schema requires `pass` and `thresholds`. `toolchain` is the engine version every build records (`g-tee-oh-builder/<version>`), since the report is written after the measured run by another process.
+
+| Thresholds key | Value |
+|---|---|
+| `peak_rss_bytes` | `{ "max": 5000000000, "unit": "bytes" }`, judged strictly: a peak of exactly 5,000,000,000 bytes fails. The judged row carries `"strict": true` and the Markdown twin prints "under". |
+| `seconds_per_line` | `{ "max": 1800, "unit": "seconds" }` |
+| `exploitability_pct_pot` | `{ "max": 0.3, "unit": "pct_pot" }` |
+
+| Measurement id | Judged | Meaning |
+|---|---|---|
+| `flop-line/staged` | yes, at least 1 | 1 when the judged run staged, uploaded and verified its build, 0 otherwise; a failed run fails here, so a failing report always has a failed row (the agreement rule of `scripts/check-reports.mjs`). |
+| `flop-line/peak-rss` | yes, under 5,000,000,000 bytes | The judged run's peak RSS. |
+| `flop-line/<line>/seconds` | yes, at most 1,800 | Wall seconds of the line's solve. |
+| `flop-line/<line>/gain-oop`, `flop-line/<line>/gain-ip` | yes, at most 0.3 | Each seat's best-response gain in percent of the pot at the stop. |
+| `flop-line/<line>/iterations`, `estimate-bytes`, `flop-bytes`, `mean-runout-bytes` | no | The iterations run, the memory estimate, the flop file's bytes and the mean runout file's bytes (the O-180 measured figure for S20). |
+| `flop-line/bytes-written`, `flop-line/job-seconds` | no | The build's uploaded bytes and the run's wall seconds. |
+| `flop-line-16bit/...` | no | The same quantities for the 16-bit run, never judged (O-200). |
+| `sweep/flops`, `sweep/cap-bytes`, `sweep/<line>/max-estimate-bytes`, `sweep/<line>/min-estimate-bytes` | no | The O-194 sweep: flops estimated per line, the memory cap, and each line's largest and smallest estimate. |
+
+`notes` states the O-50 rule, the verdict with one sentence per rule naming the numbers, the storage of each run (the judged summary is the 32-bit run by the bench method, O-194 and O-200), each line's stop reason, and the flop with the largest estimate per line. `just report-check` validates the JSON with the other reports, so a committed `bench-flop-line-zenbook.json` that misses O-50 fails that check: the miss is recorded, and the phase gate has to answer it.
+
+## Builder settings: `builder_setting` keys (O-188)
+
+The library builder reads every `builder_setting` row on every claim (A1 section 6, R2.18), so a change takes effect on the next job without a restart; the same keys appear in a job spec's `settings` (O-205). Every key has a default and a missing key takes it. A row whose value fails its check (wrong JSON type, out of range, or 16-bit storage with a target under 0.5 percent of the pot) falls back to the default alone and is listed in `/healthz` under `settings_errors` as `key: reason`, the reason naming the default used; an unknown key is listed the same way. In a job spec any such error refuses the spec instead. `services/library-builder/src/settings.rs` holds the checks.
+
+| Key | Default | Check | Meaning |
+|---|---|---|---|
+| `paused` | `false` | boolean | Claim nothing. |
+| `cpu_share` | `0.5` | above 0, at most 1 | Share of `BUILDER_THREADS` outside the boost window. |
+| `overnight` | `{"start_hour": 0, "end_hour": 7, "utc_offset_minutes": 0, "cpu_share": 1.0}` | hours 0 to 23, offset within a day, share above 0 and at most 1, no other field | The O-13 boost: inside `[start_hour, end_hour)` local time (wrapping midnight when the start is after the end, empty when they are equal) the share is the window's. |
+| `budget_bytes` | `650000000000` | positive integer | The library budget (ADR 0018). |
+| `bytes_per_runout` | `14156873` | positive integer | Planner estimate per runout file (O-180). |
+| `bytes_per_flop_tree` | `752365` | positive integer | Planner estimate per flop tree file (O-180). |
+| `k_runouts` | `20` | positive integer up to 65,535 | Runouts kept for the frequent pairs (O-14). |
+| `k_runouts_rare` | `10` | positive integer up to 65,535 | Runouts kept for the other pairs (O-191). |
+| `k_frequent_pairs` | `1` | positive integer up to 65,535 | Pairs per configuration that take `k_runouts` (O-191). |
+| `plan_configs` | `["cfg_6_online_100"]` | non-empty list of `v1_configs` ids | The configurations the planner enumerates. |
+| `target_pct_pot` | `0.3` | positive number | Stop and publish target per seat, percent of the pot (04 section 6, O-138). |
+| `max_iterations` | `20000` | positive integer | Iterations per line on the first attempt; attempt n runs n times as many. |
+| `max_seconds_per_line` | `1800` | positive integer | Wall seconds per line (O-178). |
+| `storage_bits` | `32` | 16 or 32; 16 only with `target_pct_pot` at least 0.5 | Solver storage (O-194). |
+| `memory_cap_bytes` | `4294967296` | positive integer, clamped to `BUILDER_MEMORY_CEILING_BYTES` | A solve whose estimate plus one runout walk is above it is refused before allocation (O-139, O-187); 4 GiB leaves headroom under the 5 GiB container limit for runtime, extraction and staging (PR #22 review). |
+| `max_attempts` | `3` | integer from 1 to 32,767 | Failures before a job parks (A5 section 4, O-176). |
+| `stale_hours` | `6` | positive integer | Age of a `running` row the stale reclaim re-queues (O-185). |
+| `verify_interval_hours` | `24` | positive integer | Hours between verify passes (O-186). |
+| `plan_interval_minutes` | `60` | positive integer | Minutes between automatic plans. |
+| `poll_seconds` | `30` | positive integer | Sleep when paused or idle. |
+
 ## Matrix frame bench: `matrix-frame-<machine>.json` (R3.12)
 
 Produced by `just bench-web` (S24, O-260), which runs the Playwright bench project (`web/e2e/bench/matrix-frame.bench.ts`) against `vite preview` of the harness build (`vite build --mode harness`, `dist-harness/`, never the production image, O-267). The spec opens `/bench.html`, calls `window.__runMatrixBench` (`web/src/bench/`), builds the report with `web/e2e/bench/report.ts` and writes it here. Rule 1 applies: the tool writes the whole file. The run happens on the Zenbook under the bench lock, since other heavy work on the machine moves frame times.
@@ -189,7 +245,7 @@ Fields beyond the envelope:
 | `library-size-estimate.md` | S14, `just library-size-estimate` (`library-pack estimate`) | Markdown, tool-written | R2.7: bytes per runout and per flop tree on synthetic trees with the method and seed, set against 02 section 5.2 and O-51 (the section above); the chunk decode number lives in the bench JSON. |
 | `g4-oracle.json`, `g4-oracle.md` | S17, `just g4` on the Zenbook; private, in the capture repository's `validation/reports/g4/` (O-170) | JSON gate report with its tool-written Markdown twin (the G4 section above) | R2.11: the engine's heads-up turn and river solves against the b-inary oracle through the private program (ADR 0002, O-31, O-81) on the eight gated spots of `g4-spots.json`. G4 passed on 2026-10-22 at 63bf014; report in the private repo. |
 | `g4-oracle-raked.json`, `g4-oracle-raked.md` | S17, `just g4-raked` on the Zenbook; private, beside the G4 report in the capture repository's `validation/reports/g4/` (O-170) | JSON report with its tool-written Markdown twin, informational rows only (the G4 section above) | O-161: the two raked twins of `g4-spots-raked.json` against the oracle at the online rake; nothing is judged, S18 reads the rake gap here. |
-| `bench-flop-line-zenbook.md` | S18 | Markdown | R2.12 and R2.16 to R2.18: peak RSS, seconds per line, iterations and exploitability of `library-builder --once` under the 5 GB Docker limit (O-48) against O-50. |
+| `bench-flop-line-zenbook.json`, `bench-flop-line-zenbook.md` | S18, `library-builder bench-report` on the Zenbook (the flop-line section above) | JSON gate report with its tool-written Markdown twin | R2.12 and R2.16 to R2.18: peak RSS, seconds per line, iterations and exploitability of `library-builder --once --job-spec` under the 5 GB Docker limit (O-48) against O-50, the 32-bit run judged and the 16-bit run informational (O-200). |
 | `spike-preflop-zenbook.md` | S19 | Markdown | The push/fold spike on the Zenbook (R2.21, O-49): peak bytes and seconds, the 100 big blind figure measured or labeled extrapolated, and the O-4 answer. |
 | `spike-preflop-mac.md` | S20 | Markdown | R2.21 rerun in the builder container on the Mac against O-48 and O-49. |
 | `phase-2-gate.md` | S20 | Markdown | Phase 2 gate and Deploy 1 report, R2.1 to R2.22, with the O-50 memory and O-51 storage pass rules; G4 (R2.11) stays private and is noted. |

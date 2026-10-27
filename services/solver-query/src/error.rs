@@ -236,6 +236,7 @@ impl From<LibraryError> for ApiError {
             | LibraryError::Quantize(_)
             | LibraryError::Manifest(_)
             | LibraryError::InvalidPath(_)
+            | LibraryError::InvalidRequest(_)
             | LibraryError::Model(_) => ApiError::Internal(err.to_string()),
         }
     }

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "tiny-bb-btn-srp.spec",
+  "config_id": "cfg_6_online_100",
+  "position_pair": "BB-BTN",
+  "flop": "Ah7d2c",
+  "lines": ["r250.c"],
+  "k_runouts": 2,
+  "seed": 7,
+  "convention": {
+    "placeholder_for": "cfg_6_online_100",
+    "open_bb": 2.5,
+    "iso_rule": { "base_bb": 3.0, "per_limper_bb": 1.0 },
+    "threebet_ip": 3.0,
+    "threebet_oop": 4.0,
+    "fourbet": 2.2,
+    "straddle_bb": null,
+    "postflop": { "flop": [0.33, 0.75], "turn": [0.75], "river": [0.75] }
+  },
+  "ranges_fixture": "tiny-bb-btn-srp.json",
+  "settings": {
+    "target_pct_pot": 0.3,
+    "storage_bits": 32,
+    "max_seconds_per_line": 600
+  },
+  "synthetic": true
+}

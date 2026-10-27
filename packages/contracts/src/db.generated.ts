@@ -302,6 +302,14 @@ export interface SizingConvention {
 }
 
 export interface Solution {
+  /**
+   * the build_job row whose publish wrote this solution; null for reference rows and rows published before 20261027000200
+   */
+  build_job_id: string | null;
+  /**
+   * the bytes the publish added to storage_ledger, given back when the build is marked unavailable
+   */
+  bytes: Int8 | null;
   created_at: Generated<Timestamp>;
   engine_version: string | null;
   exploitability_pct_pot: number[] | null;
@@ -313,6 +321,10 @@ export interface Solution {
   position_pair: string | null;
   source: SolutionSource;
   status: string;
+  /**
+   * the tree hash of that job's key, recorded at publish
+   */
+  tree_config_hash: Buffer | null;
 }
 
 export interface Stake {

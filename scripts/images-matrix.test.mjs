@@ -3,7 +3,8 @@
 // The images workflow (.github/workflows/images.yml) fans one multi-arch build out per entry of the
 // matrix, so every entry must name a Dockerfile that exists and the build context every Dockerfile is
 // written against: the repo root, where .dockerignore and the COPY paths live. solver-query is the
-// first entry (S06); api, web and library-builder join when their sessions publish them.
+// first entry (S06) and library-builder joined in S18 (R2.18); api and web join when their sessions
+// publish them.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -21,6 +22,11 @@ const SOLVER_QUERY_ENTRY = Object.freeze({
   dockerfile: "infra/docker/solver-query.Dockerfile",
   context: REPO_ROOT_CONTEXT,
 });
+const LIBRARY_BUILDER_ENTRY = Object.freeze({
+  name: "library-builder",
+  dockerfile: "infra/docker/library-builder.Dockerfile",
+  context: REPO_ROOT_CONTEXT,
+});
 
 function readMatrix() {
   return JSON.parse(readFileSync(MATRIX_PATH, "utf8"));
@@ -32,6 +38,14 @@ describe("images matrix", () => {
     const entry = services.find((service) => service.name === SOLVER_QUERY_ENTRY.name);
     assert.ok(entry, "solver-query is missing from infra/docker/images.json");
     assert.deepEqual(entry, SOLVER_QUERY_ENTRY);
+    assert.ok(existsSync(resolve(REPO_ROOT, entry.dockerfile)), `${entry.dockerfile} does not exist`);
+  });
+
+  it("r2_18 the images matrix lists library-builder with its Dockerfile and the repo root as context", () => {
+    const { services } = readMatrix();
+    const entry = services.find((service) => service.name === LIBRARY_BUILDER_ENTRY.name);
+    assert.ok(entry, "library-builder is missing from infra/docker/images.json");
+    assert.deepEqual(entry, LIBRARY_BUILDER_ENTRY);
     assert.ok(existsSync(resolve(REPO_ROOT, entry.dockerfile)), `${entry.dockerfile} does not exist`);
   });
 
