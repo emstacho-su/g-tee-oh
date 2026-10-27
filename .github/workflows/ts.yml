@@ -28,6 +28,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The api integration tests run against the real solver-query binary over the fixture
+      # library (O-53, O-244); the cache keeps the debug build incremental between runs.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the fixture solver-query (O-244)
+        run: cargo build --locked -p solver-query
       - name: Lint
         run: just ts-lint
       - name: Type check
@@ -38,6 +44,8 @@ jobs:
         run: just coverage-learning
       - name: Coverage of web/src at the 80 percent gate (S24, A9 section 1)
         run: just coverage-web
+      - name: Coverage of services/api at the 80 percent gate (S23, A9 section 1)
+        run: just coverage-api
       - name: Boundary (api never invokes the builder, R2.15)
         run: just ts-boundary
       - name: Pending-test tags (R0.11)

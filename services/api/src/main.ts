@@ -7,6 +7,7 @@
 import { buildApp } from "./app.js";
 import { LISTEN_HOST, loadProcessConfig } from "./config.js";
 import { createDatabase } from "./db.js";
+import { createSolverQuery } from "./solver-query/client.js";
 
 const SHUTDOWN_SIGNALS = ["SIGTERM", "SIGINT"] as const;
 
@@ -23,7 +24,8 @@ try {
 }
 
 const database = createDatabase(processConfig.database);
-const app = buildApp({ logger: true, config: processConfig.app, database });
+const solverQuery = createSolverQuery(processConfig.solverQueryUrl);
+const app = buildApp({ logger: true, config: processConfig.app, database, solverQuery });
 
 function shutdown(signal: NodeJS.Signals): void {
   app.log.info({ signal }, "api shutting down");

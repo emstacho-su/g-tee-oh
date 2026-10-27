@@ -18,6 +18,8 @@ import { resolveBinary } from "dbmate";
 import pg from "pg";
 import type { TestProject } from "vitest/node";
 
+import { startFixtureSolverQuery } from "./fixture-solver-query.js";
+
 const POSTGRES_IMAGE = "postgres:18-alpine";
 const DATABASE_NAME = "gto";
 const APP_TEST_LOGIN = "app_test_login";
@@ -29,6 +31,10 @@ declare module "vitest" {
     adminDatabaseUrl: string;
     /** app_test_login, a member of app: what the api under test connects as. */
     appDatabaseUrl: string;
+    /** The fixture solver-query's base URL, or "" when it could not start (O-244). */
+    solverQueryUrl: string;
+    /** Why the fixture solver-query is missing, or "" when it runs. */
+    solverQueryError: string;
   }
 }
 
@@ -70,7 +76,18 @@ export default async function setup(project: TestProject): Promise<() => Promise
   project.provide("adminDatabaseUrl", adminUrl);
   project.provide("appDatabaseUrl", withCredentials(adminUrl, APP_TEST_LOGIN, appPassword));
 
+  // O-53, O-244: the real solver-query binary over the fixture library, as the query role.
+  const fixture = await startFixtureSolverQuery({
+    adminUrl,
+    host: container.getHost(),
+    port: container.getPort(),
+    database: DATABASE_NAME,
+  });
+  project.provide("solverQueryUrl", fixture.url);
+  project.provide("solverQueryError", fixture.error);
+
   return async () => {
+    await fixture.stop();
     await container?.stop();
   };
 }

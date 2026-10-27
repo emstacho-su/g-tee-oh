@@ -56,13 +56,22 @@ export interface AppConfig {
   sessionTtlHours: number;
   /** Proxies trusted for X-Forwarded-For, by address (O-236). */
   trustedProxies: readonly string[];
+  /** The IANA time zone whose midnight starts a training day (O-247, O-214). */
+  timeZone: string;
 }
 
 export interface ProcessConfig {
   port: number;
   app: AppConfig;
   database: DatabaseConfig;
+  /** solver-query's base URL on the compose network (A5 section 1, O-244). */
+  solverQueryUrl: string;
 }
+
+/** solver-query inside the compose network: its service name and its internal port (A5 section 1). */
+export const DEFAULT_SOLVER_QUERY_URL = "http://solver-query:7070";
+/** O-247: the training day starts at midnight UTC unless APP_TIME_ZONE names another zone. */
+export const DEFAULT_TIME_ZONE = "UTC";
 
 /** The configuration buildApp uses when none is given: the dev profile's values. */
 export function defaultAppConfig(): AppConfig {
@@ -70,7 +79,29 @@ export function defaultAppConfig(): AppConfig {
     appOrigin: DEFAULT_APP_ORIGIN,
     sessionTtlHours: DEFAULT_SESSION_TTL_HOURS,
     trustedProxies: [...DEFAULT_TRUSTED_PROXIES],
+    timeZone: DEFAULT_TIME_ZONE,
   };
+}
+
+/** True when Intl knows the zone, so a typo stops the process at startup instead of at midnight. */
+export function isTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** An absolute http or https URL with no path beyond "/", no query and no fragment. */
+export function isServiceBaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const httpProtocol = url.protocol === "http:" || url.protocol === "https:";
+    return httpProtocol && url.search === "" && url.hash === "" && !value.includes("?") && !value.includes("#");
+  } catch {
+    return false;
+  }
 }
 
 function isBareOrigin(value: string): boolean {
@@ -125,6 +156,17 @@ const envSchema = z.object({
     z.coerce.number().int().min(1).max(MAX_SESSION_TTL_HOURS).default(DEFAULT_SESSION_TTL_HOURS),
   ),
   TRUSTED_PROXIES: z.preprocess(trimmedOrUndefined, trustedProxiesSchema.optional()),
+  SOLVER_QUERY_URL: z.preprocess(
+    trimmedOrUndefined,
+    z
+      .string()
+      .refine(isServiceBaseUrl, "an absolute http or https URL with no query or fragment")
+      .default(DEFAULT_SOLVER_QUERY_URL),
+  ),
+  APP_TIME_ZONE: z.preprocess(
+    trimmedOrUndefined,
+    z.string().refine(isTimeZone, "an IANA time zone such as UTC or America/New_York").default(DEFAULT_TIME_ZONE),
+  ),
   PGHOST: z.string().min(1),
   PGPORT: z.preprocess(trimmedOrUndefined, z.coerce.number().int().min(MIN_PORT).max(MAX_PORT).default(DEFAULT_PG_PORT)),
   PGDATABASE: z.string().min(1),
@@ -146,7 +188,9 @@ export function loadProcessConfig(env: Readonly<Record<string, string | undefine
       appOrigin: parsed.APP_ORIGIN,
       sessionTtlHours: parsed.SESSION_TTL_HOURS,
       trustedProxies: parsed.TRUSTED_PROXIES ?? [...DEFAULT_TRUSTED_PROXIES],
+      timeZone: parsed.APP_TIME_ZONE,
     },
+    solverQueryUrl: parsed.SOLVER_QUERY_URL,
     database: {
       host: parsed.PGHOST,
       port: parsed.PGPORT,

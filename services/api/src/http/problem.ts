@@ -21,6 +21,7 @@ export const PROBLEM_CONTENT_TYPE = "application/problem+json";
 export const HTTP_STATUS = {
   ok: 200,
   created: 201,
+  accepted: 202,
   noContent: 204,
   badRequest: 400,
   unauthorized: 401,
@@ -31,6 +32,7 @@ export const HTTP_STATUS = {
   tooManyRequests: 429,
   internal: 500,
   notImplemented: 501,
+  badGateway: 502,
   unavailable: 503,
 } as const;
 
@@ -68,6 +70,13 @@ export const PROBLEM_SLUGS = {
   internal: "internal",
   notImplemented: "not-implemented",
   unavailable: "unavailable",
+  // S23: the api trainer's problems.
+  forbidden: "forbidden",
+  upstream: "upstream",
+  staleState: "stale-state",
+  sessionEnded: "session-ended",
+  noCoverage: "no-coverage",
+  tooManyStreams: "too-many-streams",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -89,6 +98,12 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   internal: "Internal server error",
   "not-implemented": "Not implemented",
   unavailable: "Service unavailable",
+  forbidden: "Forbidden",
+  upstream: "The solver-query service failed",
+  "stale-state": "The session moved on since this prompt",
+  "session-ended": "The session has ended",
+  "no-coverage": "The library covers no spot this request selects",
+  "too-many-streams": "Too many open event streams",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

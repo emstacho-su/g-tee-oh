@@ -30,6 +30,14 @@ export const READ_ONE_PROBLEMS = [400, 401, 404, 429, 500] as const;
 export const MUTATE_PROBLEMS = [400, 401, 403, 409, 413, 415, 422, 429, 500] as const;
 /** An authenticated mutation of one resource. */
 export const MUTATE_ONE_PROBLEMS = [400, 401, 403, 404, 409, 413, 415, 422, 429, 500] as const;
+/** An authenticated read relayed from solver-query: 502 when it fails, 503 when it is not configured (S23). */
+export const UPSTREAM_READ_PROBLEMS = [400, 401, 404, 429, 500, 502, 503] as const;
+/** An authenticated mutation that calls solver-query (S23). */
+export const UPSTREAM_MUTATE_PROBLEMS = [400, 401, 403, 404, 409, 413, 415, 422, 429, 500, 502, 503] as const;
+/** An admin read: 403 for a user without is_admin (O-242). */
+export const ADMIN_READ_PROBLEMS = [401, 403, 429, 500] as const;
+/** An admin mutation (O-242). */
+export const ADMIN_MUTATE_PROBLEMS = [400, 401, 403, 409, 413, 415, 422, 429, 500] as const;
 /** A route that answers 501 until its owner builds it; the status set it will answer then. */
 export const PLANNED_READ_PROBLEMS = [400, 401, 404, 429, 500, 501] as const;
 export const PLANNED_MUTATE_PROBLEMS = [400, 401, 403, 404, 409, 413, 415, 422, 429, 500, 501] as const;

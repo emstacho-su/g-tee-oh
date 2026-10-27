@@ -64,7 +64,7 @@ const V1_5 = "a v1.5 session (O-15)";
 
 type Method = "GET" | "POST" | "PATCH";
 
-interface PlannedRoute {
+export interface PlannedRoute {
   method: Method;
   url: string;
   owner: string;
@@ -79,18 +79,38 @@ interface PlannedRoute {
   successContentType?: string;
 }
 
+/**
+ * S23's routes until each lane builds them (scaffold only): the lane route files register these
+ * through registerPlannedRoutes, and the S23 integration step deletes this table.
+ */
+export const S23_STUBS = {
+  study: [
+    { method: "GET", url: "/study/node", owner: S23, tag: "study", summary: "One preflop node from the library", successStatus: 200, success: studyNodeSchema, querystring: studyNodeQuerySchema },
+    { method: "GET", url: "/study/insights", owner: S23, tag: "study", summary: "Insight data for a hand at a node", successStatus: 200, success: studyInsightsSchema, querystring: studyInsightsQuerySchema },
+  ],
+  coverage: [
+    { method: "GET", url: "/coverage", owner: S23, tag: "coverage", summary: "What the library holds for a configuration and pair", successStatus: 200, success: coverageSchema, querystring: coverageQuerySchema },
+    { method: "POST", url: "/coverage/requests", owner: S23, tag: "coverage", summary: "Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)", successStatus: 202, success: coverageRequestResultSchema, body: coverageRequestBodySchema },
+  ],
+  sessions: [
+    { method: "POST", url: "/sessions", owner: S23, tag: "sessions", summary: "Start a practice session", successStatus: 201, success: sessionSchema, body: sessionCreateBodySchema },
+    { method: "GET", url: "/sessions/:id/next", owner: S23, tag: "sessions", summary: "The next prompt: table state and the buttons from the tree", successStatus: 200, success: promptSchema, params: sessionParamsSchema },
+    { method: "POST", url: "/sessions/:id/decisions", owner: S23, tag: "sessions", summary: "Submit a decision and receive its feedback; a double submission is graded once", successStatus: 200, success: feedbackSchema, params: sessionParamsSchema, body: decisionBodySchema },
+    { method: "POST", url: "/sessions/:id/end", owner: S23, tag: "sessions", summary: "End a session and receive its recap", successStatus: 200, success: recapSchema, params: sessionParamsSchema, body: emptyBodySchema },
+  ],
+  events: [
+    { method: "GET", url: "/events", owner: S23, tag: "events", summary: "Server-sent events: coverage_added, builder_state, session nudges", successStatus: 200, success: eventStreamSchema, successContentType: "text/event-stream" },
+  ],
+  admin: [
+    { method: "GET", url: "/admin/builder", owner: S23, tag: "admin", summary: "Builder queue, throughput, storage and settings", successStatus: 200, success: builderStatusSchema },
+    { method: "PATCH", url: "/admin/builder/settings", owner: S23, tag: "admin", summary: "Change builder settings", successStatus: 200, success: builderSettingsSchema, body: builderSettingsPatchSchema },
+    { method: "POST", url: "/admin/builder/pause", owner: S23, tag: "admin", summary: "Pause the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
+    { method: "POST", url: "/admin/builder/resume", owner: S23, tag: "admin", summary: "Resume the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
+  ],
+} satisfies Record<string, readonly PlannedRoute[]>;
+
 export const PLANNED_ROUTES: readonly PlannedRoute[] = [
-  // Study (R3.3) and coverage (R3.4), S23.
-  { method: "GET", url: "/study/node", owner: S23, tag: "study", summary: "One preflop node from the library", successStatus: 200, success: studyNodeSchema, querystring: studyNodeQuerySchema },
-  { method: "GET", url: "/study/insights", owner: S23, tag: "study", summary: "Insight data for a hand at a node", successStatus: 200, success: studyInsightsSchema, querystring: studyInsightsQuerySchema },
   { method: "GET", url: "/study/turn-roots", owner: V1_5, tag: "study", summary: "Every turn root at a flop node", successStatus: 200, success: turnRootsSchema, querystring: turnRootsQuerySchema },
-  { method: "GET", url: "/coverage", owner: S23, tag: "coverage", summary: "What the library holds for a configuration and pair", successStatus: 200, success: coverageSchema, querystring: coverageQuerySchema },
-  { method: "POST", url: "/coverage/requests", owner: S23, tag: "coverage", summary: "Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)", successStatus: 202, success: coverageRequestResultSchema, body: coverageRequestBodySchema },
-  // Training sessions (R3.6, R3.7), S23.
-  { method: "POST", url: "/sessions", owner: S23, tag: "sessions", summary: "Start a practice session", successStatus: 201, success: sessionSchema, body: sessionCreateBodySchema },
-  { method: "GET", url: "/sessions/:id/next", owner: S23, tag: "sessions", summary: "The next prompt: table state and the buttons from the tree", successStatus: 200, success: promptSchema, params: sessionParamsSchema },
-  { method: "POST", url: "/sessions/:id/decisions", owner: S23, tag: "sessions", summary: "Submit a decision and receive its feedback; a double submission is graded once", successStatus: 200, success: feedbackSchema, params: sessionParamsSchema, body: decisionBodySchema },
-  { method: "POST", url: "/sessions/:id/end", owner: S23, tag: "sessions", summary: "End a session and receive its recap", successStatus: 200, success: recapSchema, params: sessionParamsSchema, body: emptyBodySchema },
   // Prediction and range painting (R3.16, R3.17), S27.
   { method: "GET", url: "/prediction/:session/next", owner: S27, tag: "prediction", summary: "The next prediction prompt", successStatus: 200, success: predictionPromptSchema, params: predictionParamsSchema },
   { method: "POST", url: "/prediction/:session/answer", owner: S27, tag: "prediction", summary: "Answer a prediction prompt", successStatus: 200, success: predictionResultSchema, params: predictionParamsSchema, body: predictionAnswerBodySchema },
@@ -105,12 +125,6 @@ export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   // Explanations (R3.19, R3.20), S27.
   { method: "GET", url: "/explain/:attempt_id/more-info", owner: S27, tag: "explain", summary: "The templated explanation of an attempt", successStatus: 200, success: moreInfoSchema, params: attemptParamsSchema },
   { method: "POST", url: "/explain/:attempt_id/ask", owner: S27, tag: "explain", summary: "Ask the model about an attempt, behind a feature flag (O-54)", successStatus: 200, success: askResultSchema, params: attemptParamsSchema, body: askBodySchema },
-  // Events and admin (R3.4, R3.5), S23.
-  { method: "GET", url: "/events", owner: S23, tag: "events", summary: "Server-sent events: coverage_added, builder_state, session nudges", successStatus: 200, success: eventStreamSchema, successContentType: "text/event-stream" },
-  { method: "GET", url: "/admin/builder", owner: S23, tag: "admin", summary: "Builder queue, throughput, storage and settings", successStatus: 200, success: builderStatusSchema },
-  { method: "PATCH", url: "/admin/builder/settings", owner: S23, tag: "admin", summary: "Change builder settings", successStatus: 200, success: builderSettingsSchema, body: builderSettingsPatchSchema },
-  { method: "POST", url: "/admin/builder/pause", owner: S23, tag: "admin", summary: "Pause the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
-  { method: "POST", url: "/admin/builder/resume", owner: S23, tag: "admin", summary: "Resume the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
 ];
 
 function successResponse(route: PlannedRoute) {
@@ -138,8 +152,16 @@ function routeSchema(route: PlannedRoute): FastifySchema & { hide?: boolean; tag
   };
 }
 
+type PluginApp = Parameters<FastifyPluginCallbackZod>[0];
+
 export const plannedRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
-  for (const route of PLANNED_ROUTES) {
+  registerPlannedRoutes(app, PLANNED_ROUTES);
+  done();
+};
+
+/** Registers routes that answer a 501 problem naming their owner (O-38). */
+export function registerPlannedRoutes(app: PluginApp, routes: readonly PlannedRoute[]): void {
+  for (const route of routes) {
     app.route({
       method: route.method,
       url: route.url,
@@ -148,5 +170,4 @@ export const plannedRoutes: FastifyPluginCallbackZod = (app, _options, done) => 
       handler: (request) => notImplemented(request),
     });
   }
-  done();
-};
+}
