@@ -82,3 +82,42 @@ export function requireOneOf<T extends string>(value: T, allowed: readonly T[], 
   }
   return value;
 }
+
+/** A finite number, or a RangeError naming the field. */
+export function requireFinite(value: number, field: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new RangeError(`${field} must be a finite number, got ${String(value)}`);
+  }
+  return value;
+}
+
+/** A finite number from 0 to 1 inclusive (a probability, a share or a score), or a RangeError naming the field. */
+export function requireUnitInterval(value: number, field: string): number {
+  if (requireFinite(value, field) < 0 || value > 1) {
+    throw new RangeError(`${field} must be a finite number from 0 to 1, got ${value}`);
+  }
+  return value;
+}
+
+/** A non-empty string such as a spot class, track or family key, or a RangeError naming the field. */
+export function requireKey(value: string, field: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new RangeError(`${field} must be a non-empty string, got ${String(value)}`);
+  }
+  return value;
+}
+
+/** A list, or a RangeError naming the field. */
+export function requireList<T>(value: readonly T[], field: string): readonly T[] {
+  if (!isList(value)) {
+    throw new RangeError(`${field} must be a list`);
+  }
+  return value;
+}
+
+/** A non-null object, or a RangeError naming the field. */
+export function requireRecord(value: unknown, field: string): void {
+  if (typeof value !== "object" || value === null) {
+    throw new RangeError(`${field} must be an object`);
+  }
+}

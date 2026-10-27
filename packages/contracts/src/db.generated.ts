@@ -77,8 +77,16 @@ export interface Attempt {
 
 export interface AuthSession {
   created_at: Generated<Timestamp>;
+  /**
+   * per-session synchronizer token sent back as x-csrf-token (O-230)
+   */
+  csrf_token: string;
   expires_at: Timestamp;
   id: Generated<string>;
+  /**
+   * sha256 of the random session token the cookie carries (O-231)
+   */
+  token_hash: Buffer;
   user_id: string;
 }
 
@@ -169,6 +177,25 @@ export interface HoldoutResult {
   attempt_id: string | null;
   holdout_item_id: string | null;
   taken_at: Timestamp;
+  user_id: string;
+}
+
+export interface IdempotencyKey {
+  /**
+   * which request owns the claim; a claim taken over after its lease cannot be completed by the old owner
+   */
+  claim_token: Generated<string>;
+  completed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  key: string;
+  method: string;
+  request_hash: Buffer;
+  response_body: Json | null;
+  route: string;
+  /**
+   * null while the first request is still in flight
+   */
+  status_code: number | null;
   user_id: string;
 }
 
@@ -343,6 +370,7 @@ export interface DB {
   game_config: GameConfig;
   holdout_item: HoldoutItem;
   holdout_result: HoldoutResult;
+  idempotency_key: IdempotencyKey;
   leak_history: LeakHistory;
   leak_stat: LeakStat;
   llm_spend: LlmSpend;

@@ -235,3 +235,34 @@ describe('R0.6 role capture (private repo, O-28)', () => {
     });
   });
 });
+
+describe('R3.1 api tables (S21, O-230 to O-232)', () => {
+  test('R3.1 app reads and writes idempotency_key; builder, capture and query cannot see it', async () => {
+    await withRollback(pool, async (client) => {
+      await asRole(client, 'app', 'select * from idempotency_key limit 1');
+      await asRole(client, 'app', 'update idempotency_key set status_code = status_code where false');
+      await asRole(client, 'app', 'delete from idempotency_key where false');
+      for (const role of ['builder', 'capture', 'query']) {
+        await expectDenied(client, role, 'select * from idempotency_key limit 1');
+      }
+    });
+  });
+
+  test('R3.1 auth_session stores a unique token hash and a csrf token, never null', async () => {
+    await withRollback(pool, async (client) => {
+      const { rows } = await client.query(
+        `select column_name, is_nullable from information_schema.columns
+         where table_name = 'auth_session' and column_name in ('token_hash', 'csrf_token')
+         order by column_name`,
+      );
+      assert.deepEqual(rows, [
+        { column_name: 'csrf_token', is_nullable: 'NO' },
+        { column_name: 'token_hash', is_nullable: 'NO' },
+      ]);
+      const unique = await client.query(
+        `select 1 from pg_constraint where conname = 'auth_session_token_hash_key' and contype = 'u'`,
+      );
+      assert.equal(unique.rowCount, 1);
+    });
+  });
+});

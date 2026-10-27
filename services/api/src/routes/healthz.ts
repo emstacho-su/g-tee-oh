@@ -7,6 +7,8 @@
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
+import { RATE_LIMIT_EXEMPT } from "../http/rate-limits.js";
+import "../http/route-config.js";
 import { API_SERVICE_NAME, API_VERSION } from "../version.js";
 
 export const HEALTHZ_PATH = "/healthz";
@@ -32,6 +34,8 @@ export const healthzRoutes: FastifyPluginCallbackZod<HealthzRouteOptions> = (app
   app.get(
     HEALTHZ_PATH,
     {
+      // A probe: no session, and exempt from the global rate limit (O-236).
+      config: { auth: "none", rateLimit: RATE_LIMIT_EXEMPT },
       schema: {
         hide: !options.documented,
         summary: "Liveness probe",

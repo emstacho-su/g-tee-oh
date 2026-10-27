@@ -9,10 +9,15 @@
 // nearest tsconfig.json for every linted file, which is why every linted TypeScript file must be
 // covered by a package tsconfig: src and test everywhere, plus e2e and the two TypeScript config
 // files in web, which its tsconfig lists by name.
+//
+// packages/learning/src gets the purity block of scripts/lib/learning-purity.mjs on top (S30, A1
+// section 2): no I/O, no clock and no randomness except an injected RandomSource.
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+
+import { learningPurityBlock } from "./scripts/lib/learning-purity.mjs";
 
 const IGNORED_PATHS = [
   "**/dist/**",
@@ -38,6 +43,7 @@ export default defineConfig(
       },
     },
   },
+  learningPurityBlock(),
   {
     files: ["**/*.{js,mjs}"],
     languageOptions: {

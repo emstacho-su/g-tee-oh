@@ -156,6 +156,16 @@ x-api: &api
     API_PORT: "8080"
     # The app role login (O-28); the image's HEALTHCHECK probes GET /healthz with Node's fetch
     APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    # The database the api connects to as app_login (S21, services/api/src/config.ts)
+    PGHOST: postgres
+    PGPORT: "5432"
+    PGDATABASE: gto
+    PGUSER: app_login
+    # The one browser origin CORS and the CSRF Origin check accept: the Caddy site (O-230)
+    APP_ORIGIN: https://${CADDY_SITE:-localhost}
+    # Believe X-Forwarded-For from private addresses only: the api publishes no port, so only containers
+    # on the gto network (Caddy) can reach it; outside compose the api trusts loopback only (O-236)
+    TRUSTED_PROXIES: uniquelocal
   # A9 section 3, the same hardening as solver-query. Node writes nothing of its own; /tmp is a
   # tmpfs so os.tmpdir() keeps working for a scratch file (private to the container, gone with it).
   read_only: true
