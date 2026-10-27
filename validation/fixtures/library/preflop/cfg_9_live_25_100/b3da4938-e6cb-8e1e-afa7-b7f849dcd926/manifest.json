@@ -1,0 +1,28 @@
+{
+  "format_version": 1,
+  "kind": "preflop",
+  "source": "reference",
+  "id": "b3da4938-e6cb-8e1e-afa7-b7f849dcd926",
+  "engine_version": "synthetic",
+  "config": {
+    "format": "live",
+    "table_size": 9,
+    "stake": "2/5",
+    "depth_cbb": 10000,
+    "straddle": false,
+    "ante_cbb": 0
+  },
+  "config_id": "cfg_9_live_25_100",
+  "pair": "SB-UTG",
+  "chunks": [
+    {
+      "path": "chunks/0000.bin.zst",
+      "sha256": "a0eb33db68cd4326e966c0d435ca98571904096f407e41d58d6e8174ab28b96a",
+      "node_count": 5
+    }
+  ],
+  "tree_hash": "884873e990ac87460e4f9bab7c85363178438b3adb9d9a39e2fc3b4cc27bed0c",
+  "seed": 2525,
+  "synthetic": true,
+  "created_at": "2026-10-27T00:00:00Z"
+}
