@@ -8,10 +8,26 @@
  * at sprint start (O-56). Scores are fractional outcomes in [0, 1] from the grading policy
  * (05 section 6.3); the worked example uses the paper's 1 (win) and 0 (loss).
  *
- * Every it.todo below is pending until S30; the one green test checks that this file parses and
- * that the vector data carries the A6 section 6 numbers.
+ * The R0.11 test checks that the vector data carries the A6 section 6 numbers; S30 turned the
+ * pending rows green against src/glicko2.ts. The source constants are imported under SRC_ names
+ * because this file keeps exporting its own vector constants of the same names.
  */
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+
+import {
+  GLICKO2_DEFAULTS as SRC_DEFAULTS,
+  GLICKO2_EPSILON as SRC_EPSILON,
+  GLICKO2_SCALE as SRC_SCALE,
+  GLICKO2_MAX_RD,
+  GLICKO2_TAU as SRC_TAU,
+  applyInactivity,
+  conservativeRating,
+  newTrackRating,
+  ratePeriod,
+  rateSession,
+} from "../src/glicko2.js";
+import type { PeriodResult, SessionDecision, TrackRating } from "../src/glicko2.js";
 
 /** Conversion factor between the Glicko scale and the internal Glicko-2 scale (paper, step 2). */
 export const GLICKO2_SCALE = 173.7178;
@@ -79,6 +95,38 @@ export const GLICKO2_CONSERVATIVE_VECTOR = Object.freeze({
   conservative: 1161.02,
 });
 
+/** Full-precision readings of the worked example (S05 recompute), tighter than the paper's rounding. */
+const FULL_PRECISION_TOLERANCE = Object.freeze({ rating: 0.01, rd: 0.01, volatility: 0.000001 });
+
+/** Fractional scores strictly between 0 and 1, ascending. */
+const FRACTIONAL_SCORES = Object.freeze([0.05, 0.25, 0.5, 0.75, 0.95]);
+
+/** Rating points by which one session of three results and three one-result periods must differ. */
+const SESSION_DIFFERENCE_MIN = 0.01;
+
+/** Empty periods in the ten-period inactivity vector. */
+const INACTIVE_PERIODS = 10;
+
+const unitScore = fc.double({ min: 0, max: 1, noNaN: true });
+
+/** Players over the range a track rating can reach in practice. */
+const playerArbitrary = fc.record({
+  rating: fc.double({ min: 800, max: 2600, noNaN: true }),
+  rd: fc.double({ min: 30, max: 350, noNaN: true }),
+  volatility: fc.double({ min: 0.03, max: 0.09, noNaN: true }),
+});
+
+/** Freezes a value and every object inside it, so a mutation throws in strict mode. */
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null) {
+    for (const child of Object.values(value) as unknown[]) {
+      deepFreeze(child);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
 describe("R4.1 Glicko-2 per track (S30, ADR 0011, O-56)", () => {
   it("R0.11 Glicko-2 vector data parses and carries the A6 section 6 numbers", () => {
     expect(GLICKO2_WORKED_EXAMPLE.results).toHaveLength(3);
@@ -97,30 +145,142 @@ describe("R4.1 Glicko-2 per track (S30, ADR 0011, O-56)", () => {
     expect(GLICKO2_DEFAULTS).toEqual({ rating: 1500, rd: 350, volatility: 0.06 });
   });
 
-  it.todo(
-    "R4.1 Glickman worked example: 1500, RD 200, volatility 0.06 against (1400, 30) win, (1550, 100) loss, (1700, 300) loss with tau 0.5 gives about 1464.06, RD about 151.52, volatility about 0.05999",
-  );
-  it.todo(
-    "R4.1 fractional outcomes: a score of 0.5 against one opponent at the same rating leaves the rating unchanged and still shrinks RD",
-  );
-  it.todo(
-    "R4.1 fractional outcomes: scores strictly between 0 and 1 against one opponent give rating changes that increase monotonically with the score",
-  );
-  it.todo(
-    "R4.1 one rating period per session (O-27): three decisions in one session update once with all three results, and the result differs from three one-result updates",
-  );
-  it.todo(
-    "R4.1 inactivity raises RD only: an empty period takes RD 200 to about 200.2714 and leaves rating 1500 and volatility 0.06 unchanged",
-  );
-  it.todo(
-    "R4.1 inactivity never subtracts points: ten empty periods take RD to about 202.6978 and the rating stays 1500",
-  );
-  it.todo("R4.1 defaults: a new track starts at rating 1500, RD 350, volatility 0.06 (ADR 0011, O-56)");
-  it.todo(
-    "R4.1 conservative rating is rating minus two RD: 1464.06 and 151.52 give 1161.02 (06 section 3.3)",
-  );
-  it.todo(
-    "R4.1 fast-check update symmetry: against an opponent at the player's own rating and RD, scores s and 1 - s move the rating by equal and opposite amounts (S30 adds fast-check as a devDependency)",
-  );
-  it.todo("R4.1 the update returns a new state and never mutates the input player or results");
+  it("R4.1 Glickman worked example: 1500, RD 200, volatility 0.06 against (1400, 30) win, (1550, 100) loss, (1700, 300) loss with tau 0.5 gives about 1464.06, RD about 151.52, volatility about 0.05999", () => {
+    const { player, results, tau, expected, expectedFullPrecision, tolerance } = GLICKO2_WORKED_EXAMPLE;
+    const updated = ratePeriod(player, results, tau);
+    expect(Math.abs(updated.rating - expected.rating)).toBeLessThan(tolerance.rating);
+    expect(Math.abs(updated.rd - expected.rd)).toBeLessThan(tolerance.rd);
+    expect(Math.abs(updated.volatility - expected.volatility)).toBeLessThan(tolerance.volatility);
+    expect(Math.abs(updated.rating - expectedFullPrecision.rating)).toBeLessThan(FULL_PRECISION_TOLERANCE.rating);
+    expect(Math.abs(updated.rd - expectedFullPrecision.rd)).toBeLessThan(FULL_PRECISION_TOLERANCE.rd);
+    expect(Math.abs(updated.volatility - expectedFullPrecision.volatility)).toBeLessThan(
+      FULL_PRECISION_TOLERANCE.volatility,
+    );
+  });
+
+  it("R4.1 fractional outcomes: a score of 0.5 against one opponent at the same rating leaves the rating unchanged and still shrinks RD", () => {
+    const player = GLICKO2_WORKED_EXAMPLE.player;
+    const updated = ratePeriod(player, [{ opponent: { rating: player.rating, rd: player.rd }, score: 0.5 }]);
+    expect(updated.rating).toBeCloseTo(player.rating, 9);
+    expect(updated.rd).toBeLessThan(player.rd);
+    expect(updated.volatility).toBeCloseTo(player.volatility, 3);
+  });
+
+  it("R4.1 fractional outcomes: scores strictly between 0 and 1 against one opponent give rating changes that increase monotonically with the score", () => {
+    const player = GLICKO2_WORKED_EXAMPLE.player;
+    const opponent = { rating: 1550, rd: 100 };
+    const changes = FRACTIONAL_SCORES.map((score) => ratePeriod(player, [{ opponent, score }]).rating - player.rating);
+    changes.slice(1).forEach((change, index) => {
+      expect(change).toBeGreaterThan(changes[index] ?? Number.POSITIVE_INFINITY);
+    });
+  });
+
+  it("R4.1 one rating period per session (O-27): three decisions in one session update once with all three results, and the result differs from three one-result updates", () => {
+    const { player, results } = GLICKO2_WORKED_EXAMPLE;
+    const oneSession = ratePeriod(player, results);
+    const threePeriods = results.reduce<TrackRating>((state, result) => ratePeriod(state, [result]), player);
+    expect(Math.abs(oneSession.rating - threePeriods.rating)).toBeGreaterThan(SESSION_DIFFERENCE_MIN);
+    expect(Math.abs(oneSession.rd - threePeriods.rd)).toBeGreaterThan(SESSION_DIFFERENCE_MIN);
+
+    const decisions: SessionDecision[] = results.map((result) => ({
+      difficulty: result.opponent.rating,
+      score: result.score,
+      rated: true,
+      weight: 1,
+    }));
+    const itemResults: PeriodResult[] = results.map((result) => ({
+      opponent: { rating: result.opponent.rating, rd: 0 },
+      score: result.score,
+    }));
+    expect(rateSession(player, decisions)).toEqual(ratePeriod(player, itemResults));
+  });
+
+  it("R4.1 inactivity raises RD only: an empty period takes RD 200 to about 200.2714 and leaves rating 1500 and volatility 0.06 unchanged", () => {
+    const { player, afterOnePeriod, tolerance } = GLICKO2_INACTIVITY_VECTOR;
+    for (const updated of [ratePeriod(player, []), applyInactivity(player, 1)]) {
+      expect(updated.rating).toBe(afterOnePeriod.rating);
+      expect(updated.volatility).toBe(afterOnePeriod.volatility);
+      expect(Math.abs(updated.rd - afterOnePeriod.rd)).toBeLessThan(tolerance.rd);
+    }
+  });
+
+  it("R4.1 inactivity RD is capped at the starting RD of 350, so an idle track is never less certain than a newcomer (O-259)", () => {
+    expect(GLICKO2_MAX_RD).toBe(SRC_DEFAULTS.rd);
+    for (const periods of [52, 104]) {
+      expect(applyInactivity(newTrackRating(), periods).rd).toBe(GLICKO2_MAX_RD);
+      const nearCap = { rating: 1600, rd: 340, volatility: 0.06 };
+      const idle = applyInactivity(nearCap, periods);
+      expect(idle.rd).toBeLessThanOrEqual(GLICKO2_MAX_RD);
+      expect(idle.rating).toBe(nearCap.rating);
+      const stepwise = Array.from({ length: periods }).reduce<TrackRating>((state) => ratePeriod(state, []), nearCap);
+      expect(stepwise.rd).toBeLessThanOrEqual(GLICKO2_MAX_RD);
+      expect(conservativeRating(idle)).toBeGreaterThanOrEqual(conservativeRating(newTrackRating()));
+    }
+    // Uncapped, 104 periods from 340 would reach about 356; the cap holds it at 350.
+    expect(applyInactivity({ rating: 1600, rd: 340, volatility: 0.06 }, 104).rd).toBe(GLICKO2_MAX_RD);
+    // A track already above the cap never has its RD lowered by inactivity.
+    expect(applyInactivity({ rating: 1500, rd: 400, volatility: 0.06 }, 1).rd).toBe(400);
+  });
+
+  it("R4.1 inactivity never subtracts points: ten empty periods take RD to about 202.6978 and the rating stays 1500", () => {
+    const { player, afterTenPeriods, tolerance } = GLICKO2_INACTIVITY_VECTOR;
+    const closedForm = applyInactivity(player, INACTIVE_PERIODS);
+    const stepwise = Array.from({ length: INACTIVE_PERIODS }).reduce<TrackRating>(
+      (state) => ratePeriod(state, []),
+      player,
+    );
+    for (const updated of [closedForm, stepwise]) {
+      expect(updated.rating).toBe(afterTenPeriods.rating);
+      expect(updated.volatility).toBe(afterTenPeriods.volatility);
+      expect(Math.abs(updated.rd - afterTenPeriods.rd)).toBeLessThan(tolerance.rd);
+    }
+    expect(closedForm.rd).toBeCloseTo(stepwise.rd, 9);
+  });
+
+  it("R4.1 defaults: a new track starts at rating 1500, RD 350, volatility 0.06 (ADR 0011, O-56)", () => {
+    expect(newTrackRating()).toEqual(GLICKO2_DEFAULTS);
+    expect(newTrackRating()).not.toBe(newTrackRating());
+    expect(SRC_DEFAULTS).toEqual(GLICKO2_DEFAULTS);
+    expect(SRC_TAU).toBe(GLICKO2_TAU);
+    expect(SRC_SCALE).toBe(GLICKO2_SCALE);
+    expect(SRC_EPSILON).toBe(GLICKO2_EPSILON);
+  });
+
+  it("R4.1 conservative rating is rating minus two RD: 1464.06 and 151.52 give 1161.02 (06 section 3.3)", () => {
+    const { rating, rd, conservative } = GLICKO2_CONSERVATIVE_VECTOR;
+    expect(conservativeRating({ rating, rd, volatility: GLICKO2_DEFAULTS.volatility })).toBeCloseTo(conservative, 6);
+  });
+
+  it("R4.1 fast-check update symmetry: against an opponent at the player's own rating and RD, scores s and 1 - s move the rating by equal and opposite amounts (S30 adds fast-check as a devDependency)", () => {
+    fc.assert(
+      fc.property(playerArbitrary, unitScore, (player, score) => {
+        const opponent = { rating: player.rating, rd: player.rd };
+        const up = ratePeriod(player, [{ opponent, score }]);
+        const down = ratePeriod(player, [{ opponent, score: 1 - score }]);
+        expect(up.rating - player.rating + (down.rating - player.rating)).toBeCloseTo(0, 9);
+        expect(up.rd).toBeCloseTo(down.rd, 9);
+        expect(up.volatility).toBeCloseTo(down.volatility, 12);
+      }),
+    );
+  });
+
+  it("R4.1 the update returns a new state and never mutates the input player or results", () => {
+    const player = deepFreeze({ ...GLICKO2_WORKED_EXAMPLE.player });
+    const results = deepFreeze(
+      GLICKO2_WORKED_EXAMPLE.results.map((result) => ({ ...result, opponent: { ...result.opponent } })),
+    );
+    const decisions = deepFreeze(
+      results.map((result) => ({ difficulty: result.opponent.rating, score: result.score, rated: true, weight: 1 })),
+    );
+    const before = structuredClone({ player, results, decisions });
+    const outputs = [
+      ratePeriod(player, results),
+      ratePeriod(player, []),
+      applyInactivity(player, 0),
+      rateSession(player, decisions),
+      rateSession(player, []),
+    ];
+    expect({ player, results, decisions }).toEqual(before);
+    outputs.forEach((output) => expect(output).not.toBe(player));
+  });
 });

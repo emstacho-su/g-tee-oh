@@ -5,8 +5,8 @@
  * grouping mode, the actions list, the daily cap count and the graded action), each extension
  * marked with the open question identifier (O-ID) that decides it. The other types name what every
  * module and vector shares: the injected random number generator (RNG) that is the only
- * randomness this package may use (A1 section 2), and the placeholder descriptor each skeleton
- * module exports until its owning session lands (R0.11).
+ * randomness this package may use (A1 section 2). The skeleton placeholder descriptor of R0.11 left
+ * with the last placeholder when S30 landed the learning core.
  */
 
 /** Trainer mode of the graded decision (05 section 1, 06 section 3.6, ADR 0011). */
@@ -98,15 +98,3 @@ export type GradeOutput = {
  * (R4.2) each take one of these, so a seed replays identically (R3.6).
  */
 export type RandomSource = () => number;
-
-/**
- * Descriptor each skeleton module exports until its owning session replaces the placeholder with
- * the module's functions (R0.11). It carries no logic: the session and requirement identifiers
- * (R IDs) are what the scaffolding test checks.
- */
-export type ModulePlaceholder = {
-  readonly module: string;
-  readonly responsibility: string;
-  readonly session: string;
-  readonly requirements: readonly string[];
-};
