@@ -10,8 +10,8 @@ use std::path::Path;
 use gto_model::{ActionToken, GameConfig, HandClass, Position, PositionPair};
 use gto_solve::equity::EquityTable;
 use gto_solve::preflop::{
-    CERTIFICATE_GAIN_BB, CfrOptions, FlopPayout, PreflopGame, SolvedPreflop, best_response_gains,
-    push_fold_config, solve, solve_push_fold,
+    CfrOptions, FlopPayout, PreflopGame, SolvedPreflop, best_response_gains, is_certified,
+    larger_gain, push_fold_config, solve, solve_push_fold,
 };
 use gto_tree::{PreflopTree, SizingConventionSpec};
 
@@ -61,9 +61,8 @@ fn r2_19_push_fold_config_is_rake_free_heads_up() {
 fn r2_19_push_fold_is_certified_exact_at_each_depth() {
     for depth_bb in DEPTHS_BB {
         let (_, solution) = solved(depth_bb);
-        for gain in solution.gains_bb {
-            assert!(gain <= CERTIFICATE_GAIN_BB, "depth {depth_bb}: gain {gain} bb");
-        }
+        let gain = larger_gain(solution.gains_bb);
+        assert!(is_certified(solution.gains_bb), "depth {depth_bb}: gain {gain} bb");
         assert_eq!(solution.nodes.len(), 2);
         assert_eq!(solution.nodes[0].hands.len(), usize::from(HandClass::COUNT));
     }

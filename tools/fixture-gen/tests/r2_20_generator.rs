@@ -11,7 +11,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use fixture_gen::{
-    LIBRARY_RELATIVE_TO_REPO_ROOT, SETS_RELATIVE_TO_REPO_ROOT, Sets, Summary, generate, load_sets,
+    LIBRARY_RELATIVE_TO_REPO_ROOT, SETS_RELATIVE_TO_REPO_ROOT, Sets, Stale, Summary, generate,
+    load_sets,
 };
 use gto_model::{Cbb, Position, PositionPair, v1_configs};
 
@@ -24,7 +25,7 @@ fn sets() -> Sets {
 }
 
 fn run_into(out: &Path) -> Summary {
-    generate(&sets(), &repo_root(), out).expect("the generator runs")
+    generate(&sets(), &repo_root(), out, Stale::Keep).expect("the generator runs")
 }
 
 /// Every file under `root`, relative path to bytes.

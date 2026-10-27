@@ -24,6 +24,7 @@
 //! that is all-in before the flop has no flop line.
 
 mod builder;
+mod chips;
 mod push_fold;
 
 use gto_model::{ActionToken, Cbb, GameConfig, Position, PositionPair, Street, format_line};
@@ -31,6 +32,8 @@ use gto_model::{ActionToken, Cbb, GameConfig, Position, PositionPair, Street, fo
 use crate::error::TreeError;
 use crate::postflop::RootState;
 use crate::spec::SizingConventionSpec;
+
+pub use chips::{ChipState, PreflopChips, blind_of, small_blind_seat, total_after};
 
 /// The kind of pot a line takes to the flop, by the number of raises before it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -20,7 +20,7 @@
 
 use super::cfr::{Profile, gains};
 use super::game::{CLASSES, Child, Layout, Terminal, game_error};
-use super::{CERTIFICATE_GAIN_BB, PreflopError, linalg};
+use super::{PreflopError, is_certified, linalg};
 
 /// CFR+ iterations before the first refinement.
 const FIRST_ITERATIONS: u32 = 256;
@@ -74,7 +74,7 @@ pub(super) fn solve(layout: &Layout) -> Result<(Profile, u32), PreflopError> {
         if let Some(refined) = refine(&game, &average) {
             let profile = profile(&refined);
             let found = gains(layout, &profile);
-            if found.iter().all(|gain| *gain <= CERTIFICATE_GAIN_BB) {
+            if is_certified(found) {
                 return Ok((profile, cfr.iterations));
             }
             best = found;
@@ -88,20 +88,22 @@ pub(super) fn solve(layout: &Layout) -> Result<(Profile, u32), PreflopError> {
 
 /// The two linear maps of a push/fold layout, after checking its shape.
 fn push_fold(layout: &Layout) -> Result<PushFold, PreflopError> {
-    let shape = || game_error("the game is not the push/fold game");
-    let [root, facing] = layout.nodes.as_slice() else { return Err(shape()) };
-    let (Child::Terminal(folds), Child::Node(1)) = (root.children[0], root.children[1]) else {
-        return Err(shape());
+    let shape = |what: &str| game_error(format!("the game is not the push/fold game: {what}"));
+    let [root, facing] = layout.nodes.as_slice() else {
+        return Err(shape("it does not have two decision nodes"));
+    };
+    let [Child::Terminal(folds), Child::Node(1)] = root.children.as_slice() else {
+        return Err(shape("the root does not have two children, a fold and the all-in"));
     };
     let [Child::Terminal(called_off), Child::Terminal(showdown)] = facing.children.as_slice()
     else {
-        return Err(shape());
+        return Err(shape("the all-in is not answered by a fold and a call"));
     };
-    if root.seat != 1 || facing.seat != 0 || root.children.len() != 2 {
-        return Err(shape());
+    if root.seat != 1 || facing.seat != 0 {
+        return Err(shape("the button does not act first"));
     }
     let t = |index: usize| layout.terminals[index];
-    let (folds, called_off, showdown) = (t(folds), t(*called_off), t(*showdown));
+    let (folds, called_off, showdown) = (t(*folds), t(*called_off), t(*showdown));
     let weights = &layout.weights;
     let gain = |from: &Terminal, to: &Terminal, seat: usize, at: usize| {
         (to.base_bb[seat] - from.base_bb[seat]) * weights.pairs[at]
@@ -244,7 +246,7 @@ fn refine(game: &PushFold, average: &Pair) -> Option<Pair> {
             call_sets.iter().find_map(|mixed_call| {
                 let support = Support { push: mixed_push, call: mixed_call };
                 let refined = polish(game, average, &support)?;
-                let certified = game.gains(&refined).iter().all(|g| *g <= CERTIFICATE_GAIN_BB);
+                let certified = is_certified(game.gains(&refined));
                 certified.then_some(refined)
             })
         })

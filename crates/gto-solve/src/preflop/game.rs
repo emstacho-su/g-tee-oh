@@ -3,9 +3,11 @@
 //! weights of the equity table.
 //!
 //! Mechanism. The chips each seat has put in are replayed from the blinds along every
-//! node's line (a call matches the other seat, a raise or bet goes to its total, an
-//! all-in to the stack, a limp to one big blind, every amount capped at the stack), and
-//! the replay must give the pot the tree records at every node, so the game and the tree
+//! node's line with `gto_tree::PreflopChips`, the one replay the tree builders, this game
+//! and the fixture generator share (O-136): a call matches the other seat, a raise goes to
+//! its total, a bet adds its size, an all-in goes to the stack, a limp to one big blind,
+//! every amount capped at the stack. The replay must give the pot the tree records and
+//! hand the action to the seat the tree names at every node, so the game and the tree
 //! cannot drift apart. A seat's payoff at a terminal is its final stack minus its
 //! starting stack, in big blinds (bb), written as `base + scale x equity`: a fold pays
 //! `base` only (the folder loses what it put in, the other seat wins the pot), an all-in
@@ -15,8 +17,8 @@
 
 use std::collections::HashMap;
 
-use gto_model::{ActionToken, Cbb, GameConfig, HandClass, Position, PositionPair, TableSize};
-use gto_tree::{PreflopLine, PreflopNode, PreflopTree};
+use gto_model::{ActionToken, Cbb, GameConfig, HandClass, Position, PositionPair};
+use gto_tree::{PreflopChips, PreflopLine, PreflopTree, total_after};
 
 use super::{FlopPayout, PreflopError};
 use crate::equity::EquityTable;
@@ -26,9 +28,6 @@ pub(super) const CLASSES: usize = HandClass::COUNT as usize;
 
 /// Centi-big-blinds (cbb) in one big blind, as a float.
 pub(super) const CBB_PER_BB: f64 = 100.0;
-
-/// The big blind in cbb.
-const BIG_BLIND_CBB: u32 = Cbb::PER_BB;
 
 /// Where an action leads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,9 +86,9 @@ pub(super) struct Layout {
 /// The facts of the table the replay needs.
 struct Table {
     pair: PositionPair,
+    chips: PreflopChips,
     stack: u32,
     dead: u32,
-    blinds: [u32; 2],
 }
 
 /// Builds the vector game of `tree` at `config`.
@@ -100,8 +99,10 @@ pub(super) fn layout(
     flop: Option<FlopPayout>,
 ) -> Result<Layout, PreflopError> {
     let weights = weights(equity)?;
-    let root = tree.nodes().first().ok_or_else(|| game_error("the tree has no node"))?;
-    let table = table(tree.pair(), config, root)?;
+    if tree.nodes().is_empty() {
+        return Err(game_error("the tree has no node"));
+    }
+    let table = table(tree.pair(), config)?;
     let by_line: HashMap<&[ActionToken], usize> = tree
         .nodes()
         .iter()
@@ -112,7 +113,7 @@ pub(super) fn layout(
     let mut nodes = Vec::with_capacity(tree.nodes().len());
     for node in tree.nodes() {
         let seat = seat_of(table.pair, node.actor)?;
-        let invested = replay(&table, tree, &by_line, &node.line)?;
+        let invested = replay(&table, seat, &node.line)?;
         check_pot(&table, invested, node.pot, &node.line)?;
         let mut children = Vec::with_capacity(node.actions.len());
         for token in &node.actions {
@@ -184,76 +185,39 @@ fn seat_of(pair: PositionPair, position: Position) -> Result<usize, PreflopError
     }
 }
 
-/// The stack after the ante, the blinds and the dead money, checked against the root pot.
-fn table(
-    pair: PositionPair,
-    config: &GameConfig,
-    root: &PreflopNode,
-) -> Result<Table, PreflopError> {
+/// The pair's chips at `config`: the stack after the ante, the blinds and the dead money
+/// (`gto_tree::PreflopChips`).
+fn table(pair: PositionPair, config: &GameConfig) -> Result<Table, PreflopError> {
     if config.straddle {
         return Err(game_error("straddle pots are not modeled"));
     }
-    let stack = config.depth_cbb.checked_sub(config.ante_cbb)?.get();
-    let blinds = [blind_of(pair.oop(), config)?, blind_of(pair.ip(), config)?];
-    let dead = root.pot.get().checked_sub(blinds[0] + blinds[1]).ok_or_else(|| {
-        game_error(format!("the root pot {} is below the pair's blinds {blinds:?}", root.pot))
-    })?;
-    Ok(Table { pair, stack, dead, blinds })
+    let chips = PreflopChips::new(config, pair)?;
+    let (stack, dead) = (chips.stack().get(), chips.dead().get());
+    Ok(Table { pair, chips, stack, dead })
 }
 
-/// The blind `seat` posts in cbb, as the tree builders post it: the big blind posts one
-/// big blind, the small blind seat (the button heads-up) the stake's ratio of blinds
-/// rounded half up to the cbb grid (O-136), every other seat nothing.
-fn blind_of(seat: Position, config: &GameConfig) -> Result<u32, PreflopError> {
-    let small_blind_seat =
-        if config.table_size == TableSize::HEADS_UP { Position::Btn } else { Position::Sb };
-    if seat == Position::Bb {
-        return Ok(BIG_BLIND_CBB);
+/// The chips each seat has put in after `line`, replayed from the blinds; the replay must
+/// hand the action to `seat`, the seat the tree names at the node.
+fn replay(table: &Table, seat: usize, line: &[ActionToken]) -> Result<[u32; 2], PreflopError> {
+    let state = table.chips.after(line)?;
+    if state.to_act != seat {
+        return Err(game_error(format!("the line {line:?} hands the action to the wrong seat")));
     }
-    if seat != small_blind_seat {
-        return Ok(0);
-    }
-    let (sb, bb) = (u64::from(config.stake.sb_cents), u64::from(config.stake.bb_cents));
-    if bb == 0 {
-        return Err(game_error(format!("stake {} has no big blind", config.stake.label)));
-    }
-    let rounded = (2 * sb * u64::from(BIG_BLIND_CBB) + bb) / (2 * bb);
-    u32::try_from(rounded).map_err(|_| game_error("the small blind is too large"))
+    Ok(state.invested.map(Cbb::get))
 }
 
-/// The chips each seat has put in after `line`, replayed from the blinds.
-fn replay(
-    table: &Table,
-    tree: &PreflopTree,
-    by_line: &HashMap<&[ActionToken], usize>,
-    line: &[ActionToken],
-) -> Result<[u32; 2], PreflopError> {
-    line.iter().enumerate().try_fold(table.blinds, |invested, (at, token)| {
-        let index = by_line
-            .get(&line[..at])
-            .ok_or_else(|| game_error(format!("no node for the first {at} actions of {line:?}")))?;
-        let seat = seat_of(table.pair, tree.nodes()[*index].actor)?;
-        apply(table, invested, seat, *token)
-    })
-}
-
-/// The chips put in after `seat` takes `token`; a fold changes nothing.
+/// The chips put in after `seat` takes `token` (`gto_tree::total_after`); a fold changes
+/// nothing.
 fn apply(
     table: &Table,
     invested: [u32; 2],
     seat: usize,
     token: ActionToken,
 ) -> Result<[u32; 2], PreflopError> {
-    let total = match token {
-        ActionToken::Fold | ActionToken::Check => invested[seat],
-        ActionToken::Call => invested[1 - seat],
-        ActionToken::Limp => BIG_BLIND_CBB,
-        ActionToken::Raise(to) | ActionToken::Bet(to) => to.get(),
-        ActionToken::AllIn => table.stack,
-        ActionToken::Straddle(_) => return Err(game_error("straddle pots are not modeled")),
-    };
+    let [own, other] = [invested[seat], invested[1 - seat]].map(Cbb::new);
+    let total = total_after(token, own, other, Cbb::new(table.stack))?;
     let mut next = invested;
-    next[seat] = total.min(table.stack);
+    next[seat] = total.get();
     Ok(next)
 }
 
@@ -316,4 +280,24 @@ fn terminal(
         "the line {:?} ends in neither a fold, an all-in nor a flop",
         step.line
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use gto_model::{ActionToken, Cbb};
+    use gto_tree::PreflopTree;
+
+    use super::{apply, table};
+    use crate::preflop::push_fold_config;
+
+    #[test]
+    fn r2_19_a_bet_token_adds_its_size_and_a_raise_goes_to_its_total() {
+        let config = push_fold_config(10).expect("a config");
+        let tree = PreflopTree::push_fold(&config).expect("a tree");
+        let table = table(tree.pair(), &config).expect("a table");
+        let bet = apply(&table, [100, 100], 0, ActionToken::Bet(Cbb(300))).expect("a bet");
+        assert_eq!(bet, [400, 100], "b300 puts 300 more in (gto-model token semantics)");
+        let raise = apply(&table, [100, 100], 0, ActionToken::Raise(Cbb(300))).expect("a raise");
+        assert_eq!(raise, [300, 100], "r300 is a raise to 300");
+    }
 }

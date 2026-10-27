@@ -16,11 +16,14 @@
 //! the order a directory lists in.
 //!
 //! After a configuration is packed, any other synthetic solution left under its directory
-//! by an earlier seed is removed (`stale`), so a regenerated library holds exactly the sets
-//! of the sets file; a solution without `synthetic: true` is never touched.
+//! by an earlier seed is removed (`stale`) when the caller asks for it (`Stale::Remove`),
+//! so a regenerated library holds exactly the sets of the sets file; a solution without
+//! `synthetic: true` is never touched. The binary asks for it on the committed library and
+//! under an explicit `--out` only with `--prune` (`cli`).
 
 #![forbid(unsafe_code)]
 
+pub mod cli;
 mod emit;
 mod inputs;
 mod line;
@@ -83,6 +86,16 @@ pub enum GenError {
     /// A tree, dump or pack step failed.
     #[error("{0}")]
     Build(String),
+}
+
+/// Whether a run removes the synthetic solutions an earlier run left under the
+/// configurations it generates (`stale`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stale {
+    /// Remove them: the output root should hold exactly the sets of the sets file.
+    Remove,
+    /// Leave every directory the run did not write alone.
+    Keep,
 }
 
 /// One synthetic set.
@@ -192,12 +205,18 @@ fn check_sets(sets: &Sets) -> Result<(), String> {
 }
 
 /// Generates every set of `sets` into `out_root`, reading the equity table and the sizing
-/// conventions under `repo_root`.
+/// conventions under `repo_root`; `stale` says whether leftover synthetic solutions of the
+/// generated configurations are removed.
 ///
 /// # Errors
 ///
 /// `GenError` naming the set, configuration and pair that failed.
-pub fn generate(sets: &Sets, repo_root: &Path, out_root: &Path) -> Result<Summary, GenError> {
+pub fn generate(
+    sets: &Sets,
+    repo_root: &Path,
+    out_root: &Path,
+    stale: Stale,
+) -> Result<Summary, GenError> {
     let label = Path::new(SETS_RELATIVE_TO_REPO_ROOT);
     check_sets(sets).map_err(|message| inputs::input_error(label, message))?;
     let inputs =
@@ -225,7 +244,9 @@ pub fn generate(sets: &Sets, repo_root: &Path, out_root: &Path) -> Result<Summar
                 };
                 packed.push(one_solution(&inputs, &target, scratch.path(), out_root)?);
             }
-            stale::remove(out_root, &config.config_id(), &packed)?;
+            if stale == Stale::Remove {
+                stale::remove(out_root, &config.config_id(), &packed)?;
+            }
             solutions.extend(packed);
         }
     }

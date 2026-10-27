@@ -5,15 +5,19 @@
 //! limp or call), then at most one raise. The raise size depends only on how many raises
 //! came before: the open or the isolation raise, then the 3-bet, the 4-bet and the all-in.
 //! Every amount is a whole number of centi-big-blinds (cbb), and a raise-to total at or
-//! above the stack is the all-in. The children are built depth first, so a parent comes
-//! before its children and each flop line is recorded when its last action is reached.
+//! above the stack is the all-in. The blinds, the dead money and every action's chips come
+//! from the shared chip replay (`PreflopChips`), the one the preflop solver and the fixture
+//! generator use too. The children are built depth first, so a parent comes before its
+//! children and each flop line is recorded when its last action is reached.
 
 use gto_model::{ActionToken, Cbb, GameConfig, ModelError, Position, PositionPair};
 
 use crate::error::TreeError;
-use crate::preflop::{LineKind, PreflopLine, PreflopNode};
+use crate::preflop::{ChipState, LineKind, PreflopChips, PreflopLine, PreflopNode};
 use crate::spec::SizingConventionSpec;
 use crate::units::{PreflopUnits, preflop_units};
+
+use super::chips::small_blind_seat;
 
 /// The big blind in cbb.
 const BIG_BLIND_CBB: u32 = Cbb::PER_BB;
@@ -33,22 +37,19 @@ pub(crate) struct Built {
 /// The fixed facts of one pair tree.
 struct Table {
     pair: PositionPair,
-    /// The pair's seats in preflop order: index 0 acts first.
+    /// The pair's seats in pair order: index 0 is out of position.
     seats: [Position; 2],
-    /// The stack each seat starts with after its ante, blinds included.
-    stack: u32,
-    /// Blinds of folded seats plus every ante.
-    dead: u32,
+    /// The blinds, the stack and the dead money of the pair.
+    chips: PreflopChips,
     sizes: PreflopUnits,
     /// The seats allowed to limp.
     limpers: Vec<Position>,
 }
 
-/// The betting state at a node. Seat indexes follow `Table::seats`.
+/// The betting state at a node. Seat indexes are in pair order, as in `ChipState`.
 #[derive(Clone, Debug)]
 struct Pre {
-    invested: [u32; 2],
-    to_act: usize,
+    chips: ChipState,
     raises: u8,
     limped: bool,
     all_in: bool,
@@ -73,10 +74,8 @@ pub(crate) fn build(
     pair: PositionPair,
 ) -> Result<Built, TreeError> {
     let table = table(spec, config, pair)?;
-    let [first, second] = table.seats;
     let root = Pre {
-        invested: [blind_of(first, config)?, blind_of(second, config)?],
-        to_act: 0,
+        chips: table.chips.start()?,
         raises: 0,
         limped: false,
         all_in: false,
@@ -102,54 +101,12 @@ fn table(
         };
         return Err(TreeError::Preflop(reason.to_owned()));
     }
-    let seated = Position::seated(config.table_size);
-    let mut seats = [pair.oop(), pair.ip()];
-    if let Some(missing) = seats.iter().find(|seat| !seated.contains(seat)) {
-        let reason = format!("{missing} is not seated at a {} table", config.table_size);
-        return Err(TreeError::Preflop(reason));
-    }
-    seats.sort_by_key(|seat| seat.preflop_order());
-    let ante = config.ante_cbb;
-    let antes = u32::from(config.table_size.get()).checked_mul(ante.get()).ok_or(
-        ModelError::CbbOutOfRange {
-            op: "*",
-            left: ante.get(),
-            right: u32::from(config.table_size.get()),
-        },
-    )?;
-    let mut dead = Cbb(antes);
-    for seat in seated.iter().filter(|seat| !pair.contains(**seat)) {
-        dead = dead.checked_add(Cbb(blind_of(*seat, config)?))?;
-    }
+    let chips = PreflopChips::new(config, pair)?;
     let limpers = match &spec.limp_positions {
         Some(listed) => listed.clone(),
-        None => vec![small_blind_seat(config)],
+        None => vec![small_blind_seat(config.table_size)],
     };
-    let stack = config.depth_cbb.checked_sub(ante)?.get();
-    Ok(Table { pair, seats, stack, dead: dead.get(), sizes, limpers })
-}
-
-/// The seat that posts the small blind: the button heads-up, else the small blind.
-fn small_blind_seat(config: &GameConfig) -> Position {
-    if config.table_size.get() == 2 { Position::Btn } else { Position::Sb }
-}
-
-/// The blind a seat posts in cbb. The small blind is the stake's ratio of blinds, rounded
-/// half up to the cbb grid, so the live 1/3 small blind is 33 cbb (O-136).
-fn blind_of(seat: Position, config: &GameConfig) -> Result<u32, TreeError> {
-    if seat == Position::Bb {
-        return Ok(BIG_BLIND_CBB);
-    }
-    if seat != small_blind_seat(config) {
-        return Ok(0);
-    }
-    let (sb, bb) = (u64::from(config.stake.sb_cents), u64::from(config.stake.bb_cents));
-    if bb == 0 {
-        return Err(TreeError::Preflop(format!("stake {} has no big blind", config.stake.label)));
-    }
-    let twice = 2 * sb * u64::from(BIG_BLIND_CBB);
-    let rounded = (twice + bb) / (2 * bb);
-    u32::try_from(rounded).map_err(|_| TreeError::Preflop("the small blind is too large".into()))
+    Ok(Table { pair, seats: chips.seats(), chips, sizes, limpers })
 }
 
 /// The raise-to total of a multiplier in hundredths over `raise_to`, rounded half up.
@@ -176,8 +133,8 @@ impl Table {
     fn node(&self, st: &Pre, built: &mut Built) -> Result<(), TreeError> {
         let options = self.options(st)?;
         built.nodes.push(PreflopNode {
-            actor: self.seats[st.to_act],
-            pot: self.pot(st)?,
+            actor: self.seats[st.chips.to_act],
+            pot: st.chips.pot,
             line: st.line.clone(),
             actions: options.iter().map(|(token, _)| *token).collect(),
         });
@@ -191,37 +148,31 @@ impl Table {
         Ok(())
     }
 
-    /// The pot at a node: dead money plus both seats' chips.
-    fn pot(&self, st: &Pre) -> Result<Cbb, TreeError> {
-        let invested = Cbb(st.invested[0]).checked_add(Cbb(st.invested[1]))?;
-        Ok(Cbb(self.dead).checked_add(invested)?)
-    }
-
     /// The actions at a node with where each leads, in the order fold, passive, raise.
     fn options(&self, st: &Pre) -> Result<Vec<(ActionToken, Next)>, TreeError> {
-        let p = st.to_act;
-        let can_limp = self.limpers.contains(&self.seats[p]);
+        let actor = self.seats[st.chips.to_act];
+        let can_limp = self.limpers.contains(&actor);
         let mut options = Vec::new();
         if st.raises == 0 && !st.limped {
             options.push((ActionToken::Fold, Next::Over));
             if can_limp {
-                let limp = self.put_in(st, ActionToken::Limp, BIG_BLIND_CBB);
+                let limp = self.put_in(st, ActionToken::Limp)?;
                 options.push((ActionToken::Limp, Next::Act(Pre { limped: true, ..limp })));
             }
         } else if st.raises == 0 {
-            if self.seats[p] == Position::Bb {
-                let check = self.put_in(st, ActionToken::Check, st.invested[p]);
+            if actor == Position::Bb {
+                let check = self.put_in(st, ActionToken::Check)?;
                 options.push((ActionToken::Check, Next::Flop(check)));
             } else {
                 options.push((ActionToken::Fold, Next::Over));
                 if can_limp {
-                    let limp = self.put_in(st, ActionToken::Limp, BIG_BLIND_CBB);
+                    let limp = self.put_in(st, ActionToken::Limp)?;
                     options.push((ActionToken::Limp, Next::Flop(limp)));
                 }
             }
         } else {
             options.push((ActionToken::Fold, Next::Over));
-            let call = self.put_in(st, ActionToken::Call, st.invested[1 - p]);
+            let call = self.put_in(st, ActionToken::Call)?;
             options
                 .push((ActionToken::Call, if st.all_in { Next::Over } else { Next::Flop(call) }));
         }
@@ -231,18 +182,18 @@ impl Table {
         Ok(options)
     }
 
-    /// The state after the actor puts its total for the round at `total` with `token`.
-    fn put_in(&self, st: &Pre, token: ActionToken, total: u32) -> Pre {
-        let mut invested = st.invested;
-        invested[st.to_act] = total.min(self.stack);
+    /// The state after the actor takes `token`, its chips from the shared replay.
+    fn put_in(&self, st: &Pre, token: ActionToken) -> Result<Pre, TreeError> {
+        let chips = self.chips.apply(&st.chips, token)?;
         let line = [st.line.as_slice(), &[token]].concat();
-        Pre { invested, to_act: 1 - st.to_act, line, ..st.clone() }
+        Ok(Pre { chips, line, ..st.clone() })
     }
 
     /// The one raise at a node: its size by the raises before it, all-in at the stack.
     fn raise(&self, st: &Pre) -> Result<(ActionToken, Next), TreeError> {
-        let p = st.to_act;
-        let faced = st.invested[1 - p].max(BIG_BLIND_CBB);
+        let p = st.chips.to_act;
+        let stack = self.chips.stack().get();
+        let faced = st.chips.invested[1 - p].get().max(BIG_BLIND_CBB);
         let to = match st.raises {
             0 if st.limped => {
                 let per_limper = self.sizes.iso_per_limper_cbb;
@@ -252,27 +203,27 @@ impl Table {
             1 if self.seats[p] == self.pair.ip() => multiply(faced, self.sizes.threebet_ip_x100)?,
             1 => multiply(faced, self.sizes.threebet_oop_x100)?,
             2 => multiply(faced, self.sizes.fourbet_x100)?,
-            _ => self.stack,
+            _ => stack,
         };
         if to <= faced {
             let reason = format!("a raise to {to} cbb does not exceed the {faced} cbb it faces");
             return Err(TreeError::Preflop(reason));
         }
-        let all_in = to >= self.stack;
+        let all_in = to >= stack;
         let token = if all_in { ActionToken::AllIn } else { ActionToken::Raise(Cbb(to)) };
-        let raised = self.put_in(st, token, to);
+        let raised = self.put_in(st, token)?;
         let next = Pre { raises: st.raises + 1, all_in, aggressor: Some(p), ..raised };
         Ok((token, Next::Act(next)))
     }
 
-    /// The flop line a closed action reaches.
+    /// The flop line a closed action reaches; both seats have the same chips in by then.
     fn flop_line(&self, st: &Pre) -> Result<PreflopLine, TreeError> {
         Ok(PreflopLine {
             pair: self.pair,
             actions: st.line.clone(),
             kind: line_kind(st.raises)?,
-            flop_pot: self.pot(st)?,
-            flop_stack: Cbb(self.stack).checked_sub(Cbb(st.invested[0]))?,
+            flop_pot: st.chips.pot,
+            flop_stack: self.chips.stack().checked_sub(st.chips.invested[0])?,
             aggressor: st.aggressor.map(|seat| self.seats[seat]),
         })
     }

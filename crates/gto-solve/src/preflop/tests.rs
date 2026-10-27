@@ -7,8 +7,8 @@ use gto_model::{Cbb, GameConfig};
 use gto_tree::PreflopTree;
 
 use super::{
-    CfrOptions, PreflopError, PreflopGame, best_response_gains, push_fold_config, solve,
-    solve_push_fold,
+    CERTIFICATE_GAIN_BB, CfrOptions, PreflopError, PreflopGame, best_response_gains, certified,
+    is_certified, larger_gain, push_fold_config, solve, solve_push_fold,
 };
 use crate::equity::EquityTable;
 
@@ -94,6 +94,48 @@ fn r2_19_general_cfr_stops_at_its_target_on_push_fold() {
     let gains = best_response_gains(&game, &solution).expect("gains");
     assert_eq!(gains, solution.gains_bb, "the reported gains are the best-response gains");
     assert_eq!(solution.starting_pot, Cbb::new(150));
+}
+
+#[test]
+fn r2_19_the_exact_solve_refuses_a_root_without_two_children() {
+    let full = game(&push_fold_config(10).expect("a config")).layout;
+    let mut one_child = full.clone();
+    one_child.nodes[0].children.truncate(1);
+    let mut three_children = full.clone();
+    let extra = three_children.nodes[0].children[0];
+    three_children.nodes[0].children.push(extra);
+    let mut no_children = full;
+    no_children.nodes[0].children.clear();
+    for layout in [one_child, three_children, no_children] {
+        let refused = super::exact::solve(&layout);
+        assert!(matches!(refused, Err(PreflopError::Game(_))), "{:?}", refused.err());
+    }
+}
+
+#[test]
+fn r2_19_larger_gain_never_hides_a_nan() {
+    assert!(larger_gain([f64::NAN, 1.0]).is_nan());
+    assert!(larger_gain([1.0, f64::NAN]).is_nan());
+    assert!((larger_gain([0.5, 2.0]) - 2.0).abs() < f64::EPSILON);
+    assert!((larger_gain([-3.0, -1.0]) + 1.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn r2_19_is_certified_needs_both_gains_finite_and_within_the_bound() {
+    assert!(is_certified([0.0, CERTIFICATE_GAIN_BB]));
+    assert!(!is_certified([f64::NAN, 0.0]));
+    assert!(!is_certified([0.0, f64::INFINITY]));
+    assert!(!is_certified([f64::NEG_INFINITY, 0.0]));
+    assert!(!is_certified([0.0, 2.0 * CERTIFICATE_GAIN_BB]));
+}
+
+#[test]
+fn r2_19_the_push_fold_certificate_rejects_a_nan_or_infinite_gain() {
+    for gains_bb in [[f64::NAN, 0.0], [0.0, f64::NAN], [f64::NEG_INFINITY, 0.0]] {
+        let refused = certified(gains_bb);
+        assert!(matches!(refused, Err(PreflopError::Certificate { .. })), "{gains_bb:?}");
+    }
+    assert_eq!(certified([0.0, 1e-12]).expect("certified"), [0.0, 1e-12]);
 }
 
 #[test]

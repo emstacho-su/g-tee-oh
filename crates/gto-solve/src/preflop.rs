@@ -54,6 +54,24 @@ const PERCENT: f64 = 100.0;
 /// solution to count as the exact equilibrium (O-223).
 pub const CERTIFICATE_GAIN_BB: f64 = 1e-9;
 
+/// The larger of the two seats' best-response gains, in big blinds.
+///
+/// A NaN in either seat gives NaN: `f64::max` returns the other operand and so would
+/// hide a NaN gain behind a finite one, which would let a broken evaluation look
+/// certified or converged.
+#[must_use]
+pub fn larger_gain(gains_bb: [f64; 2]) -> f64 {
+    let [first, second] = gains_bb;
+    if first.is_nan() || second.is_nan() { f64::NAN } else { first.max(second) }
+}
+
+/// Whether `gains_bb` certifies an exact push/fold equilibrium (O-223): both gains are
+/// finite and both are at or below `CERTIFICATE_GAIN_BB`. A NaN or infinite gain fails.
+#[must_use]
+pub fn is_certified(gains_bb: [f64; 2]) -> bool {
+    gains_bb.iter().all(|gain| gain.is_finite() && *gain <= CERTIFICATE_GAIN_BB)
+}
+
 /// The label of the rake-free stake gate G6a solves at (O-220): it reads `norake` in the
 /// configuration identifier, as in `cfg_2_online_norake_10`.
 pub const NO_RAKE_STAKE_LABEL: &str = "norake";
@@ -278,11 +296,14 @@ pub fn solve_push_fold(
     let tree = PreflopTree::push_fold(config)?;
     let game = PreflopGame::new(&tree, config, equity, None)?;
     let (profile, iterations) = exact::solve(&game.layout)?;
-    let gains_bb = cfr::gains(&game.layout, &profile);
-    if gains_bb.iter().any(|gain| *gain > CERTIFICATE_GAIN_BB) {
-        return Err(PreflopError::Certificate { gains_bb });
-    }
+    let gains_bb = certified(cfr::gains(&game.layout, &profile))?;
     Ok(assemble::assemble(&game, &profile, iterations, gains_bb))
+}
+
+/// `gains_bb` back when they certify the push/fold solution (`is_certified`, O-223), else
+/// `PreflopError::Certificate` carrying them.
+fn certified(gains_bb: [f64; 2]) -> Result<[f64; 2], PreflopError> {
+    if is_certified(gains_bb) { Ok(gains_bb) } else { Err(PreflopError::Certificate { gains_bb }) }
 }
 
 /// Each seat's best-response gain in big blinds per hand dealt against the strategy in

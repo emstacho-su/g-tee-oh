@@ -4,12 +4,13 @@
 //! all-in; the big blind facing the all-in folds or calls. Both stacks are the
 //! configuration's depth before the blinds. Two decision nodes, no flop line: the root
 //! pot is the two blinds, and the pot facing the all-in is the whole stack the button
-//! moved in plus the big blind still in front of the big blind.
+//! moved in plus the big blind still in front of the big blind. The blinds, the actors and
+//! the pots come from the shared chip replay (`PreflopChips`, O-136).
 
 use gto_model::{ActionToken, Cbb, GameConfig, Position, PositionPair, TableSize};
 
 use crate::error::TreeError;
-use crate::preflop::PreflopNode;
+use crate::preflop::{ChipState, PreflopChips, PreflopNode};
 
 /// The big blind in centi-big-blinds (cbb).
 const BIG_BLIND: Cbb = Cbb::new(Cbb::PER_BB);
@@ -24,19 +25,17 @@ pub(crate) struct Built {
 pub(crate) fn build(config: &GameConfig) -> Result<Built, TreeError> {
     check(config)?;
     let pair = PositionPair::new(Position::Bb, Position::Btn)?;
-    let small_blind = small_blind(config)?;
-    let root = PreflopNode {
-        actor: Position::Btn,
-        pot: small_blind.checked_add(BIG_BLIND)?,
-        line: Vec::new(),
-        actions: vec![ActionToken::Fold, ActionToken::AllIn],
+    let chips = PreflopChips::new(config, pair)?;
+    let start = chips.start()?;
+    let pushed = chips.apply(&start, ActionToken::AllIn)?;
+    let node = |state: &ChipState, line: Vec<ActionToken>, aggressive: ActionToken| PreflopNode {
+        actor: chips.seats()[state.to_act],
+        pot: state.pot,
+        line,
+        actions: vec![ActionToken::Fold, aggressive],
     };
-    let facing = PreflopNode {
-        actor: Position::Bb,
-        pot: config.depth_cbb.checked_add(BIG_BLIND)?,
-        line: vec![ActionToken::AllIn],
-        actions: vec![ActionToken::Fold, ActionToken::Call],
-    };
+    let root = node(&start, Vec::new(), ActionToken::AllIn);
+    let facing = node(&pushed, vec![ActionToken::AllIn], ActionToken::Call);
     Ok(Built { pair, nodes: vec![root, facing] })
 }
 
@@ -56,19 +55,6 @@ fn check(config: &GameConfig) -> Result<(), TreeError> {
         return refuse(format!("a {} stack does not cover the big blind", config.depth_cbb));
     }
     Ok(())
-}
-
-/// The small blind in cbb: the stake's ratio of blinds, rounded half up to the cbb grid,
-/// as the pair-tree builder rounds it (O-136).
-fn small_blind(config: &GameConfig) -> Result<Cbb, TreeError> {
-    let (sb, bb) = (u64::from(config.stake.sb_cents), u64::from(config.stake.bb_cents));
-    if bb == 0 {
-        return Err(TreeError::Preflop(format!("stake {} has no big blind", config.stake.label)));
-    }
-    let rounded = (2 * sb * u64::from(Cbb::PER_BB) + bb) / (2 * bb);
-    let cbb = u32::try_from(rounded)
-        .map_err(|_| TreeError::Preflop("the small blind is too large".to_owned()))?;
-    Ok(Cbb::new(cbb))
 }
 
 #[cfg(test)]

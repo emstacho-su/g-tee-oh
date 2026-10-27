@@ -66,6 +66,27 @@ const CHECK_POT_SHARE: f64 = 0.5;
 /// Centi-big-blinds per big blind, as a float.
 const CBB_PER_BB: f64 = 100.0;
 
+// The ranges `band_share` draws an action's share of the actor's range from, as (low,
+// high) fractions of the combo-weighted range. Raises narrow with each raise before them;
+// calls widen as the pot grows.
+
+/// An open or an isolation raise: no raise before it.
+const OPEN_SHARE: (f64, f64) = (0.15, 0.45);
+/// A 3-bet: one raise before it.
+const THREE_BET_SHARE: (f64, f64) = (0.06, 0.15);
+/// A 4-bet: two raises before it.
+const FOUR_BET_SHARE: (f64, f64) = (0.05, 0.12);
+/// Any later raise, the 5-bet all-in.
+const LATER_RAISE_SHARE: (f64, f64) = (0.04, 0.10);
+/// A limp, the open limp or a limp behind.
+const LIMP_SHARE: (f64, f64) = (0.03, 0.15);
+/// A call of an all-in.
+const CALL_ALL_IN_SHARE: (f64, f64) = (0.25, 0.50);
+/// A call, or another passive action, with at most one raise before it: calling an open.
+const EARLY_CALL_SHARE: (f64, f64) = (0.10, 0.30);
+/// A call with two or more raises before it: calling a 3-bet or a 4-bet.
+const LATE_CALL_SHARE: (f64, f64) = (0.20, 0.40);
+
 /// One class's row at a node.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HandRow {
@@ -203,17 +224,17 @@ fn band_shares(node: &PreflopNode, rng: &mut ChaCha8Rng) -> Vec<f64> {
 fn band_share(token: ActionToken, raises: usize, facing_all_in: bool) -> (f64, f64) {
     if token.is_aggressive() {
         return match raises {
-            0 => (0.15, 0.45),
-            1 => (0.06, 0.15),
-            2 => (0.05, 0.12),
-            _ => (0.04, 0.10),
+            0 => OPEN_SHARE,
+            1 => THREE_BET_SHARE,
+            2 => FOUR_BET_SHARE,
+            _ => LATER_RAISE_SHARE,
         };
     }
     match (token, raises) {
-        (ActionToken::Limp, _) => (0.03, 0.15),
-        _ if facing_all_in => (0.25, 0.50),
-        (_, 0 | 1) => (0.10, 0.30),
-        _ => (0.20, 0.40),
+        (ActionToken::Limp, _) => LIMP_SHARE,
+        _ if facing_all_in => CALL_ALL_IN_SHARE,
+        (_, 0 | 1) => EARLY_CALL_SHARE,
+        _ => LATE_CALL_SHARE,
     }
 }
 
