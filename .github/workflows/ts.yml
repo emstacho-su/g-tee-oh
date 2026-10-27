@@ -34,6 +34,8 @@ jobs:
         run: just ts-typecheck
       - name: Tests
         run: just ts-test
+      - name: Coverage of packages/learning at the 80 percent gate (S22, A9 section 1)
+        run: just coverage-learning
       - name: Boundary (api never invokes the builder, R2.15)
         run: just ts-boundary
       - name: Pending-test tags (R0.11)

@@ -284,4 +284,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test coverage-learning ts-boundary report-check licenses security guard-test test-tags
