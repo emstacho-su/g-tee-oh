@@ -55,17 +55,29 @@ export function actionStyle(kind: ActionKind): ActionStyle {
 }
 
 /**
- * The fill color of one action at a node. Bets and raises take a shade by their size rank among
- * the node's sized actions, so two raise sizes never share a color; the size rank is the position
- * of the action among the node's bets and raises sorted by size_cbb ascending.
+ * The size rank of one action at a node: its position among the node's bets and raises sorted by
+ * size_cbb ascending (0 for the smallest). A missing size counts as 0, an action whose size the
+ * list does not hold ranks 0, and every other kind (fold, check, call, all-in and so on) is 0.
+ * actionColor picks the shade by it and the range matrix picks the hatch spacing by it, so one
+ * definition keeps the two signals in step.
  */
-export function actionColor(action: NodeAction, actions: readonly NodeAction[], theme: ThemeName): string {
-  if (!SIZED_KINDS.has(action.kind)) return ACTION_STYLES[action.kind].color[theme];
+export function sizeRank(action: NodeAction, actions: readonly NodeAction[]): number {
+  if (!SIZED_KINDS.has(action.kind)) return 0;
   const sized = actions
     .filter((candidate) => SIZED_KINDS.has(candidate.kind))
     .map((candidate) => candidate.size_cbb ?? 0)
     .sort((left, right) => left - right);
-  const rank = Math.max(0, sized.indexOf(action.size_cbb ?? 0));
+  return Math.max(0, sized.indexOf(action.size_cbb ?? 0));
+}
+
+/**
+ * The fill color of one action at a node. Bets and raises take a shade by their sizeRank among
+ * the node's sized actions, so two raise sizes never share a color; past the last shade the
+ * darkest one repeats.
+ */
+export function actionColor(action: NodeAction, actions: readonly NodeAction[], theme: ThemeName): string {
+  if (!SIZED_KINDS.has(action.kind)) return ACTION_STYLES[action.kind].color[theme];
+  const rank = sizeRank(action, actions);
   const shades = SIZE_SHADES[theme];
   return shades[Math.min(rank, shades.length - 1)] ?? ACTION_STYLES[action.kind].color[theme];
 }

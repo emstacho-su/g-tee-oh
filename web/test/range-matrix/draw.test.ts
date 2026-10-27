@@ -235,6 +235,37 @@ describe("R3.12 range matrix drawing", () => {
     const bars = fillsIn(draw(odd), rect).filter((op) => typeof op.style === "string" && colors.has(op.style));
     expect(bars.reduce((sum, bar) => sum + bar.w, 0)).toBe(rect.w);
   });
+
+  /** The frequency bars of cell AA when its strategy is replaced, drawn at a 200 pixel cell. */
+  function aaBars(strategy: readonly number[]) {
+    const pixelRatio = 5;
+    const hands = fixtureStudyNode.hands.map((row) => (row.hand === "AA" ? { ...row, strategy: [...strategy] } : row));
+    const node = buildMatrixModel({ ...fixtureStudyNode, hands });
+    const rect = cellRect(node.cells[0] as MatrixCell, pixelRatio);
+    const colors = new Set(node.actions.map((action) => actionColor(action, node.actions, "light")));
+    const bars = fillsIn(draw(node, { pixelRatio }), rect).filter((op) => typeof op.style === "string" && colors.has(op.style));
+    return { rect, bars };
+  }
+
+  it("R3.12 the last played bar runs to the cell's right edge when the frequencies sum slightly under 1", () => {
+    const { rect, bars } = aaBars([0.3, 0.3, 0.397, 0]);
+    expect(rect.w).toBe(200);
+    expect(bars).toHaveLength(3);
+    const last = bars.at(-1);
+    expect((last?.x ?? 0) + (last?.w ?? 0)).toBe(rect.x + rect.w);
+    expect(bars.map((bar) => bar.w)).toEqual([60, 60, 80]);
+  });
+
+  it("R3.12 frequencies summing to exactly 1 keep their rounded widths", () => {
+    const { rect, bars } = aaBars([0.25, 0.25, 0.25, 0.25]);
+    expect(bars.map((bar) => bar.w)).toEqual([50, 50, 50, 50]);
+    const last = bars.at(-1);
+    expect((last?.x ?? 0) + (last?.w ?? 0)).toBe(rect.x + rect.w);
+  });
+
+  it("R3.12 a present hand with no played action paints no bar", () => {
+    expect(aaBars([0, 0, 0, 0]).bars).toHaveLength(0);
+  });
 });
 
 describe("R3.12 range matrix EV scale", () => {

@@ -35,6 +35,37 @@ function grid(): HTMLElement {
   return screen.getByRole("group", { name: /range matrix cells/i });
 }
 
+interface FakeMatchMedia {
+  /** The media queries that hold a change listener right now. */
+  active(): string[];
+  /** Calls the change listeners of one query, as the browser does when the ratio leaves it. */
+  fire(query: string): void;
+}
+
+/** The inert matchMedia stub from test/setup.ts, put back after every test. */
+const setupMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+
+/** Installs a matchMedia that records change listeners per query; replaced in afterEach. */
+function installMatchMedia(): FakeMatchMedia {
+  const listeners = new Map<string, Set<() => void>>();
+  const listenersOf = (query: string): Set<() => void> => {
+    const known = listeners.get(query) ?? new Set<() => void>();
+    listeners.set(query, known);
+    return known;
+  };
+  const matchMedia = (query: string) => ({
+    media: query,
+    matches: true,
+    addEventListener: (_type: "change", listener: () => void) => listenersOf(query).add(listener),
+    removeEventListener: (_type: "change", listener: () => void) => listenersOf(query).delete(listener),
+  });
+  Object.defineProperty(window, "matchMedia", { configurable: true, writable: true, value: matchMedia });
+  return {
+    active: () => [...listeners].filter(([, set]) => set.size > 0).map(([query]) => query),
+    fire: (query) => listenersOf(query).forEach((listener) => listener()),
+  };
+}
+
 beforeEach(() => {
   frames = [];
   vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
@@ -46,6 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  if (setupMatchMedia !== undefined) Object.defineProperty(window, "matchMedia", setupMatchMedia);
 });
 
 describe("R3.12 RangeMatrix component", () => {
@@ -67,6 +99,34 @@ describe("R3.12 RangeMatrix component", () => {
     expect(canvas.width).toBe(780);
     expect(canvas.height).toBe(780);
     expect(canvas.style.width).toBe("390px");
+  });
+
+  it("R3.12 follows a device pixel ratio change, re-subscribing for the new ratio and unsubscribing on unmount", () => {
+    stubContext(null);
+    const ratio = vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(1);
+    const media = installMatchMedia();
+    const { unmount } = render(
+      <RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" sizePx={390} onSelectHand={() => undefined} />,
+    );
+    const canvas = screen.getByRole<HTMLCanvasElement>("img");
+    expect(canvas.width).toBe(390);
+    expect(media.active()).toEqual(["(resolution: 1dppx)"]);
+    ratio.mockReturnValue(2);
+    act(() => media.fire("(resolution: 1dppx)"));
+    expect(canvas.width).toBe(780);
+    expect(canvas.height).toBe(780);
+    expect(canvas.style.width).toBe("390px");
+    expect(media.active()).toEqual(["(resolution: 2dppx)"]);
+    unmount();
+    expect(media.active()).toEqual([]);
+  });
+
+  it("R3.12 without matchMedia and with an unusable ratio the matrix draws at ratio 1", () => {
+    stubContext(null);
+    Reflect.deleteProperty(window, "matchMedia");
+    vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(Number.NaN);
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" sizePx={390} onSelectHand={() => undefined} />);
+    expect(screen.getByRole<HTMLCanvasElement>("img").width).toBe(390);
   });
 
   it("R3.12 without a 2D context it renders the table and skips drawing without crashing", () => {

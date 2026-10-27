@@ -4,7 +4,10 @@
  *
  * Mechanism: the node becomes a MatrixModel once per node (model.ts); useMatrixCanvas draws it
  * through one animation frame per input change at the device pixel ratio, so the backing store
- * is sharp and the CSS box stays sizePx. The canvas is an image (role img) labeled with the mode
+ * is sharp and the CSS box stays sizePx. useDevicePixelRatio follows ratio changes (another
+ * screen, page zoom), which resizes the backing store and redraws. The table and the legend are
+ * memoized on the per-node model, so a focus move or a selection change repaints the canvas
+ * without re-rendering the 169 table cells. The canvas is an image (role img) labeled with the mode
  * and hand count and described by the table fallback, which is always in the DOM for screen
  * readers and shown on screen by the "Show as table" toggle. Keyboard: the matrix wrapper takes
  * focus, arrow keys move the focused cell (stopping at the edges), Enter or Space selects it,
@@ -13,7 +16,7 @@
  * their hand and numbers, and the legend names each action with its letter and pattern. The
  * component computes no poker math (ADR 0004); it displays the api numbers.
  */
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { memo, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { GRID_SIZE } from "../../poker/hands.js";
 import { actionStyle, type ThemeName } from "../../theme/action-style.js";
@@ -21,6 +24,7 @@ import { Button } from "../ui/Button.js";
 import { MODE_NAMES, actionShortLabel, cellText } from "./cell-text.js";
 import { buildMatrixModel, type MatrixMode, type MatrixModel, type MatrixSource } from "./model.js";
 import { RangeMatrixTable } from "./RangeMatrixTable.js";
+import { useDevicePixelRatio } from "./use-device-pixel-ratio.js";
 import { useMatrixCanvas } from "./use-matrix-canvas.js";
 
 export interface RangeMatrixProps {
@@ -44,11 +48,6 @@ const MOVES: Readonly<Record<string, readonly [number, number]>> = {
 const SELECT_KEYS: ReadonlySet<string> = new Set(["Enter", " "]);
 const KEY_SHORTCUTS = "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space";
 
-function readPixelRatio(): number {
-  const ratio = window.devicePixelRatio;
-  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-}
-
 function clampToGrid(value: number): number {
   return Math.min(GRID_SIZE - 1, Math.max(0, value));
 }
@@ -70,17 +69,22 @@ function indexAtPointer(event: MouseEvent<HTMLCanvasElement>): number | null {
   return row * GRID_SIZE + col;
 }
 
-function MatrixLegend({ model }: { model: MatrixModel }) {
+interface MatrixLegendProps {
+  actions: MatrixModel["actions"];
+}
+
+/** Memoized: its actions come from the memoized model, so focus and selection skip it. */
+const MatrixLegend = memo(function MatrixLegend({ actions }: MatrixLegendProps) {
   return (
     <ul aria-label="Action legend" className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
-      {model.actions.map((action) => (
+      {actions.map((action) => (
         <li key={action.index}>
           {`${actionShortLabel(action)}: ${action.label}, ${actionStyle(action.kind).pattern} pattern`}
         </li>
       ))}
     </ul>
   );
-}
+});
 
 export function RangeMatrix({
   node,
@@ -93,7 +97,7 @@ export function RangeMatrix({
   const model = useMemo(() => buildMatrixModel(node), [node]);
   const tableId = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pixelRatio = readPixelRatio();
+  const pixelRatio = useDevicePixelRatio();
   const [focusedIndex, setFocusedIndex] = useState(() => {
     const selected = model.cells.findIndex((cell) => cell.hand === selectedHand);
     return selected < 0 ? 0 : selected;
@@ -171,7 +175,7 @@ export function RangeMatrix({
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      <MatrixLegend model={model} />
+      <MatrixLegend actions={model.actions} />
       <Button size="sm" className="mt-2" aria-pressed={tableVisible} onClick={() => setTableVisible((shown) => !shown)}>
         Show as table
       </Button>

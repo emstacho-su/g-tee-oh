@@ -7,7 +7,8 @@
  * with a few strokes in the theme's hatch ink, turned into a repeating CanvasPattern once and
  * kept in a map, so a frame only looks patterns up and never allocates one. The key is the
  * pattern name plus a size variant: the second and later sizes of a bet or raise at one node get
- * a wider spacing, so two raise sizes differ by spacing as well as by shade. Missing hands use
+ * a wider spacing, so two raise sizes differ by spacing as well as by shade; the variant is the
+ * action's sizeRank from action-style.ts, the same rank that picks its shade. Missing hands use
  * their own gray hatch. The tile maker is injected (a canvas element in the browser, a fake in
  * tests); a tile without a 2D context yields no pattern, remembered so it is not retried.
  */

@@ -11,7 +11,7 @@ import { cardName, parseCard, rankLabel, suitSymbol } from "../../src/poker/card
 import { exactActionLabel, formatBb, formatCbb, formatPercent, formatShare } from "../../src/poker/format.js";
 import { toGradeActions } from "../../src/poker/grade-actions.js";
 import { HAND_CLASS_COUNT, HAND_GRID, cellOf, handAt } from "../../src/poker/hands.js";
-import { ACTION_STYLES, actionColor, actionStyle } from "../../src/theme/action-style.js";
+import { ACTION_STYLES, actionColor, actionStyle, sizeRank } from "../../src/theme/action-style.js";
 
 describe("R3.12 hand grid", () => {
   it("R3.12 holds 169 distinct classes: 13 pairs, 78 suited, 78 offsuit, 1326 combos", () => {
@@ -87,6 +87,33 @@ describe("R3.13 action styles", () => {
     expect(actionColor(raises[5]!, raises, "light")).toBe(actionColor(raises[3]!, raises, "light"));
     const unsized = { index: 0, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "" } as const;
     expect(actionColor(unsized, [unsized], "dark")).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it("R3.12 sizeRank ranks bets and raises by size ascending and gives unsized kinds 0", () => {
+    const large = { index: 1, token: "r900", kind: "raise", size_cbb: 900, bucket: "pot", label: "" } as const;
+    const small = { index: 2, token: "b300", kind: "bet", size_cbb: 300, bucket: "pot", label: "" } as const;
+    const middle = { index: 3, token: "r600", kind: "raise", size_cbb: 600, bucket: "pot", label: "" } as const;
+    const allIn = { index: 4, token: "a", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "" } as const;
+    const fold = { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "" } as const;
+    const actions = [fold, large, small, middle, allIn];
+    expect([small, middle, large].map((action) => sizeRank(action, actions))).toEqual([0, 1, 2]);
+    expect(sizeRank(fold, actions)).toBe(0);
+    expect(sizeRank(allIn, actions)).toBe(0);
+    const unsized = { index: 5, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "" } as const;
+    expect(sizeRank(unsized, [unsized, small])).toBe(0);
+    expect(sizeRank(small, [unsized, small])).toBe(1);
+    expect(sizeRank(middle, [small])).toBe(0);
+  });
+
+  it("R3.12 actionColor shades by sizeRank, capped at the darkest shade", () => {
+    const sizes = [100, 200, 300, 400, 500];
+    const raises = sizes.map(
+      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "" }) as const,
+    );
+    const shades = raises.map((raise) => actionColor(raise, raises, "dark"));
+    expect(new Set(shades.slice(0, 4)).size).toBe(4);
+    expect(shades[4]).toBe(shades[3]);
+    expect(shades[0]).toBe(ACTION_STYLES.raise.color.dark);
   });
 });
 

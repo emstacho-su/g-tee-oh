@@ -16,7 +16,7 @@
  * handful of small objects per action, none per cell.
  */
 import type { NodeAction } from "../../contracts.js";
-import { actionColor, actionStyle, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
+import { actionColor, actionStyle, sizeRank, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
 import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatWeightShort } from "./cell-text.js";
 import { MATRIX_PALETTES, evFill, type MatrixPalette } from "./matrix-theme.js";
 import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
@@ -84,7 +84,8 @@ const PAD_CSS_PX = 2;
 const GRID_LINE_CSS_PX = 1;
 const FOCUS_LINE_CSS_PX = 2;
 const SELECTED_LINE_CSS_PX = 4;
-const SIZED_KINDS: ReadonlySet<NodeAction["kind"]> = new Set<NodeAction["kind"]>(["bet", "raise"]);
+/** What lastPlayedPosition returns when no action has a positive frequency. */
+const NONE_PLAYED = -1;
 
 /** The 14 integer edges that cut a backing store of sizeDevicePx into 13 cells. */
 export function cellEdges(sizeDevicePx: number): number[] {
@@ -96,15 +97,6 @@ function edgeAt(index: number, sizeDevicePx: number): number {
   return Math.round((index * sizeDevicePx) / GRID_SIZE);
 }
 
-function sizeVariant(action: NodeAction, actions: readonly NodeAction[]): number {
-  if (!SIZED_KINDS.has(action.kind)) return 0;
-  const sizes = actions
-    .filter((candidate) => SIZED_KINDS.has(candidate.kind))
-    .map((candidate) => candidate.size_cbb ?? 0)
-    .sort((left, right) => left - right);
-  return Math.max(0, sizes.indexOf(action.size_cbb ?? 0));
-}
-
 function patternOf(style: ActionStyle, variant: number, patterns: PatternSource): CanvasPattern | null {
   return style.pattern === "none" ? null : patterns.get(patternKey(style.pattern, variant));
 }
@@ -112,7 +104,7 @@ function patternOf(style: ActionStyle, variant: number, patterns: PatternSource)
 function actionPaints(actions: readonly NodeAction[], theme: ThemeName, patterns: PatternSource): ActionPaint[] {
   return actions.map((action) => ({
     color: actionColor(action, actions, theme),
-    pattern: patternOf(actionStyle(action.kind), sizeVariant(action, actions), patterns),
+    pattern: patternOf(actionStyle(action.kind), sizeRank(action, actions), patterns),
   }));
 }
 
@@ -158,14 +150,28 @@ function fillWith(ctx: MatrixCanvasContext, style: string | CanvasPattern, x: nu
   ctx.fillRect(x, y, w, h);
 }
 
+/** The position of the last action with a positive frequency and a paint, or NONE_PLAYED. */
+function lastPlayedPosition(frequencies: readonly number[], paints: readonly ActionPaint[]): number {
+  for (let position = frequencies.length - 1; position >= 0; position -= 1) {
+    if ((frequencies[position] ?? 0) > 0 && paints[position] !== undefined) return position;
+  }
+  return NONE_PLAYED;
+}
+
+/**
+ * Lays the played actions' bars left to right. The last played bar always runs to the cell's
+ * right edge, so frequencies that sum slightly under 1 (the api rounds them) leave no unpainted
+ * sliver of background at the right.
+ */
 function drawFrequencyCell(ctx: MatrixCanvasContext, cell: MatrixCell, rect: Rect, paints: readonly ActionPaint[]): void {
+  const last = lastPlayedPosition(cell.frequencies, paints);
   let cumulative = 0;
   let left = rect.x;
   cell.frequencies.forEach((frequency, position) => {
     const paint = paints[position];
     if (frequency <= 0 || paint === undefined) return;
     cumulative += frequency;
-    const right = rect.x + Math.round(Math.min(1, cumulative) * rect.w);
+    const right = position === last ? rect.x + rect.w : rect.x + Math.round(Math.min(1, cumulative) * rect.w);
     fillWith(ctx, paint.color, left, rect.y, right - left, rect.h);
     if (paint.pattern !== null) fillWith(ctx, paint.pattern, left, rect.y, right - left, rect.h);
     left = right;

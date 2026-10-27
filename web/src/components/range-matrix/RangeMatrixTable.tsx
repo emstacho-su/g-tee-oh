@@ -7,6 +7,8 @@
  * reads exactly the numbers the canvas shows. The caption names the mode. RangeMatrix keeps the
  * table in the DOM at all times and points the canvas's aria-describedby at its id.
  */
+import { memo } from "react";
+
 import { RANKS } from "../../poker/cards.js";
 import { GRID_SIZE } from "../../poker/hands.js";
 import { MODE_NAMES, cellText } from "./cell-text.js";
@@ -21,7 +23,11 @@ export interface RangeMatrixTableProps {
 
 const ROW_INDEXES = Array.from({ length: GRID_SIZE }, (_, index) => index);
 
-export function RangeMatrixTable({ model, mode, id }: RangeMatrixTableProps) {
+/**
+ * Memoized: model comes memoized per node, mode is a string and id comes from useId, so a focus
+ * move or a selection change in RangeMatrix does not re-render the 169 cells.
+ */
+export const RangeMatrixTable = memo(function RangeMatrixTable({ model, mode, id }: RangeMatrixTableProps) {
   return (
     <table id={id} className="w-full border-collapse text-xs">
       <caption className="mb-1 text-left text-sm font-semibold">
@@ -55,4 +61,4 @@ export function RangeMatrixTable({ model, mode, id }: RangeMatrixTableProps) {
       </tbody>
     </table>
   );
-}
+});
