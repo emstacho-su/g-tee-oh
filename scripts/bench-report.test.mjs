@@ -25,17 +25,21 @@ import {
   readMeasurement,
 } from "./bench-report.mjs";
 
-/** The six v1 ids with made-up times; a full run writes every one of them. */
+/** The eight v1 ids with made-up times; a full run writes every one of them. */
 const FULL_RUN = {
   "chunk_decode/postflop_1326_sparse": { mean: 9800.5, median: 9700 },
   "chunk_decode/preflop_169": { mean: 1500.25, median: 1480 },
+  "extract/runout_line": { mean: 3_400_000, median: 3_300_000 },
   "grade/warm_cache": { mean: 1_200_000, median: 1_100_000 },
   "node_read/cold_cache": { mean: 2200, median: 2100 },
   "node_read/warm_cache": { mean: 95.5, median: 95 },
+  "plan/enumerate_pair": { mean: 8_000_000, median: 7_900_000 },
   "solve_iteration/simple_tree_flop": { mean: 21_500_000.5, median: 21_000_000 },
 };
 /** The grade bench id (plan D.7). */
 const GRADE_ID = "grade/warm_cache";
+/** The two library-builder ids S18 added (O-190). */
+const BUILDER_IDS = ["extract/runout_line", "plan/enumerate_pair"];
 /** Samples in the p95 fixture; the nearest-rank 95th percentile is the 19th smallest of 20. */
 const P95_SAMPLES = 20;
 const P95_RANK = 19;
@@ -107,7 +111,7 @@ test("R0.10 bench-report reads the latest run only and sorts measurements by id"
   writeFileSync(join(root, "report", "index.html"), "<html></html>");
 
   const files = findEstimateFiles(root);
-  assert.equal(files.length, 6);
+  assert.equal(files.length, 8);
   assert.ok(files.every((file) => file.endsWith(join("new", "estimates.json"))));
 
   const measurements = collectMeasurements(root);
@@ -115,14 +119,14 @@ test("R0.10 bench-report reads the latest run only and sorts measurements by id"
     measurements.map((m) => m.id),
     EXPECTED_IDS,
   );
-  assert.deepEqual(measurements[5], {
+  assert.deepEqual(measurements[7], {
     id: "solve_iteration/simple_tree_flop",
     mean_ns: 21_500_000.5,
     median_ns: 21_000_000,
     unit: "ns",
     stub: false,
   });
-  assert.deepEqual(measurements[4], {
+  assert.deepEqual(measurements[5], {
     id: "node_read/warm_cache",
     mean_ns: 95.5,
     median_ns: 95,
@@ -135,13 +139,28 @@ test("R2.7 bench-report expects the S14 chunk decode and node read ids, sorted, 
   assert.deepEqual(EXPECTED_IDS, [
     "chunk_decode/postflop_1326_sparse",
     "chunk_decode/preflop_169",
+    "extract/runout_line",
     "grade/warm_cache",
     "node_read/cold_cache",
     "node_read/warm_cache",
+    "plan/enumerate_pair",
     "solve_iteration/simple_tree_flop",
   ]);
   assert.deepEqual([...EXPECTED_IDS].sort(), EXPECTED_IDS);
   assert.ok(EXPECTED_IDS.every((id) => !id.endsWith("/stub")));
+});
+
+test("R2.18 bench-report expects the planner and extraction ids and refuses a run without them", () => {
+  assert.ok(BUILDER_IDS.every((id) => EXPECTED_IDS.includes(id)), EXPECTED_IDS.join(", "));
+  writeFullRun(BUILDER_IDS);
+  assert.throws(() => collectMeasurements(root), (error) => {
+    assert.ok(error instanceof ReportError);
+    assert.match(
+      error.message,
+      /missing bench ids extract\/runout_line, plan\/enumerate_pair; .*nothing written/,
+    );
+    return true;
+  });
 });
 
 test("R2.13 bench-report expects grade/warm_cache and tags the report with R2.13", () => {
@@ -209,7 +228,7 @@ test("R0.10 bench-report refuses a partial run and names every missing target", 
     assert.ok(!error.message.includes(GRADE_ID), "the grade id is present in this run");
     return true;
   });
-  assert.equal(EXPECTED_IDS.length, 6);
+  assert.equal(EXPECTED_IDS.length, 8);
 });
 
 test("R0.10 bench-report rejects an estimate that is not a positive number", () => {

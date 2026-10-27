@@ -2,9 +2,9 @@
 //! `GET /healthz` and `GET /metrics`, internal to the compose network and never published.
 //!
 //! [`Status`] is the state the loop writes and the handlers read: the builder state, the
-//! current job, the settings errors and the latest queue and storage figures under one
-//! mutex, and monotonic counters as atomics. A handler copies them into an immutable view
-//! per request, so a scrape never holds a lock while it formats.
+//! current job, the settings errors, the latest queue and storage figures and the
+//! monotonic counters, all under one mutex. A handler copies them into an immutable
+//! [`StatusView`] per request, so a scrape never holds the lock while it formats or probes.
 //!
 //! `/healthz` answers JSON `{status, version, worker_id, state, reason, database, store,
 //! current_job, settings_errors}`: `database` is `unconfigured`, `ok` (the probe
@@ -20,11 +20,18 @@
 //! `builder_line_iterations_total`, `builder_last_exploitability_pct_pot{seat}` and
 //! `builder_peak_rss_bytes`.
 
+mod metrics;
+mod probe;
+
 use std::net::SocketAddr;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use axum::Router;
+use axum::extract::State;
+use axum::http::{StatusCode, header};
+use axum::response::{IntoResponse, Json};
+use axum::routing::get;
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -32,6 +39,36 @@ use crate::error::BuilderError;
 use crate::notify::BuilderState;
 use crate::settings::SettingError;
 use crate::store::LibraryTarget;
+
+pub use metrics::render_metrics;
+
+/// The content type of `/metrics`: the Prometheus text exposition format 0.0.4.
+pub const METRICS_CONTENT_TYPE: &str = "text/plain; version=0.0.4";
+
+/// The `/healthz` status when every configured dependency answers.
+pub const STATUS_OK: &str = "ok";
+
+/// The `/healthz` status when a configured dependency does not answer.
+pub const STATUS_DEGRADED: &str = "degraded";
+
+/// The database probe: the login and whether it holds the builder role (O-28).
+const DATABASE_PROBE_SQL: &str =
+    "select current_user::text, pg_has_role(current_user, 'builder', 'member')";
+
+/// A dependency that is not configured.
+const UNCONFIGURED: &str = "unconfigured";
+
+/// The state's name as `/healthz` and `builder_state{state}` write it, the `snake_case`
+/// form `notify` serializes.
+#[must_use]
+pub fn state_name(state: BuilderState) -> &'static str {
+    match state {
+        BuilderState::Running => "running",
+        BuilderState::Throttled => "throttled",
+        BuilderState::Paused => "paused",
+        BuilderState::Idle => "idle",
+    }
+}
 
 /// How long the database and store probes may take before the answer is `unavailable`.
 pub const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -125,12 +162,21 @@ impl Status {
 
     /// Counts one job outcome (one of `JOB_OUTCOMES`; anything else is ignored).
     pub fn count_job(&self, outcome: &str) {
-        let _ = outcome;
+        if let Some(index) = JOB_OUTCOMES.iter().position(|known| *known == outcome) {
+            self.update(|view| view.jobs[index] = view.jobs[index].saturating_add(1));
+        } else {
+            tracing::warn!(outcome, "not a counted job outcome; builder_jobs_total unchanged");
+        }
     }
 
-    /// Records one solved line.
+    /// Records one solved line: its seconds into the sum, one into the count, and its
+    /// iterations into the total.
     pub fn record_line(&self, seconds: f64, iterations: u32) {
-        let _ = (seconds, iterations);
+        self.update(|view| {
+            view.line_seconds_sum += seconds;
+            view.line_count = view.line_count.saturating_add(1);
+            view.line_iterations = view.line_iterations.saturating_add(u64::from(iterations));
+        });
     }
 }
 
@@ -179,38 +225,128 @@ pub struct StoreHealth {
     pub reachable: bool,
 }
 
-/// The router: `GET /healthz` and `GET /metrics`.
+/// The router: `GET /healthz` and `GET /metrics`; every other path answers 404.
 pub fn router(state: OpsState) -> Router {
-    Router::new().with_state(state)
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route("/metrics", get(metrics_handler))
+        .with_state(state)
 }
 
-/// The Prometheus text for `view` and the peak resident set size.
-#[must_use]
-pub fn render_metrics(view: &StatusView, peak_rss_bytes: u64) -> String {
-    let _ = (view, peak_rss_bytes);
-    String::new()
+/// `GET /metrics`: the Prometheus text of the current view and the process's peak resident
+/// set size.
+async fn metrics_handler(State(state): State<OpsState>) -> impl IntoResponse {
+    let view = state.status.view();
+    let text = render_metrics(&view, crate::job::peak_rss_bytes());
+    ([(header::CONTENT_TYPE, METRICS_CONTENT_TYPE)], text)
 }
 
-/// Serves `router(state)` on `bind` until `shutdown` resolves.
+/// `GET /healthz`: probes the configured dependencies and answers 200 when every one
+/// answers, 503 when one does not (O-207). An unconfigured dependency is not a failure.
+async fn healthz(State(state): State<OpsState>) -> impl IntoResponse {
+    let body = health_body(&state).await;
+    let code =
+        if body.status == STATUS_OK { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    (code, Json(body))
+}
+
+/// The `/healthz` body for `state`, with both probes run.
+pub async fn health_body(state: &OpsState) -> HealthBody {
+    let view = state.status.view();
+    let database = match &state.database {
+        None => UNCONFIGURED.to_owned(),
+        Some(pool) => probe_database(pool).await.to_owned(),
+    };
+    let store = match &state.target {
+        None => StoreHealth { kind: UNCONFIGURED.to_owned(), reachable: false },
+        Some(target) => {
+            StoreHealth { kind: target.kind().to_owned(), reachable: probe_store(target).await }
+        }
+    };
+    let database_failed = state.database.is_some() && database != STATUS_OK;
+    let store_failed = state.target.is_some() && !store.reachable;
+    let status = if database_failed || store_failed { STATUS_DEGRADED } else { STATUS_OK };
+    HealthBody {
+        status: status.to_owned(),
+        version: crate::VERSION.to_owned(),
+        worker_id: state.worker_id.clone(),
+        state: state_name(view.state).to_owned(),
+        reason: view.reason,
+        database,
+        store,
+        current_job: view.current_job,
+        settings_errors: view
+            .settings_errors
+            .iter()
+            .map(|error| format!("{}: {}", error.key, error.reason))
+            .collect(),
+    }
+}
+
+/// `ok` when the probe query answers within [`PROBE_TIMEOUT`] and the login holds the
+/// builder role, `unavailable` otherwise; the failure is logged without the password.
+async fn probe_database(pool: &PgPool) -> &'static str {
+    let query = sqlx::query_as::<_, (String, bool)>(DATABASE_PROBE_SQL).fetch_one(pool);
+    match tokio::time::timeout(PROBE_TIMEOUT, query).await {
+        Ok(Ok((_, true))) => STATUS_OK,
+        Ok(Ok((login, false))) => {
+            tracing::warn!(login, "the database login does not hold the builder role");
+            "unavailable"
+        }
+        Ok(Err(error)) => {
+            tracing::warn!(%error, "database probe failed");
+            "unavailable"
+        }
+        Err(_) => {
+            tracing::warn!(timeout = ?PROBE_TIMEOUT, "database probe timed out");
+            "unavailable"
+        }
+    }
+}
+
+/// Whether the target answers within [`PROBE_TIMEOUT`]; a failure is logged.
+async fn probe_store(target: &LibraryTarget) -> bool {
+    match tokio::time::timeout(PROBE_TIMEOUT, target.probe()).await {
+        Ok(Ok(())) => true,
+        Ok(Err(error)) => {
+            tracing::warn!(%error, kind = target.kind(), "store probe failed");
+            false
+        }
+        Err(_) => {
+            tracing::warn!(timeout = ?PROBE_TIMEOUT, kind = target.kind(), "store probe timed out");
+            false
+        }
+    }
+}
+
+/// Serves `router(state)` on `bind` until `shutdown` resolves, letting in-flight requests
+/// finish (axum's graceful shutdown).
 ///
 /// # Errors
 ///
-/// `BuilderError::Io` when the address cannot be bound.
+/// `BuilderError::Io` when the address cannot be bound or the accept loop fails.
 pub async fn serve(
     bind: SocketAddr,
     state: OpsState,
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> Result<(), BuilderError> {
-    let _ = (bind, state, shutdown);
-    Err(BuilderError::NotImplemented("ops::serve"))
+    let io_error =
+        |source: std::io::Error| BuilderError::Io { path: format!("listen {bind}"), source };
+    let listener = tokio::net::TcpListener::bind(bind).await.map_err(io_error)?;
+    tracing::info!(%bind, "operations surface listening");
+    axum::serve(listener, router(state)).with_graceful_shutdown(shutdown).await.map_err(io_error)
 }
 
 /// Probes `/healthz` through the loopback at `bind`'s port; true on a 200.
 ///
+/// One plain HTTP/1.1 `GET /healthz` with `Connection: close` over a standard-library TCP
+/// connection to `127.0.0.1:<port>`, read to the end of the stream (the solver-query
+/// pattern), so the container `HEALTHCHECK` needs neither curl nor an async runtime.
+///
 /// # Errors
 ///
-/// `BuilderError::Io` when nothing answers.
+/// `BuilderError::Io` when nothing answers, `BuilderError::Malformed` when the answer has
+/// no HTTP status line.
 pub fn probe(bind: SocketAddr) -> Result<bool, BuilderError> {
-    let _ = bind;
-    Err(BuilderError::NotImplemented("ops::probe"))
+    probe::healthz_status(bind.port()).map(|status| status == StatusCode::OK.as_u16())
 }

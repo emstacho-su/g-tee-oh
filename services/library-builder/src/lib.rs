@@ -19,10 +19,6 @@
 //!   `spec`: a job without a database (O-205); `bench`: the flop-line report (O-190).
 
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::unused_async,
-    reason = "S18 skeleton: stubs answer before awaiting; the integrator removes this at join"
-)]
 
 pub mod bench;
 pub mod cli;

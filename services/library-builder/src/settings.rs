@@ -18,7 +18,7 @@
 //! | `k_runouts` | 20 | O-14 |
 //! | `k_runouts_rare` | 10 | O-191 |
 //! | `k_frequent_pairs` | 1 | O-191 |
-//! | `plan_configs` | `["cfg_6_online_100"]` | planner scope |
+//! | `plan_configs` | `["cfg_6_online_100"]` | planner scope; `[]` turns planning off |
 //! | `target_pct_pot` | 0.3 | 04 section 6, O-138 |
 //! | `max_iterations` | 20000 | per attempt, times the attempt number |
 //! | `max_seconds_per_line` | 1800 | O-178 |
@@ -29,6 +29,8 @@
 //! | `verify_interval_hours` | 24 | O-186 |
 //! | `plan_interval_minutes` | 60 | the automatic plan |
 //! | `poll_seconds` | 30 | sleep when paused or idle |
+
+mod parse;
 
 use gto_planner::PlannerSettings;
 use gto_solve::postflop::{SolveOptions, StopRule, StorageBits};
@@ -154,36 +156,88 @@ impl Default for BuilderSettings {
 impl BuilderSettings {
     /// The settings from `builder_setting` rows, with the errors of the keys that fell
     /// back to their defaults.
+    ///
+    /// Each row is applied in order to the settings built so far, so a later row of the
+    /// same key wins. A row that fails its check leaves that key at its default and adds a
+    /// [`SettingError`]; an unknown key changes nothing and adds one too. The one rule that
+    /// spans two keys, 16-bit storage only with a target of at least
+    /// [`SIXTEEN_BIT_TARGET_FLOOR_PCT_POT`] (O-194), is checked after every row is read and
+    /// reported at the position of the `storage_bits` row, so the errors stay in row order.
     #[must_use]
     pub fn from_rows(rows: &[(String, Value)]) -> (BuilderSettings, Vec<SettingError>) {
-        let _ = rows;
-        (BuilderSettings::default(), Vec::new())
+        let defaults = BuilderSettings::default();
+        let mut errors: Vec<(usize, SettingError)> = Vec::new();
+        let mut storage_row = None;
+        let mut settings = defaults.clone();
+        for (index, (key, value)) in rows.iter().enumerate() {
+            match parse::apply(&settings, key, value) {
+                Ok(next) => {
+                    if key == "storage_bits" {
+                        storage_row = Some(index);
+                    }
+                    settings = next;
+                }
+                Err(problem) => {
+                    let reason = parse::reason(&defaults, key, &problem);
+                    errors.push((index, SettingError { key: key.clone(), reason }));
+                }
+            }
+        }
+        if let Some(index) = storage_row
+            && settings.storage_bits == 16
+            && settings.target_pct_pot < SIXTEEN_BIT_TARGET_FLOOR_PCT_POT
+        {
+            let problem = parse::Problem::Invalid(format!(
+                "16-bit storage needs target_pct_pot of at least \
+                 {SIXTEEN_BIT_TARGET_FLOOR_PCT_POT} (O-194), the target is {}",
+                settings.target_pct_pot
+            ));
+            let reason = parse::reason(&defaults, "storage_bits", &problem);
+            errors.push((index, SettingError { key: "storage_bits".to_owned(), reason }));
+            settings = BuilderSettings { storage_bits: defaults.storage_bits, ..settings };
+        }
+        errors.sort_by_key(|(index, _)| *index);
+        (settings, errors.into_iter().map(|(_, error)| error).collect())
     }
 
     /// The share in force at `minute_of_day_utc` (0 to 1,439): the boost share inside the
     /// window, `cpu_share` outside it.
+    ///
+    /// The local minute is `minute_of_day_utc + utc_offset_minutes` wrapped into one day.
+    /// The window is `[start_hour, end_hour)` in local hours; when `start_hour` is after
+    /// `end_hour` it wraps midnight, and when they are equal it is empty (O-13).
     #[must_use]
     pub fn share_at(&self, minute_of_day_utc: u32) -> f64 {
-        let _ = minute_of_day_utc;
-        self.cpu_share
+        let day = i64::from(MINUTES_PER_DAY);
+        let local = (i64::from(minute_of_day_utc) + i64::from(self.overnight.utc_offset_minutes))
+            .rem_euclid(day);
+        let start = i64::from(self.overnight.start_hour) * 60;
+        let end = i64::from(self.overnight.end_hour) * 60;
+        let inside = if start <= end {
+            start <= local && local < end
+        } else {
+            local >= start || local < end
+        };
+        if inside { self.overnight.cpu_share } else { self.cpu_share }
     }
 
     /// The solve threads at `minute_of_day_utc`: `round(builder_threads * share)`, at
     /// least 1.
     #[must_use]
     pub fn threads(&self, builder_threads: usize, minute_of_day_utc: u32) -> usize {
-        let _ = (builder_threads, minute_of_day_utc);
-        1
+        let threads = u32::try_from(builder_threads).unwrap_or(u32::MAX);
+        let scaled = (f64::from(threads) * self.share_at(minute_of_day_utc)).round();
+        parse::whole_count(scaled).max(1)
     }
 
     /// The stop rule of attempt `attempt` (1 for the first): the target, `max_iterations`
-    /// times the attempt number, and `max_seconds_per_line`.
+    /// times the attempt number (an attempt of 0 counts as 1; the product saturates), and
+    /// `max_seconds_per_line`.
     #[must_use]
     pub fn stop_rule(&self, attempt: u16) -> StopRule {
-        let _ = attempt;
         StopRule {
             target_exploitability_pct_pot: self.target_pct_pot,
-            max_iterations: self.max_iterations,
+            max_iterations: self.max_iterations.saturating_mul(u32::from(attempt.max(1))),
             max_seconds: self.max_seconds_per_line,
         }
     }
