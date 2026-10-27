@@ -1,0 +1,104 @@
+# Hot reload override for the Compose dev profile (O-237, O-265; moves O-122's "no hot reload yet" to
+# S24 for api and web together). Used only through just dev-hot, from the repo root:
+#   docker compose --project-directory . -f infra/compose/compose.yaml -f infra/compose/compose.hot.yaml \
+#     --profile dev up
+# Continuous integration (CI) never uses this file: the e2e job runs the built images (just e2e).
+#
+# Mechanism: api and web stop being built images and become node:24-slim containers running the
+# sources from the working tree, bind-mounted at /app. api runs `tsx watch src/main.ts` (tsx is a
+# devDependency of services/api), which restarts the server when a file it imports changes. web
+# runs the Vite dev server on 8080, the port the edge Caddy already proxies to, so the Caddyfile is
+# unchanged; Caddy's reverse_proxy carries the WebSocket upgrade, so hot module replacement (HMR)
+# reaches the browser as wss://<CADDY_SITE> on 443. Vite's client connects back to the page's own
+# host and port when no HMR port is configured, so vite.config.ts needs no change.
+# __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS adds CADDY_SITE to Vite's allowed hosts (localhost is
+# allowed already), because Caddy forwards the browser's Host header.
+#
+# Windows bind mounts deliver no inotify events into the Linux VM, so both watchers poll:
+# CHOKIDAR_USEPOLLING and CHOKIDAR_INTERVAL are read by the chokidar copies bundled in tsx and in
+# Vite. 500 ms keeps an edit visible within a second without pegging a core.
+#
+# node_modules: every node_modules directory of the workspace (root, web, services/api,
+# packages/contracts, packages/learning) is a named volume over the bind mount, so the containers
+# install Linux binaries there and never write into the Windows checkout, and the host's own
+# node_modules stay untouched. The pnpm store and corepack's pnpm download share one more volume.
+# Both services run the same `pnpm install --frozen-lockfile` under flock on a lock file in the
+# shared root volume, so the two installs never race: the first does the work, the second finds
+# everything current. First-run cost: corepack fetches pnpm and pnpm installs the whole workspace
+# into empty volumes, a few minutes on the Zenbook; later starts reuse the volumes and take
+# seconds. just dev-hot-down keeps the volumes (and the database); just dev-down removes the
+# database and storage volumes of compose.yaml but not these node_modules volumes.
+#
+# Hardening: read_only and the tmpfs mounts of compose.yaml are relaxed here and only here, since
+# pnpm, Vite's dependency cache and tsx write inside the container. cap_drop ALL and
+# no-new-privileges stay. The containers run as root (the image default) because Docker creates
+# the named volumes root-owned; root without capabilities still writes the directories it owns.
+# The node image has no HEALTHCHECK, so each service gets one with a long start period that covers
+# the first install; just dev-hot waits for both to be healthy.
+
+x-hot-env: &hot-env
+  CHOKIDAR_USEPOLLING: "true"
+  CHOKIDAR_INTERVAL: "500"
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_HOME: /pnpm/corepack
+
+x-hot-node: &hot-node
+  image: node:24-slim
+  build: !reset null
+  working_dir: /app
+  read_only: false
+  tmpfs: !reset []
+  volumes:
+    - .:/app
+    - hot_node_modules:/app/node_modules
+    - hot_web_node_modules:/app/web/node_modules
+    - hot_api_node_modules:/app/services/api/node_modules
+    - hot_contracts_node_modules:/app/packages/contracts/node_modules
+    - hot_learning_node_modules:/app/packages/learning/node_modules
+    - hot_pnpm:/pnpm
+
+# Each command installs under the shared lock (CI=true keeps pnpm from prompting without a
+# terminal), then replaces the shell with the watcher so compose's stop signal reaches it.
+services:
+  api:
+    <<: *hot-node
+    environment:
+      <<: *hot-env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        CI=true flock /app/node_modules/.hot-install.lock
+        corepack pnpm install --frozen-lockfile --store-dir /pnpm/store
+        && exec corepack pnpm --filter @g-tee-oh/api exec tsx watch --clear-screen=false src/main.ts
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10m
+
+  web:
+    <<: *hot-node
+    environment:
+      <<: *hot-env
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ${CADDY_SITE:-localhost}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        CI=true flock /app/node_modules/.hot-install.lock
+        corepack pnpm install --frozen-lockfile --store-dir /pnpm/store
+        && exec corepack pnpm --filter @g-tee-oh/web exec vite --host 0.0.0.0 --port 8080 --strictPort
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10m
+
+volumes:
+  hot_node_modules: {}
+  hot_web_node_modules: {}
+  hot_api_node_modules: {}
+  hot_contracts_node_modules: {}
+  hot_learning_node_modules: {}
+  hot_pnpm: {}
