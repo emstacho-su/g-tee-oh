@@ -232,6 +232,15 @@ bench:
     cargo bench -p gto-solve -p gto-library -p solver-query -p gto-planner -p library-builder --features gto-library/synthetic
     node scripts/bench-report.mjs
 
+# Needs the dev stack up with the fixture library (just dev-up, just db-migrate) and the bench lock;
+# perf never starts or stops the stack. It trusts Caddy's root copied out of the caddy container,
+# creates a per-run owner through create-user (password on stdin), takes 20 warm-up and 200 timed
+# samples per path, writes the report even on a miss, then runs check-reports. BENCH_MACHINE names
+# the machine (default zenbook); --base-url, --ca-file and --out-dir pass through ARGS.
+# p95 of study node read, grade and decision to feedback through Caddy; writes validation/reports/perf-zenbook.json (R3.3, O-40, O-91)
+perf *ARGS:
+    node scripts/perf.mjs {{ARGS}}
+
 # Release build: the three scenarios pack in seconds there and in minutes in debug (O-134).
 # Synthetic library size estimate written by library-pack, seed and parameters printed (R2.7, R-19)
 library-size-estimate:
