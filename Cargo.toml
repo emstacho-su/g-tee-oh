@@ -101,16 +101,22 @@ jsonschema = { version = "0.59", default-features = false }
 # allocator of those test binaries only; dev-dependency only.
 peak_alloc = "0.2"
 # The library bucket client of library-builder (S18, O-183, ADR 0019): object_store's S3
-# (Simple Storage Service) client, Apache-2.0 or MIT. The 0.13 line is pinned on purpose:
-# its `aws` feature runs reqwest 0.12 over rustls with the ring provider and the native root
-# store, the pair the lock already holds for sqlx (no cmake or NASM on the Windows MSVC
-# toolchain, O-23), while 0.14 moves to reqwest 0.13, whose `rustls` features select
-# aws-lc-rs and verify certificates through rustls-platform-verifier, which carries
-# webpki-root-certs under CDLA-Permissive-2.0, a license outside deny.toml (ADR 0002).
-# Default features are off because the local `fs` backend is not used: gto-library's
-# FsStore stages a build and this client uploads it. `just licenses` holds the graph to
-# ring and native roots, no aws-lc-sys and no webpki roots.
-object_store = { version = "0.13", default-features = false, features = ["aws"] }
+# (Simple Storage Service) client, Apache-2.0 or MIT. The 0.13 line S18 first pinned holds
+# quick-xml 0.39 (RUSTSEC-2026-0194 and 0195, fixed from 0.41), so the 0.14 line is used,
+# without its `aws` feature: `aws` forces reqwest's `rustls` feature, which selects aws-lc-rs
+# (cmake and NASM on the Windows MSVC toolchain, O-23). `aws-base`, `reqwest` and `ring` give
+# the same S3 client with SigV4 signing over ring; reqwest runs `rustls-no-provider` and
+# library-builder installs rustls's ring provider before it builds the client. Certificates
+# go through rustls-platform-verifier (the operating system's store); its webpki-root-certs
+# edge (CDLA-Permissive-2.0) exists only on wasm32, which deny.toml's target list leaves out
+# (O-208). Default features are off because the local `fs` backend is not used: gto-library's
+# FsStore stages a build and this client uploads it. `just licenses` holds the graph to ring,
+# no aws-lc-sys and no webpki roots.
+object_store = { version = "0.14", default-features = false, features = ["aws-base", "reqwest", "ring"] }
+# The HTTP client object_store 0.14 runs on and the TLS library under it, named here only to
+# select ring instead of aws-lc-rs (see object_store above, O-208).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the

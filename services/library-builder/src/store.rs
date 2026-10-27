@@ -53,6 +53,18 @@ pub enum LibraryTarget {
     },
 }
 
+
+/// Installs rustls's ring provider as the process default once, before the first S3 client
+/// is built: reqwest runs with `rustls-no-provider` so that no aws-lc-rs is linked (O-208),
+/// and a client built without a process default provider fails. A second call finds the
+/// provider in place and does nothing.
+fn install_tls_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        // Err means another thread installed a provider between the check and the call,
+        // which leaves a default in place, the only outcome this function needs.
+        let _already = rustls::crypto::ring::default_provider().install_default();
+    }
+}
 impl LibraryTarget {
     /// The target `config` selects.
     ///
@@ -65,6 +77,7 @@ impl LibraryTarget {
             StoreConfig::Unconfigured => Err(BuilderError::StoreUnconfigured),
             StoreConfig::Fs { root } => Ok(LibraryTarget::Fs { root: root.clone() }),
             StoreConfig::S3(s3) => {
+                install_tls_provider();
                 let client = AmazonS3Builder::new()
                     .with_endpoint(&s3.endpoint)
                     .with_allow_http(true)

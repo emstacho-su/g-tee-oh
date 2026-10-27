@@ -36,9 +36,12 @@ thiserror = { workspace = true }
 # The rayon pool a job's solve runs inside, sized from cpu_share times BUILDER_THREADS
 # (A2 section 5, O-13), so gto-solve's estimate sees the same count.
 rayon = { workspace = true }
-# The library bucket client (O-183, ADR 0019); the workspace manifest says why the 0.13
-# line is pinned (ring and the native root store, no aws-lc-sys, no webpki roots).
+# The library bucket client (O-183, O-208, ADR 0019); the workspace manifest says why the
+# 0.14 line runs on ring with no aws-lc-sys and no webpki roots.
 object_store = { workspace = true }
+# object_store 0.14 over reqwest with rustls on ring, no aws-lc-rs (O-208).
+reqwest = { workspace = true }
+rustls = { workspace = true }
 # The machine block of the bench report (O-190, validation/reports/README.md), the same
 # `system` feature the validate tool uses.
 sysinfo = { workspace = true }
