@@ -1,6 +1,7 @@
-# e2e job (R0.3, R0.5, R0.6): end-to-end smoke through docker compose. just e2e runs the e2e-stack chain:
-# dev-up, db-migrate, db-test, smoke, e2e-web (the Playwright flow through Caddy), and dev-down whatever
-# happened before. The dev profile builds the solver-query, api and web images on the runner (O-121): a
+# e2e job (R0.3, R0.5, R0.6, R3.13): first just e2e-mock, the Playwright sign-in flow against the mocked
+# api with no Docker (O-264); then end-to-end smoke through docker compose. just e2e runs the e2e-stack
+# chain: dev-up, db-migrate, db-test, create-owner (a per-run owner with a random password, O-263), smoke,
+# e2e-web (the Playwright stack project through Caddy), and dev-down whatever happened before. The dev profile builds the solver-query, api and web images on the runner (O-121): a
 # cold Rust release build of solver-query for amd64 only plus the two Node builds, roughly five minutes
 # before the stack is up; cargo-chef (infra/docker/README.md) is adopted only if the job passes 15
 # minutes. Docker Engine and Compose v2 ship on ubuntu-latest, so nothing installs them.
@@ -34,7 +35,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # just e2e-web drives Chromium against the stack; --with-deps also installs the browser's system
+      # just e2e-mock and just e2e-web drive Chromium; --with-deps also installs the browser's system
       # libraries on the runner. Playwright downloads the browser once per run (an actions/cache on
       # ~/.cache/ms-playwright keyed by the lockfile is optional).
       - name: Install the Playwright Chromium browser (R0.3)
@@ -54,6 +55,11 @@ jobs:
             echo "a change-me placeholder survived the rewrite" >&2
             exit 1
           fi
+      # The sign-in flow against the mocked api (O-264): no Docker, so a front-end failure shows here in
+      # about a minute, before the image builds. Playwright builds the harness and serves it with vite
+      # preview on 4173 (CI is set, so it never reuses a server).
+      - name: Mocked-api sign-in flow (R3.13)
+        run: just e2e-mock
       # Builds the three images first (O-121, see the header), then runs the chain.
       - name: End-to-end smoke
         env:

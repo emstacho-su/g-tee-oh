@@ -1,0 +1,8 @@
+# gitleaks false positives, one fingerprint per line (<commit>:<file>:<rule>:<line>).
+# Each entry names the exact commit and line, so a new finding is never hidden by it.
+#
+# 6a81722 (S24): a synthetic stand-in password "pw-0123456789ab" in a unit test of the e2e
+# credential reader. It never authenticated anything; the literal was replaced by a low-entropy
+# value built at run time in the next commit, and this entry only clears the history scan.
+6a81722e29c3949983fd5463ce654798de480f01:web/test/e2e-support/owner-credentials.test.ts:generic-api-key:10
+6a81722e29c3949983fd5463ce654798de480f01:web/test/e2e-support/owner-credentials.test.ts:generic-api-key:11

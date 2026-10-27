@@ -8,6 +8,8 @@ OWN_CRATES := "-p gto-model -p gto-tree -p gto-solve -p gto-library -p gto-plann
 COMPOSE_FILE := "infra/compose/compose.yaml"
 # The project directory is the repo root so .env and relative paths resolve from there
 COMPOSE := "docker compose --project-directory . -f infra/compose/compose.yaml"
+# The hot reload override on top (O-265); only dev-hot and dev-hot-down use it, never CI
+COMPOSE_HOT := COMPOSE + " -f infra/compose/compose.hot.yaml"
 
 # List the recipes (the task surface)
 default:
@@ -67,11 +69,11 @@ contracts-check:
     node scripts/contracts.mjs --check
 
 # Skips until the compose file exists; the chain lives in infra/compose/e2e.mjs so dev-down always runs.
-# End-to-end: dev stack up (builds solver-query, api, web), migrate, database tests, smoke, Playwright flow, down (R0.3, R0.5, R0.6)
+# End-to-end: dev stack up (builds solver-query, api, web), migrate, database tests, owner, smoke, Playwright flow, down (R0.3, R0.5, R0.6, R3.13)
 e2e:
     {{ if path_exists(COMPOSE_FILE) == "true" { "just e2e-stack" } else { "echo 'e2e: skipped, " + COMPOSE_FILE + " does not exist yet (S02/S06)'" } }}
 
-# The e2e chain once the compose file exists: up, migrate, database tests, smoke, e2e-web, and always down
+# The e2e chain once the compose file exists: up, migrate, database tests, create-owner (O-263), smoke, e2e-web, and always down
 e2e-stack:
     node infra/compose/e2e.mjs
 
@@ -89,14 +91,55 @@ dev-up:
 dev-down:
     {{COMPOSE}} --profile dev down -v
 
+# infra/compose/compose.hot.yaml runs api under tsx watch and web under the Vite dev server, from the
+# working tree, behind the same edge Caddy (HMR over wss on 443). The first start installs the workspace
+# into named volumes inside the containers (a few minutes); later starts take seconds. --build rebuilds
+# solver-query only; --wait covers the first install through the override's health checks. Ports are the
+# dev profile's, so dev-hot and dev-up (and e2e) never run at the same time.
+# Compose dev stack with hot reload for api and web (O-237, O-265); just dev-hot-down stops it
+dev-hot:
+    {{COMPOSE_HOT}} --profile dev up -d --build --wait --wait-timeout 900 postgres seaweedfs solver-query api web caddy
+    {{COMPOSE_HOT}} --profile dev up -d bucket-init
+    node infra/compose/wait-one-shot.mjs bucket-init
+    @echo "dev-hot: up at https://localhost (https://<CADDY_SITE> when .env sets one); edits under web/ and services/api/ reload"
+
+# Keeps every volume: the database and the node_modules volumes survive, so the next dev-hot is quick.
+# just dev-down removes the database and storage volumes (not the node_modules ones); run it before just
+# e2e, whose create-owner step expects a fresh database.
+# Hot reload stack down, volumes kept (O-265)
+dev-hot-down:
+    {{COMPOSE_HOT}} --profile dev down
+
 # Health smoke over Postgres, the S3 gateway, the three built services and Caddy; what the e2e job calls (R0.3, R0.5)
 smoke:
     node infra/compose/smoke.mjs
 
-# Base URL: E2E_BASE_URL, else https://<CADDY_SITE> (environment or .env), else https://localhost
-# Playwright smoke flow against the running dev stack through Caddy (R0.3, R0.7); e2e runs it after smoke
+# Base URL: E2E_BASE_URL, else https://<CADDY_SITE> (environment or .env), else https://localhost. The e2e
+# script is the stack project only (playwright --project=stack), which never starts the preview server. The
+# sign-in test reads E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD, which e2e sets for this step only (O-263);
+# run by hand without them, it is skipped with that reason.
+# Playwright stack project against the running dev stack through Caddy: smoke and sign-in (R0.3, R0.7, R3.13)
 e2e-web:
     pnpm --filter @g-tee-oh/web run e2e
+
+# No Docker: Playwright builds the harness (build:harness), serves it with vite preview on 4173 and answers
+# /api/v1 from e2e/support/mock-api.ts through page.route. Needs the Chromium browser once per machine:
+#   pnpm --filter @g-tee-oh/web exec playwright install chromium
+# Playwright mock project: the sign-in flow against the mocked api, no Docker (R3.13, O-264)
+e2e-mock:
+    pnpm --filter @g-tee-oh/web run e2e:mock
+
+# Take the bench lock first (PM rules): nothing heavy may run beside it. BENCH_MACHINE and
+# BENCH_CONCURRENT_WORK pass through the environment to the spec, which writes
+# validation/reports/matrix-frame-<machine>.json; the harness preview server starts on its own.
+# Matrix frame bench on the harness build, Playwright bench project (R3.12, O-260); take the bench lock first
+bench-web:
+    pnpm --filter @g-tee-oh/web run bench
+
+# SCREENSHOT_DIR passes through the environment to the spec; the harness preview server starts on its own.
+# Screenshots of the login, home shell and gallery sections, light and dark, Playwright shots project (O-67)
+shots:
+    pnpm --filter @g-tee-oh/web run shots
 
 # Apply migrations; dbmate reads DATABASE_URL from the environment or .env (R0.6)
 db-migrate:
@@ -231,6 +274,10 @@ coverage-g6a:
 # Statement, branch, function and line coverage of packages/learning at the 80% gate (S22, A9 section 1)
 coverage-learning:
     pnpm --filter @g-tee-oh/learning coverage
+
+# Statement, branch, function and line coverage of web/src at the 80% gate (S24, A9 section 1)
+coverage-web:
+    pnpm --filter @g-tee-oh/web coverage
 
 # Line coverage of solver-query at the 80% gate (O-134, plan D.9); needs cargo-llvm-cov
 coverage-solver-query:
@@ -383,4 +430,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning coverage-web ts-boundary report-check licenses security guard-test test-tags

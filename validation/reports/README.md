@@ -181,6 +181,34 @@ Produced by `just spike-preflop MACHINE PLATFORM` (defaults `zenbook` and `linux
 
 When the 100bb run errors, nothing was measured and the report fails: a judged row `hu100/measured` with the value 0 against at least 1 says so, and the first line of `notes` reads "100bb: not measured" with the error. Its peak and seconds are then an extrapolation from push/fold, recorded as informational only. A run with no peak reading at all (validate built without the `peak-alloc` feature, off Linux) fails its peak row instead of counting as 0 bytes; the image builds with the feature. `notes` also quotes both pass rules, gives one line per run (seconds, iterations, gain and the three readings) and ends with the caller's two lines: `SPIKE_CONTAINER`, the docker run line with its memory limit (the recipe passes its own line unless the variable is set), and `SPIKE_CONCURRENT`, the other heavy work that was running (reported as not recorded when unset). The image holds no git checkout, so `--commit` records HEAD and `--allow-dirty` records the tree as dirty. CI never runs the spike; the R2.21 tests in `tools/validate/tests/spike.rs` validate the committed JSON and run one depth in process.
 
+## Matrix frame bench: `matrix-frame-<machine>.json` (R3.12)
+
+Produced by `just bench-web` (S24, O-260), which runs the Playwright bench project (`web/e2e/bench/matrix-frame.bench.ts`) against `vite preview` of the harness build (`vite build --mode harness`, `dist-harness/`, never the production image, O-267). The spec opens `/bench.html`, calls `window.__runMatrixBench` (`web/src/bench/`), builds the report with `web/e2e/bench/report.ts` and writes it here. Rule 1 applies: the tool writes the whole file. The run happens on the Zenbook under the bench lock, since other heavy work on the machine moves frame times.
+
+What is timed. The A7 section 4 budget is a range matrix frame under 16 ms. The page draws the matrix with the same `drawMatrix` the `RangeMatrix` component uses, at a forced device pixel ratio of 2 (a 1040 by 1040 backing store for the 520 pixel matrix, whatever the screen's ratio is), in each of the three modes (frequency, expected value, range weight). Per mode it runs 30 untimed warm-up frames, then 600 recorded frames, each paced by `requestAnimationFrame`. Every frame takes the next of five synthetic nodes (fixture formula at shifted grid positions, one with missing hands, one with two raise sizes), so no two neighboring frames draw the same data, and moves the focus and selection outlines. One frame time, from `performance.now()`, is the model build, the full draw and a one-pixel `getImageData(0, 0, 1, 1)` read; the read makes the browser finish the deferred canvas work, so the time is the cost of the pixels, not of queuing the calls. The canvas is not created with `willReadFrequently`, so it stays on the browser's default (accelerated when a GPU is there) path.
+
+How p95 is taken and judged: nearest rank, the value at rank `ceil(0.95 n)` of the recorded times sorted ascending, as for `p95_ns` in the benchmark section. A mode passes when its p95 is under 16 ms, strictly; `pass` is true only when all three modes pass. The JSON carries `{ "max": 16, "unit": "ms" }` as each threshold because the schema has no field for strictness (the G4 section has the same note). The spec writes the file before it asserts, so an over-budget run still leaves its evidence, and then the test fails.
+
+The renderer. Headless Chromium on a machine without a usable GPU path renders with SwiftShader (llvmpipe on Linux), which is pessimistic. The page reads `UNMASKED_RENDERER_WEBGL` through `WEBGL_debug_renderer_info` from a throwaway WebGL context (else the plain `RENDERER` string) and classifies it `software` when it names SwiftShader, llvmpipe or Software, `gpu` otherwise, `unknown` when WebGL is unavailable. The WebGL string names the graphics backend the browser picked; in Chromium an accelerated 2D canvas rasterizes on that same backend.
+
+Fields beyond the envelope:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `report`, `r_ids` | | `matrix-frame` and `["R3.12"]`. |
+| `machine` | object | As the benchmark section defines it, from `node:os`; `BENCH_MACHINE` names it (default `zenbook`, must match `^[a-z][a-z0-9-]*$`). |
+| `toolchain` | string | `Chromium <browser.version()>, Playwright <version>`. |
+| `measurements` | array | Per mode `<mode>/p95` (judged: `threshold` and `pass`), `<mode>/p50` and `<mode>/max` (informational, no `pass`), all in `ms`, three decimals. |
+| `renderer` | object | `string` (the renderer string or null) and `kind` (`gpu`, `software` or `unknown`). |
+| `pixel_ratio`, `size_px` | number | 2 and 520. |
+| `frames_per_mode`, `warmup_frames_per_mode` | integer | Recorded and untimed frames per mode; `BENCH_FRAMES` overrides the 600 for development runs only. |
+| `concurrent_work` | string | `BENCH_CONCURRENT_WORK` as given (free text, for example "S18 and S19 cargo builds running"), else `none recorded`. |
+| `user_agent` | string | `navigator.userAgent` of the page. |
+| `frame_times_ms` | object | Every recorded frame time per mode, sorted, so a reader can recompute the percentiles. |
+| `notes` | string | The renderer, ratio, frame counts, the timing rule and the concurrent work in one sentence each. |
+
+`BENCH_REPORT_DIR` sends the file elsewhere (development smoke runs); the default is this directory. Hosted continuous integration (CI) never reruns the bench, because runner timing noise would make the number meaningless; the ts job only checks the committed file with `just report-check` (schema, verdict agreement and `pass: true`).
+
 ## Report files (O-87)
 
 09 section 7 names where each gate report lands and O-87 fixes the file names 09 left open; `v1-gate.md` and the Phase 0 names come from 09 section 7 and the phase doc. The table lists every public report, who writes it and what it proves, so a session knows the name before it writes. Markdown files are gate summaries; JSON files follow `report.schema.json`. The two O-87 names that are fixtures rather than reports, `PROVENANCE-g6a.md` and `g4-spots.json`, live under `validation/fixtures/` and are described in that directory's README. Private reports (the Phase 1 exit, the G4 report, the coverage and quality assurance reports) stay in the capture repo and are only linked from here.
@@ -202,6 +230,7 @@ When the 100bb run errors, nothing was measured and the report fails: a judged r
 | `spike-preflop-mac.json`, `spike-preflop-mac.md` | S20, `just spike-preflop mac linux/arm64` on the Mac | JSON report with its tool-written Markdown twin | R2.21 rerun of the same image on the Mac against O-48, O-49 and O-80. |
 | `phase-2-gate.md` | S20 | Markdown | Phase 2 gate and Deploy 1 report, R2.1 to R2.22, with the O-50 memory and O-51 storage pass rules; G4 (R2.11) stays private and is noted. |
 | `recompute.json` | S29, `tools/validate recompute` | JSON gate report | Criterion 3: 200 seeded attempts recomputed through `gto-library` on a path that never calls `solver-query`, the seed in the report (O-60). |
+| `matrix-frame-zenbook.json` | S24, `just bench-web` on the Zenbook under the bench lock | JSON gate report (the matrix frame section above) | R3.12: the range matrix frame p95 under 16 ms per mode at device pixel ratio 2 in headless Chromium, with the renderer named (A7 section 4, O-260). |
 | `perf-zenbook.json` | S29, `just perf` | JSON gate report | Criterion 10 on the Zenbook: p95 against the O-40 thresholds; hosted CI checks the committed file and times the `e2e` job as an advisory only. |
 | `keying.json` | S29 | JSON gate report | Criterion 11: live rake keyed by the selected stake over 1/3 and 2/5 (O-18, O-57). |
 | `phase-3-gate.md` | S29 | Markdown | Phase 3 gate, R3.1 to R3.22, with criteria 3, 4, 5, 9, 10 (Zenbook) and 11 by report path; the build-card run names drills only (O-64). |
