@@ -7,13 +7,16 @@
  * so the strip and the grade can never disagree; this component computes no band itself. It
  * draws one segment per band, as wide as the band, with the action's color, pattern, short letter
  * and the range text ("16-95 Raise to 2.5bb"), a marker at the roll, and the sentence "Roll 37
- * selects Raise to 2.5bb". The info button calls onExplain; the explainer itself is S25. Input the
+ * selects Raise to 2.5bb". A band narrower than NARROW_BAND_ROLLS rolls shows only its swatch and
+ * letter inside the strip, with the full text as its tooltip and for screen readers, because the
+ * text would be clipped there; the legend under the strip always lists every band in full, so no
+ * band loses its text at any width. The info button calls onExplain; the explainer itself is S25. Input the
  * learning package rejects (lengths that differ, a roll outside 1 to 100, an unknown bucket)
  * renders an alert instead of a guessed strip.
  */
 import { RNG_ROLL_MAX, RNG_ROLL_MIN, rngBands, rollSelectedAction, type RngBand } from "@g-tee-oh/learning";
 
-import { Button, cn } from "../ui/index.js";
+import { Button, VisuallyHidden, cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
 import { toGradeActions } from "../../poker/grade-actions.js";
 import { ACTION_FILL_CLASSES, ActionSwatch, actionFillStyle } from "./ActionSwatch.js";
@@ -33,6 +36,8 @@ const ROLL_SPAN = RNG_ROLL_MAX - RNG_ROLL_MIN + 1;
 const PERCENT = 100;
 /** Centers the marker inside its roll's one-percent slot. */
 const HALF_SLOT = 0.5;
+/** Bands narrower than this many rolls (a fifth of the strip) show no text inside the strip. */
+export const NARROW_BAND_ROLLS = 20;
 
 function rollerModel(actions: readonly NodeAction[], freqByAction: readonly number[], roll: number | null): RollerModel {
   try {
@@ -44,6 +49,11 @@ function rollerModel(actions: readonly NodeAction[], freqByAction: readonly numb
     if (error instanceof RangeError) return { ok: false, message: error.message };
     throw error;
   }
+}
+
+/** "16-95 Raise to 2.5bb": a band's range and its action's button label. */
+function bandText(band: RngBand, action: NodeAction): string {
+  return `${band.from}-${band.to} ${action.label}`;
 }
 
 function percentOf(rolls: number): string {
@@ -87,11 +97,14 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
             const action = actions[band.actionIndex];
             if (action === undefined) return null;
             const range = `${band.from}-${band.to}`;
+            const text = bandText(band, action);
+            const narrow = band.to - band.from + 1 < NARROW_BAND_ROLLS;
             const current = band.actionIndex === model.selected;
             return (
               <li
                 key={band.actionIndex}
                 data-range={range}
+                title={text}
                 {...(current ? { "aria-current": "true" } : {})}
                 style={{ ...actionFillStyle(action, actions), width: percentOf(band.to - band.from + 1) }}
                 className={cn(
@@ -102,7 +115,7 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
               >
                 <span className="flex items-center gap-1 truncate rounded bg-white/80 px-1">
                   <ActionSwatch action={action} actions={actions} />
-                  <span>{`${range} ${action.label}`}</span>
+                  {narrow ? <VisuallyHidden>{text}</VisuallyHidden> : <span data-testid="rng-band-label">{text}</span>}
                 </span>
               </li>
             );
@@ -117,6 +130,18 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
           />
         )}
       </div>
+      <ul aria-label="RNG band legend" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        {model.bands.map((band) => {
+          const action = actions[band.actionIndex];
+          if (action === undefined) return null;
+          return (
+            <li key={band.actionIndex} className="flex items-center gap-1">
+              <ActionSwatch action={action} actions={actions} />
+              <span>{bandText(band, action)}</span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

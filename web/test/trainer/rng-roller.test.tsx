@@ -22,9 +22,34 @@ describe("R3.13 RngRoller", () => {
     expect(items).toHaveLength(bands.length);
     expect(items.map((item) => item.getAttribute("data-range"))).toEqual(["1-5", "6-15", "16-95", "96-100"]);
     expect(items[2]).toHaveTextContent("16-95 Raise to 2.5bb");
+    expect(items[0]).toHaveAttribute("title", "1-5 Fold");
     expect(within(items[2] as HTMLElement).getByTestId("action-swatch")).toBeInTheDocument();
     expect(screen.queryByText(/selects/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("rng-marker")).not.toBeInTheDocument();
+  });
+
+  it("R3.13 a band narrower than the label threshold shows only its swatch, with the full text in a tooltip", () => {
+    render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
+    const items = within(screen.getByRole("list", { name: "RNG bands" })).getAllByRole("listitem");
+    // 1-5 Fold and 6-15 Call are 5 and 10 rolls wide, under the threshold; 16-95 Raise is 80 wide.
+    for (const [index, text] of [[0, "1-5 Fold"], [1, "6-15 Call"], [3, "96-100 All-in 100bb"]] as const) {
+      const item = items[index] as HTMLElement;
+      expect(item).toHaveAttribute("title", text);
+      expect(within(item).getByTestId("action-swatch")).toBeInTheDocument();
+      expect(within(item).queryByTestId("rng-band-label")).not.toBeInTheDocument();
+    }
+    expect(within(items[2] as HTMLElement).getByTestId("rng-band-label")).toHaveTextContent("16-95 Raise to 2.5bb");
+  });
+
+  it("R3.13 the legend under the strip lists every band in full, so a narrow band loses no text", () => {
+    render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
+    const legend = screen.getByRole("list", { name: "RNG band legend" });
+    expect(within(legend).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "F1-5 Fold",
+      "C6-15 Call",
+      "R16-95 Raise to 2.5bb",
+      "A96-100 All-in 100bb",
+    ]);
   });
 
   it("R3.13 states the roll's selected action and marks it", () => {
