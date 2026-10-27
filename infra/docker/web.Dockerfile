@@ -11,7 +11,8 @@
 # itself, so the filtered install brings them in without the root devDependencies. The
 # runtime stage is caddy:2-alpine with a
 # Caddyfile written inline: it serves /srv and falls back to index.html for client-side
-# routes, listens on the unprivileged port 8080 and runs as a non-root user. The edge Caddy
+# routes, sends the security headers (O-261), listens on the unprivileged port 8080 and runs
+# as a non-root user. The edge Caddy
 # from infra/compose publishes the local area network (LAN) port and terminates Transport
 # Layer Security (TLS) (A5 section 1, 02 section 6.4); this container never does.
 #
@@ -49,6 +50,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 
 COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
+# The roller calls packages/learning for the RNG bands (O-213, O-262); it is pure TypeScript.
+COPY packages/learning packages/learning
 COPY web web
 # The Vite build writes web/dist (index.html plus hashed assets); the runtime stage copies it.
 RUN pnpm --filter @g-tee-oh/web run build
@@ -63,6 +66,15 @@ LABEL org.opencontainers.image.source="https://github.com/emstacho-su/g-tee-oh" 
 # admin off: no admin endpoint and no autosave, so the container needs no writable config.
 # auto_https off: TLS belongs to the edge Caddy (02 section 6.4); this one speaks plain HTTP
 # on the compose network. try_files sends unknown paths to index.html for client routes.
+# The header block puts the security headers on every response this container sends (O-261);
+# the edge Caddy passes them through, and HSTS (HTTP Strict Transport Security) stays with the
+# edge, which owns TLS (A9 section 3). The Content Security Policy (CSP) allows only this
+# origin for scripts: the production build loads one external module script and no inline
+# script (checked in S24), so script-src carries no 'unsafe-inline' and no 'unsafe-eval'.
+# style-src carries 'unsafe-inline' and nothing else does, only because Radix positions its
+# popovers, tooltips and dialogs with inline style attributes and React's style prop writes
+# style attributes; a style attribute cannot run code. img-src adds data: for inline SVG and
+# canvas exports; connect-src 'self' keeps every fetch on this origin (/api through the edge).
 COPY <<'CADDYFILE' /etc/caddy/Caddyfile
 {
 	admin off
@@ -72,6 +84,11 @@ COPY <<'CADDYFILE' /etc/caddy/Caddyfile
 :8080 {
 	root * /srv
 	encode gzip
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
 	try_files {path} /index.html
 	file_server
 }
