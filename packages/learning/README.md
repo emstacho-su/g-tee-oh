@@ -12,11 +12,11 @@ One module per A6 section 1 row located in packages/learning. Until its session 
 
 | Module | Responsibility (A6 section 1) | Session | R IDs |
 |---|---|---|---|
-| src/types.ts | GradeInput and GradeOutput (A6 section 4, with the S22 extensions below), GradeLabel, GradeMode, Grouping, GradeAction, ActionKind, Bucket, RandomSource, ModulePlaceholder | S05, S22 | R0.11, R3.8 |
+| src/types.ts | GradeInput and GradeOutput (A6 section 4, with the S22 extensions below), GradeLabel, GradeMode, Grouping, Street, GradeAction, ActionKind, Bucket, RandomSource, ModulePlaceholder | S05, S22 | R0.11, R3.8 |
 | src/grading.ts | grade: score, label, rated flag, weight and the graded action; the named constants tau, the label edges and the daily cap | S22 | R3.8 |
 | src/grouping.ts | Group keys of the Standard, Grouped and Simple modes; a group grades at its lowest-loss member | S22 | R3.8 |
 | src/actions.ts | Action kind and bucket spellings of the solver-query contract; the passive-to-aggressive order | S22 | R3.8, R3.10 |
-| src/rng-bands.ts | RNG mode bands, the roll from the injected RandomSource, the chi-square statistic | S22 | R3.10 |
+| src/rng-bands.ts | RNG mode bands, rollSelectedAction (the one entry grade() and the web roller share), the roll from the injected RandomSource, the chi-square statistic | S22 | R3.10 |
 | src/random.ts | SplitMix64 RandomSource, bit for bit the generator of solver-query (O-151) | S22 | R3.10 |
 | src/calibration.ts | Calibration stat (accuracy when sure versus unsure) and the confident-miss queue rule S30 reuses (O-89) | S22 | R3.11 |
 | src/validate.ts | Shared input checks that throw a RangeError naming the field | S22 | R3.8 |
@@ -33,7 +33,7 @@ Test-driven by design (R0.11): every vector is an it.todo whose title starts wit
 
 | File | Vectors | Source of the numbers | Green session |
 |---|---|---|---|
-| test/R3.8-grading.test.ts | Floor boundary, every label threshold, the mixed hand inside and outside the floor, the rated flag rows and the daily cap, the RNG rows, the three grouping modes, input validation, immutability, the contract spellings | 05 section 6.3 (tau 4 percent of pot, floor 0.2), 06 section 3.6, ADR 0008, ADR 0009, ADR 0020, O-210 to O-214 | S22 |
+| test/R3.8-grading.test.ts | Floor boundary, every label threshold, the mixed hand inside and outside the floor, the rated flag rows and the daily cap, the RNG rows, the three grouping modes with the preflop exact-size rule, the frequency tie tolerance, input validation, immutability (the contract spelling pin lives in services/api/test/learning-contract-spellings.test.ts, since this package reads no files) | 05 section 6.3 (tau 4 percent of pot, floor 0.2), 06 section 3.6, ADR 0008, ADR 0009, ADR 0020, O-210 to O-214 | S22 |
 | test/R3.8-grading.property.test.ts | fast-check: score monotone non-increasing in loss and 1 at or below the floor, label severity monotone in loss | A9 section 1 | S22 |
 | test/R3.10-rng-bands.test.ts | Cumulative bands passive to aggressive, the rounding rule, the chi-square over 10,000 seeded rolls with seed 20261020, pass when p is above 0.01 | 05 section 7, A6 section 6, O-90, O-213 | S22 |
 | test/R3.10-splitmix64.test.ts | SplitMix64 outputs, unit draws and rolls printed by the Rust generator in services/solver-query/src/rng.rs | O-151 | S22 |
@@ -59,18 +59,19 @@ Each is written into the relevant vector file as a todo marked "proposed"; the o
 
 ## The grading policy (S22)
 
-Mechanism: grade takes one GradeInput and returns a new GradeOutput. The chosen action's group is found under the grouping mode, the group grades at its lowest-loss member, and the score is exp(-max(0, loss - floor) / tau) with tau 4 percent of the pot (O-22, O-96). The label tests the raw loss against the floor first: at or below it the decision is Best when its group has the hand's highest summed frequency (or holds the roll-selected action in RNG mode) and Correct otherwise; above it the loss decides Inaccuracy (under 1), Mistake (1 to 5 inclusive) or Blunder (above 5). The decision is rated only in automated mode, on a first attempt, with no revealing panel, no noise flag and fewer than 150 rated decisions today in its track; a rated decision weighs 1. Every loss, the floor and every bucket come from solver-query and are never recomputed here (ADR 0004).
+Mechanism: grade takes one GradeInput, validates it once at the boundary (a RangeError names any malformed field), and returns a new GradeOutput. The chosen action's group is found under the grouping mode and the node's street, the group grades at its lowest-loss member, and the score is exp(-max(0, loss - floor) / tau) with tau 4 percent of the pot (O-22, O-96). The label tests the raw loss against the floor first: at or below it the decision is Best when its group's summed frequency is the hand's highest within FREQUENCY_TIE_TOLERANCE (1e-6, above the rounding of summed f32 frequencies), or holds the roll-selected action in RNG mode, and Correct otherwise; above it the loss decides Inaccuracy (under 1), Mistake (1 to 5 inclusive) or Blunder (above 5). The decision is rated only in automated mode, on a first attempt, with no revealing panel, no noise flag and fewer than 150 rated decisions today in its track; a rated decision weighs 1. Every loss, the floor and every bucket come from solver-query and are never recomputed here (ADR 0004).
 
 S22 extended the A6 section 4 types only where A6 is silent:
 
 | Extension | Why | O-ID |
 |---|---|---|
 | GradeInput.grouping, default standard | The three grouping modes of 05 section 6.4 | O-211 |
-| GradeInput.actions: kind, bucket, sizeCbb and lossPctPot per action in record order; required for Grouped and Simple | Grouping needs each action's loss, which only Rust computes; the band order needs kinds and sizes | O-210, O-213 |
+| GradeInput.actions: kind, bucket, sizeCbb and lossPctPot per action in record order; required for Grouped, Simple and RNG mode | Grouping needs each action's loss, which only Rust computes; the bands always follow the kind and size order | O-210, O-213 |
 | GradeInput.ratedTodayInTrack, required | The daily cap of 150; services/api owns the count and the day boundary | O-214 |
+| GradeInput.street, required | Grouped shows and grades exact sizes at a preflop node, so Grouped equals Standard there | R3.9, O-22, O-211 |
 | GradeOutput.gradedActionIndex | The action whose loss was graded, so services/api stores it and the criterion 3 recompute can follow it | O-211, O-60 |
 
-Rules decided where the specification is silent, each a proposed O-ID with its default implemented: Simple types are fold, check, call (a limp joins call), bet and raise, an all-in joins the node's bet or raise type or stands alone, and a straddle stands alone (O-211); an out-of-mix action within the floor is Correct and every action tied for the top frequency is Best (O-212); bands normalize the frequencies, round each cumulative edge half up and end at 100 (O-213); a confident miss is "sure" with Inaccuracy, Mistake or Blunder, and it moves the missed item to the front of the queue (O-215).
+Rules decided where the specification is silent, each a proposed O-ID with its default implemented: Grouped keys by kind and bucket postflop and by exact action preflop, and Simple types are fold, check, call (a limp joins call), bet and raise, an all-in joins the node's bet or raise type or stands alone, and a straddle stands alone (O-211); an out-of-mix action within the floor is Correct and every action tied for the top frequency, within FREQUENCY_TIE_TOLERANCE, is Best (O-212); bands always need the actions list, order by kind then size with all-in last, normalize the frequencies, round each cumulative edge half up and end at 100, and rollSelectedAction is the one entry both grade() and the web roller (S25) call, so they never disagree on a roll (O-213); a confident miss is "sure" with Inaccuracy, Mistake or Blunder, and it moves the missed item to the front of the queue (O-215).
 
 The solver-query grade response carries the loss of the chosen action only, so until it gains loss_pct_pot_by_action the caller grades each member of a Grouped or Simple group with one /v1/grade call and fills actions from the answers (O-210, an S23 dependency).
 
