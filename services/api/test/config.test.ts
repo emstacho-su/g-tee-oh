@@ -8,22 +8,32 @@ import {
   DEFAULT_TRUSTED_PROXIES,
   defaultAppConfig,
   loadProcessConfig,
-  parseApiPort,
 } from "../src/config.js";
+import * as configModule from "../src/config.js";
+
+const DATABASE_ENV = { PGHOST: "postgres", PGDATABASE: "gto", PGUSER: "app_login", APP_DB_PASSWORD: "secret" };
+
+function portOf(raw: string | undefined): number {
+  return loadProcessConfig({ ...DATABASE_ENV, API_PORT: raw }).port;
+}
 
 describe("@g-tee-oh/api config", () => {
   it("R0.7 API_PORT defaults to 8080 when unset or blank and accepts an integer port", () => {
-    expect(parseApiPort(undefined)).toBe(DEFAULT_API_PORT);
-    expect(parseApiPort("")).toBe(DEFAULT_API_PORT);
-    expect(parseApiPort("  ")).toBe(DEFAULT_API_PORT);
-    expect(parseApiPort("8081")).toBe(8081);
-    expect(parseApiPort(" 8081 ")).toBe(8081);
+    expect(portOf(undefined)).toBe(DEFAULT_API_PORT);
+    expect(portOf("")).toBe(DEFAULT_API_PORT);
+    expect(portOf("  ")).toBe(DEFAULT_API_PORT);
+    expect(portOf("8081")).toBe(8081);
+    expect(portOf(" 8081 ")).toBe(8081);
   });
 
   it("R0.7 API_PORT rejects anything that is not a port number", () => {
     for (const raw of ["0", "65536", "-1", "80a", "8080.5", "0x1F", "abc"]) {
-      expect(() => parseApiPort(raw), raw).toThrow(/API_PORT must be an integer/);
+      expect(() => portOf(raw), raw).toThrow(/API_PORT/);
     }
+  });
+
+  it("R0.7 the port is read only through loadProcessConfig (re-review LOW 5)", () => {
+    expect(Object.keys(configModule)).not.toContain("parseApiPort");
   });
 });
 

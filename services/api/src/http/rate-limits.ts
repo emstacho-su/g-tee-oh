@@ -18,9 +18,11 @@ export const LOGIN_RATE_LIMIT_MAX = 5;
 export const LOGIN_RATE_LIMIT = { max: LOGIN_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW } as const;
 
 /**
- * Login attempts per normalized email per window, whatever the client address (O-236 as amended
- * after the PR #20 security review): caps password guessing even from many addresses. The cost is
- * that someone hammering the owner's email can hold the owner off for one window.
+ * Failed logins per normalized email per window, whatever the client address (O-236 as amended
+ * after the PR #20 reviews): caps password guessing even from many addresses. Only failures count
+ * and a successful login resets the count, so correct logins never use up the budget; someone
+ * sending wrong passwords for the owner's email can make the owner wait until the window that
+ * their failures opened ends, at a pace the per-IP limits bound.
  */
 export const LOGIN_EMAIL_RATE_LIMIT_MAX = 10;
 export const LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;

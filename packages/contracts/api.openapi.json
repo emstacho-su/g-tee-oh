@@ -551,6 +551,286 @@
         ],
         "additionalProperties": false
       },
+      "SpotFilterWriteInput": {
+        "type": "object",
+        "properties": {
+          "game_config": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "online",
+                  "live"
+                ]
+              },
+              "table_size": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 9
+              },
+              "depths_bb": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "description": "Effective stack depths in big blinds"
+              }
+            },
+            "required": [
+              "format",
+              "table_size",
+              "depths_bb"
+            ],
+            "additionalProperties": false
+          },
+          "stake": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "A catalog stake label: 1/3, 2/5, online"
+          },
+          "sizing": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "convention",
+                    "description": "The configuration's sizing convention"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "fixed"
+                  },
+                  "open_bb": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "three_bet_bb": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "start_street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ]
+          },
+          "hero_positions": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            }
+          },
+          "villain_positions": {
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            },
+            "description": "Empty means any opponent"
+          },
+          "preflop_action": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "rfi",
+                "vs_open",
+                "srp",
+                "three_bet",
+                "vs_three_bet",
+                "four_bet",
+                "squeeze",
+                "limp_iso",
+                "straddle"
+              ]
+            }
+          },
+          "line": {
+            "type": "string",
+            "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
+            "description": "A preflop line as dot-separated action tokens, for example r250.c"
+          },
+          "board": {
+            "type": "object",
+            "properties": {
+              "high_card": {
+                "type": "string",
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "A",
+                  "K",
+                  "Q",
+                  "J",
+                  "T"
+                ]
+              },
+              "paired": {
+                "type": "boolean"
+              },
+              "suits": {
+                "type": "string",
+                "enum": [
+                  "monotone",
+                  "two_tone",
+                  "rainbow"
+                ]
+              },
+              "connectivity": {
+                "type": "string",
+                "enum": [
+                  "connected",
+                  "gapped",
+                  "disconnected"
+                ]
+              },
+              "flops": {
+                "description": "An explicit flop subset",
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([2-9TJQKA][cdhs]){3}$",
+                  "description": "Three cards, for example KhQd4s"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "hands": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "all"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "manual"
+                  },
+                  "hands": {
+                    "minItems": 1,
+                    "maxItems": 169,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                      "description": "A hand class, for example AKs"
+                    }
+                  }
+                },
+                "required": [
+                  "mode",
+                  "hands"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "close_decisions"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "alternate_seats": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "game_config",
+          "stake",
+          "sizing",
+          "start_street",
+          "hero_positions",
+          "villain_positions",
+          "preflop_action",
+          "hands",
+          "alternate_seats"
+        ],
+        "additionalProperties": false,
+        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)"
+      },
       "TrainerSettingsInput": {
         "type": "object",
         "properties": {
@@ -751,7 +1031,7 @@
             }
           },
           "spot_filter": {
-            "$ref": "#/components/schemas/SpotFilterInput"
+            "$ref": "#/components/schemas/SpotFilterWriteInput"
           },
           "trainer": {
             "$ref": "#/components/schemas/TrainerSettingsInput"
@@ -781,7 +1061,7 @@
             }
           },
           "spot_filter": {
-            "$ref": "#/components/schemas/SpotFilterInput"
+            "$ref": "#/components/schemas/SpotFilterWriteInput"
           },
           "trainer": {
             "$ref": "#/components/schemas/TrainerSettingsInput"
@@ -2104,6 +2384,286 @@
         ],
         "additionalProperties": false
       },
+      "SpotFilterWrite": {
+        "type": "object",
+        "properties": {
+          "game_config": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "online",
+                  "live"
+                ]
+              },
+              "table_size": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 9
+              },
+              "depths_bb": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "description": "Effective stack depths in big blinds"
+              }
+            },
+            "required": [
+              "format",
+              "table_size",
+              "depths_bb"
+            ],
+            "additionalProperties": false
+          },
+          "stake": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "A catalog stake label: 1/3, 2/5, online"
+          },
+          "sizing": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "convention",
+                    "description": "The configuration's sizing convention"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "fixed"
+                  },
+                  "open_bb": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "three_bet_bb": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "start_street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ]
+          },
+          "hero_positions": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            }
+          },
+          "villain_positions": {
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            },
+            "description": "Empty means any opponent"
+          },
+          "preflop_action": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "rfi",
+                "vs_open",
+                "srp",
+                "three_bet",
+                "vs_three_bet",
+                "four_bet",
+                "squeeze",
+                "limp_iso",
+                "straddle"
+              ]
+            }
+          },
+          "line": {
+            "type": "string",
+            "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
+            "description": "A preflop line as dot-separated action tokens, for example r250.c"
+          },
+          "board": {
+            "type": "object",
+            "properties": {
+              "high_card": {
+                "type": "string",
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "A",
+                  "K",
+                  "Q",
+                  "J",
+                  "T"
+                ]
+              },
+              "paired": {
+                "type": "boolean"
+              },
+              "suits": {
+                "type": "string",
+                "enum": [
+                  "monotone",
+                  "two_tone",
+                  "rainbow"
+                ]
+              },
+              "connectivity": {
+                "type": "string",
+                "enum": [
+                  "connected",
+                  "gapped",
+                  "disconnected"
+                ]
+              },
+              "flops": {
+                "description": "An explicit flop subset",
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([2-9TJQKA][cdhs]){3}$",
+                  "description": "Three cards, for example KhQd4s"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "hands": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "all"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "manual"
+                  },
+                  "hands": {
+                    "minItems": 1,
+                    "maxItems": 169,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                      "description": "A hand class, for example AKs"
+                    }
+                  }
+                },
+                "required": [
+                  "mode",
+                  "hands"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "const": "close_decisions"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "alternate_seats": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "game_config",
+          "stake",
+          "sizing",
+          "start_street",
+          "hero_positions",
+          "villain_positions",
+          "preflop_action",
+          "hands",
+          "alternate_seats"
+        ],
+        "additionalProperties": false,
+        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)"
+      },
       "TrainerSettings": {
         "type": "object",
         "properties": {
@@ -2305,7 +2865,7 @@
             }
           },
           "spot_filter": {
-            "$ref": "#/components/schemas/SpotFilter"
+            "$ref": "#/components/schemas/SpotFilterWrite"
           },
           "trainer": {
             "$ref": "#/components/schemas/TrainerSettings"
@@ -2336,7 +2896,7 @@
             }
           },
           "spot_filter": {
-            "$ref": "#/components/schemas/SpotFilter"
+            "$ref": "#/components/schemas/SpotFilterWrite"
           },
           "trainer": {
             "$ref": "#/components/schemas/TrainerSettings"

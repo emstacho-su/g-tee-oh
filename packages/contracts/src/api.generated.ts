@@ -4560,14 +4560,14 @@ export interface components {
         };
         DrillCreate: {
             name: string;
-            spot_filter: components["schemas"]["SpotFilter"];
+            spot_filter: components["schemas"]["SpotFilterWrite"];
             /** @default [] */
             tags: string[];
             trainer: components["schemas"]["TrainerSettings"];
         };
         DrillCreateInput: {
             name: string;
-            spot_filter: components["schemas"]["SpotFilterInput"];
+            spot_filter: components["schemas"]["SpotFilterWriteInput"];
             /** @default [] */
             tags: string[];
             trainer: components["schemas"]["TrainerSettingsInput"];
@@ -4592,13 +4592,13 @@ export interface components {
         };
         DrillPatch: {
             name?: string;
-            spot_filter?: components["schemas"]["SpotFilter"];
+            spot_filter?: components["schemas"]["SpotFilterWrite"];
             tags?: string[];
             trainer?: components["schemas"]["TrainerSettings"];
         };
         DrillPatchInput: {
             name?: string;
-            spot_filter?: components["schemas"]["SpotFilterInput"];
+            spot_filter?: components["schemas"]["SpotFilterWriteInput"];
             tags?: string[];
             trainer?: components["schemas"]["TrainerSettingsInput"];
         };
@@ -4871,6 +4871,116 @@ export interface components {
             villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
         };
         SpotFilterInput: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        SpotFilterWrite: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        SpotFilterWriteInput: {
             alternate_seats: boolean;
             board?: {
                 /** @enum {string} */

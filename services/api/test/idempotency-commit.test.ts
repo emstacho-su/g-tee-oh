@@ -182,6 +182,31 @@ describe("R3.1 Idempotency-Key commit, lease and purge (PR #20 review)", () => {
     expect(await drillCount(userId)).toBe(1);
   });
 
+  it("R3.1 a request whose claim was taken over mid-handler answers 409 and writes nothing (re-review LOW 4)", async () => {
+    const { userId, session } = await newSession();
+    const key = `stale-holder-${randomUUID()}`;
+    const fn = `steal_claim_${randomUUID().replaceAll("-", "")}`;
+    // Fires inside the handler's transaction, right after the drill insert, as a retry taking the
+    // claim over would: the claim_token changes under the running request.
+    await asAdmin([
+      `create function ${fn}() returns trigger language plpgsql as $$ begin
+         update idempotency_key set claim_token = gen_random_uuid() where user_id = new.user_id and key = '${key}';
+         return new; end $$`,
+      `create trigger ${fn} after insert on drill for each row execute function ${fn}()`,
+    ]);
+
+    let response;
+    try {
+      response = await postDrill(session, key);
+    } finally {
+      await asAdmin([`drop trigger ${fn} on drill`, `drop function ${fn}()`]);
+    }
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:idempotency-in-flight");
+    expect(await drillCount(userId)).toBe(0);
+  });
+
   it("R3.1 claiming a key purges the user's keys older than the retention window and keeps younger ones", async () => {
     const { userId, session } = await newSession();
     const other = await newSession();

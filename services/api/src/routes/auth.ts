@@ -3,12 +3,13 @@
  * Login is the one public mutating route: no session yet, so its CSRF (cross-site request
  * forgery) check is the Origin alone (O-230), it takes no Idempotency-Key (O-232), and it carries
  * two limits (O-236): the strict per-client-IP limit in its route config and a per-email limit
- * (LoginThrottle) that counts every attempt for an account whatever address sends it.
+ * (LoginThrottle) that counts the failed attempts for an account whatever address sends them and
+ * is reset by a successful login.
  *
- * Mechanism of login: the schema trims and lowercases the email; the per-email limit is checked;
- * the password is verified against the stored argon2id hash, or against DUMMY_PASSWORD_HASH when
- * no account matches, so a missing account costs the same time as a wrong password, and both
- * answer the same 401 problem. On success, in one transaction, the session whose cookie came with
+ * Mechanism of login: the schema trims and lowercases the email; the per-email limit is checked
+ * without counting; the password is verified against the stored argon2id hash, or against
+ * DUMMY_PASSWORD_HASH when no account matches, so a missing account costs the same time as a
+ * wrong password, and both answer the same 401 problem and count one failure for the email. On success, in one transaction, the session whose cookie came with
  * the request (if any) and the user's expired sessions are deleted and a new one is inserted
  * (sessions.ts); the response sets the session cookie (cookie.ts) and answers SessionInfo, whose
  * csrf_token the browser echoes in x-csrf-token. The lifetime is config.sessionTtlHours, absolute
@@ -86,7 +87,7 @@ function openSession(database: Database, user: UserCredentials, ttlHours: number
 }
 
 function checkEmailLimit(throttle: LoginThrottle, email: string): void {
-  const verdict = throttle.hit(email);
+  const verdict = throttle.check(email);
   if (!verdict.allowed) {
     throw new ProblemError(HTTP_STATUS.tooManyRequests, PROBLEM_SLUGS.rateLimited, {
       detail: "Too many login attempts for this account; retry later.",
@@ -116,9 +117,20 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteOptions> = (app, opti
       },
     },
     async (request, reply) => {
-      checkEmailLimit(emailThrottle, request.body.email);
+      const { email } = request.body;
+      checkEmailLimit(emailThrottle, email);
       const database = requireDatabase(app);
-      const user = await authenticateCredentials(database, request.body);
+      let user: UserCredentials;
+      try {
+        user = await authenticateCredentials(database, request.body);
+      } catch (error: unknown) {
+        // Only a rejected password counts toward the per-email limit (O-236); a database error does not.
+        if (error instanceof ProblemError && error.status === HTTP_STATUS.unauthorized) {
+          emailThrottle.recordFailure(email);
+        }
+        throw error;
+      }
+      emailThrottle.reset(email);
       const previousToken = request.cookies[SESSION_COOKIE_NAME];
       const session = await openSession(database, user, sessionTtlHours, previousToken);
       setSessionCookie(reply, session.token, session.expiresAt);

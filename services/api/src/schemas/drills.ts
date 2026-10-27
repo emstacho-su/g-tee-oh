@@ -104,8 +104,7 @@ export const handsFilterSchema = z.discriminatedUnion("mode", [
   z.strictObject({ mode: z.literal("close_decisions") }),
 ]);
 
-export const spotFilterSchema = z
-  .strictObject({
+const spotFilterShape = {
     game_config: drillGameConfigSchema,
     stake: z.string().min(1).max(MAX_STAKE_LABEL_LENGTH).describe("A catalog stake label: 1/3, 2/5, online"),
     sizing: sizingSchema,
@@ -117,9 +116,23 @@ export const spotFilterSchema = z
     board: boardFilterSchema.optional(),
     hands: handsFilterSchema,
     alternate_seats: z.boolean(),
-  })
+};
+
+/**
+ * The spot filter as stored and served: its shape only. Rows are read and responses are checked
+ * against this, so a drill written before a cross-field rule existed still lists (the rules apply
+ * when a drill is written, not when it is read).
+ */
+export const storedSpotFilterSchema = z.strictObject(spotFilterShape).meta({ id: "SpotFilter" });
+
+/** The spot filter a request writes: the shape plus the cross-field rules (spot-filter-rules.ts). */
+export const spotFilterSchema = z
+  .strictObject(spotFilterShape)
   .superRefine(checkSpotFilter)
-  .meta({ id: "SpotFilter" });
+  .meta({
+    id: "SpotFilterWrite",
+    description: "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)",
+  });
 
 export const trainerSettingsSchema = z
   .strictObject({
@@ -146,7 +159,7 @@ export const drillSchema = z
     id: uuidSchema,
     name: z.string(),
     tags: z.array(z.string()),
-    spot_filter: spotFilterSchema,
+    spot_filter: storedSpotFilterSchema,
     trainer: trainerSettingsSchema,
     created_at: timestampSchema,
     updated_at: timestampSchema,

@@ -9,7 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ApiApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
 import { drillPatchBodySchema, spotFilterSchema, type SpotFilter } from "../src/schemas/drills.js";
-import { buildTestApp, mutatingHeaders } from "./support/app.js";
+import { sql } from "kysely";
+
+import { buildTestApp, mutatingHeaders, readHeaders } from "./support/app.js";
 import { appDatabase, createTestSession, createTestUser } from "./support/database.js";
 
 const VALID: SpotFilter = {
@@ -127,5 +129,40 @@ describe("R3.14 spot filter rules at the HTTP boundary (M4)", () => {
     expect(response.json<{ type: string; errors: Array<{ path: string }> }>()).toMatchObject({
       type: "urn:g-tee-oh:problem:validation",
     });
+  });
+
+  it("R3.14 a stored drill written before the rules (a legacy row) still lists and reads (re-review LOW 3)", async () => {
+    const user = await createTestUser(database);
+    const session = await createTestSession(database, user.id);
+    const legacy = withFields({ hero_positions: ["BTN", "BTN"], villain_positions: ["BTN"], stake: "online" });
+    const trainer = {
+      stop_rule: "after_action",
+      input: "actions",
+      grouping: "standard",
+      rng: false,
+      pause: "never",
+      speed: "normal",
+      quick_result: false,
+      tables: 1,
+      timebank_s: null,
+      panels: {},
+    };
+    const row = await database
+      .insertInto("drill")
+      .values({
+        user_id: user.id,
+        name: "legacy",
+        spot_filter: sql`cast(${JSON.stringify(legacy)} as jsonb)`,
+        trainer_settings: sql`cast(${JSON.stringify(trainer)} as jsonb)`,
+      })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+
+    const list = await app.inject({ method: "GET", url: "/api/v1/drills", headers: readHeaders(session) });
+    const one = await app.inject({ method: "GET", url: `/api/v1/drills/${row.id}`, headers: readHeaders(session) });
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([row.id]);
+    expect(one.statusCode).toBe(200);
   });
 });

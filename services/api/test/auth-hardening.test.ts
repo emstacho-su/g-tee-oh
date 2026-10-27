@@ -209,4 +209,30 @@ describe("R3.1 auth and request hardening (PR #20 review)", () => {
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers["retry-after"]).toBeDefined();
   });
+
+  it("R3.1 correct logins never consume the per-email budget (re-review MEDIUM 1)", async () => {
+    const user = await createTestUser(database);
+    for (let attempt = 0; attempt <= LOGIN_EMAIL_RATE_LIMIT_MAX; attempt += 1) {
+      const response = await login({ email: user.email, password: user.password });
+      expect(response.statusCode, `correct login ${attempt}`).toBe(200);
+    }
+    const failures: number[] = [];
+    for (let attempt = 0; attempt < LOGIN_EMAIL_RATE_LIMIT_MAX; attempt += 1) {
+      failures.push((await login({ email: user.email, password: `wrong-${attempt}` })).statusCode);
+    }
+    expect(failures.every((status) => status === 401)).toBe(true);
+  });
+
+  it("R3.1 a successful login resets the email's failure count (re-review MEDIUM 1)", async () => {
+    const user = await createTestUser(database);
+    const statuses: number[] = [];
+    for (let round = 0; round < 2; round += 1) {
+      for (let attempt = 0; attempt < LOGIN_EMAIL_RATE_LIMIT_MAX - 1; attempt += 1) {
+        statuses.push((await login({ email: user.email, password: `wrong-${round}-${attempt}` })).statusCode);
+      }
+      statuses.push((await login({ email: user.email, password: user.password })).statusCode);
+    }
+    expect(statuses).not.toContain(429);
+    expect(statuses.filter((status) => status === 200)).toHaveLength(2);
+  });
 });
