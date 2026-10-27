@@ -153,6 +153,7 @@ fn env(config: &Config) -> Env<PgQueue> {
         worker_id: "integration-test".to_owned(),
         builder_threads: 4,
         status: Arc::new(Status::default()),
+        limits: library_builder::settings::Limits::default(),
     }
 }
 

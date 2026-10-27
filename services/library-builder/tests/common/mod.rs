@@ -94,6 +94,7 @@ pub fn env_with(queue: MemQueue, solver: Arc<dyn LineSolver>, root: &Path) -> En
         worker_id: WORKER.to_owned(),
         builder_threads: 2,
         status: Arc::new(Status::default()),
+        limits: library_builder::settings::Limits::default(),
     }
 }
 

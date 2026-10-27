@@ -262,6 +262,7 @@ fn database_env(config: &Config) -> Result<Env<PgQueue>, BuilderError> {
         worker_id: config.worker_id.clone(),
         builder_threads: config.threads,
         status: Arc::new(Status::default()),
+        limits: library_builder::settings::Limits::default(),
     })
 }
 

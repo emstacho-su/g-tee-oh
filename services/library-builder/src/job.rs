@@ -71,6 +71,8 @@ pub struct Env<Q: JobQueue> {
     pub builder_threads: usize,
     /// The shared status `/healthz` and `/metrics` read.
     pub status: Arc<Status>,
+    /// The environment ceilings every setting read is clamped to (`settings::Limits`).
+    pub limits: crate::settings::Limits,
 }
 
 /// Everything a build needs once its row is resolved.

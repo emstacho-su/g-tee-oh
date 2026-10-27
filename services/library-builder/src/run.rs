@@ -75,7 +75,7 @@ fn due(last: u64, now: u64, interval_seconds: u64) -> bool {
 /// errors when they changed.
 async fn read_settings<Q: JobQueue>(env: &Env<Q>) -> Result<BuilderSettings, BuilderError> {
     let rows = env.queue.settings().await?;
-    let (settings, errors) = BuilderSettings::from_rows(&rows);
+    let (settings, errors) = BuilderSettings::from_rows_with(&rows, &env.limits);
     if env.status.view().settings_errors != errors {
         for error in &errors {
             tracing::warn!(key = %error.key, reason = %error.reason, "setting falls back");

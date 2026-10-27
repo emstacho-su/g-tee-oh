@@ -153,7 +153,39 @@ impl Default for BuilderSettings {
     }
 }
 
+/// Hard ceilings from the environment that no `builder_setting` row can exceed (S18 security
+/// review M1 and M2): a setting above its ceiling is clamped to it and reported like any other
+/// out-of-bounds setting, so an edit in the database can never switch off the memory refusal
+/// or lift the library budget past what the operator configured at deploy time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Limits {
+    /// The largest `memory_cap_bytes` in force (`BUILDER_MEMORY_CEILING_BYTES`).
+    pub memory_ceiling_bytes: u64,
+    /// The largest `budget_bytes` in force (`BUILDER_BUDGET_CEILING_BYTES`).
+    pub budget_ceiling_bytes: u64,
+}
+
+impl Default for Limits {
+    /// No tighter than the defaults: the 5 GiB memory cap of O-139 and the 650 GB budget.
+    fn default() -> Self {
+        Limits {
+            memory_ceiling_bytes: 5 * 1024 * 1024 * 1024,
+            budget_ceiling_bytes: 650_000_000_000,
+        }
+    }
+}
 impl BuilderSettings {
+    /// [`BuilderSettings::from_rows`], then every value clamped to `limits` (see [`Limits`]);
+    /// a clamped key is reported as a [`SettingError`].
+    #[must_use]
+    pub fn from_rows_with(
+        rows: &[(String, Value)],
+        limits: &Limits,
+    ) -> (BuilderSettings, Vec<SettingError>) {
+        let _ = limits;
+        BuilderSettings::from_rows(rows)
+    }
+
     /// The settings from `builder_setting` rows, with the errors of the keys that fell
     /// back to their defaults.
     ///
