@@ -13,7 +13,7 @@ use serde_json::Value;
 
 use super::{
     BudgetGate, Claim, ClaimedJob, Failure, FailureOutcome, JobQueue, PlanWrite, Publication,
-    PublishedBuild, job_key, row_k_and_priority,
+    PublishedBuild, Unavailable, job_key, row_k_and_priority,
 };
 use crate::error::BuilderError;
 use crate::notify::{
@@ -446,6 +446,7 @@ impl JobQueue for MemQueue {
         &self,
         worker_id: &str,
         _stale_hours: u32,
+        _max_attempts: i16,
     ) -> impl Future<Output = Result<u64, BuilderError>> + Send {
         let mut state = self.lock();
         let mut requeued = 0;
@@ -557,10 +558,9 @@ impl JobQueue for MemQueue {
 
     fn mark_unavailable(
         &self,
-        solution_id: &str,
-        reason: &str,
+        build: &Unavailable,
     ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        self.lock().mark_unavailable(solution_id, reason);
+        self.lock().mark_unavailable(&build.solution_id, &build.reason);
         ready(Ok(()))
     }
 
@@ -653,7 +653,13 @@ mod tests {
         assert_eq!(state.ledger_bytes, 80);
         let builds = queue.published_builds().await.expect("builds");
         assert_eq!(builds.len(), 1);
-        queue.mark_unavailable("b2", "checksum").await.expect("marks");
+        let broken = crate::queue::Unavailable {
+            solution_id: "b2".to_owned(),
+            tree_config_hash: None,
+            bytes: 0,
+            reason: "checksum".to_owned(),
+        };
+        queue.mark_unavailable(&broken).await.expect("marks");
         assert_eq!(queue.job("a2").expect("job").status, "queued");
         assert_eq!(queue.job("a2").expect("job").attempts, 0);
         assert_eq!(queue.published_builds().await.expect("builds"), Vec::new());

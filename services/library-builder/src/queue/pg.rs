@@ -19,6 +19,7 @@ use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
 
 use super::{
     BudgetGate, Claim, Failure, FailureOutcome, JobQueue, PlanWrite, Publication, PublishedBuild,
+    Unavailable,
 };
 use crate::config::{DatabaseConfig, SslMode};
 use crate::error::BuilderError;
@@ -88,7 +89,12 @@ impl JobQueue for PgQueue {
         Ok(rows)
     }
 
-    async fn reclaim_stale(&self, worker_id: &str, stale_hours: u32) -> Result<u64, BuilderError> {
+    async fn reclaim_stale(
+        &self,
+        worker_id: &str,
+        stale_hours: u32,
+        _max_attempts: i16,
+    ) -> Result<u64, BuilderError> {
         let hours = i32::try_from(stale_hours).unwrap_or(i32::MAX);
         let requeued = sqlx::query(
             "update build_job set status = 'queued', locked_by = null, locked_at = null, \
@@ -188,8 +194,8 @@ impl JobQueue for PgQueue {
             .collect())
     }
 
-    async fn mark_unavailable(&self, solution_id: &str, reason: &str) -> Result<(), BuilderError> {
-        tx::mark_unavailable(&self.pool, solution_id, reason).await
+    async fn mark_unavailable(&self, build: &Unavailable) -> Result<(), BuilderError> {
+        tx::mark_unavailable(&self.pool, &build.solution_id, &build.reason).await
     }
 
     async fn queue_depth(&self) -> Result<Vec<(String, i64)>, BuilderError> {

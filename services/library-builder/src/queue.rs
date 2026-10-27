@@ -238,18 +238,36 @@ pub struct PublishedBuild {
     pub manifest_uri: String,
 }
 
+/// A published build the verify pass found broken (O-186; PR #22 review HIGH 1, HIGH 2,
+/// H1): its solution, the tree hash of its job's key (from the manifest) so only that job
+/// is re-queued, and its bytes so the ledger gives them back in the same transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unavailable {
+    /// The solution id.
+    pub solution_id: String,
+    /// The job key's tree hash; without it no job is re-queued.
+    pub tree_config_hash: Option<Vec<u8>>,
+    /// The bytes the build added to the library.
+    pub bytes: u64,
+    /// Why, written to the job's error.
+    pub reason: String,
+}
+
 /// The queue the loop runs against. Futures are `Send` so the loop can run on any
 /// runtime thread.
 pub trait JobQueue: Send + Sync {
     /// Every `builder_setting` row.
     fn settings(&self) -> impl Future<Output = Result<Vec<(String, Value)>, BuilderError>> + Send;
 
-    /// Re-queues `running` rows locked by `worker_id` or locked longer than
-    /// `stale_hours` (O-185); attempts are kept. Returns the rows re-queued.
+    /// Re-queues `running` rows a previous process of this worker left, or locked longer
+    /// than `stale_hours` (O-185); each reclaim counts as an attempt and parks the job at
+    /// `max_attempts`, so a job that kills its worker cannot loop forever (review M1).
+    /// Returns the rows re-queued or parked.
     fn reclaim_stale(
         &self,
         worker_id: &str,
         stale_hours: u32,
+        max_attempts: i16,
     ) -> impl Future<Output = Result<u64, BuilderError>> + Send;
 
     /// T1: claims the queue head, or the job `job_id` when given (`--once --job`).
@@ -315,11 +333,11 @@ pub trait JobQueue: Send + Sync {
         &self,
     ) -> impl Future<Output = Result<Vec<PublishedBuild>, BuilderError>> + Send;
 
-    /// Marks a solution `unavailable` and re-queues its job with attempts reset (O-186).
+    /// Marks a solution `unavailable`, re-queues its own job with attempts reset and gives
+    /// its bytes back to the ledger (O-186, see [`Unavailable`]).
     fn mark_unavailable(
         &self,
-        solution_id: &str,
-        reason: &str,
+        build: &Unavailable,
     ) -> impl Future<Output = Result<(), BuilderError>> + Send;
 
     /// Rows per status, for `/metrics`.

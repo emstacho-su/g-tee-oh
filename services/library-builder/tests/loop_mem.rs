@@ -244,7 +244,7 @@ async fn r2_17_stale_reclaim_requeues_this_workers_running_rows() {
         panic!("a job");
     };
     assert_eq!(queue.job("job-1").expect("job").status, "running");
-    let requeued = queue.reclaim_stale(WORKER, 6).await.expect("the reclaim");
+    let requeued = queue.reclaim_stale(WORKER, 6, 3).await.expect("the reclaim");
     assert_eq!(requeued, 1);
     let job = queue.job("job-1").expect("job");
     assert_eq!(job.status, "queued");

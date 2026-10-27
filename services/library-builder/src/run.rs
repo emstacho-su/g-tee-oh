@@ -22,7 +22,7 @@ use crate::error::BuilderError;
 use crate::job::now_epoch_seconds;
 use crate::job::{Env, JobOutcome, RunSummary, catalog_config, minute_of_day_utc, run_job};
 use crate::notify::{BuilderState, StatePayload};
-use crate::queue::{BudgetGate, Claim, JobQueue, PlanWrite};
+use crate::queue::{BudgetGate, Claim, JobQueue, PlanWrite, Unavailable};
 use crate::settings::BuilderSettings;
 
 /// Consecutive failed ticks the loop retries before it stops with the error.
@@ -143,7 +143,10 @@ async fn reclaim_if_due<Q: JobQueue>(
     if !due(clock.last_reclaim, now, u64::from(settings.stale_hours) * SECONDS_PER_HOUR) {
         return Ok(());
     }
-    let requeued = env.queue.reclaim_stale(&env.worker_id, settings.stale_hours).await?;
+    let requeued = env
+        .queue
+        .reclaim_stale(&env.worker_id, settings.stale_hours, settings.max_attempts)
+        .await?;
     if requeued > 0 {
         tracing::info!(requeued, "stale running jobs re-queued");
     }
@@ -374,7 +377,13 @@ pub async fn verify_once<Q: JobQueue>(env: &Env<Q>) -> Result<VerifyReport, Buil
         if let Err(err) = target.verify_build(prefix).await {
             tracing::warn!(solution_id = %build.solution_id, error = %err,
                 "published build failed verification");
-            env.queue.mark_unavailable(&build.solution_id, &err.to_string()).await?;
+            let broken = Unavailable {
+                solution_id: build.solution_id.clone(),
+                tree_config_hash: None,
+                bytes: 0,
+                reason: err.to_string(),
+            };
+            env.queue.mark_unavailable(&broken).await?;
             report.unavailable.push(build.solution_id);
         }
     }
