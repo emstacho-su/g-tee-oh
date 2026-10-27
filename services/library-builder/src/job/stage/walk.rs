@@ -2,13 +2,18 @@
 //! is written (02 section 3.2 step 4), writes the flop file from the root street, then
 //! extracts and writes each runout's file as the solver hands it over and drops the walked
 //! nodes, so a line holds at most one runout beside the solved game (A2 section 3).
+//!
+//! After each runout file is written the walk reports the line's final iteration and gains
+//! to the line's progress sink, which forwards at most one report per `PROGRESS_INTERVAL`.
+//! The report refreshes the job's `locked_at`, so a long walk of many runouts after the
+//! solve is never taken by the stale reclaim (PR #22 re-review LOW 3).
 
 use gto_library::{
     ChunkOptions, FileRef, FsStore, LibraryError, LineEntry, LineWritten, ObjectSink, RunoutSpec,
     narrow_f32, runout_file_path, write_line_files, write_tree_file,
 };
 use gto_model::PositionPair;
-use gto_solve::postflop::{NodeStrategy, SolveReport};
+use gto_solve::postflop::{NodeStrategy, ProgressSink, SolveReport};
 
 use super::check_target;
 use crate::error::BuilderError;
@@ -29,6 +34,8 @@ pub(super) struct LinePlace<'a> {
     pub seed: u64,
     /// The exploitability target, percent of the pot.
     pub target_pct_pot: f32,
+    /// The line's rate-limited progress sink, told after each runout file is written.
+    pub heartbeat: &'a (dyn ProgressSink + Sync),
 }
 
 /// The head of a walked line once its flop file is written.
@@ -156,6 +163,10 @@ impl LineWalk for StageWalk<'_> {
         )?;
         self.runout_bytes.push(counting.last_bytes);
         self.runout_files.push((raw, file));
+        if let Some(head) = &self.head {
+            let report = &head.report;
+            self.place.heartbeat.report(report.iterations, Some(report.exploitability_pct_pot));
+        }
         Ok(())
     }
 }

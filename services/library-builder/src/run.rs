@@ -1,8 +1,10 @@
 //! The claim loop (plan section C), `--once`, the planner pass and the verify pass.
 //!
 //! [`tick`] is one iteration: read the settings (every claim, R2.18); publish the state on
-//! change (`paused`, `throttled`, `running`, `idle`); when paused, claim nothing; run the
-//! stale reclaim when due (O-185); claim under the budget gate (T1); run the job; when the
+//! change (`paused`, `throttled`, `running`, `idle`); when paused, claim nothing; take or
+//! check this process's liveness signal (`JobQueue::hold_liveness`, which `--once` takes
+//! too, so the reclaim of another process never takes its job); run the stale reclaim when
+//! due (O-185); claim under the budget gate (T1); run the job; when the
 //! queue is empty, run the planner when due. [`run_loop`] repeats it, sleeping
 //! `poll_seconds` when paused or idle, until shutdown. Beside it, [`run_loop`] spawns the
 //! verify pass (O-186) as its own tokio task with its own schedule (see [`verify`]), so a
@@ -194,6 +196,7 @@ async fn tick_with_settings<Q: JobQueue>(
         set_state(env, BuilderState::Paused, "the paused setting is on".to_owned()).await?;
         return Ok((TickOutcome::Paused, settings));
     }
+    env.queue.hold_liveness(&env.worker_id).await?;
     reclaim_if_due(env, clock, now, &settings).await?;
     let gate = BudgetGate::from_planner(&settings.planner);
     let outcome = match env.queue.claim(&env.worker_id, None, &gate).await? {
@@ -298,6 +301,7 @@ pub async fn run_once<Q: JobQueue>(
     job_id: Option<&str>,
 ) -> Result<RunSummary, BuilderError> {
     let settings = read_settings(env).await?;
+    env.queue.hold_liveness(&env.worker_id).await?;
     let gate = BudgetGate::from_planner(&settings.planner);
     let job = match env.queue.claim(&env.worker_id, job_id, &gate).await? {
         Claim::Job(job) => job,

@@ -258,6 +258,7 @@ fn stage_line(
         tree_hash: &frame.tree_hash,
         seed: inputs.seed,
         target_pct_pot: inputs.settings.target_pct_pot,
+        heartbeat: &sink,
     };
     let mut walk = StageWalk::new(store, place, context);
     let started = Instant::now();

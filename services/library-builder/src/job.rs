@@ -365,8 +365,17 @@ async fn stage_off_thread<Q: JobQueue>(
     handle.await.map_err(|err| BuilderError::io(staging, std::io::Error::other(err.to_string())))?
 }
 
-/// Uploads, verifies and publishes a staged build; on any failure the uploaded objects
-/// are deleted best effort (O-184).
+/// Refreshes the job's `locked_at` between the long steps after staging (PR #22 re-review
+/// LOW 3). A failed refresh is logged: the publish's lock check is what decides.
+async fn touch<Q: JobQueue>(env: &Env<Q>, job_id: &str) {
+    if let Err(err) = env.queue.touch(job_id, &env.worker_id).await {
+        tracing::warn!(job_id = %job_id, error = %err, "locked_at was not refreshed");
+    }
+}
+
+/// Uploads, verifies and publishes a staged build, refreshing the lock after the upload and
+/// after the read-back; on any failure the uploaded objects are deleted best effort
+/// (O-184).
 async fn upload_and_publish<Q: JobQueue>(
     env: &Env<Q>,
     target: &LibraryTarget,
@@ -376,7 +385,9 @@ async fn upload_and_publish<Q: JobQueue>(
 ) -> Result<(StagedBuild, u64), BuilderError> {
     let attempt = async {
         let uploaded = target.upload_build(staging, &staged.prefix).await?;
+        touch(env, &inputs.job_id).await;
         target.verify_build(&staged.prefix).await?;
+        touch(env, &inputs.job_id).await;
         env.queue.publish(&env.worker_id, &publication(inputs, &staged)).await?;
         Ok::<u64, BuilderError>(uploaded)
     }
