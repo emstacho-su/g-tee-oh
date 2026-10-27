@@ -4,6 +4,7 @@
 // never re-parsed by a shell and a path or sha cannot inject a command.
 
 import { spawnSync } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 
 // The sha of git's empty tree, used as a diff base when HEAD has no parent.
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -59,6 +60,30 @@ function logRange(rangeArgs) {
 export function topLevel(options) {
   const result = git(['rev-parse', '--show-toplevel'], { ...options, allowFailure: true });
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+const WORKTREE_PREFIX = 'worktree ';
+const BARE_LINE = 'bare';
+
+// The main working tree from "git worktree list --porcelain" output: git always
+// lists it first. Null when that entry is bare, or its path is missing, not
+// absolute, or quoted by git because it holds unusual characters.
+export function parseMainWorkTree(porcelain) {
+  const lines = String(porcelain).split(/\r?\n/);
+  const blankAt = lines.indexOf('');
+  const entry = blankAt === -1 ? lines : lines.slice(0, blankAt);
+  const first = entry[0] ?? '';
+  if (!first.startsWith(WORKTREE_PREFIX)) return null;
+  if (entry.some((line) => line.trim() === BARE_LINE)) return null;
+  const path = first.slice(WORKTREE_PREFIX.length).trim();
+  return path !== '' && isAbsolute(path) ? path : null;
+}
+
+// The main working tree of the repository at cwd, or null when git fails or the
+// repository is bare (a bare repository has no main working tree).
+export function mainWorkTree(options) {
+  const result = git(['worktree', 'list', '--porcelain'], { ...options, allowFailure: true });
+  return result.status === 0 ? parseMainWorkTree(result.stdout) : null;
 }
 
 export function commitExists(ref, options) {

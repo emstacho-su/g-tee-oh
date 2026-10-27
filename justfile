@@ -207,16 +207,20 @@ coverage-library:
     cargo llvm-cov -p gto-library -p library-pack --features gto-library/synthetic \
         --ignore-filename-regex "(gto-model|vendor|gto-solve)" --fail-under-lines 80
 
+# Line coverage of gto-planner and library-builder at the 80% gate (S18, R2.16 to R2.18); needs cargo-llvm-cov and the dev stack
 # The ignored tests run too (--include-ignored), so the database and bucket paths count: bring the
 # dev stack up first (just dev-up, just db-migrate) with .env exported, as the integration tests
 # need. The two real-engine flop solves of tests/engine.rs are skipped by name (O-141, O-178);
 # they run once in release at the gate. One test thread, because builder_setting is global.
-# Line coverage of gto-planner and library-builder at the 80% gate (S18, R2.16 to R2.18); needs cargo-llvm-cov and the dev stack
 coverage-builder:
     cargo llvm-cov -p gto-planner -p library-builder \
         --ignore-filename-regex "(gto-model|vendor|gto-solve|gto-tree|gto-library|library-pack)" \
         --fail-under-lines 80 -- --include-ignored --test-threads=1 \
         --skip r2_12_a_suit_permuted_solve --skip r2_17_the_tiny_spec_stages
+
+# Statement, branch, function and line coverage of packages/learning at the 80% gate (S22, A9 section 1)
+coverage-learning:
+    pnpm --filter @g-tee-oh/learning coverage
 
 # Line coverage of solver-query at the 80% gate (O-134, plan D.9); needs cargo-llvm-cov
 coverage-solver-query:
@@ -293,4 +297,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test coverage-learning ts-boundary report-check licenses security guard-test test-tags

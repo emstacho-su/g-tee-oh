@@ -30,6 +30,7 @@ import {
   parseUnifiedDiff,
   pathLines,
 } from './guard.mjs';
+import { findSalt } from './private-dir.mjs';
 
 const EXIT_CLEAN = 0;
 const EXIT_FINDINGS = 1;
@@ -40,7 +41,6 @@ const MODES = ['staged', 'ci', 'history', 'paths', 'message'];
 const GUARD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PATTERNS_PATH = join(GUARD_DIR, 'patterns.json');
 const DEFAULT_DENYLIST_PATH = join(GUARD_DIR, 'denylist.sha256');
-const PRIVATE_SALT_RELATIVE = join('.guard-private', 'salt');
 
 export const MISSING_SALT_MESSAGE =
   'guard: GUARD_SALT is not set and .guard-private/salt is missing; the identifier check cannot run (fail closed, O-58)';
@@ -93,15 +93,13 @@ function loadDenylist() {
   return parseDenylist(text);
 }
 
-// GUARD_SALT wins; otherwise the local file under .guard-private/ at the repo
-// root. The salt is used in memory only and never printed.
+// GUARD_SALT wins; otherwise the first non-empty .guard-private/salt, at the
+// repo root and then, in a linked worktree, at the main working tree. The salt
+// is used in memory only and never printed.
 function resolveSalt(repoRoot) {
   const fromEnv = process.env.GUARD_SALT;
   if (fromEnv !== undefined && fromEnv.trim() !== '') return fromEnv.trim();
-  const saltPath = join(repoRoot, PRIVATE_SALT_RELATIVE);
-  if (!existsSync(saltPath)) return null;
-  const salt = readFileSync(saltPath, 'utf8').trim();
-  return salt === '' ? null : salt;
+  return findSalt(repoRoot)?.salt ?? null;
 }
 
 // Files git calls binary are read back as blobs: a UTF-16 file (PowerShell's default
