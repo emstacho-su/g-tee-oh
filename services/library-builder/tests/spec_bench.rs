@@ -14,7 +14,9 @@ use library_builder::bench::{
     write_report,
 };
 use library_builder::error::BuilderError;
-use library_builder::job::{LineSummary, RunSummary};
+use library_builder::job::{
+    LineSummary, PEAK_SOURCE_CGROUP, PeakMemory, ProcSnapshot, RunSummary, RuntimeMachine,
+};
 use library_builder::ranges::{FixtureRanges, RangeSource};
 use library_builder::settings::BuilderSettings;
 use library_builder::spec::{Sweep, SweepLine, inputs, load};
@@ -143,6 +145,33 @@ fn r2_18_a_malformed_ranges_fixture_is_named() {
     assert!(matches!(FixtureRanges::load(&path), Err(BuilderError::Malformed { .. })));
 }
 
+/// The memory of a container run whose cgroup `memory.peak` reads `cgroup_peak` and whose
+/// process `VmHWM` reads `vm_hwm_kib` kibibytes.
+fn container_memory(vm_hwm_kib: u64, cgroup_peak: u64) -> PeakMemory {
+    PeakMemory::from_snapshot(&ProcSnapshot {
+        status: Some(format!("VmHWM:\t{vm_hwm_kib} kB\n")),
+        cgroup_memory_peak: Some(format!("{cgroup_peak}\n")),
+        cgroup_memory_max: Some("5368709120\n".to_owned()),
+        dockerenv: true,
+        ..ProcSnapshot::default()
+    })
+}
+
+/// The machine of the committed bench run: the linux/amd64 image under
+/// `docker run --memory 5g`.
+fn container_machine() -> RuntimeMachine {
+    RuntimeMachine {
+        os: "Debian GNU/Linux 12 (bookworm)".to_owned(),
+        platform: "linux/amd64".to_owned(),
+        cpu: "AMD Ryzen AI 9 465 w/ Radeon 880M".to_owned(),
+        cores: 20,
+        memory_gb: 15,
+        container: true,
+        cgroup_memory_limit_bytes: Some(5_368_709_120),
+    }
+}
+
+/// A staged one-line run in a container whose judged (cgroup) peak is `peak` bytes.
 fn summary(peak: u64, seconds: f64, gains: [f64; 2]) -> RunSummary {
     RunSummary {
         job_id: "spec".to_owned(),
@@ -160,7 +189,8 @@ fn summary(peak: u64, seconds: f64, gains: [f64; 2]) -> RunSummary {
             runout_bytes: vec![2_000_000; 20],
         }],
         bytes_written: 40_700_000,
-        peak_rss_bytes: peak,
+        memory: container_memory(1_000, peak),
+        machine: container_machine(),
         seconds: seconds + 20.0,
     }
 }
@@ -205,7 +235,7 @@ fn r2_18_the_bench_report_validates_against_the_report_schema() {
     };
     let judged = summary(3_000_000_000, 900.0, [0.2, 0.29]);
     let informational = summary(2_000_000_000, 700.0, [0.45, 0.48]);
-    let machine = machine("zenbook");
+    let machine = machine("zenbook", &judged.machine);
     assert_eq!(machine.name, "zenbook");
     assert!(machine.cores >= 1 && machine.memory_gb >= 1 && !machine.cpu.is_empty());
     let report = report_json(
@@ -256,4 +286,83 @@ fn r2_18_the_bench_report_validates_against_the_report_schema() {
         std::fs::read_to_string(dir.path().join("bench-flop-line-zenbook.md")).expect("md"),
         markdown
     );
+}
+
+#[test]
+fn r2_18_o50_judges_the_judged_peak_only() {
+    let under = summary(4_000_000_000, 1_000.0, [0.25, 0.25]);
+    assert_eq!(under.memory.peak_source, PEAK_SOURCE_CGROUP);
+    assert!(o50_verdict(&under).pass, "a cgroup peak under 5 GB passes");
+
+    let hidden = RunSummary { memory: container_memory(1_000_000, 6_000_000_000), ..under.clone() };
+    assert_eq!(hidden.memory.peak_rss_bytes, Some(1_024_000_000), "VmHWM is under 5 GB");
+    let verdict = o50_verdict(&hidden);
+    assert!(!verdict.pass, "the cgroup peak is judged in a container: {verdict:?}");
+    assert!(verdict.reasons.iter().any(|r| r.contains("6000000000")), "{verdict:?}");
+
+    let unmeasured =
+        RunSummary { memory: PeakMemory::from_snapshot(&ProcSnapshot::default()), ..under.clone() };
+    assert_eq!(unmeasured.memory.judged_peak_bytes, None);
+    let verdict = o50_verdict(&unmeasured);
+    assert!(!verdict.pass, "no true peak can never pass O-50");
+    assert!(verdict.reasons.iter().any(|r| r.contains("no true peak")), "{verdict:?}");
+
+    let report = report_json(
+        &unmeasured,
+        None,
+        None,
+        &machine("zenbook", &under.machine),
+        &"c".repeat(40),
+        "2026-10-27T12:00:00Z",
+    );
+    assert_eq!(report["pass"], false);
+    let peak = report["measurements"]
+        .as_array()
+        .expect("measurements")
+        .iter()
+        .find(|m| m["id"] == "flop-line/peak-rss")
+        .expect("the judged peak row");
+    assert_eq!(peak["pass"], false, "a failing report has a failing judged row: {peak}");
+}
+
+#[test]
+fn r2_18_the_machine_block_is_where_the_run_happened() {
+    let judged = summary(1_595_564_032, 396.8, [0.25, 0.28]);
+    let block = machine("zenbook", &judged.machine);
+    assert_eq!(block.os, "Debian GNU/Linux 12 (bookworm), linux/amd64 container on the Zenbook");
+    assert_eq!(block.cpu, "AMD Ryzen AI 9 465 w/ Radeon 880M");
+    assert_eq!((block.cores, block.memory_gb), (20, 15));
+    assert!(block.container);
+    assert_eq!(block.cgroup_memory_limit_bytes, Some(5_368_709_120));
+    let report = report_json(&judged, None, None, &block, &"d".repeat(40), "2026-10-27T12:00:00Z");
+    assert_eq!(report["machine"]["container"], true);
+    assert_eq!(report["machine"]["cgroup_memory_limit_bytes"], 5_368_709_120_u64);
+    let notes = report["notes"].as_str().expect("notes");
+    assert!(notes.contains("linux/amd64 container"), "{notes}");
+    assert!(notes.contains("cgroup memory.peak"), "{notes}");
+    let ids: Vec<&str> = report["measurements"]
+        .as_array()
+        .expect("measurements")
+        .iter()
+        .filter_map(|m| m["id"].as_str())
+        .collect();
+    assert!(ids.contains(&"flop-line/vm-hwm") && ids.contains(&"flop-line/cgroup-memory-peak"));
+
+    let host = RuntimeMachine {
+        container: false,
+        cgroup_memory_limit_bytes: None,
+        os: "Windows 11 Home".to_owned(),
+        platform: "windows/amd64".to_owned(),
+        ..container_machine()
+    };
+    assert_eq!(machine("zenbook", &host).os, "Windows 11 Home, windows/amd64 on the Zenbook");
+}
+
+#[test]
+fn r2_18_a_summary_round_trips_through_its_file() {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let path = dir.path().join("summary.json");
+    let written = summary(1_595_564_032, 396.8, [0.25, 0.28]);
+    std::fs::write(&path, serde_json::to_string(&written).expect("serializes")).expect("writes");
+    assert_eq!(library_builder::bench::read_summary(&path).expect("reads"), written);
 }

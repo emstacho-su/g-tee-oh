@@ -34,10 +34,14 @@ use gto_library::{MANIFEST_FILE, Manifest, narrow_f32, sha256_hex};
 use gto_model::{Flop, GameConfig, PositionPair, flop_weight, v1_configs};
 use gto_solve::postflop::Range;
 use gto_tree::{PreflopLine, PreflopTree, SizingConventionSpec, TreeConfig, tree_hash};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use self::stage::{PROGRESS_INTERVAL, manifest_config, stage_build};
-pub use self::sys::{minute_of_day_utc, now_epoch_seconds, peak_rss_bytes, utc_now_rfc3339};
+pub use self::sys::{
+    PEAK_SOURCE_CGROUP, PEAK_SOURCE_NONE, PEAK_SOURCE_VM_HWM, PeakMemory, ProcSnapshot,
+    RuntimeMachine, minute_of_day_utc, now_epoch_seconds, peak_memory, peak_rss_bytes,
+    runtime_machine, utc_now_rfc3339,
+};
 use crate::error::BuilderError;
 use crate::notify::BuildProgress;
 use crate::ops::Status;
@@ -107,7 +111,8 @@ pub struct BuildInputs {
 }
 
 /// One line's measurements.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LineSummary {
     /// The line.
     pub line: String,
@@ -142,8 +147,10 @@ pub struct StagedBuild {
     pub max_gains_pct_pot: [f64; 2],
 }
 
-/// What a job run reports, also the `--once` summary line and the bench's input.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+/// What a job run reports, also the `--once` summary line and the bench's input (read back
+/// by `bench::read_summary`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RunSummary {
     /// The job.
     pub job_id: String,
@@ -157,8 +164,10 @@ pub struct RunSummary {
     pub lines: Vec<LineSummary>,
     /// Bytes written.
     pub bytes_written: u64,
-    /// The process's peak resident set size at the end of the job.
-    pub peak_rss_bytes: u64,
+    /// The memory figures at the end of the job and which one O-50 judges (O-190).
+    pub memory: PeakMemory,
+    /// The machine the job ran on, captured in this process.
+    pub machine: RuntimeMachine,
     /// Wall seconds of the job.
     pub seconds: f64,
 }
@@ -412,7 +421,8 @@ fn record_publish<Q: JobQueue>(env: &Env<Q>, done: Published, started: Instant) 
         error: None,
         lines: staged.lines,
         bytes_written: uploaded,
-        peak_rss_bytes: peak_rss_bytes(),
+        memory: peak_memory(),
+        machine: runtime_machine(),
         seconds: started.elapsed().as_secs_f64(),
     }
 }
@@ -449,7 +459,8 @@ async fn record_failure<Q: JobQueue>(
         error: Some(error),
         lines: Vec::new(),
         bytes_written: 0,
-        peak_rss_bytes: peak_rss_bytes(),
+        memory: peak_memory(),
+        machine: runtime_machine(),
         seconds: started.elapsed().as_secs_f64(),
     };
     Ok(JobOutcome::Failed { outcome, summary })

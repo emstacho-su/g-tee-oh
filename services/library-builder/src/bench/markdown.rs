@@ -52,10 +52,15 @@ fn list(value: &Value) -> String {
         .unwrap_or_default()
 }
 
-/// The machine block in one line.
+/// The machine block in one line, with the container's cgroup memory limit when the run
+/// had one.
 fn machine(value: &Value) -> String {
+    let limit = value["cgroup_memory_limit_bytes"]
+        .as_u64()
+        .map(|bytes| format!(", cgroup memory limit {bytes} bytes"))
+        .unwrap_or_default();
     format!(
-        "{}, {}, {}, {} logical cores, {} GB of memory",
+        "{}, {}, {}, {} logical cores, {} GB of memory{limit}",
         text(&value["name"]),
         text(&value["os"]),
         text(&value["cpu"]),

@@ -236,7 +236,8 @@ pub async fn run_spec(
         error: None,
         lines: staged.lines,
         bytes_written,
-        peak_rss_bytes: job::peak_rss_bytes(),
+        memory: job::peak_memory(),
+        machine: job::runtime_machine(),
         seconds: started.elapsed().as_secs_f64(),
     })
 }

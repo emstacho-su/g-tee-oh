@@ -5,15 +5,20 @@
 //! percent (the O-194 floor) and the estimate sweep.
 //!
 //! The report id is `bench-flop-line`, not the `bench` baseline, so the schema requires
-//! `pass` and `thresholds`: the report is judged against O-50, peak resident set size under
-//! 5 GB (5,000,000,000 bytes) and every line at most 1,800 seconds to 0.3 percent of the
-//! pot for both seats. The judged measurements carry their own `pass`; the informational
-//! 16-bit and sweep rows carry none. A miss is reported as a miss (O-178), never hidden.
+//! `pass` and `thresholds`: the report is judged against O-50, peak memory under 5 GB
+//! (5,000,000,000 bytes) and every line at most 1,800 seconds to 0.3 percent of the pot
+//! for both seats. The judged peak is a true peak the measured process read (O-190): the
+//! container cgroup's `memory.peak` in a container, else the process's `VmHWM`; a run with
+//! neither fails. The machine block is the run's own machine from its summary, not the
+//! host writing the report. The judged measurements carry their own `pass`; the
+//! informational 16-bit and sweep rows carry none. A miss is reported as a miss (O-178),
+//! never hidden.
 //!
 //! Measurement ids: the judged run's rows start with `flop-line/` (`staged`, `peak-rss`,
 //! and per line `<line>/seconds`, `<line>/gain-oop` and `<line>/gain-ip` judged, then
 //! `<line>/iterations`, `<line>/estimate-bytes`, `<line>/flop-bytes`,
-//! `<line>/mean-runout-bytes`, `bytes-written` and `job-seconds` informational); the
+//! `<line>/mean-runout-bytes`, `vm-hwm` and `cgroup-memory-peak` when read,
+//! `bytes-written` and `job-seconds` informational); the
 //! informational run repeats them under `flop-line-16bit/` without a verdict; the sweep
 //! writes `sweep/<line>/max-estimate-bytes`, `sweep/<line>/min-estimate-bytes`,
 //! `sweep/flops` and `sweep/cap-bytes`. A run that did not stage fails its `staged` row,
@@ -24,12 +29,11 @@ mod markdown;
 
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Map, Value, json};
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, System};
 
 use crate::error::BuilderError;
-use crate::job::{ENGINE_VERSION, LineSummary, RunSummary};
+use crate::job::{ENGINE_VERSION, LineSummary, PeakMemory, RunSummary, RuntimeMachine};
 use crate::spec::{OUTCOME_STAGED, Sweep};
 
 pub use markdown::render_markdown;
@@ -58,15 +62,14 @@ const JUDGED_PREFIX: &str = "flop-line";
 /// The prefix of the informational 16-bit run's measurement ids (O-200).
 const SIXTEEN_BIT_PREFIX: &str = "flop-line-16bit";
 
-/// Bytes in a gibibyte, for the machine block's memory (the validate tool's rounding).
-const BYTES_PER_GIB: u64 = 1 << 30;
-
-/// The machine block of the report schema.
+/// The machine block of the report schema, describing where the judged run happened (its
+/// summary's runtime machine), not the host that writes the report. `container` and
+/// `cgroup_memory_limit_bytes` are fields the schema lets a tool add.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Machine {
     /// `VALIDATE_MACHINE`, for example `zenbook`.
     pub name: String,
-    /// The operating system as sysinfo reports it.
+    /// The run's operating system and platform, and the container when there was one.
     pub os: String,
     /// The processor brand.
     pub cpu: String,
@@ -74,6 +77,10 @@ pub struct Machine {
     pub cores: u32,
     /// Memory in gigabytes.
     pub memory_gb: u64,
+    /// True when the run was in a container.
+    pub container: bool,
+    /// The container cgroup's memory limit, `null` when unlimited.
+    pub cgroup_memory_limit_bytes: Option<u64>,
 }
 
 /// The O-50 verdict of a judged run.
@@ -87,15 +94,17 @@ pub struct Verdict {
 
 /// The verdict of `summary` against O-50.
 ///
-/// Three rules, one sentence each: peak resident set size strictly under
+/// Three rules, one sentence each: the judged peak (the container cgroup's `memory.peak` in
+/// a container, else the process's `VmHWM`, see `job::PeakMemory`) strictly under
 /// [`O50_PEAK_RSS_BYTES`], every line's seconds at most [`O50_SECONDS_PER_LINE`], and both
-/// seats' gains of every line at most [`O50_TARGET_PCT_POT`]. A run that did not stage
-/// fails whatever its numbers, with a fourth sentence saying so; a staged run with no line
-/// fails the time and gain rules, since there is nothing to judge.
+/// seats' gains of every line at most [`O50_TARGET_PCT_POT`]. A run with no true peak
+/// recorded fails the memory rule, so a current resident set size can never pass it. A
+/// run that did not stage fails whatever its numbers, with a fourth sentence saying so; a
+/// staged run with no line fails the time and gain rules, since there is nothing to judge.
 #[must_use]
 pub fn o50_verdict(summary: &RunSummary) -> Verdict {
     let staged = summary.outcome == OUTCOME_STAGED;
-    let (memory_ok, memory) = memory_rule(summary.peak_rss_bytes);
+    let (memory_ok, memory) = memory_rule(&summary.memory);
     let (time_ok, time) = time_rule(&summary.lines);
     let (gains_ok, gains) = gain_rule(&summary.lines);
     let staged_reason = (!staged).then(|| {
@@ -107,13 +116,29 @@ pub fn o50_verdict(summary: &RunSummary) -> Verdict {
     Verdict { pass: staged && memory_ok && time_ok && gains_ok, reasons }
 }
 
-fn memory_rule(peak: u64) -> (bool, String) {
-    let held = peak < O50_PEAK_RSS_BYTES;
+/// True when the judged peak was recorded and is under the O-50 limit.
+fn memory_held(memory: &PeakMemory) -> bool {
+    memory.judged_peak_bytes.is_some_and(|peak| peak < O50_PEAK_RSS_BYTES)
+}
+
+fn memory_rule(memory: &PeakMemory) -> (bool, String) {
+    let Some(peak) = memory.judged_peak_bytes else {
+        return (
+            false,
+            format!(
+                "no true peak was recorded (peak source {}), so the O-50 limit of \
+                 {O50_PEAK_RSS_BYTES} bytes cannot be met",
+                memory.peak_source
+            ),
+        );
+    };
+    let held = memory_held(memory);
     let relation = if held { "is under" } else { "is not under" };
     (
         held,
         format!(
-            "peak resident set size {peak} bytes {relation} the O-50 limit of {O50_PEAK_RSS_BYTES} bytes"
+            "peak memory {peak} bytes ({}) {relation} the O-50 limit of {O50_PEAK_RSS_BYTES} bytes",
+            memory.peak_source
         ),
     )
 }
@@ -168,29 +193,34 @@ fn gain_rule(lines: &[LineSummary]) -> (bool, String) {
     }
 }
 
-/// The machine block for `name` from sysinfo: the long operating system name, the first
-/// CPU's brand, the logical cores and the memory rounded to whole gibibytes. Every field
-/// has a floor the schema accepts (the compile-time OS and architecture names, at least
-/// one core and one gigabyte), so a host that reports nothing still yields a valid block.
+/// The machine block for `name` from the judged run's runtime machine, which the measured
+/// process captured itself (`job::RuntimeMachine`), so a report written on the host still
+/// describes the container the run was in. The os reads `<os>, <platform> container on
+/// the <Name>` in a container and `<os>, <platform> on the <Name>` otherwise, for example
+/// `Debian GNU/Linux 12 (bookworm), linux/amd64 container on the Zenbook`.
 #[must_use]
-pub fn machine(name: &str) -> Machine {
-    let mut system = System::new();
-    system.refresh_cpu_list(CpuRefreshKind::nothing());
-    system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
-    let cpu = system
-        .cpus()
-        .first()
-        .map(|cpu| cpu.brand().trim().to_owned())
-        .filter(|brand| !brand.is_empty())
-        .unwrap_or_else(|| std::env::consts::ARCH.to_owned());
-    let cores = u32::try_from(system.cpus().len()).unwrap_or(u32::MAX).max(1);
-    let memory_gb =
-        (system.total_memory().saturating_add(BYTES_PER_GIB / 2) / BYTES_PER_GIB).max(1);
-    let os = System::long_os_version()
-        .map(|text| text.trim().to_owned())
-        .filter(|text| !text.is_empty())
-        .unwrap_or_else(|| std::env::consts::OS.to_owned());
-    Machine { name: name.to_owned(), os, cpu, cores, memory_gb }
+pub fn machine(name: &str, runtime: &RuntimeMachine) -> Machine {
+    Machine {
+        name: name.to_owned(),
+        os: where_run(name, runtime),
+        cpu: runtime.cpu.clone(),
+        cores: runtime.cores.max(1),
+        memory_gb: runtime.memory_gb.max(1),
+        container: runtime.container,
+        cgroup_memory_limit_bytes: runtime.cgroup_memory_limit_bytes,
+    }
+}
+
+/// Where a run happened, in words: see [`machine`].
+fn where_run(name: &str, runtime: &RuntimeMachine) -> String {
+    let container = if runtime.container { " container" } else { "" };
+    format!("{}, {}{container} on the {}", runtime.os, runtime.platform, display_name(name))
+}
+
+/// `name` with its first letter in upper case, `zenbook` as `Zenbook`.
+fn display_name(name: &str) -> String {
+    let mut chars = name.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
 /// True when `name` fits the report schema's machine name, `^[a-z][a-z0-9-]*$`.
@@ -237,7 +267,7 @@ pub fn report_json(
             "exploitability_pct_pot": { "max": O50_TARGET_PCT_POT, "unit": "pct_pot" },
         },
         "measurements": measurements,
-        "notes": notes(judged, informational, sweep, &verdict),
+        "notes": notes(judged, informational, sweep, &verdict, machine),
     })
 }
 
@@ -279,15 +309,10 @@ fn judged_rows(summary: &RunSummary) -> Vec<Value> {
         json!({ "min": 1, "unit": "boolean" }),
         staged,
     );
-    let mut rss = Map::new();
-    rss.insert("id".to_owned(), Value::from(format!("{JUDGED_PREFIX}/peak-rss")));
-    rss.insert("value".to_owned(), Value::from(summary.peak_rss_bytes));
-    rss.insert("unit".to_owned(), Value::from("bytes"));
-    rss.insert("strict".to_owned(), Value::Bool(true));
     let rss_row = judged_row(
-        rss,
+        peak_row(&summary.memory),
         json!({ "max": O50_PEAK_RSS_BYTES, "unit": "bytes" }),
-        summary.peak_rss_bytes < O50_PEAK_RSS_BYTES,
+        memory_held(&summary.memory),
     );
     let lines = summary.lines.iter().flat_map(|line| {
         let seconds = judged_row(
@@ -307,6 +332,33 @@ fn judged_rows(summary: &RunSummary) -> Vec<Value> {
     [staged_row, rss_row].into_iter().chain(lines).collect()
 }
 
+/// The judged peak row before its verdict: the judged peak in bytes with its `source`
+/// (`cgroup memory.peak`, `VmHWM` or `none`), strict since O-50 says under. With no true
+/// peak the value is 0 with `"not_recorded": true`, since the schema needs a number.
+fn peak_row(memory: &PeakMemory) -> Map<String, Value> {
+    let mut map = Map::new();
+    map.insert("id".to_owned(), Value::from(format!("{JUDGED_PREFIX}/peak-rss")));
+    map.insert("value".to_owned(), Value::from(memory.judged_peak_bytes.unwrap_or(0)));
+    map.insert("unit".to_owned(), Value::from("bytes"));
+    map.insert("strict".to_owned(), Value::Bool(true));
+    map.insert("source".to_owned(), Value::from(memory.peak_source.as_str()));
+    if memory.judged_peak_bytes.is_none() {
+        map.insert("not_recorded".to_owned(), Value::Bool(true));
+    }
+    map
+}
+
+/// The informational memory rows under `prefix`: `vm-hwm` and `cgroup-memory-peak`, each
+/// only when it was read.
+fn memory_rows(prefix: &str, memory: &PeakMemory) -> Vec<Value> {
+    [("vm-hwm", memory.peak_rss_bytes), ("cgroup-memory-peak", memory.cgroup_memory_peak_bytes)]
+        .into_iter()
+        .filter_map(|(name, bytes)| {
+            bytes.map(|value| count_row(&format!("{prefix}/{name}"), value, "bytes"))
+        })
+        .collect()
+}
+
 /// The informational detail rows of a run under `prefix`.
 fn detail_rows(prefix: &str, summary: &RunSummary) -> Vec<Value> {
     let lines = summary.lines.iter().flat_map(|line| {
@@ -321,6 +373,7 @@ fn detail_rows(prefix: &str, summary: &RunSummary) -> Vec<Value> {
         ]
     });
     lines
+        .chain(memory_rows(prefix, &summary.memory))
         .chain([
             count_row(&format!("{prefix}/bytes-written"), summary.bytes_written, "bytes"),
             Value::Object(row(&format!("{prefix}/job-seconds"), summary.seconds, "seconds")),
@@ -332,10 +385,13 @@ fn detail_rows(prefix: &str, summary: &RunSummary) -> Vec<Value> {
 /// details (O-200).
 fn sixteen_bit_rows(summary: &RunSummary) -> Vec<Value> {
     let staged = u64::from(summary.outcome == OUTCOME_STAGED);
-    let head = [
-        count_row(&format!("{SIXTEEN_BIT_PREFIX}/staged"), staged, "boolean"),
-        count_row(&format!("{SIXTEEN_BIT_PREFIX}/peak-rss"), summary.peak_rss_bytes, "bytes"),
-    ];
+    let peak = summary
+        .memory
+        .judged_peak_bytes
+        .map(|bytes| count_row(&format!("{SIXTEEN_BIT_PREFIX}/peak-rss"), bytes, "bytes"));
+    let head =
+        std::iter::once(count_row(&format!("{SIXTEEN_BIT_PREFIX}/staged"), staged, "boolean"))
+            .chain(peak);
     let lines = summary.lines.iter().flat_map(|line| {
         let id = |name: &str| format!("{SIXTEEN_BIT_PREFIX}/{}/{name}", line.line);
         let [oop, ip] = line.gains_pct_pot;
@@ -345,7 +401,7 @@ fn sixteen_bit_rows(summary: &RunSummary) -> Vec<Value> {
             Value::Object(row(&id("gain-ip"), ip, "pct_pot")),
         ]
     });
-    head.into_iter().chain(lines).chain(detail_rows(SIXTEEN_BIT_PREFIX, summary)).collect()
+    head.chain(lines).chain(detail_rows(SIXTEEN_BIT_PREFIX, summary)).collect()
 }
 
 /// The informational estimate sweep rows (O-194).
@@ -369,19 +425,21 @@ fn sweep_rows(sweep: &Sweep) -> Vec<Value> {
     .collect()
 }
 
-/// The notes: the rule, the verdict sentences, the storage of each run, the stop reasons
-/// and the sweep's largest estimates.
+/// The notes: the rule, where the run happened and which peak was judged, the verdict
+/// sentences, the storage of each run, the stop reasons and the sweep's largest estimates.
 fn notes(
     judged: &RunSummary,
     informational: Option<&RunSummary>,
     sweep: Option<&Sweep>,
     verdict: &Verdict,
+    machine: &Machine,
 ) -> String {
     let rule = format!(
-        "Judged against O-50: peak resident set size under {O50_PEAK_RSS_BYTES} bytes and \
+        "Judged against O-50: peak memory under {O50_PEAK_RSS_BYTES} bytes and \
          every line at most {O50_SECONDS_PER_LINE:.0} seconds to {O50_TARGET_PCT_POT} percent \
          of the pot for both seats; a miss is recorded as a miss (O-178)."
     );
+    let place = where_note(judged, machine);
     let verdict_text =
         format!("Verdict: {}. {}.", pass_word(verdict.pass), verdict.reasons.join("; "));
     let storage = "By the bench method the judged summary is the 32-bit run at the 0.3 percent \
@@ -411,11 +469,39 @@ fn notes(
             largest.join("; ")
         )
     });
-    [Some(rule), Some(verdict_text), Some(storage.to_owned()), Some(stops), sixteen, sweep_text]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<String>>()
-        .join(" ")
+    [
+        Some(rule),
+        Some(place),
+        Some(verdict_text),
+        Some(storage.to_owned()),
+        Some(stops),
+        sixteen,
+        sweep_text,
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<String>>()
+    .join(" ")
+}
+
+/// Where the judged run happened, as its own process recorded it, and which peak was
+/// judged: the container cgroup's `memory.peak` in a container, else `VmHWM` (O-190).
+fn where_note(judged: &RunSummary, machine: &Machine) -> String {
+    let limit = machine
+        .cgroup_memory_limit_bytes
+        .map(|bytes| format!(" under a cgroup memory limit of {bytes} bytes"))
+        .unwrap_or_default();
+    let memory = &judged.memory;
+    let read =
+        |bytes: Option<u64>| bytes.map_or_else(|| "not read".to_owned(), |b| format!("{b} bytes"));
+    format!(
+        "The judged run ran in {}{limit}, recorded by the measured process; the report was \
+         written from its summary. The judged peak is the {} (VmHWM {}, cgroup memory.peak {}).",
+        machine.os,
+        memory.peak_source,
+        read(memory.peak_rss_bytes),
+        read(memory.cgroup_memory_peak_bytes)
+    )
 }
 
 /// `pass` or `fail`.
@@ -436,50 +522,6 @@ fn stop_reasons(summary: &RunSummary) -> String {
         .join(", ")
 }
 
-/// A run summary as `--once --job-spec --summary-out` writes it. `RunSummary` itself is
-/// only `Serialize`, so the report reads the file through this mirror and converts it.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SummaryFile {
-    job_id: String,
-    build_id: Option<String>,
-    outcome: String,
-    error: Option<String>,
-    lines: Vec<LineFile>,
-    bytes_written: u64,
-    peak_rss_bytes: u64,
-    seconds: f64,
-}
-
-/// One line of a [`SummaryFile`].
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LineFile {
-    line: String,
-    seconds: f64,
-    iterations: u32,
-    gains_pct_pot: [f64; 2],
-    stop_reason: String,
-    estimate_bytes: u64,
-    flop_bytes: u64,
-    runout_bytes: Vec<u64>,
-}
-
-impl From<LineFile> for LineSummary {
-    fn from(line: LineFile) -> Self {
-        LineSummary {
-            line: line.line,
-            seconds: line.seconds,
-            iterations: line.iterations,
-            gains_pct_pot: line.gains_pct_pot,
-            stop_reason: line.stop_reason,
-            estimate_bytes: line.estimate_bytes,
-            flop_bytes: line.flop_bytes,
-            runout_bytes: line.runout_bytes,
-        }
-    }
-}
-
 /// Reads and parses the JSON file at `path`.
 fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, BuilderError> {
     let text = std::fs::read_to_string(path).map_err(|source| BuilderError::io(path, source))?;
@@ -489,23 +531,15 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, BuilderEr
     })
 }
 
-/// The run summary in the file at `path`.
+/// The run summary in the file at `path`, as `--once --job-spec --summary-out` writes it.
+/// Unknown fields are refused, so a summary from before the memory and machine fields
+/// (one with a bare `peak_rss_bytes`) is named as malformed rather than half read.
 ///
 /// # Errors
 ///
 /// `BuilderError::Io` or `BuilderError::Malformed` naming the file.
 pub fn read_summary(path: &Path) -> Result<RunSummary, BuilderError> {
-    let file: SummaryFile = read_json(path)?;
-    Ok(RunSummary {
-        job_id: file.job_id,
-        build_id: file.build_id,
-        outcome: file.outcome,
-        error: file.error,
-        lines: file.lines.into_iter().map(LineSummary::from).collect(),
-        bytes_written: file.bytes_written,
-        peak_rss_bytes: file.peak_rss_bytes,
-        seconds: file.seconds,
-    })
+    read_json(path)
 }
 
 /// The estimate sweep in the file at `path`.
