@@ -4,6 +4,2287 @@
  */
 
 export interface paths {
+    "/api/v1/admin/builder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Builder queue, throughput, storage and settings
+         * @description Builder queue, throughput, storage and settings
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BuilderStatus"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/builder/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause the builder
+         * @description Pause the builder
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BuilderStatus"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/builder/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume the builder
+         * @description Resume the builder
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BuilderStatus"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/builder/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change builder settings
+         * @description Change builder settings
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            settings: {
+                                [key: string]: unknown;
+                            };
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log in with email and password; sets the session cookie */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: email
+                         * @description An email address; surrounding whitespace and capitals are ignored
+                         */
+                        email: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionInfo"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End the session, if any, and clear the cookie */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Logged out */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game configurations, each keyed by config_id with its stake */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    format?: "online" | "live";
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                    stake_id?: string;
+                    table_size?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["GameConfig"][];
+                            /** @description Pass as cursor for the next page; null on the last page */
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/configs/{id}/pairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Position pairs seated at a configuration, with preflop availability (O-234) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                            config_id: string;
+                            items: components["schemas"]["PositionPairEntry"][];
+                            /** @description Pass as cursor for the next page; null on the last page */
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the library holds for a configuration and pair
+         * @description What the library holds for a configuration and pair
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                    config_id: string;
+                    /** @description Two positions, out of position first, for example BB-BTN */
+                    pair: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Coverage"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coverage/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)
+         * @description Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                        config_id: string;
+                        /** @description Three cards, for example KhQd4s */
+                        flop?: string;
+                        /** @description A preflop line as dot-separated action tokens, for example r250.c */
+                        line?: string;
+                        /** @description Two positions, out of position first, for example BB-BTN */
+                        pair: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The raised build job; null when the spot is already covered */
+                            job_id: string | null;
+                            priority: number | null;
+                            queue_position: number | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The session user's drills, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                    /** @description Only drills carrying this tag */
+                    tag?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["Drill"][];
+                            /** @description Pass as cursor for the next page; null on the last page */
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a drill */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DrillCreateInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Drill"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One drill */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Drill"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a drill */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a drill's name, tags, spot filter or trainer settings */
+        patch: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DrillPatchInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Drill"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/drills/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A drill's export code
+         * @description g-tee-oh's own encoding of the drill.
+         *
+         *     Answers 501 until S26 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description g-tee-oh's own encoding of a drill (S26) */
+                            export_code: string;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/drills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a drill from its export code
+         * @description Creates a drill from an export code.
+         *
+         *     Answers 501 until S26 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        export_code: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Drill"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Server-sent events: coverage_added, builder_state, session nudges
+         * @description Server-sent events: coverage_added, builder_state, session nudges
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Server-sent events: coverage_added, builder_state, session nudges */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explain/{attempt_id}/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the model about an attempt, behind a feature flag (O-54)
+         * @description Ask the model about an attempt, behind a feature flag (O-54)
+         *
+         *     Answers 501 until S27 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    attempt_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        question: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            cached: boolean;
+                            cost_cents: number;
+                            text: string;
+                            validated: boolean;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explain/{attempt_id}/more-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The templated explanation of an attempt
+         * @description The templated explanation of an attempt
+         *
+         *     Answers 501 until S27 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    attempt_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            template: string;
+                            /** @description Every number in it exists in the node or insights data (R3.19, ADR 0016) */
+                            text: string;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/healthz": {
         parameters: {
             query?: never;
@@ -46,10 +2327,2940 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The session user and the CSRF token */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionInfo"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prediction/{session}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a prediction prompt
+         * @description Answer a prediction prompt
+         *
+         *     Answers 501 until S27 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    session: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        answer_pct: number;
+                        /** Format: uuid */
+                        prompt_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            correct_pct: number;
+                            error_pct_points: number;
+                            level: number;
+                            next_level_unlocked: boolean;
+                            within_tolerance: boolean;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prediction/{session}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The next prediction prompt
+         * @description The next prediction prompt
+         *
+         *     Answers 501 until S27 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            hand: string | null;
+                            level: number;
+                            /** @description An opaque node key */
+                            node_key: string;
+                            /** Format: uuid */
+                            prompt_id: string;
+                            question: string;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mastery heat map
+         * @description Mastery heat map
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            cells: {
+                                n: number;
+                                p_known: number;
+                                spot_class_key: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/holdout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holdout results
+         * @description Holdout results
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            last_taken_at: string | null;
+                            mean_score: number | null;
+                            taken: number;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/leaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leak cost by spot class over recent weeks
+         * @description Leak cost by spot class over recent weeks
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    weeks?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                leak_cost_bb_per_1k: number;
+                                spot_class_key: string;
+                                trend: {
+                                    leak_cost_bb_per_1k: number;
+                                    /** Format: date */
+                                    week: string;
+                                }[];
+                            }[];
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The overall rank
+         * @description The overall rank
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            overall: {
+                                mu: number;
+                                rd: number;
+                                tier: string;
+                            };
+                            updated_at: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/streak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Streak state
+         * @description Streak state
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            current_days: number;
+                            freezes_available: number;
+                            longest_days: number;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-track ratings
+         * @description Per-track ratings
+         *
+         *     Answers 501 until S31 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** @enum {string} */
+                                family: "equilibrium" | "exploit";
+                                key: string;
+                                mu: number;
+                                rd: number;
+                                /** Format: uuid */
+                                track_id: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/range-paint/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a painted range for grading
+         * @description Submit a painted range for grading
+         *
+         *     Answers 501 until S27 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description An opaque node key */
+                        node_key: string;
+                        /** @description Hand class to the action index painted for it */
+                        paint: {
+                            [key: string]: number;
+                        };
+                        /** Format: uuid */
+                        session_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            per_hand: {
+                                ev_loss_bb: number;
+                                /** @description A hand class, for example AKs */
+                                hand: string;
+                            }[];
+                            total_ev_loss_bb: number;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a practice session
+         * @description Start a practice session
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description Required when mode is drill
+                         */
+                        drill_id?: string;
+                        /** @enum {string} */
+                        mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+                        settings?: {
+                            /** @enum {string} */
+                            grouping?: "standard" | "grouped" | "simple";
+                            /** @enum {string} */
+                            input?: "actions" | "frequency";
+                            /** @description Panel visibility; an absent key is off */
+                            panels?: {
+                                action_frequency_table?: boolean;
+                                draw_breakdown?: boolean;
+                                equity_distribution_chart?: boolean;
+                                hand_class?: boolean;
+                                hero_range_matrix?: boolean;
+                                hero_strategy_matrix?: boolean;
+                                made_hand_breakdown?: boolean;
+                                range_advantage?: boolean;
+                                rng_roller?: boolean;
+                                streak_counter?: boolean;
+                                threshold_card?: boolean;
+                                villain_range_matrix?: boolean;
+                            };
+                            /** @enum {string} */
+                            pause?: "after_mistake" | "every_action" | "never";
+                            quick_result?: boolean;
+                            /** @description RNG mode (05 section 7); off by default */
+                            rng?: boolean;
+                            /** @enum {string} */
+                            speed?: "slow" | "normal" | "fast";
+                            /** @enum {string} */
+                            stop_rule?: "after_action" | "end_of_street" | "end_of_hand";
+                            tables?: number;
+                            /** @description Seconds per decision; null is off */
+                            timebank_s?: (7 | 15 | 25) | null;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PracticeSession"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a decision and receive its feedback; a double submission is graded once
+         * @description Submit a decision and receive its feedback; a double submission is graded once
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        action_index: number;
+                        /** @enum {string} */
+                        confidence?: "sure" | "unsure";
+                        prediction_answer?: number;
+                        response_ms: number;
+                        size_cbb?: number;
+                        state_version: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DecisionFeedback"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a session and receive its recap
+         * @description End a session and receive its recap
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Optional; a repeat with the same key and request replays the first response (O-232) */
+                    "idempotency-key"?: string;
+                    /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
+                    "x-csrf-token": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionRecap"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (403) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (413) */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (415) */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{id}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The next prompt: table state and the buttons from the tree
+         * @description The next prompt: table state and the buttons from the tree
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TrainerPrompt"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stakes with their rake terms (ADR 0014) */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    format?: "online" | "live";
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["Stake"][];
+                            /** @description Pass as cursor for the next page; null on the last page */
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/study/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insight data for a hand at a node
+         * @description Insight data for a hand at a node
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description A hand class (AKs) or two cards (AhKd) */
+                    hand: string;
+                    /** @description An opaque node key */
+                    node_key: string;
+                    solution_id: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudyInsights"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/study/node": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One preflop node from the library
+         * @description One preflop node from the library
+         *
+         *     Answers 501 until S23 builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Three to five cards, for example KhQd4s */
+                    board?: string;
+                    /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                    config_id: string;
+                    /** @description Restrict the rows to one hand */
+                    hand?: string;
+                    /** @description The preflop action path; the pair's root when absent */
+                    line?: string;
+                    /** @description Two positions, out of position first, for example BB-BTN */
+                    pair: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudyNode"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/study/turn-roots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every turn root at a flop node
+         * @description Every turn root at a flop node
+         *
+         *     Answers 501 until a v1.5 session (O-15) builds it (O-38).
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description A game_config identifier, for example cfg_9_live_13_150 */
+                    config_id: string;
+                    /** @description Three cards, for example KhQd4s */
+                    flop: string;
+                    /** @description A preflop line as dot-separated action tokens, for example r250.c */
+                    line: string;
+                    /** @description Two positions, out of position first, for example BB-BTN */
+                    pair: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            roots: {
+                                /** @description An opaque node key */
+                                node_key: string;
+                                /** Format: uuid */
+                                solution_id: string;
+                                turn: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (501) */
+                501: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        BuilderStatus: {
+            queue: {
+                failed: number;
+                queued: number;
+                running: number;
+            };
+            reason: string | null;
+            settings: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            state: "running" | "paused" | "throttled";
+            storage: {
+                library_bytes: number;
+                reference_bytes: number;
+            };
+            throughput_per_hour: number;
+        };
+        BuilderStatusInput: {
+            queue: {
+                failed: number;
+                queued: number;
+                running: number;
+            };
+            reason: string | null;
+            settings: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            state: "running" | "paused" | "throttled";
+            storage: {
+                library_bytes: number;
+                reference_bytes: number;
+            };
+            throughput_per_hour: number;
+        };
+        Coverage: {
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            flops: {
+                flop: string;
+                scenarios: number;
+                texture_family: string;
+            }[];
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            preflop_available: boolean;
+            queue: {
+                flop: string;
+                /** Format: uuid */
+                job_id: string;
+                position: number;
+                priority: number;
+            }[];
+        };
+        CoverageInput: {
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            flops: {
+                flop: string;
+                scenarios: number;
+                texture_family: string;
+            }[];
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            preflop_available: boolean;
+            queue: {
+                flop: string;
+                /** Format: uuid */
+                job_id: string;
+                position: number;
+                priority: number;
+            }[];
+        };
+        DecisionFeedback: {
+            /** Format: uuid */
+            attempt_id: string;
+            best_action_indexes: number[];
+            ev_by_action: number[];
+            ev_loss_bb: number;
+            ev_loss_pct_pot: number;
+            freq_by_action: number[];
+            /** @enum {string} */
+            label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
+            rated: boolean;
+            rng_roll: number | null;
+            score: number;
+            state_version: number;
+        };
+        DecisionFeedbackInput: {
+            /** Format: uuid */
+            attempt_id: string;
+            best_action_indexes: number[];
+            ev_by_action: number[];
+            ev_loss_bb: number;
+            ev_loss_pct_pot: number;
+            freq_by_action: number[];
+            /** @enum {string} */
+            label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
+            rated: boolean;
+            rng_roll: number | null;
+            score: number;
+            state_version: number;
+        };
+        Drill: {
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            spot_filter: components["schemas"]["SpotFilter"];
+            tags: string[];
+            trainer: components["schemas"]["TrainerSettings"];
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            updated_at: string;
+        };
+        DrillCreate: {
+            name: string;
+            spot_filter: components["schemas"]["SpotFilterWrite"];
+            /** @default [] */
+            tags: string[];
+            trainer: components["schemas"]["TrainerSettings"];
+        };
+        DrillCreateInput: {
+            name: string;
+            spot_filter: components["schemas"]["SpotFilterWriteInput"];
+            /** @default [] */
+            tags: string[];
+            trainer: components["schemas"]["TrainerSettingsInput"];
+        };
+        DrillInput: {
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            spot_filter: components["schemas"]["SpotFilterInput"];
+            tags: string[];
+            trainer: components["schemas"]["TrainerSettingsInput"];
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            updated_at: string;
+        };
+        DrillPatch: {
+            name?: string;
+            spot_filter?: components["schemas"]["SpotFilterWrite"];
+            tags?: string[];
+            trainer?: components["schemas"]["TrainerSettings"];
+        };
+        DrillPatchInput: {
+            name?: string;
+            spot_filter?: components["schemas"]["SpotFilterWriteInput"];
+            tags?: string[];
+            trainer?: components["schemas"]["TrainerSettingsInput"];
+        };
+        GameConfig: {
+            /** @description Ante in centi-big-blinds; stored but not served in v1 (O-33) */
+            ante_cbb: number;
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            /** @description Effective stack in centi-big-blinds */
+            depth_cbb: number;
+            /** @enum {string} */
+            format: "online" | "live";
+            /** Format: uuid */
+            stake_id: string;
+            stake_label: string;
+            straddle: boolean;
+            table_size: number;
+        };
+        GameConfigInput: {
+            /** @description Ante in centi-big-blinds; stored but not served in v1 (O-33) */
+            ante_cbb: number;
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            /** @description Effective stack in centi-big-blinds */
+            depth_cbb: number;
+            /** @enum {string} */
+            format: "online" | "live";
+            /** Format: uuid */
+            stake_id: string;
+            stake_label: string;
+            straddle: boolean;
+            table_size: number;
+        };
+        NodeAction: {
+            bucket: string | null;
+            index: number;
+            /** @enum {string} */
+            kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
+            label: string;
+            size_cbb: number | null;
+            token: string;
+        };
+        NodeActionInput: {
+            bucket: string | null;
+            index: number;
+            /** @enum {string} */
+            kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
+            label: string;
+            size_cbb: number | null;
+            token: string;
+        };
+        NodeHandRow: {
+            ev_bb: number[];
+            ev_best_bb: number;
+            hand: string;
+            loss_pct_pot: number[];
+            reach: number[] | null;
+            strategy: number[];
+        };
+        NodeHandRowInput: {
+            ev_bb: number[];
+            ev_best_bb: number;
+            hand: string;
+            loss_pct_pot: number[];
+            reach: number[] | null;
+            strategy: number[];
+        };
+        PositionPairEntry: {
+            /** @enum {string} */
+            ip: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @enum {string} */
+            oop: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            /** @description A published preflop solution covers this pair */
+            preflop_available: boolean;
+        };
+        PositionPairEntryInput: {
+            /** @enum {string} */
+            ip: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @enum {string} */
+            oop: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            /** @description A published preflop solution covers this pair */
+            preflop_available: boolean;
+        };
+        PracticeSession: {
+            drill_id: string | null;
+            /** @enum {string} */
+            mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+            /** Format: uuid */
+            session_id: string;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            started_at: string;
+            /** @enum {string} */
+            state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
+            state_version: number;
+        };
+        PracticeSessionInput: {
+            drill_id: string | null;
+            /** @enum {string} */
+            mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+            /** Format: uuid */
+            session_id: string;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            started_at: string;
+            /** @enum {string} */
+            state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
+            state_version: number;
+        };
+        /** @description RFC 9457 problem details (application/problem+json) */
+        Problem: {
+            detail?: string;
+            /** @description Field errors of a validation problem */
+            errors?: {
+                message: string;
+                /** @description Dotted path of the offending field, prefixed by its location */
+                path: string;
+            }[];
+            /** @description The request path */
+            instance?: string;
+            /** @description The x-request-id of the failed request */
+            request_id?: string;
+            status: number;
+            title: string;
+            /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
+            type: string;
+        };
+        /** @description RFC 9457 problem details (application/problem+json) */
+        ProblemInput: {
+            detail?: string;
+            /** @description Field errors of a validation problem */
+            errors?: {
+                message: string;
+                /** @description Dotted path of the offending field, prefixed by its location */
+                path: string;
+            }[];
+            /** @description The request path */
+            instance?: string;
+            /** @description The x-request-id of the failed request */
+            request_id?: string;
+            status: number;
+            title: string;
+            /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
+            type: string;
+        };
+        SessionInfo: {
+            /** @description Send as x-csrf-token on every mutating request (O-230) */
+            csrf_token: string;
+            /**
+             * Format: date-time
+             * @description When the session cookie stops being accepted (O-231)
+             */
+            expires_at: string;
+            user: {
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                created_at: string;
+                email: string;
+                /** Format: uuid */
+                id: string;
+            };
+        };
+        SessionInfoInput: {
+            /** @description Send as x-csrf-token on every mutating request (O-230) */
+            csrf_token: string;
+            /**
+             * Format: date-time
+             * @description When the session cookie stops being accepted (O-231)
+             */
+            expires_at: string;
+            user: {
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                created_at: string;
+                email: string;
+                /** Format: uuid */
+                id: string;
+            };
+        };
+        SessionRecap: {
+            decisions: number;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            ended_at: string;
+            ev_loss_bb_total: number;
+            mean_score: number | null;
+            rated_decisions: number;
+            /** Format: uuid */
+            session_id: string;
+        };
+        SessionRecapInput: {
+            decisions: number;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            ended_at: string;
+            ev_loss_bb_total: number;
+            mean_score: number | null;
+            rated_decisions: number;
+            /** Format: uuid */
+            session_id: string;
+        };
+        SpotFilter: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        SpotFilterInput: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        SpotFilterWrite: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        SpotFilterWriteInput: {
+            alternate_seats: boolean;
+            board?: {
+                /** @enum {string} */
+                connectivity?: "connected" | "gapped" | "disconnected";
+                /** @description An explicit flop subset */
+                flops?: string[];
+                /** @enum {string} */
+                high_card?: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "A" | "K" | "Q" | "J" | "T";
+                paired?: boolean;
+                /** @enum {string} */
+                suits?: "monotone" | "two_tone" | "rainbow";
+            };
+            game_config: {
+                /** @description Effective stack depths in big blinds */
+                depths_bb: number[];
+                /** @enum {string} */
+                format: "online" | "live";
+                table_size: number;
+            };
+            hands: {
+                /** @constant */
+                mode: "all";
+            } | {
+                hands: string[];
+                /** @constant */
+                mode: "manual";
+            } | {
+                /** @constant */
+                mode: "close_decisions";
+            };
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description A preflop line as dot-separated action tokens, for example r250.c */
+            line?: string;
+            preflop_action: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            sizing: {
+                /**
+                 * @description The configuration's sizing convention
+                 * @constant
+                 */
+                mode: "convention";
+            } | {
+                /** @constant */
+                mode: "fixed";
+                open_bb?: number;
+                three_bet_bb?: number;
+            };
+            /** @description A catalog stake label: 1/3, 2/5, online */
+            stake: string;
+            /** @enum {string} */
+            start_street: "preflop" | "flop" | "turn" | "river";
+            /** @description Empty means any opponent */
+            villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        Stake: {
+            bb_cents: number;
+            /** @enum {string} */
+            format: "online" | "live";
+            /** Format: uuid */
+            id: string;
+            /** @description 1/3, 2/5, or online for the online rake profile */
+            label: string;
+            no_flop_no_drop: boolean;
+            /** @description A flag such as the unverified 2/5 cap (O-66, O-71) */
+            note: string | null;
+            rake_cap_cents: number;
+            /** @description Rake in basis points: 1000 is 10 percent */
+            rake_percent_bp: number;
+        };
+        StakeInput: {
+            bb_cents: number;
+            /** @enum {string} */
+            format: "online" | "live";
+            /** Format: uuid */
+            id: string;
+            /** @description 1/3, 2/5, or online for the online rake profile */
+            label: string;
+            no_flop_no_drop: boolean;
+            /** @description A flag such as the unverified 2/5 cap (O-66, O-71) */
+            note: string | null;
+            rake_cap_cents: number;
+            /** @description Rake in basis points: 1000 is 10 percent */
+            rake_percent_bp: number;
+        };
+        /** @description solver-query's InsightsResponse relayed as is; S23 pins the inner shapes */
+        StudyInsights: {
+            blockers: {
+                [key: string]: unknown;
+            };
+            equity_distribution: {
+                [key: string]: unknown;
+            };
+            hand_role: string;
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
+            nut_advantage: {
+                [key: string]: unknown;
+            };
+            range_advantage: {
+                [key: string]: unknown;
+            };
+            threshold_card: {
+                [key: string]: unknown;
+            };
+        };
+        /** @description solver-query's InsightsResponse relayed as is; S23 pins the inner shapes */
+        StudyInsightsInput: {
+            blockers: {
+                [key: string]: unknown;
+            };
+            equity_distribution: {
+                [key: string]: unknown;
+            };
+            hand_role: string;
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
+            nut_advantage: {
+                [key: string]: unknown;
+            };
+            range_advantage: {
+                [key: string]: unknown;
+            };
+            threshold_card: {
+                [key: string]: unknown;
+            };
+        };
+        StudyNode: {
+            actions: components["schemas"]["NodeAction"][];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            floor_pct_pot: number;
+            hands: components["schemas"]["NodeHandRow"][];
+            /** @description The line the api prefetched next (R3.3) */
+            next_likely_line: string | null;
+            /** @description An opaque node key */
+            node_key: string;
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            pot_cbb: number;
+            /** Format: uuid */
+            solution_id: string;
+            spot_class_key: string | null;
+            stacks_cbb: number[];
+            /** @enum {string} */
+            street: "preflop" | "flop" | "turn" | "river";
+            /** @enum {string} */
+            to_act: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+        };
+        StudyNodeInput: {
+            actions: components["schemas"]["NodeActionInput"][];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            floor_pct_pot: number;
+            hands: components["schemas"]["NodeHandRowInput"][];
+            /** @description The line the api prefetched next (R3.3) */
+            next_likely_line: string | null;
+            /** @description An opaque node key */
+            node_key: string;
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            pot_cbb: number;
+            /** Format: uuid */
+            solution_id: string;
+            spot_class_key: string | null;
+            stacks_cbb: number[];
+            /** @enum {string} */
+            street: "preflop" | "flop" | "turn" | "river";
+            /** @enum {string} */
+            to_act: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+        };
+        TrainerPrompt: {
+            board: string[];
+            /** @description Generated from the node's tree actions (ADR 0020) */
+            buttons: components["schemas"]["NodeAction"][];
+            hero_hand: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            pot_cbb: number;
+            /** Format: uuid */
+            session_id: string;
+            stacks_cbb: number[];
+            /** @enum {string} */
+            state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
+            state_version: number;
+            visible_panels: string[];
+        };
+        TrainerPromptInput: {
+            board: string[];
+            /** @description Generated from the node's tree actions (ADR 0020) */
+            buttons: components["schemas"]["NodeActionInput"][];
+            hero_hand: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            pot_cbb: number;
+            /** Format: uuid */
+            session_id: string;
+            stacks_cbb: number[];
+            /** @enum {string} */
+            state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
+            state_version: number;
+            visible_panels: string[];
+        };
+        TrainerSettings: {
+            /** @enum {string} */
+            grouping: "standard" | "grouped" | "simple";
+            /** @enum {string} */
+            input: "actions" | "frequency";
+            /** @description Panel visibility; an absent key is off */
+            panels: {
+                action_frequency_table?: boolean;
+                draw_breakdown?: boolean;
+                equity_distribution_chart?: boolean;
+                hand_class?: boolean;
+                hero_range_matrix?: boolean;
+                hero_strategy_matrix?: boolean;
+                made_hand_breakdown?: boolean;
+                range_advantage?: boolean;
+                rng_roller?: boolean;
+                streak_counter?: boolean;
+                threshold_card?: boolean;
+                villain_range_matrix?: boolean;
+            };
+            /** @enum {string} */
+            pause: "after_mistake" | "every_action" | "never";
+            quick_result: boolean;
+            /** @description RNG mode (05 section 7); off by default */
+            rng: boolean;
+            /** @enum {string} */
+            speed: "slow" | "normal" | "fast";
+            /** @enum {string} */
+            stop_rule: "after_action" | "end_of_street" | "end_of_hand";
+            tables: number;
+            /** @description Seconds per decision; null is off */
+            timebank_s: (7 | 15 | 25) | null;
+        };
+        TrainerSettingsInput: {
+            /** @enum {string} */
+            grouping: "standard" | "grouped" | "simple";
+            /** @enum {string} */
+            input: "actions" | "frequency";
+            /** @description Panel visibility; an absent key is off */
+            panels: {
+                action_frequency_table?: boolean;
+                draw_breakdown?: boolean;
+                equity_distribution_chart?: boolean;
+                hand_class?: boolean;
+                hero_range_matrix?: boolean;
+                hero_strategy_matrix?: boolean;
+                made_hand_breakdown?: boolean;
+                range_advantage?: boolean;
+                rng_roller?: boolean;
+                streak_counter?: boolean;
+                threshold_card?: boolean;
+                villain_range_matrix?: boolean;
+            };
+            /** @enum {string} */
+            pause: "after_mistake" | "every_action" | "never";
+            quick_result: boolean;
+            /** @description RNG mode (05 section 7); off by default */
+            rng: boolean;
+            /** @enum {string} */
+            speed: "slow" | "normal" | "fast";
+            /** @enum {string} */
+            stop_rule: "after_action" | "end_of_street" | "end_of_hand";
+            tables: number;
+            /** @description Seconds per decision; null is off */
+            timebank_s: (7 | 15 | 25) | null;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;

@@ -34,6 +34,7 @@ Order of the files:
 | 20261020000900_capture_solution_guard.sql | The BEFORE INSERT trigger on solution |
 | 20261020001000_grants.sql | Revocation from public, grants per role |
 | 20261020001100_seed_catalog.sql | Three stakes, eleven placeholder sizing conventions, eleven game_config rows |
+| 20261027000100_api_auth_idempotency.sql | auth_session token_hash and csrf_token (O-230, O-231), idempotency_key and its app grant (O-232) |
 
 ## Role model
 

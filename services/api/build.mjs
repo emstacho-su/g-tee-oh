@@ -1,7 +1,8 @@
 // esbuild bundle for the api runtime (R0.7, O-114).
 //
-// Mechanism: the two entry points are bundled to dist/index.js (the server) and
-// dist/openapi-export.js (the document writer). What stays external is decided per bare import
+// Mechanism: the three entry points are bundled to dist/index.js (the server),
+// dist/openapi-export.js (the document writer) and dist/create-user.js (the owner account
+// command, O-233). What stays external is decided per bare import
 // by isExternal: Node's built-in modules (with or without the node: prefix; node:module's
 // isBuiltin knows both) and the packages listed under dependencies in this package.json, which
 // the Docker runtime stage has in services/api/node_modules. Everything else is bundled in: the
@@ -28,6 +29,8 @@ const OUTPUT_DIRECTORY = "dist";
 const ENTRY_POINTS = {
   index: "src/main.ts",
   "openapi-export": "src/openapi-export.ts",
+  // The owner account command (O-233): A5 has no sign-up route.
+  "create-user": "src/cli/create-user.ts",
 };
 
 /** Matches specifiers that are neither relative (./ ../) nor rooted (/). */
