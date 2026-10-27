@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use crate::error::BuilderError;
 
 /// The usage line.
-pub const USAGE: &str = "usage: library-builder [run | --version | plan | verify | healthz \
+pub const USAGE: &str = "usage: library-builder [run | --version | plan | verify [--full] | healthz \
 | --once [--job <uuid>] | --once --job-spec <file> [--summary-out <file>] \
 | estimate --job-spec <file> [--out <file>] \
 | bench-report --judged <summary> [--informational <summary>] [--sweep <file>] --out <dir>]";
@@ -22,7 +22,11 @@ pub enum Command {
     /// One planner pass.
     Plan,
     /// One verify pass (O-186).
-    Verify,
+    Verify {
+        /// Read every build in full and check its sha256 (`--full`); else the cheap pass,
+        /// existence and size of every object and one build read in full.
+        full: bool,
+    },
     /// Probe the running `/healthz` and exit 0 on a 200.
     Healthz,
     /// Claim and run one job in the foreground.
@@ -78,7 +82,7 @@ pub fn parse(args: &[OsString]) -> Result<Command, BuilderError> {
         "run" => bare("run", rest, Command::Run),
         "--version" => bare("--version", rest, Command::Version),
         "plan" => bare("plan", rest, Command::Plan),
-        "verify" => bare("verify", rest, Command::Verify),
+        "verify" => parse_verify(rest),
         "healthz" => bare("healthz", rest, Command::Healthz),
         "--once" => parse_once(rest),
         "estimate" => parse_estimate(rest),
@@ -96,6 +100,7 @@ const OUT_FLAG: &str = "--out";
 const JUDGED_FLAG: &str = "--judged";
 const INFORMATIONAL_FLAG: &str = "--informational";
 const SWEEP_FLAG: &str = "--sweep";
+const FULL_FLAG: &str = "--full";
 
 /// The length of a job id in its hyphenated form, and where its hyphens sit.
 const UUID_LEN: usize = 36;
@@ -149,6 +154,15 @@ fn required(
         .get(flag)
         .map(PathBuf::from)
         .ok_or_else(|| usage(format!("{command} needs {flag} <file>")))
+}
+
+/// `verify [--full]`.
+fn parse_verify(rest: &[String]) -> Result<Command, BuilderError> {
+    match rest {
+        [] => Ok(Command::Verify { full: false }),
+        [flag] if flag == FULL_FLAG => Ok(Command::Verify { full: true }),
+        _ => Err(usage(format!("verify takes only {FULL_FLAG}, got {rest:?}"))),
+    }
 }
 
 /// `--once [--job <uuid>]` or `--once --job-spec <file> [--summary-out <file>]`.

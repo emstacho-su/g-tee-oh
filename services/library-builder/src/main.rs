@@ -103,7 +103,7 @@ fn dispatch(command: Command) -> Result<ExitCode, BuilderError> {
         }
         Command::Run => block_on(run_service()),
         Command::Plan => block_on(plan()),
-        Command::Verify => block_on(verify()),
+        Command::Verify { full } => block_on(verify(full)),
         Command::Once { job } => block_on(once(job)),
         Command::OnceSpec { spec, summary_out } => block_on(once_spec(spec, summary_out)),
     }
@@ -198,7 +198,7 @@ fn bench_report(
         &judged,
         informational.as_ref(),
         sweep.as_ref(),
-        &bench::machine(&name),
+        &bench::machine(&name, &judged.machine),
         &git_head()?,
         &job::utc_now_rfc3339(),
     );
@@ -259,10 +259,10 @@ fn database_env(config: &Config) -> Result<Env<PgQueue>, BuilderError> {
         ranges: ranges_of(config)?,
         reach: Arc::new(PriorReach),
         scratch_dir: config.scratch_dir.clone(),
-        worker_id: config.worker_id.clone(),
+        worker_id: library_builder::config::process_worker_id(&config.worker_id),
         builder_threads: config.threads,
         status: Arc::new(Status::default()),
-        limits: library_builder::settings::Limits::default(),
+        limits: config.limits,
     })
 }
 
@@ -370,7 +370,7 @@ async fn shutdown_signal() {
 /// The settings in force now, with their errors logged.
 async fn current_settings(env: &Env<PgQueue>) -> Result<BuilderSettings, BuilderError> {
     let rows = env.queue.settings().await?;
-    let (settings, errors) = BuilderSettings::from_rows(&rows);
+    let (settings, errors) = BuilderSettings::from_rows_with(&rows, &env.limits);
     for error in errors {
         tracing::warn!(key = %error.key, reason = %error.reason, "setting falls back to its default");
     }
@@ -386,10 +386,18 @@ async fn plan() -> Result<ExitCode, BuilderError> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `verify`: one verify pass (O-186); prints what it found.
-async fn verify() -> Result<ExitCode, BuilderError> {
+/// `verify [--full]`: one verify pass (O-186); prints what it found. Without `--full` the
+/// pass is the cheap one, and the build it reads in full is picked from the clock, so
+/// repeated runs rotate over the builds. Exit 1 when a pass aborts (store unreachable,
+/// nothing marked).
+async fn verify(full: bool) -> Result<ExitCode, BuilderError> {
     let env = database_env(&config()?)?;
-    let report = run::verify_once(&env).await?;
+    let mode = if full {
+        run::VerifyMode::Full
+    } else {
+        run::VerifyMode::Sampled { pass: job::now_epoch_seconds() }
+    };
+    let report = run::verify_once(&env, mode).await?;
     emit(&report, None)?;
     Ok(ExitCode::SUCCESS)
 }
@@ -426,7 +434,8 @@ async fn once_spec(
             error: Some(error.to_string()),
             lines: Vec::new(),
             bytes_written: 0,
-            peak_rss_bytes: job::peak_rss_bytes(),
+            memory: job::peak_memory(),
+            machine: job::runtime_machine(),
             seconds: started.elapsed().as_secs_f64(),
         }
     });

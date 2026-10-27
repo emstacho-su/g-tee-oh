@@ -9,8 +9,17 @@
 //! a configuration error naming the missing variable, so a half-set identity never runs.
 //! The secret key is held in [`Password`], so it is redacted wherever the configuration is
 //! shown.
+//!
+//! Plain HTTP to the endpoint carries the library identity's signed requests in the clear,
+//! so it is allowed only where the traffic never leaves the machine or the compose network:
+//! a loopback host (`127.0.0.1`, `::1`, `localhost`), the compose host `seaweedfs`, or when
+//! `S3_ALLOW_HTTP=true` says the operator accepts it (PR #22 review L1). HTTPS is always
+//! allowed. [`S3Config::check_endpoint`] applies the rule when the target is built, and its
+//! error names the variables.
 
 use std::ffi::OsString;
+use std::fmt;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use super::database::{Password, text_or};
@@ -34,10 +43,16 @@ pub const LIBRARY_BUCKET_VAR: &str = "LIBRARY_BUCKET";
 /// The bucket when `LIBRARY_BUCKET` is unset: the one compose's bucket-init creates.
 pub const DEFAULT_LIBRARY_BUCKET: &str = "library";
 
+/// Variable that, set to `true`, allows plain HTTP to any endpoint host.
+pub const S3_ALLOW_HTTP_VAR: &str = "S3_ALLOW_HTTP";
+
+/// The compose service name of the object store, reachable only on the compose network.
+pub const COMPOSE_S3_HOST: &str = "seaweedfs";
+
 /// The S3 target's parts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct S3Config {
-    /// The endpoint, scheme included; `http` is allowed for the compose network.
+    /// The endpoint, scheme included; see [`S3Config::check_endpoint`] for `http`.
     pub endpoint: String,
     /// The library identity's access key.
     pub access_key: String,
@@ -45,6 +60,82 @@ pub struct S3Config {
     pub secret_key: Password,
     /// The bucket the builds go under.
     pub bucket: String,
+    /// `S3_ALLOW_HTTP` is `true` (any letter case); any other value leaves it off.
+    pub allow_http: bool,
+}
+
+/// Why an endpoint is refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EndpointError {
+    /// The endpoint is not a URL with a host.
+    Unparsable {
+        /// The value as set.
+        endpoint: String,
+    },
+    /// The scheme is neither `http` nor `https`.
+    Scheme {
+        /// The value as set.
+        endpoint: String,
+    },
+    /// Plain HTTP to a host that is not loopback or the compose host, without
+    /// `S3_ALLOW_HTTP=true`.
+    PlainHttp {
+        /// The value as set.
+        endpoint: String,
+    },
+}
+
+impl fmt::Display for EndpointError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unparsable { endpoint } => {
+                write!(f, "{S3_ENDPOINT_VAR}={endpoint:?} is not a URL with a host")
+            }
+            Self::Scheme { endpoint } => {
+                write!(f, "{S3_ENDPOINT_VAR}={endpoint:?} is neither http nor https")
+            }
+            Self::PlainHttp { endpoint } => write!(
+                f,
+                "{S3_ENDPOINT_VAR}={endpoint:?} is plain http to a host that is not loopback or \
+                 {COMPOSE_S3_HOST}: use https or set {S3_ALLOW_HTTP_VAR}=true"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for EndpointError {}
+
+impl S3Config {
+    /// Whether the client may speak plain HTTP to the endpoint: `false` for `https`, `true`
+    /// for an allowed `http` endpoint (see the module docs).
+    ///
+    /// # Errors
+    ///
+    /// [`EndpointError`] naming `S3_ENDPOINT` and, for plain HTTP, `S3_ALLOW_HTTP`.
+    pub fn check_endpoint(&self) -> Result<bool, EndpointError> {
+        let endpoint = || self.endpoint.clone();
+        let url = reqwest::Url::parse(&self.endpoint)
+            .map_err(|_| EndpointError::Unparsable { endpoint: endpoint() })?;
+        let host =
+            url.host_str().ok_or_else(|| EndpointError::Unparsable { endpoint: endpoint() })?;
+        match url.scheme() {
+            "https" => Ok(false),
+            "http" if self.allow_http || is_local_host(host) => Ok(true),
+            "http" => Err(EndpointError::PlainHttp { endpoint: endpoint() }),
+            _ => Err(EndpointError::Scheme { endpoint: endpoint() }),
+        }
+    }
+}
+
+/// A loopback address, `localhost`, or the compose host. An IPv6 host comes in brackets.
+fn is_local_host(host: &str) -> bool {
+    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    match bare.parse::<IpAddr>() {
+        Ok(address) => address.is_loopback(),
+        Err(_) => {
+            bare.eq_ignore_ascii_case("localhost") || bare.eq_ignore_ascii_case(COMPOSE_S3_HOST)
+        }
+    }
 }
 
 /// The library target the environment selects.
@@ -93,7 +184,9 @@ where
     let access_key = required(lookup, S3_ACCESS_KEY_VAR)?;
     let secret_key = Password::new(required(lookup, S3_SECRET_KEY_VAR)?);
     let bucket = text_or(lookup, LIBRARY_BUCKET_VAR, DEFAULT_LIBRARY_BUCKET)?;
-    Ok(StoreConfig::S3(S3Config { endpoint, access_key, secret_key, bucket }))
+    let allow_http =
+        unicode(lookup, S3_ALLOW_HTTP_VAR)?.is_some_and(|value| value.eq_ignore_ascii_case("true"));
+    Ok(StoreConfig::S3(S3Config { endpoint, access_key, secret_key, bucket, allow_http }))
 }
 
 /// A variable the S3 target cannot do without.
@@ -110,8 +203,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        DEFAULT_LIBRARY_BUCKET, LIBRARY_BUCKET_VAR, LIBRARY_ROOT_VAR, S3_ACCESS_KEY_VAR,
-        S3_ENDPOINT_VAR, S3_SECRET_KEY_VAR, S3Config, StoreConfig, read,
+        DEFAULT_LIBRARY_BUCKET, EndpointError, LIBRARY_BUCKET_VAR, LIBRARY_ROOT_VAR,
+        S3_ACCESS_KEY_VAR, S3_ALLOW_HTTP_VAR, S3_ENDPOINT_VAR, S3_SECRET_KEY_VAR, S3Config,
+        StoreConfig, read,
     };
     use crate::config::{Error, Password};
 
@@ -159,6 +253,7 @@ mod tests {
                 access_key: ACCESS.to_owned(),
                 secret_key: Password::new(SECRET.to_owned()),
                 bucket: DEFAULT_LIBRARY_BUCKET.to_owned(),
+                allow_http: false,
             })
         );
         assert_eq!(store.kind(), "s3");
@@ -188,5 +283,57 @@ mod tests {
         .expect_err("an empty secret is unset");
         assert_eq!(error, Error::MissingS3Variable { name: S3_SECRET_KEY_VAR });
         assert!(error.to_string().contains(S3_SECRET_KEY_VAR), "message was {error}");
+    }
+
+    fn s3(endpoint: &str, allow: Option<&str>) -> S3Config {
+        let mut pairs = vec![
+            (S3_ENDPOINT_VAR, endpoint),
+            (S3_ACCESS_KEY_VAR, ACCESS),
+            (S3_SECRET_KEY_VAR, SECRET),
+        ];
+        if let Some(value) = allow {
+            pairs.push((S3_ALLOW_HTTP_VAR, value));
+        }
+        match read(&lookup(&pairs)).expect("well formed") {
+            StoreConfig::S3(s3) => s3,
+            other => panic!("expected S3, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn r2_17_plain_http_is_allowed_only_to_loopback_or_the_compose_host() {
+        for local in [
+            "http://127.0.0.1:8333",
+            "http://[::1]:8333",
+            "http://localhost:8333",
+            "http://LOCALHOST",
+            "http://seaweedfs:8333",
+        ] {
+            assert_eq!(s3(local, None).check_endpoint(), Ok(true), "{local}");
+        }
+        assert_eq!(s3("https://s3.example.org", None).check_endpoint(), Ok(false));
+        let remote = "http://s3.example.org:8333";
+        let error = s3(remote, None).check_endpoint().expect_err("plain http off the machine");
+        assert_eq!(error, EndpointError::PlainHttp { endpoint: remote.to_owned() });
+        let message = error.to_string();
+        assert!(
+            message.contains(S3_ENDPOINT_VAR) && message.contains(S3_ALLOW_HTTP_VAR),
+            "{message}"
+        );
+        assert_eq!(s3(remote, Some("true")).check_endpoint(), Ok(true));
+        assert_eq!(s3(remote, Some("TRUE")).check_endpoint(), Ok(true));
+        assert!(s3(remote, Some("yes")).check_endpoint().is_err(), "only true allows it");
+        assert!(matches!(
+            s3("ftp://seaweedfs", None).check_endpoint(),
+            Err(EndpointError::Scheme { .. })
+        ));
+        assert!(matches!(
+            s3("seaweedfs:8333/x", None).check_endpoint(),
+            Err(EndpointError::Unparsable { .. } | EndpointError::Scheme { .. })
+        ));
+        assert!(matches!(
+            s3("not a url", None).check_endpoint(),
+            Err(EndpointError::Unparsable { .. })
+        ));
     }
 }

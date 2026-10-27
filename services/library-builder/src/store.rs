@@ -30,6 +30,10 @@ use object_store::aws::AmazonS3Builder;
 use crate::config::StoreConfig;
 use crate::error::BuilderError;
 
+mod check;
+
+pub use check::{BuildFacts, CheckDepth, VerifyOutcome, first_line_tree_hash};
+
 /// How long the S3 probe may take before the store counts as unreachable.
 pub const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -69,17 +73,23 @@ impl LibraryTarget {
     ///
     /// # Errors
     ///
-    /// `BuilderError::StoreUnconfigured` when nothing is selected; `BuilderError::Store`
-    /// when the S3 client cannot be built from the configuration.
+    /// `BuilderError::StoreUnconfigured` when nothing is selected; `BuilderError::Malformed`
+    /// naming `S3_ENDPOINT` when the endpoint is plain HTTP to a host the configuration
+    /// does not allow it for (`S3Config::check_endpoint`, PR #22 review L1);
+    /// `BuilderError::Store` when the S3 client cannot be built from the configuration.
     pub fn from_config(config: &StoreConfig) -> Result<LibraryTarget, BuilderError> {
         match config {
             StoreConfig::Unconfigured => Err(BuilderError::StoreUnconfigured),
             StoreConfig::Fs { root } => Ok(LibraryTarget::Fs { root: root.clone() }),
             StoreConfig::S3(s3) => {
+                let allow_http = s3.check_endpoint().map_err(|err| BuilderError::Malformed {
+                    path: crate::config::S3_ENDPOINT_VAR.to_owned(),
+                    reason: err.to_string(),
+                })?;
                 install_tls_provider();
                 let client = AmazonS3Builder::new()
                     .with_endpoint(&s3.endpoint)
-                    .with_allow_http(true)
+                    .with_allow_http(allow_http)
                     .with_virtual_hosted_style_request(false)
                     .with_region(S3_REGION)
                     .with_bucket_name(&s3.bucket)

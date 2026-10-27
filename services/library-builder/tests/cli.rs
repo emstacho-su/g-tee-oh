@@ -17,7 +17,11 @@ fn r2_18_every_form_parses() {
     assert_eq!(parse(&args(&["run"])).expect("run"), Command::Run);
     assert_eq!(parse(&args(&["--version"])).expect("version"), Command::Version);
     assert_eq!(parse(&args(&["plan"])).expect("plan"), Command::Plan);
-    assert_eq!(parse(&args(&["verify"])).expect("verify"), Command::Verify);
+    assert_eq!(parse(&args(&["verify"])).expect("verify"), Command::Verify { full: false });
+    assert_eq!(
+        parse(&args(&["verify", "--full"])).expect("verify --full"),
+        Command::Verify { full: true }
+    );
     assert_eq!(parse(&args(&["healthz"])).expect("healthz"), Command::Healthz);
     assert_eq!(parse(&args(&["--once"])).expect("once"), Command::Once { job: None });
     assert_eq!(
@@ -76,6 +80,8 @@ fn r2_18_malformed_forms_are_usage_errors() {
         &["estimate", "--out", "x"],
         &["bench-report", "--judged", "a.json"],
         &["plan", "extra"],
+        &["verify", "--fast"],
+        &["verify", "--full", "--full"],
         &["--version", "extra"],
     ] {
         match parse(&args(words)) {

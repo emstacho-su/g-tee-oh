@@ -4,9 +4,11 @@
 //! change (`paused`, `throttled`, `running`, `idle`); when paused, claim nothing; run the
 //! stale reclaim when due (O-185); claim under the budget gate (T1); run the job; when the
 //! queue is empty, run the planner when due. [`run_loop`] repeats it, sleeping
-//! `poll_seconds` when paused or idle, and runs the verify pass every
-//! `verify_interval_hours` (O-186), until shutdown. Tests drive [`tick`] directly with an
-//! injected clock so the boost window and the intervals are deterministic.
+//! `poll_seconds` when paused or idle, until shutdown. Beside it, [`run_loop`] spawns the
+//! verify pass (O-186) as its own tokio task with its own schedule (see [`verify`]), so a
+//! pass never holds a claim back; the task stops when the loop returns. Tests drive
+//! [`tick`] directly with an injected clock so the boost window and the intervals are
+//! deterministic.
 //!
 //! A malformed setting is logged once when the set of settings errors changes, and is
 //! shown in `/healthz` for as long as it stays malformed (O-188).
@@ -16,14 +18,17 @@ use std::time::Duration;
 
 use gto_planner::ConfigScope;
 use gto_tree::SizingConventionSpec;
-use serde::Serialize;
 
 use crate::error::BuilderError;
 use crate::job::now_epoch_seconds;
 use crate::job::{Env, JobOutcome, RunSummary, catalog_config, minute_of_day_utc, run_job};
 use crate::notify::{BuilderState, StatePayload};
-use crate::queue::{BudgetGate, Claim, JobQueue, PlanWrite, Unavailable};
+use crate::queue::{BudgetGate, Claim, JobQueue, PlanWrite};
 use crate::settings::BuilderSettings;
+
+pub mod verify;
+
+pub use verify::{VerifyMode, VerifyReport, VerifySchedule, verify_once};
 
 /// Consecutive failed ticks the loop retries before it stops with the error.
 pub const MAX_TICK_RETRIES: u32 = 3;
@@ -36,6 +41,10 @@ const SECONDS_PER_HOUR: u64 = 3_600;
 
 /// What one [`tick`] did.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "one value per tick, never stored in bulk; boxing would break the Ran(..) patterns"
+)]
 pub enum TickOutcome {
     /// The `paused` setting is on; nothing was claimed.
     Paused,
@@ -61,8 +70,6 @@ pub struct LoopClock {
     pub last_reclaim: u64,
     /// Seconds since the epoch of the last plan, 0 for never.
     pub last_plan: u64,
-    /// Seconds since the epoch of the last verify pass, 0 for never.
-    pub last_verify: u64,
 }
 
 /// True when an action last run at `last` (0 for never) is due at `now` every
@@ -229,37 +236,27 @@ fn waits_after(outcome: &TickOutcome) -> bool {
     }
 }
 
-/// The verify pass when due; its errors are logged, never fatal to the loop.
-async fn verify_if_due<Q: JobQueue>(
-    env: &Env<Q>,
-    clock: &mut LoopClock,
-    now: u64,
-    settings: &BuilderSettings,
-) {
-    if !due(clock.last_verify, now, u64::from(settings.verify_interval_hours) * SECONDS_PER_HOUR) {
-        return;
-    }
-    clock.last_verify = now;
-    match verify_once(env).await {
-        Ok(report) => tracing::info!(
-            checked = report.checked,
-            unavailable = report.unavailable.len(),
-            "verify pass"
-        ),
-        Err(err) => tracing::warn!(error = %err, "verify pass failed"),
+/// Aborts the spawned verify task when the loop returns, on every path.
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 
-/// Ticks until `shutdown` resolves.
+/// Ticks until `shutdown` resolves, with the verify pass running beside it in its own task
+/// (see [`verify`]).
 ///
 /// # Errors
 ///
 /// The first error a tick returns after the loop has logged it and retried
 /// `poll_seconds` later three times in a row.
-pub async fn run_loop<Q: JobQueue>(
+pub async fn run_loop<Q: JobQueue + 'static>(
     env: &Env<Q>,
     shutdown: impl Future<Output = ()> + Send,
 ) -> Result<(), BuilderError> {
+    let _verify = AbortOnDrop(tokio::spawn(verify::VerifyTask::of(env).run()));
     let mut shutdown = std::pin::pin!(shutdown);
     let mut clock = LoopClock::default();
     let mut failures = 0_u32;
@@ -268,9 +265,6 @@ pub async fn run_loop<Q: JobQueue>(
         let (wait, poll_seconds) = match tick_with_settings(env, &mut clock, now).await {
             Ok((outcome, settings)) => {
                 failures = 0;
-                if outcome != TickOutcome::Paused {
-                    verify_if_due(env, &mut clock, now, &settings).await;
-                }
                 (waits_after(&outcome), settings.poll_seconds)
             }
             Err(err) => {
@@ -353,43 +347,6 @@ pub async fn plan_once<Q: JobQueue>(
     Ok(written)
 }
 
-/// What a verify pass found (O-186).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
-pub struct VerifyReport {
-    /// Builds checked.
-    pub checked: u64,
-    /// Solution ids marked unavailable and re-queued.
-    pub unavailable: Vec<String>,
-}
-
-/// Reads every published own build back and checks it; a failing one is marked
-/// unavailable and its job re-queued (O-186).
-///
-/// # Errors
-///
-/// The database errors, and `BuilderError::StoreUnconfigured`.
-pub async fn verify_once<Q: JobQueue>(env: &Env<Q>) -> Result<VerifyReport, BuilderError> {
-    let target = env.target.as_ref().ok_or(BuilderError::StoreUnconfigured)?;
-    let mut report = VerifyReport::default();
-    for build in env.queue.published_builds().await? {
-        report.checked += 1;
-        let prefix = build.manifest_uri.trim_end_matches("/manifest.json");
-        if let Err(err) = target.verify_build(prefix).await {
-            tracing::warn!(solution_id = %build.solution_id, error = %err,
-                "published build failed verification");
-            let broken = Unavailable {
-                solution_id: build.solution_id.clone(),
-                tree_config_hash: None,
-                bytes: 0,
-                reason: err.to_string(),
-            };
-            env.queue.mark_unavailable(&broken).await?;
-            report.unavailable.push(build.solution_id);
-        }
-    }
-    Ok(report)
-}
-
 #[cfg(test)]
 mod tests {
     use super::{TickOutcome, due, waits_after};
@@ -418,7 +375,7 @@ mod tests {
         let mut clock = super::LoopClock::default();
         send(super::tick(env, &mut clock, 0));
         send(super::run_once(env, None));
-        send(super::verify_once(env));
+        send(super::verify_once(env, super::VerifyMode::Full));
         send(super::run_loop(env, std::future::pending::<()>()));
     }
 }
