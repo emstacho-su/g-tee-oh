@@ -13,6 +13,8 @@ justfile text eol=lf
 *.webp binary
 *.woff binary
 *.woff2 binary
+# Library format chunk files (A3 section 2): zstd frames, never text (R2.19, R2.20).
+*.zst binary
 
 # Lockfiles: never merge by text, regenerate instead
 Cargo.lock merge=binary

@@ -7,16 +7,51 @@
 //! O-133); and, when a chart is given, every hand where the chart and the solution
 //! disagree, each with its expected value (EV) gap, which must be at or below
 //! `NEAR_INDIFFERENT_BB` (O-222). Without a chart (public CI, O-221) the chart part is
-//! reported as run locally and the committed report carries its result.
+//! reported as run locally and the committed report carries its result. The `library`
+//! child module dumps, packs and checks the committed solutions; `notes` writes the
+//! report's notes, which always name the chart and its parameters.
 
+mod library;
+mod notes;
+
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use gto_model::Cbb;
 use gto_solve::equity::EquityTable;
-use gto_solve::preflop::SolvedPreflop;
+use gto_solve::preflop::{
+    CERTIFICATE_GAIN_BB, PreflopError, SolvedClass, SolvedPreflop, push_fold_config,
+    solve_push_fold,
+};
+use library_pack::export::FREQUENCY_TOLERANCE;
 
 use crate::fixtures::g6a_chart::Chart;
 use crate::gates::GateReport;
+use crate::report::{Measurement, Threshold};
+pub use library::{EXPORTED_AT, LibraryCheck, SEED};
+pub use notes::{CHART_NAME, CHART_PARAMETERS, CHART_URL};
+
+/// The unit of expected values and gains.
+const BB: &str = "bb";
+
+/// The unit of frequencies.
+const FREQUENCY: &str = "frequency";
+
+/// The unit of counts.
+const COUNT: &str = "count";
+
+/// Centi-big-blinds in one big blind, as a float.
+const CBB_PER_BB: f64 = 100.0;
+
+/// The action index of fold at both push/fold nodes.
+const PASSIVE: usize = 0;
+
+/// The action index of the all-in or the call.
+const AGGRESSIVE: usize = 1;
+
+/// A class is in (pushes or calls) when its aggressive frequency is at least this.
+const MAJORITY: f64 = 0.5;
 
 /// The report id and file stem.
 pub const REPORT_ID: &str = "g6a-pushfold";
@@ -103,12 +138,20 @@ pub fn solve_depths(
     equity: &EquityTable,
     depths_bb: &[u32],
 ) -> Result<Vec<SolvedPreflop>, G6aError> {
-    let _ = (equity, depths_bb);
-    Err(G6aError::new("solve_depths is not implemented yet (S19 lane 1)"))
+    depths_bb
+        .iter()
+        .map(|depth| {
+            let failed = |error: PreflopError| G6aError::new(format!("depth {depth} bb: {error}"));
+            let config = push_fold_config(*depth).map_err(failed)?;
+            solve_push_fold(&config, equity).map_err(failed)
+        })
+        .collect()
 }
 
 /// Packs `solutions` into library format under `out_root` through library-pack, one
 /// solution per depth, ids deterministic from the dump (O-131); returns the prefixes.
+/// The dump carries a fixed export time, seed 0, the CFR+ iterations and the gains as
+/// percent of the starting pot (see the `library` child module).
 ///
 /// # Errors
 ///
@@ -118,23 +161,149 @@ pub fn pack_library(
     out_root: &Path,
     engine_version: &str,
 ) -> Result<Vec<PathBuf>, G6aError> {
-    let _ = (solutions, out_root, engine_version);
-    Err(G6aError::new("pack_library is not implemented yet (S19 lane 1)"))
+    library::pack(solutions, out_root, engine_version)
 }
 
-/// Every hand where `chart` and `solutions` disagree, with its EV gap.
+/// Every hand where `chart` and `solutions` disagree, with its EV gap. The solution's
+/// action is its majority action (the aggressive action when its frequency is at least
+/// 0.5); the gap is the EV of the chart's action minus the EV of that action, read at
+/// the push node for the push side and at the call node for the call side.
 #[must_use]
 pub fn compare(chart: &Chart, solutions: &[SolvedPreflop]) -> Vec<Disagreement> {
-    let _ = (chart, solutions);
-    Vec::new()
+    solutions
+        .iter()
+        .flat_map(|solution| {
+            let depth_cbb = solution.nodes.first().map_or(0, library::depth_cbb);
+            let sides = [(Side::Push, solution.nodes.first()), (Side::Call, solution.nodes.get(1))];
+            sides.into_iter().flat_map(move |(side, node)| {
+                node.into_iter().flat_map(move |node| {
+                    node.hands
+                        .iter()
+                        .filter_map(move |hand| disagreement(chart, depth_cbb, side, hand))
+                })
+            })
+        })
+        .collect()
+}
+
+/// The disagreement of one hand at one side, or `None` when the chart agrees or does not
+/// know the hand.
+fn disagreement(
+    chart: &Chart,
+    depth_cbb: u32,
+    side: Side,
+    hand: &SolvedClass,
+) -> Option<Disagreement> {
+    let label = hand.class.to_string();
+    let depth = f64::from(depth_cbb) / CBB_PER_BB;
+    let chart_in = match side {
+        Side::Push => chart.pushes(&label, depth)?,
+        Side::Call => chart.calls(&label, depth)?,
+    };
+    let frequency = *hand.frequencies.get(AGGRESSIVE)?;
+    let ours_in = frequency >= MAJORITY;
+    if chart_in == ours_in {
+        return None;
+    }
+    let ev = |is_in: bool| hand.ev_bb.get(if is_in { AGGRESSIVE } else { PASSIVE }).copied();
+    let ev_gap_bb = ev(chart_in)? - ev(ours_in)?;
+    Some(Disagreement {
+        depth_bb: depth_cbb / Cbb::PER_BB,
+        hand: label,
+        side,
+        frequency,
+        ev_gap_bb,
+    })
 }
 
 /// Runs the gate and builds its report.
 ///
 /// # Errors
 ///
-/// `G6aError` when a solve, the library read or the comparison cannot run.
+/// `G6aError` when a solve, the library read or the comparison cannot run; a missing
+/// committed solution is such an error.
 pub fn run(input: &G6aInput<'_>) -> Result<GateReport, G6aError> {
-    let _ = input;
-    Err(G6aError::new("g6a::run is not implemented yet (S19 lane 1)"))
+    let solutions = solve_depths(input.equity, input.depths_bb)?;
+    let checks = solutions
+        .iter()
+        .map(|solution| library::check(input.library_root, solution))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut measurements: Vec<Measurement> = input
+        .depths_bb
+        .iter()
+        .zip(&solutions)
+        .zip(&checks)
+        .flat_map(|((depth, solution), check)| depth_measurements(*depth, solution, check))
+        .collect();
+    let disagreements = input.chart.map(|chart| compare(chart, &solutions)).unwrap_or_default();
+    if input.chart.is_some() {
+        let largest = disagreements.iter().map(|row| row.ev_gap_bb.abs()).fold(0.0, f64::max);
+        let near = Threshold::at_most(NEAR_INDIFFERENT_BB, BB);
+        measurements.push(Measurement::judged("chart/max-ev-gap", largest, BB, near));
+        measurements.push(Measurement::informational(
+            "chart/disagreements",
+            count(disagreements.len()),
+            COUNT,
+        ));
+    }
+    let notes = notes::text(&notes::NotesInput {
+        solutions: &solutions,
+        depths_bb: input.depths_bb,
+        library: &checks,
+        chart: input.chart,
+        disagreements: &disagreements,
+    });
+    let thresholds: BTreeMap<String, Threshold> = measurements
+        .iter()
+        .filter_map(|m| m.threshold.clone().map(|threshold| (m.id.clone(), threshold)))
+        .collect();
+    let pass = measurements.iter().filter(|m| m.threshold.is_some()).all(|m| m.pass == Some(true));
+    Ok(GateReport {
+        report: REPORT_ID.to_owned(),
+        r_ids: vec![R_ID.to_owned()],
+        pass,
+        thresholds,
+        measurements,
+        notes,
+    })
 }
+
+/// The measurements of one depth: the certificate and the library comparison, judged,
+/// and the iterations, informational.
+fn depth_measurements(
+    depth: u32,
+    solution: &SolvedPreflop,
+    check: &LibraryCheck,
+) -> Vec<Measurement> {
+    let id = |what: &str| format!("depth-{depth}/{what}");
+    let gain = solution.gains_bb.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    vec![
+        Measurement::judged(
+            &id("certificate-gain"),
+            gain,
+            BB,
+            Threshold::at_most(CERTIFICATE_GAIN_BB, BB),
+        ),
+        Measurement::judged(
+            &id("library-frequency-diff"),
+            check.max_frequency_diff,
+            FREQUENCY,
+            Threshold::at_most(FREQUENCY_TOLERANCE, FREQUENCY),
+        ),
+        Measurement::judged(
+            &id("library-differences"),
+            count(check.differences.len()),
+            COUNT,
+            Threshold::at_most(0.0, COUNT),
+        ),
+        Measurement::informational(&id("iterations"), f64::from(solution.iterations), COUNT),
+    ]
+}
+
+/// A count as a report value.
+fn count(n: usize) -> f64 {
+    u32::try_from(n).map_or(f64::from(u32::MAX), f64::from)
+}
+
+#[cfg(test)]
+mod tests;

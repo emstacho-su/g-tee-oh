@@ -19,12 +19,36 @@
 //! Expected values (EVs) follow O-224 (the O-175 pot-share convention): the EV of an
 //! action is the expected final stack of the actor minus the actor's stack behind at the
 //! node, in big blinds, so at the root the two seats' EVs sum to the pot and losses are
-//! differences of EVs at one node.
+//! differences of EVs at one node. The opponent's classes are weighted by their reach and
+//! the pairs weights, so "equity" in an EV is the class pair equity averaged that way.
+//!
+//! Submodules: `game` builds the vector game from the tree, `cfr` holds CFR+, the best
+//! response and the exact evaluations, `assemble` turns a strategy into a
+//! `SolvedPreflop`, `exact` is the push/fold refinement and `linalg` its Gaussian
+//! elimination.
 
-use gto_model::{ActionToken, Cbb, ConfigId, GameConfig, HandClass, ModelError, NodeKey, Position};
+mod assemble;
+mod cfr;
+mod exact;
+mod game;
+mod linalg;
+#[cfg(test)]
+mod tests;
+
+use gto_model::{
+    ActionToken, Cbb, ConfigId, GameConfig, GameFormat, HandClass, ModelError, NodeKey, Position,
+    RakeModel, Stake, TableSize,
+};
 use gto_tree::{PreflopTree, TreeError};
 
 use crate::equity::EquityTable;
+use game::{CBB_PER_BB, Layout, game_error};
+
+/// The rake model of the rake-free stake: zero percent, zero cap (O-220, ADR 0014).
+const NO_RAKE: RakeModel = RakeModel { percent_bp: 0, cap_cents: 0, no_flop_no_drop: true };
+
+/// Percent in one whole.
+const PERCENT: f64 = 100.0;
 
 /// The largest best-response gain, in big blinds, either seat may have for a push/fold
 /// solution to count as the exact equilibrium (O-223).
@@ -98,6 +122,7 @@ pub struct PreflopGame {
     config: GameConfig,
     tree: PreflopTree,
     flop: Option<FlopPayout>,
+    layout: Layout,
 }
 
 impl PreflopGame {
@@ -107,15 +132,21 @@ impl PreflopGame {
     /// # Errors
     ///
     /// `PreflopError::Equity` for a table that is not 169 by 169, `PreflopError::Game` for
-    /// a flop line without a payout.
+    /// a flop line without a payout, a straddle, or a tree whose pots the replay of its
+    /// lines does not reproduce.
     pub fn new(
         tree: &PreflopTree,
         config: &GameConfig,
         equity: &EquityTable,
         flop: Option<FlopPayout>,
     ) -> Result<Self, PreflopError> {
-        let _ = (tree, config, equity, flop);
-        Err(PreflopError::NotImplemented("PreflopGame::new"))
+        let layout = game::layout(tree, config, equity, flop)?;
+        Ok(PreflopGame { config: config.clone(), tree: tree.clone(), flop, layout })
+    }
+
+    /// The pot at the root in big blinds.
+    fn starting_pot_bb(&self) -> f64 {
+        self.tree.nodes().first().map_or(0.0, |root| f64::from(root.pot.get()) / CBB_PER_BB)
     }
 
     /// The configuration.
@@ -187,21 +218,50 @@ pub struct SolvedPreflop {
 ///
 /// # Errors
 ///
-/// `PreflopError::Model` when the depth is zero or out of range.
+/// `PreflopError::Game` when the depth is zero, `PreflopError::Model` when it is out of
+/// the cbb range.
 pub fn push_fold_config(depth_bb: u32) -> Result<GameConfig, PreflopError> {
-    let _ = depth_bb;
-    Err(PreflopError::NotImplemented("push_fold_config"))
+    if depth_bb == 0 {
+        return Err(game_error("a push/fold depth is at least 1 bb"));
+    }
+    let depth = depth_bb.checked_mul(Cbb::PER_BB).ok_or(ModelError::CbbOutOfRange {
+        op: "*",
+        left: depth_bb,
+        right: Cbb::PER_BB,
+    })?;
+    let (sb_cents, bb_cents) = NO_RAKE_BLINDS_CENTS;
+    let stake = Stake::new(NO_RAKE_STAKE_LABEL, sb_cents, bb_cents, NO_RAKE)?;
+    Ok(GameConfig::new(GameFormat::Online, TableSize::HEADS_UP, stake, Cbb::new(depth)))
 }
 
-/// Solves `game` with CFR+ until `options` stop it.
+/// Solves `game` with CFR+ until `options` stop it: the gains of the average strategy
+/// are measured every `check_every` iterations and after the last one, and the run stops
+/// once both are at or below `target_gain_pct_pot` percent of the starting pot.
 ///
 /// # Errors
 ///
 /// `PreflopError::Game` when the options are degenerate (zero iterations or check
-/// interval).
+/// interval, or a target that is negative or not finite).
 pub fn solve(game: &PreflopGame, options: &CfrOptions) -> Result<SolvedPreflop, PreflopError> {
-    let _ = (game, options);
-    Err(PreflopError::NotImplemented("solve"))
+    let target_ok = options.target_gain_pct_pot.is_finite() && options.target_gain_pct_pot >= 0.0;
+    if options.max_iterations == 0 || options.check_every == 0 || !target_ok {
+        return Err(game_error(format!("degenerate CFR+ options {options:?}")));
+    }
+    let target_bb = options.target_gain_pct_pot / PERCENT * game.starting_pot_bb();
+    let mut state = cfr::Cfr::new(&game.layout);
+    let mut gains_bb = [f64::INFINITY; 2];
+    while state.iterations() < options.max_iterations {
+        state.iterate(&game.layout);
+        let done = state.iterations() == options.max_iterations;
+        if done || state.iterations() % options.check_every == 0 {
+            gains_bb = cfr::gains(&game.layout, &state.average(&game.layout));
+            if gains_bb.iter().all(|gain| *gain <= target_bb) {
+                break;
+            }
+        }
+    }
+    let average = state.average(&game.layout);
+    Ok(assemble::assemble(game, &average, state.iterations(), gains_bb))
 }
 
 /// Solves the push/fold game at `config` exactly: CFR+ for the support, the indifference
@@ -215,12 +275,19 @@ pub fn solve_push_fold(
     config: &GameConfig,
     equity: &EquityTable,
 ) -> Result<SolvedPreflop, PreflopError> {
-    let _ = (config, equity);
-    Err(PreflopError::NotImplemented("solve_push_fold"))
+    let tree = PreflopTree::push_fold(config)?;
+    let game = PreflopGame::new(&tree, config, equity, None)?;
+    let (profile, iterations) = exact::solve(&game.layout)?;
+    let gains_bb = cfr::gains(&game.layout, &profile);
+    if gains_bb.iter().any(|gain| *gain > CERTIFICATE_GAIN_BB) {
+        return Err(PreflopError::Certificate { gains_bb });
+    }
+    Ok(assemble::assemble(&game, &profile, iterations, gains_bb))
 }
 
-/// Each seat's best-response gain in big blinds against the strategy in `solved`, in
-/// pair order.
+/// Each seat's best-response gain in big blinds per hand dealt against the strategy in
+/// `solved`, in pair order: the value of the seat's best response minus the value of
+/// its strategy, both against the other seat's strategy.
 ///
 /// # Errors
 ///
@@ -229,6 +296,6 @@ pub fn best_response_gains(
     game: &PreflopGame,
     solved: &SolvedPreflop,
 ) -> Result<[f64; 2], PreflopError> {
-    let _ = (game, solved);
-    Err(PreflopError::NotImplemented("best_response_gains"))
+    let profile = assemble::profile_of(game, solved)?;
+    Ok(cfr::gains(&game.layout, &profile))
 }
