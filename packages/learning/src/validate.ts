@@ -42,6 +42,39 @@ export function requireFrequencies(frequencies: readonly number[], field: string
   return total;
 }
 
+/** A boolean, or a RangeError naming the field. */
+export function requireBoolean(value: boolean, field: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new RangeError(`${field} must be true or false, got ${String(value)}`);
+  }
+  return value;
+}
+
+/**
+ * Whether a value is a list at run time. A plain boolean rather than a type guard, because
+ * Array.isArray as a guard narrows a readonly typed list to any[].
+ */
+export function isList(value: unknown): boolean {
+  return Array.isArray(value);
+}
+
+/** A list of strings, or a RangeError naming the field. */
+export function requireStringList(value: readonly string[], field: string): readonly string[] {
+  if (!isList(value) || !value.every((entry) => typeof entry === "string")) {
+    throw new RangeError(`${field} must be a list of strings`);
+  }
+  return value;
+}
+
+/** The list's element at index, or a RangeError naming the field when there is none. */
+export function elementAt<T>(list: readonly T[], index: number, field: string): T {
+  const element = list[index];
+  if (element === undefined) {
+    throw new RangeError(`${field} has no element ${index}`);
+  }
+  return element;
+}
+
 /** A value from a fixed list of spellings, or a RangeError naming the field. */
 export function requireOneOf<T extends string>(value: T, allowed: readonly T[], field: string): T {
   if (!allowed.includes(value)) {

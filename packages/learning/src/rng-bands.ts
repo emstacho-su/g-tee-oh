@@ -2,8 +2,9 @@
  * RNG (random number generator) mode band mapping (05 section 7, ADR 0009, R3.10 mapping part).
  *
  * Mechanism: before the hero acts, an integer roll from 1 to 100 is drawn from the injected
- * RandomSource. The hand's actions are put in passive-to-aggressive order (by kind and size when
- * the actions list is given, record order otherwise), each played action owns a band of rolls as
+ * RandomSource. The hand's actions are put in passive-to-aggressive order by kind and size, from
+ * the actions list, which is always required so grade() and the web roller (S25) can never order
+ * the same node two ways (O-213); each played action owns a band of rolls as
  * wide as its frequency, and the roll selects the action whose band contains it. Bands are cut
  * once at each cumulative edge (O-213): the frequencies are normalized by their sum, each upper
  * edge is the cumulative percent rounded half up, the last edge is 100, and a band whose edges
@@ -12,7 +13,7 @@
  */
 import { passiveToAggressiveOrder, requireActions } from "./actions.js";
 import type { GradeAction, RandomSource } from "./types.js";
-import { requireFrequencies, requireIntegerInRange, requireNonNegative } from "./validate.js";
+import { elementAt, requireFrequencies, requireIntegerInRange, requireNonNegative } from "./validate.js";
 
 /** Smallest and largest roll of RNG mode (05 section 7). */
 export const RNG_ROLL_MIN = 1;
@@ -35,24 +36,20 @@ function cumulativeEdge(cumulativeShare: number): number {
 }
 
 /**
- * The bands of a hand's frequencies, in passive-to-aggressive order. With actions given the order
- * comes from their kinds and sizes; without them the record order is taken as already passive to
- * aggressive (own preflop trees are fold, passive, raise). Throws a RangeError on an empty or
- * all-zero frequency list, a negative frequency, or an actions list of another length.
+ * The bands of a hand's frequencies, in the passive-to-aggressive order of the node's actions
+ * (kind, then size). Throws a RangeError on an empty or all-zero frequency list, a negative
+ * frequency, or a missing actions list or one of another length (O-213).
  */
-export function rngBands(freqByAction: readonly number[], actions?: readonly GradeAction[]): RngBand[] {
+export function rngBands(freqByAction: readonly number[], actions: readonly GradeAction[]): RngBand[] {
   const total = requireFrequencies(freqByAction, "freqByAction");
-  const order =
-    actions === undefined
-      ? freqByAction.map((_, index) => index)
-      : passiveToAggressiveOrder(requireActions(actions, freqByAction.length));
-  const played = order.filter((index) => (freqByAction[index] ?? 0) > 0);
+  const order = passiveToAggressiveOrder(requireActions(actions, freqByAction.length));
+  const played = order.filter((index) => elementAt(freqByAction, index, "freqByAction") > 0);
   const lastPlayed = played.at(-1);
   const bands: RngBand[] = [];
   let cumulative = 0;
   let previousEdge = RNG_ROLL_MIN - 1;
   for (const index of played) {
-    cumulative += freqByAction[index] ?? 0;
+    cumulative += elementAt(freqByAction, index, "freqByAction");
     const edge = index === lastPlayed ? RNG_ROLL_MAX : cumulativeEdge(cumulative / total);
     if (edge > previousEdge) {
       bands.push({ actionIndex: index, from: previousEdge + 1, to: edge });
@@ -70,6 +67,19 @@ export function actionForRoll(bands: readonly RngBand[], roll: number): number {
     throw new RangeError(`no band contains roll ${roll}; bands must tile ${RNG_ROLL_MIN} to ${RNG_ROLL_MAX}`);
   }
   return band.actionIndex;
+}
+
+/**
+ * The record index of the action a roll selects for a hand: the bands of its frequencies over the
+ * node's actions, then the band containing the roll. This is the one entry for RNG mode: grade()
+ * labels this action Best, and the web roller (S25) must call it too, so both always agree.
+ */
+export function rollSelectedAction(
+  freqByAction: readonly number[],
+  actions: readonly GradeAction[],
+  roll: number,
+): number {
+  return actionForRoll(rngBands(freqByAction, actions), roll);
 }
 
 /** One integer roll from 1 to 100 drawn from the injected source; a RangeError if the source leaves [0, 1). */

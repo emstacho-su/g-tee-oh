@@ -21,6 +21,9 @@ export type GradeLabel = "Best" | "Correct" | "Inaccuracy" | "Mistake" | "Blunde
  */
 export type Grouping = "standard" | "grouped" | "simple";
 
+/** The street of the graded node; v1 serves preflop only, v1.5 the rest (ADR 0023). */
+export type Street = "preflop" | "flop" | "turn" | "river";
+
 /**
  * Action kinds, spelled as solver-query's ActionKind enum. The package depends on no workspace
  * package (A1 section 2), so the union is local and a test pins it to the contract.
@@ -53,9 +56,10 @@ export type GradeAction = {
  * section 7, ADR 0009); noiseFlags carries the flags of 05 section 9 (any flag unrates).
  *
  * S22 extensions: grouping (default standard, O-211); actions, the node's actions in record order,
- * required for Grouped and Simple and used to order the RNG bands when given (O-210, O-213);
- * ratedTodayInTrack, the rated decisions already counted today in this decision's track, which the
- * daily cap of 150 needs (O-56, O-214).
+ * required for Grouped and Simple and for RNG mode, whose bands always follow their kind and size
+ * order (O-210, O-213); ratedTodayInTrack, the rated decisions already counted today in this
+ * decision's track, which the daily cap of 150 needs (O-56, O-214); street, because Grouped shows
+ * and grades exact sizes at a preflop node (R3.9, O-22, O-211).
  */
 export type GradeInput = {
   lossPctPot: number;
@@ -70,6 +74,7 @@ export type GradeInput = {
   grouping?: Grouping;
   actions?: readonly GradeAction[];
   ratedTodayInTrack: number;
+  street: Street;
 };
 
 /**

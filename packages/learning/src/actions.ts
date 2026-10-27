@@ -5,7 +5,7 @@
  * computes a bucket or a loss; both arrive from Rust (ADR 0004).
  */
 import type { ActionKind, Bucket, GradeAction } from "./types.js";
-import { requireNonNegative, requireOneOf } from "./validate.js";
+import { isList, requireNonNegative, requireOneOf } from "./validate.js";
 
 /** solver-query's ActionKind enum, in contract order. */
 export const ACTION_KINDS: readonly ActionKind[] = Object.freeze([
@@ -50,6 +50,9 @@ const KIND_RANK: Readonly<Record<ActionKind, number>> = Object.freeze({
  * kinds and buckets, and finite non-negative sizes and losses. Throws a RangeError otherwise.
  */
 export function requireActions(actions: readonly GradeAction[], actionCount: number): readonly GradeAction[] {
+  if (!isList(actions)) {
+    throw new RangeError("actions must be the node's actions list, one per frequency (O-210, O-213)");
+  }
   if (actions.length !== actionCount) {
     throw new RangeError(`actions must list ${actionCount} actions, one per frequency, got ${actions.length}`);
   }

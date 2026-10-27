@@ -35,9 +35,15 @@ export function isCorrectLabel(label: GradeLabel): boolean {
   return CORRECT_LABELS.includes(requireOneOf(label, LABELS, "label"));
 }
 
-/** True when the hero was sure and the label is Inaccuracy, Mistake or Blunder (O-215). */
+/**
+ * True when the hero was sure and the label is Inaccuracy, Mistake or Blunder (O-215). Both fields
+ * are validated before either is used, so a malformed attempt throws a RangeError whatever its
+ * confidence.
+ */
 export function isConfidentMiss(attempt: ConfidenceAttempt): boolean {
-  return requireOneOf(attempt.confidence, CONFIDENCES, "confidence") === "sure" && !isCorrectLabel(attempt.label);
+  const confidence = requireOneOf(attempt.confidence, CONFIDENCES, "confidence");
+  const correct = isCorrectLabel(attempt.label);
+  return confidence === "sure" && !correct;
 }
 
 function sideOf(attempts: readonly ConfidenceAttempt[], confidence: Confidence): CalibrationSide {

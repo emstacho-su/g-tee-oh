@@ -579,7 +579,7 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
       { ratedTodayInTrack: 1.5 },
       { actions: SIZED_NODE_ACTIONS },
       { street: "preflopp" as GradeInput["street"] },
-      { grouping: "exact" as GradeInput["grouping"] },
+      { grouping: "exact" as NonNullable<GradeInput["grouping"]> },
     ];
     for (const overrides of bad) {
       expect(() => grade({ ...BASE_GRADE_INPUT, ...overrides }), JSON.stringify(overrides)).toThrow(RangeError);

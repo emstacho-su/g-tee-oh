@@ -22,11 +22,14 @@ export type {
   Grouping,
   ModulePlaceholder,
   RandomSource,
+  Street,
 } from "./types.js";
 
 export {
   BLUNDER_ABOVE_PCT_POT,
   DAILY_RATED_CAP,
+  DEFAULT_GROUPING,
+  FREQUENCY_TIE_TOLERANCE,
   GRADING_TAU_PCT_POT,
   MISTAKE_FROM_PCT_POT,
   RATED_WEIGHT,
@@ -37,7 +40,15 @@ export {
 } from "./grading.js";
 export { ACTION_KINDS, BUCKETS, passiveToAggressiveOrder } from "./actions.js";
 export { groupKeys } from "./grouping.js";
-export { RNG_ROLL_MAX, RNG_ROLL_MIN, actionForRoll, chiSquareStatistic, rngBands, rollFrom } from "./rng-bands.js";
+export {
+  RNG_ROLL_MAX,
+  RNG_ROLL_MIN,
+  actionForRoll,
+  chiSquareStatistic,
+  rngBands,
+  rollFrom,
+  rollSelectedAction,
+} from "./rng-bands.js";
 export type { RngBand } from "./rng-bands.js";
 export { createSplitMix64, splitMix64Source, splitMix64Step } from "./random.js";
 export type { SplitMix64, SplitMix64Step } from "./random.js";
