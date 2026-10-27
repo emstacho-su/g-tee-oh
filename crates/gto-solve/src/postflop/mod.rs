@@ -27,6 +27,7 @@ mod measure;
 mod nodes;
 mod options;
 mod problem;
+mod runout_walk;
 mod runouts;
 mod solve;
 
@@ -36,7 +37,7 @@ mod parity_tests;
 pub use error::SolveError;
 pub use estimate::{MemoryEstimate, estimate_bytes, estimate_bytes_with, estimate_memory};
 pub use measure::{BestResponseReport, best_response};
-pub use nodes::{HandStrategy, NodeStrategy, root_street_nodes};
+pub use nodes::{HandStrategy, NodeSelection, NodeStrategy, root_street_nodes, select_nodes};
 pub use options::{
     DEFAULT_MEASURE_EVERY, DEFAULT_MEMORY_CAP_BYTES, NoProgress, ProgressSink, SolveOptions,
     SolveReport, StopReason, StopRule, StorageBits,

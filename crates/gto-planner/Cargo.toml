@@ -8,11 +8,31 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Edges (A1 section 2): gto-model and gto-library. The planner reads the library's
-# (the binaries that link both decide that).
+# Edges (A1 section 2): gto-model, gto-tree and gto-library. gto-tree is a lower layer than
+# gto-library and is needed because a job's preflop lines come from PreflopTree::build and
+# its tree hash from TreeConfig::from_spec (S18, R2.16). The planner reads the library's
+# published preflop solution for equilibrium reach (ADR 0013) and never links a solver;
+# the binaries that link both decide what to solve.
 [dependencies]
 gto-model = { workspace = true }
+gto-tree = { workspace = true }
 gto-library = { workspace = true }
+thiserror = { workspace = true }
+
+# The reach fixture of the R2.16 tests is a packed synthetic preflop solution in a temporary
+# directory (the S16 pattern): gto-library's synthetic generator, library-pack's dump export
+# and pack, and tempfile. The planner bench (plan/enumerate_pair) uses the workspace's
+# criterion line.
+[dev-dependencies]
+gto-library = { workspace = true, features = ["synthetic"] }
+library-pack = { workspace = true }
+tempfile = { workspace = true }
+serde_json = { workspace = true }
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "plan"
+harness = false

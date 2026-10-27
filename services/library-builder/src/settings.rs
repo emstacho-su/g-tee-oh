@@ -1,0 +1,383 @@
+//! Live builder settings (A1 section 6, R2.18, O-13, O-188): the `builder_setting` rows
+//! are read on every claim, so a change takes effect on the next job without a redeploy.
+//!
+//! Every key has a default, and a missing key takes it. A key whose value is malformed
+//! (wrong JSON type, out of range, or 16-bit storage with a target under the O-194 floor)
+//! is reported as a [`SettingError`] naming the key, which `/healthz` lists, and that key
+//! alone falls back to its default; an unknown key is reported the same way. Nothing is
+//! skipped silently.
+//!
+//! Every number has a ceiling named by a `MAX_*` constant (S18 review MEDIUM 7, M2), and a
+//! value above it is malformed in the same way. The two keys that bound real resources,
+//! `memory_cap_bytes` and `budget_bytes`, are also held under the deploy-time [`Limits`]
+//! from the environment: [`BuilderSettings::from_rows_with`] lowers a value above its
+//! ceiling to the ceiling and reports that too.
+//!
+//! | key | default | meaning |
+//! |---|---|---|
+//! | `paused` | false | claim nothing |
+//! | `cpu_share` | 0.5 | share of `BUILDER_THREADS` outside the boost window |
+//! | `overnight` | `{"start_hour":0,"end_hour":7,"utc_offset_minutes":0,"cpu_share":1.0}` | the O-13 boost |
+//! | `budget_bytes` | 650000000000 | ADR 0018 |
+//! | `bytes_per_runout` | 14156873 | O-180 |
+//! | `bytes_per_flop_tree` | 752365 | O-180 |
+//! | `k_runouts` | 20 | O-14 |
+//! | `k_runouts_rare` | 10 | O-191 |
+//! | `k_frequent_pairs` | 1 | O-191 |
+//! | `plan_configs` | `["cfg_6_online_100"]` | planner scope; `[]` turns planning off |
+//! | `target_pct_pot` | 0.3 | 04 section 6, O-138 |
+//! | `max_iterations` | 20000 | per attempt, times the attempt number |
+//! | `max_seconds_per_line` | 1800 | O-178 |
+//! | `storage_bits` | 32 | O-194; 16 only with a target of at least 0.5 |
+//! | `memory_cap_bytes` | 4294967296 | O-139, O-187; 4 GiB under the 5 GiB container |
+//! | `max_attempts` | 3 | A5 section 4, O-176 |
+//! | `stale_hours` | 6 | O-185 |
+//! | `verify_interval_hours` | 24 | O-186 |
+//! | `plan_interval_minutes` | 60 | the automatic plan |
+//! | `poll_seconds` | 30 | sleep when paused or idle |
+
+mod parse;
+
+use gto_planner::PlannerSettings;
+use gto_solve::postflop::{SolveOptions, StopRule, StorageBits};
+use serde::Serialize;
+use serde_json::Value;
+
+/// The smallest stop target 16-bit storage may be paired with (O-194).
+pub const SIXTEEN_BIT_TARGET_FLOOR_PCT_POT: f32 = 0.5;
+
+/// Minutes in a day, for the boost window.
+pub const MINUTES_PER_DAY: u32 = 24 * 60;
+
+/// One gibibyte (GiB), 2 to the 30th bytes.
+const GIB: u64 = 1024 * 1024 * 1024;
+
+/// The default `memory_cap_bytes`: 4 GiB, leaving 1 GiB of headroom under the 5 GiB
+/// container limit (O-139) for the runtime, the runout extraction and the staging buffers
+/// that live beside the solve (S18 review HIGH 4).
+pub const DEFAULT_MEMORY_CAP_BYTES: u64 = 4 * GIB;
+
+/// The default memory ceiling when neither `BUILDER_MEMORY_CEILING_BYTES` nor a cgroup
+/// limit is known: the 5 GiB container limit of O-139.
+pub const DEFAULT_MEMORY_CEILING_BYTES: u64 = 5 * GIB;
+
+/// The default budget ceiling when `BUILDER_BUDGET_CEILING_BYTES` is unset: the 650 GB
+/// library budget of ADR 0018.
+pub const DEFAULT_BUDGET_CEILING_BYTES: u64 = 650_000_000_000;
+
+/// The largest `k_runouts` and `k_runouts_rare`: every ordered turn and river pair of a
+/// flop (`gto_library::ORDERED_RUNOUTS`, 2,352), which also fits the `smallint` column.
+// 2,352 fits a u16; the test `r2_18_every_key_above_its_ceiling_falls_back_and_is_named`
+// pins the two equal.
+#[allow(clippy::cast_possible_truncation)]
+pub const MAX_K_RUNOUTS: u16 = gto_library::ORDERED_RUNOUTS as u16;
+
+/// The largest `k_frequent_pairs`: 1,326 is every two-card pair of a 52-card deck, so no
+/// configuration has more pairs to rank.
+pub const MAX_K_FREQUENT_PAIRS: u16 = 1_326;
+
+/// The largest `max_seconds_per_line`: one day; a line that needs longer is a broken
+/// setting, not a slow solve.
+pub const MAX_SECONDS_PER_LINE: u32 = 86_400;
+
+/// The largest `max_iterations` on the first attempt: one million, fifty times the default;
+/// later attempts multiply it by the attempt number.
+pub const MAX_ITERATIONS: u32 = 1_000_000;
+
+/// The largest `poll_seconds`: one hour, so a paused or idle builder still looks again.
+pub const MAX_POLL_SECONDS: u32 = 3_600;
+
+/// The largest `stale_hours`: one week (168 hours).
+pub const MAX_STALE_HOURS: u32 = 168;
+
+/// The largest `verify_interval_hours`: 30 days (720 hours).
+pub const MAX_VERIFY_INTERVAL_HOURS: u32 = 720;
+
+/// The largest `plan_interval_minutes`: one week (10,080 minutes).
+pub const MAX_PLAN_INTERVAL_MINUTES: u32 = 10_080;
+
+/// The largest `max_attempts`: 100 failures before a job parks.
+pub const MAX_ATTEMPTS: i16 = 100;
+
+/// The largest `bytes_per_runout` and `bytes_per_flop_tree`: one GiB, about 70 times the
+/// O-180 runout measurement.
+pub const MAX_BYTES_PER_ITEM: u64 = GIB;
+
+/// The largest `target_pct_pot`: the whole pot.
+pub const MAX_TARGET_PCT_POT: f32 = 100.0;
+
+/// Every key the builder reads.
+pub const KEYS: [&str; 20] = [
+    "paused",
+    "cpu_share",
+    "overnight",
+    "budget_bytes",
+    "bytes_per_runout",
+    "bytes_per_flop_tree",
+    "k_runouts",
+    "k_runouts_rare",
+    "k_frequent_pairs",
+    "plan_configs",
+    "target_pct_pot",
+    "max_iterations",
+    "max_seconds_per_line",
+    "storage_bits",
+    "memory_cap_bytes",
+    "max_attempts",
+    "stale_hours",
+    "verify_interval_hours",
+    "plan_interval_minutes",
+    "poll_seconds",
+];
+
+/// The O-13 overnight boost window, in local hours given by a UTC offset.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct Overnight {
+    /// The local hour the boost starts, 0 to 23.
+    pub start_hour: u8,
+    /// The local hour the boost ends, 0 to 23; a window may wrap midnight.
+    pub end_hour: u8,
+    /// The local time's offset from UTC in minutes.
+    pub utc_offset_minutes: i32,
+    /// The share inside the window, above 0 and at most 1.
+    pub cpu_share: f64,
+}
+
+impl Default for Overnight {
+    fn default() -> Self {
+        Overnight { start_hour: 0, end_hour: 7, utc_offset_minutes: 0, cpu_share: 1.0 }
+    }
+}
+
+/// One setting that could not be used.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SettingError {
+    /// The key.
+    pub key: String,
+    /// Why, naming the default used instead.
+    pub reason: String,
+}
+
+/// The settings in force for one claim.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BuilderSettings {
+    /// Claim nothing.
+    pub paused: bool,
+    /// Share of `BUILDER_THREADS` outside the boost window, above 0 and at most 1.
+    pub cpu_share: f64,
+    /// The boost window.
+    pub overnight: Overnight,
+    /// The planner's budget, sizes and K (`budget_bytes`, `bytes_per_*`, `k_*`).
+    #[serde(skip)]
+    pub planner: PlannerSettings,
+    /// The configurations the planner enumerates.
+    pub plan_configs: Vec<String>,
+    /// The stop and publish target per seat in percent of the pot.
+    pub target_pct_pot: f32,
+    /// Iterations per line on the first attempt.
+    pub max_iterations: u32,
+    /// Seconds per line.
+    pub max_seconds_per_line: u32,
+    /// 16 or 32.
+    pub storage_bits: u8,
+    /// The memory cap.
+    pub memory_cap_bytes: u64,
+    /// Failures before a job parks.
+    pub max_attempts: i16,
+    /// Age of a running row the stale reclaim re-queues.
+    pub stale_hours: u32,
+    /// Hours between verify passes.
+    pub verify_interval_hours: u32,
+    /// Minutes between automatic plans.
+    pub plan_interval_minutes: u32,
+    /// Sleep when paused or idle.
+    pub poll_seconds: u32,
+}
+
+impl Default for BuilderSettings {
+    fn default() -> Self {
+        BuilderSettings {
+            paused: false,
+            cpu_share: 0.5,
+            overnight: Overnight::default(),
+            planner: PlannerSettings::default(),
+            plan_configs: vec!["cfg_6_online_100".to_owned()],
+            target_pct_pot: 0.3,
+            max_iterations: 20_000,
+            max_seconds_per_line: 1_800,
+            storage_bits: 32,
+            memory_cap_bytes: DEFAULT_MEMORY_CAP_BYTES,
+            max_attempts: 3,
+            stale_hours: 6,
+            verify_interval_hours: 24,
+            plan_interval_minutes: 60,
+            poll_seconds: 30,
+        }
+    }
+}
+
+/// Hard ceilings from the environment that no `builder_setting` row can exceed (S18 security
+/// review M1 and M2): a setting above its ceiling is clamped to it and reported like any other
+/// out-of-bounds setting, so an edit in the database can never switch off the memory refusal
+/// or lift the library budget past what the operator configured at deploy time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Limits {
+    /// The largest `memory_cap_bytes` in force (`BUILDER_MEMORY_CEILING_BYTES`).
+    pub memory_ceiling_bytes: u64,
+    /// The largest `budget_bytes` in force (`BUILDER_BUDGET_CEILING_BYTES`).
+    pub budget_ceiling_bytes: u64,
+}
+
+impl Default for Limits {
+    /// [`DEFAULT_MEMORY_CEILING_BYTES`] and [`DEFAULT_BUDGET_CEILING_BYTES`], neither below the
+    /// matching default setting, so the defaults are never clamped.
+    fn default() -> Self {
+        Limits {
+            memory_ceiling_bytes: DEFAULT_MEMORY_CEILING_BYTES,
+            budget_ceiling_bytes: DEFAULT_BUDGET_CEILING_BYTES,
+        }
+    }
+}
+impl BuilderSettings {
+    /// [`BuilderSettings::from_rows`], then `memory_cap_bytes` and `budget_bytes` clamped to
+    /// `limits` (see [`Limits`]). A clamped key is reported as a [`SettingError`] after the
+    /// row errors, the memory cap first. The value in force is then the ceiling, not the
+    /// default: the ceiling is the operator's deploy-time bound, and the default may itself
+    /// be above it.
+    #[must_use]
+    pub fn from_rows_with(
+        rows: &[(String, Value)],
+        limits: &Limits,
+    ) -> (BuilderSettings, Vec<SettingError>) {
+        let (settings, mut errors) = BuilderSettings::from_rows(rows);
+        let (memory_cap_bytes, memory_clamp) = clamp(
+            "memory_cap_bytes",
+            settings.memory_cap_bytes,
+            limits.memory_ceiling_bytes,
+            "BUILDER_MEMORY_CEILING_BYTES",
+        );
+        let (budget_bytes, budget_clamp) = clamp(
+            "budget_bytes",
+            settings.planner.budget_bytes,
+            limits.budget_ceiling_bytes,
+            "BUILDER_BUDGET_CEILING_BYTES",
+        );
+        errors.extend(memory_clamp.into_iter().chain(budget_clamp));
+        let planner = PlannerSettings { budget_bytes, ..settings.planner };
+        (BuilderSettings { planner, memory_cap_bytes, ..settings }, errors)
+    }
+
+    /// The settings from `builder_setting` rows, with the errors of the keys that fell
+    /// back to their defaults.
+    ///
+    /// Each row is applied in order to the settings built so far, so a later row of the
+    /// same key wins. A row that fails its check leaves that key at its default and adds a
+    /// [`SettingError`]; an unknown key changes nothing and adds one too. The one rule that
+    /// spans two keys, 16-bit storage only with a target of at least
+    /// [`SIXTEEN_BIT_TARGET_FLOOR_PCT_POT`] (O-194), is checked after every row is read and
+    /// reported at the position of the `storage_bits` row, so the errors stay in row order.
+    #[must_use]
+    pub fn from_rows(rows: &[(String, Value)]) -> (BuilderSettings, Vec<SettingError>) {
+        let defaults = BuilderSettings::default();
+        let mut errors: Vec<(usize, SettingError)> = Vec::new();
+        let mut storage_row = None;
+        let mut settings = defaults.clone();
+        for (index, (key, value)) in rows.iter().enumerate() {
+            match parse::apply(&settings, key, value) {
+                Ok(next) => {
+                    if key == "storage_bits" {
+                        storage_row = Some(index);
+                    }
+                    settings = next;
+                }
+                Err(problem) => {
+                    let reason = parse::reason(&defaults, key, &problem);
+                    errors.push((index, SettingError { key: key.clone(), reason }));
+                }
+            }
+        }
+        if let Some(index) = storage_row
+            && settings.storage_bits == 16
+            && settings.target_pct_pot < SIXTEEN_BIT_TARGET_FLOOR_PCT_POT
+        {
+            let problem = parse::Problem::Invalid(format!(
+                "16-bit storage needs target_pct_pot of at least \
+                 {SIXTEEN_BIT_TARGET_FLOOR_PCT_POT} (O-194), the target is {}",
+                settings.target_pct_pot
+            ));
+            let reason = parse::reason(&defaults, "storage_bits", &problem);
+            errors.push((index, SettingError { key: "storage_bits".to_owned(), reason }));
+            settings = BuilderSettings { storage_bits: defaults.storage_bits, ..settings };
+        }
+        errors.sort_by_key(|(index, _)| *index);
+        (settings, errors.into_iter().map(|(_, error)| error).collect())
+    }
+
+    /// The share in force at `minute_of_day_utc` (0 to 1,439): the boost share inside the
+    /// window, `cpu_share` outside it.
+    ///
+    /// The local minute is `minute_of_day_utc + utc_offset_minutes` wrapped into one day.
+    /// The window is `[start_hour, end_hour)` in local hours; when `start_hour` is after
+    /// `end_hour` it wraps midnight, and when they are equal it is empty (O-13).
+    #[must_use]
+    pub fn share_at(&self, minute_of_day_utc: u32) -> f64 {
+        let day = i64::from(MINUTES_PER_DAY);
+        let local = (i64::from(minute_of_day_utc) + i64::from(self.overnight.utc_offset_minutes))
+            .rem_euclid(day);
+        let start = i64::from(self.overnight.start_hour) * 60;
+        let end = i64::from(self.overnight.end_hour) * 60;
+        let inside = if start <= end {
+            start <= local && local < end
+        } else {
+            local >= start || local < end
+        };
+        if inside { self.overnight.cpu_share } else { self.cpu_share }
+    }
+
+    /// The solve threads at `minute_of_day_utc`: `round(builder_threads * share)`, at
+    /// least 1.
+    #[must_use]
+    pub fn threads(&self, builder_threads: usize, minute_of_day_utc: u32) -> usize {
+        let threads = u32::try_from(builder_threads).unwrap_or(u32::MAX);
+        let scaled = (f64::from(threads) * self.share_at(minute_of_day_utc)).round();
+        parse::whole_count(scaled).max(1)
+    }
+
+    /// The stop rule of attempt `attempt` (1 for the first): the target, `max_iterations`
+    /// times the attempt number (an attempt of 0 counts as 1; the product saturates), and
+    /// `max_seconds_per_line`.
+    #[must_use]
+    pub fn stop_rule(&self, attempt: u16) -> StopRule {
+        StopRule {
+            target_exploitability_pct_pot: self.target_pct_pot,
+            max_iterations: self.max_iterations.saturating_mul(u32::from(attempt.max(1))),
+            max_seconds: self.max_seconds_per_line,
+        }
+    }
+
+    /// The solve options: the storage and the memory cap.
+    #[must_use]
+    pub fn solve_options(&self) -> SolveOptions {
+        SolveOptions {
+            storage: if self.storage_bits == 16 {
+                StorageBits::Sixteen
+            } else {
+                StorageBits::ThirtyTwo
+            },
+            memory_cap_bytes: self.memory_cap_bytes,
+            ..SolveOptions::default()
+        }
+    }
+}
+
+/// `value` clamped to `ceiling`, with the [`SettingError`] of `key` when it was above it;
+/// `variable` names the environment variable that sets the ceiling.
+fn clamp(key: &str, value: u64, ceiling: u64, variable: &str) -> (u64, Option<SettingError>) {
+    if value <= ceiling {
+        return (value, None);
+    }
+    let reason = format!(
+        "{value} is above the ceiling {ceiling} ({variable}); the ceiling {ceiling} is used"
+    );
+    (ceiling, Some(SettingError { key: key.to_owned(), reason }))
+}

@@ -8,12 +8,60 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
-# Edges (A1 section 2): gto-solve, gto-planner and gto-library with its default `solve`
-# feature, since this is the process that is allowed to solve.
+# Edges (A1 section 2, ADR 0018): this is the one process that solves, so it links
+# gto-solve beside gto-planner, gto-library, gto-tree and gto-model. gto-library carries no
+# feature that reaches a solver (O-101); the glue between a solve and the library (runout
+# extraction, publishing) lives here (O-173).
 [dependencies]
+gto-model = { workspace = true }
+gto-tree = { workspace = true }
 gto-solve = { workspace = true }
 gto-planner = { workspace = true }
 gto-library = { workspace = true }
+
+# The builder-role connection (O-28, O-146): a lazy sqlx pool as builder_login with
+# runtime-checked queries (O-147), on the tokio runtime; the claim, publish and notify
+# statements are plain SQL (ADR 0005). tokio's `sync` feature carries a job's progress from
+# the blocking solve thread to the async queue (src/job.rs).
+tokio = { workspace = true, features = ["sync"] }
+sqlx = { workspace = true }
+# The operations surface on 7071 (A5 section 1, R2.18): GET /healthz and GET /metrics.
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+# The one error enum.
+thiserror = { workspace = true }
+# The rayon pool a job's solve runs inside, sized from cpu_share times BUILDER_THREADS
+# (A2 section 5, O-13), so gto-solve's estimate sees the same count.
+rayon = { workspace = true }
+# The library bucket client (O-183, O-208, ADR 0019); the workspace manifest says why the
+# 0.14 line runs on ring with no aws-lc-sys and no webpki roots.
+object_store = { workspace = true }
+# object_store 0.14 over reqwest with rustls on ring, no aws-lc-rs (O-208).
+reqwest = { workspace = true }
+rustls = { workspace = true }
+# The machine block of the bench report (O-190, validation/reports/README.md), the same
+# `system` feature the validate tool uses.
+sysinfo = { workspace = true }
+
+# In-process request tests (tower::ServiceExt::oneshot), response body collection, scratch
+# directories for staging and fixture libraries, the permutation proptest, the extract bench,
+# library-pack for a packed preflop fixture (the S16 pattern) and the report schema check.
+[dev-dependencies]
+tower = { workspace = true }
+http-body-util = { workspace = true }
+tempfile = { workspace = true }
+proptest = { workspace = true }
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+library-pack = { workspace = true }
+jsonschema = { workspace = true }
+gto-library = { workspace = true, features = ["synthetic"] }
+
+[[bench]]
+name = "extract"
+harness = false
 
 [lints]
 workspace = true

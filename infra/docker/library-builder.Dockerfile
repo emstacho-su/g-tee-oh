@@ -86,21 +86,36 @@ RUN set -eu; \
     apt-get install -y --no-install-recommends ca-certificates; \
     rm -rf /var/lib/apt/lists/*; \
     groupadd --system --gid 10001 gto; \
-    useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin gto
+    useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin gto; \
+    install -d -o 10001 -g 10001 -m 0750 /scratch
 
 COPY --from=builder /out/${SERVICE} /usr/local/bin/${SERVICE}
 
+# The O-148 pattern: one directory of validation/ enters the image. The hand-made builder
+# fixtures (O-83, O-181, O-201) are what a smoke build and the Zenbook benchmark read
+# before a preflop solution is packed: BUILDER_RANGES_FIXTURE points at a ranges file here,
+# and `library-builder --once --job-spec /fixtures/builder/bench-bb-btn-srp.json` finds its
+# ranges beside the spec. Read-only data owned by root; .dockerignore keeps the reports out.
+COPY validation/fixtures/builder /fixtures/builder
+
 USER 10001:10001
 WORKDIR /
-# A5 section 1: 7071 serves health and metrics only, inside the compose network.
+# A5 section 1: 7071 serves health and metrics only, inside the compose network (O-207).
 EXPOSE 7071
 
-# No HEALTHCHECK yet. The S01 stub ignores its arguments, prints its version line and exits,
-# so a `--version` probe would prove nothing. S06 adds GET /healthz on 7071 and with it a
-# probe such as: HEALTHCHECK CMD ["/usr/local/bin/library-builder", "healthz"] implemented
-# as a self-check subcommand, which keeps curl and wget out of the image.
+# Health probe (A5 section 2, the solver-query pattern): the binary's own `healthz`
+# subcommand opens a loopback TCP connection to the BUILDER_BIND port, sends GET /healthz
+# and exits 0 on a 200 status line, so curl and wget stay out of the image. /healthz answers
+# 503 while a configured database or bucket does not answer (O-207). start-period covers
+# process start; six retries at 10s give a minute.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 CMD ["/usr/local/bin/library-builder", "healthz"]
 
-# Environment (names from .env.example): the builder role (O-28) through BUILDER_DB_PASSWORD,
-# the library bucket through S3_ENDPOINT and S3_LIBRARY_*. Scratch space for a solve in
-# progress is the compose-provided tmpfs at /tmp, not the image. Nothing is baked in.
+# Environment (names from .env.example): the builder role (O-28) through the BUILDER_DB_*
+# parts (O-146), the library bucket through S3_ENDPOINT and S3_LIBRARY_*, or LIBRARY_ROOT
+# for a directory target (the benchmark), and BUILDER_BIND, BUILDER_THREADS,
+# BUILDER_SCRATCH_DIR, BUILDER_WORKER_ID and BUILDER_RANGES_FIXTURE, each with a default.
+# Scratch space for a build in progress is /scratch, an empty directory owned by 10001 that
+# compose mounts the named volume builder-scratch over: Docker fills a new named volume from
+# the image's directory, owner included, so the read-only container can write it. Nothing
+# secret is baked in.
 ENTRYPOINT ["/usr/local/bin/library-builder"]

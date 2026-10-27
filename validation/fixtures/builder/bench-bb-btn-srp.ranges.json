@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "bench-bb-btn-srp.ranges",
+  "sources": [
+    {
+      "id": "hand-made",
+      "citation": "hand-made by S18 for the O-52 line (online 6-max 100bb, BTN opens 2.5bb, BB calls) from common public 6-max conventions of opening and defending widths; not derived from any reference tool or captured data (O-26, O-83, O-201)",
+      "url": null
+    }
+  ],
+  "config_id": "cfg_6_online_100",
+  "lines": [
+    {
+      "position_pair": "BB-BTN",
+      "line": "r250.c",
+      "oop": "JJ-22,AJs-A2s,KJs-K2s,QJs-Q4s,JTs-J6s,T9s-T6s,98s-96s,87s-85s,76s-74s,65s-63s,54s-53s,43s,AJo-A2o,KJo-K8o,QJo-Q9o,JTo-J9o,T9o-T8o,98o,87o",
+      "ip": "22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,54s,A2o+,K8o+,Q9o+,J9o+,T8o+,98o"
+    }
+  ],
+  "notes": [
+    "The BTN range is an opening range of about 43 percent of hands; the BB range is a flatting range against a 2.5bb open, without the hands that would usually 3-bet (QQ+, AK, AQs).",
+    "Benchmark input only (O-201): the first real build runs on reference ranges in S20 (O-41)."
+  ]
+}

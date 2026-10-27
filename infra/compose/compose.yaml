@@ -24,6 +24,11 @@
 # reloaded (O-122). The three built services run hardened the same way (A9 section 3): read-only
 # root filesystem, every capability dropped, no privilege escalation, and a tmpfs on each path the
 # process still writes, so a write anywhere else fails loudly instead of persisting in the container.
+#
+# library-builder (S18, R2.18) is the one service that solves (ADR 0018). It has a single entry under the
+# profiles builder and mac only, so "just dev-up" and the e2e job never start it (O-189): on the Zenbook it
+# runs with --profile dev --profile builder, on the Mac with --profile mac. Its operations port 7071
+# (/healthz and /metrics) stays inside the network gto, unpublished and unauthenticated (O-207).
 
 x-postgres: &postgres
   image: postgres:18-alpine
@@ -279,11 +284,89 @@ services:
       gto:
         aliases: [caddy]
 
+  # The library builder (A1 section 1, A5 section 1, S18): one worker that claims build_job rows, solves
+  # each flop through the vendored engine and writes the build to the library bucket. Profiles builder and
+  # mac only (O-189); dev-up and e2e are unchanged.
+  library-builder:
+    profiles: [builder, mac]
+    build:
+      context: .
+      dockerfile: infra/docker/library-builder.Dockerfile
+    # O-185, PR #22 re-review LOW 2: a fixed host name, so the default stable worker id (the host name) stays
+    # the same when the container is recreated and the new process can reclaim the old one's rows at once
+    # instead of after stale_hours. The per-process nonce and the liveness lock tell the processes apart.
+    hostname: library-builder
+    environment:
+      # A5 section 1: 7071 serves /healthz and /metrics inside the network gto only (O-207)
+      BUILDER_BIND: "0.0.0.0:7071"
+      # O-146: the builder-role connection from its parts, as solver-query does; the pool is lazy, so the
+      # service starts before Postgres answers and /healthz reports the database once it does
+      BUILDER_DB_HOST: postgres
+      BUILDER_DB_SSLMODE: disable
+      BUILDER_DB_PASSWORD: ${BUILDER_DB_PASSWORD:?set BUILDER_DB_PASSWORD in .env}
+      # ADR 0019: the library bucket through the S3 gateway as the library identity (02 section 6.4)
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_LIBRARY_ACCESS_KEY: ${S3_LIBRARY_ACCESS_KEY:?set S3_LIBRARY_ACCESS_KEY in .env}
+      S3_LIBRARY_SECRET_KEY: ${S3_LIBRARY_SECRET_KEY:?set S3_LIBRARY_SECRET_KEY in .env}
+      # A build is staged on the disk-backed named volume builder-scratch before its upload (plan C.6):
+      # a flop build can run to gigabytes, which a tmpfs would take from the 5 GB memory cap
+      BUILDER_SCRATCH_DIR: /scratch
+      # Empty takes the binary's default: the machine's parallelism and the container's host name
+      BUILDER_THREADS: ${BUILDER_THREADS:-}
+      BUILDER_WORKER_ID: ${BUILDER_WORKER_ID:-}
+      # O-181, O-201: the hand-made ranges the image carries under /fixtures/builder until a preflop
+      # solution is packed; a line outside the fixture fails its job with MissingRanges
+      BUILDER_RANGES_FIXTURE: ${BUILDER_RANGES_FIXTURE:-/fixtures/builder/bench-bb-btn-srp.ranges.json}
+    # A9 section 3, the same hardening as solver-query; the writable paths are /scratch, the staging volume
+    # (the image creates it owned by 10001, so a new volume starts with that owner), and a small /tmp
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    volumes:
+      - builder-scratch:/scratch
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    # 02 section 6.2 and O-48: 5 GB for the container, no swap beyond it (the memory cap of O-139 and O-187
+    # refuses a solve whose estimate exceeds it before anything is allocated)
+    mem_limit: 5g
+    memswap_limit: 5g
+    restart: unless-stopped
+    # The image's healthz self-probe, repeated here so the probe is visible beside the service
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/library-builder", "healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    # required: false lets one entry serve both profiles: the dev postgres under builder, postgres-mac under
+    # mac, and none when the builder profile runs alone against an external database
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      postgres-mac:
+        condition: service_healthy
+        required: false
+      # The library bucket's S3 gateway the same way: seaweedfs under dev, seaweedfs-mac under mac, and
+      # none when the bucket is external
+      seaweedfs:
+        condition: service_healthy
+        required: false
+      seaweedfs-mac:
+        condition: service_healthy
+        required: false
+    # No ports: 7071 is never published (O-207)
+    networks:
+      gto: {}
+
 volumes:
   postgres_data: {}
   seaweedfs_data: {}
   caddy_data: {}
   caddy_config: {}
+  # The library builder's staging area (BUILDER_SCRATCH_DIR); a build's files live here only until its upload
+  builder-scratch: {}
 
 networks:
   gto: {}

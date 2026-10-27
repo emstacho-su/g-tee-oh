@@ -225,9 +225,11 @@ docs-mirror:
 hooks:
     git config core.hooksPath .githooks
 
-# Benchmark harness: solve iteration, chunk decode, node read, grade; writes validation/reports/bench-zenbook.json (R0.10, R2.13)
+# S18 adds the two fast builder ids, plan/enumerate_pair (gto-planner) and extract/runout_line
+# (library-builder), which scripts/bench-report.mjs requires in EXPECTED_IDS (O-190).
+# Benchmark harness: solve iteration, chunk decode, node read, grade, plan, extract; writes validation/reports/bench-zenbook.json (R0.10, R2.13)
 bench:
-    cargo bench -p gto-solve -p gto-library -p solver-query --features gto-library/synthetic
+    cargo bench -p gto-solve -p gto-library -p solver-query -p gto-planner -p library-builder --features gto-library/synthetic
     node scripts/bench-report.mjs
 
 # Release build: the three scenarios pack in seconds there and in minutes in debug (O-134).
@@ -270,6 +272,17 @@ coverage-g6a:
     cargo llvm-cov --no-report -p validate --features peak-alloc --lib --test g6a --test spike
     cargo llvm-cov --no-report -p fixture-gen
     cargo llvm-cov report --ignore-filename-regex "{{COVERAGE_G6A_IGNORE}}" --fail-under-lines 80
+
+# Line coverage of gto-planner and library-builder at the 80% gate (S18, R2.16 to R2.18); needs cargo-llvm-cov and the dev stack
+# The ignored tests run too (--include-ignored), so the database and bucket paths count: bring the
+# dev stack up first (just dev-up, just db-migrate) with .env exported, as the integration tests
+# need. The two real-engine flop solves of tests/engine.rs are skipped by name (O-141, O-178);
+# they run once in release at the gate. One test thread, because builder_setting is global.
+coverage-builder:
+    cargo llvm-cov -p gto-planner -p library-builder \
+        --ignore-filename-regex "(gto-model|vendor|gto-solve|gto-tree|gto-library|library-pack)" \
+        --fail-under-lines 80 -- --include-ignored --test-threads=1 \
+        --skip r2_12_a_suit_permuted_solve --skip r2_17_the_tiny_spec_stages
 
 # Statement, branch, function and line coverage of packages/learning at the 80% gate (S22, A9 section 1)
 coverage-learning:

@@ -1,9 +1,14 @@
 {
-  "comment": "Image matrix read by .github/workflows/images.yml with jq (R0.3). Each entry is an object {name, dockerfile, context}; the build job runs once per entry for linux/amd64 and linux/arm64 and pushes to ghcr.io on v* tags only. solver-query is the first entry (S06); api, library-builder and web follow the same shape with their own Dockerfile under infra/docker when their sessions publish them. scripts/images-matrix.test.mjs checks every entry. With an empty list the workflow prints a notice and skips the build job.",
+  "comment": "Image matrix read by .github/workflows/images.yml with jq (R0.3). Each entry is an object {name, dockerfile, context}; the build job runs once per entry for linux/amd64 and linux/arm64 and pushes to ghcr.io on v* tags only. solver-query is the first entry (S06) and library-builder joined in S18 (R2.18); api and web follow the same shape with their own Dockerfile under infra/docker when their sessions publish them. scripts/images-matrix.test.mjs checks every entry. With an empty list the workflow prints a notice and skips the build job.",
   "services": [
     {
       "name": "solver-query",
       "dockerfile": "infra/docker/solver-query.Dockerfile",
+      "context": "."
+    },
+    {
+      "name": "library-builder",
+      "dockerfile": "infra/docker/library-builder.Dockerfile",
       "context": "."
     }
   ]

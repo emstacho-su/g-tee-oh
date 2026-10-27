@@ -12,10 +12,10 @@
 // nearest-rank 95th percentile of the per-iteration times, whenever sample.json is there
 // (plan D.7, O-154): scripts/check-reports.mjs holds grade/warm_cache to the 30 ms budget
 // of A9 section 6 (O-86). It refuses to write when no estimate exists, so `just bench`
-// cannot produce an empty report, and when one of the six ids (five R0.10, one R2.13) is
-// missing, so a partial run cannot overwrite a complete baseline. `just bench` runs it after
-// `cargo bench -p gto-solve -p gto-library -p solver-query --features gto-library/synthetic`;
-// Node only, no npm packages.
+// cannot produce an empty report, and when one of the eight ids (five R0.10, one R2.13, two
+// from S18) is missing, so a partial run cannot overwrite a complete baseline. `just bench`
+// runs it after `cargo bench -p gto-solve -p gto-library -p solver-query -p gto-planner
+// -p library-builder --features gto-library/synthetic`; Node only, no npm packages.
 //
 // BENCH_MACHINE=<name> changes the machine name and the output file name; the default is
 // zenbook (the Mac baseline from S20 onward uses another name).
@@ -32,13 +32,18 @@ export const DEFAULT_MACHINE = "zenbook";
 // The three targets A9 section 1 names plus the grade bench, by criterion id, sorted: S14
 // replaced the two stubs with two chunk decode ids (R2.7, one dense preflop frame and one
 // sparse flop frame) and two node read ids (a cache hit and a cache miss); S16 added one
-// POST /v1/grade through the solver-query router (R2.13, O-154).
+// POST /v1/grade through the solver-query router (R2.13, O-154); S18 added the two fast
+// library-builder ids (O-190): plan/enumerate_pair, the planner enumerating one pair
+// (crates/gto-planner/benches/plan.rs, R2.16), and extract/runout_line, one runout of one line
+// extracted to library nodes (services/library-builder/benches/extract.rs, R2.12).
 export const EXPECTED_IDS = [
   "chunk_decode/postflop_1326_sparse",
   "chunk_decode/preflop_169",
+  "extract/runout_line",
   "grade/warm_cache",
   "node_read/cold_cache",
   "node_read/warm_cache",
+  "plan/enumerate_pair",
   "solve_iteration/simple_tree_flop",
 ];
 const STUB_SUFFIX = "/stub";
