@@ -28,13 +28,17 @@ const TOY_GAMES: [(&str, &str, &str); 3] =
 const CURVE_ITERATIONS: [u64; 5] = [1, 10, 100, 1000, 5000];
 
 /// Every file the fixtures README must name.
-const FIXTURE_FILES: [&str; 6] = [
+const FIXTURE_FILES: [&str; 10] = [
     "toy-games/kuhn.json",
     "toy-games/akq.json",
     "toy-games/leduc.json",
     "openspiel/leduc_curve.py",
     "openspiel/leduc_exploitability.json",
     "openspiel/PROVENANCE.md",
+    "PROVENANCE-g6a.md",
+    "synthetic/sets.json",
+    "synthetic/README.md",
+    "library/README.md",
 ];
 
 /// Closeness for numbers the fixture states exactly and the test restates in code.

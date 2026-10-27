@@ -8,6 +8,7 @@
 pub mod equity;
 mod exploit;
 pub mod postflop;
+pub mod preflop;
 pub mod toy;
 
 /// The crate's package name, used by the workspace link tests (R0.1).

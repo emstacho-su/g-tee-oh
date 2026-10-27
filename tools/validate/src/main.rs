@@ -25,7 +25,7 @@ use std::process::ExitCode;
 use std::time::SystemTime;
 
 use library_pack::NodeDump;
-use validate::cli::{ALLOW_DIRTY, Command, G4Options, Options, USAGE, parse};
+use validate::cli::{ALLOW_DIRTY, Command, G4Options, G6aOptions, Options, USAGE, parse};
 use validate::fixtures::g4_spots::{self, G4Spots};
 use validate::gates::g4::{self, RunExtras};
 use validate::gates::g4_engine::{self, SpotSolve};
@@ -86,7 +86,136 @@ fn main() -> ExitCode {
             Err(message) => fail(&message),
         },
         Command::G4(g4) => verdict(run_g4(&g4, options)),
+        Command::G6a(g6a) => verdict(run_g6a(&g6a, options)),
+        Command::G6aPack => match run_g6a_pack(options) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(message) => fail(&message),
+        },
+        Command::SpikePreflop => verdict(run_spike(options)),
     }
+}
+
+/// The committed equity table as the solver reads it (O-126).
+fn equity_table(repo_root: &Path) -> Result<gto_solve::equity::EquityTable, String> {
+    let path = repo_root.join(validate::equity_fixture::DEFAULT_PATH);
+    let fixture = validate::equity_fixture::load(&path).map_err(|error| error.to_string())?;
+    Ok(fixture.to_table())
+}
+
+/// Write a gate report's two files into `out_dir` and print the verdict line.
+fn write_report(
+    gate_report: &gates::GateReport,
+    context: &Context,
+    out_dir: &Path,
+) -> Result<bool, String> {
+    let envelope = Report::from_gate(gate_report, context);
+    let json = out_dir.join(format!("{}.json", gate_report.report));
+    let markdown = out_dir.join(format!("{}.md", gate_report.report));
+    report::write_json(&envelope, &json).map_err(|error| error.to_string())?;
+    report::write_markdown(&envelope, &markdown).map_err(|error| error.to_string())?;
+    let verdict = if gate_report.pass { "pass" } else { "FAIL" };
+    println!(
+        "{BIN_NAME}: {} {verdict} ({}, {})",
+        gate_report.report,
+        json.display(),
+        markdown.display()
+    );
+    Ok(gate_report.pass)
+}
+
+/// Run gate G6a (R2.19): solve the 15 depths, certify them, compare the committed library
+/// and, when a local chart is named, the published chart (O-221).
+fn run_g6a(g6a: &G6aOptions, options: &Options) -> Result<bool, String> {
+    use validate::fixtures::g6a_chart::{CHART_ENV, Chart};
+    use validate::gates::g6a;
+
+    let repo_root = validate::repo_root();
+    let context = run_context(&repo_root, options)?;
+    let equity = equity_table(&repo_root)?;
+    let chart_path = g6a.chart.clone().or_else(|| std::env::var_os(CHART_ENV).map(Into::into));
+    let chart = match chart_path {
+        Some(path) => Some(Chart::load(&path).map_err(|error| error.to_string())?),
+        None => None,
+    };
+    let library_root = repo_root.join(g6a::LIBRARY_RELATIVE_TO_REPO_ROOT);
+    let input = g6a::G6aInput {
+        equity: &equity,
+        library_root: &library_root,
+        chart: chart.as_ref(),
+        depths_bb: &g6a::DEPTHS_BB,
+    };
+    let gate_report = g6a::run(&input).map_err(|error| error.to_string())?;
+    let out_dir =
+        options.out.clone().unwrap_or_else(|| repo_root.join(REPORTS_RELATIVE_TO_REPO_ROOT));
+    write_report(&gate_report, &context, &out_dir)
+}
+
+/// Solve push/fold at the 15 depths and pack them as the G6a library fixture (R2.19).
+fn run_g6a_pack(options: &Options) -> Result<(), String> {
+    use validate::gates::g6a;
+
+    let repo_root = validate::repo_root();
+    let equity = equity_table(&repo_root)?;
+    let out_root =
+        options.out.clone().unwrap_or_else(|| repo_root.join(g6a::LIBRARY_RELATIVE_TO_REPO_ROOT));
+    let solutions =
+        g6a::solve_depths(&equity, &g6a::DEPTHS_BB).map_err(|error| error.to_string())?;
+    let prefixes =
+        g6a::pack_library(&solutions, &out_root, VERSION).map_err(|error| error.to_string())?;
+    for prefix in &prefixes {
+        println!("{BIN_NAME}: packed {}", prefix.display());
+    }
+    Ok(())
+}
+
+/// Run the preflop spike (R2.21) and write `spike-preflop-<machine>`.
+///
+/// Inputs come from `spike::repo_root` (the `VALIDATE_REPO_ROOT` override inside the
+/// spike image, O-228). Outside a git checkout the context is built from `--commit`
+/// instead of `git status`. The caller's notes come from `SPIKE_CONTAINER` (the docker
+/// run line, with `--memory 5g`) and `SPIKE_CONCURRENT` (other heavy work running). A
+/// 100bb run that errors is reported as not measured and fails the report; its labeled
+/// extrapolation is informational only (`spike::measure_hu100`).
+fn run_spike(options: &Options) -> Result<bool, String> {
+    use validate::gates::g6a::DEPTHS_BB;
+    use validate::spike;
+
+    let repo_root = spike::repo_root();
+    let context = if spike::is_git_checkout(&repo_root) {
+        run_context(&repo_root, options)?
+    } else {
+        let commit = options.commit.as_deref().ok_or_else(|| {
+            format!("{} is not a git checkout, so pass --commit <sha>", repo_root.display())
+        })?;
+        spike::context_without_git(options.machine.as_deref(), commit, options.allow_dirty)
+            .map_err(|error| error.to_string())?
+    };
+    let container = std::env::var(spike::CONTAINER_ENV).ok();
+    if !spike::records_container_limit(container.as_deref()) {
+        eprintln!(
+            "{BIN_NAME}: {} does not record a {} container run",
+            spike::CONTAINER_ENV,
+            spike::CONTAINER_LIMIT_FLAG
+        );
+    }
+    if !spike::ACCOUNTED_PEAK_AVAILABLE {
+        eprintln!(
+            "{BIN_NAME}: built without the peak-alloc feature, so the accounted peak is \
+             unavailable; a run with no other reading fails its peak judge"
+        );
+    }
+    let concurrent = std::env::var(spike::CONCURRENT_ENV).ok();
+    let notes = spike::caller_notes(container.as_deref(), concurrent.as_deref());
+    let equity = equity_table(&repo_root)?;
+    let push_fold = spike::run_push_fold(&equity, &DEPTHS_BB).map_err(|error| error.to_string())?;
+    let hu100 = spike::measure_hu100(&equity, &repo_root, &push_fold);
+    if let spike::Hu100::NotMeasured { reason, .. } = &hu100 {
+        eprintln!("{BIN_NAME}: the 100bb run was not measured, so the report fails: {reason}");
+    }
+    let gate_report = spike::report(&context.machine.name, &push_fold, &hu100, &notes);
+    let out_dir =
+        options.out.clone().unwrap_or_else(|| repo_root.join(REPORTS_RELATIVE_TO_REPO_ROOT));
+    write_report(&gate_report, &context, &out_dir)
 }
 
 /// The exit code of a gate run: success, the gate failure code, or the error code.

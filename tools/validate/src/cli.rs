@@ -21,11 +21,18 @@ pub const USAGE: &str = "\
 usage: validate [COMMAND] [--out DIR|FILE] [--machine NAME] [--commit SHA] [--allow-dirty]
        validate g4 --oracle PATH [--spots PATH] [--engine PATH] [--write-engine PATH]
                    [--report-id ID] ...
+       validate g6a [--chart PATH] ...
 
 commands
   g1 | g2 | g3   run one toy-game gate and write its JSON and Markdown report
   gates          run G1, G2 and G3 (--out is the report directory)
   g4             compare the engine against an oracle dump over the G4 spot list (R2.11)
+  g6a            solve heads-up push/fold at 1 to 15 bb, certify it, compare it with the
+                 committed library and, given a chart, with the published chart (R2.19)
+  g6a-pack       solve push/fold and pack the 15 solutions under --out (default
+                 validation/fixtures/library) (R2.19)
+  spike-preflop  measure seconds and peak bytes of push/fold and the heads-up 100bb run
+                 and write the spike report (R2.21)
   equity-table   write the 169 by 169 preflop equity fixture (--out is the file)
   help           print this text
 
@@ -45,6 +52,10 @@ g4 options
   --report-id    the report id and file stem (default g4-oracle; g4-oracle-raked for the
                  raked list): lowercase words of letters and digits joined by dashes
 
+g6a options
+  --chart        the local chart transcription (default $G6A_CHART_PATH); without it the
+                 chart comparison is skipped and the report says so (O-221)
+
 With no command the tool prints its name and version. A dirty working tree is refused
 unless --allow-dirty is given. Exit 1 when a gate failed, 2 on an error.";
 
@@ -58,8 +69,12 @@ const ORACLE: &str = "--oracle";
 const ENGINE: &str = "--engine";
 const WRITE_ENGINE: &str = "--write-engine";
 const REPORT_ID: &str = "--report-id";
+/// The flag that takes a value, `g6a` only.
+const CHART: &str = "--chart";
 /// The `g4` command name, for its usage errors.
 const G4: &str = "g4";
+/// The `g6a` command name, for its usage errors.
+const G6A: &str = "g6a";
 /// The character between the words of a report id (report.schema.json).
 const ID_WORD_SEPARATOR: char = '-';
 
@@ -76,6 +91,19 @@ pub enum Command {
     EquityTable,
     /// The oracle gate.
     G4(G4Options),
+    /// Gate G6a, heads-up push/fold (R2.19).
+    G6a(G6aOptions),
+    /// Solve push/fold and pack the G6a library fixture (R2.19).
+    G6aPack,
+    /// The preflop spike measurement (R2.21).
+    SpikePreflop,
+}
+
+/// The options of `g6a`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct G6aOptions {
+    /// `--chart`: the local chart transcription; else `$G6A_CHART_PATH`, else none (O-221).
+    pub chart: Option<PathBuf>,
 }
 
 /// The shared options: three `--flag value` pairs and the bare `--allow-dirty`.
@@ -124,6 +152,7 @@ struct Raw {
     engine: Option<PathBuf>,
     write_engine: Option<PathBuf>,
     report_id: Option<String>,
+    chart: Option<PathBuf>,
 }
 
 /// Parse the arguments after the program name.
@@ -143,6 +172,9 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
         "equity-table" => Command::EquityTable,
         "help" | "--help" | "-h" => Command::Help,
         G4 => Command::G4(g4_options(&raw)?),
+        G6A => Command::G6a(G6aOptions { chart: raw.chart.clone() }),
+        "g6a-pack" => Command::G6aPack,
+        "spike-preflop" => Command::SpikePreflop,
         name => match Gate::from_name(name) {
             Some(gate) => Command::Gates(vec![gate]),
             None => return Err(format!("unknown command {name:?}")),
@@ -150,6 +182,9 @@ pub fn parse(args: &[String]) -> Result<Invocation, String> {
     };
     if !matches!(command, Command::G4(_)) {
         refuse_g4_flags(&raw)?;
+    }
+    if !matches!(command, Command::G6a(_)) && raw.chart.is_some() {
+        return Err(format!("{CHART} is an option of {G6A} only"));
     }
     Ok(Invocation { command, options: raw.options })
 }
@@ -238,6 +273,7 @@ fn with_value(raw: Raw, flag: &str, value: &str) -> Result<Raw, String> {
             }
             Ok(Raw { report_id: set_once(raw.report_id.as_ref(), text, flag)?, ..raw })
         }
+        CHART => Ok(Raw { chart: set_once(raw.chart.as_ref(), path, flag)?, ..raw }),
         other => Err(format!("unknown option {other:?}")),
     }
 }

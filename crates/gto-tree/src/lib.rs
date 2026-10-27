@@ -39,7 +39,10 @@ pub use postflop::{
     PlayerSizes, RootState, SizeKind, SizeTable, SkeletonCounts, StreetCounts, StreetSizes,
     TREE_HASH_TAG, TreeConfig, canonical_bytes, tree_hash, tree_hash_hex,
 };
-pub use preflop::{LineKind, PreflopLine, PreflopNode, PreflopTree};
+pub use preflop::{
+    ChipState, LineKind, PreflopChips, PreflopLine, PreflopNode, PreflopTree, blind_of,
+    small_blind_seat, total_after,
+};
 pub use spec::{IsoRule, PostflopSpec, SPEC_VERSION, SizingConventionSpec, StreetFractions};
 
 /// The crate's package name, used by the workspace link tests (R0.1).

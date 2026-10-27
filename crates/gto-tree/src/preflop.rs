@@ -24,12 +24,16 @@
 //! that is all-in before the flop has no flop line.
 
 mod builder;
+mod chips;
+mod push_fold;
 
 use gto_model::{ActionToken, Cbb, GameConfig, Position, PositionPair, Street, format_line};
 
 use crate::error::TreeError;
 use crate::postflop::RootState;
 use crate::spec::SizingConventionSpec;
+
+pub use chips::{ChipState, PreflopChips, blind_of, small_blind_seat, total_after};
 
 /// The kind of pot a line takes to the flop, by the number of raises before it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -127,6 +131,21 @@ impl PreflopTree {
     ) -> Result<Self, TreeError> {
         let built = builder::build(spec, config, pair)?;
         Ok(PreflopTree { pair, nodes: built.nodes, lines: built.lines })
+    }
+
+    /// Builds the heads-up push/fold tree of gate G6a (R2.19, 04 section 4): the button,
+    /// who posts the small blind, folds or moves all-in; the big blind facing the all-in
+    /// folds or calls. The pair is `BB-BTN`, the stacks are `config.depth_cbb` before the
+    /// blinds, and the tree has no flop line, since every non-fold line is all-in.
+    ///
+    /// # Errors
+    ///
+    /// `TreeError::Preflop` when the configuration is not heads-up, posts a straddle or an
+    /// ante, or its stack does not cover the big blind, and `TreeError::Model` when an
+    /// amount leaves the cbb range.
+    pub fn push_fold(config: &GameConfig) -> Result<Self, TreeError> {
+        let built = push_fold::build(config)?;
+        Ok(PreflopTree { pair: built.pair, nodes: built.nodes, lines: Vec::new() })
     }
 
     /// The pair the tree was built for.
