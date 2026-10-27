@@ -3,10 +3,14 @@
 //!
 //! Mechanism. A run resets the peak readings ([`memory::start`]), starts a wall clock,
 //! does all of its work (build each tree, solve, certify; the equity table arrives
-//! already parsed), stops the clock and reads the peaks ([`memory::finish`]). Push/fold builds the push/fold tree and its vector game per
-//! depth, runs `solve_push_fold` and then recomputes the best-response certificate from
-//! scratch with `best_response_gains`, so the gain the report judges is measured, not
-//! copied from the solver. The 100bb run builds the `BB-BTN` pair tree from the online
+//! already parsed), stops the clock and reads the peaks ([`memory::finish`]). Push/fold
+//! runs `solve_push_fold` per depth, which builds the push/fold tree and its game once,
+//! solves, evaluates each seat's best-response gain on the solved profile and refuses a
+//! result whose gains do not certify (O-223); the gain the report judges is that
+//! certificate, taken with `larger_gain` so a NaN stays visible. It is not recomputed
+//! here: a recompute would need a second tree and game per depth and would only repeat
+//! the same evaluation, and the independent check of the solutions against the committed
+//! library is gate G6a's. The 100bb run builds the `BB-BTN` pair tree from the online
 //! seed sizing spec (O-136) at `push_fold_config(100)`, values flop lines with
 //! `FlopPayout::PLACEHOLDER` and runs CFR+ to `HU100_TARGET_PCT_POT`; its gain is the
 //! larger seat gain in percent of the starting pot.
@@ -17,8 +21,7 @@ use std::time::Instant;
 use gto_model::{Position, PositionPair};
 use gto_solve::equity::EquityTable;
 use gto_solve::preflop::{
-    CfrOptions, FlopPayout, PreflopGame, best_response_gains, push_fold_config, solve,
-    solve_push_fold,
+    CfrOptions, FlopPayout, PreflopGame, larger_gain, push_fold_config, solve, solve_push_fold,
 };
 use gto_tree::{PreflopTree, SizingConventionSpec};
 
@@ -68,22 +71,19 @@ pub fn run_push_fold(equity: &EquityTable, depths_bb: &[u32]) -> Result<SpikeRun
         label: format!("push/fold, {} depths from {first} to {last} bb", depths_bb.len()),
         seconds,
         iterations: depths.iter().map(|(iterations, _)| iterations).sum(),
-        gain: depths.iter().map(|(_, gain)| *gain).fold(0.0, larger_of),
+        gain: depths.iter().fold(0.0, |largest, (_, gain)| larger_gain([largest, *gain])),
         peak,
     })
 }
 
-/// One push/fold depth: the iterations it took and the larger recomputed seat gain in bb.
+/// One push/fold depth: the iterations it took and the larger certified seat gain in bb.
 fn push_fold_depth(equity: &EquityTable, depth_bb: u32) -> Result<(u64, f64), SpikeError> {
     let at = |what: &str, error: &dyn std::fmt::Display| {
         SpikeError::new(format!("push/fold at {depth_bb} bb: {what}: {error}"))
     };
     let config = push_fold_config(depth_bb).map_err(|e| at("configuration", &e))?;
-    let tree = PreflopTree::push_fold(&config).map_err(|e| at("tree", &e))?;
-    let game = PreflopGame::new(&tree, &config, equity, None).map_err(|e| at("game", &e))?;
     let solved = solve_push_fold(&config, equity).map_err(|e| at("solve", &e))?;
-    let gains = best_response_gains(&game, &solved).map_err(|e| at("certificate", &e))?;
-    Ok((u64::from(solved.iterations), larger_of(gains[0], gains[1])))
+    Ok((u64::from(solved.iterations), larger_gain(solved.gains_bb)))
 }
 
 /// Runs the minimal heads-up 100bb P2 solve (O-227) and measures it, reading the sizing
@@ -125,7 +125,7 @@ pub fn run_hu100_at(equity: &EquityTable, repo_root: &Path) -> Result<SpikeRun, 
         ),
         seconds,
         iterations: u64::from(solved.iterations),
-        gain: larger_of(solved.gains_bb[0], solved.gains_bb[1]) / pot_bb * PERCENT,
+        gain: larger_gain(solved.gains_bb) / pot_bb * PERCENT,
         peak,
     })
 }
@@ -139,27 +139,12 @@ fn load_seed_spec(repo_root: &Path) -> Result<SizingConventionSpec, SpikeError> 
         .map_err(|error| SpikeError::new(format!("{}: {error}", path.display())))
 }
 
-/// The larger of two gains; a NaN wins, so it fails the threshold it meets instead of
-/// vanishing the way `f64::max` drops it.
-fn larger_of(a: f64, b: f64) -> f64 {
-    if a.is_nan() || b.is_nan() { f64::NAN } else { a.max(b) }
-}
-
 #[cfg(test)]
 mod tests {
     use gto_solve::equity::EquityTable;
 
-    use super::larger_of;
-
     fn empty_table() -> EquityTable {
         EquityTable { classes: Vec::new(), equity: Vec::new(), pairs: Vec::new() }
-    }
-
-    #[test]
-    fn r2_21_the_larger_gain_keeps_a_nan() {
-        assert!((larger_of(1e-12, 3e-12) - 3e-12).abs() < f64::EPSILON);
-        assert!(larger_of(f64::NAN, 0.0).is_nan());
-        assert!(larger_of(0.0, f64::NAN).is_nan());
     }
 
     #[test]

@@ -388,28 +388,27 @@ function readManifest(settings, configId, solutionId) {
   return parseJsonBody(path, readFileSync(path, "utf8"));
 }
 
-// Coverage lists one fixture solution for the configuration, and its manifest carries the expected flag.
+// Coverage lists one fixture solution for the configuration, and its manifest carries the expected
+// flag; returns the solution id with the detail line.
 function checkFixtureSolution(settings, expected) {
   const response = fetchInsideNetwork(coverageUrl(expected.configId));
   const solutionId = singleFixtureSolution(expected.configId, response);
   const manifest = readManifest(settings, expected.configId, solutionId);
   checkSyntheticFlag(`${expected.configId} manifest ${solutionId}`, manifest, expected.synthetic);
-  return `coverage lists ${expected.configId} BB-BTN solution ${solutionId} from the fixture library, synthetic ${expected.synthetic}`;
+  const detail = `coverage lists ${expected.configId} BB-BTN solution ${solutionId} from the fixture library, synthetic ${expected.synthetic}`;
+  return { solutionId, detail };
 }
 
-function checkG6aCoverage(settings) {
-  return checkFixtureSolution(settings, G6A);
+// The G6a solution through the real reader, one coverage fetch: coverage names the solution, its
+// manifest says synthetic false, and nodes answers its root key.
+function checkG6aSolution(settings) {
+  const { solutionId, detail } = checkFixtureSolution(settings, G6A);
+  const hands = checkG6aRoot(fetchInsideNetwork(nodesUrl(solutionId, G6A_ROOT_KEY)));
+  return `${detail}; nodes answers ${G6A_ROOT_KEY} with fold and all-in over ${hands} hands`;
 }
 
 function checkSyntheticCoverage(settings) {
-  return checkFixtureSolution(settings, SYNTHETIC);
-}
-
-// The G6a root read through the real reader: coverage names the solution, nodes answers its root key.
-function checkG6aRootNode() {
-  const solutionId = singleFixtureSolution(G6A.configId, fetchInsideNetwork(coverageUrl(G6A.configId)));
-  const hands = checkG6aRoot(fetchInsideNetwork(nodesUrl(solutionId, G6A_ROOT_KEY)));
-  return `nodes answers ${G6A_ROOT_KEY} of ${solutionId} with fold and all-in over ${hands} hands`;
+  return checkFixtureSolution(settings, SYNTHETIC).detail;
 }
 
 const CHECKS = [
@@ -424,9 +423,8 @@ const CHECKS = [
   ["caddy https /api/v1/healthz", checkApiHealthzThroughCaddy],
   ["solver-query fixture library mount", checkFixtureLibraryMount],
   ["solver-query query-role connection", checkQueryRoleConnection],
-  ["solver-query coverage G6a 10bb", checkG6aCoverage],
+  ["solver-query coverage and root node G6a 10bb", checkG6aSolution],
   ["solver-query coverage synthetic 6-max 100bb", checkSyntheticCoverage],
-  ["solver-query nodes G6a 10bb root", checkG6aRootNode],
 ];
 
 async function runCheck(name, check, settings) {

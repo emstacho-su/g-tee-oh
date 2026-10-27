@@ -46,12 +46,14 @@ jobs:
         env:
           VALIDATE_MACHINE: github-ubuntu
       # Gate G6a in public CI (O-63): the certificate at all 15 depths and the committed library
-      # against the recomputation, written as g6a-pushfold and uploaded with the other gate
-      # reports. No chart here: the transcription is never committed, so the report says the
-      # chart part is run locally (O-221). --allow-dirty because the step above has rewritten
-      # the committed G1 to G3 reports in this checkout; the report's notes say the tree was dirty.
+      # against the recomputation. No chart here: the transcription is never committed, so the
+      # report says the chart part is run locally (O-221). just g6a-smoke writes it under
+      # target/gate-reports/g6a and leaves the committed validation/reports/g6a-pushfold.*
+      # untouched (just g6a refuses to run without the chart, since its output is the committed
+      # report). The recipe passes --allow-dirty because the step above has rewritten the
+      # committed G1 to G3 reports in this checkout; the report's notes say the tree was dirty.
       - name: Gate G6a push/fold (R2.19)
-        run: just g6a --allow-dirty
+        run: just g6a-smoke
         env:
           VALIDATE_MACHINE: github-ubuntu
       # Seed determinism of the synthetic sets (O-225): regenerate into target and byte-compare
@@ -65,12 +67,18 @@ jobs:
         run: just g4-smoke
         env:
           VALIDATE_MACHINE: github-ubuntu
+      # The G1 to G3 reports this run rewrote, and this run's chart-less G6a report from
+      # target. The committed g6a-pushfold files (the Zenbook run with the chart) are left out,
+      # so the artifact holds only what this run wrote.
       - name: Upload gate reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gate-reports
-          path: validation/reports/g*-*.*
+          path: |
+            validation/reports/g*-*.*
+            !validation/reports/g6a-pushfold.*
+            target/gate-reports/g6a/g6a-pushfold.*
           if-no-files-found: error
 
   # The canonical tree hash is sha256 over integers in little endian with no float, no map

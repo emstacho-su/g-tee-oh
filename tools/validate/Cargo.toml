@@ -29,13 +29,18 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["float_roundtrip"] }
 # The machine block of every gate report: CPU, cores, memory and operating system.
 sysinfo = { workspace = true }
-# The accounted peak heap bytes of the preflop spike (R2.21, O-228): spike/memory.rs installs
-# it as the global allocator of every binary linking this library, the tool and its tests.
-peak_alloc = { workspace = true }
-
-# Scratch library roots for the G6a pack determinism test (R2.19).
-[dev-dependencies]
+# The accounted peak heap bytes of the preflop spike (R2.21, O-228), behind the peak-alloc
+# feature: with it, spike/memory.rs installs it as the global allocator of every binary
+# linking this library; without it the gates run on the system allocator.
+peak_alloc = { workspace = true, optional = true }
+# The G6a library check hands its recomputed dump to library_pack::verify, which reads a
+# dump file, through a temporary file (R2.19); the tests use it for scratch library roots.
 tempfile = { workspace = true }
+
+[features]
+# Off by default, so gates and g4 pay no allocator tax. The spike image and the spike's
+# peak-bytes test build with it (R2.21, O-228); without it the accounted peak is unavailable.
+peak-alloc = ["dep:peak_alloc"]
 
 [lints]
 workspace = true

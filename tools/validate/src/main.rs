@@ -174,7 +174,8 @@ fn run_g6a_pack(options: &Options) -> Result<(), String> {
 /// spike image, O-228). Outside a git checkout the context is built from `--commit`
 /// instead of `git status`. The caller's notes come from `SPIKE_CONTAINER` (the docker
 /// run line, with `--memory 5g`) and `SPIKE_CONCURRENT` (other heavy work running). A
-/// 100bb run that errors falls back to a labeled extrapolation, never a silent pass.
+/// 100bb run that errors is reported as not measured and fails the report; its labeled
+/// extrapolation is informational only (`spike::measure_hu100`).
 fn run_spike(options: &Options) -> Result<bool, String> {
     use validate::gates::g6a::DEPTHS_BB;
     use validate::spike;
@@ -197,17 +198,20 @@ fn run_spike(options: &Options) -> Result<bool, String> {
             spike::CONTAINER_LIMIT_FLAG
         );
     }
+    if !spike::ACCOUNTED_PEAK_AVAILABLE {
+        eprintln!(
+            "{BIN_NAME}: built without the peak-alloc feature, so the accounted peak is \
+             unavailable; a run with no other reading fails its peak judge"
+        );
+    }
     let concurrent = std::env::var(spike::CONCURRENT_ENV).ok();
     let notes = spike::caller_notes(container.as_deref(), concurrent.as_deref());
     let equity = equity_table(&repo_root)?;
     let push_fold = spike::run_push_fold(&equity, &DEPTHS_BB).map_err(|error| error.to_string())?;
-    let hu100 = spike::run_hu100(&equity).map_or_else(
-        |error| {
-            eprintln!("{BIN_NAME}: the 100bb run failed, extrapolating: {error}");
-            spike::extrapolate_hu100(&push_fold, &format!("the 100bb run failed: {error}"))
-        },
-        spike::Hu100::Measured,
-    );
+    let hu100 = spike::measure_hu100(&equity, &repo_root, &push_fold);
+    if let spike::Hu100::NotMeasured { reason, .. } = &hu100 {
+        eprintln!("{BIN_NAME}: the 100bb run was not measured, so the report fails: {reason}");
+    }
     let gate_report = spike::report(&context.machine.name, &push_fold, &hu100, &notes);
     let out_dir =
         options.out.clone().unwrap_or_else(|| repo_root.join(REPORTS_RELATIVE_TO_REPO_ROOT));

@@ -1,11 +1,15 @@
 //! The three peak readings of the spike (O-228).
 //!
-//! Mechanism. The accounted peak comes from `peak_alloc`, installed here as the global
-//! allocator of every binary that links the `validate` library: the `validate` binary and
-//! the crate's test binaries alike, so the one-depth R2.21 test measures real bytes on any
-//! operating system. The allocator keeps a current and a peak byte count in two atomics;
+//! Mechanism. With the crate's `peak-alloc` feature the accounted peak comes from
+//! `peak_alloc`, installed here as the global allocator of every binary that links the
+//! `validate` library: the `validate` binary and the crate's test binaries alike, so the
+//! one-depth R2.21 test measures real bytes on any operating system. The allocator keeps a
+//! current and a peak byte count in two atomics, which every allocation of the process
+//! pays for; the feature is therefore off by default, so the gates and g4 run on the
+//! system allocator, and only the spike image and the spike test build turn it on.
 //! [`start`] moves the peak down to the current count, so a run's accounted peak is the
-//! largest heap the process held from that point on.
+//! largest heap the process held from that point on. Without the feature the accounted
+//! reading is `None`, never 0.
 //!
 //! The two kernel readings are Linux only and read as `None` elsewhere. `VmHWM` in
 //! `/proc/self/status` is the process's resident high-water mark; [`start`] writes `5` to
@@ -19,11 +23,13 @@
 
 use std::path::Path;
 
+#[cfg(feature = "peak-alloc")]
 use peak_alloc::PeakAlloc;
 
 use super::PeakBytes;
 
 /// The allocator that keeps the accounted peak.
+#[cfg(feature = "peak-alloc")]
 #[global_allocator]
 static ALLOCATOR: PeakAlloc = PeakAlloc;
 
@@ -54,6 +60,7 @@ const BYTES_PER_KIB: u64 = 1024;
 /// Start a measured run: reset the accounted peak and, where the kernel allows, the
 /// resident high-water mark.
 pub(crate) fn start() {
+    #[cfg(feature = "peak-alloc")]
     ALLOCATOR.reset_peak_usage();
     // A failed reset leaves VmHWM at the process's lifetime peak, which is at least this
     // run's peak, so the judged figure stays an upper bound; nothing is lost but detail.
@@ -63,10 +70,26 @@ pub(crate) fn start() {
 /// The three readings at the end of a measured run.
 pub(crate) fn finish() -> PeakBytes {
     PeakBytes {
-        accounted: u64::try_from(ALLOCATOR.peak_usage()).unwrap_or(u64::MAX),
+        accounted: accounted_peak(),
         vm_hwm: read_vm_hwm(),
         cgroup_peak: read_cgroup_peak(),
     }
+}
+
+/// The allocator's peak since [`start`].
+#[cfg(feature = "peak-alloc")]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "one signature for both builds: without peak-alloc the reading is None"
+)]
+fn accounted_peak() -> Option<u64> {
+    Some(u64::try_from(ALLOCATOR.peak_usage()).unwrap_or(u64::MAX))
+}
+
+/// No accounting allocator in this build, so no accounted peak.
+#[cfg(not(feature = "peak-alloc"))]
+fn accounted_peak() -> Option<u64> {
+    None
 }
 
 /// `VmHWM` in bytes, when `/proc/self/status` is readable and carries it.
@@ -126,12 +149,20 @@ mod tests {
         assert_eq!(parse_bytes("max\n"), None);
     }
 
+    #[cfg(feature = "peak-alloc")]
     #[test]
     fn r2_21_accounted_peak_sees_an_allocation() {
         super::start();
         let block = std::hint::black_box(vec![0_u8; 1 << 20]);
         let peak = super::finish();
-        assert!(peak.accounted >= 1 << 20, "{peak:?}");
+        assert!(peak.accounted.is_some_and(|bytes| bytes >= 1 << 20), "{peak:?}");
         drop(block);
+    }
+
+    #[cfg(not(feature = "peak-alloc"))]
+    #[test]
+    fn r2_21_without_the_feature_the_accounted_peak_is_unavailable() {
+        super::start();
+        assert_eq!(super::finish().accounted, None, "unavailable, never 0 bytes");
     }
 }

@@ -7,13 +7,17 @@
 //! (the dump's sha256, O-131) and every packed byte, is the same on every run. The pack
 //! goes through library-pack's `to_solution` (both checkers, criterion 2) and
 //! gto-library's `prepare_preflop`, the two steps `library_pack::pack` runs on a dump
-//! file, without the file. The check reads the one committed solution of the depth's
-//! configuration back through gto-library's `Reader`, re-exports it under its manifest
-//! and compares it with the recomputed dump with library-pack's `compare_dumps`, the O-133
-//! tolerances (frequencies within 1/255, the best action's expected value (EV) equal as
-//! an f32, losses within half a unit); the largest frequency difference is reported too.
+//! file, without the file. The check of the one committed solution of the depth's
+//! configuration is library-pack's own `verify` on the recomputed dump: it reads the
+//! solution back through gto-library's `Reader`, re-exports it under its manifest and
+//! compares it with the dump within the O-133 tolerances (frequencies within 1/255, the
+//! best action's expected value (EV) equal as an f32, losses within half a unit), and
+//! holds the manifest's tree hash and node count against the dump's, so a stale tree hash
+//! or nodes stored beyond the dump fail too. Every sentence it returns is a difference.
+//! The largest frequency difference is reported beside them, from a second read-back.
 
 use std::collections::BTreeMap;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use gto_library::{
@@ -22,7 +26,7 @@ use gto_library::{
 };
 use gto_model::{ActionToken, Cbb, NodeKey};
 use gto_solve::preflop::{SolvedPreflop, SolvedPreflopNode};
-use library_pack::{DumpAction, DumpConfig, DumpHand, DumpNode, NodeDump, PackOptions};
+use library_pack::{DumpAction, DumpConfig, DumpHand, DumpNode, NodeDump, PackError, PackOptions};
 
 use super::G6aError;
 
@@ -196,6 +200,7 @@ pub fn check(library_root: &Path, solution: &SolvedPreflop) -> Result<LibraryChe
     let ours = dump(solution)?;
     let prefix = committed_prefix(library_root, solution)?;
     let named = |message: String| G6aError::new(format!("{prefix}: {message}"));
+    let differences = verify(library_root, &prefix, &ours).map_err(named)?;
     let store = FsStore::new(library_root).map_err(|error| named(error.to_string()))?;
     let bytes = store
         .get(&format!("{prefix}/{MANIFEST_FILE}"))
@@ -203,10 +208,30 @@ pub fn check(library_root: &Path, solution: &SolvedPreflop) -> Result<LibraryChe
     let manifest = Manifest::from_json(&bytes).map_err(|error| named(error.to_string()))?;
     let meta = meta_of(&manifest).map_err(named)?;
     let back = read_back(library_root, &prefix, &ours).map_err(named)?;
-    let exported = library_pack::export_dump(&meta, &back);
-    let differences = library_pack::compare_dumps(&ours, &exported);
-    let max_frequency_diff = max_frequency_diff(&ours, &exported);
+    let max_frequency_diff = max_frequency_diff(&ours, &library_pack::export_dump(&meta, &back));
     Ok(LibraryCheck { prefix, max_frequency_diff, differences })
+}
+
+/// Every difference `library_pack::verify` finds between the solution at `prefix` and
+/// `ours`, none when they match. `verify` reads its dump from a file, so `ours` is written
+/// to a temporary file first; the JSON round trip is exact (`serde_json` with
+/// `float_roundtrip`), so the file holds the dump that was packed.
+fn verify(library_root: &Path, prefix: &str, ours: &NodeDump) -> Result<Vec<String>, String> {
+    let bytes = serde_json::to_vec(ours).map_err(|error| format!("dump to JSON: {error}"))?;
+    let mut file = tempfile::NamedTempFile::new()
+        .map_err(|error| format!("a temporary dump file: {error}"))?;
+    file.write_all(&bytes)
+        .and_then(|()| file.flush())
+        .map_err(|error| format!("{}: {error}", file.path().display()))?;
+    match library_pack::verify(library_root, prefix, file.path()) {
+        Ok(()) => Ok(Vec::new()),
+        Err(PackError::Mismatch(found)) => Ok(found),
+        Err(PackError::Rejected(found)) => Err(format!(
+            "library-pack rejected the recomputed dump: {}",
+            found.iter().map(ToString::to_string).collect::<Vec<_>>().join(" ")
+        )),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 /// `preflop/<config_id>/<id>` of the one committed solution of the configuration.

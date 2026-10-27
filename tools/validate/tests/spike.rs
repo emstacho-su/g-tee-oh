@@ -2,9 +2,11 @@
 //! identifier (R ID).
 //!
 //! Mechanism: the committed Zenbook report must carry the measurements S20 compares the Mac
-//! against, under the fixed ids of `validate::spike::ids`, with the 100bb part labeled as
-//! measured or extrapolated; and a one-depth in-process run must report real peak bytes.
+//! against, under the fixed ids of `validate::spike::ids`, with the 100bb part measured (a
+//! 100bb run that errored is labeled not measured and fails the report); and a one-depth
+//! in-process run must report real peak bytes.
 
+use gto_solve::equity::EquityTable;
 use validate::equity_fixture;
 use validate::report::Report;
 use validate::spike::{
@@ -43,18 +45,19 @@ fn r2_21_committed_spike_report_has_the_schema_s20_reads() {
     assert!(report.thresholds.contains_key(ids::PUSH_FOLD_PEAK_BYTES));
     assert!(value(&report, ids::HU100_PEAK_BYTES) > 0.0);
     assert!(value(&report, ids::HU100_SECONDS) > 0.0);
-    let labeled =
-        report.notes.contains("100bb: measured") || report.notes.contains("100bb: extrapolated");
-    assert!(labeled, "the 100bb part says measured or extrapolated: {}", report.notes);
+    // A passing report measured its 100bb run: a run that was not measured fails (O-49).
+    assert!(report.notes.starts_with("100bb: measured"), "{}", report.notes);
+    assert!(!report.measurements.iter().any(|m| m.id == ids::HU100_MEASURED));
     assert!(report.notes.contains("--memory 5g"), "the container limit is recorded");
     assert!(report.notes.contains("concurrent"), "concurrent heavy work is recorded");
 }
 
 #[test]
 fn r2_21_peak_bytes_judges_the_largest_reading() {
-    let peak = PeakBytes { accounted: 10, vm_hwm: Some(30), cgroup_peak: Some(20) };
-    assert_eq!(peak.judged(), 30);
-    assert_eq!(PeakBytes { accounted: 7, vm_hwm: None, cgroup_peak: None }.judged(), 7);
+    let peak = PeakBytes { accounted: Some(10), vm_hwm: Some(30), cgroup_peak: Some(20) };
+    assert_eq!(peak.judged(), Some(30));
+    assert_eq!(PeakBytes { accounted: Some(7), vm_hwm: None, cgroup_peak: None }.judged(), Some(7));
+    assert_eq!(PeakBytes::default().judged(), None, "no reading is no figure, not 0 bytes");
 }
 
 #[test]
@@ -64,7 +67,7 @@ fn r2_21_report_judges_o80_and_o49() {
         seconds,
         iterations: 1,
         gain,
-        peak: PeakBytes { accounted: bytes, vm_hwm: None, cgroup_peak: None },
+        peak: PeakBytes { accounted: Some(bytes), vm_hwm: None, cgroup_peak: None },
     };
     let push_fold = run("push/fold", 1 << 20, 1.0, 0.0);
     let hu100 = Hu100::Measured(run("hu100", 1 << 24, 60.0, 0.2));
@@ -79,11 +82,40 @@ fn r2_21_report_judges_o80_and_o49() {
 }
 
 #[test]
+fn r2_21_an_errored_100bb_run_fails_the_report() {
+    // An empty equity table is refused by the preflop game, so the 100bb run errors after its
+    // spec and tree are built: the path a real failure of the measured run takes.
+    let empty = EquityTable { classes: Vec::new(), equity: Vec::new(), pairs: Vec::new() };
+    let push_fold = spike::SpikeRun {
+        label: "push/fold".to_owned(),
+        seconds: 1.0,
+        iterations: 1,
+        gain: 0.0,
+        peak: PeakBytes { accounted: Some(1 << 20), vm_hwm: None, cgroup_peak: None },
+    };
+    let hu100 = spike::measure_hu100(&empty, &validate::repo_root(), &push_fold);
+    let report = spike::report("dryrun", &push_fold, &hu100, "");
+    assert!(!report.pass, "an errored 100bb run is no pass: {}", report.notes);
+    assert!(report.notes.starts_with("100bb: not measured"), "{}", report.notes);
+    assert!(report.notes.contains("100bb run: game"), "the error is in the notes");
+    let pass_of = |id: &str| report.measurements.iter().find(|m| m.id == id).map(|m| m.pass);
+    assert_eq!(pass_of(ids::HU100_PEAK_BYTES), Some(None), "the extrapolation is informational");
+    assert_eq!(pass_of(ids::HU100_SECONDS), Some(None));
+    assert_eq!(pass_of(ids::HU100_MEASURED), Some(Some(false)), "the judged row that fails");
+}
+
+#[test]
+#[cfg_attr(
+    not(feature = "peak-alloc"),
+    ignore = "R2.21: the accounted peak needs the peak-alloc feature; just rust-test runs this \
+              with cargo test -p validate --features peak-alloc --test spike"
+)]
 fn r2_21_one_depth_push_fold_run_reports_peak_bytes() {
     let path = validate::repo_root().join(equity_fixture::DEFAULT_PATH);
     let equity = equity_fixture::load(&path).expect("the equity table").to_table();
     let run = spike::run_push_fold(&equity, &[10]).expect("a measured run");
-    assert!(run.peak.judged() > 0);
+    assert!(run.peak.accounted.is_some_and(|bytes| bytes > 0), "{:?}", run.peak);
+    assert!(run.peak.judged().is_some_and(|bytes| bytes > 0));
     assert!(run.seconds >= 0.0);
     assert!(run.gain <= 1e-9, "the certificate holds");
 }

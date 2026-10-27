@@ -112,18 +112,19 @@ pub fn context_without_git(
     })
 }
 
-/// The labeled 100bb extrapolation from the push/fold run, used when the 100bb run could
-/// not be measured: peak bytes and seconds are the push/fold figures times
-/// [`HU100_EXTRAPOLATION_FACTOR`], and `reason` says why nothing was measured (O-49).
+/// The not-measured 100bb part with its labeled extrapolation from the push/fold run, used
+/// when the 100bb run errored: peak bytes and seconds are the push/fold figures times
+/// [`HU100_EXTRAPOLATION_FACTOR`], and `reason` says why nothing was measured. The report
+/// fails on it and records the figures as informational only (O-49).
 #[must_use]
 pub fn extrapolate_hu100(push_fold: &SpikeRun, reason: &str) -> Hu100 {
     let factor = HU100_EXTRAPOLATION_FACTOR;
-    Hu100::Extrapolated {
+    Hu100::NotMeasured {
         reason: format!(
             "{reason}; the figures are the push/fold peak and seconds times {factor}, an \
              assumed bound and not a measurement"
         ),
-        peak_bytes: push_fold.peak.judged().saturating_mul(u64::from(factor)),
+        peak_bytes: push_fold.peak.judged().map(|bytes| bytes.saturating_mul(u64::from(factor))),
         seconds: push_fold.seconds * f64::from(factor),
     }
 }
@@ -156,14 +157,14 @@ mod tests {
             seconds: 2.0,
             iterations: 1,
             gain: 0.0,
-            peak: PeakBytes { accounted: 5, vm_hwm: Some(7), cgroup_peak: None },
+            peak: PeakBytes { accounted: Some(5), vm_hwm: Some(7), cgroup_peak: None },
         };
-        let Hu100::Extrapolated { reason, peak_bytes, seconds } =
+        let Hu100::NotMeasured { reason, peak_bytes, seconds } =
             extrapolate_hu100(&push_fold, "the solve failed")
         else {
             panic!("an extrapolation");
         };
-        assert_eq!(peak_bytes, 700);
+        assert_eq!(peak_bytes, Some(700));
         assert!((seconds - 200.0).abs() < f64::EPSILON);
         assert!(reason.starts_with("the solve failed") && reason.contains("not a measurement"));
     }

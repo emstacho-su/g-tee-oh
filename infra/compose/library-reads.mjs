@@ -11,8 +11,9 @@
 // one preflop solution served from the fixture registry. The HTTP (Hypertext Transfer Protocol)
 // answer carries no synthetic flag, so the flag is read from that solution's manifest under the
 // host directory the compose file mounts (FIXTURE_LIBRARY_PATH, else validation/fixtures/library):
-// false for G6a, true for the synthetic set (O-57). Then GET /v1/nodes on the G6a solution at its
-// root key must answer 200 with the 169 hand classes and the fold and all-in actions.
+// false for G6a, true for the synthetic set (O-57). Then GET /v1/nodes on the G6a solution the one
+// G6a coverage read named, at its root key, must answer 200 with the 169 hand classes and the fold
+// and all-in actions; the smoke fetches the G6a coverage once for both checks.
 
 /** The solver-query base URL on the compose network (compose.yaml, SOLVER_QUERY_BIND port 7070). */
 export const SOLVER_QUERY_URL = "http://solver-query:7070";

@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 use gto_model::Cbb;
 use gto_solve::equity::EquityTable;
 use gto_solve::preflop::{
-    CERTIFICATE_GAIN_BB, PreflopError, SolvedClass, SolvedPreflop, push_fold_config,
-    solve_push_fold,
+    CERTIFICATE_GAIN_BB, PreflopError, SolvedClass, SolvedPreflop, is_certified, larger_gain,
+    push_fold_config, solve_push_fold,
 };
 use library_pack::export::FREQUENCY_TOLERANCE;
 
@@ -253,19 +253,25 @@ pub fn run(input: &G6aInput<'_>) -> Result<GateReport, G6aError> {
         chart: input.chart,
         disagreements: &disagreements,
     });
+    Ok(gate_report(measurements, &notes))
+}
+
+/// The report from its measurements and notes: it passes only when every judged
+/// measurement passed.
+fn gate_report(measurements: Vec<Measurement>, notes: &str) -> GateReport {
     let thresholds: BTreeMap<String, Threshold> = measurements
         .iter()
         .filter_map(|m| m.threshold.clone().map(|threshold| (m.id.clone(), threshold)))
         .collect();
     let pass = measurements.iter().filter(|m| m.threshold.is_some()).all(|m| m.pass == Some(true));
-    Ok(GateReport {
+    GateReport {
         report: REPORT_ID.to_owned(),
         r_ids: vec![R_ID.to_owned()],
         pass,
         thresholds,
         measurements,
-        notes,
-    })
+        notes: notes.to_owned(),
+    }
 }
 
 /// The measurements of one depth: the certificate and the library comparison, judged,
@@ -276,13 +282,15 @@ fn depth_measurements(
     check: &LibraryCheck,
 ) -> Vec<Measurement> {
     let id = |what: &str| format!("depth-{depth}/{what}");
-    let gain = solution.gains_bb.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    // The verdict is gto-solve's own rule (both gains finite and at or below the bound), and
+    // the value keeps a NaN where `f64::max` would drop it, so a broken evaluation fails.
     vec![
-        Measurement::judged(
+        Measurement::judged_as(
             &id("certificate-gain"),
-            gain,
+            larger_gain(solution.gains_bb),
             BB,
             Threshold::at_most(CERTIFICATE_GAIN_BB, BB),
+            is_certified(solution.gains_bb),
         ),
         Measurement::judged(
             &id("library-frequency-diff"),

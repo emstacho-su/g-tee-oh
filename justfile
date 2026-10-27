@@ -19,13 +19,18 @@ rust-fmt:
 
 # Clippy on the workspace minus the vendored engine; warnings are errors.
 # --no-deps is required: --exclude only drops engine from the primary set, clippy still lints it as a dependency.
+# The second line lints validate's peak-alloc feature code (the spike's accounting allocator), off by default.
 rust-clippy:
     cargo clippy --workspace --exclude engine --all-targets --no-deps -- -D warnings
+    cargo clippy -p validate --features peak-alloc --all-targets --no-deps -- -D warnings
 
-# Workspace tests; the vendored engine runs in release mode only (upstream debug assertion in src/br.rs)
+# Workspace tests; the vendored engine runs in release mode only (upstream debug assertion in src/br.rs).
+# The last line runs validate's unit tests and tests/spike.rs with the peak-alloc feature, so the
+# accounted peak tests (R2.21, O-228) run; without the feature the one-depth peak test is ignored.
 rust-test:
     cargo test --workspace --exclude engine
     cargo test -p engine --release
+    cargo test -p validate --features peak-alloc --lib --test spike
 
 # Compile-time boundary: solver-query never depends on gto-solve (ADR 0018)
 rust-boundary:
@@ -219,7 +224,7 @@ coverage-g6a:
     cargo llvm-cov --no-report -p gto-solve --lib -- preflop
     cargo llvm-cov --no-report -p gto-solve --test r2_19_push_fold
     cargo llvm-cov --no-report -p gto-tree
-    cargo llvm-cov --no-report -p validate --lib --test g6a --test spike
+    cargo llvm-cov --no-report -p validate --features peak-alloc --lib --test g6a --test spike
     cargo llvm-cov --no-report -p fixture-gen
     cargo llvm-cov report --ignore-filename-regex "{{COVERAGE_G6A_IGNORE}}" --fail-under-lines 80
 
@@ -295,11 +300,14 @@ G6A_CHECK_DIR := "target/gate-reports/g6a"
 # best-response certificate (O-223) and that the committed library under validation/fixtures/library
 # decodes to the recomputation (O-133), and writes g6a-pushfold.json with its Markdown twin. The
 # chart comparison runs only when G6A_CHART_PATH names the local transcription, which is never
-# committed (O-221); without it the report says the chart part is run locally. The Zenbook run sets
-# that variable on a clean tree and commits what the tool wrote. FLAGS go to validate: the rust job
-# passes --allow-dirty, because its gates step has just rewritten the committed G1 to G3 reports.
-# Gate G6a push/fold (R2.19); writes g6a-pushfold to validation/reports, FLAGS passed to validate
+# committed (O-221). This recipe writes the committed report, which must carry the chart result, so
+# it refuses to run when G6A_CHART_PATH is unset or empty rather than overwrite the committed files
+# with a chart-less report. The Zenbook run sets that variable on a clean tree and commits what the
+# tool wrote; CI and just ci run the chart-less g6a-smoke and g6a-check into target instead. FLAGS
+# go to validate, for example --machine.
+# Gate G6a push/fold with the local chart (R2.19); writes g6a-pushfold to validation/reports, needs G6A_CHART_PATH
 g6a *FLAGS:
+    {{ if env_var_or_default("G6A_CHART_PATH", "") == "" { error("the committed G6a report needs the local chart: set G6A_CHART_PATH; CI runs just g6a-check") } else { "" } }}
     cargo run --release -p validate -- g6a --out validation/reports {{FLAGS}}
 
 # Regenerates the committed G6a fixture, the 15 cfg_2_online_norake_<d> solutions (O-220) with ids
@@ -308,10 +316,17 @@ g6a *FLAGS:
 g6a-pack:
     cargo run --release -p validate -- g6a-pack
 
-# What gates-check and so just ci run for G6a: the committed report stays untouched.
-# Gate G6a into target/gate-reports/g6a, then check-reports on it (R2.19)
-g6a-check:
+# The chart-less G6a run into target: the certificate at all 15 depths and the committed library
+# against the recomputation, with no chart unless G6A_CHART_PATH is set; the committed report stays
+# untouched. The rust job runs this one (it has cargo but no node_modules for check-reports) and
+# uploads the report; --allow-dirty because its gates step has rewritten the committed G1 to G3 reports.
+# Gate G6a into target/gate-reports/g6a without touching the committed report (R2.19)
+g6a-smoke:
     cargo run --release -p validate -- g6a --out {{G6A_CHECK_DIR}} --allow-dirty
+
+# What gates-check and so just ci run for G6a: the smoke, then check-reports on its report.
+# Gate G6a smoke, then check-reports on target/gate-reports/g6a (R2.19)
+g6a-check: g6a-smoke
     node scripts/check-reports.mjs {{G6A_CHECK_DIR}}
 
 FIXTURES_CHECK_DIR := "target/fixtures-check"
@@ -344,10 +359,11 @@ SPIKE_CONTAINER := env_var_or_default("SPIKE_CONTAINER", SPIKE_RUN + " " + SPIKE
 # Markdown twin into validation/reports (O-87). SPIKE_CONTAINER (default: the run line here) and
 # SPIKE_CONCURRENT (the other heavy work running; unset is reported as not recorded) pass through
 # into the report notes. --commit is HEAD; --allow-dirty because the image has no git to check.
+# The image builds validate with the peak-alloc feature, the accounting allocator (O-228).
 # Preflop spike in the 5 GB container: push/fold and heads-up 100bb seconds and peak bytes (R2.21, O-80, O-49)
 spike-preflop MACHINE="zenbook" PLATFORM="linux/amd64":
     docker buildx build --load --platform {{PLATFORM}} -f infra/docker/spike-preflop.Dockerfile \
-        -t {{SPIKE_IMAGE}} .
+        --build-arg FEATURES=peak-alloc -t {{SPIKE_IMAGE}} .
     {{SPIKE_RUN}} -e "SPIKE_CONTAINER={{SPIKE_CONTAINER}}" -e SPIKE_CONCURRENT \
         --mount "type=bind,source={{justfile_directory()}}/validation/reports,target=/out" \
         {{SPIKE_IMAGE}} spike-preflop --out /out --machine {{MACHINE}} \

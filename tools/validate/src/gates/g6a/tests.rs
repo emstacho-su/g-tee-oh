@@ -109,6 +109,69 @@ fn r2_19_dump_reads_the_depth_and_sizes_the_actions() {
 }
 
 #[test]
+fn r2_19_a_nan_gain_fails_the_certificate_and_the_report() {
+    let clean = library::LibraryCheck {
+        prefix: "preflop/cfg_2_online_norake_10/test".to_owned(),
+        max_frequency_diff: 0.0,
+        differences: Vec::new(),
+    };
+    for gains_bb in [[f64::NAN, 0.0], [0.0, f64::NAN]] {
+        let solution = SolvedPreflop { gains_bb, ..ten_bb()[0].clone() };
+        let report = super::gate_report(super::depth_measurements(10, &solution, &clean), "");
+        let certificate = report.measurements.iter().find(|m| m.id == "depth-10/certificate-gain");
+        assert_eq!(certificate.and_then(|m| m.pass), Some(false), "{gains_bb:?}");
+        assert!(certificate.is_some_and(|m| m.value.is_nan()), "the NaN is reported, not hidden");
+        assert!(!report.pass, "{gains_bb:?} must fail the report");
+    }
+}
+
+/// Copies every file under `from` into `to`, keeping the relative paths.
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).expect("a directory");
+    for entry in std::fs::read_dir(from).expect("a readable directory") {
+        let entry = entry.expect("an entry");
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).expect("a copy");
+        }
+    }
+}
+
+#[test]
+fn r2_19_a_stale_manifest_tree_hash_fails_the_library_check() {
+    let config = "preflop/cfg_2_online_norake_10";
+    let scratch = tempfile::tempdir().expect("a directory");
+    copy_tree(&library_root().join(config), &scratch.path().join(config));
+    let solution_dir = std::fs::read_dir(scratch.path().join(config))
+        .expect("the copied configuration")
+        .map(|entry| entry.expect("an entry").path())
+        .next()
+        .expect("one solution");
+    let manifest = solution_dir.join("manifest.json");
+    let text = std::fs::read_to_string(&manifest).expect("a manifest");
+    let stale_hash = "0".repeat(64);
+    let start = text.find("\"tree_hash\": \"").expect("a tree_hash") + "\"tree_hash\": \"".len();
+    let stale = format!("{}{stale_hash}{}", &text[..start], &text[start + 64..]);
+    assert_ne!(stale, text, "the hash was replaced");
+    std::fs::write(&manifest, stale).expect("the stale manifest");
+
+    let check = library::check(scratch.path(), &ten_bb()[0]).expect("the stale copy still reads");
+    assert!(
+        check.differences.iter().any(|line| line.contains("tree_hash")),
+        "a stale tree_hash is a difference: {:?}",
+        check.differences
+    );
+    let input =
+        G6aInput { equity: equity(), library_root: scratch.path(), chart: None, depths_bb: &[10] };
+    let report = run(&input).expect("the gate runs");
+    let differences = report.measurements.iter().find(|m| m.id == "depth-10/library-differences");
+    assert_eq!(differences.and_then(|m| m.pass), Some(false));
+    assert!(!report.pass, "a stale manifest fails the gate at that depth");
+}
+
+#[test]
 fn r2_19_check_of_a_missing_library_is_an_error() {
     let error =
         library::check(Path::new("no-such-library-root"), &ten_bb()[0]).expect_err("missing");

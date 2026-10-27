@@ -6,8 +6,11 @@
 # Zenbook, through WSL2) and linux/arm64 (S20 reruns it on the Mac).
 #
 # Mechanism: the library-builder.Dockerfile pattern. The builder stage runs on the build host
-# (BUILDPLATFORM) and cross-compiles `validate` in release for TARGETARCH, since every crate
-# in Cargo.lock is pure Rust and only the target's gcc is needed as the linker. The runtime
+# (BUILDPLATFORM) and cross-compiles `validate` in release for TARGETARCH with the cargo
+# features in FEATURES, by default `peak-alloc`: the accounting allocator behind the spike's
+# accounted peak, which the plain build leaves out so the gates run on the system
+# allocator (O-228). Every crate in Cargo.lock is pure Rust and only the target's gcc is
+# needed as the linker. The runtime
 # stage is the target platform's debian:bookworm-slim with the binary at
 # /usr/local/bin/validate, a non-root user, and the spike's two inputs at the same relative
 # paths they have in the repository, under /opt/g-tee-oh:
@@ -40,6 +43,7 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG PACKAGE=validate
+ARG FEATURES=peak-alloc
 WORKDIR /app
 
 # Pick the Rust target triple from TARGETARCH and install the cross linker only when the
@@ -76,7 +80,7 @@ RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharin
     --mount=type=cache,id=cargo-target-${PACKAGE}-${TARGETARCH},target=/app/target,sharing=locked \
     set -eu; \
     triple="$(cat /rust-target)"; \
-    cargo build --release --locked -p "$PACKAGE" --target "$triple"; \
+    cargo build --release --locked -p "$PACKAGE" --features "$FEATURES" --target "$triple"; \
     mkdir -p /out; \
     cp "target/$triple/release/$PACKAGE" /out/
 

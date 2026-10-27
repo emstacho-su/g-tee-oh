@@ -5,18 +5,23 @@
 //!
 //! Peak bytes are read three ways and all recorded (O-228): the allocator's accounted
 //! peak, the process `VmHWM` from `/proc/self/status`, and the container's cgroup
-//! memory.peak; the judged figure is the largest that is available. The report id is
+//! memory.peak; the judged figure is the largest that is available, and a run with no
+//! reading at all fails its peak judge rather than counting as 0 bytes. The report id is
 //! `spike-preflop-<machine>`, so the Zenbook writes spike-preflop-zenbook (O-87) and S20
 //! writes spike-preflop-mac.
 //!
 //! The work is split by concern: `memory` holds the global allocator and the three
 //! readings, `runs` the two measured runs, `judge` the report and its verdicts, and
 //! `host` what the container needs (the repository root override, the run context
-//! without git, the caller's notes, and the labeled 100bb extrapolation). The global
-//! allocator lives in this library rather than in `main.rs`, so the crate's test
-//! binaries account their peak too: off Linux the accounted figure is the only reading.
+//! without git, the caller's notes, and the labeled 100bb extrapolation). The accounting
+//! allocator is behind the crate's `peak-alloc` feature, off by default so the gates run
+//! on the system allocator; the spike image builds with it, and so does the test run of
+//! `tests/spike.rs` that needs the reading, since off Linux the accounted figure is the
+//! only one. The allocator lives in this library rather than in `main.rs`, so the crate's
+//! test binaries built with the feature account their peak too.
 
 use std::fmt;
+use std::path::Path;
 
 use gto_solve::equity::EquityTable;
 
@@ -71,13 +76,20 @@ pub mod ids {
     pub const HU100_SECONDS: &str = "hu100/seconds";
     /// The 100bb run's larger seat gain at the stop, in percent of the starting pot.
     pub const HU100_GAIN: &str = "hu100/gain-pct-pot";
+    /// Present only when the 100bb run errored: 0 runs measured, judged against at least
+    /// 1, so the report fails (O-49).
+    pub const HU100_MEASURED: &str = "hu100/measured";
 }
 
-/// The three peak readings in bytes.
+/// True when this build accounts its heap peak: validate built with the `peak-alloc`
+/// feature, as the spike image and `just spike-preflop` build it (O-228).
+pub const ACCOUNTED_PEAK_AVAILABLE: bool = cfg!(feature = "peak-alloc");
+
+/// The three peak readings in bytes; an absent reading is `None`, never 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PeakBytes {
-    /// The allocator's accounted peak.
-    pub accounted: u64,
+    /// The allocator's accounted peak, when validate is built with `peak-alloc`.
+    pub accounted: Option<u64>,
     /// `VmHWM` from `/proc/self/status`, when readable (Linux).
     pub vm_hwm: Option<u64>,
     /// The cgroup's memory.peak, when readable (inside a container).
@@ -85,14 +97,11 @@ pub struct PeakBytes {
 }
 
 impl PeakBytes {
-    /// The judged figure: the largest available reading.
+    /// The judged figure: the largest available reading, `None` when there is none. A
+    /// judge fails a run with no reading instead of reading it as 0 bytes.
     #[must_use]
-    pub fn judged(&self) -> u64 {
-        [Some(self.accounted), self.vm_hwm, self.cgroup_peak]
-            .into_iter()
-            .flatten()
-            .max()
-            .unwrap_or(0)
+    pub fn judged(&self) -> Option<u64> {
+        [self.accounted, self.vm_hwm, self.cgroup_peak].into_iter().flatten().max()
     }
 }
 
@@ -112,17 +121,18 @@ pub struct SpikeRun {
     pub peak: PeakBytes,
 }
 
-/// The 100bb part: measured, or extrapolated and labeled (O-49).
+/// The 100bb part: measured, or not measured with a labeled extrapolation (O-49).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Hu100 {
     /// The minimal P2 run was measured.
     Measured(SpikeRun),
-    /// It did not fit the session; the figures are extrapolated from push/fold.
-    Extrapolated {
-        /// Why it was not measured.
+    /// The run errored, so nothing was measured and the report fails; the figures are
+    /// extrapolated from push/fold and recorded as informational only.
+    NotMeasured {
+        /// Why it was not measured: the run's error.
         reason: String,
-        /// The extrapolated peak bytes.
-        peak_bytes: u64,
+        /// The extrapolated peak bytes, `None` when push/fold had no peak reading.
+        peak_bytes: Option<u64>,
         /// The extrapolated seconds.
         seconds: f64,
     },
@@ -150,12 +160,14 @@ impl fmt::Display for SpikeError {
 
 impl std::error::Error for SpikeError {}
 
-/// Runs the minimal heads-up 100bb P2 solve (O-227) and measures it, reading the online
-/// seed sizing spec under [`repo_root`].
-///
-/// # Errors
-///
-/// `SpikeError` when the spec, the tree or the solve fails.
-pub fn run_hu100(equity: &EquityTable) -> Result<SpikeRun, SpikeError> {
-    run_hu100_at(equity, &repo_root())
+/// The 100bb part of the report, reading the sizing spec under `repo_root`: the measured
+/// run, or, when the run errors, [`Hu100::NotMeasured`] carrying the error and the
+/// labeled extrapolation from `push_fold`. A not-measured part fails the report (O-49);
+/// the extrapolation is never a pass.
+#[must_use]
+pub fn measure_hu100(equity: &EquityTable, repo_root: &Path, push_fold: &SpikeRun) -> Hu100 {
+    run_hu100_at(equity, repo_root).map_or_else(
+        |error| extrapolate_hu100(push_fold, &format!("the 100bb run failed: {error}")),
+        Hu100::Measured,
+    )
 }
