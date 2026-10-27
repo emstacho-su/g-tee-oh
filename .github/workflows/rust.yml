@@ -45,6 +45,19 @@ jobs:
         run: just gates
         env:
           VALIDATE_MACHINE: github-ubuntu
+      # Gate G6a in public CI (O-63): the certificate at all 15 depths and the committed library
+      # against the recomputation, written as g6a-pushfold and uploaded with the other gate
+      # reports. No chart here: the transcription is never committed, so the report says the
+      # chart part is run locally (O-221). --allow-dirty because the step above has rewritten
+      # the committed G1 to G3 reports in this checkout; the report's notes say the tree was dirty.
+      - name: Gate G6a push/fold (R2.19)
+        run: just g6a --allow-dirty
+        env:
+          VALIDATE_MACHINE: github-ubuntu
+      # Seed determinism of the synthetic sets (O-225): regenerate into target and byte-compare
+      # with the committed library (node builtins only, so no node_modules are needed).
+      - name: Synthetic fixture sets regenerate byte for byte (R2.20)
+        run: just fixtures-check
       # The G4 compare on the committed synthetic tiny pair, no solve and no artifact: the
       # real G4 run and its report are private (R2.11, O-168, O-170). The compare half only:
       # check-reports on its output needs the ts job's node_modules, so just ci runs that.

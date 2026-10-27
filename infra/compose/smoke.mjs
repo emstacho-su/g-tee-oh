@@ -24,7 +24,12 @@
 // misplaced bind mount fails here rather than in S19's first library read. The same health JSON proves
 // the query-role connection (O-28, O-146): its database block must say configured and connected with
 // role "query", which means the pool composed from QUERY_DB_PASSWORD reached postgres as query_login and
-// that login is a member of the read-only query group role, with no Rust on the runner.
+// that login is a member of the read-only query group role, with no Rust on the runner. Last, the fixture
+// library is read through solver-query (R2.19, R2.20, O-62; infra/compose/library-reads.mjs): GET
+// /v1/coverage lists exactly one fixture solution for the G6a 10bb configuration and one for the synthetic
+// 6-max 100bb configuration, both BB-BTN, their manifests in the mounted host directory say synthetic false
+// and true, and GET /v1/nodes answers the G6a root with 169 hands. solver-query publishes no port, so the
+// requests run from inside the api container with its Node.
 
 import { spawnSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
@@ -32,8 +37,24 @@ import { existsSync, readFileSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import { createConnection } from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import {
+  DEFAULT_LIBRARY_PATH,
+  FETCH_SCRIPT,
+  FETCH_SERVICE,
+  G6A,
+  G6A_ROOT_KEY,
+  SYNTHETIC,
+  checkG6aRoot,
+  checkSyntheticFlag,
+  coverageUrl,
+  manifestPath,
+  nodesUrl,
+  parseFetchOutput,
+  singleFixtureSolution,
+} from "./library-reads.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const COMPOSE_FILE = "infra/compose/compose.yaml";
@@ -339,6 +360,58 @@ function checkQueryRoleConnection() {
   return `healthz inside the container reports the database connected under role ${QUERY_ROLE}`;
 }
 
+// One GET to solver-query on the compose network, run by Node inside the api container, because
+// solver-query publishes no port (A5 section 1). Returns { status, body }.
+function fetchInsideNetwork(url) {
+  const command = `compose exec ${FETCH_SERVICE} node -e <fetch> ${url}`;
+  const result = runCompose(["exec", "-T", FETCH_SERVICE, "node", "-e", FETCH_SCRIPT, url]);
+  if (result.status !== 0) {
+    throw new Error(`${command} exited ${result.status}: ${(result.stdout + result.stderr).trim()}`);
+  }
+  return parseFetchOutput(command, result.stdout);
+}
+
+// The host directory the compose file mounts at /fixtures/library: FIXTURE_LIBRARY_PATH from the
+// environment or .env, relative to the repo root (the compose project directory), else the committed one.
+function hostLibraryRoot(settings) {
+  const configured = settings.FIXTURE_LIBRARY_PATH || DEFAULT_LIBRARY_PATH;
+  return isAbsolute(configured) ? configured : resolve(REPO_ROOT, configured);
+}
+
+// The manifest of a solution solver-query listed, read from the mounted host directory, since the HTTP
+// answer carries no synthetic flag. The id was checked as UUID-shaped before it reaches the path.
+function readManifest(settings, configId, solutionId) {
+  const path = resolve(hostLibraryRoot(settings), manifestPath(configId, solutionId));
+  if (!existsSync(path)) {
+    throw new Error(`${path} does not exist: solver-query lists a solution the mounted host library lacks`);
+  }
+  return parseJsonBody(path, readFileSync(path, "utf8"));
+}
+
+// Coverage lists one fixture solution for the configuration, and its manifest carries the expected flag.
+function checkFixtureSolution(settings, expected) {
+  const response = fetchInsideNetwork(coverageUrl(expected.configId));
+  const solutionId = singleFixtureSolution(expected.configId, response);
+  const manifest = readManifest(settings, expected.configId, solutionId);
+  checkSyntheticFlag(`${expected.configId} manifest ${solutionId}`, manifest, expected.synthetic);
+  return `coverage lists ${expected.configId} BB-BTN solution ${solutionId} from the fixture library, synthetic ${expected.synthetic}`;
+}
+
+function checkG6aCoverage(settings) {
+  return checkFixtureSolution(settings, G6A);
+}
+
+function checkSyntheticCoverage(settings) {
+  return checkFixtureSolution(settings, SYNTHETIC);
+}
+
+// The G6a root read through the real reader: coverage names the solution, nodes answers its root key.
+function checkG6aRootNode() {
+  const solutionId = singleFixtureSolution(G6A.configId, fetchInsideNetwork(coverageUrl(G6A.configId)));
+  const hands = checkG6aRoot(fetchInsideNetwork(nodesUrl(solutionId, G6A_ROOT_KEY)));
+  return `nodes answers ${G6A_ROOT_KEY} of ${solutionId} with fold and all-in over ${hands} hands`;
+}
+
 const CHECKS = [
   ["compose services healthy", checkComposeServices],
   ["postgres tcp 5432", checkPostgresTcp],
@@ -351,6 +424,9 @@ const CHECKS = [
   ["caddy https /api/v1/healthz", checkApiHealthzThroughCaddy],
   ["solver-query fixture library mount", checkFixtureLibraryMount],
   ["solver-query query-role connection", checkQueryRoleConnection],
+  ["solver-query coverage G6a 10bb", checkG6aCoverage],
+  ["solver-query coverage synthetic 6-max 100bb", checkSyntheticCoverage],
+  ["solver-query nodes G6a 10bb root", checkG6aRootNode],
 ];
 
 async function runCheck(name, check, settings) {

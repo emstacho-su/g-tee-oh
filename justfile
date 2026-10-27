@@ -4,7 +4,7 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 # Crates this repo owns. The vendored engine is excluded from fmt and clippy.
-OWN_CRATES := "-p gto-model -p gto-tree -p gto-solve -p gto-library -p gto-planner -p solver-query -p library-builder -p validate -p library-pack"
+OWN_CRATES := "-p gto-model -p gto-tree -p gto-solve -p gto-library -p gto-planner -p solver-query -p library-builder -p validate -p library-pack -p fixture-gen"
 COMPOSE_FILE := "infra/compose/compose.yaml"
 # The project directory is the repo root so .env and relative paths resolve from there
 COMPOSE := "docker compose --project-directory . -f infra/compose/compose.yaml"
@@ -205,6 +205,24 @@ coverage-library:
     cargo llvm-cov -p gto-library -p library-pack --features gto-library/synthetic \
         --ignore-filename-regex "(gto-model|vendor|gto-solve)" --fail-under-lines 80
 
+# Every file the S19 coverage leaves out: other crates, and the files of gto-solve, gto-tree and
+# validate that S19 did not write, so the report shows the new push/fold, G6a, spike and
+# fixture-gen code only. A raw string, so the backslashes reach the regex.
+COVERAGE_G6A_IGNORE := '(vendor|gto-model|gto-library|library-pack|gto-solve[\\/]src[\\/](equity|exploit|lib)\.rs|gto-solve[\\/]src[\\/](postflop|toy)[\\/]|gto-tree[\\/]src[\\/](error|lib|player|spec|units|preflop)\.rs|gto-tree[\\/]src[\\/](postflop|spec)[\\/]|gto-tree[\\/]src[\\/]preflop[\\/]builder\.rs|validate[\\/]src[\\/](cli|equity_fixture|lib|machine|main|report|toolchain)\.rs|validate[\\/]src[\\/](cli|machine|report)[\\/]|validate[\\/]src[\\/]fixtures[\\/](g4_spots|mod|openspiel|toy_game)|validate[\\/]src[\\/]gates[\\/](error|g1|g2|g3|g4|g4_engine|mod)\.rs|validate[\\/]src[\\/]gates[\\/]g4[\\/])'
+
+# The runs are split so only the tests of that code run under instrumentation: the rest of
+# gto-solve's tests (the postflop solves) stop at their 300 second cap when instrumented and
+# fail, and they are not this code. Each run adds to the profile data; report merges them.
+# Line coverage of the S19 code (preflop solver, push/fold tree, G6a, spike, fixture-gen) at the 80% gate; needs cargo-llvm-cov
+coverage-g6a:
+    cargo llvm-cov clean --workspace
+    cargo llvm-cov --no-report -p gto-solve --lib -- preflop
+    cargo llvm-cov --no-report -p gto-solve --test r2_19_push_fold
+    cargo llvm-cov --no-report -p gto-tree
+    cargo llvm-cov --no-report -p validate --lib --test g6a --test spike
+    cargo llvm-cov --no-report -p fixture-gen
+    cargo llvm-cov report --ignore-filename-regex "{{COVERAGE_G6A_IGNORE}}" --fail-under-lines 80
+
 # Statement, branch, function and line coverage of packages/learning at the 80% gate (S22, A9 section 1)
 coverage-learning:
     pnpm --filter @g-tee-oh/learning coverage
@@ -226,11 +244,12 @@ GATE_CHECK_DIR := "target/gate-reports"
 
 # What ci runs instead of gates: the committed reports stay untouched, and --allow-dirty
 # lets a development tree run (the reports' notes then say the tree was dirty).
-# Gates G1 to G3 into target/gate-reports, check-reports, then g4-check (R2.4 to R2.6, R2.11)
+# Gates G1 to G3 into target/gate-reports, check-reports, then g4-check and g6a-check (R2.4 to R2.6, R2.11, R2.19)
 gates-check:
     cargo run --release -p validate -- gates --out {{GATE_CHECK_DIR}} --allow-dirty
     node scripts/check-reports.mjs {{GATE_CHECK_DIR}}
     just g4-check
+    just g6a-check
 
 G4_CHECK_DIR := "target/gate-reports/g4"
 G4_TINY := "validation/fixtures/g4"
@@ -270,6 +289,70 @@ g4-smoke:
 g4-check: g4-smoke
     node scripts/check-reports.mjs {{G4_CHECK_DIR}}
 
+G6A_CHECK_DIR := "target/gate-reports/g6a"
+
+# The G6a gate (R2.19, O-63, O-125): solves heads-up push/fold at 1 to 15 bb, judges each seat's
+# best-response certificate (O-223) and that the committed library under validation/fixtures/library
+# decodes to the recomputation (O-133), and writes g6a-pushfold.json with its Markdown twin. The
+# chart comparison runs only when G6A_CHART_PATH names the local transcription, which is never
+# committed (O-221); without it the report says the chart part is run locally. The Zenbook run sets
+# that variable on a clean tree and commits what the tool wrote. FLAGS go to validate: the rust job
+# passes --allow-dirty, because its gates step has just rewritten the committed G1 to G3 reports.
+# Gate G6a push/fold (R2.19); writes g6a-pushfold to validation/reports, FLAGS passed to validate
+g6a *FLAGS:
+    cargo run --release -p validate -- g6a --out validation/reports {{FLAGS}}
+
+# Regenerates the committed G6a fixture, the 15 cfg_2_online_norake_<d> solutions (O-220) with ids
+# from the dump sha256 (O-131); run on purpose, never in CI, then commit what it wrote.
+# Solve push/fold and pack the 15 G6a solutions into validation/fixtures/library (R2.19)
+g6a-pack:
+    cargo run --release -p validate -- g6a-pack
+
+# What gates-check and so just ci run for G6a: the committed report stays untouched.
+# Gate G6a into target/gate-reports/g6a, then check-reports on it (R2.19)
+g6a-check:
+    cargo run --release -p validate -- g6a --out {{G6A_CHECK_DIR}} --allow-dirty
+    node scripts/check-reports.mjs {{G6A_CHECK_DIR}}
+
+FIXTURES_CHECK_DIR := "target/fixtures-check"
+
+# Reads validation/fixtures/synthetic/sets.json and packs every set, labeled synthetic, into
+# validation/fixtures/library (O-225, O-226). Release, as packing is slow in debug (O-134).
+# Synthetic preflop fixture sets: fixture-gen writes the 117 labeled solutions (R2.20)
+fixtures:
+    cargo run --release -p fixture-gen
+
+# The seed determinism check the rust job and ci run: an emptied target directory, a fresh
+# fixture-gen run into it, then scripts/compare-trees.mjs byte-compares every synthetic
+# configuration directory with the committed library and fails on a changed, missing or extra
+# file. The G6a solutions beside them are outside the selection (g6a checks those).
+# Regenerate the synthetic sets into target/fixtures-check and byte-compare them with the committed library (R2.20)
+fixtures-check:
+    node -e "require('node:fs').rmSync('{{FIXTURES_CHECK_DIR}}', { recursive: true, force: true })"
+    cargo run --release -p fixture-gen -- --out {{FIXTURES_CHECK_DIR}}
+    node scripts/compare-trees.mjs {{FIXTURES_CHECK_DIR}} validation/fixtures/library \
+        "preflop/cfg_6_online_*" "preflop/cfg_9_live_*"
+
+SPIKE_IMAGE := "g-tee-oh/spike-preflop:dev"
+SPIKE_RUN := "docker run --rm --memory 5g --memory-swap 5g"
+SPIKE_CONTAINER := env_var_or_default("SPIKE_CONTAINER", SPIKE_RUN + " " + SPIKE_IMAGE)
+
+# A measurement, not a check: run alone; no other build, test or bench at the same time, because
+# seconds and peak bytes are what it records (O-228). Builds the spike image for PLATFORM
+# (linux/amd64 on the Zenbook through WSL2; S20 passes mac linux/arm64), then runs validate
+# spike-preflop in it under the 5 GB cap (O-48), writing spike-preflop-<MACHINE>.json and its
+# Markdown twin into validation/reports (O-87). SPIKE_CONTAINER (default: the run line here) and
+# SPIKE_CONCURRENT (the other heavy work running; unset is reported as not recorded) pass through
+# into the report notes. --commit is HEAD; --allow-dirty because the image has no git to check.
+# Preflop spike in the 5 GB container: push/fold and heads-up 100bb seconds and peak bytes (R2.21, O-80, O-49)
+spike-preflop MACHINE="zenbook" PLATFORM="linux/amd64":
+    docker buildx build --load --platform {{PLATFORM}} -f infra/docker/spike-preflop.Dockerfile \
+        -t {{SPIKE_IMAGE}} .
+    {{SPIKE_RUN}} -e "SPIKE_CONTAINER={{SPIKE_CONTAINER}}" -e SPIKE_CONCURRENT \
+        --mount "type=bind,source={{justfile_directory()}}/validation/reports,target=/out" \
+        {{SPIKE_IMAGE}} spike-preflop --out /out --machine {{MACHINE}} \
+        --commit $(git rev-parse HEAD) --allow-dirty
+
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
 
 # Exact enumeration in gto_solve::equity, run once on the Zenbook from a clean tree and
@@ -284,4 +367,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check ts-lint ts-typecheck ts-test coverage-learning ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning ts-boundary report-check licenses security guard-test test-tags
