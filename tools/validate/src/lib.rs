@@ -21,6 +21,7 @@ pub mod fixtures;
 pub mod gates;
 pub mod machine;
 pub mod report;
+pub mod spike;
 pub mod toolchain;
 
 /// The repository root, two levels above this crate's manifest. The tool runs from a

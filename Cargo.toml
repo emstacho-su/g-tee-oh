@@ -21,6 +21,7 @@ members = [
     "services/library-builder",
     "tools/validate",
     "tools/library-pack",
+    "tools/fixture-gen",
 ]
 
 [workspace.package]

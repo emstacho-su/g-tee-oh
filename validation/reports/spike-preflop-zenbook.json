@@ -1,0 +1,137 @@
+{
+  "report": "spike-preflop-zenbook",
+  "r_ids": [
+    "R2.21"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "Debian GNU/Linux 12",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 20
+  },
+  "commit": "77ff43ec374c39dc887fb792a7d5b9ece78c15f3",
+  "date": "2026-10-27T22:03:54Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "pass": true,
+  "thresholds": {
+    "hu100/gain-pct-pot": {
+      "max": 0.3,
+      "unit": "percent of the starting pot"
+    },
+    "hu100/peak-bytes": {
+      "max": 4294967296.0,
+      "unit": "bytes"
+    },
+    "hu100/seconds": {
+      "max": 43200.0,
+      "unit": "seconds"
+    },
+    "push-fold/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "push-fold/peak-bytes": {
+      "max": 5368709120.0,
+      "unit": "bytes"
+    }
+  },
+  "measurements": [
+    {
+      "id": "push-fold/peak-bytes",
+      "value": 6541312.0,
+      "unit": "bytes",
+      "threshold": {
+        "max": 5368709120.0,
+        "unit": "bytes"
+      },
+      "pass": true
+    },
+    {
+      "id": "push-fold/certificate-gain",
+      "value": 3.583443279679097e-17,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "push-fold/seconds",
+      "value": 0.298324384,
+      "unit": "seconds"
+    },
+    {
+      "id": "push-fold/iterations",
+      "value": 3840.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "push-fold/peak-accounted",
+      "value": 1759458.0,
+      "unit": "bytes"
+    },
+    {
+      "id": "push-fold/peak-vmhwm",
+      "value": 6541312.0,
+      "unit": "bytes"
+    },
+    {
+      "id": "push-fold/peak-cgroup",
+      "value": 5423104.0,
+      "unit": "bytes"
+    },
+    {
+      "id": "hu100/peak-bytes",
+      "value": 6578176.0,
+      "unit": "bytes",
+      "threshold": {
+        "max": 4294967296.0,
+        "unit": "bytes"
+      },
+      "pass": true
+    },
+    {
+      "id": "hu100/seconds",
+      "value": 0.376972997,
+      "unit": "seconds",
+      "threshold": {
+        "max": 43200.0,
+        "unit": "seconds"
+      },
+      "pass": true
+    },
+    {
+      "id": "hu100/gain-pct-pot",
+      "value": 0.25834675531773843,
+      "unit": "percent of the starting pot",
+      "threshold": {
+        "max": 0.3,
+        "unit": "percent of the starting pot"
+      },
+      "pass": true
+    },
+    {
+      "id": "hu100/iterations",
+      "value": 175.0,
+      "unit": "iterations"
+    },
+    {
+      "id": "hu100/peak-accounted",
+      "value": 1157741.0,
+      "unit": "bytes"
+    },
+    {
+      "id": "hu100/peak-vmhwm",
+      "value": 6578176.0,
+      "unit": "bytes"
+    },
+    {
+      "id": "hu100/peak-cgroup",
+      "value": 5423104.0,
+      "unit": "bytes"
+    }
+  ],
+  "notes": "100bb: measured (O-227 placeholder: heads-up BB-BTN at 100bb, realization factor 1.0 for both seats, rake-free, online seed sizing spec).\nPass rules. O-80: push/fold peak bytes under 5 GiB (the largest of the accounted, VmHWM and cgroup readings) and the G6a certificate gain at most 1e-9 bb at every depth; push/fold wall seconds are recorded, not gated. O-49: the measured 100bb run's peak under 4 GiB, its seconds to target under 12 hours and its larger seat gain at most 0.3 percent of the starting pot; an extrapolated 100bb figure is informational only.\npush/fold, 15 depths from 1 to 15 bb: 0.298 s, 3840 iterations, gain 3.583443279679097e-17; peak accounted 1759458 bytes, VmHWM 6541312 bytes, cgroup 5423104 bytes.\n100bb P2, 10 decision nodes, 7 flop lines: 0.377 s, 175 iterations, gain 2.5834675531773843e-1; peak accounted 1157741 bytes, VmHWM 6578176 bytes, cgroup 5423104 bytes.\nContainer: docker run --rm --memory 5g --memory-swap 5g g-tee-oh/spike-preflop:dev (linux/amd64, Docker Desktop WSL2 backend)\nHeavy work running concurrently: none in this worktree; no cargo or rustc process on the machine at start; idle containers only (bb2dash workspace, harness-postgres, s18-throwaway-pg); bench.lock held by S19\nworking tree dirty at run time"
+}

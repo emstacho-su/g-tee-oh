@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "kind": "preflop",
+  "source": "own",
+  "id": "20f7d2e6-a87e-8f43-a41c-dd734c1b256f",
+  "engine_version": "0.1.0",
+  "config": {
+    "format": "online",
+    "table_size": 2,
+    "stake": "norake",
+    "depth_cbb": 1400,
+    "straddle": false,
+    "ante_cbb": 0
+  },
+  "config_id": "cfg_2_online_norake_14",
+  "pair": "BB-BTN",
+  "chunks": [
+    {
+      "path": "chunks/0000.bin.zst",
+      "sha256": "faff9f1269435ec64e56ed1be958d213cb91a2a3ab2a03ae55f25414790468dd",
+      "node_count": 2
+    }
+  ],
+  "tree_hash": "fcced8e7e0004e2725f4bff4888aa6281f70a184ddf5448e3983d4b46b16d77e",
+  "seed": 0,
+  "iterations": 256,
+  "exploitability_pct_pot": [
+    0.0,
+    0.0
+  ],
+  "synthetic": false,
+  "created_at": "2026-10-27T00:00:00Z"
+}

@@ -1,0 +1,746 @@
+{
+  "report": "g6a-pushfold",
+  "r_ids": [
+    "R2.19"
+  ],
+  "machine": {
+    "name": "zenbook",
+    "os": "Windows 11 (26200)",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "cores": 20,
+    "memory_gb": 31
+  },
+  "commit": "2233fccbdd905ef97f751f3157eaa46264de14de",
+  "date": "2026-10-27T22:01:51Z",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "pass": true,
+  "thresholds": {
+    "chart/max-ev-gap": {
+      "max": 0.02,
+      "unit": "bb"
+    },
+    "depth-1/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-1/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-1/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-10/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-10/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-10/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-11/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-11/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-11/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-12/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-12/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-12/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-13/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-13/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-13/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-14/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-14/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-14/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-15/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-15/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-15/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-2/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-2/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-2/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-3/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-3/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-3/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-4/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-4/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-4/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-5/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-5/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-5/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-6/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-6/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-6/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-7/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-7/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-7/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-8/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-8/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-8/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    },
+    "depth-9/certificate-gain": {
+      "max": 1e-9,
+      "unit": "bb"
+    },
+    "depth-9/library-differences": {
+      "max": 0.0,
+      "unit": "count"
+    },
+    "depth-9/library-frequency-diff": {
+      "max": 0.00392156862745098,
+      "unit": "frequency"
+    }
+  },
+  "measurements": [
+    {
+      "id": "depth-1/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-1/library-frequency-diff",
+      "value": 0.0,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-1/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-1/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-2/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-2/library-frequency-diff",
+      "value": 0.0,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-2/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-2/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-3/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-3/library-frequency-diff",
+      "value": 0.0009841960230577151,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-3/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-3/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-4/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-4/library-frequency-diff",
+      "value": 0.0,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-4/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-4/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-5/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-5/library-frequency-diff",
+      "value": 0.0012885898231669302,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-5/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-5/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-6/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-6/library-frequency-diff",
+      "value": 0.0017598871835575736,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-6/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-6/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-7/certificate-gain",
+      "value": 1.7917216398395484e-17,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-7/library-frequency-diff",
+      "value": 0.0006436420234078311,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-7/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-7/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-8/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-8/library-frequency-diff",
+      "value": 0.0009492617886379673,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-8/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-8/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-9/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-9/library-frequency-diff",
+      "value": 0.0,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-9/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-9/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-10/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-10/library-frequency-diff",
+      "value": 0.0011424105858544586,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-10/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-10/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-11/certificate-gain",
+      "value": 3.583443279679097e-17,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-11/library-frequency-diff",
+      "value": 0.0009218172471320285,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-11/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-11/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-12/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-12/library-frequency-diff",
+      "value": 0.0,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-12/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-12/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-13/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-13/library-frequency-diff",
+      "value": 0.00007249863842639925,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-13/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-13/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-14/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-14/library-frequency-diff",
+      "value": 0.0015383548032948946,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-14/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-14/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "depth-15/certificate-gain",
+      "value": 0.0,
+      "unit": "bb",
+      "threshold": {
+        "max": 1e-9,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-15/library-frequency-diff",
+      "value": 0.0017963579741054891,
+      "unit": "frequency",
+      "threshold": {
+        "max": 0.00392156862745098,
+        "unit": "frequency"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-15/library-differences",
+      "value": 0.0,
+      "unit": "count",
+      "threshold": {
+        "max": 0.0,
+        "unit": "count"
+      },
+      "pass": true
+    },
+    {
+      "id": "depth-15/iterations",
+      "value": 256.0,
+      "unit": "count"
+    },
+    {
+      "id": "chart/max-ev-gap",
+      "value": 0.007698838905393024,
+      "unit": "bb",
+      "threshold": {
+        "max": 0.02,
+        "unit": "bb"
+      },
+      "pass": true
+    },
+    {
+      "id": "chart/disagreements",
+      "value": 7.0,
+      "unit": "count"
+    }
+  ],
+  "notes": "Push/fold solved exactly per depth: CFR+ (alternating updates, linear averaging) over the 169 classes with exact card removal finds the support, the mixed classes are solved from their indifference equations by Gaussian elimination in f64, and an exact best response certifies each seat's gain at or below 1e-9 bb (O-223). EVs follow O-224: final stack minus the stack behind at the node, in bb.\nDepth 1 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [], mixed call [], committed preflop/cfg_2_online_norake_1/be0d7db1-7b41-80dd-9023-5ed65fd3eeb5 (0 differences).\nDepth 2 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [], mixed call [], committed preflop/cfg_2_online_norake_2/2a661c8a-ac05-861d-95b8-774516758df1 (0 differences).\nDepth 3 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [T2o 0.344114], mixed call [63o 0.461797], committed preflop/cfg_2_online_norake_3/78c3a07c-1409-842b-97c8-6d236a6521c2 (0 differences).\nDepth 4 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [], mixed call [], committed preflop/cfg_2_online_norake_4/936f5b76-f371-8240-9242-1ff1dcd12cbb (0 differences).\nDepth 5 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [96o 0.156335], mixed call [97o 0.751653], committed preflop/cfg_2_online_norake_5/ecaa3711-e6e9-8a38-91a7-553fff6ba065 (0 differences).\nDepth 6 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [86o 0.990397], mixed call [98o 0.999139], committed preflop/cfg_2_online_norake_6/6d84d8be-9d14-854a-93cb-e90f149af794 (0 differences).\nDepth 7 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 1.7917216398395484e-17 bb, mixed push [86o 0.772866], mixed call [97s 0.658180], committed preflop/cfg_2_online_norake_7/119c6e27-8768-8ee0-b67f-d3380d997793 (0 differences).\nDepth 8 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [Q4o 0.191686], mixed call [Q7o 0.528463], committed preflop/cfg_2_online_norake_8/8cb085eb-7568-849e-8a49-5b9624fef56f (0 differences).\nDepth 9 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [], mixed call [], committed preflop/cfg_2_online_norake_9/3985998c-c4cd-8176-a404-f2d5982ef323 (0 differences).\nDepth 10 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [43s 0.710748], mixed call [Q6s 0.402779], committed preflop/cfg_2_online_norake_10/77d568b2-bf44-8f55-b130-48954e2ac642 (0 differences).\nDepth 11 bb: 256 CFR+ iterations, gains BB 3.583443279679097e-17 bb and BTN 0e0 bb, mixed push [76o 0.054719], mixed call [K6o 0.548098], committed preflop/cfg_2_online_norake_11/479b8a45-2412-819c-8208-a9dd30bad818 (0 differences).\nDepth 12 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [], mixed call [], committed preflop/cfg_2_online_norake_12/ae24c412-885f-8f01-a385-0959a7405df6 (0 differences).\nDepth 13 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [J8o 0.811837], mixed call [JTo 0.035294], committed preflop/cfg_2_online_norake_13/6748bc40-4ad4-8d35-a925-4f092cb1339c (0 differences).\nDepth 14 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [J8o 0.287813], mixed call [K8o 0.208919], committed preflop/cfg_2_online_norake_14/20f7d2e6-a87e-8f43-a41c-dd734c1b256f (0 differences).\nDepth 15 bb: 256 CFR+ iterations, gains BB 0e0 bb and BTN 0e0 bb, mixed push [Q4s 0.844934], mixed call [QTo 0.711405], committed preflop/cfg_2_online_norake_15/1874e345-dfe7-8889-85f0-62b3a077db65 (0 differences).\nChart: HoldemResources.net heads-up push/fold Nash equilibrium chart, no-ante variant, https://www.holdemresources.net/hune; parameters: heads-up, small blind 0.5, big blind 1, no ante, no rake, effective stack before blinds, push or fold. Its per-hand thresholds are not redistributed: the site grants no reuse right (O-221), so the transcription stays outside the repository, named by --chart or G6A_CHART_PATH.\nChart comparison against \"HoldemResources.net, HeadsUp Push/Fold Nash Equilibrium, No Ante charts (Pusher and Caller)\" (https://www.holdemresources.net/hune, retrieved 2026-10-27): 7 disagreements between the chart and the solution's majority action (frequency at least 0.5 is in), the largest absolute EV gap 0.007699 bb; near-indifferent means at most 0.02 bb (O-222).\nDisagreement: depth 4 bb, 53s push, our frequency 0.000000, EV gap -0.007699 bb.\nDisagreement: depth 5 bb, 96o push, our frequency 0.156335, EV gap 0.000000 bb.\nDisagreement: depth 6 bb, 94s push, our frequency 0.000000, EV gap -0.003859 bb.\nDisagreement: depth 6 bb, 63s push, our frequency 0.000000, EV gap -0.000735 bb.\nDisagreement: depth 8 bb, 84s push, our frequency 0.000000, EV gap -0.001515 bb.\nDisagreement: depth 8 bb, 43s push, our frequency 0.000000, EV gap -0.002819 bb.\nDisagreement: depth 9 bb, 84s push, our frequency 0.000000, EV gap -0.001413 bb."
+}
