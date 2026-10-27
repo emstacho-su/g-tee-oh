@@ -13,7 +13,8 @@ use serde_json::Value;
 
 use super::{
     BudgetGate, Claim, ClaimedJob, Failure, FailureOutcome, JobQueue, PlanWrite, Publication,
-    PublishedBuild, Unavailable, job_key, row_k_and_priority,
+    PublishedBuild, SECONDS_PER_HOUR, Unavailable, job_key, reclaim_error, row_k_and_priority,
+    stable_worker_id,
 };
 use crate::error::BuilderError;
 use crate::notify::{
@@ -47,6 +48,9 @@ pub struct MemJob {
     pub last_exploitability_pct_pot: Option<[f32; 2]>,
     /// The worker holding it.
     pub locked_by: Option<String>,
+    /// When the lock was taken or last refreshed by progress, in seconds of the queue's
+    /// clock ([`MemQueue::set_now`]).
+    pub locked_at: Option<u64>,
     /// The last progress.
     pub progress: Option<Value>,
     /// The last error.
@@ -80,6 +84,7 @@ impl MemJob {
             attempts: 0,
             last_exploitability_pct_pot: None,
             locked_by: None,
+            locked_at: None,
             progress: None,
             error: None,
         }
@@ -112,6 +117,9 @@ pub struct MemState {
     pub notifications: Vec<(String, Value)>,
     /// The next build id's counter.
     pub next_build: u64,
+    /// The clock that stands in for `now()`, in seconds; tests move it with
+    /// [`MemQueue::set_now`].
+    pub now: u64,
 }
 
 /// The in-memory queue.
@@ -149,6 +157,12 @@ impl MemQueue {
         let mut state = self.lock();
         state.conventions.retain(|(existing, _)| existing != config_id);
         state.conventions.push((config_id.to_owned(), spec));
+    }
+
+    /// Sets the queue's clock, in seconds: claims and progress stamp `locked_at` with it
+    /// and the stale reclaim compares against it, as Postgres does with `now()`.
+    pub fn set_now(&self, seconds: u64) {
+        self.lock().now = seconds;
     }
 
     /// Sets the ledger's latest library bytes.
@@ -242,11 +256,14 @@ impl MemState {
             .fold(self.ledger_bytes, |sum, (_, job)| sum.saturating_add(job.estimate(gate)))
     }
 
-    /// T1 under the lock.
+    /// T1 under the lock. The mutex is held for the whole call, so two claims never both
+    /// pass the budget gate on the same figure: it stands in for the advisory lock
+    /// `PgQueue` takes (review L4).
     fn claim(&mut self, worker_id: &str, job_id: Option<&str>, gate: &BudgetGate) -> Claim {
         let Some(index) = self.head(job_id) else { return Claim::Empty };
         let estimate = self.jobs[index].estimate(gate);
         let used = self.used_bytes(gate, index);
+        let now = self.now;
         let job = &mut self.jobs[index];
         if let Some(reason) = gate.refusal(estimate, used) {
             "blocked_budget".clone_into(&mut job.status);
@@ -255,7 +272,41 @@ impl MemState {
         }
         "running".clone_into(&mut job.status);
         job.locked_by = Some(worker_id.to_owned());
+        job.locked_at = Some(now);
         Claim::Job(job.claimed())
+    }
+
+    /// Whether the stale reclaim takes `job` for the process `worker_id`: running, not
+    /// held by exactly this process, and held by a dead previous process of this worker
+    /// or locked at or before `cutoff` (O-185, review M1, L6).
+    fn reclaimable(job: &MemJob, worker_id: &str, cutoff: Option<u64>) -> bool {
+        let holder = job.locked_by.as_deref();
+        let dead_previous = holder.is_some_and(|by| {
+            by != worker_id && stable_worker_id(by) == stable_worker_id(worker_id)
+        });
+        let stale = job.locked_at.zip(cutoff).is_some_and(|(at, cutoff)| at < cutoff);
+        job.status == "running" && holder != Some(worker_id) && (dead_previous || stale)
+    }
+
+    /// The stale reclaim under the lock, as `PgQueue::reclaim_stale` does it.
+    fn reclaim_stale(&mut self, worker_id: &str, stale_hours: u32, max_attempts: i16) -> u64 {
+        let cutoff = self.now.checked_sub(u64::from(stale_hours) * SECONDS_PER_HOUR);
+        let mut reclaimed = 0;
+        for job in &mut self.jobs {
+            if !Self::reclaimable(job, worker_id, cutoff) {
+                continue;
+            }
+            let holder = job.locked_by.take().unwrap_or_default();
+            let attempts = job.attempts.saturating_add(1);
+            let parked = attempts >= max_attempts;
+            job.attempts = attempts;
+            job.locked_at = None;
+            job.error = Some(reclaim_error(&holder, attempts, parked));
+            let status = if parked { "failed" } else { "queued" };
+            status.clone_into(&mut job.status);
+            reclaimed += 1;
+        }
+        reclaimed
     }
 
     /// T2 under the lock.
@@ -288,6 +339,7 @@ impl MemState {
         let job = &mut self.jobs[index];
         "done".clone_into(&mut job.status);
         job.locked_by = None;
+        job.locked_at = None;
         job.error = None;
         job.last_exploitability_pct_pot = Some(publication.exploitability_pct_pot);
         self.notifications.push((COVERAGE_ADDED.to_owned(), notice));
@@ -312,6 +364,7 @@ impl MemState {
         job.last_exploitability_pct_pot =
             failure.exploitability_pct_pot.or(job.last_exploitability_pct_pot);
         job.locked_by = None;
+        job.locked_at = None;
         if attempts >= max_attempts {
             "failed".clone_into(&mut job.status);
             Ok(FailureOutcome::Parked { attempts })
@@ -401,27 +454,38 @@ impl MemState {
         Ok(write)
     }
 
-    /// Marks a solution unavailable and re-queues its job with attempts reset (O-186).
-    fn mark_unavailable(&mut self, solution_id: &str, reason: &str) {
-        let Some(solution) =
-            self.solutions.iter_mut().find(|s| s.publication.build_id == solution_id)
+    /// Marks a solution unavailable, re-queues only its own `done` job and gives its
+    /// bytes back to the ledger, as `PgQueue::mark_unavailable` does (O-186). A solution
+    /// already unavailable is left alone, so a repeat never subtracts twice.
+    fn mark_unavailable(&mut self, build: &Unavailable) {
+        let Some(solution) = self
+            .solutions
+            .iter_mut()
+            .find(|s| s.publication.build_id == build.solution_id && s.status != "unavailable")
         else {
-            tracing::warn!(solution_id, "mark_unavailable: no such solution");
+            tracing::warn!(solution_id = %build.solution_id,
+                "mark_unavailable: no such solution, or already unavailable");
             return;
         };
         "unavailable".clone_into(&mut solution.status);
         let published = solution.publication.clone();
-        for job in &mut self.jobs {
-            if job.game_config_id == published.config_id
-                && job.position_pair == published.pair
-                && job.flop == published.flop
-            {
+        if let Some(hash) = &build.tree_config_hash {
+            let own = self.jobs.iter_mut().filter(|job| {
+                job.status == "done"
+                    && job.game_config_id == published.config_id
+                    && job.position_pair == published.pair
+                    && job.flop == published.flop
+                    && &job.tree_config_hash == hash
+            });
+            for job in own {
                 "queued".clone_into(&mut job.status);
                 job.attempts = 0;
-                job.error = Some(reason.to_owned());
+                job.error = Some(build.reason.clone());
                 job.locked_by = None;
+                job.locked_at = None;
             }
         }
+        self.ledger_bytes = self.ledger_bytes.saturating_sub(build.bytes);
     }
 
     /// Rows per status, sorted by status.
@@ -440,24 +504,14 @@ impl JobQueue for MemQueue {
         ready(Ok(self.lock().settings.clone()))
     }
 
-    /// No clock is kept in memory, so the rows re-queued are the running rows this worker
-    /// holds (the restart case of O-185); `stale_hours` has nothing to compare with.
+    /// Staleness is measured against the queue's clock ([`MemQueue::set_now`]).
     fn reclaim_stale(
         &self,
         worker_id: &str,
-        _stale_hours: u32,
-        _max_attempts: i16,
+        stale_hours: u32,
+        max_attempts: i16,
     ) -> impl Future<Output = Result<u64, BuilderError>> + Send {
-        let mut state = self.lock();
-        let mut requeued = 0;
-        for job in &mut state.jobs {
-            if job.status == "running" && job.locked_by.as_deref() == Some(worker_id) {
-                "queued".clone_into(&mut job.status);
-                job.locked_by = None;
-                requeued += 1;
-            }
-        }
-        ready(Ok(requeued))
+        ready(Ok(self.lock().reclaim_stale(worker_id, stale_hours, max_attempts)))
     }
 
     fn claim(
@@ -492,8 +546,13 @@ impl JobQueue for MemQueue {
     ) -> impl Future<Output = Result<(), BuilderError>> + Send {
         let result = payload(BUILD_PROGRESS, progress).map(|value| {
             let mut state = self.lock();
+            let now = state.now;
             if let Some(index) = state.index_of(&progress.job_id) {
-                state.jobs[index].progress = Some(value.clone());
+                let job = &mut state.jobs[index];
+                job.progress = Some(value.clone());
+                if job.status == "running" {
+                    job.locked_at = Some(now);
+                }
             }
             state.notifications.push((BUILD_PROGRESS.to_owned(), value));
         });
@@ -560,7 +619,7 @@ impl JobQueue for MemQueue {
         &self,
         build: &Unavailable,
     ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        self.lock().mark_unavailable(&build.solution_id, &build.reason);
+        self.lock().mark_unavailable(build);
         ready(Ok(()))
     }
 
@@ -655,14 +714,15 @@ mod tests {
         assert_eq!(builds.len(), 1);
         let broken = crate::queue::Unavailable {
             solution_id: "b2".to_owned(),
-            tree_config_hash: None,
-            bytes: 0,
+            tree_config_hash: Some(vec![7; 32]),
+            bytes: 40,
             reason: "checksum".to_owned(),
         };
         queue.mark_unavailable(&broken).await.expect("marks");
         assert_eq!(queue.job("a2").expect("job").status, "queued");
         assert_eq!(queue.job("a2").expect("job").attempts, 0);
         assert_eq!(queue.published_builds().await.expect("builds"), Vec::new());
+        assert_eq!(queue.snapshot().ledger_bytes, 40, "the build's bytes are given back");
     }
 
     #[tokio::test]

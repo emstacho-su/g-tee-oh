@@ -19,7 +19,7 @@ use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
 
 use super::{
     BudgetGate, Claim, Failure, FailureOutcome, JobQueue, PlanWrite, Publication, PublishedBuild,
-    Unavailable,
+    Unavailable, stable_worker_id,
 };
 use crate::config::{DatabaseConfig, SslMode};
 use crate::error::BuilderError;
@@ -34,6 +34,34 @@ pub const ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// The builder role every login of this service must hold.
 pub const BUILDER_ROLE: &str = "builder";
+
+/// The key of the transaction-scoped advisory lock every claim takes first
+/// (`pg_advisory_xact_lock`), so claims run one at a time and two workers never both
+/// pass the budget gate on the same ledger figure (review L4). The bytes spell
+/// `gtoclaim`.
+pub const CLAIM_LOCK_KEY: i64 = i64::from_be_bytes(*b"gtoclaim");
+
+/// The stale reclaim (O-185, review M1, L6), one statement. `$1` is this process's full
+/// id, never taken; `$2` its stable part (the holder's text before its last `#`, the
+/// whole holder without one, compared by `regexp_replace`); `$3` the stale hours; `$4`
+/// `max_attempts`. Every assignment reads the row's old values, so the error names the
+/// holder; the text matches `queue::reclaim_error`.
+const RECLAIM_STALE: &str = "update build_job set attempts = attempts + 1, \
+     status = case when attempts + 1 >= $4 then 'failed'::job_status \
+     else 'queued'::job_status end, \
+     error = 'stale reclaim from ' || coalesce(locked_by, '') || \
+     case when attempts + 1 >= $4 then ': parked after ' || (attempts + 1)::text || ' attempts' \
+     else ': re-queued at attempt ' || (attempts + 1)::text end, \
+     locked_by = null, locked_at = null, updated_at = now() \
+     where status = 'running' and locked_by is distinct from $1 and \
+     (regexp_replace(locked_by, '#[^#]*$', '') = $2 \
+     or locked_at < now() - make_interval(hours => $3))";
+
+/// A progress write: `locked_at` is refreshed while the row runs, so a live long job is
+/// never stale (review L6).
+const PROGRESS: &str = "update build_job set progress = $2, updated_at = now(), \
+     locked_at = case when status = 'running' then now() else locked_at end \
+     where id = $1::uuid";
 
 /// The queue over Postgres.
 #[derive(Clone, Debug)]
@@ -93,20 +121,18 @@ impl JobQueue for PgQueue {
         &self,
         worker_id: &str,
         stale_hours: u32,
-        _max_attempts: i16,
+        max_attempts: i16,
     ) -> Result<u64, BuilderError> {
         let hours = i32::try_from(stale_hours).unwrap_or(i32::MAX);
-        let requeued = sqlx::query(
-            "update build_job set status = 'queued', locked_by = null, locked_at = null, \
-             updated_at = now() where status = 'running' and \
-             (locked_by = $1 or locked_at < now() - make_interval(hours => $2))",
-        )
-        .bind(worker_id)
-        .bind(hours)
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-        Ok(requeued)
+        let reclaimed = sqlx::query(RECLAIM_STALE)
+            .bind(worker_id)
+            .bind(stable_worker_id(worker_id))
+            .bind(hours)
+            .bind(max_attempts)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+        Ok(reclaimed)
     }
 
     async fn claim(
@@ -139,11 +165,7 @@ impl JobQueue for PgQueue {
             path: BUILD_PROGRESS.to_owned(),
             reason: err.to_string(),
         })?;
-        sqlx::query("update build_job set progress = $2, updated_at = now() where id = $1::uuid")
-            .bind(&progress.job_id)
-            .bind(&value)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(PROGRESS).bind(&progress.job_id).bind(&value).execute(&self.pool).await?;
         let mut conn = self.pool.acquire().await?;
         tx::notify(&mut conn, BUILD_PROGRESS, progress).await
     }
@@ -195,7 +217,7 @@ impl JobQueue for PgQueue {
     }
 
     async fn mark_unavailable(&self, build: &Unavailable) -> Result<(), BuilderError> {
-        tx::mark_unavailable(&self.pool, &build.solution_id, &build.reason).await
+        tx::mark_unavailable(&self.pool, build).await
     }
 
     async fn queue_depth(&self) -> Result<Vec<(String, i64)>, BuilderError> {

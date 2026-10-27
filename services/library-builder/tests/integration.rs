@@ -29,10 +29,10 @@ use gto_planner::PriorReach;
 use library_builder::config::Config;
 use library_builder::error::BuilderError;
 use library_builder::job::Env;
-use library_builder::notify::{COVERAGE_ADDED, CoverageAdded};
+use library_builder::notify::{BuildProgress, COVERAGE_ADDED, CoverageAdded};
 use library_builder::ops::Status;
-use library_builder::queue::pg::PgQueue;
-use library_builder::queue::{BudgetGate, Claim, JobQueue};
+use library_builder::queue::pg::{CLAIM_LOCK_KEY, PgQueue};
+use library_builder::queue::{BudgetGate, Claim, JobQueue, Unavailable};
 use library_builder::ranges::FixtureRanges;
 use library_builder::run::{plan_once, run_once};
 use library_builder::settings::BuilderSettings;
@@ -42,7 +42,8 @@ use sqlx::Row;
 use sqlx::postgres::{PgConnectOptions, PgListener, PgPool, PgPoolOptions, PgSslMode};
 
 /// The flops these tests own; nothing else in the dev database is touched.
-const TEST_FLOPS: [&str; 5] = ["Ah7d2c", "Kh7d2c", "Qh7d2c", "Jh7d2c", "Th7d2c"];
+const TEST_FLOPS: [&str; 8] =
+    ["Ah7d2c", "Kh7d2c", "Qh7d2c", "Jh7d2c", "Th7d2c", "9h7d2c", "8h7d2c", "6h7d2c"];
 
 /// The priority of a test job: above anything a real plan writes, so it is the head.
 const HEAD: f32 = 1.0e9;
@@ -344,6 +345,246 @@ async fn r2_16_plan_writes_queued_and_blocked_rows_once() {
     assert_eq!(again.queued + again.blocked + again.promoted, 0, "nothing new: {again:?}");
     chrono_free::delete_jobs_since(&admin, &started).await;
     clean(&admin).await;
+}
+
+/// A row the queue tests below seed directly: `flop` with tree hash `[byte; 32]` in
+/// `status`, held by `locked_by` since `hours_ago` hours, after `attempts` attempts.
+struct Seed<'a> {
+    flop: &'a str,
+    byte: u8,
+    status: &'a str,
+    locked_by: Option<&'a str>,
+    hours_ago: i32,
+    attempts: i16,
+}
+
+async fn seed(admin: &PgPool, row: &Seed<'_>) -> String {
+    sqlx::query(
+        "insert into build_job (game_config_id, position_pair, flop, preflop_lines,
+         tree_config_hash, k_runouts, priority, status, attempts, locked_by, locked_at)
+         values ($1, $2, $3, $4, $5, 2, 0, $6::job_status, $7, $8,
+         case when $8::text is null then null else now() - make_interval(hours => $9) end)
+         returning id::text",
+    )
+    .bind(CONFIG_ID)
+    .bind(PAIR)
+    .bind(row.flop)
+    .bind(vec![LINE.to_owned()])
+    .bind(vec![row.byte; 32])
+    .bind(row.status)
+    .bind(row.attempts)
+    .bind(row.locked_by)
+    .bind(row.hours_ago)
+    .fetch_one(admin)
+    .await
+    .expect("the row is seeded")
+    .get(0)
+}
+
+/// A job's status, attempts, holder, error and lock time as text.
+type JobRow = (String, i16, Option<String>, Option<String>, Option<String>);
+
+async fn job_row(admin: &PgPool, id: &str) -> JobRow {
+    sqlx::query_as(
+        "select status::text, attempts, locked_by, error, locked_at::text from build_job
+         where id = $1::uuid",
+    )
+    .bind(id)
+    .fetch_one(admin)
+    .await
+    .expect("the job")
+}
+
+/// The latest ledger figure, 0 without a row.
+async fn latest_ledger(admin: &PgPool) -> i64 {
+    sqlx::query_scalar(
+        "select coalesce((select library_bytes from storage_ledger order by day desc limit 1), 0)",
+    )
+    .fetch_one(admin)
+    .await
+    .expect("the ledger")
+}
+
+/// Today's ledger row grows by `bytes`, as a publish would.
+async fn add_to_ledger(admin: &PgPool, bytes: i64) {
+    sqlx::query(
+        "insert into storage_ledger (day, library_bytes, reference_bytes)
+         values ((now() at time zone 'utc')::date,
+         coalesce((select library_bytes from storage_ledger order by day desc limit 1), 0) + $1,
+         coalesce((select reference_bytes from storage_ledger order by day desc limit 1), 0))
+         on conflict (day) do update set library_bytes = excluded.library_bytes",
+    )
+    .bind(bytes)
+    .execute(admin)
+    .await
+    .expect("the ledger grows");
+}
+
+#[tokio::test]
+#[ignore = "R2.17: needs the compose dev profile (just dev-up, just db-migrate) and .env exported"]
+async fn r2_17_mark_unavailable_requeues_only_its_own_done_job_and_gives_bytes_back() {
+    let admin = admin().await;
+    clean(&admin).await;
+    let flop = TEST_FLOPS[5];
+    let row = |byte, status, locked_by, attempts| Seed {
+        flop,
+        byte,
+        status,
+        locked_by,
+        hours_ago: 0,
+        attempts,
+    };
+    let own = seed(&admin, &row(11, "done", None, 2)).await;
+    let others = [
+        seed(&admin, &row(12, "running", Some("other-host#1"), 0)).await,
+        seed(&admin, &row(13, "failed", None, 3)).await,
+        seed(&admin, &row(14, "blocked_budget", None, 0)).await,
+        seed(&admin, &row(15, "done", None, 1)).await,
+    ];
+    let mut before = Vec::new();
+    for id in &others {
+        before.push(job_row(&admin, id).await);
+    }
+    let solution_id: String = sqlx::query_scalar(
+        "insert into solution (kind, source, game_config_id, position_pair, flop, manifest_uri,
+         status) values ('flop_build', 'own', $1, $2, $3, 'builds/test/manifest.json',
+         'published') returning id::text",
+    )
+    .bind(CONFIG_ID)
+    .bind(PAIR)
+    .bind(flop)
+    .fetch_one(&admin)
+    .await
+    .expect("the solution");
+    add_to_ledger(&admin, 5_000).await;
+    let ledger_before = latest_ledger(&admin).await;
+
+    let queue = PgQueue::connect_lazy(config().database.as_ref().expect("configured"));
+    let broken = Unavailable {
+        solution_id: solution_id.clone(),
+        tree_config_hash: Some(vec![11; 32]),
+        bytes: 5_000,
+        reason: "checksum mismatch".to_owned(),
+    };
+    queue.mark_unavailable(&broken).await.expect("marked");
+
+    let (status, attempts, locked_by, error, _) = job_row(&admin, &own).await;
+    assert_eq!((status.as_str(), attempts, locked_by), ("queued", 0, None));
+    assert_eq!(error.as_deref(), Some("checksum mismatch"));
+    for (id, was) in others.iter().zip(&before) {
+        assert_eq!(&job_row(&admin, id).await, was, "{id} is untouched");
+    }
+    let solution: String = sqlx::query_scalar("select status from solution where id = $1::uuid")
+        .bind(&solution_id)
+        .fetch_one(&admin)
+        .await
+        .expect("the solution");
+    assert_eq!(solution, "unavailable");
+    assert_eq!(latest_ledger(&admin).await, ledger_before - 5_000, "the bytes are given back");
+    clean(&admin).await;
+}
+
+#[tokio::test]
+#[ignore = "R2.17: needs the compose dev profile (just dev-up, just db-migrate) and .env exported"]
+async fn r2_17_stale_reclaim_takes_dead_nonces_and_stale_rows_and_parks_at_max_attempts() {
+    let admin = admin().await;
+    clean(&admin).await;
+    let flop = TEST_FLOPS[6];
+    let row = |byte, locked_by, hours_ago, attempts| Seed {
+        flop,
+        byte,
+        status: "running",
+        locked_by: Some(locked_by),
+        hours_ago,
+        attempts,
+    };
+    let dead = seed(&admin, &row(21, "itest-host#dead", 0, 0)).await;
+    let dead_at_max = seed(&admin, &row(22, "itest-host#dead2", 0, 2)).await;
+    let live = seed(&admin, &row(23, "itest-host#live", 10, 0)).await;
+    let fresh_other = seed(&admin, &row(24, "other-host#1", 1, 0)).await;
+    let stale_other = seed(&admin, &row(25, "other-host#2", 7, 0)).await;
+
+    let queue = PgQueue::connect_lazy(config().database.as_ref().expect("configured"));
+    let reclaimed = queue.reclaim_stale("itest-host#live", 6, 3).await.expect("the reclaim");
+    // At least the three test rows; a dev database may hold stale rows of its own.
+    assert!(reclaimed >= 3, "{reclaimed}");
+
+    let (status, attempts, locked_by, error, _) = job_row(&admin, &dead).await;
+    assert_eq!((status.as_str(), attempts, locked_by), ("queued", 1, None));
+    assert!(error.is_some_and(|e| e.contains("reclaim")));
+    let (status, attempts, _, error, _) = job_row(&admin, &dead_at_max).await;
+    assert_eq!((status.as_str(), attempts), ("failed", 3), "parked (O-176, review M1)");
+    assert!(error.is_some_and(|e| e.contains("reclaim")));
+    let (status, _, locked_by, _, _) = job_row(&admin, &live).await;
+    assert_eq!((status.as_str(), locked_by.as_deref()), ("running", Some("itest-host#live")));
+    assert_eq!(job_row(&admin, &fresh_other).await.0, "running");
+    let (status, attempts, ..) = job_row(&admin, &stale_other).await;
+    assert_eq!((status.as_str(), attempts), ("queued", 1));
+    clean(&admin).await;
+}
+
+#[tokio::test]
+#[ignore = "R2.17: needs the compose dev profile (just dev-up, just db-migrate) and .env exported"]
+async fn r2_17_progress_refreshes_locked_at_so_a_live_job_is_not_reclaimed() {
+    let admin = admin().await;
+    clean(&admin).await;
+    let busy = Seed {
+        flop: TEST_FLOPS[7],
+        byte: 31,
+        status: "running",
+        locked_by: Some("other-host#busy"),
+        hours_ago: 7,
+        attempts: 0,
+    };
+    let id = seed(&admin, &busy).await;
+    let queue = PgQueue::connect_lazy(config().database.as_ref().expect("configured"));
+    let progress = BuildProgress {
+        job_id: id.clone(),
+        line: LINE.to_owned(),
+        iteration: 100,
+        exploitability: None,
+    };
+    queue.progress(&progress).await.expect("progress");
+    let fresh: bool = sqlx::query_scalar(
+        "select locked_at > now() - interval '1 minute' from build_job where id = $1::uuid",
+    )
+    .bind(&id)
+    .fetch_one(&admin)
+    .await
+    .expect("the lock time");
+    assert!(fresh, "progress refreshed locked_at");
+    queue.reclaim_stale("itest-host#live", 6, 3).await.expect("the reclaim");
+    let (status, _, locked_by, _, _) = job_row(&admin, &id).await;
+    assert_eq!((status.as_str(), locked_by.as_deref()), ("running", Some("other-host#busy")));
+    clean(&admin).await;
+}
+
+#[tokio::test]
+#[ignore = "R2.17: needs the compose dev profile (just dev-up, just db-migrate) and .env exported"]
+async fn r2_17_a_claim_waits_for_the_claim_advisory_lock() {
+    let admin = admin().await;
+    let queue = PgQueue::connect_lazy(config().database.as_ref().expect("configured"));
+    let mut held = admin.begin().await.expect("a transaction");
+    sqlx::query("select pg_advisory_xact_lock($1)")
+        .bind(CLAIM_LOCK_KEY)
+        .execute(&mut *held)
+        .await
+        .expect("the lock");
+    let gate = BudgetGate { budget_bytes: u64::MAX, bytes_per_runout: 1, bytes_per_flop_tree: 1 };
+    // A named claim of an id that does not exist, so no dev row is ever taken.
+    let waiting = queue.clone();
+    let pending = tokio::spawn(async move {
+        waiting.claim("integration-test", Some("00000000-0000-7000-8000-000000000000"), &gate).await
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(!pending.is_finished(), "the claim waits while another holds the claim lock");
+    held.commit().await.expect("the lock is released");
+    let claimed = tokio::time::timeout(Duration::from_secs(10), pending)
+        .await
+        .expect("the claim finishes once the lock is free")
+        .expect("the task joins")
+        .expect("a claim");
+    assert_eq!(claimed, Claim::Empty);
 }
 
 /// Timestamps from the database clock, so the test needs no time crate.

@@ -7,9 +7,10 @@ use sqlx::Row;
 use sqlx::postgres::{PgConnection, PgPool, PgRow};
 
 use super::super::{
-    BudgetGate, Claim, ClaimedJob, Failure, FailureOutcome, PlanWrite, Publication, job_key,
-    row_k_and_priority,
+    BudgetGate, Claim, ClaimedJob, Failure, FailureOutcome, PlanWrite, Publication, Unavailable,
+    job_key, row_k_and_priority,
 };
+use super::CLAIM_LOCK_KEY;
 use crate::error::BuilderError;
 use crate::notify::{COVERAGE_ADDED, CoverageAdded};
 use gto_planner::{JobSpec, Plan};
@@ -39,12 +40,14 @@ const INSERT_BLOCKED: &str = "insert into build_job (game_config_id, position_pa
      values ($1, $2, $3, $4, $5, $6, $7, 'blocked_budget', 'past the budget cut of the plan') \
      on conflict (game_config_id, position_pair, flop, tree_config_hash) do nothing";
 
-/// Today's ledger row from the latest one plus a build's bytes; `reference_bytes` carried
-/// forward (O-206). The table lock taken first serializes concurrent publishes, so no
-/// addition is lost between reading the latest row and writing today's.
+/// Today's ledger row from the latest one plus a signed change in bytes, never below 0;
+/// `reference_bytes` carried forward (O-206). A publish adds its bytes, a build marked
+/// unavailable takes them off (review H1), so a rebuild never counts them twice. The
+/// table lock taken first serializes concurrent writers, so no change is lost between
+/// reading the latest row and writing today's.
 const LEDGER_UPSERT: &str = "insert into storage_ledger (day, library_bytes, reference_bytes) \
-     values ((now() at time zone 'utc')::date, \
-     coalesce((select library_bytes from storage_ledger order by day desc limit 1), 0) + $1, \
+     values ((now() at time zone 'utc')::date, greatest(0, \
+     coalesce((select library_bytes from storage_ledger order by day desc limit 1), 0) + $1), \
      coalesce((select reference_bytes from storage_ledger order by day desc limit 1), 0)) \
      on conflict (day) do update set library_bytes = excluded.library_bytes, \
      reference_bytes = excluded.reference_bytes";
@@ -114,7 +117,9 @@ fn claimed_job(row: &PgRow) -> Result<ClaimedJob, BuilderError> {
     })
 }
 
-/// T1: the claim and the budget gate in one transaction (A5 section 4).
+/// T1: the claim and the budget gate in one transaction (A5 section 4). The advisory
+/// lock comes first and is held to commit, so a second claim waits and then reads the
+/// first one's `running` row in its budget figure (review L4).
 pub(super) async fn claim(
     pool: &PgPool,
     worker_id: &str,
@@ -122,6 +127,7 @@ pub(super) async fn claim(
     gate: &BudgetGate,
 ) -> Result<Claim, BuilderError> {
     let mut tx = pool.begin().await?;
+    sqlx::query("select pg_advisory_xact_lock($1)").bind(CLAIM_LOCK_KEY).execute(&mut *tx).await?;
     let row = match job_id {
         Some(id) => sqlx::query(CLAIM_NAMED).bind(id).fetch_optional(&mut *tx).await?,
         None => sqlx::query(CLAIM_HEAD).fetch_optional(&mut *tx).await?,
@@ -218,15 +224,12 @@ async fn insert_solution(conn: &mut PgConnection, p: &Publication) -> Result<(),
     Ok(())
 }
 
-/// Today's ledger row grows by `bytes` (O-206).
-async fn add_to_ledger(conn: &mut PgConnection, bytes: u64) -> Result<(), BuilderError> {
+/// Today's ledger row changes by `delta` bytes, never below 0 (O-206).
+async fn change_ledger(conn: &mut PgConnection, delta: i64) -> Result<(), BuilderError> {
     sqlx::query("lock table storage_ledger in share row exclusive mode")
         .execute(&mut *conn)
         .await?;
-    sqlx::query(LEDGER_UPSERT)
-        .bind(to_bigint(bytes, "publication bytes")?)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query(LEDGER_UPSERT).bind(delta).execute(&mut *conn).await?;
     Ok(())
 }
 
@@ -251,7 +254,7 @@ pub(super) async fn publish(
         return Err(BuilderError::LostLock(p.job_id.clone()));
     }
     insert_solution(&mut tx, p).await?;
-    add_to_ledger(&mut tx, p.bytes).await?;
+    change_ledger(&mut tx, to_bigint(p.bytes, "publication bytes")?).await?;
     sqlx::query(
         "update build_job set status = 'done', last_exploitability_pct_pot = $2, error = null, \
          locked_by = null, locked_at = null, updated_at = now() where id = $1::uuid",
@@ -382,36 +385,49 @@ pub(super) async fn write_plan(pool: &PgPool, plan: &Plan) -> Result<PlanWrite, 
     Ok(write)
 }
 
-/// Marks a solution unavailable and re-queues its job with attempts reset (O-186).
+/// Re-queues only the solution's own job: its configuration, pair and flop, `done`, with
+/// the tree hash of the build's key. Running, queued, parked, `blocked_budget` and
+/// other-hash rows are never touched (review HIGH 2, L5).
+const REQUEUE_OWN_JOB: &str = "update build_job set status = 'queued', attempts = 0, \
+     error = $5, locked_by = null, locked_at = null, updated_at = now() \
+     where game_config_id = $1 and position_pair = $2 and flop = $3 \
+     and tree_config_hash = $4 and status = 'done'";
+
+/// Marks a solution unavailable, re-queues its own job with attempts reset and takes its
+/// bytes off the ledger, in one transaction (O-186, see [`Unavailable`]). A solution
+/// already unavailable is left alone, so a repeat never subtracts twice.
 pub(super) async fn mark_unavailable(
     pool: &PgPool,
-    solution_id: &str,
-    reason: &str,
+    build: &Unavailable,
 ) -> Result<(), BuilderError> {
     let mut tx = pool.begin().await?;
     let solution: Option<(String, Option<String>, Option<String>)> = sqlx::query_as(
-        "update solution set status = 'unavailable' where id = $1::uuid \
+        "update solution set status = 'unavailable' \
+         where id = $1::uuid and status <> 'unavailable' \
          returning game_config_id, position_pair, flop",
     )
-    .bind(solution_id)
+    .bind(&build.solution_id)
     .fetch_optional(&mut *tx)
     .await?;
     let Some((config_id, pair, flop)) = solution else {
         tx.rollback().await?;
-        tracing::warn!(solution_id, "mark_unavailable: no such solution");
+        tracing::warn!(solution_id = %build.solution_id,
+            "mark_unavailable: no such solution, or already unavailable");
         return Ok(());
     };
-    sqlx::query(
-        "update build_job set status = 'queued', attempts = 0, error = $4, locked_by = null, \
-         locked_at = null, updated_at = now() \
-         where game_config_id = $1 and position_pair = $2 and flop = $3",
-    )
-    .bind(&config_id)
-    .bind(pair)
-    .bind(flop)
-    .bind(reason)
-    .execute(&mut *tx)
-    .await?;
+    if let Some(hash) = &build.tree_config_hash {
+        sqlx::query(REQUEUE_OWN_JOB)
+            .bind(&config_id)
+            .bind(pair)
+            .bind(flop)
+            .bind(hash)
+            .bind(&build.reason)
+            .execute(&mut *tx)
+            .await?;
+    }
+    if build.bytes > 0 {
+        change_ledger(&mut tx, -to_bigint(build.bytes, "unavailable bytes")?).await?;
+    }
     tx.commit().await?;
     Ok(())
 }

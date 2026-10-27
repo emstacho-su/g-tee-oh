@@ -4,15 +4,33 @@
 //!
 //! Transaction boundaries (plan section C):
 //!
-//! - T1, [`JobQueue::claim`]: `for update skip locked` on the queue head; over budget the
-//!   row becomes `blocked_budget` with the numbers in `error`, else `running` under this
-//!   worker. One transaction, committed before any work starts.
+//! - T1, [`JobQueue::claim`]: a transaction-scoped advisory lock first, so two workers
+//!   never both pass the budget gate on the same ledger figure (review L4); then
+//!   `for update skip locked` on the queue head; over budget the row becomes
+//!   `blocked_budget` with the numbers in `error`, else `running` under this worker with
+//!   `locked_at` stamped. One transaction, committed before any work starts.
+//! - [`JobQueue::progress`] refreshes `locked_at` while the row runs, so a live long job
+//!   is never taken by the stale reclaim (review L6).
 //! - Work runs with no transaction open.
 //! - T2, [`JobQueue::publish`]: the lock check, the supersede of a previous own build, the
 //!   `solution` row, the `scenario` rows, the `storage_ledger` upsert, the job marked
 //!   `done` and `pg_notify('coverage_added', ...)`, in one transaction.
 //! - T3, [`JobQueue::fail`]: attempts plus one, back to `queued` below `max_attempts`,
 //!   `failed` (parked, O-176) at it.
+//! - [`JobQueue::reclaim_stale`] (O-185, review M1, L6): a running row held by a dead
+//!   previous process of this worker (the same [`stable_worker_id`], another nonce), or
+//!   locked longer than `stale_hours`, goes back to `queued` with attempts plus one, or to
+//!   `failed` at `max_attempts`, so a job that kills its container parks instead of
+//!   looping. A row held by exactly this process's id is never taken.
+//! - [`JobQueue::mark_unavailable`] (O-186, review HIGH 2, H1, L5): the solution marked
+//!   `unavailable`, only its own `done` job (same configuration, pair, flop and tree hash)
+//!   re-queued with attempts reset, and its bytes taken off the latest ledger figure
+//!   (never below 0), in one transaction.
+//!
+//! Worker ids: two processes running at the same time must not share `BUILDER_WORKER_ID`.
+//! The nonce tells a dead previous process from this one only across restarts; two live
+//! processes with one stable id would each see the other's rows as a dead process's and
+//! reclaim them mid-solve.
 
 pub mod mem;
 pub mod pg;
@@ -97,6 +115,30 @@ impl BudgetGate {
                 self.budget_bytes
             )
         })
+    }
+}
+
+/// The stable part of a worker id: the text before the last `#`, or the whole id.
+///
+/// A process's `locked_by` is `<stable>#<nonce>`: the stable part never holds a `#` and
+/// stays the same across restarts on a host, the nonce changes per process. A running
+/// row whose holder has this worker's stable part but another nonce was left by a dead
+/// previous process of this worker, so the stale reclaim takes it at once (review M1).
+#[must_use]
+pub fn stable_worker_id(worker_id: &str) -> &str {
+    worker_id.rsplit_once('#').map_or(worker_id, |(stable, _)| stable)
+}
+
+/// Seconds in an hour, for `stale_hours`.
+pub(crate) const SECONDS_PER_HOUR: u64 = 3_600;
+
+/// The `error` a stale reclaim writes to a row taken from `holder`, now at `attempts`;
+/// `PgQueue` builds the same text in SQL.
+pub(crate) fn reclaim_error(holder: &str, attempts: i16, parked: bool) -> String {
+    if parked {
+        format!("stale reclaim from {holder}: parked after {attempts} attempts")
+    } else {
+        format!("stale reclaim from {holder}: re-queued at attempt {attempts}")
     }
 }
 
@@ -345,4 +387,17 @@ pub trait JobQueue: Send + Sync {
 
     /// The latest `storage_ledger.library_bytes`, 0 without a row.
     fn ledger_bytes(&self) -> impl Future<Output = Result<u64, BuilderError>> + Send;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stable_worker_id;
+
+    #[test]
+    fn r2_17_the_stable_worker_id_is_the_text_before_the_last_hash() {
+        assert_eq!(stable_worker_id("host-a#0192f0"), "host-a");
+        assert_eq!(stable_worker_id("host-a"), "host-a", "no nonce: the whole id");
+        assert_eq!(stable_worker_id("a#b#c"), "a#b", "the last hash splits");
+        assert_eq!(stable_worker_id("#n"), "", "an empty stable part stays empty");
+    }
 }
