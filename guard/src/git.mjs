@@ -4,6 +4,7 @@
 // never re-parsed by a shell and a path or sha cannot inject a command.
 
 import { spawnSync } from 'node:child_process';
+import { basename, dirname } from 'node:path';
 
 // The sha of git's empty tree, used as a diff base when HEAD has no parent.
 export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -59,6 +60,17 @@ function logRange(rangeArgs) {
 export function topLevel(options) {
   const result = git(['rev-parse', '--show-toplevel'], { ...options, allowFailure: true });
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+// The main working tree of a non-bare repository: the parent of the common
+// .git directory, which every linked worktree shares. Null when git fails or
+// the common directory is not named .git (a bare repository has no main tree).
+export function mainWorkTree(options) {
+  const result = git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { ...options, allowFailure: true });
+  if (result.status !== 0) return null;
+  const commonDir = result.stdout.trim();
+  if (commonDir === '' || basename(commonDir) !== '.git') return null;
+  return dirname(commonDir);
 }
 
 export function commitExists(ref, options) {

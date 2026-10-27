@@ -28,6 +28,8 @@ Run `node guard/src/cli.mjs <mode>` from the repository root, or use the `just` 
 
 The salt comes from the `GUARD_SALT` environment variable, or else from the file `.guard-private/salt` (trimmed) at the repository root. Locally that file exists on the owner's machine; in CI the security job sets `GUARD_SALT` from the repository secret of the same name.
 
+In a linked worktree (made with `git worktree add`) the top level is the worktree itself, and `.guard-private/` is gitignored, so it is normally absent there. The guard then falls back to the main working tree, which it finds from `git rev-parse --path-format=absolute --git-common-dir`: the parent of the common `.git` directory. The order is `GUARD_SALT`, then the worktree's own `.guard-private/salt`, then the main working tree's; the first non-empty one wins. A worktree of a bare repository has no main working tree and gets no fallback. `hash-denylist.mjs` uses the same lookup when `GUARD_PRIVATE_DIR` is not set. If no location holds a salt, the fail-closed rule below still applies.
+
 When neither source is available the guard cannot run the identifier check. If `GUARD_FORK` is `true` or the flag `--patterns-only` is given, it runs the path check only and prints a notice. Otherwise it exits with code 2 and this message:
 
 ```text
