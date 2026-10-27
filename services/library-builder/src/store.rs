@@ -53,7 +53,6 @@ pub enum LibraryTarget {
     },
 }
 
-
 /// Installs rustls's ring provider as the process default once, before the first S3 client
 /// is built: reqwest runs with `rustls-no-provider` so that no aws-lc-rs is linked (O-208),
 /// and a client built without a process default provider fails. A second call finds the
