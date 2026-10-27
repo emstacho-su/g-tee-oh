@@ -2,21 +2,30 @@
 //! library nodes in the job's raw labels. The proptest is the A2 section 3 property:
 //! permuting suits and then extracting equals extracting and then permuting.
 
+mod common;
+
+use std::path::Path;
+
 use gto_library::{
-    ChunkOptions, FlopBuildMeta, HandSpace, ManifestConfig, MemStore, Reader, ReaderOptions,
-    RunoutSpec, builds_prefix, permute_node, write_flop_build,
+    ChunkOptions, FlopBuildMeta, FsStore, HandSpace, LineBuild, ManifestConfig, MemStore, Reader,
+    ReaderOptions, RunoutSpec, SolutionHandle, builds_prefix, draw_runouts, permute_key,
+    permute_node, write_flop_build,
 };
 use gto_model::{
     ActionToken, Card, Cbb, ComboId, ConfigId, Flop, GameFormat, NodeKey, Position, PositionPair,
-    SuitPermutation, TableSize,
+    SuitPermutation, TableSize, canonical_flop, is_canonical_flop,
 };
+use gto_planner::{ConfigScope, PlannerSettings, PriorReach, enumerate};
 use gto_solve::postflop::{HandStrategy, NodeStrategy, SolveReport, StopReason, StorageBits};
-use gto_tree::Player;
+use gto_tree::{Player, SizingConventionSpec};
 use library_builder::error::BuilderError;
 use library_builder::extract::{
-    ExtractContext, extract_line, extract_nodes, permute_runout, permute_strategies, to_solved_node,
+    ExtractContext, extract_line, extract_nodes, extract_runout, permute_range, permute_runout,
+    permute_strategies, to_solved_node,
 };
-use library_builder::solve::SolvedLine;
+use library_builder::job::{BuildInputs, stage_build};
+use library_builder::solve::{FakeSolver, SolvedLine};
+use library_builder::spec::{inputs, load};
 use proptest::prelude::*;
 
 const X: ActionToken = ActionToken::Check;
@@ -237,10 +246,18 @@ fn r2_12_an_extracted_line_writes_a_build_the_reader_routes() {
         report: report(),
         gains_pct_pot: [0.21, 0.27],
         root_nodes: walked(canonical, runouts[0]).0,
-        runout_nodes: runouts.iter().map(|r| (*r, walked(canonical, *r).1)).collect(),
     };
-    let line = extract_line(&ctx(canonical, perm), "r250.c", &"ab".repeat(32), 7, &solved)
+    let head = extract_line(&ctx(canonical, perm), "r250.c", &"ab".repeat(32), 7, &solved)
         .expect("extracts");
+    assert!(head.runouts.is_empty(), "the head carries no runouts; each is written as walked");
+    let line = LineBuild {
+        runouts: runouts
+            .iter()
+            .map(|r| extract_runout(&ctx(canonical, perm), *r, &walked(canonical, *r).1))
+            .collect::<Result<_, _>>()
+            .expect("extracts the runouts"),
+        ..head
+    };
     assert_eq!(line.line, "r250.c");
     assert_eq!(line.iterations, 340);
     assert_eq!(line.exploitability_pct_pot, [0.21, 0.27]);
@@ -281,4 +298,91 @@ fn r2_12_an_extracted_line_writes_a_build_the_reader_routes() {
     for node in line.flop_nodes.iter().chain(line.runouts.iter().flat_map(|(_, n)| n)) {
         reader.node(handle, &node.key).unwrap_or_else(|err| panic!("{}: {err}", node.key));
     }
+}
+
+/// The tiny spec's inputs moved onto `flop`, with each line's ranges relabelled by `perm`.
+fn moved_inputs(base: &BuildInputs, flop: Flop, perm: SuitPermutation) -> BuildInputs {
+    let lines = base
+        .lines
+        .iter()
+        .map(|(line, ranges)| {
+            (line.clone(), ranges.clone().map(|r| permute_range(&r, perm).expect("a range")))
+        })
+        .collect();
+    BuildInputs { raw_flop: flop, lines, ..base.clone() }
+}
+
+/// Stages `inputs` with the fake solver under `root` and opens the staged build.
+fn stage_with_fake(inputs: &BuildInputs, root: &Path) -> (Reader<FsStore>, SolutionHandle) {
+    let staged = stage_build(inputs, &FakeSolver::converging([0.1, 0.2]), root, &|_| {})
+        .expect("the build stages");
+    let reader =
+        Reader::new(FsStore::new(root).expect("a store"), ReaderOptions { cache_bytes: 1 << 26 });
+    let handle = reader.open(&staged.prefix).expect("the staged build opens");
+    (reader, handle)
+}
+
+/// The keys of the fake's nodes on `flop` after `preflop`, for `runouts`.
+fn fake_keys(flop: Flop, preflop: &[ActionToken], runouts: &[RunoutSpec]) -> Vec<NodeKey> {
+    let start = || NodeKey::preflop(config_id(), pair(), preflop.to_vec());
+    let mut keys = vec![start().with_flop(flop, Vec::new()).expect("the root key")];
+    for runout in runouts {
+        let turn = start().with_flop(flop, vec![X, X]).expect("a flop key");
+        keys.push(turn.clone().with_turn(runout.turn, Vec::new()).expect("a turn key"));
+        let river = turn.with_turn(runout.turn, vec![X, X]).expect("a turn key");
+        keys.push(river.with_river(runout.river, Vec::new()).expect("a river key"));
+    }
+    keys
+}
+
+/// R2.12: a job on a non-canonical raw flop with suit-specific ranges stages the build of
+/// the same spot on the canonical flop, relabelled to the raw suits. The fake's hands are
+/// the live combos of the ranges it is handed, so ranges left in the raw labels while the
+/// solve runs on the canonical flop show as other hands.
+#[test]
+fn r2_12_suit_specific_ranges_on_a_raw_flop_stage_the_relabelled_canonical_build() {
+    let base = inputs(&load(&common::fixture("tiny-bb-btn-srp.spec.json")).expect("spec"), 1)
+        .expect("inputs");
+    let (canonical, to_canonical) = canonical_flop(base.raw_flop);
+    let perm = SuitPermutation::all()
+        .into_iter()
+        .find(|perm| !is_canonical_flop(perm.apply_flop(canonical)))
+        .expect("a permutation that leaves the canonical flop");
+    let canonical_job = moved_inputs(&base, canonical, to_canonical);
+    let raw_job = moved_inputs(&canonical_job, perm.apply_flop(canonical), perm);
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let (canonical_reader, canonical_handle) =
+        stage_with_fake(&canonical_job, &dir.path().join("canonical"));
+    let (raw_reader, raw_handle) = stage_with_fake(&raw_job, &dir.path().join("raw"));
+    let runouts = draw_runouts(canonical, base.k_runouts, base.seed).expect("the runouts");
+    let preflop = &base.lines[0].0.actions;
+    for key in fake_keys(canonical, preflop, &runouts) {
+        let expected = canonical_reader
+            .node(canonical_handle, &key)
+            .and_then(|view| view.to_solved(&key))
+            .and_then(|node| permute_node(&node, perm))
+            .unwrap_or_else(|err| panic!("{key}: {err}"));
+        let raw_key = permute_key(&key, perm).expect("a raw key");
+        let got = raw_reader
+            .node(raw_handle, &raw_key)
+            .and_then(|view| view.to_solved(&raw_key))
+            .unwrap_or_else(|err| panic!("{raw_key}: {err}"));
+        assert_eq!(got, expected, "{raw_key}");
+    }
+}
+
+/// R2.12: every job the planner lists names a canonical flop, the flop the builder solves.
+#[test]
+fn r2_12_every_planner_job_flop_is_canonical() {
+    let config = gto_model::v1_configs()
+        .into_iter()
+        .find(|config| config.config_id().as_str() == common::CONFIG_ID)
+        .expect("the configuration");
+    let convention = SizingConventionSpec::from_json(&common::placeholder_convention().to_string())
+        .expect("the convention");
+    let jobs =
+        enumerate(&[ConfigScope { config, convention }], &PriorReach, &PlannerSettings::default())
+            .expect("the jobs");
+    assert!(jobs.len() > 1, "the scope lists jobs");
+    assert!(jobs.iter().all(|job| is_canonical_flop(job.flop)), "a job names a raw flop");
 }

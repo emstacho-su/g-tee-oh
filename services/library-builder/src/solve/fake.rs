@@ -1,4 +1,4 @@
-//! The tree [`super::FakeSolver`] returns: a small, well-formed walk on the job's flop with
+//! The tree [`super::FakeSolver`] walks: a small, well-formed walk on the job's flop with
 //! no engine behind it (R2.17 loop tests, R2.12 extraction tests).
 //!
 //! Mechanism: the root is an out-of-position decision with a check and one bet of half
@@ -8,14 +8,14 @@
 //! one river node after check-check on the turn (`dealt [turn, river]`, street lines
 //! `[[x, x], [x, x], []]`), each over the combos live on its board. Checks move no chips,
 //! so every node has the root pot and stacks. Frequencies and values are fixed functions
-//! of the combo index, so two calls with one job return equal trees.
+//! of the combo index, so two calls with one job walk equal trees.
 
 use gto_library::RunoutSpec;
 use gto_model::{ActionToken, Card, Cbb, ComboId};
 use gto_solve::postflop::{HandStrategy, NodeStrategy, SolveError, SolveReport, StopReason};
 use gto_tree::Player;
 
-use super::{LineJob, SolvedLine};
+use super::{LineJob, LineWalk, SolvedLine};
 use crate::error::BuilderError;
 
 /// The iterations the fake reports.
@@ -25,21 +25,9 @@ const FREQUENCY_STEPS: u16 = 10;
 /// Centi-big-blinds in a big blind.
 const CBB_PER_BB: f64 = 100.0;
 
-/// The fake's solved line for `job`.
-pub(super) fn solved_line(
-    job: &LineJob,
-    gains_pct_pot: [f64; 2],
-    estimate_bytes: u64,
-) -> Result<SolvedLine, BuilderError> {
-    let board = job.problem.board.cards();
-    let shape = Shape::of(job);
-    let root_nodes = vec![shape.node(job, &board, Vec::new(), vec![Vec::new()])];
-    let runout_nodes = job
-        .runouts
-        .iter()
-        .map(|runout| Ok((*runout, shape.runout_nodes(job, &board, *runout)?)))
-        .collect::<Result<Vec<_>, BuilderError>>()?;
-    let report = SolveReport {
+/// The fake's report for `job`.
+pub(super) fn report(job: &LineJob, gains_pct_pot: [f64; 2], estimate_bytes: u64) -> SolveReport {
+    SolveReport {
         iterations: FAKE_ITERATIONS,
         exploitability_pct_pot: gains_pct_pot.map(narrow),
         peak_bytes: estimate_bytes,
@@ -48,8 +36,25 @@ pub(super) fn solved_line(
         stop_reason: StopReason::Target,
         storage: job.options.storage,
         tree_hash: gto_tree::tree_hash(&job.problem.tree),
-    };
-    Ok(SolvedLine { report, gains_pct_pot, root_nodes, runout_nodes })
+    }
+}
+
+/// Walks the fake's tree for `job` into `walk`: the root, then each runout built only
+/// after the previous one was handed over, as the engine solver does.
+pub(super) fn walk_line(
+    job: &LineJob,
+    report: SolveReport,
+    gains_pct_pot: [f64; 2],
+    walk: &mut dyn LineWalk,
+) -> Result<(), BuilderError> {
+    let board = job.problem.board.cards();
+    let shape = Shape::of(job);
+    let root_nodes = vec![shape.node(job, &board, Vec::new(), vec![Vec::new()])];
+    walk.root(SolvedLine { report, gains_pct_pot, root_nodes })?;
+    for runout in &job.runouts {
+        walk.runout(*runout, shape.runout_nodes(job, &board, *runout)?)?;
+    }
+    Ok(())
 }
 
 /// A gain as the report's `f32`; gains are small percentages, well inside its range.

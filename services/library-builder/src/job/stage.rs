@@ -3,20 +3,24 @@
 //! inline in a job-spec run (O-205).
 //!
 //! The job's flop is canonicalized once (`canonical_flop` gives the raw-to-canonical
-//! permutation, so its inverse relabels the solve back to the raw flop); the runouts are
-//! drawn once on the canonical flop from the job's seed (O-192), so every line keeps the
-//! same runouts. Per line the solver runs, both seats' gains are checked against the
-//! target before anything is written (02 section 3.2 step 4), the walk is extracted to
-//! library nodes on the raw flop (O-173), and the line's files are written into the
-//! staging `FsStore`; the solved line is dropped before the next one starts (memory).
+//! permutation, which moves each line's ranges onto the canonical labels before the solve,
+//! and its inverse relabels the solve back to the raw flop); the runouts are drawn once on
+//! the canonical flop from the job's seed (O-192), so every line keeps the same runouts.
+//! Per line the solver runs and hands its walk to the line's `StageWalk` (`walk`): both
+//! seats' gains are checked against the target before anything is written (02 section
+//! 3.2 step 4), then the root street becomes the flop file and each runout, as it is
+//! walked, is extracted to library nodes on the raw flop (O-173), written into the staging
+//! `FsStore` and dropped before the next runout is walked. Beside the solved game a line
+//! therefore holds at most one runout, and the solved game is dropped before the next line
+//! starts (memory, O-187).
 
 use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use gto_library::{
-    ChunkOptions, FlopBuildMeta, FsStore, LineWritten, MANIFEST_FILE, ManifestConfig, RunoutSpec,
-    builds_prefix, draw_runouts, narrow_f32, write_flop_build_manifest, write_line_files,
+    FlopBuildMeta, FsStore, LineWritten, MANIFEST_FILE, ManifestConfig, RunoutSpec, builds_prefix,
+    draw_runouts, write_flop_build_manifest,
 };
 use gto_model::{Board, ConfigId, Flop, GameConfig, SuitPermutation, canonical_flop};
 use gto_solve::postflop::{PostflopProblem, ProgressSink, Range, StopReason};
@@ -24,9 +28,13 @@ use gto_tree::{PreflopLine, tree_hash_hex};
 
 use super::{BuildInputs, ENGINE_VERSION, LineSummary, StagedBuild, utc_now_rfc3339};
 use crate::error::BuilderError;
-use crate::extract::{ExtractContext, extract_line};
+use crate::extract::{ExtractContext, permute_range};
 use crate::notify::BuildProgress;
 use crate::solve::{LineJob, LineSolver};
+
+mod walk;
+
+use self::walk::{LinePlace, StageWalk};
 
 /// The least time between two progress reports of one line (A4 section 4: at most one
 /// `build_progress` notify per 10 seconds).
@@ -36,6 +44,8 @@ pub const PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 struct BuildFrame {
     /// The canonical flop the solves run on.
     canonical: Flop,
+    /// The job's raw labels to the canonical labels, for the ranges.
+    to_canonical: SuitPermutation,
     /// Canonical labels to the job's raw labels.
     to_raw: SuitPermutation,
     /// The runouts on the canonical flop.
@@ -107,6 +117,7 @@ pub fn stage_build(
     let config_id = inputs.config.config_id();
     let frame = BuildFrame {
         canonical,
+        to_canonical: raw_to_canonical,
         to_raw: raw_to_canonical.inverse(),
         runouts: draw_runouts(canonical, inputs.k_runouts, inputs.seed)?,
         prefix: builds_prefix(&config_id, inputs.pair, inputs.raw_flop, &inputs.build_id),
@@ -183,7 +194,39 @@ fn stop_reason_text(reason: StopReason) -> &'static str {
     }
 }
 
-/// Solves, checks, extracts and writes one line.
+/// The line's job: the problem on the canonical flop, with the line's ranges moved from
+/// the raw flop's labels to the canonical flop's (A2 section 3), so a suit-specific range
+/// is solved on the cards it names.
+fn line_job(
+    inputs: &BuildInputs,
+    frame: &BuildFrame,
+    line: &PreflopLine,
+    ranges: &[Range; 2],
+) -> Result<LineJob, BuilderError> {
+    let canonical_ranges = [
+        permute_range(&ranges[0], frame.to_canonical)?,
+        permute_range(&ranges[1], frame.to_canonical)?,
+    ];
+    let problem = PostflopProblem::from_line(
+        inputs.config.clone(),
+        line.clone(),
+        Board::new(frame.canonical, None, None)?,
+        canonical_ranges,
+        inputs.tree.clone(),
+    )?;
+    Ok(LineJob {
+        problem,
+        line: line.text(),
+        stop: inputs.settings.stop_rule(inputs.attempt),
+        options: inputs.settings.solve_options(),
+        threads: inputs.threads,
+        runouts: frame.runouts.clone(),
+        seed: inputs.seed,
+    })
+}
+
+/// Solves one line and hands its walk to a [`StageWalk`], which checks the target and
+/// writes the flop file and then each runout's file as it is walked.
 fn stage_line(
     inputs: &BuildInputs,
     solver: &dyn LineSolver,
@@ -192,68 +235,62 @@ fn stage_line(
     (line, ranges): (&PreflopLine, &[Range; 2]),
     progress: &(dyn Fn(BuildProgress) + Sync),
 ) -> Result<(LineWritten, LineSummary), BuilderError> {
-    let text = line.text();
-    let board = Board::new(frame.canonical, None, None)?;
-    let problem = PostflopProblem::from_line(
-        inputs.config.clone(),
-        line.clone(),
-        board,
-        ranges.clone(),
-        inputs.tree.clone(),
-    )?;
-    let line_job = LineJob {
-        problem,
-        line: text.clone(),
-        stop: inputs.settings.stop_rule(inputs.attempt),
-        options: inputs.settings.solve_options(),
-        threads: inputs.threads,
-        runouts: frame.runouts.clone(),
-        seed: inputs.seed,
-    };
+    let line_job = line_job(inputs, frame, line, ranges)?;
+    let text = line_job.line.clone();
     let sink = ForwardProgress {
         job_id: &inputs.job_id,
         line: &text,
         forward: progress,
         last_sent: Mutex::new(None),
     };
-    let started = Instant::now();
-    let walked = solver.solve_line(&line_job, &sink)?;
-    let seconds = started.elapsed().as_secs_f64();
-    let gains = walked.gains_pct_pot;
-    check_target(&text, gains, inputs.settings.target_pct_pot)?;
     let context = ExtractContext {
         config_id: frame.config_id.clone(),
         pair: inputs.pair,
         preflop: line.actions.clone(),
         solved_flop: frame.canonical,
         to_raw: frame.to_raw,
-        accuracy_pct_pot: Some(narrow_f32(gains[0].max(gains[1]))),
+        accuracy_pct_pot: None,
     };
-    let built = extract_line(&context, &text, &frame.tree_hash, inputs.seed, &walked)?;
-    let report = walked.report;
-    drop(walked);
-    let files =
-        write_line_files(store, &frame.prefix, inputs.pair, &built, &ChunkOptions::default())?;
+    let place = LinePlace {
+        prefix: &frame.prefix,
+        pair: inputs.pair,
+        line: &text,
+        tree_hash: &frame.tree_hash,
+        seed: inputs.seed,
+        target_pct_pot: inputs.settings.target_pct_pot,
+    };
+    let mut walk = StageWalk::new(store, place, context);
+    let started = Instant::now();
+    solver.solve_line(&line_job, &sink, &mut walk)?;
+    let seconds = started.elapsed().as_secs_f64();
+    let walked = walk.finish(frame.runouts.len())?;
     let summary = LineSummary {
-        line: text,
+        line: text.clone(),
         seconds,
-        iterations: report.iterations,
-        gains_pct_pot: gains,
-        stop_reason: stop_reason_text(report.stop_reason).to_owned(),
-        estimate_bytes: report.estimate_bytes,
-        flop_bytes: files.flop_bytes,
-        runout_bytes: files.runout_bytes.clone(),
+        iterations: walked.report.iterations,
+        gains_pct_pot: walked.gains_pct_pot,
+        stop_reason: stop_reason_text(walked.report.stop_reason).to_owned(),
+        estimate_bytes: walked.report.estimate_bytes,
+        flop_bytes: walked.written.flop_bytes,
+        runout_bytes: walked.written.runout_bytes.clone(),
     };
-    Ok((files, summary))
+    Ok((walked.written, summary))
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
 
-    use super::{ForwardProgress, check_target};
+    use std::path::{Path, PathBuf};
+
+    use gto_library::RunoutSpec;
+    use gto_solve::postflop::NodeStrategy;
+
+    use super::{BuildInputs, ForwardProgress, check_target, stage_build};
     use crate::error::BuilderError;
     use crate::notify::BuildProgress;
+    use crate::solve::{FakeSolver, LineJob, LineSolver, LineWalk, SolvedLine};
+    use crate::spec::{inputs, load};
     use gto_solve::postflop::ProgressSink;
 
     #[test]
@@ -281,5 +318,105 @@ mod tests {
         let above = check_target("l", [0.1, 0.31], 0.3);
         assert!(matches!(above, Err(BuilderError::AboveTarget { .. })), "{above:?}");
         assert!(check_target("l", [f64::NAN, 0.0], 0.3).is_err(), "not a number fails");
+    }
+
+    /// The files under `dir` whose path runs through a `runouts` directory.
+    fn runout_files(dir: &Path) -> usize {
+        let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+        entries
+            .flatten()
+            .map(|entry| entry.path())
+            .map(|path| {
+                if path.is_dir() {
+                    runout_files(&path)
+                } else {
+                    usize::from(path.components().any(|part| part.as_os_str() == "runouts"))
+                }
+            })
+            .sum()
+    }
+
+    /// A walk that checks, at every runout handed over, that each earlier runout's file is
+    /// already on disk, and that this runout's file is written before the solver goes on.
+    struct Watch<'a> {
+        inner: &'a mut dyn LineWalk,
+        staging: &'a Path,
+        handed: usize,
+    }
+
+    impl LineWalk for Watch<'_> {
+        fn root(&mut self, solved: SolvedLine) -> Result<(), BuilderError> {
+            self.inner.root(solved)
+        }
+
+        fn runout(
+            &mut self,
+            runout: RunoutSpec,
+            nodes: Vec<NodeStrategy>,
+        ) -> Result<(), BuilderError> {
+            assert_eq!(runout_files(self.staging), self.handed, "earlier runouts are on disk");
+            self.inner.runout(runout, nodes)?;
+            self.handed += 1;
+            assert_eq!(runout_files(self.staging), self.handed, "{runout} is written at once");
+            Ok(())
+        }
+    }
+
+    /// The fake solver behind a [`Watch`].
+    struct Watching {
+        staging: PathBuf,
+    }
+
+    impl LineSolver for Watching {
+        fn solve_line(
+            &self,
+            job: &LineJob,
+            sink: &dyn ProgressSink,
+            walk: &mut dyn LineWalk,
+        ) -> Result<(), BuilderError> {
+            let mut watch = Watch { inner: walk, staging: &self.staging, handed: 0 };
+            FakeSolver::converging([0.1, 0.2]).solve_line(job, sink, &mut watch)?;
+            assert_eq!(watch.handed, job.runouts.len());
+            Ok(())
+        }
+    }
+
+    /// R2.17: each runout is extracted and written before the solver walks the next one,
+    /// so a line never holds more than one walked runout.
+    #[test]
+    fn r2_17_each_runout_is_written_before_the_next_is_walked() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../validation/fixtures/builder/tiny-bb-btn-srp.spec.json");
+        let spec = load(&fixture).expect("the tiny spec");
+        let inputs = BuildInputs { k_runouts: 4, ..inputs(&spec, 1).expect("inputs") };
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let solver = Watching { staging: dir.path().to_path_buf() };
+        let staged = stage_build(&inputs, &solver, dir.path(), &|_| {}).expect("stages");
+        assert_eq!(staged.lines[0].runout_bytes.len(), 4);
+        assert_eq!(runout_files(dir.path()), 4);
+    }
+
+    /// R2.17: a line whose gain is above the target writes nothing, not even its flop file.
+    #[test]
+    fn r2_17_a_line_above_the_target_writes_no_file() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../validation/fixtures/builder/tiny-bb-btn-srp.spec.json");
+        let inputs = inputs(&load(&fixture).expect("the tiny spec"), 1).expect("inputs");
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let above = FakeSolver::converging([0.1, 5.0]);
+        let result = stage_build(&inputs, &above, dir.path(), &|_| {});
+        assert!(matches!(result, Err(BuilderError::AboveTarget { .. })), "{result:?}");
+        let mut files = Vec::new();
+        let mut stack = vec![dir.path().to_path_buf()];
+        while let Some(next) = stack.pop() {
+            for entry in std::fs::read_dir(&next).expect("a directory").flatten() {
+                if entry.path().is_dir() {
+                    stack.push(entry.path());
+                } else {
+                    files.push(entry.path());
+                }
+            }
+        }
+        assert!(files.is_empty(), "{files:?}");
     }
 }

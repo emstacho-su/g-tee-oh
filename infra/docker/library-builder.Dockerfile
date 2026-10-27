@@ -86,7 +86,8 @@ RUN set -eu; \
     apt-get install -y --no-install-recommends ca-certificates; \
     rm -rf /var/lib/apt/lists/*; \
     groupadd --system --gid 10001 gto; \
-    useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin gto
+    useradd --system --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin gto; \
+    install -d -o 10001 -g 10001 -m 0750 /scratch
 
 COPY --from=builder /out/${SERVICE} /usr/local/bin/${SERVICE}
 
@@ -113,6 +114,8 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 CMD ["/us
 # parts (O-146), the library bucket through S3_ENDPOINT and S3_LIBRARY_*, or LIBRARY_ROOT
 # for a directory target (the benchmark), and BUILDER_BIND, BUILDER_THREADS,
 # BUILDER_SCRATCH_DIR, BUILDER_WORKER_ID and BUILDER_RANGES_FIXTURE, each with a default.
-# Scratch space for a build in progress is the compose-provided tmpfs at /tmp, not the
-# image. Nothing secret is baked in.
+# Scratch space for a build in progress is /scratch, an empty directory owned by 10001 that
+# compose mounts the named volume builder-scratch over: Docker fills a new named volume from
+# the image's directory, owner included, so the read-only container can write it. Nothing
+# secret is baked in.
 ENTRYPOINT ["/usr/local/bin/library-builder"]

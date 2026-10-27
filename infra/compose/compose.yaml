@@ -294,18 +294,22 @@ services:
       S3_ENDPOINT: http://seaweedfs:8333
       S3_LIBRARY_ACCESS_KEY: ${S3_LIBRARY_ACCESS_KEY:?set S3_LIBRARY_ACCESS_KEY in .env}
       S3_LIBRARY_SECRET_KEY: ${S3_LIBRARY_SECRET_KEY:?set S3_LIBRARY_SECRET_KEY in .env}
-      # A build is staged on the tmpfs below before its upload (plan C.6)
-      BUILDER_SCRATCH_DIR: /tmp
+      # A build is staged on the disk-backed named volume builder-scratch before its upload (plan C.6):
+      # a flop build can run to gigabytes, which a tmpfs would take from the 5 GB memory cap
+      BUILDER_SCRATCH_DIR: /scratch
       # Empty takes the binary's default: the machine's parallelism and the container's host name
       BUILDER_THREADS: ${BUILDER_THREADS:-}
       BUILDER_WORKER_ID: ${BUILDER_WORKER_ID:-}
       # O-181, O-201: the hand-made ranges the image carries under /fixtures/builder until a preflop
       # solution is packed; a line outside the fixture fails its job with MissingRanges
       BUILDER_RANGES_FIXTURE: ${BUILDER_RANGES_FIXTURE:-/fixtures/builder/bench-bb-btn-srp.ranges.json}
-    # A9 section 3, the same hardening as solver-query; /tmp is the one writable path (the staging area)
+    # A9 section 3, the same hardening as solver-query; the writable paths are /scratch, the staging volume
+    # (the image creates it owned by 10001, so a new volume starts with that owner), and a small /tmp
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:size=64m
+    volumes:
+      - builder-scratch:/scratch
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     user: "10001:10001"
@@ -330,6 +334,14 @@ services:
       postgres-mac:
         condition: service_healthy
         required: false
+      # The library bucket's S3 gateway the same way: seaweedfs under dev, seaweedfs-mac under mac, and
+      # none when the bucket is external
+      seaweedfs:
+        condition: service_healthy
+        required: false
+      seaweedfs-mac:
+        condition: service_healthy
+        required: false
     # No ports: 7071 is never published (O-207)
     networks:
       gto: {}
@@ -339,6 +351,8 @@ volumes:
   seaweedfs_data: {}
   caddy_data: {}
   caddy_config: {}
+  # The library builder's staging area (BUILDER_SCRATCH_DIR); a build's files live here only until its upload
+  builder-scratch: {}
 
 networks:
   gto: {}

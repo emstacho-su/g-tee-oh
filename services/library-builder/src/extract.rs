@@ -10,9 +10,11 @@
 //! reach, frequencies and per-action EV (O-175, O-202) in the 1,326-combo space. Then
 //! `gto_library::permute_node` applies the canonical-to-raw suit permutation to the key's
 //! cards and to every per-combo array (A2 section 3). [`extract_line`] does this for the
-//! root street (the flop file) and for each runout (the runout files) and relabels the
-//! runout cards the same way. The property `extract(permute(input)) ==
-//! permute(extract(input))` is tested over [`permute_strategies`].
+//! root street (the flop file) and [`extract_runout`] for one runout at a time (its runout
+//! file), relabelling the runout cards the same way. The property `extract(permute(input))
+//! == permute(extract(input))` is tested over [`permute_strategies`]. [`permute_range`]
+//! moves the job's ranges from the raw flop's labels to the canonical flop's before the
+//! solve.
 //!
 //! Wagers. A fold or a check wagers 0 and a bet or raise its street total. A call and an
 //! all-in need the chips already in on the street, which the node's current street line
@@ -29,7 +31,7 @@ use gto_library::{HandSpace, LineBuild, RunoutSpec, SolvedHand, SolvedNode, perm
 use gto_model::{
     ActionToken, Cbb, ComboId, ConfigId, Flop, NodeKey, PositionPair, SuitPermutation,
 };
-use gto_solve::postflop::{HandStrategy, NodeStrategy};
+use gto_solve::postflop::{HandStrategy, NodeStrategy, Range};
 use gto_tree::Player;
 
 use crate::error::BuilderError;
@@ -168,8 +170,9 @@ pub fn extract_nodes(
     nodes.iter().map(|node| Ok(permute_node(&to_solved_node(ctx, node)?, ctx.to_raw)?)).collect()
 }
 
-/// A solved line as the library's `LineBuild` on the raw flop: the flop nodes, and per
-/// runout (relabelled) its turn and river nodes.
+/// A solved line's head as the library's `LineBuild` on the raw flop: the flop nodes, and
+/// no runouts. The job writes each runout as it is walked ([`extract_runout`]), so a line
+/// never holds all its runouts at once.
 ///
 /// # Errors
 ///
@@ -181,13 +184,6 @@ pub fn extract_line(
     seed: u64,
     solved: &SolvedLine,
 ) -> Result<LineBuild, BuilderError> {
-    let runouts = solved
-        .runout_nodes
-        .iter()
-        .map(|(runout, nodes)| {
-            Ok((permute_runout(*runout, ctx.to_raw), extract_nodes(ctx, nodes)?))
-        })
-        .collect::<Result<Vec<_>, BuilderError>>()?;
     Ok(LineBuild {
         line: line.to_owned(),
         tree_hash: tree_hash.to_owned(),
@@ -195,8 +191,41 @@ pub fn extract_line(
         iterations: u64::from(solved.report.iterations),
         exploitability_pct_pot: solved.gains_pct_pot,
         flop_nodes: extract_nodes(ctx, &solved.root_nodes)?,
-        runouts,
+        runouts: Vec::new(),
     })
+}
+
+/// One walked runout on the raw flop: the runout and its turn and river nodes relabelled.
+///
+/// # Errors
+///
+/// As [`extract_nodes`].
+pub fn extract_runout(
+    ctx: &ExtractContext,
+    runout: RunoutSpec,
+    nodes: &[NodeStrategy],
+) -> Result<(RunoutSpec, Vec<SolvedNode>), BuilderError> {
+    Ok((permute_runout(runout, ctx.to_raw), extract_nodes(ctx, nodes)?))
+}
+
+/// A range relabelled by `perm`: each combo's weight moves to the combo of its relabelled
+/// cards. The job maps its ranges from the raw flop's labels to the canonical flop's this
+/// way before it solves (A2 section 3).
+///
+/// # Errors
+///
+/// `BuilderError::Model` when a combo cannot be rebuilt, `BuilderError::Solve` when the
+/// weights are not a range.
+pub fn permute_range(range: &Range, perm: SuitPermutation) -> Result<Range, BuilderError> {
+    let mut weights = vec![0.0_f32; range.weights().len()];
+    for combo in ComboId::all() {
+        let (a, b) = combo.cards();
+        let to = ComboId::from_cards(perm.apply(a), perm.apply(b))?;
+        if let Some(weight) = weights.get_mut(usize::from(u16::from(to))) {
+            *weight = range.weight(combo);
+        }
+    }
+    Ok(Range::from_weights(&weights)?)
 }
 
 /// Walked nodes relabelled by `perm`: dealt cards and every hand's combo, hands re-sorted
