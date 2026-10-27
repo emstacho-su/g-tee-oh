@@ -3,10 +3,14 @@
 //! so the password cannot leak through one. Every statement is a runtime-checked
 //! `sqlx::query` with bound parameters (O-147: no macros, no `.sqlx` directory, no string
 //! interpolation of values). The transactions are the ones the module docs of `queue`
-//! name; `pg_notify` is used rather than `NOTIFY` so the payload is a bound parameter.
+//! name and live in [`tx`]; `pg_notify` is used rather than `NOTIFY` so the payload is a
+//! bound parameter. Enum columns are compared and read as text (`status::text`) and ids
+//! as `id::text` with `$n::uuid` casts, so no sqlx type feature beyond the defaults is
+//! needed.
+
+mod tx;
 
 use std::collections::BTreeSet;
-use std::future::{Future, ready};
 use std::time::Duration;
 
 use gto_planner::{JobKey, Plan};
@@ -18,7 +22,7 @@ use super::{
 };
 use crate::config::{DatabaseConfig, SslMode};
 use crate::error::BuilderError;
-use crate::notify::{BuildProgress, StatePayload};
+use crate::notify::{BUILD_PROGRESS, BUILDER_STATE, BuildProgress, StatePayload};
 
 /// The most connections the pool opens: the loop, the progress writer, the health probe
 /// and the metrics scrape.
@@ -73,104 +77,132 @@ fn pg_ssl_mode(mode: SslMode) -> PgSslMode {
     }
 }
 
-// Skeleton: every method answers at once with NotImplemented until its lane lands.
+// Each method is one statement or one transaction of `tx`; sqlx errors become
+// `BuilderError::Database` through `?`.
 impl JobQueue for PgQueue {
-    fn settings(&self) -> impl Future<Output = Result<Vec<(String, Value)>, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::settings")))
+    async fn settings(&self) -> Result<Vec<(String, Value)>, BuilderError> {
+        let rows: Vec<(String, Value)> =
+            sqlx::query_as("select key, value from builder_setting order by key")
+                .fetch_all(&self.pool)
+                .await?;
+        Ok(rows)
     }
 
-    fn reclaim_stale(
+    async fn reclaim_stale(&self, worker_id: &str, stale_hours: u32) -> Result<u64, BuilderError> {
+        let hours = i32::try_from(stale_hours).unwrap_or(i32::MAX);
+        let requeued = sqlx::query(
+            "update build_job set status = 'queued', locked_by = null, locked_at = null, \
+             updated_at = now() where status = 'running' and \
+             (locked_by = $1 or locked_at < now() - make_interval(hours => $2))",
+        )
+        .bind(worker_id)
+        .bind(hours)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(requeued)
+    }
+
+    async fn claim(
         &self,
-        _worker_id: &str,
-        _stale_hours: u32,
-    ) -> impl Future<Output = Result<u64, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::reclaim_stale")))
+        worker_id: &str,
+        job_id: Option<&str>,
+        gate: &BudgetGate,
+    ) -> Result<Claim, BuilderError> {
+        tx::claim(&self.pool, worker_id, job_id, gate).await
     }
 
-    fn claim(
+    async fn new_build_id(&self) -> Result<String, BuilderError> {
+        let id: String = sqlx::query_scalar("select uuidv7()::text").fetch_one(&self.pool).await?;
+        Ok(id)
+    }
+
+    async fn sizing_convention(&self, config_id: &str) -> Result<Value, BuilderError> {
+        let spec: Option<Value> = sqlx::query_scalar(
+            "select sc.spec from game_config gc join sizing_convention sc \
+             on sc.id = gc.sizing_convention_id where gc.id = $1",
+        )
+        .bind(config_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        spec.ok_or_else(|| BuilderError::UnknownConfig(config_id.to_owned()))
+    }
+
+    async fn progress(&self, progress: &BuildProgress) -> Result<(), BuilderError> {
+        let value = serde_json::to_value(progress).map_err(|err| BuilderError::Malformed {
+            path: BUILD_PROGRESS.to_owned(),
+            reason: err.to_string(),
+        })?;
+        sqlx::query("update build_job set progress = $2, updated_at = now() where id = $1::uuid")
+            .bind(&progress.job_id)
+            .bind(&value)
+            .execute(&self.pool)
+            .await?;
+        let mut conn = self.pool.acquire().await?;
+        tx::notify(&mut conn, BUILD_PROGRESS, progress).await
+    }
+
+    async fn publish(
         &self,
-        _worker_id: &str,
-        _job_id: Option<&str>,
-        _gate: &BudgetGate,
-    ) -> impl Future<Output = Result<Claim, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::claim")))
+        worker_id: &str,
+        publication: &Publication,
+    ) -> Result<(), BuilderError> {
+        tx::publish(&self.pool, worker_id, publication).await
     }
 
-    fn new_build_id(&self) -> impl Future<Output = Result<String, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::new_build_id")))
-    }
-
-    fn sizing_convention(
+    async fn fail(
         &self,
-        _config_id: &str,
-    ) -> impl Future<Output = Result<Value, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::sizing_convention")))
+        worker_id: &str,
+        failure: &Failure,
+        max_attempts: i16,
+    ) -> Result<FailureOutcome, BuilderError> {
+        tx::fail(&self.pool, worker_id, failure, max_attempts).await
     }
 
-    fn progress(
+    async fn notify_state(&self, state: &StatePayload) -> Result<(), BuilderError> {
+        let mut conn = self.pool.acquire().await?;
+        tx::notify(&mut conn, BUILDER_STATE, state).await
+    }
+
+    async fn plan_inputs(
         &self,
-        _progress: &BuildProgress,
-    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::progress")))
+        gate: &BudgetGate,
+    ) -> Result<(BTreeSet<JobKey>, u64), BuilderError> {
+        tx::plan_inputs(&self.pool, gate).await
     }
 
-    fn publish(
-        &self,
-        _worker_id: &str,
-        _publication: &Publication,
-    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::publish")))
+    async fn write_plan(&self, plan: &Plan) -> Result<PlanWrite, BuilderError> {
+        tx::write_plan(&self.pool, plan).await
     }
 
-    fn fail(
-        &self,
-        _worker_id: &str,
-        _failure: &Failure,
-        _max_attempts: i16,
-    ) -> impl Future<Output = Result<FailureOutcome, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::fail")))
+    async fn published_builds(&self) -> Result<Vec<PublishedBuild>, BuilderError> {
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "select id::text, manifest_uri from solution where kind = 'flop_build' and \
+             source = 'own' and status = 'published' order by created_at",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(solution_id, manifest_uri)| PublishedBuild { solution_id, manifest_uri })
+            .collect())
     }
 
-    fn notify_state(
-        &self,
-        _state: &StatePayload,
-    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::notify_state")))
+    async fn mark_unavailable(&self, solution_id: &str, reason: &str) -> Result<(), BuilderError> {
+        tx::mark_unavailable(&self.pool, solution_id, reason).await
     }
 
-    fn plan_inputs(
-        &self,
-        _gate: &BudgetGate,
-    ) -> impl Future<Output = Result<(BTreeSet<JobKey>, u64), BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::plan_inputs")))
+    async fn queue_depth(&self) -> Result<Vec<(String, i64)>, BuilderError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "select status::text, count(*) from build_job group by status order by status::text",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
-    fn write_plan(
-        &self,
-        _plan: &Plan,
-    ) -> impl Future<Output = Result<PlanWrite, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::write_plan")))
-    }
-
-    fn published_builds(
-        &self,
-    ) -> impl Future<Output = Result<Vec<PublishedBuild>, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::published_builds")))
-    }
-
-    fn mark_unavailable(
-        &self,
-        _solution_id: &str,
-        _reason: &str,
-    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::mark_unavailable")))
-    }
-
-    fn queue_depth(&self) -> impl Future<Output = Result<Vec<(String, i64)>, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::queue_depth")))
-    }
-
-    fn ledger_bytes(&self) -> impl Future<Output = Result<u64, BuilderError>> + Send {
-        ready(Err(BuilderError::NotImplemented("PgQueue::ledger_bytes")))
+    async fn ledger_bytes(&self) -> Result<u64, BuilderError> {
+        let mut conn = self.pool.acquire().await?;
+        tx::ledger_bytes(&mut conn).await
     }
 }

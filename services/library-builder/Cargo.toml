@@ -21,8 +21,9 @@ gto-library = { workspace = true }
 
 # The builder-role connection (O-28, O-146): a lazy sqlx pool as builder_login with
 # runtime-checked queries (O-147), on the tokio runtime; the claim, publish and notify
-# statements are plain SQL (ADR 0005).
-tokio = { workspace = true }
+# statements are plain SQL (ADR 0005). tokio's `sync` feature carries a job's progress from
+# the blocking solve thread to the async queue (src/job.rs).
+tokio = { workspace = true, features = ["sync"] }
 sqlx = { workspace = true }
 # The operations surface on 7071 (A5 section 1, R2.18): GET /healthz and GET /metrics.
 axum = { workspace = true }

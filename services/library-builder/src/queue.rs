@@ -20,7 +20,7 @@ pub mod pg;
 use std::collections::BTreeSet;
 use std::future::Future;
 
-use gto_planner::{JobKey, Plan};
+use gto_planner::{JobKey, JobSpec, Plan, PlannerSettings};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -59,6 +59,85 @@ pub struct BudgetGate {
     pub bytes_per_runout: u64,
     /// Estimated bytes per flop tree per line.
     pub bytes_per_flop_tree: u64,
+}
+
+impl BudgetGate {
+    /// The gate the planner settings in force give.
+    #[must_use]
+    pub fn from_planner(settings: &PlannerSettings) -> BudgetGate {
+        BudgetGate {
+            budget_bytes: settings.budget_bytes,
+            bytes_per_runout: settings.bytes_per_runout,
+            bytes_per_flop_tree: settings.bytes_per_flop_tree,
+        }
+    }
+
+    /// The estimated bytes of a job with `lines` preflop lines and K = `k_runouts`, the
+    /// planner's formula (plan section B) under this gate's sizes.
+    #[must_use]
+    pub fn estimate(&self, lines: usize, k_runouts: i16) -> u64 {
+        let settings = PlannerSettings {
+            budget_bytes: self.budget_bytes,
+            bytes_per_runout: self.bytes_per_runout,
+            bytes_per_flop_tree: self.bytes_per_flop_tree,
+            ..PlannerSettings::default()
+        };
+        gto_planner::estimated_bytes(lines, k_runouts.max(0).unsigned_abs(), &settings)
+    }
+
+    /// The reason a job of `estimate` bytes does not fit when `used` bytes are already
+    /// stored or committed to running jobs, or `None` when it fits (A5 section 4).
+    #[must_use]
+    pub fn refusal(&self, estimate: u64, used: u64) -> Option<String> {
+        let total = used.saturating_add(estimate);
+        (total > self.budget_bytes).then(|| {
+            format!(
+                "over the storage budget: estimate {estimate} bytes plus {used} bytes stored or \
+                 running comes to {total} bytes, above the budget of {} bytes",
+                self.budget_bytes
+            )
+        })
+    }
+}
+
+/// The unique key of a row from its columns.
+///
+/// # Errors
+///
+/// `BuilderError::Malformed` when the tree hash is not 32 bytes.
+pub(crate) fn job_key(
+    game_config_id: &str,
+    position_pair: &str,
+    flop: &str,
+    tree_config_hash: &[u8],
+) -> Result<JobKey, BuilderError> {
+    let hash: [u8; 32] = tree_config_hash.try_into().map_err(|_| BuilderError::Malformed {
+        path: format!("build_job {game_config_id} {position_pair} {flop}"),
+        reason: format!("tree_config_hash has {} bytes, not 32", tree_config_hash.len()),
+    })?;
+    Ok(JobKey {
+        game_config_id: game_config_id.to_owned(),
+        position_pair: position_pair.to_owned(),
+        flop: flop.to_owned(),
+        tree_config_hash: hash,
+    })
+}
+
+/// A planned job's K and priority as the row's column types.
+///
+/// # Errors
+///
+/// `BuilderError::Malformed` when K does not fit a `smallint`.
+pub(crate) fn row_k_and_priority(spec: &JobSpec) -> Result<(i16, f32), BuilderError> {
+    let k = i16::try_from(spec.k_runouts).map_err(|_| BuilderError::Malformed {
+        path: format!("plan {}", spec.key().flop),
+        reason: format!("k_runouts {} does not fit a smallint", spec.k_runouts),
+    })?;
+    // The column is `real`: the priority only orders the queue, so single precision is
+    // what the schema keeps.
+    #[allow(clippy::cast_possible_truncation, reason = "the priority column is real (f32)")]
+    let priority = spec.priority as f32;
+    Ok((k, priority))
 }
 
 /// The result of one claim.
