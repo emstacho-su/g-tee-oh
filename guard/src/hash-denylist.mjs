@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { topLevel } from './git.mjs';
 import { hashToken } from './guard.mjs';
-import { privateDirCandidates } from './private-dir.mjs';
+import { PRIVATE_DIR_NAME, SALT_FILE_NAME, findSalt } from './private-dir.mjs';
 
 const GUARD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN_SHAPE = /^[a-z0-9_]{6,}$/;
@@ -47,20 +47,20 @@ export function buildDenylist(salt, plainText) {
   return { hashes: [...hashes].sort(), skipped };
 }
 
-// GUARD_PRIVATE_DIR wins; otherwise the first candidate holding a salt file
-// (the repo root's, then the main working tree's in a linked worktree), or the
-// repo root's so a missing input is reported where it belongs.
+// GUARD_PRIVATE_DIR wins; otherwise the directory the guard takes its salt
+// from (the repo root's, then the main working tree's in a linked worktree),
+// or the repo root's so a missing input is reported where it belongs.
 function resolvePrivateDir() {
   if (process.env.GUARD_PRIVATE_DIR !== undefined) return process.env.GUARD_PRIVATE_DIR;
-  const candidates = privateDirCandidates(topLevel() ?? process.cwd());
-  return candidates.find((dir) => existsSync(join(dir, 'salt'))) ?? candidates[0];
+  const repoRoot = topLevel() ?? process.cwd();
+  return findSalt(repoRoot)?.dir ?? join(repoRoot, PRIVATE_DIR_NAME);
 }
 
 function main() {
   const privateDir = resolvePrivateDir();
   const outputPath = process.env.GUARD_DENYLIST_PATH ?? join(GUARD_DIR, 'denylist.sha256');
 
-  const salt = readRequired(join(privateDir, 'salt'), 'the salt');
+  const salt = readRequired(join(privateDir, SALT_FILE_NAME), 'the salt');
   const plain = readRequired(join(privateDir, 'denylist.txt'), 'the plain denylist');
   if (salt === null || plain === null) return 2;
   if (salt.trim() === '') {
