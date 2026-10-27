@@ -1,12 +1,14 @@
 {
-  "commit": "635fd4ebd94916e7af9c7ecf1c806f9f320c64bc",
-  "date": "2026-10-27T18:44:56Z",
+  "commit": "f26f2c5c252fc2d91da417dc9246f014d8e35306",
+  "date": "2026-10-27T20:59:31Z",
   "machine": {
+    "cgroup_memory_limit_bytes": 5368709120,
+    "container": true,
     "cores": 20,
     "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
-    "memory_gb": 31,
+    "memory_gb": 20,
     "name": "zenbook",
-    "os": "Windows 11 Home"
+    "os": "Linux (Debian GNU/Linux 12), linux/amd64 container on the Zenbook"
   },
   "measurements": [
     {
@@ -22,13 +24,14 @@
     {
       "id": "flop-line/peak-rss",
       "pass": true,
+      "source": "cgroup memory.peak",
       "strict": true,
       "threshold": {
         "max": 5000000000,
         "unit": "bytes"
       },
       "unit": "bytes",
-      "value": 1592279040
+      "value": 1490747392
     },
     {
       "id": "flop-line/r250.c/seconds",
@@ -38,7 +41,7 @@
         "unit": "seconds"
       },
       "unit": "seconds",
-      "value": 396.841611714
+      "value": 357.800479638
     },
     {
       "id": "flop-line/r250.c/gain-oop",
@@ -81,6 +84,16 @@
       "value": 366613
     },
     {
+      "id": "flop-line/vm-hwm",
+      "unit": "bytes",
+      "value": 1480314880
+    },
+    {
+      "id": "flop-line/cgroup-memory-peak",
+      "unit": "bytes",
+      "value": 1490747392
+    },
+    {
       "id": "flop-line/bytes-written",
       "unit": "bytes",
       "value": 7386222
@@ -88,7 +101,7 @@
     {
       "id": "flop-line/job-seconds",
       "unit": "seconds",
-      "value": 402.086883426
+      "value": 359.104430638
     },
     {
       "id": "flop-line-16bit/staged",
@@ -98,12 +111,12 @@
     {
       "id": "flop-line-16bit/peak-rss",
       "unit": "bytes",
-      "value": 919986176
+      "value": 817061888
     },
     {
       "id": "flop-line-16bit/r250.c/seconds",
       "unit": "seconds",
-      "value": 485.913231474
+      "value": 451.838136471
     },
     {
       "id": "flop-line-16bit/r250.c/gain-oop",
@@ -136,6 +149,16 @@
       "value": 389659
     },
     {
+      "id": "flop-line-16bit/vm-hwm",
+      "unit": "bytes",
+      "value": 808906752
+    },
+    {
+      "id": "flop-line-16bit/cgroup-memory-peak",
+      "unit": "bytes",
+      "value": 817061888
+    },
+    {
       "id": "flop-line-16bit/bytes-written",
       "unit": "bytes",
       "value": 7849911
@@ -143,7 +166,7 @@
     {
       "id": "flop-line-16bit/job-seconds",
       "unit": "seconds",
-      "value": 492.16623249
+      "value": 452.941198708
     },
     {
       "id": "sweep/flops",
@@ -153,7 +176,7 @@
     {
       "id": "sweep/cap-bytes",
       "unit": "bytes",
-      "value": 5368709120
+      "value": 4294967296
     },
     {
       "id": "sweep/r250.c/max-estimate-bytes",
@@ -166,7 +189,7 @@
       "value": 1246447400
     }
   ],
-  "notes": "Judged against O-50: peak resident set size under 5000000000 bytes and every line at most 1800 seconds to 0.3 percent of the pot for both seats; a miss is recorded as a miss (O-178). Verdict: pass. peak resident set size 1592279040 bytes is under the O-50 limit of 5000000000 bytes; every line finished within the O-50 limit of 1800 seconds; both seats of every line reached the O-50 target of 0.3 percent of the pot. By the bench method the judged summary is the 32-bit run at the 0.3 percent target (O-194, O-200), the judged storage of O-50 by the O-200 erratum. Judged run stop reasons: r250.c target. The flop-line-16bit rows are the informational 16-bit run at the 0.5 percent floor of O-194, never judged (O-200); its stop reasons: r250.c target. The sweep estimated 1755 canonical flops per line at 32-bit storage against a cap of 5368709120 bytes (O-194): r250.c at most 1558549576 bytes on 2c2d2h.",
+  "notes": "Judged against O-50: peak memory under 5000000000 bytes and every line at most 1800 seconds to 0.3 percent of the pot for both seats; a miss is recorded as a miss (O-178). The judged run ran in Linux (Debian GNU/Linux 12), linux/amd64 container on the Zenbook under a cgroup memory limit of 5368709120 bytes, recorded by the measured process; the report was written from its summary. The judged peak is the cgroup memory.peak (VmHWM 1480314880 bytes, cgroup memory.peak 1490747392 bytes). Verdict: pass. peak memory 1490747392 bytes (cgroup memory.peak) is under the O-50 limit of 5000000000 bytes; every line finished within the O-50 limit of 1800 seconds; both seats of every line reached the O-50 target of 0.3 percent of the pot. By the bench method the judged summary is the 32-bit run at the 0.3 percent target (O-194, O-200), the judged storage of O-50 by the O-200 erratum. Judged run stop reasons: r250.c target. The flop-line-16bit rows are the informational 16-bit run at the 0.5 percent floor of O-194, never judged (O-200); its stop reasons: r250.c target. The sweep estimated 1755 canonical flops per line at 32-bit storage against a cap of 4294967296 bytes (O-194): r250.c at most 1558549576 bytes on 2c2d2h.",
   "pass": true,
   "r_ids": [
     "R2.12",
