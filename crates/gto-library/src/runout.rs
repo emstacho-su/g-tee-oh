@@ -39,8 +39,93 @@ impl fmt::Display for RunoutSpec {
 ///
 /// `LibraryError::InvalidRequest` when `k` exceeds [`ORDERED_RUNOUTS`].
 pub fn draw_runouts(flop: Flop, k: usize, seed: u64) -> Result<Vec<RunoutSpec>, LibraryError> {
-    let _ = (flop, seed);
-    Err(LibraryError::InvalidRequest(format!(
-        "draw_runouts({k}) is not implemented yet (S18 lane X)"
-    )))
+    if k > ORDERED_RUNOUTS {
+        return Err(LibraryError::InvalidRequest(format!(
+            "{k} runouts asked of a flop that has {ORDERED_RUNOUTS}"
+        )));
+    }
+    let mut pairs = ordered_runouts(flop);
+    let mut rng = SplitMix64::new(seed);
+    for i in 0..k {
+        let j = i + rng.below(pairs.len() - i);
+        pairs.swap(i, j);
+    }
+    pairs.truncate(k);
+    Ok(pairs)
+}
+
+/// Every ordered (turn, river) pair of the cards off `flop`, in card-index order.
+fn ordered_runouts(flop: Flop) -> Vec<RunoutSpec> {
+    let off_flop: Vec<Card> = Card::all().filter(|card| !flop.contains(*card)).collect();
+    off_flop
+        .iter()
+        .flat_map(|&turn| {
+            off_flop
+                .iter()
+                .filter(move |&&river| river != turn)
+                .map(move |&river| RunoutSpec { turn, river })
+        })
+        .collect()
+}
+
+/// The `SplitMix64` generator (Steele, Lea and Flood, 2014): a 64-bit counter stepped by the
+/// golden-ratio increment and mixed by two multiply-xorshift rounds.
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    /// The golden-ratio increment of the counter.
+    const GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
+    /// The first mixing multiplier.
+    const MIX_1: u64 = 0xBF58_476D_1CE4_E5B9;
+    /// The second mixing multiplier.
+    const MIX_2: u64 = 0x94D0_49BB_1331_11EB;
+
+    fn new(seed: u64) -> Self {
+        SplitMix64 { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(Self::GAMMA);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(Self::MIX_1);
+        z = (z ^ (z >> 27)).wrapping_mul(Self::MIX_2);
+        z ^ (z >> 31)
+    }
+
+    /// A uniform index below `bound` (at least 1): draws above the largest multiple of
+    /// `bound` are rejected, so no index is favoured by the modulo.
+    fn below(&mut self, bound: usize) -> usize {
+        let bound = bound as u64;
+        let zone = u64::MAX - u64::MAX % bound;
+        loop {
+            let draw = self.next_u64();
+            if draw < zone {
+                // The remainder is below `bound`, which came from a usize.
+                return usize::try_from(draw % bound).unwrap_or(0);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ORDERED_RUNOUTS, SplitMix64, ordered_runouts};
+
+    /// R2.12: the reference outputs of `SplitMix64` seeded with 0, so the draw stays the
+    /// same on every machine and release.
+    #[test]
+    fn r2_12_splitmix64_matches_the_reference_sequence() {
+        let mut rng = SplitMix64::new(0);
+        assert_eq!(rng.next_u64(), 0xE220_A839_7B1D_CDAF);
+        assert_eq!(rng.next_u64(), 0x6E78_9E6A_A1B9_65F4);
+    }
+
+    #[test]
+    fn r2_12_ordered_runouts_lists_every_pair_once() {
+        let pairs = ordered_runouts("Ah7d2c".parse().expect("a flop"));
+        assert_eq!(pairs.len(), ORDERED_RUNOUTS);
+        assert!(pairs.windows(2).all(|w| w[0] < w[1]), "card-index order");
+    }
 }

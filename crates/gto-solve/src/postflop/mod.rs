@@ -27,6 +27,7 @@ mod measure;
 mod nodes;
 mod options;
 mod problem;
+mod runout_walk;
 mod runouts;
 mod solve;
 

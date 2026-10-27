@@ -9,14 +9,20 @@
 //! manifest id is the build id and the directory name, which the `solver-query` scan
 //! requires (O-177). [`write_flop_build`] does both in one call.
 
-use gto_model::{ConfigId, Flop, PositionPair};
+use std::collections::BTreeMap;
 
+use gto_model::{ConfigId, Flop, PositionPair, flop_weight};
+
+use crate::FORMAT_VERSION;
 use crate::chunk::ChunkOptions;
 use crate::error::LibraryError;
-use crate::manifest::{FileRef, LineEntry, Manifest, ManifestConfig};
+use crate::manifest::{
+    FileRef, LineEntry, MANIFEST_FILE, Manifest, ManifestConfig, ManifestKind, Runout, Source,
+};
 use crate::record::SolvedNode;
 use crate::runout::RunoutSpec;
 use crate::store::ObjectSink;
+use crate::writer::write_tree_file;
 
 /// `builds/<config_id>/<pair>/<flop>/<build_id>`, the build's prefix in the library.
 #[must_use]
@@ -110,11 +116,106 @@ pub fn write_line_files(
     line: &LineBuild,
     o: &ChunkOptions,
 ) -> Result<LineWritten, LibraryError> {
-    let _ = (sink, prefix, pair, o);
-    Err(LibraryError::InvalidRequest(format!(
-        "write_line_files({}) is not implemented yet (S18 lane X)",
-        line.line
-    )))
+    let mut counting = Counting { inner: sink, last_bytes: 0 };
+    let flop_path = flop_file_path(&line.line);
+    let flop_ref = write_tree_file(&mut counting, prefix, &flop_path, pair, &line.flop_nodes, o)?;
+    let flop_bytes = counting.last_bytes;
+    let mut runout_files = Vec::with_capacity(line.runouts.len());
+    let mut runout_bytes = Vec::with_capacity(line.runouts.len());
+    for (runout, nodes) in &line.runouts {
+        let path = runout_file_path(runout, &line.line);
+        let file = write_tree_file(&mut counting, prefix, &path, pair, nodes, o)?;
+        runout_files.push((*runout, file));
+        runout_bytes.push(counting.last_bytes);
+    }
+    let entry = LineEntry {
+        line: line.line.clone(),
+        tree_hash: line.tree_hash.clone(),
+        seed: line.seed,
+        iterations: line.iterations,
+        exploitability_pct_pot: line.exploitability_pct_pot,
+        flop_file: flop_ref.path,
+        sha256: flop_ref.sha256,
+    };
+    Ok(LineWritten { entry, runout_files, flop_bytes, runout_bytes })
+}
+
+/// A sink that passes every put through and remembers the size of the last one, so the
+/// writer can report each file's bytes without a second encode.
+struct Counting<'a> {
+    inner: &'a mut dyn ObjectSink,
+    last_bytes: u64,
+}
+
+impl ObjectSink for Counting<'_> {
+    fn put(&mut self, path: &str, bytes: &[u8]) -> Result<(), LibraryError> {
+        self.inner.put(path, bytes)?;
+        self.last_bytes = bytes.len() as u64;
+        Ok(())
+    }
+}
+
+/// The manifest's runouts: those of the first line, each with its file per line. Every
+/// line must list the same runouts in the same order.
+fn manifest_runouts(lines: &[LineWritten]) -> Result<Vec<Runout>, LibraryError> {
+    let Some(first) = lines.first() else {
+        return Err(LibraryError::Manifest("a flop build needs at least one line".to_owned()));
+    };
+    let drawn: Vec<RunoutSpec> = first.runout_files.iter().map(|(runout, _)| *runout).collect();
+    for written in lines {
+        let listed: Vec<RunoutSpec> =
+            written.runout_files.iter().map(|(runout, _)| *runout).collect();
+        if listed != drawn {
+            return Err(LibraryError::Manifest(format!(
+                "line {} lists other runouts than line {}",
+                written.entry.line, first.entry.line
+            )));
+        }
+    }
+    Ok(drawn
+        .iter()
+        .enumerate()
+        .map(|(index, runout)| Runout {
+            turn: runout.turn.to_string(),
+            river: runout.river.to_string(),
+            files: lines
+                .iter()
+                .map(|written| (written.entry.line.clone(), written.runout_files[index].1.clone()))
+                .collect::<BTreeMap<_, _>>(),
+        })
+        .collect())
+}
+
+/// The flop-build manifest of `meta` with its lines and runouts.
+fn flop_build_manifest(
+    meta: &FlopBuildMeta,
+    lines: &[LineWritten],
+) -> Result<Manifest, LibraryError> {
+    let weight = flop_weight(meta.flop);
+    let flop_weight = u8::try_from(weight)
+        .map_err(|_| LibraryError::Manifest(format!("flop_weight {weight} exceeds a byte")))?;
+    Ok(Manifest {
+        format_version: FORMAT_VERSION,
+        kind: ManifestKind::FlopBuild,
+        source: Source::Own,
+        id: meta.id.clone(),
+        engine_version: meta.engine_version.clone(),
+        config: meta.config.clone(),
+        config_id: Some(meta.config_id.clone()),
+        pair: Some(meta.pair),
+        flop: Some(meta.flop.to_string()),
+        flop_weight: Some(flop_weight),
+        lines: Some(lines.iter().map(|written| written.entry.clone()).collect()),
+        runouts: Some(manifest_runouts(lines)?),
+        turn_roots: None,
+        chunks: None,
+        tree_hash: Some(meta.tree_hash.clone()),
+        seed: Some(meta.seed),
+        iterations: None,
+        exploitability_pct_pot: None,
+        synthetic: Some(meta.synthetic),
+        created_at: meta.created_at.clone(),
+    })
 }
 
 /// Builds, validates and writes `manifest.json` under `prefix` from the written lines;
@@ -130,11 +231,11 @@ pub fn write_flop_build_manifest(
     meta: &FlopBuildMeta,
     lines: &[LineWritten],
 ) -> Result<Manifest, LibraryError> {
-    let _ = (sink, prefix, lines);
-    Err(LibraryError::InvalidRequest(format!(
-        "write_flop_build_manifest({}) is not implemented yet (S18 lane X)",
-        meta.id
-    )))
+    let manifest = flop_build_manifest(meta, lines)?;
+    manifest.validate()?;
+    let json = manifest.to_json_pretty()?;
+    sink.put(&format!("{prefix}/{MANIFEST_FILE}"), json.as_bytes())?;
+    Ok(manifest)
 }
 
 /// Writes every line and then the manifest of a flop build under its prefix.

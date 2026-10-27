@@ -114,9 +114,9 @@ pub fn select_nodes(
 ) -> Result<Vec<NodeStrategy>, SolveError> {
     match selection {
         NodeSelection::RootStreet => root_street_nodes(game_solved),
-        NodeSelection::Runout { turn, river } => Err(SolveError::Problem(format!(
-            "the runout walk ({turn}{river}) is not implemented yet (S18 lane X)"
-        ))),
+        NodeSelection::Runout { turn, river } => {
+            super::runout_walk::runout_nodes(game_solved, *turn, *river)
+        }
     }
 }
 
@@ -128,29 +128,46 @@ pub fn select_nodes(
 /// `SolveError::Engine` when an engine amount sits off the 0.01 grid or a node names a
 /// player other than 0 or 1.
 pub fn root_street_nodes(game_solved: &SolvedGame) -> Result<Vec<NodeStrategy>, SolveError> {
-    let solver = game_solved.solver();
-    let game = solver.game();
-    let walk = Walk {
-        game,
-        solver,
-        profile: solver.average(),
-        half_pot_bb: HALF * game.config().starting_pot,
-    };
-    let reach = [game.root_weights(0).to_vec(), game.root_weights(1).to_vec()];
+    let walk = Walk::new(game_solved);
     let mut nodes = Vec::new();
-    walk.visit(game.root(), &[], &reach, &mut nodes)?;
+    walk.visit(walk.game.root(), &[], &walk.root_reach(), &mut nodes)?;
     Ok(nodes)
 }
 
-/// The walk's shared state.
-struct Walk<'a> {
-    game: &'a NlheGame,
+/// The walk's shared state; the runout walk (`runout_walk`) reuses it.
+pub(super) struct Walk<'a> {
+    pub(super) game: &'a NlheGame,
     solver: &'a Solver<NlheGame>,
     profile: AverageStrategy<'a, NlheGame>,
     half_pot_bb: f64,
 }
 
-impl Walk<'_> {
+/// A decision node read off the engine: the actor, its average strategy (action-major,
+/// per live combo) and its action tokens in the engine's order.
+pub(super) struct Decision {
+    pub(super) actor: Player,
+    pub(super) strategy: Vec<f32>,
+    pub(super) actions: Vec<ActionToken>,
+}
+
+impl<'a> Walk<'a> {
+    /// The walk over a solved game, crediting half the root pot to each player (O-175).
+    pub(super) fn new(game_solved: &'a SolvedGame) -> Self {
+        let solver = game_solved.solver();
+        let game = solver.game();
+        Walk {
+            game,
+            solver,
+            profile: solver.average(),
+            half_pot_bb: HALF * game.config().starting_pot,
+        }
+    }
+
+    /// Both players' root range weights, `[oop, ip]`.
+    pub(super) fn root_reach(&self) -> [Vec<f32>; 2] {
+        [self.game.root_weights(0).to_vec(), self.game.root_weights(1).to_vec()]
+    }
+
     /// Records `node` when it is a decision node and descends through its actions with the
     /// actor's reach multiplied by the average strategy; chance nodes and terminals end
     /// the walk.
@@ -161,35 +178,71 @@ impl Walk<'_> {
         reach: &[Vec<f32>; 2],
         out: &mut Vec<NodeStrategy>,
     ) -> Result<(), SolveError> {
-        let NodeInfo::Decision { player, num_actions } = self.game.node(node) else {
+        let Some(decision) = self.decision(node)? else {
             return Ok(());
         };
-        let actor = Player::from_u8(player)
-            .ok_or_else(|| SolveError::Engine(format!("node {node} names player {player}")))?;
-        let strategy = self.solver.average_strategy(node);
-        let actions = self.actions_at(node)?;
-        let hands = self.hands_at(node, actor, &strategy, reach)?;
-        let tree_node = self.game.node_at(node);
-        out.push(NodeStrategy {
-            line: line.to_vec(),
-            street_lines: vec![line.to_vec()],
-            dealt: Vec::new(),
-            player: actor,
-            pot: cbb_of_chips(tree_node.pot)?,
-            stacks: [cbb_of_chips(tree_node.stacks[0])?, cbb_of_chips(tree_node.stacks[1])?],
-            actions: actions.clone(),
-            hands,
-        });
-        let combos = self.game.combo_count(node, player);
-        for (action, token) in actions.into_iter().enumerate().take(num_actions) {
-            let mut next = reach.clone();
-            for (i, weight) in next[actor.index()].iter_mut().enumerate() {
-                *weight *= strategy[action * combos + i];
-            }
-            let child_line = [line, &[token]].concat();
+        out.push(self.record(node, &decision, vec![line.to_vec()], Vec::new(), reach)?);
+        for (action, token) in decision.actions.iter().enumerate() {
+            let next = self.after_action(node, &decision, action, reach);
+            let child_line = [line, &[*token]].concat();
             self.visit(self.game.child(node, action), &child_line, &next, out)?;
         }
         Ok(())
+    }
+
+    /// The decision at `node`, or `None` at a chance node or a terminal.
+    pub(super) fn decision(&self, node: u32) -> Result<Option<Decision>, SolveError> {
+        let NodeInfo::Decision { player, .. } = self.game.node(node) else {
+            return Ok(None);
+        };
+        let actor = Player::from_u8(player)
+            .ok_or_else(|| SolveError::Engine(format!("node {node} names player {player}")))?;
+        Ok(Some(Decision {
+            actor,
+            strategy: self.solver.average_strategy(node),
+            actions: self.actions_at(node)?,
+        }))
+    }
+
+    /// The strategy of the decision node `node`, reached along `street_lines` after the
+    /// cards `dealt`; its `line` is the street lines concatenated.
+    pub(super) fn record(
+        &self,
+        node: u32,
+        decision: &Decision,
+        street_lines: Vec<Vec<ActionToken>>,
+        dealt: Vec<Card>,
+        reach: &[Vec<f32>; 2],
+    ) -> Result<NodeStrategy, SolveError> {
+        let hands = self.hands_at(node, decision.actor, &decision.strategy, reach)?;
+        let tree_node = self.game.node_at(node);
+        Ok(NodeStrategy {
+            line: street_lines.concat(),
+            street_lines,
+            dealt,
+            player: decision.actor,
+            pot: cbb_of_chips(tree_node.pot)?,
+            stacks: [cbb_of_chips(tree_node.stacks[0])?, cbb_of_chips(tree_node.stacks[1])?],
+            actions: decision.actions.clone(),
+            hands,
+        })
+    }
+
+    /// Both reach vectors after the actor takes `action` at `node`: the actor's weights
+    /// times the average frequency of that action, the opponent's unchanged.
+    pub(super) fn after_action(
+        &self,
+        node: u32,
+        decision: &Decision,
+        action: usize,
+        reach: &[Vec<f32>; 2],
+    ) -> [Vec<f32>; 2] {
+        let combos = self.game.combo_count(node, decision.actor.as_u8());
+        let mut next = reach.clone();
+        for (i, weight) in next[decision.actor.index()].iter_mut().enumerate() {
+            *weight *= decision.strategy[action * combos + i];
+        }
+        next
     }
 
     /// The action tokens of a decision node, in the engine's order.

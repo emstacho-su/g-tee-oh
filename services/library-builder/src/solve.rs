@@ -11,12 +11,20 @@
 //! the drawn runouts are walked (ADR 0023). The exploitability check against the target is
 //! the job's, not the solver's, so a fake gain exercises it too.
 
+use std::sync::mpsc;
+
 use gto_library::RunoutSpec;
 use gto_solve::postflop::{
-    NodeStrategy, PostflopProblem, ProgressSink, SolveOptions, SolveReport, StopRule,
+    NodeSelection, NodeStrategy, PostflopProblem, ProgressSink, SolveError, SolveOptions,
+    SolveReport, StopRule, best_response, estimate_memory, select_nodes,
+    solve_postflop_with_estimate,
 };
 
 use crate::error::BuilderError;
+
+mod fake;
+#[cfg(test)]
+mod tests;
 
 /// One line to solve.
 #[derive(Clone, Debug)]
@@ -69,14 +77,98 @@ pub trait LineSolver: Send + Sync {
 pub struct EngineSolver;
 
 impl LineSolver for EngineSolver {
+    /// The pool is built first so the estimate counts its threads (the estimate's
+    /// traversal scratch is per worker thread); the estimate and the refusal still come
+    /// before the engine allocates anything. The solve runs on a scoped thread inside the
+    /// pool while this thread forwards its progress to `sink`, because `sink` need not be
+    /// shared across threads.
     fn solve_line(
         &self,
         job: &LineJob,
         sink: &dyn ProgressSink,
     ) -> Result<SolvedLine, BuilderError> {
-        let _ = (job, sink);
-        Err(BuilderError::NotImplemented("EngineSolver::solve_line"))
+        let pool =
+            rayon::ThreadPoolBuilder::new().num_threads(job.threads).build().map_err(|err| {
+                SolveError::Engine(format!("a pool of {} solve threads: {err}", job.threads))
+            })?;
+        std::thread::scope(|scope| {
+            let (sender, receiver) = mpsc::channel();
+            let worker = scope.spawn(|| {
+                let forward = Forward { sender };
+                pool.install(|| solve_in_pool(job, &forward))
+            });
+            for event in receiver {
+                match event {
+                    Progress::Report(iteration, gains) => sink.report(iteration, gains),
+                    Progress::Finished(report) => sink.finished(&report),
+                }
+            }
+            worker.join().map_err(|_| {
+                BuilderError::Solve(SolveError::Engine(format!(
+                    "the solve of line {} panicked",
+                    job.line
+                )))
+            })?
+        })
     }
+}
+
+/// One progress event of a solve running on another thread.
+enum Progress {
+    Report(u32, Option<[f32; 2]>),
+    Finished(SolveReport),
+}
+
+/// A progress sink that sends every event to the thread that owns the caller's sink. A
+/// send fails only when that thread stopped listening, and then the event has no reader.
+struct Forward {
+    sender: mpsc::Sender<Progress>,
+}
+
+impl ProgressSink for Forward {
+    fn report(&self, iteration: u32, exploitability_pct_pot: Option<[f32; 2]>) {
+        if self.sender.send(Progress::Report(iteration, exploitability_pct_pot)).is_err() {
+            tracing::debug!(iteration, "solve progress after the listener stopped");
+        }
+    }
+
+    fn finished(&self, report: &SolveReport) {
+        if self.sender.send(Progress::Finished(*report)).is_err() {
+            tracing::debug!("a solve report after the listener stopped");
+        }
+    }
+}
+
+/// The estimate, the refusal above the cap (O-187), the solve, the exact best response
+/// (O-138) and the walks (O-174), all on a thread of the job's pool.
+fn solve_in_pool(job: &LineJob, sink: &dyn ProgressSink) -> Result<SolvedLine, BuilderError> {
+    let estimate = estimate_memory(&job.problem, job.options.storage)?;
+    if estimate.total_bytes > job.options.memory_cap_bytes {
+        return Err(BuilderError::OverMemoryCap {
+            line: job.line.clone(),
+            estimate_bytes: estimate.total_bytes,
+            cap_bytes: job.options.memory_cap_bytes,
+        });
+    }
+    let (solved, report) = solve_postflop_with_estimate(
+        &job.problem,
+        &estimate,
+        job.stop,
+        job.seed,
+        sink,
+        &job.options,
+    )?;
+    let gains_pct_pot = best_response(&solved).gain_pct_pot;
+    let root_nodes = select_nodes(&solved, &NodeSelection::RootStreet)?;
+    let runout_nodes = job
+        .runouts
+        .iter()
+        .map(|runout| {
+            let selection = NodeSelection::Runout { turn: runout.turn, river: runout.river };
+            Ok((*runout, select_nodes(&solved, &selection)?))
+        })
+        .collect::<Result<Vec<_>, BuilderError>>()?;
+    Ok(SolvedLine { report, gains_pct_pot, root_nodes, runout_nodes })
 }
 
 /// A solver for tests: it never runs the engine and returns a small, well-formed tree on
@@ -107,7 +199,18 @@ impl LineSolver for FakeSolver {
         job: &LineJob,
         sink: &dyn ProgressSink,
     ) -> Result<SolvedLine, BuilderError> {
-        let _ = (job, sink);
-        Err(BuilderError::NotImplemented("FakeSolver::solve_line"))
+        if self.estimate_bytes > job.options.memory_cap_bytes {
+            return Err(BuilderError::OverMemoryCap {
+                line: job.line.clone(),
+                estimate_bytes: self.estimate_bytes,
+                cap_bytes: job.options.memory_cap_bytes,
+            });
+        }
+        if let Some(text) = &self.fail_with {
+            return Err(BuilderError::Solve(SolveError::Engine(text.clone())));
+        }
+        let solved = fake::solved_line(job, self.gains_pct_pot, self.estimate_bytes)?;
+        sink.finished(&solved.report);
+        Ok(solved)
     }
 }

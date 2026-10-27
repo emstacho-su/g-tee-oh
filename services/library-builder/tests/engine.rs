@@ -20,10 +20,17 @@ use library_builder::solve::{EngineSolver, LineJob, LineSolver};
 use library_builder::spec::{inputs, load, run_spec};
 use library_builder::store::LibraryTarget;
 
-/// Closeness of two solves' frequencies and EVs that differ only by suit labels: the same
-/// iterations on a relabelled game, so only floating-point summation order differs.
+/// Closeness of two solves that differ only by suit labels. Relabelling reorders the combos,
+/// so the floating-point sums run in another order and the two solves drift apart as the
+/// iterations grow (S18 measured 1.7e-4 in frequency and 6e-3 bb in EV at 5 iterations,
+/// 0.1 and 5 bb at 20). The test therefore compares at 5 iterations, early enough to be
+/// tight and late enough that strategies are no longer uniform, so a mislabelled combo or
+/// card shows.
 const FREQUENCY_CLOSE: f64 = 1e-3;
 const EV_CLOSE_BB: f64 = 1e-2;
+
+/// The iterations of each symmetry solve (see the tolerances above).
+const SYMMETRY_ITERATIONS: u32 = 5;
 
 fn tiny_inputs() -> BuildInputs {
     inputs(&load(&fixture("tiny-bb-btn-srp.spec.json")).expect("the spec"), 4).expect("inputs")
@@ -53,7 +60,7 @@ fn line_job(inputs: &BuildInputs, perm: SuitPermutation, runouts: &[RunoutSpec])
         line: line.text(),
         stop: StopRule {
             target_exploitability_pct_pot: 0.0,
-            max_iterations: 200,
+            max_iterations: SYMMETRY_ITERATIONS,
             max_seconds: 600,
         },
         options: inputs.settings.solve_options(),
