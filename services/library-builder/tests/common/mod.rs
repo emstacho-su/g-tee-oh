@@ -4,6 +4,8 @@
 
 #![allow(dead_code, reason = "each test binary uses a different subset of the helpers")]
 
+pub mod ticking;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -11,6 +13,7 @@ use gto_planner::PriorReach;
 use gto_tree::{SizingConventionSpec, TreeConfig, tree_hash};
 use library_builder::job::Env;
 use library_builder::ops::Status;
+use library_builder::queue::JobQueue;
 use library_builder::queue::mem::{MemJob, MemQueue};
 use library_builder::ranges::FixtureRanges;
 use library_builder::solve::{FakeSolver, LineSolver};
@@ -79,6 +82,11 @@ pub fn queue_with(jobs: Vec<MemJob>) -> MemQueue {
 /// An environment over `queue` with `solver`, a directory target under `root` and the
 /// tiny ranges fixture.
 pub fn env_with(queue: MemQueue, solver: Arc<dyn LineSolver>, root: &Path) -> Env<MemQueue> {
+    env_over(queue, solver, root)
+}
+
+/// [`env_with`] over any queue.
+pub fn env_over<Q: JobQueue>(queue: Q, solver: Arc<dyn LineSolver>, root: &Path) -> Env<Q> {
     let ranges = FixtureRanges::load(&fixture("tiny-bb-btn-srp.json")).expect("the tiny fixture");
     let scratch = root.join("scratch");
     let library = root.join("library");

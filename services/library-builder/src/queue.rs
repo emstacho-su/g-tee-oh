@@ -9,28 +9,37 @@
 //!   `for update skip locked` on the queue head; over budget the row becomes
 //!   `blocked_budget` with the numbers in `error`, else `running` under this worker with
 //!   `locked_at` stamped. One transaction, committed before any work starts.
-//! - [`JobQueue::progress`] refreshes `locked_at` while the row runs, so a live long job
-//!   is never taken by the stale reclaim (review L6).
+//! - [`JobQueue::progress`] and [`JobQueue::touch`] refresh `locked_at` while the row
+//!   runs: progress during the solve and after each staged runout file (rate limited like
+//!   progress), touch after the upload and after the read-back, so a live long job is never
+//!   taken by the stale reclaim (review L6, PR #22 re-review LOW 3).
 //! - Work runs with no transaction open.
 //! - T2, [`JobQueue::publish`]: the lock check, the supersede of a previous own build, the
-//!   `solution` row, the `scenario` rows, the `storage_ledger` upsert, the job marked
-//!   `done` and `pg_notify('coverage_added', ...)`, in one transaction.
+//!   `solution` row (with the job's id, its tree hash and the build's bytes, so the database
+//!   alone can undo the publish), the `scenario` rows, the `storage_ledger` upsert, the job
+//!   marked `done` and `pg_notify('coverage_added', ...)`, in one transaction.
 //! - T3, [`JobQueue::fail`]: attempts plus one, back to `queued` below `max_attempts`,
 //!   `failed` (parked, O-176) at it.
-//! - [`JobQueue::reclaim_stale`] (O-185, review M1, L6): a running row held by a dead
-//!   previous process of this worker (the same [`stable_worker_id`], another nonce), or
-//!   locked longer than `stale_hours`, goes back to `queued` with attempts plus one, or to
-//!   `failed` at `max_attempts`, so a job that kills its container parks instead of
-//!   looping. A row held by exactly this process's id is never taken.
-//! - [`JobQueue::mark_unavailable`] (O-186, review HIGH 2, H1, L5): the solution marked
-//!   `unavailable`, only its own `done` job (same configuration, pair, flop and tree hash)
-//!   re-queued with attempts reset, and its bytes taken off the latest ledger figure
-//!   (never below 0), in one transaction.
+//! - [`JobQueue::reclaim_stale`] (O-185, review M1, L6, PR #22 re-review MEDIUM): a running
+//!   row held by a dead previous process of this worker (the same [`stable_worker_id`],
+//!   another nonce, and that process's liveness lock free, see below), or locked longer
+//!   than `stale_hours`, goes back to `queued` with attempts plus one, or to `failed` at
+//!   `max_attempts`, so a job that kills its container parks instead of looping. A row held
+//!   by exactly this process's id is never taken.
+//! - [`JobQueue::mark_unavailable`] (O-186, review HIGH 2, H1, L5, PR #22 re-review HIGH 1,
+//!   LOW 1): for a solution still `published`, the solution marked `unavailable`, exactly
+//!   the `done` job its publish recorded re-queued with attempts reset, and the bytes its
+//!   publish recorded taken off the latest ledger figure (never below 0), in one
+//!   transaction. None of it reads the store, so a lost manifest or a lost prefix is
+//!   handled like any other loss.
 //!
-//! Worker ids: two processes running at the same time must not share `BUILDER_WORKER_ID`.
-//! The nonce tells a dead previous process from this one only across restarts; two live
-//! processes with one stable id would each see the other's rows as a dead process's and
-//! reclaim them mid-solve.
+//! Liveness (PR #22 re-review MEDIUM): every process that claims jobs first calls
+//! [`JobQueue::hold_liveness`] with its full worker id. `PgQueue` then holds a
+//! session-level advisory lock keyed by [`liveness_key`] of that id, on a connection of its
+//! own, for as long as the process lives; Postgres releases it when the process dies and
+//! its connection closes. The reclaim takes a row from a holder with this worker's stable
+//! id only when that holder's lock is free, so a live `--once` run in the same container
+//! (the same host name, another nonce) keeps its job. The nonce tells the processes apart.
 
 pub mod mem;
 pub mod pg;
@@ -281,18 +290,32 @@ pub struct PublishedBuild {
 }
 
 /// A published build the verify pass found broken (O-186; PR #22 review HIGH 1, HIGH 2,
-/// H1): its solution, the tree hash of its job's key (from the manifest) so only that job
-/// is re-queued, and its bytes so the ledger gives them back in the same transaction.
+/// H1; re-review HIGH 1). The job to re-queue and the bytes to give back come from what the
+/// publish recorded on the `solution` row. `tree_config_hash` and `bytes`, which the check
+/// read from the store, are used only for a row published before those columns existed
+/// (migration `20261027000200`), whose recorded values are null.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unavailable {
     /// The solution id.
     pub solution_id: String,
-    /// The job key's tree hash; without it no job is re-queued.
+    /// Fallback for an old row: the tree hash from the manifest, if it was readable.
     pub tree_config_hash: Option<Vec<u8>>,
-    /// The bytes the build added to the library.
+    /// Fallback for an old row: the bytes the check found.
     pub bytes: u64,
     /// Why, written to the job's error.
     pub reason: String,
+}
+
+/// The key of a process's liveness lock (see the module docs): the first 8 bytes of the
+/// sha256 of its full worker id (`<stable>#<nonce>`, the text a claim writes to
+/// `locked_by`), read big-endian as an `i64`. Any process derives the key of a row's
+/// holder from `locked_by` alone.
+#[must_use]
+pub fn liveness_key(worker_id: &str) -> i64 {
+    let digest = gto_library::sha256_hex(worker_id.as_bytes());
+    // sha256_hex always gives 64 hexadecimal digits, so the first 16 always parse.
+    let first = digest.get(..16).and_then(|hex| u64::from_str_radix(hex, 16).ok());
+    i64::from_be_bytes(first.unwrap_or_default().to_be_bytes())
 }
 
 /// The queue the loop runs against. Futures are `Send` so the loop can run on any
@@ -301,8 +324,16 @@ pub trait JobQueue: Send + Sync {
     /// Every `builder_setting` row.
     fn settings(&self) -> impl Future<Output = Result<Vec<(String, Value)>, BuilderError>> + Send;
 
-    /// Re-queues `running` rows a previous process of this worker left, or locked longer
-    /// than `stale_hours` (O-185); each reclaim counts as an attempt and parks the job at
+    /// Takes this process's liveness signal, or checks it still holds it (module docs).
+    /// Idempotent: the loop and `--once` call it before every claim, so a signal lost with
+    /// its connection is taken again.
+    fn hold_liveness(
+        &self,
+        worker_id: &str,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send;
+
+    /// Re-queues `running` rows a dead previous process of this worker left, or locked
+    /// longer than `stale_hours` (O-185); each reclaim counts as an attempt and parks the job at
     /// `max_attempts`, so a job that kills its worker cannot loop forever (review M1).
     /// Returns the rows re-queued or parked.
     fn reclaim_stale(
@@ -333,6 +364,14 @@ pub trait JobQueue: Send + Sync {
     fn progress(
         &self,
         progress: &BuildProgress,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send;
+
+    /// Refreshes `locked_at` of the job while `worker_id` holds it running. A row it no
+    /// longer holds is left alone; the publish then reports `LostLock`.
+    fn touch(
+        &self,
+        job_id: &str,
+        worker_id: &str,
     ) -> impl Future<Output = Result<(), BuilderError>> + Send;
 
     /// T2: the publish transaction.
@@ -375,8 +414,10 @@ pub trait JobQueue: Send + Sync {
         &self,
     ) -> impl Future<Output = Result<Vec<PublishedBuild>, BuilderError>> + Send;
 
-    /// Marks a solution `unavailable`, re-queues its own job with attempts reset and gives
-    /// its bytes back to the ledger (O-186, see [`Unavailable`]).
+    /// Marks a `published` solution `unavailable`, re-queues the job its publish recorded
+    /// with attempts reset and gives the recorded bytes back to the ledger (O-186, see
+    /// [`Unavailable`]). A solution no longer `published` (already unavailable, or
+    /// superseded since the pass listed it) is left alone.
     fn mark_unavailable(
         &self,
         build: &Unavailable,
@@ -391,7 +432,15 @@ pub trait JobQueue: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use super::stable_worker_id;
+    use super::{liveness_key, stable_worker_id};
+
+    #[test]
+    fn r2_17_the_liveness_key_is_the_first_eight_bytes_of_the_ids_sha256() {
+        // sha256("abc") = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+        let expected = i64::from_be_bytes(0xba78_16bf_8f01_cfea_u64.to_be_bytes());
+        assert_eq!(liveness_key("abc"), expected);
+        assert_ne!(liveness_key("host#1"), liveness_key("host#2"), "each nonce has its own key");
+    }
 
     #[test]
     fn r2_17_the_stable_worker_id_is_the_text_before_the_last_hash() {

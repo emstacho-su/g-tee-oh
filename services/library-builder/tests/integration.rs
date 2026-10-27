@@ -19,6 +19,9 @@
 //! works on flops of its own and removes its rows and settings before and after.
 
 mod common;
+// PR #22 re-review: the recorded publish, the liveness lock and the lock refresh.
+#[path = "integration/recorded.rs"]
+mod recorded;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -26,7 +29,7 @@ use std::time::Duration;
 
 use common::{CONFIG_ID, LINE, PAIR, fixture, placeholder_tree_hash};
 use gto_planner::PriorReach;
-use library_builder::config::Config;
+use library_builder::config::{Config, DatabaseConfig};
 use library_builder::error::BuilderError;
 use library_builder::job::Env;
 use library_builder::notify::{BuildProgress, COVERAGE_ADDED, CoverageAdded};
@@ -42,8 +45,10 @@ use sqlx::Row;
 use sqlx::postgres::{PgConnectOptions, PgListener, PgPool, PgPoolOptions, PgSslMode};
 
 /// The flops these tests own; nothing else in the dev database is touched.
-const TEST_FLOPS: [&str; 8] =
-    ["Ah7d2c", "Kh7d2c", "Qh7d2c", "Jh7d2c", "Th7d2c", "9h7d2c", "8h7d2c", "6h7d2c"];
+const TEST_FLOPS: [&str; 12] = [
+    "Ah7d2c", "Kh7d2c", "Qh7d2c", "Jh7d2c", "Th7d2c", "9h7d2c", "8h7d2c", "6h7d2c", "5h7d2c",
+    "4h7d2c", "3h7d2c", "Ah7d3c",
+];
 
 /// The priority of a test job: above anything a real plan writes, so it is the head.
 const HEAD: f32 = 1.0e9;
@@ -58,10 +63,16 @@ fn config() -> Config {
     config
 }
 
+/// The builder-role database settings alone, for the tests that need no bucket.
+fn database() -> DatabaseConfig {
+    let config = Config::from_env().expect("the BUILDER_* variables are well formed");
+    config.database.expect("export BUILDER_DB_PASSWORD from .env")
+}
+
 /// The superuser pool that seeds and cleans test rows.
 async fn admin() -> PgPool {
     let password = std::env::var("POSTGRES_PASSWORD").expect("export POSTGRES_PASSWORD from .env");
-    let database = config().database.expect("configured");
+    let database = database();
     let options = PgConnectOptions::new_without_pgpass()
         .host(&database.host)
         .port(database.port)

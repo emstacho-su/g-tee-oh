@@ -8,8 +8,10 @@
 //! process id (a container's process 1), never mistakes the old process's lock for its own.
 //! The stable half may therefore not contain `#`.
 //!
-//! Two processes running at the same time must not share a `BUILDER_WORKER_ID`: the stale
-//! reclaim keys on the stable half, so one would re-queue the other's running jobs.
+//! Two processes running at the same time may share a `BUILDER_WORKER_ID` (the loop and a
+//! `--once` run in one container, PR #22 re-review MEDIUM): each holds a liveness lock keyed
+//! by its full id (`queue::liveness_key`), and the stale reclaim takes a row of the same
+//! stable half only when its holder's lock is free, that is, when the holder is dead.
 
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};

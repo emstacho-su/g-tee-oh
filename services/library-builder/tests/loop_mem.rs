@@ -7,7 +7,10 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{FLOP, NOON_EPOCH, WORKER, env_with, fake, files_under, queue_with, tiny_job};
+use common::ticking::Ticking;
+use common::{
+    FLOP, NOON_EPOCH, WORKER, env_over, env_with, fake, files_under, queue_with, tiny_job,
+};
 use gto_library::Manifest;
 use library_builder::error::BuilderError;
 use library_builder::job::JobOutcome;
@@ -16,7 +19,7 @@ use library_builder::queue::mem::MemJob;
 use library_builder::queue::{
     BudgetGate, Claim, FailureOutcome, JobQueue, Publication, Unavailable,
 };
-use library_builder::run::{LoopClock, TickOutcome, run_once, tick};
+use library_builder::run::{LoopClock, TickOutcome, VerifyMode, run_once, tick, verify_once};
 use library_builder::solve::FakeSolver;
 use serde_json::json;
 
@@ -402,24 +405,156 @@ async fn r2_17_mark_unavailable_requeues_only_its_own_done_job_and_gives_bytes_b
 }
 
 #[tokio::test]
-async fn r2_17_mark_unavailable_without_a_hash_requeues_nothing_and_floors_the_ledger() {
+async fn r2_17_mark_unavailable_without_the_manifest_uses_what_the_publish_recorded() {
     let queue = queue_with(vec![tiny_job("own", FLOP, 1.0)]);
     let Claim::Job(_) = queue.claim(WORKER, None, &gate()).await.expect("a claim") else {
         panic!("a job");
     };
     queue.publish(WORKER, &publication("own", "build-1", FLOP, 100)).await.expect("published");
     queue.set_ledger_bytes(40);
+    // What the check reports for a lost manifest: no tree hash, no bytes found.
     let broken = Unavailable {
         solution_id: "build-1".to_owned(),
         tree_config_hash: None,
-        bytes: 100,
+        bytes: 0,
         reason: "missing manifest".to_owned(),
     };
     queue.mark_unavailable(&broken).await.expect("marked");
-    assert_eq!(queue.job("own").expect("job").status, "done", "no hash, no re-queue");
+    let own = queue.job("own").expect("job");
+    assert_eq!((own.status.as_str(), own.attempts), ("queued", 0), "the recorded job re-queued");
     let state = queue.snapshot();
-    assert_eq!(state.ledger_bytes, 0, "never below 0");
+    assert_eq!(state.ledger_bytes, 0, "the recorded 100 bytes taken off, never below 0");
     assert_eq!(state.solutions[0].status, "unavailable");
+}
+
+/// Publishes `job-1` through the loop with a directory target under `dir`; the env, the
+/// build's directory in the library and the bytes the publish recorded.
+async fn published_build(
+    dir: &std::path::Path,
+) -> (library_builder::job::Env<library_builder::queue::mem::MemQueue>, std::path::PathBuf, u64) {
+    let queue = queue_with(vec![tiny_job("job-1", FLOP, 1.0)]);
+    no_plan(&queue);
+    let env = env_with(queue, fake([0.1, 0.2]), dir);
+    let summary = run_once(&env, None).await.expect("the job runs");
+    assert_eq!(summary.outcome, "published", "{summary:?}");
+    let build_id = summary.build_id.expect("a build id");
+    let prefix = format!("builds/{}/{}/{FLOP}/{build_id}", common::CONFIG_ID, common::PAIR);
+    let bytes = env.queue.snapshot().solutions[0].publication.bytes;
+    (env, dir.join("library").join(prefix), bytes)
+}
+
+/// Runs a full verify pass and checks the PR #22 re-review HIGH 1 outcome: the job
+/// re-queued, the solution unavailable, the ledger reduced by exactly the published bytes.
+async fn assert_loss_is_undone(
+    env: &library_builder::job::Env<library_builder::queue::mem::MemQueue>,
+    published: u64,
+) {
+    const OTHER_BYTES: u64 = 7_000;
+    env.queue.set_ledger_bytes(published + OTHER_BYTES);
+    let report = verify_once(env, VerifyMode::Full).await.expect("the pass runs");
+    assert_eq!(report.unavailable.len(), 1, "{report:?}");
+    let job = env.queue.job("job-1").expect("the job");
+    assert_eq!((job.status.as_str(), job.attempts), ("queued", 0), "{job:?}");
+    let state = env.queue.snapshot();
+    assert_eq!(state.solutions[0].status, "unavailable");
+    assert_eq!(state.ledger_bytes, OTHER_BYTES, "exactly the published bytes are taken off");
+}
+
+#[tokio::test]
+async fn r2_17_a_lost_build_prefix_requeues_its_job_and_gives_its_bytes_back() {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let (env, build_dir, published) = published_build(dir.path()).await;
+    std::fs::remove_dir_all(&build_dir).expect("the whole build directory is deleted");
+    assert_loss_is_undone(&env, published).await;
+}
+
+#[tokio::test]
+async fn r2_17_a_lost_runout_file_requeues_its_job_and_gives_all_its_bytes_back() {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let (env, build_dir, published) = published_build(dir.path()).await;
+    let runout = files_under(&build_dir)
+        .into_iter()
+        .find(|file| file.contains("runouts"))
+        .expect("a runout file");
+    std::fs::remove_file(build_dir.join(runout)).expect("one runout file is deleted");
+    assert_loss_is_undone(&env, published).await;
+}
+
+#[tokio::test]
+async fn r2_17_mark_unavailable_leaves_a_superseded_solution_and_its_job_alone() {
+    let queue = queue_with(vec![tiny_job("own", FLOP, 1.0), same_flop("newer", 9, "queued")]);
+    let Claim::Job(_) = queue.claim(WORKER, Some("own"), &gate()).await.expect("a claim") else {
+        panic!("a job");
+    };
+    queue.publish(WORKER, &publication("own", "build-1", FLOP, 100)).await.expect("published");
+    let Claim::Job(_) = queue.claim(WORKER, Some("newer"), &gate()).await.expect("a claim") else {
+        panic!("a job");
+    };
+    queue.publish(WORKER, &publication("newer", "build-2", FLOP, 50)).await.expect("published");
+    let before = queue.snapshot();
+    assert_eq!(before.solutions[0].status, "superseded");
+    // The pass listed build-1 before build-2 superseded it, then found it broken.
+    let broken = Unavailable {
+        solution_id: "build-1".to_owned(),
+        tree_config_hash: Some(common::placeholder_tree_hash().to_vec()),
+        bytes: 100,
+        reason: "checksum mismatch".to_owned(),
+    };
+    queue.mark_unavailable(&broken).await.expect("a no-op");
+    assert_eq!(queue.snapshot(), before, "nothing changes for a superseded solution");
+}
+
+/// Another live process of this worker, for example a `--once` run in the same container.
+const ONCE_PROCESS: &str = "test-worker#once";
+
+#[tokio::test]
+async fn r2_17_a_live_process_sharing_the_stable_id_keeps_its_row_until_it_dies() {
+    let queue = queue_with(vec![tiny_job("once-job", FLOP, 1.0)]);
+    queue.hold_liveness(LIVE_PROCESS).await.expect("this process is live");
+    queue.hold_liveness(ONCE_PROCESS).await.expect("the other process is live");
+    let Claim::Job(_) = queue.claim(ONCE_PROCESS, None, &gate()).await.expect("a claim") else {
+        panic!("a job");
+    };
+    let reclaimed = queue.reclaim_stale(LIVE_PROCESS, 6, 3).await.expect("the reclaim");
+    assert_eq!(reclaimed, 0, "a live holder's row is never reclaimed");
+    let job = queue.job("once-job").expect("job");
+    assert_eq!((job.status.as_str(), job.locked_by.as_deref()), ("running", Some(ONCE_PROCESS)));
+    queue.mark_dead(ONCE_PROCESS);
+    let reclaimed = queue.reclaim_stale(LIVE_PROCESS, 6, 3).await.expect("the reclaim");
+    assert_eq!(reclaimed, 1, "once its liveness signal is gone, the row is reclaimed");
+    assert_eq!(queue.job("once-job").expect("job").status, "queued");
+}
+
+#[tokio::test]
+async fn r2_17_the_loop_and_once_hold_the_liveness_signal_before_claiming() {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let queue = queue_with(vec![]);
+    no_plan(&queue);
+    let env = env_with(queue, fake([0.1, 0.2]), dir.path());
+    let _ = tick(&env, &mut LoopClock::default(), NOON_EPOCH).await.expect("the tick runs");
+    assert!(env.queue.snapshot().live.contains(WORKER), "the tick took the signal");
+    env.queue.mark_dead(WORKER);
+    let nothing = run_once(&env, None).await;
+    assert!(matches!(nothing, Err(BuilderError::JobNotQueued(_))), "{nothing:?}");
+    assert!(env.queue.snapshot().live.contains(WORKER), "--once took the signal");
+}
+
+#[tokio::test]
+async fn r2_17_the_lock_is_refreshed_while_runouts_are_staged_and_after_the_upload() {
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let queue = queue_with(vec![tiny_job("job-1", FLOP, 1.0)]);
+    no_plan(&queue);
+    let ticking = Ticking::new(queue, dir.path().join("library"));
+    let env = env_over(ticking, fake([0.1, 0.2]), dir.path());
+    let summary = run_once(&env, None).await.expect("the job runs");
+    assert_eq!(summary.outcome, "published", "{summary:?}");
+    let beats = env.queue.beats();
+    // The fake solver reports no solve progress, so a refresh before the upload comes from
+    // the runout walk.
+    let staged = beats.iter().find(|beat| !beat.uploaded).expect("a refresh while staging");
+    assert_eq!(staged.locked_at, Some(staged.now), "locked_at moved while staging: {beats:?}");
+    let uploaded = beats.iter().find(|beat| beat.uploaded).expect("a refresh after the upload");
+    assert_eq!(uploaded.locked_at, Some(uploaded.now), "locked_at moved after upload: {beats:?}");
 }
 
 #[tokio::test]

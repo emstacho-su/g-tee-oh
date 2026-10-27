@@ -188,6 +188,13 @@ impl JobQueue for Vanishing {
         self.inner.settings()
     }
 
+    fn hold_liveness(
+        &self,
+        worker_id: &str,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
+        self.inner.hold_liveness(worker_id)
+    }
+
     fn reclaim_stale(
         &self,
         worker_id: &str,
@@ -222,6 +229,14 @@ impl JobQueue for Vanishing {
         progress: &BuildProgress,
     ) -> impl Future<Output = Result<(), BuilderError>> + Send {
         self.inner.progress(progress)
+    }
+
+    fn touch(
+        &self,
+        job_id: &str,
+        worker_id: &str,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
+        self.inner.touch(job_id, worker_id)
     }
 
     fn publish(

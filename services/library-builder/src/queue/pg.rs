@@ -8,14 +8,16 @@
 //! as `id::text` with `$n::uuid` casts, so no sqlx type feature beyond the defaults is
 //! needed.
 
+mod live;
 mod tx;
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use gto_planner::{JobKey, Plan};
 use serde_json::Value;
-use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
+use sqlx::postgres::{PgConnectOptions, PgConnection, PgPool, PgPoolOptions, PgSslMode};
 
 use super::{
     BudgetGate, Claim, Failure, FailureOutcome, JobQueue, PlanWrite, Publication, PublishedBuild,
@@ -41,32 +43,18 @@ pub const BUILDER_ROLE: &str = "builder";
 /// `gtoclaim`.
 pub const CLAIM_LOCK_KEY: i64 = i64::from_be_bytes(*b"gtoclaim");
 
-/// The stale reclaim (O-185, review M1, L6), one statement. `$1` is this process's full
-/// id, never taken; `$2` its stable part (the holder's text before its last `#`, the
-/// whole holder without one, compared by `regexp_replace`); `$3` the stale hours; `$4`
-/// `max_attempts`. Every assignment reads the row's old values, so the error names the
-/// holder; the text matches `queue::reclaim_error`.
-const RECLAIM_STALE: &str = "update build_job set attempts = attempts + 1, \
-     status = case when attempts + 1 >= $4 then 'failed'::job_status \
-     else 'queued'::job_status end, \
-     error = 'stale reclaim from ' || coalesce(locked_by, '') || \
-     case when attempts + 1 >= $4 then ': parked after ' || (attempts + 1)::text || ' attempts' \
-     else ': re-queued at attempt ' || (attempts + 1)::text end, \
-     locked_by = null, locked_at = null, updated_at = now() \
-     where status = 'running' and locked_by is distinct from $1 and \
-     (regexp_replace(locked_by, '#[^#]*$', '') = $2 \
-     or locked_at < now() - make_interval(hours => $3))";
-
 /// A progress write: `locked_at` is refreshed while the row runs, so a live long job is
 /// never stale (review L6).
 const PROGRESS: &str = "update build_job set progress = $2, updated_at = now(), \
      locked_at = case when status = 'running' then now() else locked_at end \
      where id = $1::uuid";
 
-/// The queue over Postgres.
+/// The queue over Postgres. Clones share the pool and the liveness connection.
 #[derive(Clone, Debug)]
 pub struct PgQueue {
     pool: PgPool,
+    /// The connection holding this process's liveness lock, once taken (`live`).
+    liveness: Arc<tokio::sync::Mutex<Option<PgConnection>>>,
 }
 
 impl PgQueue {
@@ -84,7 +72,7 @@ impl PgQueue {
             .max_connections(MAX_CONNECTIONS)
             .acquire_timeout(ACQUIRE_TIMEOUT)
             .connect_lazy_with(options);
-        PgQueue { pool }
+        PgQueue { pool, liveness: Arc::new(tokio::sync::Mutex::new(None)) }
     }
 
     /// The pool, for the health probe and the tests.
@@ -117,6 +105,11 @@ impl JobQueue for PgQueue {
         Ok(rows)
     }
 
+    async fn hold_liveness(&self, worker_id: &str) -> Result<(), BuilderError> {
+        let mut held = self.liveness.lock().await;
+        live::hold(&self.pool, &mut held, worker_id).await
+    }
+
     async fn reclaim_stale(
         &self,
         worker_id: &str,
@@ -124,15 +117,8 @@ impl JobQueue for PgQueue {
         max_attempts: i16,
     ) -> Result<u64, BuilderError> {
         let hours = i32::try_from(stale_hours).unwrap_or(i32::MAX);
-        let reclaimed = sqlx::query(RECLAIM_STALE)
-            .bind(worker_id)
-            .bind(stable_worker_id(worker_id))
-            .bind(hours)
-            .bind(max_attempts)
-            .execute(&self.pool)
-            .await?
-            .rows_affected();
-        Ok(reclaimed)
+        let stable = stable_worker_id(worker_id);
+        live::reclaim_stale(&self.pool, worker_id, stable, hours, max_attempts).await
     }
 
     async fn claim(
@@ -168,6 +154,10 @@ impl JobQueue for PgQueue {
         sqlx::query(PROGRESS).bind(&progress.job_id).bind(&value).execute(&self.pool).await?;
         let mut conn = self.pool.acquire().await?;
         tx::notify(&mut conn, BUILD_PROGRESS, progress).await
+    }
+
+    async fn touch(&self, job_id: &str, worker_id: &str) -> Result<(), BuilderError> {
+        live::touch(&self.pool, job_id, worker_id).await
     }
 
     async fn publish(

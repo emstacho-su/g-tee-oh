@@ -180,7 +180,10 @@ pub(super) async fn notify(
     Ok(())
 }
 
-/// The solution row of a publish, after marking the previous own build superseded.
+/// The solution row of a publish, after marking the previous own build superseded. The row
+/// records the job, the job's tree hash (read from its row, which the publish holds) and
+/// the bytes, so marking it unavailable later never needs the store (PR #22 re-review
+/// HIGH 1).
 async fn insert_solution(conn: &mut PgConnection, p: &Publication) -> Result<(), BuilderError> {
     sqlx::query(
         "update solution set status = 'superseded' where kind = 'flop_build' and \
@@ -194,8 +197,10 @@ async fn insert_solution(conn: &mut PgConnection, p: &Publication) -> Result<(),
     .await?;
     sqlx::query(
         "insert into solution (id, kind, source, game_config_id, position_pair, flop, \
-         engine_version, manifest_uri, exploitability_pct_pot, status) \
-         values ($1::uuid, 'flop_build', 'own', $2, $3, $4, $5, $6, $7, 'published')",
+         engine_version, manifest_uri, exploitability_pct_pot, status, build_job_id, \
+         tree_config_hash, bytes) \
+         values ($1::uuid, 'flop_build', 'own', $2, $3, $4, $5, $6, $7, 'published', $8::uuid, \
+         (select tree_config_hash from build_job where id = $8::uuid), $9)",
     )
     .bind(&p.build_id)
     .bind(&p.config_id)
@@ -204,6 +209,8 @@ async fn insert_solution(conn: &mut PgConnection, p: &Publication) -> Result<(),
     .bind(&p.engine_version)
     .bind(&p.manifest_uri)
     .bind(p.exploitability_pct_pot.to_vec())
+    .bind(&p.job_id)
+    .bind(to_bigint(p.bytes, "publication bytes")?)
     .execute(&mut *conn)
     .await?;
     for scenario in &p.scenarios {
@@ -385,48 +392,64 @@ pub(super) async fn write_plan(pool: &PgPool, plan: &Plan) -> Result<PlanWrite, 
     Ok(write)
 }
 
-/// Re-queues only the solution's own job: its configuration, pair and flop, `done`, with
-/// the tree hash of the build's key. Running, queued, parked, `blocked_budget` and
-/// other-hash rows are never touched (review HIGH 2, L5).
-const REQUEUE_OWN_JOB: &str = "update build_job set status = 'queued', attempts = 0, \
-     error = $5, locked_by = null, locked_at = null, updated_at = now() \
-     where game_config_id = $1 and position_pair = $2 and flop = $3 \
-     and tree_config_hash = $4 and status = 'done'";
+/// Marks a still `published` solution unavailable and answers what its publish recorded
+/// (PR #22 re-review LOW 1: a superseded solution is never touched).
+const MARK_UNAVAILABLE: &str = "update solution set status = 'unavailable' \
+     where id = $1::uuid and status = 'published' \
+     returning game_config_id, position_pair, flop, build_job_id::text, tree_config_hash, bytes";
 
-/// Marks a solution unavailable, re-queues its own job with attempts reset and takes its
-/// bytes off the ledger, in one transaction (O-186, see [`Unavailable`]). A solution
-/// already unavailable is left alone, so a repeat never subtracts twice.
+/// Re-queues only the solution's own `done` job: the row `build_job_id` names (`$1`), or
+/// for a row published before migration `20261027000200` (`$1` null) the row of the same
+/// configuration, pair, flop and tree hash. Running, queued, parked, `blocked_budget` and
+/// other rows are never touched (review HIGH 2, L5, re-review HIGH 1).
+const REQUEUE_OWN_JOB: &str = "update build_job set status = 'queued', attempts = 0, \
+     error = $6, locked_by = null, locked_at = null, updated_at = now() \
+     where status = 'done' and case when $1::uuid is not null then id = $1::uuid \
+     else game_config_id = $2 and position_pair = $3 and flop = $4 \
+     and tree_config_hash = $5 end";
+
+/// What `MARK_UNAVAILABLE` answers.
+type MarkedRow =
+    (String, Option<String>, Option<String>, Option<String>, Option<Vec<u8>>, Option<i64>);
+
+/// Marks a `published` solution unavailable, re-queues the `done` job its publish recorded
+/// with attempts reset and takes the recorded bytes off the ledger, in one transaction
+/// (O-186, see [`Unavailable`], whose hash and bytes stand in only for a row published
+/// before they were recorded). A solution no longer published is left alone, so a repeat
+/// never subtracts twice.
 pub(super) async fn mark_unavailable(
     pool: &PgPool,
     build: &Unavailable,
 ) -> Result<(), BuilderError> {
     let mut tx = pool.begin().await?;
-    let solution: Option<(String, Option<String>, Option<String>)> = sqlx::query_as(
-        "update solution set status = 'unavailable' \
-         where id = $1::uuid and status <> 'unavailable' \
-         returning game_config_id, position_pair, flop",
-    )
-    .bind(&build.solution_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let Some((config_id, pair, flop)) = solution else {
+    let marked: Option<MarkedRow> =
+        sqlx::query_as(MARK_UNAVAILABLE).bind(&build.solution_id).fetch_optional(&mut *tx).await?;
+    let Some((config_id, pair, flop, job_id, recorded_hash, recorded_bytes)) = marked else {
         tx.rollback().await?;
         tracing::warn!(solution_id = %build.solution_id,
-            "mark_unavailable: no such solution, or already unavailable");
+            "mark_unavailable: no such solution, or no longer published");
         return Ok(());
     };
-    if let Some(hash) = &build.tree_config_hash {
-        sqlx::query(REQUEUE_OWN_JOB)
-            .bind(&config_id)
-            .bind(pair)
-            .bind(flop)
-            .bind(hash)
-            .bind(&build.reason)
-            .execute(&mut *tx)
-            .await?;
+    let hash = recorded_hash.or_else(|| build.tree_config_hash.clone());
+    if job_id.is_none() && hash.is_none() {
+        tracing::warn!(solution_id = %build.solution_id,
+            "mark_unavailable: no recorded job and no tree hash; no job is re-queued");
     }
-    if build.bytes > 0 {
-        change_ledger(&mut tx, -to_bigint(build.bytes, "unavailable bytes")?).await?;
+    sqlx::query(REQUEUE_OWN_JOB)
+        .bind(job_id)
+        .bind(&config_id)
+        .bind(pair)
+        .bind(flop)
+        .bind(hash)
+        .bind(&build.reason)
+        .execute(&mut *tx)
+        .await?;
+    let bytes = match recorded_bytes {
+        Some(bytes) => non_negative(bytes, "solution.bytes")?,
+        None => build.bytes,
+    };
+    if bytes > 0 {
+        change_ledger(&mut tx, -to_bigint(bytes, "unavailable bytes")?).await?;
     }
     tx.commit().await?;
     Ok(())

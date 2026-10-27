@@ -98,6 +98,32 @@ pub struct MemSolution {
     pub publication: Publication,
     /// `published`, `unavailable` or `superseded`.
     pub status: String,
+    /// `build_job_id`: the job whose publish wrote it; `None` stands for a row published
+    /// before migration `20261027000200`.
+    pub build_job_id: Option<String>,
+    /// `tree_config_hash`, that job's tree hash.
+    pub tree_config_hash: Option<Vec<u8>>,
+    /// `bytes`, what the publish added to the ledger.
+    pub bytes: Option<u64>,
+}
+
+impl MemSolution {
+    /// Whether `job` is the job this solution's unavailable mark re-queues: the recorded
+    /// job, or for an old row the job of the same key, `fallback_hash` standing in for the
+    /// unrecorded tree hash (PR #22 re-review HIGH 1).
+    fn owns(&self, job: &MemJob, fallback_hash: Option<&[u8]>) -> bool {
+        if let Some(id) = &self.build_job_id {
+            return &job.id == id;
+        }
+        let hash = self.tree_config_hash.as_deref().or(fallback_hash);
+        let p = &self.publication;
+        hash.is_some_and(|hash| {
+            job.game_config_id == p.config_id
+                && job.position_pair == p.pair
+                && job.flop == p.flop
+                && job.tree_config_hash == hash
+        })
+    }
 }
 
 /// Everything the queue holds.
@@ -120,6 +146,9 @@ pub struct MemState {
     /// The clock that stands in for `now()`, in seconds; tests move it with
     /// [`MemQueue::set_now`].
     pub now: u64,
+    /// The full worker ids whose liveness signal is held, standing in for the advisory
+    /// locks `PgQueue` takes; tests end one with [`MemQueue::mark_dead`].
+    pub live: BTreeSet<String>,
 }
 
 /// The in-memory queue.
@@ -163,6 +192,12 @@ impl MemQueue {
     /// and the stale reclaim compares against it, as Postgres does with `now()`.
     pub fn set_now(&self, seconds: u64) {
         self.lock().now = seconds;
+    }
+
+    /// Ends the process `worker_id`: its liveness signal is released, as Postgres releases
+    /// the advisory lock when a process's connection closes.
+    pub fn mark_dead(&self, worker_id: &str) {
+        self.lock().live.remove(worker_id);
     }
 
     /// Sets the ledger's latest library bytes.
@@ -278,11 +313,19 @@ impl MemState {
 
     /// Whether the stale reclaim takes `job` for the process `worker_id`: running, not
     /// held by exactly this process, and held by a dead previous process of this worker
-    /// or locked at or before `cutoff` (O-185, review M1, L6).
-    fn reclaimable(job: &MemJob, worker_id: &str, cutoff: Option<u64>) -> bool {
+    /// (the same stable id, another nonce, not in `live`) or locked at or before `cutoff`
+    /// (O-185, review M1, L6, PR #22 re-review MEDIUM).
+    fn reclaimable(
+        job: &MemJob,
+        worker_id: &str,
+        cutoff: Option<u64>,
+        live: &BTreeSet<String>,
+    ) -> bool {
         let holder = job.locked_by.as_deref();
         let dead_previous = holder.is_some_and(|by| {
-            by != worker_id && stable_worker_id(by) == stable_worker_id(worker_id)
+            by != worker_id
+                && stable_worker_id(by) == stable_worker_id(worker_id)
+                && !live.contains(by)
         });
         let stale = job.locked_at.zip(cutoff).is_some_and(|(at, cutoff)| at < cutoff);
         job.status == "running" && holder != Some(worker_id) && (dead_previous || stale)
@@ -293,7 +336,7 @@ impl MemState {
         let cutoff = self.now.checked_sub(u64::from(stale_hours) * SECONDS_PER_HOUR);
         let mut reclaimed = 0;
         for job in &mut self.jobs {
-            if !Self::reclaimable(job, worker_id, cutoff) {
+            if !Self::reclaimable(job, worker_id, cutoff, &self.live) {
                 continue;
             }
             let holder = job.locked_by.take().unwrap_or_default();
@@ -333,8 +376,13 @@ impl MemState {
                 "superseded".clone_into(&mut solution.status);
             }
         }
-        self.solutions
-            .push(MemSolution { publication: publication.clone(), status: "published".to_owned() });
+        self.solutions.push(MemSolution {
+            publication: publication.clone(),
+            status: "published".to_owned(),
+            build_job_id: Some(publication.job_id.clone()),
+            tree_config_hash: Some(self.jobs[index].tree_config_hash.clone()),
+            bytes: Some(publication.bytes),
+        });
         self.ledger_bytes = self.ledger_bytes.saturating_add(publication.bytes);
         let job = &mut self.jobs[index];
         "done".clone_into(&mut job.status);
@@ -454,38 +502,45 @@ impl MemState {
         Ok(write)
     }
 
-    /// Marks a solution unavailable, re-queues only its own `done` job and gives its
-    /// bytes back to the ledger, as `PgQueue::mark_unavailable` does (O-186). A solution
-    /// already unavailable is left alone, so a repeat never subtracts twice.
+    /// Marks a `published` solution unavailable, re-queues the `done` job its publish
+    /// recorded and gives the recorded bytes back to the ledger, as
+    /// `PgQueue::mark_unavailable` does (O-186, PR #22 re-review HIGH 1, LOW 1). A solution
+    /// no longer published is left alone, so a repeat never subtracts twice and a build
+    /// superseded mid-pass never re-queues the job that superseded it.
     fn mark_unavailable(&mut self, build: &Unavailable) {
         let Some(solution) = self
             .solutions
             .iter_mut()
-            .find(|s| s.publication.build_id == build.solution_id && s.status != "unavailable")
+            .find(|s| s.publication.build_id == build.solution_id && s.status == "published")
         else {
             tracing::warn!(solution_id = %build.solution_id,
-                "mark_unavailable: no such solution, or already unavailable");
+                "mark_unavailable: no such solution, or no longer published");
             return;
         };
         "unavailable".clone_into(&mut solution.status);
-        let published = solution.publication.clone();
-        if let Some(hash) = &build.tree_config_hash {
-            let own = self.jobs.iter_mut().filter(|job| {
-                job.status == "done"
-                    && job.game_config_id == published.config_id
-                    && job.position_pair == published.pair
-                    && job.flop == published.flop
-                    && &job.tree_config_hash == hash
-            });
-            for job in own {
-                "queued".clone_into(&mut job.status);
-                job.attempts = 0;
-                job.error = Some(build.reason.clone());
-                job.locked_by = None;
-                job.locked_at = None;
-            }
+        let solution = solution.clone();
+        let fallback_hash = build.tree_config_hash.as_deref();
+        let own = self
+            .jobs
+            .iter_mut()
+            .filter(|job| job.status == "done" && solution.owns(job, fallback_hash));
+        for job in own {
+            "queued".clone_into(&mut job.status);
+            job.attempts = 0;
+            job.error = Some(build.reason.clone());
+            job.locked_by = None;
+            job.locked_at = None;
         }
-        self.ledger_bytes = self.ledger_bytes.saturating_sub(build.bytes);
+        let bytes = solution.bytes.unwrap_or(build.bytes);
+        self.ledger_bytes = self.ledger_bytes.saturating_sub(bytes);
+    }
+
+    /// Refreshes `locked_at` of `job_id` while `worker_id` holds it running.
+    fn touch(&mut self, job_id: &str, worker_id: &str) {
+        let now = self.now;
+        if let Ok(index) = self.locked_index(worker_id, job_id) {
+            self.jobs[index].locked_at = Some(now);
+        }
     }
 
     /// Rows per status, sorted by status.
@@ -502,6 +557,15 @@ impl MemState {
 impl JobQueue for MemQueue {
     fn settings(&self) -> impl Future<Output = Result<Vec<(String, Value)>, BuilderError>> + Send {
         ready(Ok(self.lock().settings.clone()))
+    }
+
+    /// Adds `worker_id` to the live set, standing in for the advisory lock.
+    fn hold_liveness(
+        &self,
+        worker_id: &str,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
+        self.lock().live.insert(worker_id.to_owned());
+        ready(Ok(()))
     }
 
     /// Staleness is measured against the queue's clock ([`MemQueue::set_now`]).
@@ -557,6 +621,15 @@ impl JobQueue for MemQueue {
             state.notifications.push((BUILD_PROGRESS.to_owned(), value));
         });
         ready(result)
+    }
+
+    fn touch(
+        &self,
+        job_id: &str,
+        worker_id: &str,
+    ) -> impl Future<Output = Result<(), BuilderError>> + Send {
+        self.lock().touch(job_id, worker_id);
+        ready(Ok(()))
     }
 
     fn publish(
@@ -633,138 +706,4 @@ impl JobQueue for MemQueue {
 }
 
 #[cfg(test)]
-mod tests {
-    use gto_model::{ConfigId, Flop, PositionPair};
-    use gto_planner::{JobSpec, Plan};
-
-    use super::{MemJob, MemQueue};
-    use crate::queue::{BudgetGate, Claim, Failure, JobQueue, PlanWrite, Publication};
-
-    fn gate(budget_bytes: u64) -> BudgetGate {
-        BudgetGate { budget_bytes, bytes_per_runout: 10, bytes_per_flop_tree: 5 }
-    }
-
-    fn job(id: &str, flop: &str, priority: f32) -> MemJob {
-        MemJob::queued(id, "cfg_6_online_100", "BB-BTN", flop, &["r250.c"], [7; 32], 2, priority)
-    }
-
-    fn spec(flop: &str) -> JobSpec {
-        JobSpec {
-            game_config_id: ConfigId::new("cfg_6_online_100").expect("an id"),
-            position_pair: "BB-BTN".parse::<PositionPair>().expect("a pair"),
-            flop: flop.parse::<Flop>().expect("a flop"),
-            preflop_lines: vec!["r250.c".to_owned()],
-            tree_config_hash: [7; 32],
-            k_runouts: 2,
-            priority: 0.5,
-            estimated_bytes: 25,
-        }
-    }
-
-    fn publication(job_id: &str, build_id: &str) -> Publication {
-        Publication {
-            job_id: job_id.to_owned(),
-            build_id: build_id.to_owned(),
-            config_id: "cfg_6_online_100".to_owned(),
-            pair: "BB-BTN".to_owned(),
-            flop: "Ah7d2c".to_owned(),
-            flop_weight: 24,
-            engine_version: "test".to_owned(),
-            manifest_uri: format!("builds/x/{build_id}/manifest.json"),
-            exploitability_pct_pot: [0.1, 0.2],
-            scenarios: Vec::new(),
-            bytes: 40,
-        }
-    }
-
-    #[tokio::test]
-    async fn r2_17_ties_go_to_the_row_inserted_first_and_a_named_claim_needs_queued() {
-        let queue = MemQueue::new();
-        queue.insert_job(job("a", "Ah7d2c", 1.0));
-        queue.insert_job(job("b", "Kh7d2c", 1.0));
-        let named = queue.claim("w", Some("b"), &gate(u64::MAX)).await.expect("a claim");
-        assert!(matches!(named, Claim::Job(ref j) if j.id == "b"), "{named:?}");
-        let again = queue.claim("w", Some("b"), &gate(u64::MAX)).await.expect("a claim");
-        assert_eq!(again, Claim::Empty, "a running job is not claimable by name");
-        let head = queue.claim("w", None, &gate(u64::MAX)).await.expect("a claim");
-        assert!(matches!(head, Claim::Job(ref j) if j.id == "a"), "{head:?}");
-    }
-
-    #[tokio::test]
-    async fn r2_17_publish_needs_the_lock_and_supersedes_the_previous_build() {
-        let queue = MemQueue::new();
-        queue.insert_job(job("a", "Ah7d2c", 1.0));
-        let lost = queue.publish("w", &publication("a", "b1")).await;
-        assert!(lost.is_err(), "a queued job cannot publish");
-        let Claim::Job(_) = queue.claim("w", None, &gate(u64::MAX)).await.expect("claim") else {
-            panic!("a job");
-        };
-        queue.publish("w", &publication("a", "b1")).await.expect("publishes");
-        queue.insert_job(job("a2", "Ah7d2c", 1.0));
-        let Claim::Job(_) = queue.claim("w", Some("a2"), &gate(u64::MAX)).await.expect("claim")
-        else {
-            panic!("a job");
-        };
-        queue.publish("w", &publication("a2", "b2")).await.expect("publishes");
-        let state = queue.snapshot();
-        let statuses: Vec<&str> = state.solutions.iter().map(|s| s.status.as_str()).collect();
-        assert_eq!(statuses, ["superseded", "published"]);
-        assert_eq!(state.ledger_bytes, 80);
-        let builds = queue.published_builds().await.expect("builds");
-        assert_eq!(builds.len(), 1);
-        let broken = crate::queue::Unavailable {
-            solution_id: "b2".to_owned(),
-            tree_config_hash: Some(vec![7; 32]),
-            bytes: 40,
-            reason: "checksum".to_owned(),
-        };
-        queue.mark_unavailable(&broken).await.expect("marks");
-        assert_eq!(queue.job("a2").expect("job").status, "queued");
-        assert_eq!(queue.job("a2").expect("job").attempts, 0);
-        assert_eq!(queue.published_builds().await.expect("builds"), Vec::new());
-        assert_eq!(queue.snapshot().ledger_bytes, 40, "the build's bytes are given back");
-    }
-
-    #[tokio::test]
-    async fn r2_17_the_budget_gate_counts_the_ledger_and_running_jobs() {
-        let queue = MemQueue::new();
-        queue.insert_job(job("a", "Ah7d2c", 2.0));
-        queue.insert_job(job("b", "Kh7d2c", 1.0));
-        queue.set_ledger_bytes(10);
-        let gate = gate(10 + 2 * queue.job("a").expect("a").estimate(&gate(0)) - 1);
-        let first = queue.claim("w", None, &gate).await.expect("a claim");
-        assert!(matches!(first, Claim::Job(_)), "{first:?}");
-        let second = queue.claim("w", None, &gate).await.expect("a claim");
-        let Claim::Blocked { job_id, reason } = second else { panic!("blocked: {second:?}") };
-        assert_eq!(job_id, "b");
-        assert!(reason.contains("budget"), "{reason}");
-        let failure = Failure { job_id: "b".to_owned(), error: "x".to_owned(), ..failure() };
-        assert!(queue.fail("w", &failure, 3).await.is_err(), "an unlocked job cannot fail");
-    }
-
-    fn failure() -> Failure {
-        Failure { job_id: String::new(), error: String::new(), exploitability_pct_pot: None }
-    }
-
-    #[tokio::test]
-    async fn r2_16_a_plan_inserts_once_and_promotes_blocked_rows() {
-        let queue = MemQueue::new();
-        let plan = Plan {
-            queued: vec![spec("Ah7d2c")],
-            blocked: vec![spec("Kh7d2c")],
-            committed_bytes: 0,
-        };
-        let first = queue.write_plan(&plan).await.expect("written");
-        assert_eq!(first, PlanWrite { queued: 1, blocked: 1, promoted: 0 });
-        let again = queue.write_plan(&plan).await.expect("written");
-        assert_eq!(again, PlanWrite::default());
-        let (keys, committed) = queue.plan_inputs(&gate(0)).await.expect("inputs");
-        assert_eq!(keys.len(), 1, "blocked rows are not existing keys");
-        assert_eq!(committed, gate(0).estimate(1, 2));
-        let promote = Plan { queued: vec![spec("Kh7d2c")], blocked: vec![], committed_bytes: 0 };
-        let promoted = queue.write_plan(&promote).await.expect("written");
-        assert_eq!(promoted, PlanWrite { queued: 0, blocked: 0, promoted: 1 });
-        let depth = queue.queue_depth().await.expect("depth");
-        assert_eq!(depth, vec![("queued".to_owned(), 2)]);
-    }
-}
+mod tests;
