@@ -1,0 +1,58 @@
+/**
+ * The accessible table fallback of the range matrix (S24, R3.12, A7 section 4).
+ *
+ * Mechanism: a real <table> of 13 rows by 13 columns with rank letters as row and column
+ * headers, one cell per hand class in grid order, built from the same MatrixModel the canvas
+ * draws (cell-text.ts formats both), so a screen reader user or a sighted user who prefers text
+ * reads exactly the numbers the canvas shows. The caption names the mode. RangeMatrix keeps the
+ * table in the DOM at all times and points the canvas's aria-describedby at its id.
+ */
+import { RANKS } from "../../poker/cards.js";
+import { GRID_SIZE } from "../../poker/hands.js";
+import { MODE_NAMES, cellText } from "./cell-text.js";
+import type { MatrixMode, MatrixModel } from "./model.js";
+
+export interface RangeMatrixTableProps {
+  model: MatrixModel;
+  mode: MatrixMode;
+  /** The table's id, which the canvas references through aria-describedby. */
+  id: string;
+}
+
+const ROW_INDEXES = Array.from({ length: GRID_SIZE }, (_, index) => index);
+
+export function RangeMatrixTable({ model, mode, id }: RangeMatrixTableProps) {
+  return (
+    <table id={id} className="w-full border-collapse text-xs">
+      <caption className="mb-1 text-left text-sm font-semibold">
+        {`Range matrix, ${MODE_NAMES[mode]} mode: rows are the first rank, columns the second; suited above the pairs, offsuit below`}
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" className="border border-border px-1">
+            Hand
+          </th>
+          {RANKS.map((rank) => (
+            <th key={rank} scope="col" className="border border-border px-1">
+              {rank}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {ROW_INDEXES.map((row) => (
+          <tr key={RANKS[row]}>
+            <th scope="row" className="border border-border px-1">
+              {RANKS[row]}
+            </th>
+            {model.cells.slice(row * GRID_SIZE, (row + 1) * GRID_SIZE).map((cell) => (
+              <td key={cell.hand} className="border border-border px-1 align-top">
+                {cellText(cell, model.actions, mode)}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
