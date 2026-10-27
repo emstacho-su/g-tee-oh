@@ -15,6 +15,12 @@ engineStrict: true
 # depends on, so it is allowed.
 allowBuilds:
   esbuild: true
+  # Dev-only, through testcontainers (the api's Postgres test container, S21). None of the three
+  # scripts is needed: ssh2 and cpu-features build an optional native speed-up for SSH, which the
+  # local Docker socket never uses, and protobufjs's postinstall only checks its own version.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
 # GHSA-vfj7-8cjw-p6xm: stack exhaustion in braces, reachable only through the dev-only kysely-codegen (via micromatch), no patched version; pnpm audit (just audit-ts) reads this block, so the recipe passes no --ignore flag
 auditConfig:
