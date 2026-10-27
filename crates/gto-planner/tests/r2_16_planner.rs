@@ -222,6 +222,15 @@ fn fixture_frequency(index: usize, count: usize) -> f64 {
         / f64::from(u32::try_from(total).expect("small"))
 }
 
+/// `fixture_frequency` as the library reads it back: rows are stored at 1/255 by the
+/// largest-remainder method and renormalized on read (gto-library's `quantize` module), so
+/// a row such as 1/6, 2/6, 3/6 does not read back exactly.
+fn stored_frequency(index: usize, count: usize) -> f64 {
+    let row: Vec<f64> = (0..count).map(|i| fixture_frequency(i, count)).collect();
+    let stored = gto_library::quantize::quantize_frequencies(&row).expect("a valid row");
+    f64::from(gto_library::quantize::dequantize_frequencies(&stored)[index])
+}
+
 /// Writes a preflop solution of the BB-BTN pair tree whose frequencies follow
 /// `fixture_frequency`, and returns the library root and its prefix.
 fn packed_pair_solution(dir: &std::path::Path) -> String {
@@ -236,7 +245,11 @@ fn packed_pair_solution(dir: &std::path::Path) -> String {
             to_act: node.actor,
             pot: node.pot,
             stacks: [Cbb(9_000), Cbb(9_000)],
-            actions: node.actions.iter().map(|action| (*action, Cbb(0))).collect(),
+            actions: node
+                .actions
+                .iter()
+                .map(|action| (*action, action.size().unwrap_or(Cbb(0))))
+                .collect(),
             hand_space: gto_library::HandSpace::Preflop169,
             hands: HandClass::all()
                 .map(|class| SolvedHand {
@@ -298,7 +311,7 @@ fn r2_16_library_reach_is_the_product_of_the_line_frequencies() {
                 .find(|node| node.line.as_slice() == &line.actions[..depth])
                 .expect("the node before each action");
             let index = node.actions.iter().position(|a| a == action).expect("the action");
-            expected *= fixture_frequency(index, node.actions.len());
+            expected *= stored_frequency(index, node.actions.len());
         }
         let got = reach.line_reach(&config_id, line).expect("the line's reach");
         assert!((got - expected).abs() < 1e-6, "{}: {got} against {expected}", line.text());

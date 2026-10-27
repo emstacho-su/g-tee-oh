@@ -14,6 +14,9 @@ pub enum PlanError {
         /// The tree error.
         source: TreeError,
     },
+    /// The scope names a configuration outside `gto_model::v1_configs` (O-182).
+    #[error("configuration {0} is not in the v1 catalog")]
+    UnknownConfig(String),
     /// No reach is known for a line (no published preflop solution and no prior).
     #[error("no equilibrium reach for line {line} of {config_id}")]
     MissingReach {
@@ -32,10 +35,18 @@ pub enum PlanError {
         /// The value read.
         value: f64,
     },
+    /// The published preflop solution does not follow a line: a node of the line does not
+    /// offer the action the line takes, or names a seat outside the pair.
+    #[error("line {line} of {config_id} does not follow the preflop solution: {reason}")]
+    LineNotInSolution {
+        /// The configuration.
+        config_id: String,
+        /// The preflop line.
+        line: String,
+        /// What did not match.
+        reason: String,
+    },
     /// Reading the published preflop solution failed.
     #[error("library: {0}")]
     Library(#[from] LibraryError),
-    /// Not implemented yet (the red half of S18).
-    #[error("{0} is not implemented yet (S18 lane P)")]
-    NotImplemented(&'static str),
 }

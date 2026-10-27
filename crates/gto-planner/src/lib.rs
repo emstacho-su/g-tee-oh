@@ -26,7 +26,8 @@ mod schedule;
 mod settings;
 
 pub use enumerate::{
-    JobKey, JobSpec, RAW_FLOPS, enumerate, estimated_bytes, pair_lines, seat_share,
+    JobKey, JobSpec, RAW_FLOPS, RankedPair, enumerate, estimated_bytes, pair_jobs, pair_lines,
+    rank_pairs, seat_share,
 };
 pub use error::PlanError;
 pub use reach::{LibraryReach, PriorReach, ReachSource, prior_reach};
