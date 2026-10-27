@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "tiny-bb-btn-srp",
+  "sources": [
+    {
+      "id": "hand-made",
+      "citation": "hand-made by S18 from the rules of hold'em: five specific combos a side that avoid the test flops, so a real flop solve finishes in seconds in release (O-178, O-181)",
+      "url": null
+    }
+  ],
+  "config_id": "cfg_6_online_100",
+  "lines": [
+    {
+      "position_pair": "BB-BTN",
+      "line": "r250.c",
+      "oop": "KcKh,QdQs,JcJd,7s6s,5h4h",
+      "ip": "AsKs,TcTs,9d8d,8h8s,6c6d"
+    }
+  ],
+  "notes": [
+    "Ten combos in total, chosen so none holds a card of Ah7d2c, the flop of the integration tests and of tiny-bb-btn-srp.spec.json.",
+    "Not a strategy: the ranges exist to make the builder's real-solve tests small. Nothing here comes from a reference tool (O-26)."
+  ]
+}

@@ -26,8 +26,15 @@
 //! Chips come off the engine's 0.01 grid through `cbb_of_chips`, so pots, stacks and sizes
 //! are exact cbb. Action labels map to tokens as fold `f`, check `x`, call `c`, bet
 //! `b<cbb>` and raise `r<cbb>` with the street total the label carries, and all-in `a`.
+//!
+//! Runouts (S18, O-173, O-174, R2.12). [`select_nodes`] with [`NodeSelection::Runout`]
+//! walks past the root street along one chosen turn and river: every decision branch is
+//! followed, and at a chance node only the child dealt the chosen card, with both reach
+//! vectors compacted to the child's live combos through the engine's `parent_of_child` map.
+//! It returns the turn and river decision nodes of that runout; reach stays normalised per
+//! node and the EV keeps the root-street offset of half the root pot (O-175, O-202).
 
-use gto_model::{ActionToken, Cbb, ComboId};
+use gto_model::{ActionToken, Card, Cbb, ComboId};
 use gto_tree::Player;
 use postflop_engine::br;
 use postflop_engine::cfr::{AverageStrategy, Solver};
@@ -56,11 +63,17 @@ pub struct HandStrategy {
     pub ev_bb: Vec<f64>,
 }
 
-/// One decision node on the root street.
+/// One decision node of a solved game.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeStrategy {
-    /// The actions from the root to this node.
+    /// The actions from the root to this node, every street concatenated.
     pub line: Vec<ActionToken>,
+    /// The actions from the root to this node, one list per street from the root street:
+    /// one list on the root street, two on the next, three on the river of a flop root.
+    pub street_lines: Vec<Vec<ActionToken>>,
+    /// The cards dealt below the root on the way to this node, in deal order; empty on
+    /// the root street.
+    pub dealt: Vec<Card>,
     /// The player to act.
     pub player: Player,
     /// The pot at the node, an outstanding bet included.
@@ -71,6 +84,40 @@ pub struct NodeStrategy {
     pub actions: Vec<ActionToken>,
     /// The actor's live combos in canonical order.
     pub hands: Vec<HandStrategy>,
+}
+
+/// Which decision nodes of a solved game [`select_nodes`] returns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NodeSelection {
+    /// Every decision node on the root street (what [`root_street_nodes`] returns).
+    RootStreet,
+    /// Every decision node on the turn and river of one runout of a flop root: the turn
+    /// dealt `turn`, then the river dealt `river`, every action branch kept.
+    Runout {
+        /// The turn card.
+        turn: Card,
+        /// The river card.
+        river: Card,
+    },
+}
+
+/// The decision nodes `selection` names, depth first with a parent before its children
+/// and children in action order.
+///
+/// # Errors
+///
+/// `SolveError::Engine` as for [`root_street_nodes`]; `SolveError::Problem` when a runout
+/// is asked of a root that is not a flop, or names a card on the board or twice.
+pub fn select_nodes(
+    game_solved: &SolvedGame,
+    selection: &NodeSelection,
+) -> Result<Vec<NodeStrategy>, SolveError> {
+    match selection {
+        NodeSelection::RootStreet => root_street_nodes(game_solved),
+        NodeSelection::Runout { turn, river } => Err(SolveError::Problem(format!(
+            "the runout walk ({turn}{river}) is not implemented yet (S18 lane X)"
+        ))),
+    }
 }
 
 /// Every decision node on the root street of a solved game, depth first with a parent
@@ -125,6 +172,8 @@ impl Walk<'_> {
         let tree_node = self.game.node_at(node);
         out.push(NodeStrategy {
             line: line.to_vec(),
+            street_lines: vec![line.to_vec()],
+            dealt: Vec::new(),
             player: actor,
             pot: cbb_of_chips(tree_node.pot)?,
             stacks: [cbb_of_chips(tree_node.stacks[0])?, cbb_of_chips(tree_node.stacks[1])?],

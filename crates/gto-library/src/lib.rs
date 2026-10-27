@@ -32,11 +32,14 @@ pub mod cache;
 pub mod checksum;
 pub mod chunk;
 pub mod error;
+pub mod flop_build;
 pub mod key_hash;
 pub mod manifest;
+pub mod permute;
 pub mod quantize;
 pub mod reader;
 pub mod record;
+pub mod runout;
 pub mod store;
 #[cfg(feature = "synthetic")]
 pub mod synthetic;
@@ -49,18 +52,24 @@ pub use chunk::{
     ChunkOptions, FileDirectory, FrameEntry, RecordEntry, decode_frame, encode_file, read_directory,
 };
 pub use error::LibraryError;
+pub use flop_build::{
+    FlopBuildMeta, LineBuild, LineWritten, builds_prefix, flop_file_path, runout_file_path,
+    write_flop_build, write_flop_build_manifest, write_line_files,
+};
 pub use key_hash::key_hash;
 pub use manifest::{
     ChunkRef, FileRef, LineEntry, MANIFEST_FILE, MANIFEST_SCHEMA, MAX_CHUNKS, Manifest,
     ManifestConfig, ManifestKind, Runout, Source, TREE_FILE_SUFFIX, TurnRoot, is_timestamp,
     is_uuid,
 };
+pub use permute::{permute_combo, permute_key, permute_node};
 pub use quantize::{
     dequantize_frequencies, dequantize_reach, loss_bb, loss_bb_f64, loss_units, narrow_f32,
     quantize_frequencies, quantize_reach,
 };
 pub use reader::{Availability, Reader, ReaderOptions, SolutionHandle};
 pub use record::{HandSpace, NodeRecord, RecordAction, SolvedHand, SolvedNode};
+pub use runout::{ORDERED_RUNOUTS, RunoutSpec, draw_runouts};
 pub use store::{FsStore, MemStore, ObjectSink, ObjectStore};
 #[cfg(feature = "synthetic")]
 pub use synthetic::{SyntheticParams, synthetic_tree};

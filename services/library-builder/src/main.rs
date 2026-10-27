@@ -1,19 +1,29 @@
-//! `library-builder`: the background worker that takes the planner's build list, solves
-//! each spot through `gto-solve` and writes the result into the solutions library. It
-//! runs outside every request path, which is what lets `solver-query` stay solve-free
-//! (ADR 0018). In S01 the binary is a stub that prints its name and version.
+//! `library-builder`: maps a parsed command (`library_builder::cli`) to the library half of
+//! the crate. With no argument it runs the claim loop and the operations surface;
+//! `--version` prints the S01 line (O-189).
 
 #![forbid(unsafe_code)]
 
-/// The binary's package name.
-const BIN_NAME: &str = env!("CARGO_PKG_NAME");
+use std::ffi::OsString;
+use std::process::ExitCode;
 
-/// The binary's package version.
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use library_builder::cli::{self, Command, USAGE};
+use library_builder::version_line;
 
-/// Internal crates this binary links (A1 section 2), named so the edges are exercised.
-const LINKS: &[&str] = &[gto_solve::CRATE_NAME, gto_planner::CRATE_NAME, gto_library::CRATE_NAME];
-
-fn main() {
-    println!("{BIN_NAME} {VERSION} (links {})", LINKS.join(", "));
+fn main() -> ExitCode {
+    let args: Vec<OsString> = std::env::args_os().skip(1).collect();
+    match cli::parse(&args) {
+        Ok(Command::Version) => {
+            println!("{}", version_line());
+            ExitCode::SUCCESS
+        }
+        Ok(command) => {
+            eprintln!("library-builder: {command:?} is not implemented yet (S18)");
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("library-builder: {error}\n{USAGE}");
+            ExitCode::from(2)
+        }
+    }
 }

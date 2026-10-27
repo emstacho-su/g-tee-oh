@@ -81,6 +81,10 @@ pub enum LibraryError {
     /// Windows device such as `CON` or `nul.json`.
     #[error("invalid store path {0:?}: expected a relative path with forward slashes")]
     InvalidPath(String),
+    /// A request the build writer cannot satisfy, such as more runouts than a flop has or
+    /// a node with a hand space a suit permutation does not apply to (S18).
+    #[error("invalid build request: {0}")]
+    InvalidRequest(String),
     /// A `gto-model` value that failed its own checks.
     #[error(transparent)]
     Model(#[from] gto_model::ModelError),
