@@ -292,6 +292,10 @@ services:
     build:
       context: .
       dockerfile: infra/docker/library-builder.Dockerfile
+    # O-185, PR #22 re-review LOW 2: a fixed host name, so the default stable worker id (the host name) stays
+    # the same when the container is recreated and the new process can reclaim the old one's rows at once
+    # instead of after stale_hours. The per-process nonce and the liveness lock tell the processes apart.
+    hostname: library-builder
     environment:
       # A5 section 1: 7071 serves /healthz and /metrics inside the network gto only (O-207)
       BUILDER_BIND: "0.0.0.0:7071"
