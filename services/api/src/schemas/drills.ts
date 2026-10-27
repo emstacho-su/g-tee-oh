@@ -13,6 +13,7 @@
 import { z } from "zod";
 
 import { pageQuerySchema, pageSchema } from "../http/pagination.js";
+import { checkSpotFilter } from "./spot-filter-rules.js";
 import {
   flopSchema,
   gameFormatSchema,
@@ -117,6 +118,7 @@ export const spotFilterSchema = z
     hands: handsFilterSchema,
     alternate_seats: z.boolean(),
   })
+  .superRefine(checkSpotFilter)
   .meta({ id: "SpotFilter" });
 
 export const trainerSettingsSchema = z

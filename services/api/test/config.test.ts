@@ -5,7 +5,7 @@ import {
   DEFAULT_APP_ORIGIN,
   DEFAULT_PG_PORT,
   DEFAULT_SESSION_TTL_HOURS,
-  DEFAULT_TRUST_PROXY_HOPS,
+  DEFAULT_TRUSTED_PROXIES,
   defaultAppConfig,
   loadProcessConfig,
   parseApiPort,
@@ -42,7 +42,7 @@ describe("R3.1 process configuration", () => {
     expect(config.app).toEqual({
       appOrigin: DEFAULT_APP_ORIGIN,
       sessionTtlHours: DEFAULT_SESSION_TTL_HOURS,
-      trustProxyHops: DEFAULT_TRUST_PROXY_HOPS,
+      trustedProxies: [...DEFAULT_TRUSTED_PROXIES],
     });
     expect(config.database).toEqual({
       host: "postgres",
@@ -68,12 +68,32 @@ describe("R3.1 process configuration", () => {
     }
   });
 
-  it("R3.1 SESSION_TTL_HOURS and TRUST_PROXY_HOPS are bounded integers", () => {
-    const config = loadProcessConfig({ ...COMPLETE_ENV, SESSION_TTL_HOURS: "24", TRUST_PROXY_HOPS: "0" });
-    expect(config.app.sessionTtlHours).toBe(24);
-    expect(config.app.trustProxyHops).toBe(0);
+  it("R3.1 SESSION_TTL_HOURS is a bounded integer", () => {
+    expect(loadProcessConfig({ ...COMPLETE_ENV, SESSION_TTL_HOURS: "24" }).app.sessionTtlHours).toBe(24);
     expect(() => loadProcessConfig({ ...COMPLETE_ENV, SESSION_TTL_HOURS: "0" })).toThrow(/SESSION_TTL_HOURS/);
-    expect(() => loadProcessConfig({ ...COMPLETE_ENV, TRUST_PROXY_HOPS: "-1" })).toThrow(/TRUST_PROXY_HOPS/);
+  });
+
+  it("R3.1 TRUSTED_PROXIES is a list of presets, addresses and CIDR ranges (O-236, L1)", () => {
+    expect(loadProcessConfig({ ...COMPLETE_ENV, TRUSTED_PROXIES: "uniquelocal, 10.0.0.5, 172.18.0.0/16" }).app.trustedProxies).toEqual([
+      "uniquelocal",
+      "10.0.0.5",
+      "172.18.0.0/16",
+    ]);
+    for (const bad of ["everyone", "10.0.0.300", "172.18.0.0/40", "loopback,,"]) {
+      expect(() => loadProcessConfig({ ...COMPLETE_ENV, TRUSTED_PROXIES: bad }), bad).toThrow(/TRUSTED_PROXIES/);
+    }
+  });
+
+  it("R3.1 one error names every bad variable, API_PORT included (LOW 10)", () => {
+    let message = "";
+    try {
+      loadProcessConfig({ ...COMPLETE_ENV, API_PORT: "80a", SESSION_TTL_HOURS: "0", PGHOST: "" });
+    } catch (error: unknown) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/API_PORT/);
+    expect(message).toMatch(/SESSION_TTL_HOURS/);
+    expect(message).toMatch(/PGHOST/);
   });
 
   it("R3.1 the default app configuration is the dev profile's", () => {

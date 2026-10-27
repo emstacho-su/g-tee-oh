@@ -7,7 +7,9 @@
  * every query in drills/repository.ts filters by it, so another user's drill is a 404 problem,
  * never a 403. The list is newest first by uuidv7 id with an opaque id cursor (http/cursor.ts).
  * PATCH sets only the fields the body carries and moves updated_at. A DELETE that a
- * practice_session still references answers a 409 conflict problem rather than a 500.
+ * practice_session still references answers a 409 conflict problem rather than a 500. POST, PATCH
+ * and DELETE write through idempotentWrite, so under an Idempotency-Key the stored response
+ * commits with the write and a retry can never write twice (O-232).
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -17,6 +19,7 @@ import { toDrill } from "../drills/mapper.js";
 import { deleteDrill, findDrill, insertDrill, listDrills, updateDrill } from "../drills/repository.js";
 import { decodeCursor, paginate } from "../http/cursor.js";
 import { requireDatabase } from "../http/database.js";
+import { idempotentWrite } from "../http/idempotent-write.js";
 import { notImplemented, plannedDescription } from "../http/not-implemented.js";
 import {
   AUTHENTICATED,
@@ -27,7 +30,7 @@ import {
   READ_ONE_PROBLEMS,
   READ_PROBLEMS,
 } from "../http/openapi.js";
-import { PROBLEM_SLUGS, ProblemError, problemResponses } from "../http/problem.js";
+import { PROBLEM_SLUGS, ProblemError, problemResponses, HTTP_STATUS } from "../http/problem.js";
 import { requireSession } from "../plugins/authenticate.js";
 import { idParamsSchema, uuidSchema } from "../schemas/common.js";
 import {
@@ -42,15 +45,11 @@ import {
 
 const TAG = "drills";
 const DRILLS_OWNER = "S26";
-const CREATED_STATUS = 201;
-const NO_CONTENT_STATUS = 204;
-const NOT_FOUND_STATUS = 404;
-const CONFLICT_STATUS = 409;
 
 const drillCursorSchema = z.strictObject({ id: uuidSchema });
 
 function drillNotFound(): ProblemError {
-  return new ProblemError(NOT_FOUND_STATUS, PROBLEM_SLUGS.notFound, { detail: "No drill of yours has this id." });
+  return new ProblemError(HTTP_STATUS.notFound, PROBLEM_SLUGS.notFound, { detail: "No drill of yours has this id." });
 }
 
 export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
@@ -110,8 +109,10 @@ export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
     },
     async (request, reply) => {
       const { userId } = requireSession(request);
-      const row = await insertDrill(requireDatabase(app), userId, request.body);
-      return reply.code(CREATED_STATUS).send(toDrill(row));
+      const drill = await idempotentWrite(app, request, HTTP_STATUS.created, async (transaction) =>
+        toDrill(await insertDrill(transaction, userId, request.body)),
+      );
+      return reply.code(HTTP_STATUS.created).send(drill);
     },
   );
 
@@ -130,11 +131,13 @@ export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
     },
     async (request) => {
       const { userId } = requireSession(request);
-      const row = await updateDrill(requireDatabase(app), userId, request.params.id, request.body);
-      if (row === undefined) {
-        throw drillNotFound();
-      }
-      return toDrill(row);
+      return idempotentWrite(app, request, HTTP_STATUS.ok, async (transaction) => {
+        const row = await updateDrill(transaction, userId, request.params.id, request.body);
+        if (row === undefined) {
+          throw drillNotFound();
+        }
+        return toDrill(row);
+      });
     },
   );
 
@@ -152,16 +155,19 @@ export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
     },
     async (request, reply) => {
       const { userId } = requireSession(request);
-      const outcome = await deleteDrill(requireDatabase(app), userId, request.params.id);
-      if (outcome === "not_found") {
-        throw drillNotFound();
-      }
-      if (outcome === "in_use") {
-        throw new ProblemError(CONFLICT_STATUS, PROBLEM_SLUGS.conflict, {
-          detail: "A practice session still references this drill.",
-        });
-      }
-      return reply.code(NO_CONTENT_STATUS).send(null);
+      await idempotentWrite(app, request, HTTP_STATUS.noContent, async (transaction) => {
+        const outcome = await deleteDrill(transaction, userId, request.params.id);
+        if (outcome === "not_found") {
+          throw drillNotFound();
+        }
+        if (outcome === "in_use") {
+          throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.conflict, {
+            detail: "A practice session still references this drill.",
+          });
+        }
+        return null;
+      });
+      return reply.code(HTTP_STATUS.noContent).send(null);
     },
   );
 

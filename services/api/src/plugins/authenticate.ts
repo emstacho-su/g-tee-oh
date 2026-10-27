@@ -2,7 +2,8 @@
  * Session authentication (R3.1, A9 section 3, O-231). An onRequest hook reads the session cookie,
  * hashes it, and looks up a live auth_session row joined to its user. The result is set on
  * request.session; a route whose policy is auth "required" (the default, route-config.ts) answers
- * a 401 problem when there is none.
+ * a 401 problem when there is none, an "optional" route proceeds without one, and a "none" route
+ * never reads the cookie (no database lookup on the probes or login).
  *
  * Mechanism: the cookie carries 32 random bytes, the table only their sha256, so the lookup is by
  * hash. An expired row is deleted when it is met and treated as absent; sessions do not slide, so
@@ -17,10 +18,9 @@ import type { SessionContext } from "../auth/session-context.js";
 import { hashSessionToken, isWellFormedToken } from "../auth/tokens.js";
 import type { Database } from "../db.js";
 import { SESSION_COOKIE_NAME } from "../http/openapi.js";
-import { PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "../http/problem.js";
 import { DEFAULT_AUTH_POLICY } from "../http/route-config.js";
 
-const UNAUTHENTICATED_STATUS = 401;
 
 /** Finds the live session for a cookie value; deletes the row if it has expired. */
 export async function findLiveSession(
@@ -64,7 +64,7 @@ export async function findLiveSession(
 /** The session of an authenticated route; the hook guarantees it, this narrows the type. */
 export function requireSession(request: FastifyRequest): SessionContext {
   if (request.session === null) {
-    throw new ProblemError(UNAUTHENTICATED_STATUS, PROBLEM_SLUGS.unauthenticated);
+    throw new ProblemError(HTTP_STATUS.unauthorized, PROBLEM_SLUGS.unauthenticated);
   }
   return request.session;
 }
@@ -80,12 +80,16 @@ async function authenticationPlugin(app: FastifyInstance): Promise<void> {
       return;
     }
     const policy = request.routeOptions.config.auth ?? DEFAULT_AUTH_POLICY;
+    // Probes and login never read the cookie, so a database outage cannot fail them.
+    if (policy === "none") {
+      return;
+    }
     const token = request.cookies[SESSION_COOKIE_NAME];
     if (token !== undefined && app.database !== null) {
       request.session = await findLiveSession(app.database, token);
     }
     if (policy === "required" && request.session === null) {
-      throw new ProblemError(UNAUTHENTICATED_STATUS, PROBLEM_SLUGS.unauthenticated);
+      throw new ProblemError(HTTP_STATUS.unauthorized, PROBLEM_SLUGS.unauthenticated);
     }
   });
 }

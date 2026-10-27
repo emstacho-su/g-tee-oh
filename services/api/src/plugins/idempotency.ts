@@ -7,37 +7,40 @@
  * has a session and an Idempotency-Key header. The key is checked against IDEMPOTENCY_KEY_PATTERN
  * even when the route schema already did. The request hash covers the method, the route pattern,
  * the params and the canonical JSON of the body (canonical-json.ts). claimKey (idempotency-store.ts)
- * then decides: claimed, so the handler runs; a different request under the same key, a 422
- * idempotency-mismatch problem; the first request still running, a 409 idempotency-in-flight
- * problem; or a replay of the stored status and body with idempotent-replayed: true, sent as stored
- * JSON text so the route's serializer never reshapes it (204 has no body).
+ * then decides: claimed, so the claim is put on request.idempotencyClaim and the handler runs; a
+ * different request under the same key, a 422 idempotency-mismatch problem; the first request
+ * still running, a 409 idempotency-in-flight problem; or a replay of the stored status and body
+ * with idempotent-replayed: true, sent as stored JSON text so the route's serializer never
+ * reshapes it (204 has no body).
  *
- * A claimed request settles in onSend: a status below 500 stores the status and the JSON body,
- * 500 or above deletes the claim so a retry can run. onResponse is the safety net: a claim still
- * open there (onSend failed, or never ran for the request) is released, so a failed request never
- * leaves its key in flight. Keys belong to the session user, so two users may use the same key.
+ * A handler with a side effect writes through idempotentWrite (http/idempotent-write.ts), which
+ * stores the response in the same transaction as the side effect: once the write commits, the
+ * stored response exists, so a later failure (a reply that cannot be sent, a store call that
+ * fails) can never free the key and let a retry write twice. For every other claimed request the
+ * response is settled in onSend: a status below 500 is stored, 500 or above releases the claim so
+ * a retry can run. Store and release match the claim token and a null status, so after an
+ * in-transaction store both are no-ops. onResponse is the safety net that releases a claim still
+ * unsettled (onSend failed, or never ran). Keys belong to the session user, so two users may use
+ * the same key.
  */
+import "fastify";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fastifyPlugin from "fastify-plugin";
 
 import { requestHash } from "../http/canonical-json.js";
 import { requireDatabase } from "../http/database.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN, IDEMPOTENCY_REPLAYED_HEADER } from "../http/headers.js";
-import { PROBLEM_CONTENT_TYPE, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { HTTP_STATUS, PROBLEM_CONTENT_TYPE, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { isMutatingMethod } from "../http/route-config.js";
-import {
-  claimKey,
-  completeKey,
-  type IdempotencyClaim,
-  releaseKey,
-} from "./idempotency-store.js";
+import { claimKey, completeKey, type IdempotencyClaim, releaseKey } from "./idempotency-store.js";
 
-const BAD_REQUEST_STATUS = 400;
-const CONFLICT_STATUS = 409;
-const UNPROCESSABLE_STATUS = 422;
-const NO_CONTENT_STATUS = 204;
-const SERVER_ERROR_STATUS = 500;
-const FIRST_CLIENT_ERROR_STATUS = 400;
+declare module "fastify" {
+  interface FastifyRequest {
+    /** The Idempotency-Key claim this request owns, or null when the hooks do not apply. */
+    idempotencyClaim: IdempotencyClaim | null;
+  }
+}
+
 const JSON_CONTENT_TYPE = "application/json";
 
 /** The Idempotency-Key of a request the hooks apply to, or undefined when they do not apply. */
@@ -53,7 +56,7 @@ function idempotencyKeyOf(request: FastifyRequest): string | undefined {
     return undefined;
   }
   if (typeof key !== "string" || !IDEMPOTENCY_KEY_PATTERN.test(key)) {
-    throw new ProblemError(BAD_REQUEST_STATUS, PROBLEM_SLUGS.validation, {
+    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.validation, {
       errors: [{ path: `headers.${IDEMPOTENCY_HEADER}`, message: "1 to 255 visible ASCII characters" }],
     });
   }
@@ -62,10 +65,10 @@ function idempotencyKeyOf(request: FastifyRequest): string | undefined {
 
 function sendReplay(reply: FastifyReply, statusCode: number, body: unknown): FastifyReply {
   reply.code(statusCode).header(IDEMPOTENCY_REPLAYED_HEADER, "true");
-  if (statusCode === NO_CONTENT_STATUS || body === null || body === undefined) {
+  if (statusCode === HTTP_STATUS.noContent || body === null || body === undefined) {
     return reply.send();
   }
-  const contentType = statusCode >= FIRST_CLIENT_ERROR_STATUS ? PROBLEM_CONTENT_TYPE : JSON_CONTENT_TYPE;
+  const contentType = statusCode >= HTTP_STATUS.badRequest ? PROBLEM_CONTENT_TYPE : JSON_CONTENT_TYPE;
   return reply.type(contentType).send(JSON.stringify(body));
 }
 
@@ -95,7 +98,8 @@ async function settleClaim(
   payload: unknown,
 ): Promise<void> {
   const database = requireDatabase(app);
-  if (statusCode >= SERVER_ERROR_STATUS) {
+  if (statusCode >= HTTP_STATUS.internal) {
+    // A no-op when idempotentWrite already stored the response in the handler's transaction.
     await releaseKey(database, claim);
     return;
   }
@@ -108,48 +112,59 @@ async function settleClaim(
   await completeKey(database, claim, statusCode, bodyJson);
 }
 
+async function claimFor(app: FastifyInstance, request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const key = idempotencyKeyOf(request);
+  if (key === undefined || request.session === null) {
+    return;
+  }
+  const method = request.method.toUpperCase();
+  const route = request.routeOptions.url ?? request.url;
+  const hash = requestHash({ method, route, params: request.params, body: request.body });
+  const outcome = await claimKey(requireDatabase(app), {
+    userId: request.session.userId,
+    key,
+    method,
+    route,
+    requestHash: hash,
+  });
+  switch (outcome.kind) {
+    case "claimed":
+      request.idempotencyClaim = outcome.claim;
+      return;
+    case "mismatch":
+      throw new ProblemError(HTTP_STATUS.unprocessable, PROBLEM_SLUGS.idempotencyMismatch);
+    case "in-flight":
+      throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.idempotencyInFlight);
+    case "replay":
+      await sendReplay(reply, outcome.statusCode, outcome.body);
+      return;
+  }
+}
+
 function idempotencyPlugin(app: FastifyInstance, _options: unknown, registered: (error?: Error) => void): void {
-  const openClaims = new WeakMap<FastifyRequest, IdempotencyClaim>();
+  const settled = new WeakSet<FastifyRequest>();
+  app.decorateRequest("idempotencyClaim", null);
 
   app.addHook("preHandler", async (request, reply) => {
-    const key = idempotencyKeyOf(request);
-    if (key === undefined || request.session === null) {
-      return;
-    }
-    const method = request.method.toUpperCase();
-    const route = request.routeOptions.url ?? request.url;
-    const claim: IdempotencyClaim = { userId: request.session.userId, key };
-    const hash = requestHash({ method, route, params: request.params, body: request.body });
-    const outcome = await claimKey(requireDatabase(app), { ...claim, method, route, requestHash: hash });
-    switch (outcome.kind) {
-      case "claimed":
-        openClaims.set(request, claim);
-        return;
-      case "mismatch":
-        throw new ProblemError(UNPROCESSABLE_STATUS, PROBLEM_SLUGS.idempotencyMismatch);
-      case "in-flight":
-        throw new ProblemError(CONFLICT_STATUS, PROBLEM_SLUGS.idempotencyInFlight);
-      case "replay":
-        return sendReplay(reply, outcome.statusCode, outcome.body);
-    }
+    await claimFor(app, request, reply);
   });
 
   app.addHook("onSend", async (request, reply, payload) => {
-    const claim = openClaims.get(request);
-    if (claim !== undefined) {
-      // Forgotten only once settled: if settling throws, onResponse still releases the claim.
+    const claim = request.idempotencyClaim;
+    if (claim !== null && !settled.has(request)) {
+      // Marked only once settled: if settling throws, onResponse still releases the claim.
       await settleClaim(app, request, claim, reply.statusCode, payload);
-      openClaims.delete(request);
+      settled.add(request);
     }
     return payload;
   });
 
   app.addHook("onResponse", async (request) => {
-    const claim = openClaims.get(request);
-    if (claim === undefined) {
+    const claim = request.idempotencyClaim;
+    if (claim === null || settled.has(request)) {
       return;
     }
-    openClaims.delete(request);
+    settled.add(request);
     try {
       await releaseKey(requireDatabase(app), claim);
     } catch (error) {

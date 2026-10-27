@@ -10,6 +10,8 @@
  * stream without a line ending cannot grow without bound. A failure message is one line and has the
  * password cut out, whatever the error said.
  */
+import { StringDecoder } from "node:string_decoder";
+
 import { MAX_PASSWORD_LENGTH } from "../schemas/auth.js";
 
 export const EMAIL_FLAG = "--email";
@@ -70,21 +72,27 @@ export function parseCreateUserArgs(argv: readonly string[]): CreateUserArgs {
   return { email };
 }
 
-function chunkText(chunk: unknown): string {
+/**
+ * Decodes one chunk. Byte chunks go through one StringDecoder for the whole stream, which holds
+ * back the bytes of a character split across two chunks until the rest arrives, so a multibyte
+ * character in a password survives any chunking.
+ */
+function chunkText(chunk: unknown, decoder: StringDecoder): string {
   if (typeof chunk === "string") {
     return chunk;
   }
   if (chunk instanceof Uint8Array) {
-    return Buffer.from(chunk).toString("utf8");
+    return decoder.write(Buffer.from(chunk));
   }
   throw new CreateUserUsageError("standard input is not text.");
 }
 
 /** Reads text up to the first line ending; stops reading there. */
 async function readUntilLineEnd(input: AsyncIterable<unknown>): Promise<string> {
+  const decoder = new StringDecoder("utf8");
   let text = "";
   for await (const chunk of input) {
-    text += chunkText(chunk);
+    text += chunkText(chunk, decoder);
     if (text.includes(LINE_FEED)) {
       break;
     }
@@ -92,7 +100,8 @@ async function readUntilLineEnd(input: AsyncIterable<unknown>): Promise<string> 
       throw new CreateUserUsageError(`the password line is longer than ${MAX_STDIN_BYTES} bytes.`);
     }
   }
-  return text;
+  // Input that ends mid-character keeps the replacement character, never silently drops bytes.
+  return text + decoder.end();
 }
 
 /** The first line of the input without its line ending; empty input is an error. */

@@ -5,9 +5,9 @@
  */
 import type { FastifyRequest } from "fastify";
 
-import { PROBLEM_SLUGS, ProblemError } from "./problem.js";
+import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "./problem.js";
 
-export const NOT_IMPLEMENTED_STATUS = 501;
+export const NOT_IMPLEMENTED_STATUS = HTTP_STATUS.notImplemented;
 
 export function notImplemented(request: FastifyRequest): never {
   const owner = request.routeOptions.config.owner ?? "a later session";

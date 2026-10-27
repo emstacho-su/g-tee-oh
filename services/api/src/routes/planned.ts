@@ -12,7 +12,7 @@ import { mutatingHeadersSchema } from "../http/headers.js";
 import { notImplemented, plannedDescription } from "../http/not-implemented.js";
 import { AUTHENTICATED, PLANNED_MUTATE_PROBLEMS, PLANNED_READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
-import { sessionParamsSchema } from "../schemas/common.js";
+import { emptyBodySchema, sessionParamsSchema } from "../schemas/common.js";
 import {
   askBodySchema,
   askResultSchema,
@@ -79,8 +79,6 @@ interface PlannedRoute {
   successContentType?: string;
 }
 
-const emptyMutationBody = z.strictObject({}).optional();
-
 export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   // Study (R3.3) and coverage (R3.4), S23.
   { method: "GET", url: "/study/node", owner: S23, tag: "study", summary: "One preflop node from the library", successStatus: 200, success: studyNodeSchema, querystring: studyNodeQuerySchema },
@@ -92,7 +90,7 @@ export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "POST", url: "/sessions", owner: S23, tag: "sessions", summary: "Start a practice session", successStatus: 201, success: sessionSchema, body: sessionCreateBodySchema },
   { method: "GET", url: "/sessions/:id/next", owner: S23, tag: "sessions", summary: "The next prompt: table state and the buttons from the tree", successStatus: 200, success: promptSchema, params: sessionParamsSchema },
   { method: "POST", url: "/sessions/:id/decisions", owner: S23, tag: "sessions", summary: "Submit a decision and receive its feedback; a double submission is graded once", successStatus: 200, success: feedbackSchema, params: sessionParamsSchema, body: decisionBodySchema },
-  { method: "POST", url: "/sessions/:id/end", owner: S23, tag: "sessions", summary: "End a session and receive its recap", successStatus: 200, success: recapSchema, params: sessionParamsSchema, body: emptyMutationBody },
+  { method: "POST", url: "/sessions/:id/end", owner: S23, tag: "sessions", summary: "End a session and receive its recap", successStatus: 200, success: recapSchema, params: sessionParamsSchema, body: emptyBodySchema },
   // Prediction and range painting (R3.16, R3.17), S27.
   { method: "GET", url: "/prediction/:session/next", owner: S27, tag: "prediction", summary: "The next prediction prompt", successStatus: 200, success: predictionPromptSchema, params: predictionParamsSchema },
   { method: "POST", url: "/prediction/:session/answer", owner: S27, tag: "prediction", summary: "Answer a prediction prompt", successStatus: 200, success: predictionResultSchema, params: predictionParamsSchema, body: predictionAnswerBodySchema },
@@ -111,8 +109,8 @@ export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "GET", url: "/events", owner: S23, tag: "events", summary: "Server-sent events: coverage_added, builder_state, session nudges", successStatus: 200, success: eventStreamSchema, successContentType: "text/event-stream" },
   { method: "GET", url: "/admin/builder", owner: S23, tag: "admin", summary: "Builder queue, throughput, storage and settings", successStatus: 200, success: builderStatusSchema },
   { method: "PATCH", url: "/admin/builder/settings", owner: S23, tag: "admin", summary: "Change builder settings", successStatus: 200, success: builderSettingsSchema, body: builderSettingsPatchSchema },
-  { method: "POST", url: "/admin/builder/pause", owner: S23, tag: "admin", summary: "Pause the builder", successStatus: 200, success: builderStatusSchema, body: emptyMutationBody },
-  { method: "POST", url: "/admin/builder/resume", owner: S23, tag: "admin", summary: "Resume the builder", successStatus: 200, success: builderStatusSchema, body: emptyMutationBody },
+  { method: "POST", url: "/admin/builder/pause", owner: S23, tag: "admin", summary: "Pause the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
+  { method: "POST", url: "/admin/builder/resume", owner: S23, tag: "admin", summary: "Resume the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
 ];
 
 function successResponse(route: PlannedRoute) {

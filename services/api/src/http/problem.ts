@@ -17,6 +17,37 @@ import { z } from "zod";
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
 
+/** The HTTP statuses the api answers, named once for every handler, hook and plugin. */
+export const HTTP_STATUS = {
+  ok: 200,
+  created: 201,
+  noContent: 204,
+  badRequest: 400,
+  unauthorized: 401,
+  forbidden: 403,
+  notFound: 404,
+  conflict: 409,
+  unprocessable: 422,
+  tooManyRequests: 429,
+  internal: 500,
+  notImplemented: 501,
+  unavailable: 503,
+} as const;
+
+/** Postgres SQLSTATE codes the api turns into problems instead of 500s. */
+export const PG_ERROR = {
+  uniqueViolation: "23505",
+  foreignKeyViolation: "23503",
+} as const;
+
+/** The SQLSTATE of a pg driver error, or undefined for anything else. */
+export function pgErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+  return typeof error.code === "string" ? error.code : undefined;
+}
+
 /** Problem type identifiers are URNs under one namespace, so they are stable and never fetched. */
 const PROBLEM_TYPE_PREFIX = "urn:g-tee-oh:problem:";
 

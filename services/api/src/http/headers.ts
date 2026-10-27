@@ -36,7 +36,11 @@ export const mutatingHeadersSchema = z.looseObject({
   [IDEMPOTENCY_HEADER]: idempotencyKeyHeaderSchema.optional(),
 });
 
-/** Headers of an authenticated mutating route without idempotency (logout). */
-export const csrfOnlyHeadersSchema = z.looseObject({
-  [CSRF_HEADER]: csrfTokenHeaderSchema,
+/**
+ * Headers of logout: the CSRF token is required when a live session is presented and unnecessary
+ * when none is (route-config.ts, auth "optional"), so the schema leaves it optional and the CSRF
+ * guard decides.
+ */
+export const optionalCsrfHeadersSchema = z.looseObject({
+  [CSRF_HEADER]: csrfTokenHeaderSchema.optional(),
 });

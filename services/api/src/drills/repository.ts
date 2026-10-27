@@ -16,6 +16,7 @@ import { sql, type RawBuilder, type Selectable } from "kysely";
 import type { DB } from "@g-tee-oh/contracts";
 
 import type { Database } from "../db.js";
+import { PG_ERROR, pgErrorCode } from "../http/problem.js";
 import type { DrillCreateBody, DrillPatchBody } from "../schemas/drills.js";
 
 export type DrillRow = Selectable<DB["drill"]>;
@@ -28,8 +29,6 @@ export interface DrillListQuery {
   beforeId?: string | undefined;
   fetch: number;
 }
-
-const FOREIGN_KEY_VIOLATION = "23503";
 
 const DRILL_COLUMNS = ["id", "user_id", "name", "tags", "spot_filter", "trainer_settings", "created_at", "updated_at"] as const;
 
@@ -108,13 +107,9 @@ export async function deleteDrill(database: Database, userId: string, id: string
       .executeTakeFirst();
     return result.numDeletedRows > 0n ? "deleted" : "not_found";
   } catch (error: unknown) {
-    if (isForeignKeyViolation(error)) {
+    if (pgErrorCode(error) === PG_ERROR.foreignKeyViolation) {
       return "in_use";
     }
     throw error;
   }
-}
-
-function isForeignKeyViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === FOREIGN_KEY_VIOLATION;
 }

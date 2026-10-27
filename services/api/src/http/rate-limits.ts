@@ -17,5 +17,15 @@ export const LOGIN_RATE_LIMIT_MAX = 5;
 
 export const LOGIN_RATE_LIMIT = { max: LOGIN_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW } as const;
 
+/**
+ * Login attempts per normalized email per window, whatever the client address (O-236 as amended
+ * after the PR #20 security review): caps password guessing even from many addresses. The cost is
+ * that someone hammering the owner's email can hold the owner off for one window.
+ */
+export const LOGIN_EMAIL_RATE_LIMIT_MAX = 10;
+export const LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+/** The most emails the email limiter tracks at once; expired windows are dropped first. */
+export const LOGIN_EMAIL_THROTTLE_MAX_KEYS = 10_000;
+
 /** Route config value that exempts a probe route from the global limit. */
 export const RATE_LIMIT_EXEMPT = false as const;

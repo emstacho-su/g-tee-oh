@@ -1,14 +1,23 @@
 /**
- * Process configuration read at the boundary (R0.7, R3.1). Every variable is parsed with Zod once
- * at startup, so a missing or malformed value stops the process with a message naming it instead
- * of failing on the first request (A9 section 3).
+ * Process configuration read at the boundary (R0.7, R3.1). Every variable is parsed with one Zod
+ * schema at startup, so a missing or malformed value stops the process with one message naming
+ * every bad variable instead of failing on the first request (A9 section 3).
  *
  * A5 section 1 fixes the listen address to every interface inside the compose network, which
  * Caddy fronts. The database connection is the app_login user, a member of the app group role
  * (O-28); compose passes PGHOST, PGPORT, PGDATABASE and PGUSER literally and APP_DB_PASSWORD from
  * .env. APP_ORIGIN is the one browser origin CORS (cross-origin resource sharing) and the CSRF
  * (cross-site request forgery) Origin check accept (A9 section 3, O-230).
+ *
+ * TRUSTED_PROXIES (O-236 as amended after the PR #20 security review) names the proxies whose
+ * X-Forwarded-For is believed, by address: proxy-addr presets (loopback, linklocal, uniquelocal),
+ * single addresses or CIDR ranges. The default is loopback only, so a client that reaches the api
+ * directly cannot pick its own address for the rate limiter by sending X-Forwarded-For. Compose
+ * sets uniquelocal, because there the api publishes no port and only containers on the private
+ * compose network, Caddy among them, can reach it.
  */
+import { isIP } from "node:net";
+
 import { z } from "zod";
 
 export const DEFAULT_API_PORT = 8080;
@@ -18,11 +27,14 @@ export const DEFAULT_PG_PORT = 5432;
 /** O-231: sessions expire seven days after login, with no sliding renewal. */
 export const DEFAULT_SESSION_TTL_HOURS = 168;
 export const MAX_SESSION_TTL_HOURS = 24 * 90;
-/** Caddy is the one proxy hop in front of the api (A5 section 1, O-236). */
-export const DEFAULT_TRUST_PROXY_HOPS = 1;
+/** Only the local host is trusted as a proxy unless TRUSTED_PROXIES says otherwise (O-236). */
+export const DEFAULT_TRUSTED_PROXIES: readonly string[] = ["loopback"];
+export const TRUSTED_PROXY_PRESETS: readonly string[] = ["loopback", "linklocal", "uniquelocal"];
 
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
+const IPV4_MAX_PREFIX = 32;
+const IPV6_MAX_PREFIX = 128;
 
 const portSchema = z
   .string()
@@ -54,7 +66,8 @@ export interface AppConfig {
   /** The browser origin allowed by CORS and the CSRF Origin check, scheme and host, no path. */
   appOrigin: string;
   sessionTtlHours: number;
-  trustProxyHops: number;
+  /** Proxies trusted for X-Forwarded-For, by address (O-236). */
+  trustedProxies: readonly string[];
 }
 
 export interface ProcessConfig {
@@ -68,7 +81,7 @@ export function defaultAppConfig(): AppConfig {
   return {
     appOrigin: DEFAULT_APP_ORIGIN,
     sessionTtlHours: DEFAULT_SESSION_TTL_HOURS,
-    trustProxyHops: DEFAULT_TRUST_PROXY_HOPS,
+    trustedProxies: [...DEFAULT_TRUSTED_PROXIES],
   };
 }
 
@@ -80,25 +93,52 @@ function isBareOrigin(value: string): boolean {
   }
 }
 
+/** A proxy-addr preset, an IP address, or an IP address with a prefix length that fits it. */
+export function isTrustedProxyEntry(entry: string): boolean {
+  if (TRUSTED_PROXY_PRESETS.includes(entry)) {
+    return true;
+  }
+  const [address = "", prefix, ...rest] = entry.split("/");
+  const family = isIP(address);
+  if (family === 0 || rest.length > 0) {
+    return false;
+  }
+  if (prefix === undefined) {
+    return true;
+  }
+  const maxPrefix = family === 4 ? IPV4_MAX_PREFIX : IPV6_MAX_PREFIX;
+  return /^[0-9]{1,3}$/.test(prefix) && Number(prefix) <= maxPrefix;
+}
+
 const originSchema = z
   .url({ protocol: /^https?$/ })
   .refine(isBareOrigin, "an origin: scheme and host, no path or trailing slash");
 
-const blankAsUndefined = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
+const trimmedOrUndefined = (value: unknown) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+const trustedProxiesSchema = z
+  .string()
+  .transform((raw) => raw.split(",").map((entry) => entry.trim()))
+  .refine((entries) => entries.every(isTrustedProxyEntry), {
+    message: `a comma-separated list of ${TRUSTED_PROXY_PRESETS.join(", ")}, addresses or CIDR ranges`,
+  });
 
 const envSchema = z.object({
-  API_PORT: z.string().optional(),
-  APP_ORIGIN: z.preprocess(blankAsUndefined, originSchema.default(DEFAULT_APP_ORIGIN)),
+  API_PORT: z.preprocess(trimmedOrUndefined, portSchema.optional()),
+  APP_ORIGIN: z.preprocess(trimmedOrUndefined, originSchema.default(DEFAULT_APP_ORIGIN)),
   SESSION_TTL_HOURS: z.preprocess(
-    blankAsUndefined,
+    trimmedOrUndefined,
     z.coerce.number().int().min(1).max(MAX_SESSION_TTL_HOURS).default(DEFAULT_SESSION_TTL_HOURS),
   ),
-  TRUST_PROXY_HOPS: z.preprocess(
-    blankAsUndefined,
-    z.coerce.number().int().min(0).max(10).default(DEFAULT_TRUST_PROXY_HOPS),
-  ),
+  TRUSTED_PROXIES: z.preprocess(trimmedOrUndefined, trustedProxiesSchema.optional()),
   PGHOST: z.string().min(1),
-  PGPORT: z.preprocess(blankAsUndefined, z.coerce.number().int().min(MIN_PORT).max(MAX_PORT).default(DEFAULT_PG_PORT)),
+  PGPORT: z.preprocess(trimmedOrUndefined, z.coerce.number().int().min(MIN_PORT).max(MAX_PORT).default(DEFAULT_PG_PORT)),
   PGDATABASE: z.string().min(1),
   PGUSER: z.string().min(1),
   APP_DB_PASSWORD: z.string().min(1),
@@ -113,11 +153,11 @@ export function loadProcessConfig(env: Readonly<Record<string, string | undefine
   }
   const parsed = result.data;
   return {
-    port: parseApiPort(parsed.API_PORT),
+    port: parsed.API_PORT ?? DEFAULT_API_PORT,
     app: {
       appOrigin: parsed.APP_ORIGIN,
       sessionTtlHours: parsed.SESSION_TTL_HOURS,
-      trustProxyHops: parsed.TRUST_PROXY_HOPS,
+      trustedProxies: parsed.TRUSTED_PROXIES ?? [...DEFAULT_TRUSTED_PROXIES],
     },
     database: {
       host: parsed.PGHOST,

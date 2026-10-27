@@ -250,14 +250,24 @@ describe("R3.1 auth routes", () => {
     expect(me.statusCode).toBe(401);
   });
 
-  it("R3.1 logout without a session answers a 401 problem", async () => {
+  // Changed by the PR #20 review (M7): logout always answers 204 and clears the cookie.
+  it("R3.1 logout without a session answers 204 even with a stray CSRF header", async () => {
     const response = await app.inject({
       method: "POST",
       url: LOGOUT_URL,
       headers: { origin: APP_ORIGIN, "x-csrf-token": "a".repeat(43) },
     });
 
-    expect(response.statusCode).toBe(401);
-    expect(response.json<{ type: string }>().type).toBe(UNAUTHENTICATED_TYPE);
+    expect(response.statusCode).toBe(204);
+  });
+
+  it("R3.1 logout from a foreign Origin is still refused", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: LOGOUT_URL,
+      headers: { origin: "https://evil.example" },
+    });
+
+    expect(response.statusCode).toBe(403);
   });
 });

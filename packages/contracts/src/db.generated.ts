@@ -181,6 +181,10 @@ export interface HoldoutResult {
 }
 
 export interface IdempotencyKey {
+  /**
+   * which request owns the claim; a claim taken over after its lease cannot be completed by the old owner
+   */
+  claim_token: Generated<string>;
   completed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   key: string;

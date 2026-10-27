@@ -8,11 +8,12 @@
  * at creation as now plus the configured lifetime and never moves (absolute expiry, no sliding
  * renewal, O-231). Expired rows are cleaned in two places: the authentication hook deletes one when
  * it is presented (plugins/authenticate.ts), and login deletes the rest of that user's, so the
- * table does not grow with abandoned sessions. Every function takes a Kysely handle, so a caller
+ * table does not grow with abandoned sessions. Login also deletes the session whose cookie it was
+ * sent with, so logging in again never leaves the previous session alive. Every function takes a Kysely handle, so a caller
  * may pass a transaction.
  */
 import type { Database } from "../db.js";
-import { newCsrfToken, newSessionToken } from "./tokens.js";
+import { hashSessionToken, isWellFormedToken, newCsrfToken, newSessionToken } from "./tokens.js";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
@@ -49,6 +50,17 @@ export async function createSession(
 /** Deletes one session row; deleting a row that is already gone is not an error. */
 export async function deleteSession(database: Database, sessionId: string): Promise<void> {
   await database.deleteFrom("auth_session").where("id", "=", sessionId).execute();
+}
+
+/**
+ * Deletes the session a cookie value names, whoever it belongs to: presenting the cookie proves
+ * possession of it. A malformed value deletes nothing.
+ */
+export async function deleteSessionByToken(database: Database, token: string): Promise<void> {
+  if (!isWellFormedToken(token)) {
+    return;
+  }
+  await database.deleteFrom("auth_session").where("token_hash", "=", hashSessionToken(token)).execute();
 }
 
 /** Deletes the user's sessions whose expiry is at or before `now`; returns how many went. */

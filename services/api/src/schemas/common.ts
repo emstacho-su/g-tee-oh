@@ -48,7 +48,8 @@ export const tableSizeSchema = z.number().int().min(2).max(9);
 
 export const idParamsSchema = z.object({ id: uuidSchema });
 export const configIdParamsSchema = z.object({ id: configIdSchema });
-export const sessionParamsSchema = z.object({ id: uuidSchema });
+/** Session routes take the same uuid id parameter as every other resource. */
+export const sessionParamsSchema = idParamsSchema;
 
 /** The body of a mutating route that takes none. */
 export const emptyBodySchema = z.strictObject({}).optional();

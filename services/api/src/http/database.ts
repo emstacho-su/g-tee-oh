@@ -8,7 +8,7 @@ import "fastify";
 import type { FastifyInstance } from "fastify";
 
 import type { Database } from "../db.js";
-import { PROBLEM_SLUGS, ProblemError } from "./problem.js";
+import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "./problem.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -16,11 +16,10 @@ declare module "fastify" {
   }
 }
 
-const UNAVAILABLE_STATUS = 503;
 
 export function requireDatabase(app: FastifyInstance): Database {
   if (app.database === null) {
-    throw new ProblemError(UNAVAILABLE_STATUS, PROBLEM_SLUGS.unavailable, {
+    throw new ProblemError(HTTP_STATUS.unavailable, PROBLEM_SLUGS.unavailable, {
       detail: "The database is not configured.",
     });
   }

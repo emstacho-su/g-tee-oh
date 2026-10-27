@@ -7,7 +7,8 @@
  * authentication):
  * - The text/plain body parser Fastify installs by default is removed, so a JSON route answers 415
  *   to it: text/plain is one of the content types a cross-site form can POST without a preflight.
- * - An onSend hook writes x-request-id on every response, errors and preflights included.
+ * - An onSend hook writes x-request-id and cache-control: no-store on every response, errors and
+ *   preflights included (login and /me carry the CSRF token and the email).
  * - helmet adds its headers in onRequest. The Content-Security-Policy allows nothing (default-src
  *   and frame-ancestors 'none'): the api serves JSON only, never a page or a script.
  * - CORS reflects the request Origin only when it equals config.appOrigin (an array origin, so a
@@ -21,7 +22,8 @@
  *   rateLimit false (the probes), the route's own for an object (login, LOGIN_RATE_LIMIT), the
  *   global one (GLOBAL_RATE_LIMIT_MAX per RATE_LIMIT_WINDOW) otherwise, unknown paths included.
  *   Running a limiter marks the request, so the plugin's own route hook for login skips it and a
- *   login is counted once. The key is the client IP (request.ip behind the trusted proxy hop). An
+ *   login is counted once. The key is the client IP (request.ip; X-Forwarded-For counts only from a
+ *   trusted proxy address, config.trustedProxies). An
  *   exceeded limit throws a ProblemError, so the error handler answers an RFC 9457 problem with
  *   Retry-After.
  */
@@ -33,17 +35,18 @@ import fastifyPlugin from "fastify-plugin";
 
 import type { AppConfig } from "../config.js";
 import { CSRF_HEADER, IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER, REQUEST_ID_HEADER } from "../http/headers.js";
-import { PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "../http/problem.js";
 import { GLOBAL_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../http/rate-limits.js";
 
 export interface SecurityOptions {
   config: AppConfig;
 }
 
-const TOO_MANY_REQUESTS_STATUS = 429;
 const MS_PER_SECOND = 1000;
 const RETRY_AFTER_HEADER = "retry-after";
 const TEXT_PLAIN = "text/plain";
+const CACHE_CONTROL_HEADER = "cache-control";
+const NO_STORE = "no-store";
 
 export const CORS_METHODS: readonly string[] = ["GET", "POST", "PATCH", "DELETE"];
 export const CORS_ALLOWED_HEADERS: readonly string[] = [
@@ -61,7 +64,7 @@ export const CORS_EXPOSED_HEADERS: readonly string[] = [
 /** The 429 problem; the limiter already set Retry-After on the reply, this repeats it. */
 function rateLimitedProblem(_request: FastifyRequest, context: { ttl: number; after: string }): ProblemError {
   const retryAfterSeconds = Math.max(1, Math.ceil(context.ttl / MS_PER_SECOND));
-  return new ProblemError(TOO_MANY_REQUESTS_STATUS, PROBLEM_SLUGS.rateLimited, {
+  return new ProblemError(HTTP_STATUS.tooManyRequests, PROBLEM_SLUGS.rateLimited, {
     detail: `Too many requests from this client; retry in ${context.after}.`,
     headers: { [RETRY_AFTER_HEADER]: String(retryAfterSeconds) },
   });
@@ -106,6 +109,8 @@ async function securityPlugin(app: FastifyInstance, options: SecurityOptions): P
 
   app.addHook("onSend", (request, reply, payload, done) => {
     reply.header(REQUEST_ID_HEADER, request.id);
+    // Login and /me carry the CSRF token and the email: no response of this api may be cached.
+    reply.header(CACHE_CONTROL_HEADER, NO_STORE);
     done(null, payload);
   });
 

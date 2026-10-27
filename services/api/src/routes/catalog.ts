@@ -19,7 +19,7 @@ import { findConfigSeating, listConfigs, listStakes, publishedPreflopPairs } fro
 import { decodeCursor, paginate } from "../http/cursor.js";
 import { requireDatabase } from "../http/database.js";
 import { AUTHENTICATED, READ_ONE_PROBLEMS, READ_PROBLEMS } from "../http/openapi.js";
-import { PROBLEM_SLUGS, ProblemError, problemResponses } from "../http/problem.js";
+import { PROBLEM_SLUGS, ProblemError, problemResponses, HTTP_STATUS } from "../http/problem.js";
 import {
   configPageSchema,
   configsQuerySchema,
@@ -31,7 +31,6 @@ import {
 import { configIdParamsSchema, configIdSchema, uuidSchema } from "../schemas/common.js";
 
 const TAG = "catalog";
-const NOT_FOUND_STATUS = 404;
 
 const stakeCursorSchema = z.strictObject({ id: uuidSchema });
 const configCursorSchema = z.strictObject({ id: configIdSchema });
@@ -103,7 +102,7 @@ export const catalogRoutes: FastifyPluginCallbackZod = (app, _options, done) => 
       const { cursor, limit } = request.query;
       const config = await findConfigSeating(database, request.params.id);
       if (config === undefined) {
-        throw new ProblemError(NOT_FOUND_STATUS, PROBLEM_SLUGS.notFound, { detail: "No configuration has this id." });
+        throw new ProblemError(HTTP_STATUS.notFound, PROBLEM_SLUGS.notFound, { detail: "No configuration has this id." });
       }
       const pairs = canonicalPairs(config.tableSize);
       const names = pairs.map((entry) => entry.pair);

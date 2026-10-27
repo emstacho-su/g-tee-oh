@@ -12,9 +12,11 @@
 -- cookie, so it is stored as is. Existing session rows predate both columns and could never be presented,
 -- so they are deleted before the not-null columns are added.
 -- idempotency_key holds one row per (user, key). The api claims the row before the handler runs (status_code
--- null means in flight), then stores the status and body the first request produced; a repeat with the same
--- request_hash replays them, a repeat with a different hash is refused. Rows older than the retention window
--- are treated as absent and overwritten by the api; the created_at index serves that check and any purge.
+-- null means in flight, claim_token names the claiming request), and a handler with a side effect stores the
+-- status and body in the same transaction as the side effect, so a committed write always has its stored
+-- response; a repeat with the same request_hash replays it, a repeat with a different hash is refused. An
+-- in-flight claim older than the api's lease may be taken over with a new claim_token, and the user's rows
+-- older than the retention window are purged when that user claims a key; the created_at index serves both.
 
 -- migrate:up
 
@@ -35,6 +37,7 @@ create table idempotency_key (
   method text not null,
   route text not null,
   request_hash bytea not null,
+  claim_token uuid not null default gen_random_uuid(),
   status_code smallint,
   response_body jsonb,
   created_at timestamptz not null default now(),
@@ -44,6 +47,7 @@ create table idempotency_key (
 
 comment on table idempotency_key is 'first response of each Idempotency-Key per user, replayed on a repeat (O-232)';
 comment on column idempotency_key.status_code is 'null while the first request is still in flight';
+comment on column idempotency_key.claim_token is 'which request owns the claim; a claim taken over after its lease cannot be completed by the old owner';
 
 create index idempotency_key_created_at_idx on idempotency_key (created_at);
 

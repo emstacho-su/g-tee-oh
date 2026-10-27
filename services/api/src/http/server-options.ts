@@ -1,6 +1,7 @@
 /**
  * Fastify server options (R3.1, A9 section 3, O-158, O-236): the request body limit, the proxy
- * trust for Caddy, the request id and the pino logger with secrets redacted.
+ * trust (by address, config.trustedProxies: X-Forwarded-For counts only when the connection comes
+ * from a trusted proxy such as Caddy), the request id and the pino logger with secrets redacted.
  *
  * Mechanism: Fastify's built-in x-request-id handling is turned off (requestIdHeader false), so
  * genReqId alone decides the id. It keeps an incoming x-request-id only when it matches
@@ -51,8 +52,8 @@ export function serverOptions(config: AppConfig, logging: boolean): FastifyServe
   return {
     logger: loggerOptions(logging),
     bodyLimit: BODY_LIMIT_BYTES,
-    // Trust the nearest trustProxyHops proxies (Caddy is one), so request.ip is the client's address.
-    trustProxy: (_address: string, hop: number) => hop < config.trustProxyHops,
+    // Trust X-Forwarded-For only from the configured proxy addresses (O-236), never from a direct client.
+    trustProxy: [...config.trustedProxies],
     requestIdHeader: false,
     genReqId: requestIdFor,
   };

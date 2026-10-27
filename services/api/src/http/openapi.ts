@@ -8,6 +8,8 @@ export const SESSION_COOKIE_SCHEME = "sessionCookie";
 
 /** The route-level security requirement for authenticated routes. */
 export const AUTHENTICATED = [{ [SESSION_COOKIE_SCHEME]: [] }];
+/** The route-level security requirement for routes that work with or without a session (logout). */
+export const OPTIONAL_SESSION = [{}, { [SESSION_COOKIE_SCHEME]: [] }];
 /** The route-level security requirement for public routes. */
 export const PUBLIC: Array<Record<string, string[]>> = [];
 

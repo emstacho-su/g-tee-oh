@@ -126,6 +126,14 @@ describe("R3.1 create-user command arguments (O-233)", () => {
     await expect(readFirstLine(Readable.from(["no newline at the end"]))).resolves.toBe("no newline at the end");
   });
 
+  it("R3.1 readFirstLine keeps a multibyte character whose bytes are split across chunks (M6)", async () => {
+    const bytes = Buffer.from("pässwörd-€-🂡\n", "utf8");
+    const euro = bytes.indexOf(Buffer.from("€", "utf8"));
+    const chunks = [bytes.subarray(0, euro + 1), bytes.subarray(euro + 1, euro + 2), bytes.subarray(euro + 2)];
+
+    await expect(readFirstLine(Readable.from(chunks))).resolves.toBe("pässwörd-€-🂡");
+  });
+
   it("R3.1 readFirstLine rejects empty input and an overlong line", async () => {
     await expect(readFirstLine(Readable.from([]))).rejects.toThrow(CreateUserUsageError);
     await expect(readFirstLine(Readable.from(["\n"]))).rejects.toThrow(CreateUserUsageError);

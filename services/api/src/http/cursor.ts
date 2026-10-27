@@ -5,9 +5,8 @@
  */
 import { z } from "zod";
 
-import { PROBLEM_SLUGS, ProblemError } from "./problem.js";
+import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "./problem.js";
 
-const BAD_REQUEST_STATUS = 400;
 
 export function encodeCursor<Key>(key: Key): string {
   return Buffer.from(JSON.stringify(key), "utf8").toString("base64url");
@@ -28,7 +27,7 @@ export function decodeCursor<Schema extends z.ZodType>(cursor: string, schema: S
 }
 
 function invalidCursor(): ProblemError {
-  return new ProblemError(BAD_REQUEST_STATUS, PROBLEM_SLUGS.badRequest, {
+  return new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, {
     detail: "The cursor is not one this endpoint issued.",
     errors: [{ path: "querystring.cursor", message: "invalid cursor" }],
   });

@@ -10,7 +10,8 @@
  * non-browser client, which a forged browser request cannot be, and passes this step. Both failures
  * are a 403 forbidden-origin problem. A "token" route then needs the x-csrf-token header to equal
  * the session's own csrf_token, compared in constant time (tokensEqual), else a 403 csrf problem.
- * "origin-only" is login's policy: there is no session to hold a token yet. The hook runs before
+ * "origin-only" is login's policy: there is no session to hold a token yet. On a route whose auth
+ * policy is "optional" (logout) a request without a live session needs no token either. The hook runs before
  * body parsing and validation, so a forged request costs no parsing and never reaches a handler.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -19,14 +20,13 @@ import fastifyPlugin from "fastify-plugin";
 import { tokensEqual } from "../auth/tokens.js";
 import type { AppConfig } from "../config.js";
 import { CSRF_HEADER } from "../http/headers.js";
-import { PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "../http/problem.js";
 import { DEFAULT_CSRF_POLICY, isMutatingMethod } from "../http/route-config.js";
 
 export interface CsrfOptions {
   config: AppConfig;
 }
 
-const FORBIDDEN_STATUS = 403;
 const ORIGIN_HEADER = "origin";
 const FETCH_SITE_HEADER = "sec-fetch-site";
 const CROSS_SITE = "cross-site";
@@ -37,7 +37,7 @@ function singleHeader(request: FastifyRequest, name: string): string | undefined
 }
 
 function forbiddenOrigin(detail: string): ProblemError {
-  return new ProblemError(FORBIDDEN_STATUS, PROBLEM_SLUGS.forbiddenOrigin, { detail });
+  return new ProblemError(HTTP_STATUS.forbidden, PROBLEM_SLUGS.forbiddenOrigin, { detail });
 }
 
 /** The forbidden-origin problem, or null when the request plausibly comes from the app origin. */
@@ -60,7 +60,7 @@ export function tokenFailure(request: FastifyRequest): ProblemError | null {
   if (given !== undefined && expected !== undefined && tokensEqual(expected, given)) {
     return null;
   }
-  return new ProblemError(FORBIDDEN_STATUS, PROBLEM_SLUGS.csrf, {
+  return new ProblemError(HTTP_STATUS.forbidden, PROBLEM_SLUGS.csrf, {
     detail: `Send the session's csrf_token in the ${CSRF_HEADER} header.`,
   });
 }
@@ -77,6 +77,10 @@ export function csrfFailure(request: FastifyRequest, appOrigin: string): Problem
   const failure = originFailure(request, appOrigin);
   if (failure !== null || policy === "origin-only") {
     return failure;
+  }
+  // An optional-auth route (logout) with no live session holds nothing a forged request could misuse.
+  if (request.session === null && request.routeOptions.config.auth === "optional") {
+    return null;
   }
   return tokenFailure(request);
 }

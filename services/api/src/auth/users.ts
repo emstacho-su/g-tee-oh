@@ -16,14 +16,12 @@
 import { z } from "zod";
 
 import type { Database } from "../db.js";
+import { PG_ERROR, pgErrorCode } from "../http/problem.js";
 import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from "../schemas/auth.js";
 import { hashPassword } from "./password.js";
 
 /** The minimum password length for a new account, in characters (A9 section 3). */
 export const MIN_NEW_PASSWORD_LENGTH = 12;
-
-/** Postgres SQLSTATE for unique_violation. */
-const UNIQUE_VIOLATION = "23505";
 
 const emailSchema = z.email().max(MAX_EMAIL_LENGTH);
 
@@ -84,10 +82,6 @@ function validateNewUser(input: NewUserInput): string {
   return email;
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === UNIQUE_VIOLATION;
-}
-
 /** Creates an account; throws CreateUserError for bad input or an email already in use. */
 export async function createUser(database: Database, input: NewUserInput): Promise<CreatedUser> {
   const email = validateNewUser(input);
@@ -100,7 +94,7 @@ export async function createUser(database: Database, input: NewUserInput): Promi
       .executeTakeFirstOrThrow();
     return { id: row.id, email: row.email, createdAt: row.created_at };
   } catch (error: unknown) {
-    if (isUniqueViolation(error)) {
+    if (pgErrorCode(error) === PG_ERROR.uniqueViolation) {
       throw new CreateUserError("duplicate-email", `A user with the email ${email} already exists.`);
     }
     throw error;

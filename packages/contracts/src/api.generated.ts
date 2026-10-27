@@ -572,7 +572,10 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** Format: email */
+                        /**
+                         * Format: email
+                         * @description An email address; surrounding whitespace and capitals are ignored
+                         */
                         email: string;
                         password: string;
                     };
@@ -668,13 +671,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** End the session and clear the cookie */
+        /** End the session, if any, and clear the cookie */
         post: {
             parameters: {
                 query?: never;
-                header: {
+                header?: {
                     /** @description The csrf_token from POST /auth/login or GET /me (O-230) */
-                    "x-csrf-token": string;
+                    "x-csrf-token"?: string;
                 };
                 path?: never;
                 cookie?: never;
@@ -687,15 +690,6 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
-                };
-                /** @description Problem (401) */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
                 };
                 /** @description Problem (403) */
                 403: {

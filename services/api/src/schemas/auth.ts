@@ -11,8 +11,21 @@ import { timestampSchema, uuidSchema } from "./common.js";
 export const MAX_EMAIL_LENGTH = 254;
 export const MAX_PASSWORD_LENGTH = 1024;
 
+/**
+ * A pasted address often carries surrounding whitespace or capitals; it is trimmed and lowercased
+ * before the format check, so it logs in like the stored, normalized address (createUser stores
+ * the same normalization).
+ */
+export const loginEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .check(z.email())
+  .max(MAX_EMAIL_LENGTH)
+  .describe("An email address; surrounding whitespace and capitals are ignored");
+
 export const loginBodySchema = z.strictObject({
-  email: z.email().max(MAX_EMAIL_LENGTH),
+  email: loginEmailSchema,
   password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
 });
 
