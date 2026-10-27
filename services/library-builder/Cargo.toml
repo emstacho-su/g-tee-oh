@@ -55,5 +55,9 @@ library-pack = { workspace = true }
 jsonschema = { workspace = true }
 gto-library = { workspace = true, features = ["synthetic"] }
 
+[[bench]]
+name = "extract"
+harness = false
+
 [lints]
 workspace = true
