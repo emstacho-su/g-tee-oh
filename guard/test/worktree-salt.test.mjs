@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 
+import { MISSING_SALT_MESSAGE as MESSAGE } from '../src/cli.mjs';
+import { parseMainWorkTree } from '../src/git.mjs';
 import { hashToken } from '../src/guard.mjs';
 import {
   CLI,
@@ -26,7 +28,6 @@ import {
   writeFile,
 } from './helpers.mjs';
 
-const MESSAGE = 'guard: GUARD_SALT is not set and .guard-private/salt is missing; the identifier check cannot run (fail closed, O-58)';
 const WORKTREE_SALT = 'synthetic-worktree-own-salt';
 const ENV_SALT = 'synthetic-env-salt';
 
@@ -110,22 +111,61 @@ test('r0_4 cli in a linked worktree prefers GUARD_SALT over both salt files', ()
   assert.ok(result.stdout.includes(hashToken(ENV_SALT, PLANTED_TOKEN).slice(0, 8)), result.output);
 });
 
-test('r0_4 cli in a worktree of a bare repository has no main tree to fall back to', () => {
+// A bare clone in <parent>/<bareName> with a linked worktree, and a salt beside
+// the bare directory that must never be taken for a main working tree's.
+function bareWithWorktree(bareName) {
   const source = tempDir('guard-wt-source');
   initRepo(source);
   writeFile(source, 'README.md', 'source\n');
   commitAll(source, 'chore: initial');
   const parent = tempDir('guard-wt-bare-parent');
-  const bare = join(parent, 'repo.git');
+  const bare = join(parent, bareName);
   runGit(['clone', '-q', '--bare', source, bare], parent);
-  // A salt beside the bare directory must not be picked up as a main tree's.
   writeFile(parent, '.guard-private/salt', `${TEST_SALT}\n`);
   const worktree = join(tempDir('guard-wt-bare-linked'), 'wt');
   runGit(['worktree', 'add', '-q', '-b', 'wt', worktree], bare);
   stagePlanted(worktree);
+  return worktree;
+}
+
+test('r0_4 cli in a worktree of a bare repository has no main tree to fall back to', () => {
+  const worktree = bareWithWorktree('repo.git');
   const result = runStaged(worktree, { GUARD_DENYLIST_PATH: denylistFor(TEST_SALT) });
   assert.equal(result.status, 2, result.output);
   assert.ok(result.stderr.includes(MESSAGE), result.output);
+});
+
+test('r0_4 cli in a worktree of a bare repository cloned into a directory named .git has no fallback', () => {
+  const worktree = bareWithWorktree('.git');
+  const result = runStaged(worktree, { GUARD_DENYLIST_PATH: denylistFor(TEST_SALT) });
+  assert.equal(result.status, 2, result.output);
+  assert.ok(result.stderr.includes(MESSAGE), result.output);
+});
+
+test('r0_4 an empty worktree salt counts as missing, so the cli and hash-denylist both use the main tree', () => {
+  const { main, worktree } = mainWithWorktree({ mainSalt: TEST_SALT });
+  writeFile(main, '.guard-private/denylist.txt', `${PLANTED_TOKEN}\n`);
+  writeFile(worktree, '.guard-private/salt', '  \n');
+  const cli = runStaged(worktree, { GUARD_DENYLIST_PATH: denylistFor(TEST_SALT) });
+  assert.equal(cli.status, 1, cli.output);
+  assert.ok(cli.stdout.includes(PLANTED_PREFIX), cli.output);
+  const outputPath = join(tempDir('guard-wt-out'), 'denylist.sha256');
+  const hashed = runNode([HASH_DENYLIST], { cwd: worktree, env: guardEnv({ GUARD_DENYLIST_PATH: outputPath }) });
+  assert.equal(hashed.status, 0, hashed.output);
+  assert.ok(readFileSync(outputPath, 'utf8').includes(PLANTED_HASH));
+});
+
+test('r0_4 parseMainWorkTree takes the first entry and rejects bare, relative, quoted or empty output', () => {
+  const main = process.platform === 'win32' ? 'C:/repos/main' : '/repos/main';
+  const linked = process.platform === 'win32' ? 'C:/repos/wt' : '/repos/wt';
+  const listing = `worktree ${main}\nHEAD abc\nbranch refs/heads/main\n\nworktree ${linked}\nHEAD def\nbranch refs/heads/wt\n`;
+  assert.equal(parseMainWorkTree(listing), main);
+  assert.equal(parseMainWorkTree(listing.replace(/\n/g, '\r\n')), main);
+  assert.equal(parseMainWorkTree(`worktree ${main}\nbare\n\nworktree ${linked}\nHEAD def\n`), null);
+  assert.equal(parseMainWorkTree('worktree relative/path\nHEAD abc\n'), null);
+  assert.equal(parseMainWorkTree(`worktree "${main}\\nx"\nHEAD abc\n`), null);
+  assert.equal(parseMainWorkTree('HEAD abc\n'), null);
+  assert.equal(parseMainWorkTree(''), null);
 });
 
 test('r0_4 hash-denylist in a linked worktree reads the main working tree private directory', () => {
