@@ -4,8 +4,13 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { FeedbackPanel } from "../../src/components/trainer/index.js";
-import type { DecisionFeedback } from "../../src/contracts.js";
+import type { DecisionFeedback, NodeAction } from "../../src/contracts.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
+
+/** The fixture actions numbered 10 to 13, so a NodeAction.index never equals its position (O-198). */
+const OFFSET_ACTIONS: readonly NodeAction[] = fixtureActions.map((action) => ({ ...action, index: action.index + 10 }));
+/** The fixture feedback with its best action (Raise, index 2) renumbered to match OFFSET_ACTIONS. */
+const OFFSET_FEEDBACK: DecisionFeedback = { ...fixtureFeedback, best_action_indexes: [12] };
 
 describe("R3.13 FeedbackPanel", () => {
   it("R3.13 shows the label as text with a symbol, not color alone", () => {
@@ -93,6 +98,27 @@ describe("R3.13 FeedbackPanel", () => {
     );
     expect(screen.getByText("range slot")).toBeInTheDocument();
     expect(screen.getByText("threshold slot")).toBeInTheDocument();
+  });
+
+  it("R3.13 marks the chosen action and the Best actions by NodeAction.index when indexes are not positions (O-198)", () => {
+    render(<FeedbackPanel feedback={OFFSET_FEEDBACK} actions={OFFSET_ACTIONS} chosenIndex={11} />);
+    expect(screen.getByTestId("feedback-panel")).toHaveTextContent("Your action: Call");
+    const table = screen.getByRole("table", { name: "This hand's strategy" });
+    expect(within(table).getByRole("row", { name: /Raise 2.5bb/ })).toHaveTextContent("Best");
+    expect(within(table).getByRole("row", { name: /All-in 100bb/ })).not.toHaveTextContent("Best");
+    expect(within(table).getByRole("row", { name: /Call/ })).not.toHaveTextContent("Best");
+  });
+
+  it("R3.13 a chosen position that is not a NodeAction.index renders an alert, not a wrong action (O-198)", () => {
+    render(<FeedbackPanel feedback={OFFSET_FEEDBACK} actions={OFFSET_ACTIONS} chosenIndex={1} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("chosen action 1");
+    expect(screen.queryByText(/Your action/)).not.toBeInTheDocument();
+  });
+
+  it("R3.13 a best action index that names no action renders an alert, not a wrong Best row (O-198)", () => {
+    render(<FeedbackPanel feedback={fixtureFeedback} actions={OFFSET_ACTIONS} chosenIndex={11} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Best action 2 is not one of the 4 actions");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("R3.13 a chosen index outside the actions renders an error", () => {

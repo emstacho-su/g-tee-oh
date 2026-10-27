@@ -8,10 +8,13 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { RngRoller } from "../../src/components/trainer/index.js";
+import type { NodeAction } from "../../src/contracts.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
 import { toGradeActions } from "../../src/poker/grade-actions.js";
 
 const FREQUENCIES = fixtureFeedback.freq_by_action;
+/** The fixture actions numbered 10 to 13, so a NodeAction.index never equals its position (O-198). */
+const OFFSET_ACTIONS: readonly NodeAction[] = fixtureActions.map((action) => ({ ...action, index: action.index + 10 }));
 
 describe("R3.13 RngRoller", () => {
   it("R3.13 renders one segment per band with its range text and short letter", () => {
@@ -72,6 +75,31 @@ describe("R3.13 RngRoller", () => {
       expect(screen.getByTestId("rng-roller")).toHaveAttribute("data-selected-index", String(expected));
     },
   );
+
+  it.each([1, 6, 37, 96])(
+    "R3.13 with indexes that are not positions, roll %i selects rollSelectedAction's action and reports its NodeAction.index (O-198)",
+    (roll) => {
+      render(<RngRoller actions={OFFSET_ACTIONS} freqByAction={FREQUENCIES} roll={roll} onExplain={vi.fn()} />);
+      const position = rollSelectedAction(FREQUENCIES, toGradeActions(OFFSET_ACTIONS), roll);
+      const action = OFFSET_ACTIONS[position] as NodeAction;
+      const roller = screen.getByTestId("rng-roller");
+      expect(roller).toHaveTextContent(`Roll ${roll} selects ${action.label}`);
+      expect(roller).toHaveAttribute("data-selected-index", String(action.index));
+      const current = within(roller).getAllByRole("listitem").filter((item) => item.getAttribute("aria-current") === "true");
+      expect(current.map((item) => item.getAttribute("data-action-index"))).toEqual([String(action.index)]);
+    },
+  );
+
+  it("R3.13 with indexes that are not positions, the bands still match rngBands and carry NodeAction.index (O-198)", () => {
+    render(<RngRoller actions={OFFSET_ACTIONS} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
+    const bands = rngBands(FREQUENCIES, toGradeActions(OFFSET_ACTIONS));
+    const items = within(screen.getByRole("list", { name: "RNG bands" })).getAllByRole("listitem");
+    expect(items.map((item) => item.getAttribute("data-range"))).toEqual(bands.map((band) => `${band.from}-${band.to}`));
+    expect(items.map((item) => item.getAttribute("data-action-index"))).toEqual(
+      bands.map((band) => String(OFFSET_ACTIONS[band.actionIndex]?.index)),
+    );
+    expect(items[2]).toHaveTextContent("16-95 Raise to 2.5bb");
+  });
 
   it("R3.13 the info button calls onExplain", async () => {
     const onExplain = vi.fn();

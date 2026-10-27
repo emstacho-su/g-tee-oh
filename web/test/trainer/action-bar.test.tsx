@@ -18,6 +18,9 @@ const FLOP_ACTIONS: readonly NodeAction[] = [
   { index: 2, token: "b1000", kind: "bet", size_cbb: 1000, bucket: "pot", label: "Pot" },
 ];
 
+/** The fixture actions numbered 10 to 13, so a NodeAction.index never equals its position (O-198). */
+const OFFSET_ACTIONS: readonly NodeAction[] = fixtureActions.map((action) => ({ ...action, index: action.index + 10 }));
+
 function withRoot(ui: ReactNode) {
   return render(<HotkeyRoot store={createHotkeyStore()}>{ui}</HotkeyRoot>);
 }
@@ -84,6 +87,15 @@ describe("R3.13 ActionBar", () => {
     await userEvent.keyboard("4");
     expect(onAction).toHaveBeenLastCalledWith(3);
     expect(onAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("R3.13 onAction receives NodeAction.index, not the button's position, when they differ (O-198)", async () => {
+    const onAction = vi.fn();
+    withRoot(<ActionBar actions={OFFSET_ACTIONS} grouping="standard" street="preflop" onAction={onAction} />);
+    await userEvent.click(screen.getByRole("button", { name: "Call" }));
+    expect(onAction).toHaveBeenLastCalledWith(11);
+    await userEvent.keyboard("3");
+    expect(onAction).toHaveBeenLastCalledWith(12);
   });
 
   it("R3.13 disabled buttons ignore clicks and hotkeys", async () => {

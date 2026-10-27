@@ -9,17 +9,24 @@
  * roll when there was one, and "Unrated" when the attempt does not count toward the rating. Two
  * slots take the range view and the threshold card. More info and Ask render disabled with a
  * note when their handlers are absent.
+ *
+ * Numbering (O-198): chosenIndex and feedback.best_action_indexes are NodeAction.index values,
+ * never positions in actions; freq_by_action and ev_by_action are positional, as the contract
+ * defines them. A chosen index that names no action renders an alert, and a best action index
+ * that names none makes the table render its own alert, so no wrong row is ever marked.
  */
 import type { ReactNode } from "react";
 
 import { Button, cn } from "../ui/index.js";
 import type { DecisionFeedback, FeedbackLabel, NodeAction } from "../../contracts.js";
+import { actionOfIndex } from "../../poker/action-index.js";
 import { exactActionLabel, formatBb, formatPercent } from "../../poker/format.js";
 import { ActionFrequencyTable } from "../panels/ActionFrequencyTable.js";
 
 export interface FeedbackPanelProps {
   feedback: DecisionFeedback;
   actions: readonly NodeAction[];
+  /** The NodeAction.index the hero chose (O-198), not a position in actions. */
   chosenIndex: number;
   rangeView?: ReactNode;
   thresholdCard?: ReactNode;
@@ -55,7 +62,7 @@ function LaterButton({ label, onClick }: { label: string; onClick: (() => void) 
 }
 
 export function FeedbackPanel({ feedback, actions, chosenIndex, rangeView, thresholdCard, onMoreInfo, onAsk }: FeedbackPanelProps) {
-  const chosen = actions.find((action) => action.index === chosenIndex);
+  const chosen = actionOfIndex(actions, chosenIndex);
   if (chosen === undefined) {
     return (
       <p role="alert" data-testid="feedback-panel" className="text-danger">

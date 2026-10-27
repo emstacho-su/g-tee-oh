@@ -6,8 +6,11 @@
  * one. Labels come from actionButtonLabel (Standard exact size; Grouped bucket label with the
  * size underneath on postflop nodes). Each button carries the action's swatch and short letter so
  * color is not the only signal, prints its hotkey number, and registers that number (1 to 9 for
- * the first nine actions) through useHotkey while it is enabled. onAction receives the record
- * index (NodeAction.index), which is what the api grades.
+ * the first nine actions) through useHotkey while it is enabled.
+ *
+ * Numbering (O-198): onAction receives NodeAction.index, the numbering the api grades and the
+ * contract's action_index carries, never the button's position; the position only picks the
+ * hotkey number.
  */
 import { Button } from "../ui/index.js";
 import type { Grouping, NodeAction, Street } from "../../contracts.js";

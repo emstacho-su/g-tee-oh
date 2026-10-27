@@ -10,26 +10,41 @@
  * selects Raise to 2.5bb". A band narrower than NARROW_BAND_ROLLS rolls shows only its swatch and
  * letter inside the strip, with the full text as its tooltip and for screen readers, because the
  * text would be clipped there; the legend under the strip always lists every band in full, so no
- * band loses its text at any width. The info button calls onExplain; the explainer itself is S25. Input the
- * learning package rejects (lengths that differ, a roll outside 1 to 100, an unknown bucket)
- * renders an alert instead of a guessed strip.
+ * band loses its text at any width. The info button calls onExplain; the explainer itself is
+ * S25. Input the learning package rejects (lengths that differ, a roll outside 1 to 100, an
+ * unknown bucket) renders an alert instead of a guessed strip.
+ *
+ * Numbering (O-198): packages/learning returns record positions (RngBand.actionIndex and
+ * rollSelectedAction's result), which this component uses only to read actions and the
+ * positional freqByAction. Wherever an index leaves the component (data-selected-index on the
+ * strip, data-action-index on each band) it is converted to NodeAction.index through
+ * src/poker/action-index.ts.
  */
 import { RNG_ROLL_MAX, RNG_ROLL_MIN, rngBands, rollSelectedAction, type RngBand } from "@g-tee-oh/learning";
 
 import { Button, VisuallyHidden, cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
+import { indexAtPosition } from "../../poker/action-index.js";
 import { toGradeActions } from "../../poker/grade-actions.js";
 import { ACTION_FILL_CLASSES, ActionSwatch, actionFillStyle } from "./ActionSwatch.js";
 
 export interface RngRollerProps {
   actions: readonly NodeAction[];
+  /** One frequency per action, by position in actions (record order). */
   freqByAction: readonly number[];
   roll: number | null;
   onExplain: () => void;
 }
 
 type RollerModel =
-  | { readonly ok: true; readonly bands: readonly RngBand[]; readonly selected: number | null }
+  | {
+      readonly ok: true;
+      readonly bands: readonly RngBand[];
+      /** The selected action's record position, for reading actions; null without a roll. */
+      readonly selectedPosition: number | null;
+      /** The selected action's NodeAction.index, the only index that leaves the component. */
+      readonly selectedIndex: number | null;
+    }
   | { readonly ok: false; readonly message: string };
 
 const ROLL_SPAN = RNG_ROLL_MAX - RNG_ROLL_MIN + 1;
@@ -43,8 +58,9 @@ function rollerModel(actions: readonly NodeAction[], freqByAction: readonly numb
   try {
     const gradeActions = toGradeActions(actions);
     const bands = rngBands(freqByAction, gradeActions);
-    const selected = roll === null ? null : rollSelectedAction(freqByAction, gradeActions, roll);
-    return { ok: true, bands, selected };
+    const selectedPosition = roll === null ? null : rollSelectedAction(freqByAction, gradeActions, roll);
+    const selectedIndex = selectedPosition === null ? null : indexAtPosition(actions, selectedPosition);
+    return { ok: true, bands, selectedPosition, selectedIndex };
   } catch (error: unknown) {
     if (error instanceof RangeError) return { ok: false, message: error.message };
     throw error;
@@ -78,11 +94,11 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
       </div>
     );
   }
-  const selectedAction = model.selected === null ? undefined : actions[model.selected];
+  const selectedAction = model.selectedPosition === null ? undefined : actions[model.selectedPosition];
   return (
     <div
       data-testid="rng-roller"
-      {...(model.selected === null ? {} : { "data-selected-index": String(model.selected) })}
+      {...(model.selectedIndex === null ? {} : { "data-selected-index": String(model.selectedIndex) })}
       className="flex flex-col gap-2"
     >
       <div className="flex items-center justify-between gap-2">
@@ -99,11 +115,12 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
             const range = `${band.from}-${band.to}`;
             const text = bandText(band, action);
             const narrow = band.to - band.from + 1 < NARROW_BAND_ROLLS;
-            const current = band.actionIndex === model.selected;
+            const current = band.actionIndex === model.selectedPosition;
             return (
               <li
-                key={band.actionIndex}
+                key={action.index}
                 data-range={range}
+                data-action-index={action.index}
                 title={text}
                 {...(current ? { "aria-current": "true" } : {})}
                 style={{ ...actionFillStyle(action, actions), width: percentOf(band.to - band.from + 1) }}
@@ -135,7 +152,7 @@ export function RngRoller({ actions, freqByAction, roll, onExplain }: RngRollerP
           const action = actions[band.actionIndex];
           if (action === undefined) return null;
           return (
-            <li key={band.actionIndex} className="flex items-center gap-1">
+            <li key={action.index} className="flex items-center gap-1">
               <ActionSwatch action={action} actions={actions} />
               <span>{bandText(band, action)}</span>
             </li>

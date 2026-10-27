@@ -8,19 +8,26 @@
  * big blinds when given. Highlighted rows say so in text ("Best" by default). The table does no
  * aggregation: callers pass the numbers the api sent, in action order (ADR 0004). Lists of other
  * lengths, or a frequency outside 0 to 1, render an alert instead of a misleading table.
+ *
+ * Numbering (O-198): highlightIndexes holds NodeAction.index values, the numbering the contract's
+ * best_action_indexes carries, and a row is highlighted when its action's index is listed.
+ * frequencies and evBb stay positional (entry i belongs to actions[i]), as the contract defines
+ * freq_by_action and ev_by_action. A highlight index that names no action renders an alert, never
+ * a highlight on the wrong row.
  */
 import { cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
+import { unknownIndexes } from "../../poker/action-index.js";
 import { exactActionLabel, formatBb, formatShare } from "../../poker/format.js";
 import { ACTION_FILL_CLASSES, ActionSwatch, actionFillStyle } from "../trainer/ActionSwatch.js";
 
 export interface ActionFrequencyTableProps {
   actions: readonly NodeAction[];
-  /** One share in 0..1 per action, in the same order. */
+  /** One share in 0..1 per action, by position in actions. */
   frequencies: readonly number[];
-  /** One EV in big blinds per action, in the same order. */
+  /** One EV in big blinds per action, by position in actions. */
   evBb?: readonly number[];
-  /** Positions in actions to mark, for example the best actions. */
+  /** NodeAction.index values to mark, for example the best actions (O-198). */
   highlightIndexes?: readonly number[];
   highlightLabel?: string;
   caption: string;
@@ -45,6 +52,16 @@ export function frequencyTableProblem(
   return outside === undefined ? null : `frequency ${outside} is outside 0 to 1`;
 }
 
+/** The first highlight index that names no action, as a sentence, or null when all are known. */
+export function highlightProblem(
+  actions: readonly NodeAction[],
+  highlightIndexes: readonly number[],
+  highlightLabel: string,
+): string | null {
+  const [unknown] = unknownIndexes(actions, highlightIndexes);
+  return unknown === undefined ? null : `${highlightLabel} action ${unknown} is not one of the ${actions.length} actions`;
+}
+
 export function ActionFrequencyTable({
   actions,
   frequencies,
@@ -53,7 +70,7 @@ export function ActionFrequencyTable({
   highlightLabel = DEFAULT_HIGHLIGHT_LABEL,
   caption,
 }: ActionFrequencyTableProps) {
-  const problem = frequencyTableProblem(actions, frequencies, evBb);
+  const problem = frequencyTableProblem(actions, frequencies, evBb) ?? highlightProblem(actions, highlightIndexes, highlightLabel);
   if (problem !== null) {
     return (
       <p role="alert" data-testid="action-frequency-table" className="text-danger">
@@ -82,7 +99,7 @@ export function ActionFrequencyTable({
       <tbody>
         {actions.map((action, position) => {
           const share = frequencies[position] ?? 0;
-          const highlighted = highlightIndexes.includes(position);
+          const highlighted = highlightIndexes.includes(action.index);
           const ev = evBb?.[position];
           return (
             <tr

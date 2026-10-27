@@ -3,7 +3,11 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ActionFrequencyTable } from "../../src/components/panels/index.js";
+import type { NodeAction } from "../../src/contracts.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
+
+/** The fixture actions numbered 10 to 13, so a NodeAction.index never equals its position (O-198). */
+const OFFSET_ACTIONS: readonly NodeAction[] = fixtureActions.map((action) => ({ ...action, index: action.index + 10 }));
 
 describe("R3.12 ActionFrequencyTable", () => {
   it("R3.12 is a real table with a caption, column headers and row headers", () => {
@@ -68,6 +72,37 @@ describe("R3.12 ActionFrequencyTable", () => {
       />,
     );
     expect(screen.getByRole("row", { name: /Fold/ })).toHaveTextContent("Hero");
+  });
+
+  it("R3.12 highlights rows by NodeAction.index, not by position, while frequencies stay positional (O-198)", () => {
+    render(
+      <ActionFrequencyTable
+        actions={OFFSET_ACTIONS}
+        frequencies={fixtureFeedback.freq_by_action}
+        evBb={fixtureFeedback.ev_by_action}
+        highlightIndexes={[12]}
+        caption="c"
+      />,
+    );
+    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    expect(raise).toHaveAttribute("data-highlight", "true");
+    expect(raise).toHaveTextContent("80.0%");
+    expect(raise).toHaveTextContent("0.62bb");
+    const highlighted = screen.getAllByRole("row").filter((row) => row.getAttribute("data-highlight") === "true");
+    expect(highlighted).toEqual([raise]);
+  });
+
+  it("R3.12 a highlight index that names no action renders an alert, not a wrong row (O-198)", () => {
+    render(
+      <ActionFrequencyTable
+        actions={OFFSET_ACTIONS}
+        frequencies={fixtureFeedback.freq_by_action}
+        highlightIndexes={[2]}
+        caption="c"
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Best action 2 is not one of the 4 actions");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("R3.12 rejects mismatched lengths and frequencies outside 0 to 1", () => {
