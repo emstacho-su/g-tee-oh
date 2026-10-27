@@ -64,6 +64,17 @@ describe("R3.11 calibration and the confident-miss rule (S22, O-89, O-215)", () 
     expect(ALL_LABELS.some((label) => isConfidentMiss({ confidence: "unsure", label }))).toBe(false);
   });
 
+  it("R3.11 isConfidentMiss and isCorrectLabel validate every field up front, as aggregateCalibration does", () => {
+    const unsureBadLabel = { confidence: "unsure", label: "Great" } as unknown as ConfidenceAttempt;
+    const badConfidenceHit = { confidence: "maybe", label: "Best" } as unknown as ConfidenceAttempt;
+    expect(() => isConfidentMiss(unsureBadLabel)).toThrow(RangeError);
+    expect(() => isConfidentMiss(badConfidenceHit)).toThrow(RangeError);
+    expect(() => isCorrectLabel("Great" as GradeLabel)).toThrow(RangeError);
+    expect(() =>
+      promoteConfidentMiss(QUEUE, item("c"), unsureBadLabel, keyOf),
+    ).toThrow(RangeError);
+  });
+
   it("R3.11 calibration aggregation on fixture attempts: accuracy when sure 4 of 6, when unsure 1 of 4, gap 5/12", () => {
     const calibration = aggregateCalibration(CALIBRATION_FIXTURE_ATTEMPTS);
     expect(calibration.sure).toEqual(CALIBRATION_FIXTURE_EXPECTED.sure);

@@ -18,7 +18,9 @@
  *
  * Rounding (O-213): frequencies are normalized by their sum, each band's upper edge is the
  * cumulative percent rounded half up, the last edge is 100, and an action under half a roll owns
- * no band. With the actions list the order comes from kind and size, whatever the record order.
+ * no band. The actions list is always required and the order always comes from kind and size,
+ * whatever the record order, so grade() and the web roller (S25, through rollSelectedAction) pick
+ * the same action for the same roll.
  */
 import { describe, expect, it } from "vitest";
 
@@ -27,12 +29,42 @@ import {
   RNG_ROLL_MIN as POLICY_ROLL_MIN,
   actionForRoll,
   chiSquareStatistic,
+  grade,
   passiveToAggressiveOrder,
   rngBands,
   rollFrom,
+  rollSelectedAction,
   splitMix64Source,
 } from "../src/index.js";
 import type { GradeAction } from "../src/index.js";
+
+/** The tree action behind each fixture action name; losses are 0 because only the order matters here. */
+export const FIXTURE_ACTIONS: Readonly<Record<string, GradeAction>> = Object.freeze({
+  fold: { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 0 },
+  call: { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
+  raise: { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0 },
+  "raise 2.5x": { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0 },
+  "raise 3x": { kind: "raise", bucket: "pot", sizeCbb: 300, lossPctPot: 0 },
+  "all-in": { kind: "all_in", bucket: "all-in", sizeCbb: 10000, lossPctPot: 0 },
+});
+
+/** Tree actions already in passive-to-aggressive order, for frequency lists of up to four actions. */
+const ORDERED_ACTION_NAMES = ["fold", "call", "raise 2.5x", "raise 3x"] as const;
+
+function actionsNamed(names: readonly string[]): GradeAction[] {
+  return names.map((name) => {
+    const action = FIXTURE_ACTIONS[name];
+    if (action === undefined) {
+      throw new Error(`no fixture action named ${name}`);
+    }
+    return action;
+  });
+}
+
+/** count actions in passive-to-aggressive order, so record order and band order coincide. */
+function orderedActions(count: number): GradeAction[] {
+  return actionsNamed(ORDERED_ACTION_NAMES.slice(ORDERED_ACTION_NAMES.length - count));
+}
 
 export const RNG_ROLL_COUNT = 10000;
 export const RNG_ROLL_MIN = 1;
@@ -242,29 +274,30 @@ describe("R3.10 RNG mode band mapping and the chi-square test (S22, ADR 0009, O-
 
   it("R3.10 non-integer percentages: cumulative bands are rounded once at the edge so every roll from 1 to 100 maps to exactly one action (O-213)", () => {
     const third = 1 / 3;
-    expect(rngBands([third, third, third])).toEqual([
+    const bandsOf = (frequencies: number[]) => rngBands(frequencies, orderedActions(frequencies.length));
+    expect(bandsOf([third, third, third])).toEqual([
       { actionIndex: 0, from: 1, to: 33 },
       { actionIndex: 1, from: 34, to: 67 },
       { actionIndex: 2, from: 68, to: 100 },
     ]);
-    expect(rngBands([0.405, 0.595])).toEqual([
+    expect(bandsOf([0.405, 0.595])).toEqual([
       { actionIndex: 0, from: 1, to: 41 },
       { actionIndex: 1, from: 42, to: 100 },
     ]);
-    expect(rngBands([0.004, 0.996]), "a band under half a roll selects nothing").toEqual([
+    expect(bandsOf([0.004, 0.996]), "a band under half a roll selects nothing").toEqual([
       { actionIndex: 1, from: 1, to: 100 },
     ]);
-    expect(rngBands([0.2, 0.2]), "frequencies are normalized by their sum").toEqual([
+    expect(bandsOf([0.2, 0.2]), "frequencies are normalized by their sum").toEqual([
       { actionIndex: 0, from: 1, to: 50 },
       { actionIndex: 1, from: 51, to: 100 },
     ]);
     const float32Mix = [0.4000000059604645, 0.6000000238418579];
-    expect(rngBands(float32Mix)).toEqual([
+    expect(bandsOf(float32Mix)).toEqual([
       { actionIndex: 0, from: 1, to: 40 },
       { actionIndex: 1, from: 41, to: 100 },
     ]);
     for (const frequencies of [[third, third, third], [0.405, 0.595], [0.004, 0.996], [0.123, 0.456, 0.421]]) {
-      const bands = rngBands(frequencies);
+      const bands = bandsOf(frequencies);
       for (let roll = RNG_ROLL_MIN; roll <= RNG_ROLL_MAX; roll += 1) {
         const owners = bands.filter((band) => roll >= band.from && roll <= band.to);
         expect(owners, `roll ${roll}`).toHaveLength(1);
@@ -273,16 +306,40 @@ describe("R3.10 RNG mode band mapping and the chi-square test (S22, ADR 0009, O-
     }
   });
 
-  it("R3.10 band mapping rejects malformed input with a RangeError", () => {
-    expect(() => rngBands([])).toThrow(RangeError);
-    expect(() => rngBands([0, 0])).toThrow(RangeError);
-    expect(() => rngBands([-0.5, 1.5])).toThrow(RangeError);
-    expect(() => rngBands([0.5, 0.5], [{ kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 }])).toThrow(
-      RangeError,
-    );
-    const bands = rngBands([0.4, 0.6]);
+  it("R3.10 band mapping rejects malformed input with a RangeError, including a missing actions list (O-213)", () => {
+    expect(() => rngBands([], [])).toThrow(RangeError);
+    expect(() => rngBands([0, 0], orderedActions(2))).toThrow(RangeError);
+    expect(() => rngBands([-0.5, 1.5], orderedActions(2))).toThrow(RangeError);
+    expect(() => rngBands([0.5, 0.5], orderedActions(1))).toThrow(RangeError);
+    const withoutActions = rngBands as unknown as (frequencies: readonly number[]) => unknown;
+    expect(() => withoutActions([0.4, 0.6])).toThrow(RangeError);
+    const bands = rngBands([0.4, 0.6], orderedActions(2));
     for (const roll of [0, 101, 40.5, Number.NaN]) {
       expect(() => actionForRoll(bands, roll), String(roll)).toThrow(RangeError);
+    }
+  });
+
+  it("R3.10 rollSelectedAction is the one entry the web roller (S25) and grade() share: for every roll it picks the action grade() labels Best", () => {
+    const records = actionsNamed(["all-in", "raise 3x", "fold", "raise 2.5x", "call"]);
+    const frequencies = [0.05, 0.2, 0.1, 0.35, 0.3];
+    for (let roll = RNG_ROLL_MIN; roll <= RNG_ROLL_MAX; roll += 1) {
+      const selected = rollSelectedAction(frequencies, records, roll);
+      expect(selected).toBe(actionForRoll(rngBands(frequencies, records), roll));
+      const output = grade({
+        lossPctPot: 0,
+        floorPctPot: 0.2,
+        freqByAction: frequencies,
+        actionIndex: selected,
+        actions: records,
+        rngRoll: roll,
+        noiseFlags: [],
+        mode: "drill",
+        firstAttempt: true,
+        panelsRevealed: false,
+        ratedTodayInTrack: 0,
+        street: "flop",
+      });
+      expect(output.label, `roll ${roll}`).toBe("Best");
     }
   });
 
@@ -310,9 +367,14 @@ function actionName(hand: RngBandHandVector, index: number): string {
   return name;
 }
 
+/** The policy's bands for a fixture hand, from its frequencies and the tree actions its names stand for. */
+function handBands(hand: RngBandHandVector): ReturnType<typeof rngBands> {
+  return rngBands(hand.frequencies, actionsNamed(hand.actions));
+}
+
 /** The policy's bands for a fixture hand, with action names in place of indices. */
 function namedBands(hand: RngBandHandVector): RngBand[] {
-  return rngBands(hand.frequencies).map((band) => ({
+  return handBands(hand).map((band) => ({
     action: actionName(hand, band.actionIndex),
     from: band.from,
     to: band.to,
@@ -320,7 +382,7 @@ function namedBands(hand: RngBandHandVector): RngBand[] {
 }
 
 function expectSpotChecks(hand: RngBandHandVector): void {
-  const bands = rngBands(hand.frequencies);
+  const bands = handBands(hand);
   for (const check of hand.spotChecks) {
     expect(actionName(hand, actionForRoll(bands, check.roll)), `roll ${check.roll}`).toBe(check.action);
   }
@@ -333,7 +395,7 @@ function drawRolls(seed: number): number[] {
 
 /** Selected-action counts over RNG_ROLL_COUNT rolls from the seeded source, in the hand's action order. */
 function countSelections(hand: RngBandHandVector, seed: number): number[] {
-  const bands = rngBands(hand.frequencies);
+  const bands = handBands(hand);
   const selections = drawRolls(seed).map((roll) => actionForRoll(bands, roll));
   return hand.actions.map((_, index) => selections.filter((selected) => selected === index).length);
 }

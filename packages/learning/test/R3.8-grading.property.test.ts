@@ -8,7 +8,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { grade, scoreFor } from "../src/index.js";
-import type { GradeInput, GradeLabel } from "../src/index.js";
+import type { GradeAction, GradeInput, GradeLabel } from "../src/index.js";
 
 /** Largest loss and floor the generators draw, in percent of the pot. */
 const MAX_LOSS_PCT_POT = 200;
@@ -33,7 +33,15 @@ const BASE: GradeInput = {
   firstAttempt: true,
   panelsRevealed: false,
   ratedTodayInTrack: 0,
+  street: "preflop",
 };
+
+/** The fixture node's actions (fold, call, raise to 2.5bb); RNG mode needs them (O-213). */
+const NODE_ACTIONS: readonly GradeAction[] = [
+  { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 0 },
+  { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
+  { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0 },
+];
 
 const loss = fc.double({ min: 0, max: MAX_LOSS_PCT_POT, noNaN: true, noDefaultInfinity: true });
 const floor = fc.double({ min: 0, max: MAX_FLOOR_PCT_POT, noNaN: true, noDefaultInfinity: true });
@@ -44,9 +52,9 @@ const roll = fc.option(fc.integer({ min: 1, max: 100 }), { nil: undefined });
 const lossPair = fc.tuple(loss, loss).map(([a, b]): [number, number] => (a <= b ? [a, b] : [b, a]));
 
 function inputFor(lossPctPot: number, floorPctPot: number, index: number, rngRoll: number | undefined): GradeInput {
-  return rngRoll === undefined
-    ? { ...BASE, lossPctPot, floorPctPot, actionIndex: index }
-    : { ...BASE, lossPctPot, floorPctPot, actionIndex: index, rngRoll };
+  const actions = NODE_ACTIONS.map((action, actionIndex) => (actionIndex === index ? { ...action, lossPctPot } : action));
+  const input: GradeInput = { ...BASE, lossPctPot, floorPctPot, actionIndex: index, actions };
+  return rngRoll === undefined ? input : { ...input, rngRoll };
 }
 
 describe("R3.8 grading policy properties (fast-check)", () => {

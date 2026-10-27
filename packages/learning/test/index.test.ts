@@ -33,6 +33,7 @@ const S22_FUNCTIONS = [
   "rngBands",
   "actionForRoll",
   "rollFrom",
+  "rollSelectedAction",
   "passiveToAggressiveOrder",
   "chiSquareStatistic",
   "createSplitMix64",

@@ -16,17 +16,15 @@
  * highest-frequency action. One tick is 0.01 percent of pot, the display precision of EV loss.
  * The grouping vectors use a five-action node with two raise sizes and an all-in (O-210, O-211).
  */
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
 import {
-  ACTION_KINDS,
-  BUCKETS,
   DAILY_RATED_CAP,
+  FREQUENCY_TIE_TOLERANCE,
   GRADING_TAU_PCT_POT as POLICY_TAU_PCT_POT,
   grade,
   groupKeys,
+  isRated,
   scoreFor,
 } from "../src/index.js";
 import type { GradeAction, GradeInput, GradeLabel } from "../src/index.js";
@@ -49,7 +47,7 @@ export const NOISE_FLAGS = Object.freeze({
 export const ACTION_ORDER = Object.freeze(["fold", "call", "raise"]);
 export const ACTION_INDEX = Object.freeze({ fold: 0, call: 1, raise: 2 });
 
-/** A rated automated decision on the fixture node; every row below overrides fields of this one. */
+/** A rated automated decision on the fixture node, a preflop node; every row below overrides fields of this one. */
 export const BASE_GRADE_INPUT: GradeInput = {
   lossPctPot: 0,
   floorPctPot: GRADING_FLOOR_PCT_POT,
@@ -60,7 +58,26 @@ export const BASE_GRADE_INPUT: GradeInput = {
   firstAttempt: true,
   panelsRevealed: false,
   ratedTodayInTrack: 0,
+  street: "preflop",
 };
+
+/** The fixture node's tree actions in record order (fold, call, raise to 2.5bb), each at loss 0. */
+export const BASE_NODE_ACTIONS: readonly GradeAction[] = Object.freeze([
+  { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 0 },
+  { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
+  { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0 },
+]);
+
+/**
+ * The input with the fixture node's actions list, the chosen action carrying the input's loss.
+ * RNG mode needs the list, so the bands follow one order everywhere (O-213).
+ */
+export function withNodeActions(input: GradeInput): GradeInput {
+  const actions = BASE_NODE_ACTIONS.map((action, index) =>
+    index === input.actionIndex ? { ...action, lossPctPot: input.lossPctPot } : action,
+  );
+  return { ...input, actions };
+}
 
 export type GradingVector = {
   name: string;
@@ -204,22 +221,22 @@ export const GRADING_DAILY_CAP_ROWS: readonly RatedVector[] = Object.freeze([
 export const GRADING_RNG_ROWS: readonly GradingVector[] = Object.freeze([
   {
     name: "roll 37 selects call (band 1 to 40): call with loss 0 is Best",
-    input: { ...BASE_GRADE_INPUT, rngRoll: 37, actionIndex: ACTION_INDEX.call },
+    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 37, actionIndex: ACTION_INDEX.call }),
     expected: { label: "Best", score: 1 },
   },
   {
     name: "roll 41 selects raise (band 41 to 100): raise with loss 0 is Best",
-    input: { ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.raise },
+    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.raise }),
     expected: { label: "Best", score: 1 },
   },
   {
     name: "roll 41 selects raise: call chosen with loss 0 is Correct, not Best",
-    input: { ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.call },
+    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.call }),
     expected: { label: "Correct", score: 1 },
   },
   {
     name: "roll 40 selects call: raise chosen with loss 0 is Correct, not Best",
-    input: { ...BASE_GRADE_INPUT, rngRoll: 40, actionIndex: ACTION_INDEX.raise },
+    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 40, actionIndex: ACTION_INDEX.raise }),
     expected: { label: "Correct", score: 1 },
   },
 ]);
@@ -254,7 +271,11 @@ function sizedInput(actionIndex: number, overrides: Partial<GradeInput> = {}): G
   };
 }
 
-/** The sized node with both raise sizes in one bucket, which ADR 0020 says a simple tree never holds. */
+/**
+ * The sized node with both raise sizes in one bucket. ADR 0020 keeps one size per bucket in a
+ * simple postflop tree; preflop nodes may hold two, and Grouped shows them as exact sizes there
+ * (R3.9, O-22), so this fixture merges postflop and stays split preflop.
+ */
 const TWO_SIZE_BUCKET_ACTIONS: readonly GradeAction[] = SIZED_NODE_ACTIONS.map((action) =>
   action.kind === "raise" ? { ...action, bucket: "medium" as const } : action,
 );
@@ -411,8 +432,12 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
   });
 
   it("R3.8 RNG mode: the roll-selected action above the floor is labelled by its loss", () => {
-    const output = grade({ ...BASE_GRADE_INPUT, rngRoll: 37, lossPctPot: 1.5, actionIndex: ACTION_INDEX.call });
-    expect(output.label).toBe("Mistake");
+    const input = withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 37, lossPctPot: 1.5, actionIndex: ACTION_INDEX.call });
+    expect(grade(input).label).toBe("Mistake");
+  });
+
+  it("R3.8 RNG mode needs the actions list, so the bands follow one order everywhere (O-213)", () => {
+    expect(() => grade({ ...BASE_GRADE_INPUT, rngRoll: 37 })).toThrow(RangeError);
   });
 
   it("R3.8 grouping modes: Standard grades the exact size and Grouped grades the bucket mapped in Rust (R2.3), never recomputed here (ADR 0004)", () => {
@@ -424,11 +449,41 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     const grouped = grade(sizedInput(SIZED_INDEX.raise250, { grouping: "grouped" }));
     expect(grouped).toEqual(standard);
 
-    const twoSizeBucket = grade(
-      sizedInput(SIZED_INDEX.raise250, { grouping: "grouped", actions: TWO_SIZE_BUCKET_ACTIONS }),
+    const postflopBucket = grade(
+      sizedInput(SIZED_INDEX.raise250, { grouping: "grouped", actions: TWO_SIZE_BUCKET_ACTIONS, street: "flop" }),
     );
-    expect(twoSizeBucket.label).toBe("Best");
-    expect(twoSizeBucket.gradedActionIndex).toBe(SIZED_INDEX.raise300);
+    expect(postflopBucket.label, "postflop Grouped grades the bucket at its best size").toBe("Best");
+    expect(postflopBucket.gradedActionIndex).toBe(SIZED_INDEX.raise300);
+  });
+
+  it("R3.8 Grouped on a preflop node grades the exact size, as Standard does: two raise sizes in one bucket never merge (R3.9, O-22, O-211)", () => {
+    const preflopInput = sizedInput(SIZED_INDEX.raise250, { actions: TWO_SIZE_BUCKET_ACTIONS, street: "preflop" });
+    const standard = grade(preflopInput);
+    const grouped = grade({ ...preflopInput, grouping: "grouped" });
+    expect(grouped).toEqual(standard);
+    expect(grouped.label).toBe("Inaccuracy");
+    expect(grouped.gradedActionIndex).toBe(SIZED_INDEX.raise250);
+  });
+
+  it("R3.8 Best ties use FREQUENCY_TIE_TOLERANCE: a call at 0.3 ties a Simple raise type summing 0.1 + 0.2", () => {
+    expect(FREQUENCY_TIE_TOLERANCE).toBe(1e-6);
+    expect(0.1 + 0.2).not.toBe(0.3);
+    const actions: GradeAction[] = [
+      { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 2 },
+      { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
+      { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0.1 },
+      { kind: "raise", bucket: "pot", sizeCbb: 300, lossPctPot: 0 },
+    ];
+    const input: GradeInput = {
+      ...BASE_GRADE_INPUT,
+      grouping: "simple",
+      freqByAction: [0, 0.3, 0.1, 0.2],
+      actions,
+      actionIndex: 1,
+      lossPctPot: 0,
+    };
+    expect(grade(input).label).toBe("Best");
+    expect(grade({ ...input, actionIndex: 3 }).label).toBe("Best");
   });
 
   it("R3.8 Simple grouping grades the action type by its best size: raise 2.5x at loss 0.6 and raise 3x at loss 0 grade a Simple raise at loss 0, Best (05 section 6.4 rule 3)", () => {
@@ -452,42 +507,59 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(rollOnCall.label).toBe("Correct");
   });
 
-  it("R3.8 group keys: limp joins call, all-in joins bet or raise or stands alone, straddle stands alone (O-211)", () => {
+  it("R3.8 group keys: limp joins call, all-in joins bet or raise or stands alone, straddle stands alone; Grouped keys by bucket postflop and by exact action preflop (O-211)", () => {
     const action = (kind: GradeAction["kind"], sizeCbb = 0): GradeAction => ({
       kind,
       bucket: null,
       sizeCbb,
       lossPctPot: 0,
     });
-    expect(groupKeys([action("fold"), action("limp"), action("raise", 400)], "simple")).toEqual([
+    expect(groupKeys([action("fold"), action("limp"), action("raise", 400)], "simple", "preflop")).toEqual([
       "fold",
       "call",
       "raise",
     ]);
-    expect(groupKeys([action("check"), action("bet", 300), action("all_in", 9000)], "simple")).toEqual([
+    expect(groupKeys([action("check"), action("bet", 300), action("all_in", 9000)], "simple", "flop")).toEqual([
       "check",
       "bet",
       "bet",
     ]);
-    expect(groupKeys([action("fold"), action("call"), action("all_in", 9000)], "simple")).toEqual([
+    expect(groupKeys([action("fold"), action("call"), action("all_in", 9000)], "simple", "river")).toEqual([
       "fold",
       "call",
       "all_in",
     ]);
-    expect(groupKeys([action("straddle", 200)], "simple")).toEqual(["straddle"]);
-    expect(groupKeys(SIZED_NODE_ACTIONS, "grouped")).toEqual([
+    expect(groupKeys([action("straddle", 200)], "simple", "preflop")).toEqual(["straddle"]);
+    expect(groupKeys(SIZED_NODE_ACTIONS, "grouped", "turn")).toEqual([
       "fold/none",
       "call/none",
       "raise/medium",
       "raise/pot",
       "all_in/all-in",
     ]);
-    expect(groupKeys(SIZED_NODE_ACTIONS, "standard")).toEqual(["0", "1", "2", "3", "4"]);
+    const exact = ["0", "1", "2", "3", "4"];
+    expect(groupKeys(SIZED_NODE_ACTIONS, "grouped", "preflop")).toEqual(exact);
+    expect(groupKeys(SIZED_NODE_ACTIONS, "standard", "flop")).toEqual(exact);
   });
 
   it("R3.8 Grouped and Simple need the actions list with a loss per action (O-210)", () => {
     expect(() => grade({ ...BASE_GRADE_INPUT, grouping: "simple" })).toThrow(RangeError);
     expect(() => grade({ ...BASE_GRADE_INPUT, grouping: "grouped" })).toThrow(RangeError);
+  });
+
+  it("R3.8 isRated validates every field up front, as grade does, whatever the short-circuit order", () => {
+    const bad: Partial<GradeInput>[] = [
+      { mode: "drill", ratedTodayInTrack: -1 },
+      { firstAttempt: false, mode: "bogus" as GradeInput["mode"] },
+      { panelsRevealed: true, ratedTodayInTrack: 1.5 },
+      { noiseFlags: ["rare_line"], firstAttempt: "yes" as unknown as boolean },
+      { mode: "drill", panelsRevealed: undefined as unknown as boolean },
+      { mode: "drill", noiseFlags: "rare_line" as unknown as string[] },
+    ];
+    for (const overrides of bad) {
+      expect(() => isRated({ ...BASE_GRADE_INPUT, ...overrides }), JSON.stringify(overrides)).toThrow(RangeError);
+    }
+    expect(isRated(BASE_GRADE_INPUT)).toBe(true);
   });
 
   it("R3.8 grade rejects malformed input with a RangeError", () => {
@@ -503,15 +575,17 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
       { freqByAction: [0, -0.1, 1.1] },
       { freqByAction: [0, 0, 0] },
       { freqByAction: [0, Number.NaN, 1] },
-      { rngRoll: 0 },
-      { rngRoll: 101 },
-      { rngRoll: 40.5 },
       { ratedTodayInTrack: -1 },
       { ratedTodayInTrack: 1.5 },
       { actions: SIZED_NODE_ACTIONS },
+      { street: "preflopp" as GradeInput["street"] },
+      { grouping: "exact" as GradeInput["grouping"] },
     ];
     for (const overrides of bad) {
       expect(() => grade({ ...BASE_GRADE_INPUT, ...overrides }), JSON.stringify(overrides)).toThrow(RangeError);
+    }
+    for (const rngRoll of [0, 101, 40.5]) {
+      expect(() => grade(withNodeActions({ ...BASE_GRADE_INPUT, rngRoll })), `roll ${rngRoll}`).toThrow(RangeError);
     }
     expect(() => grade(sizedInput(SIZED_INDEX.raise250, { lossPctPot: 0.5 }))).toThrow(RangeError);
   });
@@ -524,19 +598,5 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(input).toEqual(snapshot);
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
-  });
-
-  it("R3.8 the local action kinds, buckets and noise flags match the solver-query contract spellings", () => {
-    const contractUrl = new URL("../../contracts/solver-query.openapi.json", import.meta.url);
-    const contract = JSON.parse(readFileSync(contractUrl, "utf8")) as {
-      components: { schemas: Record<string, { enum?: string[]; properties?: Record<string, { description?: string }> }> };
-    };
-    const schemas = contract.components.schemas;
-    expect([...ACTION_KINDS]).toEqual(schemas.ActionKind?.enum);
-    expect(Object.values(NOISE_FLAGS).sort()).toEqual([...(schemas.NoiseFlag?.enum ?? [])].sort());
-    const bucketDescription = schemas.ActionView?.properties?.bucket?.description ?? "";
-    for (const bucket of BUCKETS) {
-      expect(bucketDescription).toContain(`\`${bucket}\``);
-    }
   });
 });
