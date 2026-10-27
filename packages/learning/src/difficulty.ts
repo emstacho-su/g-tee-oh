@@ -5,9 +5,10 @@
  * by hand in v1; items where every action is inside the noise floor carry no information about
  * skill and are excluded from rated play.
  *
- * Mechanism (O-250): v1 uses only what solver-query ships in its DifficultyFeatures (the gap,
- * purity, the action count, the mixed flag and the all-within-floor flag), never recomputing
- * anything from the strategy (ADR 0004). difficulty = DIFFICULTY_BASE + GAP_WEIGHT x gapHardness
+ * Mechanism (O-250): v1 uses only what solver-query ships in its DifficultyFeatures, never
+ * recomputing anything from the strategy (ADR 0004), and takes only the fields the formula reads:
+ * the gap, purity and the all-within-floor flag. solver-query's n_actions and mixed are not inputs
+ * here; a later formula that uses them adds them back. difficulty = DIFFICULTY_BASE + GAP_WEIGHT x gapHardness
  * + MIX_WEIGHT x mixHardness with gapHardness = 1 / (1 + evGapPctPot / GAP_SCALE_PCT_POT) and
  * mixHardness = min(1, 2 x (1 - purity)), so items span 1100 to 1900 around the new-track rating
  * of 1500. The item enters Glicko-2 as an opponent at that rating with ITEM_RD 0 (src/glicko2.ts).
@@ -17,14 +18,12 @@
  */
 import { UNRATED_WEIGHT } from "./grading.js";
 import type { GradeOutput } from "./types.js";
-import { requireBoolean, requireCount, requireNonNegative } from "./validate.js";
+import { requireBoolean, requireNonNegative, requireUnitInterval } from "./validate.js";
 
-/** solver-query's DifficultyFeatures (ev_gap_pct_pot, purity, n_actions, mixed, all_within_floor) in camelCase. */
+/** The fields of solver-query's DifficultyFeatures the formula reads (ev_gap_pct_pot, purity, all_within_floor), in camelCase. */
 export type DifficultyFeatures = Readonly<{
   evGapPctPot: number;
   purity: number;
-  nActions: number;
-  mixed: boolean;
   allWithinFloor: boolean;
 }>;
 
@@ -57,18 +56,13 @@ const MAX_HARDNESS = 1;
 
 function validateFeatures(features: DifficultyFeatures): void {
   requireNonNegative(features.evGapPctPot, "evGapPctPot");
-  if (requireNonNegative(features.purity, "purity") > 1) {
-    throw new RangeError(`purity must be from 0 to 1, got ${features.purity}`);
-  }
-  requireCount(features.nActions, "nActions");
-  requireBoolean(features.mixed, "mixed");
+  requireUnitInterval(features.purity, "purity");
   requireBoolean(features.allWithinFloor, "allWithinFloor");
 }
 
 /**
  * The item's difficulty and exclusion (O-250). Throws a RangeError naming the field on a negative
- * or non-finite gap, a purity outside [0, 1], a non-integer or negative action count, or a flag
- * that is not a boolean.
+ * or non-finite gap, a purity outside [0, 1], or a flag that is not a boolean.
  */
 export function itemDifficulty(features: DifficultyFeatures): ItemDifficulty {
   validateFeatures(features);

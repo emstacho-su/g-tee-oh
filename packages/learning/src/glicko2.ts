@@ -20,7 +20,7 @@
  * opponent at the item's difficulty with ITEM_RD 0 (O-250); a session with none leaves the track
  * identical (O-251). Every function validates at the boundary and returns a new frozen object.
  */
-import { isList, requireBoolean, requireNonNegative } from "./validate.js";
+import { requireBoolean, requireFinite, requireList, requireNonNegative, requireUnitInterval } from "./validate.js";
 
 /** A track's Glicko-2 state on the Glicko scale. */
 export type TrackRating = Readonly<{ rating: number; rd: number; volatility: number }>;
@@ -36,6 +36,13 @@ export type SessionDecision = Readonly<{ difficulty: number; score: number; rate
 
 /** Starting state of a new track (06 section 3.3, ADR 0011, O-56). */
 export const GLICKO2_DEFAULTS: TrackRating = Object.freeze({ rating: 1500, rd: 350, volatility: 0.06 });
+
+/**
+ * Ceiling inactivity can raise RD to: the starting RD of a new track, as in standard Glicko
+ * practice, so an idle track is never less certain than a newcomer (O-259). Rating periods with
+ * results are not capped; they shrink RD.
+ */
+export const GLICKO2_MAX_RD = GLICKO2_DEFAULTS.rd;
 
 /** System constant tau, which limits how fast volatility moves (ADR 0011, O-56). */
 export const GLICKO2_TAU = 0.5;
@@ -64,26 +71,6 @@ const CONSERVATIVE_RD_MULTIPLE = 2;
 /** One result on the internal scale with its g and E (paper, step 3). */
 type ScaledResult = Readonly<{ g: number; e: number; score: number; weight: number }>;
 
-function requireFinite(value: number, field: string): number {
-  if (!Number.isFinite(value)) {
-    throw new RangeError(`${field} must be a finite number, got ${value}`);
-  }
-  return value;
-}
-
-function requireScore(value: number, field: string): number {
-  if (requireNonNegative(value, field) > 1) {
-    throw new RangeError(`${field} must be from 0 to 1, got ${value}`);
-  }
-  return value;
-}
-
-function requireList(value: readonly unknown[], field: string): void {
-  if (!isList(value)) {
-    throw new RangeError(`${field} must be a list`);
-  }
-}
-
 function validatePlayer(player: TrackRating): void {
   requireFinite(player.rating, "rating");
   requireNonNegative(player.rd, "rd");
@@ -95,7 +82,7 @@ function validatePlayer(player: TrackRating): void {
 function validateResult(result: PeriodResult, field: string): void {
   requireFinite(result.opponent.rating, `${field}.opponent.rating`);
   requireNonNegative(result.opponent.rd, `${field}.opponent.rd`);
-  requireScore(result.score, `${field}.score`);
+  requireUnitInterval(result.score, `${field}.score`);
   requireNonNegative(result.weight ?? DEFAULT_RESULT_WEIGHT, `${field}.weight`);
 }
 
@@ -154,24 +141,39 @@ function initialUpperBound(a: number, f: (x: number) => number, surplus: number,
   return a - k * tau;
 }
 
-/** The inactivity step on the Glicko scale: RD^2 grows by (volatility x scale)^2 per period. */
+/**
+ * The inactivity step on the Glicko scale: RD^2 grows by (volatility x scale)^2 per period, up to
+ * GLICKO2_MAX_RD (O-259). A track already above the ceiling keeps its RD: inactivity never lowers it.
+ */
 function inactiveRd(player: TrackRating, periods: number): number {
   const volatilityOnScale = player.volatility * GLICKO2_SCALE;
-  return Math.sqrt(player.rd * player.rd + periods * volatilityOnScale * volatilityOnScale);
+  const grown = Math.sqrt(player.rd * player.rd + periods * volatilityOnScale * volatilityOnScale);
+  return Math.min(grown, Math.max(player.rd, GLICKO2_MAX_RD));
 }
 
 function withRd(player: TrackRating, rd: number): TrackRating {
   return Object.freeze({ rating: player.rating, rd, volatility: player.volatility });
 }
 
-/** Steps 3 to 8 over results with a positive weight. */
-function updateWithResults(player: TrackRating, results: readonly ScaledResult[], tau: number): TrackRating {
+/** One result's term of the information sum 1 / v (paper, step 3). */
+function informationOf(result: ScaledResult): number {
+  return result.weight * result.g * result.g * result.e * (1 - result.e);
+}
+
+/**
+ * Steps 3 to 8 over results with a positive weight. A result whose information underflows to 0
+ * (an opponent thousands of points away, so E is exactly 0 or 1 in a double) says nothing about
+ * the player and is skipped; when every result is like that the player comes back unchanged, so
+ * a session never loses its update to an error.
+ */
+function updateWithResults(player: TrackRating, scaled: readonly ScaledResult[], tau: number): TrackRating {
+  const results = scaled.filter((result) => informationOf(result) > 0);
+  if (results.length === 0) {
+    return withRd(player, player.rd);
+  }
   const mu = (player.rating - CENTER_RATING) / GLICKO2_SCALE;
   const phi = player.rd / GLICKO2_SCALE;
-  const information = results.reduce((sum, r) => sum + r.weight * r.g * r.g * r.e * (1 - r.e), 0);
-  if (!(information > 0)) {
-    throw new RangeError("results carry no information: every opponent is too far from the player's rating");
-  }
+  const information = results.reduce((sum, result) => sum + informationOf(result), 0);
   const v = 1 / information;
   const improvement = results.reduce((sum, r) => sum + r.weight * r.g * (r.score - r.e), 0);
   const sigma = newVolatility(player.volatility, phi, v, v * improvement, tau);
@@ -194,8 +196,8 @@ export function newTrackRating(): TrackRating {
  * One Glicko-2 rating period (paper, steps 1 to 8). Results with weight 0 are dropped; when none
  * remain the period is the inactivity step. Throws a RangeError naming the field on a non-finite
  * rating, a negative RD, a volatility at or below 0, a score outside [0, 1], a negative weight or a
- * tau at or below 0, and when every result is so far from the player that it carries no
- * information.
+ * tau at or below 0. Results too far from the player to carry information are skipped, and a
+ * period of only such results leaves the player unchanged.
  */
 export function ratePeriod(player: TrackRating, results: readonly PeriodResult[], tau: number = GLICKO2_TAU): TrackRating {
   validatePlayer(player);
@@ -227,7 +229,7 @@ export function inactivePeriods(daysSinceLastRatedSession: number): number {
 
 function validateDecision(decision: SessionDecision, field: string): void {
   requireFinite(decision.difficulty, `${field}.difficulty`);
-  requireScore(decision.score, `${field}.score`);
+  requireUnitInterval(decision.score, `${field}.score`);
   requireBoolean(decision.rated, `${field}.rated`);
   requireNonNegative(decision.weight, `${field}.weight`);
 }

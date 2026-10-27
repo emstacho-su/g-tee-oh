@@ -16,7 +16,7 @@
  */
 import { isCorrectLabel } from "./calibration.js";
 import type { GradeLabel } from "./types.js";
-import { requireBoolean } from "./validate.js";
+import { requireBoolean, requireUnitInterval } from "./validate.js";
 
 /** Starting parameters of 06 section 5, tuned once data exists. */
 export const BKT_PARAMETERS = Object.freeze({ prior: 0.2, learn: 0.15, guess: 0.2, slip: 0.1 });
@@ -33,17 +33,9 @@ export type Mastery = Readonly<{ pKnown: number }>;
 /** One update: the posterior given the evidence, and the mastery after the learn transition. */
 export type MasteryUpdate = Readonly<{ posterior: number; mastery: Mastery }>;
 
-/** A probability in [0, 1], or a RangeError naming the field. */
-function requireProbability(value: number, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
-    throw new RangeError(`${field} must be a number from 0 to 1, got ${String(value)}`);
-  }
-  return value;
-}
-
 /** A probability strictly between 0 and 1, so neither evidence denominator can vanish. */
 function requireOpenProbability(value: number, field: string): number {
-  if (requireProbability(value, field) === 0 || value === 1) {
+  if (requireUnitInterval(value, field) === 0 || value === 1) {
     throw new RangeError(`${field} must be strictly between 0 and 1, got ${value}`);
   }
   return value;
@@ -51,8 +43,8 @@ function requireOpenProbability(value: number, field: string): number {
 
 function requireParameters(params: BktParameters): BktParameters {
   return {
-    prior: requireProbability(params.prior, "params.prior"),
-    learn: requireProbability(params.learn, "params.learn"),
+    prior: requireUnitInterval(params.prior, "params.prior"),
+    learn: requireUnitInterval(params.learn, "params.learn"),
     guess: requireOpenProbability(params.guess, "params.guess"),
     slip: requireOpenProbability(params.slip, "params.slip"),
   };
@@ -76,7 +68,7 @@ export function updateMastery(
   correct: boolean,
   params: BktParameters = BKT_PARAMETERS,
 ): MasteryUpdate {
-  const p = requireProbability(mastery.pKnown, "mastery.pKnown");
+  const p = requireUnitInterval(mastery.pKnown, "mastery.pKnown");
   const valid = requireParameters(params);
   const posterior = posteriorOf(p, requireBoolean(correct, "correct"), valid);
   const pKnown = posterior + (1 - posterior) * valid.learn;
@@ -90,5 +82,5 @@ export function observationFromLabel(label: GradeLabel): boolean {
 
 /** True when pKnown is at or above MASTERY_THRESHOLD. */
 export function isMastered(mastery: Mastery): boolean {
-  return requireProbability(mastery.pKnown, "mastery.pKnown") >= MASTERY_THRESHOLD;
+  return requireUnitInterval(mastery.pKnown, "mastery.pKnown") >= MASTERY_THRESHOLD;
 }

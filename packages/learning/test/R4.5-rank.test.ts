@@ -129,6 +129,20 @@ describe("R4.5 promotion needs coverage (O-252)", () => {
     expect(tierFor(underCap)).toMatchObject({ bandTier: "III", tier: "III", blockedBy: [] });
   });
 
+  it("R4.5 a zero-weight track does not block promotion, since it does not count in the overall rating", () => {
+    const covered = [standing("opens", 1800, 60, 2), standing("blind-defense", 1800, 60, 1)];
+    const unweighted = standing("live-limped", 1500, 350, 0);
+    const withoutIt = tierFor(covered);
+    const withIt = tierFor([...covered, unweighted]);
+    expect(withIt.overall).toBe(withoutIt.overall);
+    expect(withIt.tier).toBe(withoutIt.tier);
+    expect(withIt.tier).toBe(withIt.bandTier);
+    expect(withIt.blockedBy).toEqual([]);
+    // Given any weight at all, the same uncovered track blocks promotion again.
+    const weighted = tierFor([...covered, { ...unweighted, weight: 0.01 }]);
+    expect(weighted.blockedBy).toEqual(["live-limped"]);
+  });
+
   it("R4.5 a band of I is tier I with nothing blocking, whatever the RDs", () => {
     expect(tierFor([standing("new", 1500, 350, 1)])).toEqual({
       overall: 800,

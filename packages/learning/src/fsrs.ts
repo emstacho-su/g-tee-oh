@@ -11,8 +11,9 @@
  * passes retentionFor(true), 0.85 for a class BKT marks mastered, which spaces mastered classes
  * further apart without gating anything (06 section 5, O-253); default parameters and the default
  * short-term steps until enough reviews exist for fitting; fuzz always off, so a review is a
- * function of its arguments. overdueFactor, (1 - R(now)) / (1 - retention), is the queue's due
- * input: 1 at the due time, above 1 as recall decays, and 1 for a class never reviewed (O-254).
+ * function of its arguments. overdueFactor, (1 - R(now)) / (1 - retention) with the retention of
+ * the same options, is the queue's due input: 1 at the due time, above 1 as recall decays, 1 for a
+ * class never reviewed (O-254), and at least 1 for a due learning or relearning step (O-195).
  *
  * Purity: ts-fsrs takes the review time as an argument (next(card, now, grade),
  * get_retrievability(card, now), next_state(state, elapsedDays, grade)), so the adapter passes the
@@ -35,7 +36,15 @@ import {
 } from "ts-fsrs";
 import type { Card, FSRS, FSRSParameters, FSRSState, Grade } from "ts-fsrs";
 
-import { elementAt, isList, requireBoolean, requireNonNegative, requireOneOf } from "./validate.js";
+import {
+  elementAt,
+  isList,
+  requireBoolean,
+  requireKey,
+  requireNonNegative,
+  requireOneOf,
+  requireUnitInterval,
+} from "./validate.js";
 
 /** The version string of the ts-fsrs build this adapter imports, for example "v5.4.2 using FSRS-6.0" (O-35). */
 export const FSRS_LIBRARY_VERSION: string = FSRSVersion;
@@ -83,13 +92,6 @@ const RATING_OF: Readonly<Record<FsrsGrade, Grade>> = Object.freeze({
 /** Fuzz is always off so a review is a function of its arguments (O-253). */
 const ENABLE_FUZZ = false;
 
-function requireUnitScore(value: number, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
-    throw new RangeError(`${field} must be a number from 0 to 1, got ${String(value)}`);
-  }
-  return value;
-}
-
 function requireRetention(value: number, field: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value >= 1) {
     throw new RangeError(`${field} must be a number strictly between 0 and 1, got ${String(value)}`);
@@ -100,13 +102,6 @@ function requireRetention(value: number, field: string): number {
 function requireDate(value: Date, field: string): Date {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new RangeError(`${field} must be a valid Date, got ${String(value)}`);
-  }
-  return value;
-}
-
-function requireKey(value: string, field: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new RangeError(`${field} must be a non-empty string, got ${String(value)}`);
   }
   return value;
 }
@@ -155,7 +150,7 @@ function ratingOf(grade: FsrsGrade, field: string): Grade {
 
 /** The FSRS grade of a mean score; Easy needs a median response faster than typical (06 section 4). */
 export function gradeFromMean(meanScore: number, fasterThanTypical: boolean): FsrsGrade {
-  const mean = requireUnitScore(meanScore, "meanScore");
+  const mean = requireUnitInterval(meanScore, "meanScore");
   const faster = requireBoolean(fasterThanTypical, "fasterThanTypical");
   if (mean < GRADE_THRESHOLDS.hard) {
     return "Again";
@@ -185,7 +180,7 @@ export function reviewGrade(outcome: ReviewOutcome): FsrsGrade {
   if (!isList(scores) || scores.length === 0) {
     throw new RangeError("scores must list at least one score");
   }
-  scores.forEach((score, index) => requireUnitScore(score, `scores[${index}]`));
+  scores.forEach((score, index) => requireUnitInterval(score, `scores[${index}]`));
   if (!isList(responseMs) || responseMs.length !== scores.length) {
     throw new RangeError("responseMs must list one response time per score");
   }
@@ -274,20 +269,28 @@ export function isDue(spotClassCard: SpotClassCard, now: Date): boolean {
   return spotClassCard.card.due.getTime() <= requireDate(now, "now").getTime();
 }
 
+/** States whose steps run inside a day, where retrievability does not move yet (O-195). */
+const SHORT_TERM_STATES: readonly State[] = [State.Learning, State.Relearning];
+
+/** The overdue factor a due card in a same-day step gets at least (O-195). */
+const DUE_STEP_MIN_FACTOR = 1;
+
 /**
  * Overdue factor (1 - R(now)) / (1 - retention) (O-254): 1 at the due time, above 1 as recall
- * decays, below 1 before due, and 1 for a class with no card or a card never reviewed.
+ * decays, below 1 before due, and 1 for a class with no card or a card never reviewed. The
+ * retention is the one the card is scheduled with, options.requestRetention (default
+ * DESIRED_RETENTION), so a mastered class at 0.85 sits near 1 at its due time like any other
+ * (O-253). ts-fsrs moves retrievability only once a whole day has passed, so a card in a
+ * learning or relearning step that is due gets at least 1, and same-day steps reach the queue
+ * (O-195).
  */
-export function overdueFactor(
-  spotClassCard: SpotClassCard | null,
-  now: Date,
-  retention: number = DESIRED_RETENTION,
-  options: FsrsOptions = {},
-): number {
-  const target = requireRetention(retention, "retention");
+export function overdueFactor(spotClassCard: SpotClassCard | null, now: Date, options: FsrsOptions = {}): number {
+  const parameters = parametersOf(options);
   const at = requireDate(now, "now");
   if (spotClassCard === null || spotClassCard.card.state === State.New) {
     return 1;
   }
-  return (1 - retrievability(spotClassCard, at, options)) / (1 - target);
+  const factor = (1 - retrievability(spotClassCard, at, options)) / (1 - parameters.request_retention);
+  const dueStep = SHORT_TERM_STATES.includes(spotClassCard.card.state) && isDue(spotClassCard, at);
+  return dueStep ? Math.max(factor, DUE_STEP_MIN_FACTOR) : factor;
 }

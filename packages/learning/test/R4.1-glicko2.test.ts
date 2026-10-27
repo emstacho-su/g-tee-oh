@@ -19,6 +19,7 @@ import {
   GLICKO2_DEFAULTS as SRC_DEFAULTS,
   GLICKO2_EPSILON as SRC_EPSILON,
   GLICKO2_SCALE as SRC_SCALE,
+  GLICKO2_MAX_RD,
   GLICKO2_TAU as SRC_TAU,
   applyInactivity,
   conservativeRating,
@@ -201,6 +202,24 @@ describe("R4.1 Glicko-2 per track (S30, ADR 0011, O-56)", () => {
       expect(updated.volatility).toBe(afterOnePeriod.volatility);
       expect(Math.abs(updated.rd - afterOnePeriod.rd)).toBeLessThan(tolerance.rd);
     }
+  });
+
+  it("R4.1 inactivity RD is capped at the starting RD of 350, so an idle track is never less certain than a newcomer (O-259)", () => {
+    expect(GLICKO2_MAX_RD).toBe(SRC_DEFAULTS.rd);
+    for (const periods of [52, 104]) {
+      expect(applyInactivity(newTrackRating(), periods).rd).toBe(GLICKO2_MAX_RD);
+      const nearCap = { rating: 1600, rd: 340, volatility: 0.06 };
+      const idle = applyInactivity(nearCap, periods);
+      expect(idle.rd).toBeLessThanOrEqual(GLICKO2_MAX_RD);
+      expect(idle.rating).toBe(nearCap.rating);
+      const stepwise = Array.from({ length: periods }).reduce<TrackRating>((state) => ratePeriod(state, []), nearCap);
+      expect(stepwise.rd).toBeLessThanOrEqual(GLICKO2_MAX_RD);
+      expect(conservativeRating(idle)).toBeGreaterThanOrEqual(conservativeRating(newTrackRating()));
+    }
+    // Uncapped, 104 periods from 340 would reach about 356; the cap holds it at 350.
+    expect(applyInactivity({ rating: 1600, rd: 340, volatility: 0.06 }, 104).rd).toBe(GLICKO2_MAX_RD);
+    // A track already above the cap never has its RD lowered by inactivity.
+    expect(applyInactivity({ rating: 1500, rd: 400, volatility: 0.06 }, 1).rd).toBe(400);
   });
 
   it("R4.1 inactivity never subtracts points: ten empty periods take RD to about 202.6978 and the rating stays 1500", () => {

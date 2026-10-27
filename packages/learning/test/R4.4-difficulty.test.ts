@@ -26,8 +26,6 @@ const DIFFICULTY_MAX = 1900;
 const BASE_FEATURES: DifficultyFeatures = Object.freeze({
   evGapPctPot: 1,
   purity: 0.7,
-  nActions: 3,
-  mixed: true,
   allWithinFloor: false,
 });
 
@@ -44,8 +42,6 @@ const purity = fc.double({ min: 0, max: 1, noNaN: true });
 const featuresArbitrary: fc.Arbitrary<DifficultyFeatures> = fc.record({
   evGapPctPot: gap,
   purity,
-  nActions: fc.integer({ min: 1, max: 8 }),
-  mixed: fc.boolean(),
   allWithinFloor: fc.boolean(),
 });
 
@@ -64,7 +60,7 @@ describe("R4.4 item difficulty (O-250)", () => {
     // gap 0, purity 0.5: 1100 + 400 + 400 = 1900, the hardest item
     expect(itemDifficulty({ ...BASE_FEATURES, evGapPctPot: 0, purity: 0.5 }).difficulty).toBe(DIFFICULTY_MAX);
     // gap 18, purity 1: 1100 + 400 / 10 + 0 = 1140
-    expect(itemDifficulty({ ...BASE_FEATURES, evGapPctPot: 18, purity: 1, mixed: false }).difficulty).toBeCloseTo(1140, 9);
+    expect(itemDifficulty({ ...BASE_FEATURES, evGapPctPot: 18, purity: 1 }).difficulty).toBeCloseTo(1140, 9);
   });
 
   it("R4.4 difficulty is non-increasing in the EV gap (fast-check)", () => {
@@ -128,9 +124,6 @@ describe("R4.4 input checks (RangeError naming the field)", () => {
     ["purity below 0", { ...BASE_FEATURES, purity: -0.01 }, /purity/],
     ["purity above 1", { ...BASE_FEATURES, purity: 1.01 }, /purity/],
     ["purity NaN", { ...BASE_FEATURES, purity: Number.NaN }, /purity/],
-    ["nActions fractional", { ...BASE_FEATURES, nActions: 2.5 }, /nActions/],
-    ["nActions negative", { ...BASE_FEATURES, nActions: -1 }, /nActions/],
-    ["mixed not a boolean", { ...BASE_FEATURES, mixed: 1 as unknown as boolean }, /mixed/],
     ["allWithinFloor not a boolean", { ...BASE_FEATURES, allWithinFloor: "no" as unknown as boolean }, /allWithinFloor/],
   ];
   it.each(rows)("R4.4 %s is a RangeError", (_label, features, field) => {

@@ -331,12 +331,46 @@ describe("R4.6 FSRS adapter over ts-fsrs (S30, ADR 0012, O-35)", () => {
     expect(atDue).toBeLessThan(1.1);
     expect(overdueFactor(card, card.card.last_review ?? FIXED_TIME)).toBe(0);
     expect(overdueFactor(card, new Date(due.getTime() + 60 * DAY_MS))).toBeGreaterThan(1);
-    const masteredFactor = overdueFactor(card, due, MASTERED_RETENTION);
-    expect(masteredFactor).toBeCloseTo((1 - retrievability(card, due)) / (1 - MASTERED_RETENTION), 12);
-    expect(masteredFactor).toBeLessThan(atDue);
+    const masteredOptions: FsrsOptions = { requestRetention: MASTERED_RETENTION };
+    const masteredFactor = overdueFactor(card, due, masteredOptions);
+    expect(masteredFactor).toBeCloseTo(
+      (1 - retrievability(card, due, masteredOptions)) / (1 - MASTERED_RETENTION),
+      12,
+    );
     expect(isDue(card, due)).toBe(true);
     expect(isDue(card, new Date(due.getTime() - 1))).toBe(false);
     expect(retrievability(newSpotClassCard(KEY, FIXED_TIME), FIXED_TIME)).toBe(0);
+  });
+
+  it("R4.6 the overdue factor reads its retention from the scheduling options: at its due time a mastered class (0.85) and an unmastered class (0.9) both sit near 1 (O-253, O-254)", () => {
+    const unmasteredOptions: FsrsOptions = { requestRetention: retentionFor(false) };
+    const masteredOptions: FsrsOptions = { requestRetention: retentionFor(true) };
+    const unmastered = reviewStateCard(unmasteredOptions);
+    const mastered = reviewStateCard(masteredOptions);
+    const unmasteredAtDue = overdueFactor(unmastered, unmastered.card.due, unmasteredOptions);
+    const masteredAtDue = overdueFactor(mastered, mastered.card.due, masteredOptions);
+    // ts-fsrs rounds intervals to whole days, so the factor at the due time is near 1, not exactly 1.
+    expect(unmasteredAtDue).toBeGreaterThan(0.85);
+    expect(unmasteredAtDue).toBeLessThan(1.15);
+    expect(masteredAtDue).toBeGreaterThan(0.85);
+    expect(masteredAtDue).toBeLessThan(1.15);
+    // The mastered class is spaced further apart, never pushed up the queue at its due time.
+    expect(mastered.card.due.getTime()).toBeGreaterThan(unmastered.card.due.getTime());
+  });
+
+  it("R4.6 a due learning or relearning card gets an overdue factor of at least 1, so same-day FSRS steps reach the queue (O-195)", () => {
+    const learning = reviewSpotClass(newSpotClassCard(KEY, FIXED_TIME), "Again", FIXED_TIME);
+    expect(learning.card.state).toBe(State.Learning);
+    expect(learning.card.due.getTime() - FIXED_TIME.getTime()).toBeLessThan(DAY_MS);
+    expect(overdueFactor(learning, learning.card.due)).toBeGreaterThanOrEqual(1);
+    expect(overdueFactor(learning, new Date(learning.card.due.getTime() + 60_000))).toBeGreaterThanOrEqual(1);
+    expect(overdueFactor(learning, FIXED_TIME)).toBeLessThan(1);
+
+    const review = reviewStateCard();
+    const relearning = reviewSpotClass(review, "Again", review.card.due);
+    expect(relearning.card.state).toBe(State.Relearning);
+    expect(overdueFactor(relearning, relearning.card.due)).toBeGreaterThanOrEqual(1);
+    expect(overdueFactor(relearning, review.card.due)).toBeLessThan(1);
   });
 
   it("R4.6 invalid input throws a RangeError naming the field", () => {
@@ -376,7 +410,7 @@ describe("R4.6 FSRS adapter over ts-fsrs (S30, ADR 0012, O-35)", () => {
     expect(() => memoryState([{ grade: "Good", elapsedDays: -1 }])).toThrow(/steps\[0\]\.elapsedDays/);
     expect(() => memoryState([{ grade: "Fine" as FsrsGrade, elapsedDays: 0 }])).toThrow(/steps\[0\]\.grade/);
     expect(() => retrievability(card, new Date(Number.NaN))).toThrow(/at/);
-    expect(() => overdueFactor(card, FIXED_TIME, 1)).toThrow(/retention/);
+    expect(() => overdueFactor(card, FIXED_TIME, { requestRetention: 1 })).toThrow(/options.requestRetention/);
     expect(() => isDue(card, new Date(Number.NaN))).toThrow(/now/);
   });
 });

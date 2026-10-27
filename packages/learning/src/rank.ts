@@ -15,7 +15,7 @@
  */
 import { conservativeRating } from "./glicko2.js";
 import type { TrackRating } from "./glicko2.js";
-import { elementAt, isList, requireNonNegative } from "./validate.js";
+import { elementAt, isList, requireKey, requireNonNegative } from "./validate.js";
 
 /** Tier names (O-8 placeholders). */
 export type Tier = "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
@@ -58,9 +58,7 @@ function validateTracks(tracks: readonly TrackStanding[]): void {
   }
   const seen = new Set<string>();
   tracks.forEach((track, index) => {
-    if (typeof track.trackKey !== "string" || track.trackKey.length === 0) {
-      throw new RangeError(`tracks[${index}].trackKey must be a non-empty string`);
-    }
+    requireKey(track.trackKey, `tracks[${index}].trackKey`);
     if (seen.has(track.trackKey)) {
       throw new RangeError(`tracks[${index}].trackKey is a duplicate of ${track.trackKey}`);
     }
@@ -105,13 +103,17 @@ export function bandTier(overall: number): Tier {
   return tierAt(bandIndex(overall)).tier;
 }
 
-/** The tracks that keep the tier at index from being shown: RD at or above the cap, or under its floor. */
+/**
+ * The tracks that keep the tier at index from being shown: RD at or above the cap, or under its
+ * floor. A track with weight 0 does not count in the overall rating, so it does not block either.
+ */
 function blockersAt(tracks: readonly TrackStanding[], index: number): string[] {
   if (index === BASE_TIER_INDEX) {
     return [];
   }
   const { floor } = tierAt(index);
   return tracks
+    .filter((track) => track.weight > 0)
     .filter((track) => track.rating.rd >= PROMOTION_RD_CAP || conservativeRating(track.rating) < floor)
     .map((track) => track.trackKey);
 }

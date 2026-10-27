@@ -3,9 +3,9 @@
  * section 3; 06 section 4). Owner: S30 (p4/learning), closing R4.9.
  *
  * Mechanism: services/api builds one QueueCandidate per spot class it can serve, with priority =
- * leak cost x overdue factor (queuePriority; the overdue factor is src/fsrs.ts overdueFactor,
- * O-254, and a never-practiced class takes its leak cost from the frequency prior, ADR 0013,
- * O-255). pickNext then applies the rules of O-256 in order:
+ * max(leak cost, LEAK_COST_FLOOR_BB_PER_1000) x overdue factor (queuePriority; the overdue factor
+ * is src/fsrs.ts overdueFactor, O-254, O-195, and a never-practiced class takes its leak cost from
+ * the frequency prior, ADR 0013, O-255; the floor keeps every due class drawable, O-255). pickNext then applies the rules of O-256 in order:
  *   1. The interleave rule: only candidates whose action family differs from the last pick's are
  *      eligible. With one family only, the rule relaxes and every candidate is eligible.
  *   2. Hypercorrection (05 section 5, O-215): the first key of state.hypercorrection (most recent
@@ -23,7 +23,7 @@
 import { promoteConfidentMiss } from "./calibration.js";
 import type { ConfidenceAttempt } from "./calibration.js";
 import type { RandomSource } from "./types.js";
-import { elementAt, isList, requireBoolean, requireNonNegative, requireStringList } from "./validate.js";
+import { elementAt, isList, requireBoolean, requireKey, requireNonNegative, requireStringList } from "./validate.js";
 
 /** One spot class the queue may serve: its key, its action family, its priority, and whether it is new. */
 export type QueueCandidate = Readonly<{
@@ -52,23 +52,26 @@ export type QueuePick = Readonly<{
 /** One pick and the queue state after it. */
 export type QueueStep = Readonly<{ pick: QueuePick; state: QueueState }>;
 
-/** Priority of a class: leak cost in bb per 1,000 hands times the overdue factor (A6 section 3). */
+/**
+ * The smallest leak cost a class counts with in its priority, in bb per 1,000 hands (O-255). A
+ * class with no misses, or a never-practiced class in a track with no misses, has leak cost 0 and
+ * would never be drawn while any positive priority exists, so it would miss its first exposure and
+ * its reviews. 0.1 bb per 1,000 hands is one 1 bb mistake per 10,000 hands: at equal overdue
+ * factors such a class is drawn about 1 time in 45 against the 4.5 bb worked row of 06 section 6,
+ * enough to keep clean classes in rotation without crowding out real leaks. The floor scales with
+ * the overdue factor, so a class that is not due (factor 0) still waits for its due time.
+ */
+export const LEAK_COST_FLOOR_BB_PER_1000 = 0.1;
+
+/** Priority of a class: max(leak cost, the floor) in bb per 1,000 hands times the overdue factor (A6 section 3, O-255). */
 export function queuePriority(leakCostBbPer1000: number, overdueFactor: number): number {
   const leakCost = requireNonNegative(leakCostBbPer1000, "leakCostBbPer1000");
-  return leakCost * requireNonNegative(overdueFactor, "overdueFactor");
+  return Math.max(leakCost, LEAK_COST_FLOOR_BB_PER_1000) * requireNonNegative(overdueFactor, "overdueFactor");
 }
 
 /** The state before the first pick: no last family and no pending miss. */
 export function emptyQueueState(): QueueState {
   return Object.freeze({ lastFamily: null, hypercorrection: Object.freeze([]) });
-}
-
-/** A non-empty string, or a RangeError naming the field. */
-function requireKey(value: string, field: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new RangeError(`${field} must be a non-empty string, got ${String(value)}`);
-  }
-  return value;
 }
 
 function requireState(state: QueueState): QueueState {
@@ -116,17 +119,22 @@ function drawUnit(random: RandomSource): number {
 
 /**
  * One candidate drawn in proportion to priority with exactly one draw. The cumulative walk runs
- * over positive priorities only; the index is clamped so rounding can never step past the end.
+ * over positive priorities only with a running total; a target past every earlier band falls in
+ * the last one, so rounding can never step past the end.
  */
 function drawByPriority(eligible: readonly QueueCandidate[], random: RandomSource): QueueCandidate {
   const draw = drawUnit(random);
   const positive = eligible.filter((candidate) => candidate.priority > 0);
   const pool = positive.length === 0 ? eligible : positive;
   const weights = pool.map((candidate) => (positive.length === 0 ? 1 : candidate.priority));
-  const cumulative = weights.reduce<number[]>((sums, weight) => [...sums, (sums.at(-1) ?? 0) + weight], []);
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   const target = draw * total;
-  const index = Math.min(cumulative.filter((sum) => sum <= target).length, pool.length - 1);
+  let runningTotal = 0;
+  const found = weights.slice(0, -1).findIndex((weight) => {
+    runningTotal += weight;
+    return target < runningTotal;
+  });
+  const index = found === -1 ? pool.length - 1 : found;
   return elementAt(pool, index, "candidates");
 }
 

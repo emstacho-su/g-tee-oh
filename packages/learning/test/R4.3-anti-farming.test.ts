@@ -35,7 +35,7 @@ const RATED_INPUT: GradeInput = Object.freeze({
 });
 
 /** Synthetic solver features of the fixture node: a 1 percent gap and purity 0.7 give 1606.67. */
-const ITEM = itemDifficulty({ evGapPctPot: 1, purity: 0.7, nActions: 3, mixed: true, allWithinFloor: false });
+const ITEM = itemDifficulty({ evGapPctPot: 1, purity: 0.7, allWithinFloor: false });
 
 /** A track part way through calibration. */
 const PLAYER: TrackRating = Object.freeze({ rating: 1540, rd: 180, volatility: 0.06 });

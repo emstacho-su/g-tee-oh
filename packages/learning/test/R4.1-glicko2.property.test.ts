@@ -12,6 +12,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import {
+  GLICKO2_MAX_RD,
   GLICKO2_DEFAULTS,
   GLICKO2_SCALE,
   INACTIVITY_PERIOD_DAYS,
@@ -141,15 +142,20 @@ describe("R4.1 Glicko-2 properties (fast-check)", () => {
     );
   });
 
-  it("R4.1 inactivity grows RD monotonically with the number of empty periods and never moves the rating", () => {
+  it("R4.1 inactivity grows RD with the number of empty periods up to the 350 cap and never moves the rating (O-259)", () => {
     fc.assert(
       fc.property(playerArbitrary, fc.integer({ min: 0, max: 520 }), (player, periods) => {
         const now = applyInactivity(player, periods);
         const later = applyInactivity(player, periods + 1);
-        expect(later.rd).toBeGreaterThan(now.rd);
+        if (now.rd < GLICKO2_MAX_RD) {
+          expect(later.rd).toBeGreaterThan(now.rd);
+          expect(conservativeRating(later)).toBeLessThan(conservativeRating(now));
+        } else {
+          expect(later.rd).toBe(now.rd);
+        }
+        expect(later.rd).toBeLessThanOrEqual(Math.max(player.rd, GLICKO2_MAX_RD));
         expect(now.rating).toBe(player.rating);
         expect(now.volatility).toBe(player.volatility);
-        expect(conservativeRating(later)).toBeLessThan(conservativeRating(now));
       }),
     );
   });
@@ -223,12 +229,22 @@ describe("R4.1 Glicko-2 input checks (RangeError naming the field)", () => {
     expect(() => ratePeriod(VALID_PLAYER, [result])).toThrow(field);
   });
 
-  it("R4.1 results that are not a list, a non-positive tau and results too far away to inform the rating are RangeErrors", () => {
+  it("R4.1 results that are not a list and a non-positive tau are RangeErrors", () => {
     expect(() => ratePeriod(VALID_PLAYER, "results" as unknown as PeriodResult[])).toThrow(/results/);
     expect(() => ratePeriod(VALID_PLAYER, [VALID_RESULT], 0)).toThrow(/tau/);
     expect(() => ratePeriod(VALID_PLAYER, [VALID_RESULT], Number.NaN)).toThrow(/tau/);
+  });
+
+  it("R4.1 results too far away to inform the rating leave the player unchanged instead of throwing, and a session degrades the same way", () => {
     const unreachable = { opponent: { rating: 1e9, rd: 0 }, score: 1 };
-    expect(() => ratePeriod(VALID_PLAYER, [unreachable])).toThrow(RangeError);
+    expect(ratePeriod(VALID_PLAYER, [unreachable])).toEqual(VALID_PLAYER);
+    const extremeGap: SessionDecision = { difficulty: 1e9, score: 0, rated: true, weight: 1 };
+    expect(rateSession(VALID_PLAYER, [extremeGap, extremeGap])).toEqual(VALID_PLAYER);
+    // An informative result in the same session still counts; only the empty one is skipped.
+    const informative: SessionDecision = { difficulty: VALID_PLAYER.rating, score: 1, rated: true, weight: 1 };
+    const mixed = rateSession(VALID_PLAYER, [extremeGap, informative]);
+    expect(mixed.rating).toBeGreaterThan(VALID_PLAYER.rating);
+    expect(mixed).toEqual(rateSession(VALID_PLAYER, [informative]));
   });
 
   it("R4.1 results whose weights are all zero form an empty period (the inactivity step)", () => {

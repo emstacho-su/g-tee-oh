@@ -22,7 +22,16 @@
  */
 import { isCorrectLabel } from "./calibration.js";
 import type { GradeLabel } from "./types.js";
-import { elementAt, isList, requireCount, requireIntegerInRange, requireNonNegative } from "./validate.js";
+import {
+  elementAt,
+  requireCount,
+  requireIntegerInRange,
+  requireKey,
+  requireList,
+  requireNonNegative,
+  requireRecord,
+  requireUnitInterval,
+} from "./validate.js";
 
 /** Leak cost is stated per this many hands (06 section 6). */
 export const HANDS_PER_UNIT = 1000;
@@ -74,35 +83,9 @@ export type LeakStat = Readonly<{
 /** One A4 leak_history row in camelCase. */
 export type LeakHistoryRow = Readonly<{ spotClassKey: string; week: string; leakCostBbPer1k: number }>;
 
-function requireProbability(value: number, field: string): number {
-  if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new RangeError(`${field} must be a finite number from 0 to 1, got ${value}`);
-  }
-  return value;
-}
-
-function requireRecord(value: unknown, field: string): void {
-  if (typeof value !== "object" || value === null) {
-    throw new RangeError(`${field} must be an object`);
-  }
-}
-
-function requireListOf(value: unknown, field: string): void {
-  if (!isList(value)) {
-    throw new RangeError(`${field} must be a list`);
-  }
-}
-
-function requireKey(value: string, field: string): string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new RangeError(`${field} must be a non-empty string`);
-  }
-  return value;
-}
-
 function requireTrack(track: TrackAverage, field: string): TrackAverage {
   requireRecord(track, field);
-  requireProbability(track.missRate, `${field}.missRate`);
+  requireUnitInterval(track.missRate, `${field}.missRate`);
   requireNonNegative(track.evPerMissBb, `${field}.evPerMissBb`);
   return track;
 }
@@ -111,7 +94,7 @@ function requireClassStat(stat: ClassStat, field: string): ClassStat {
   requireRecord(stat, field);
   const n = requireCount(stat.n, `${field}.n`);
   requireIntegerInRange(stat.misses, 0, n, `${field}.misses`);
-  requireProbability(stat.missRate, `${field}.missRate`);
+  requireUnitInterval(stat.missRate, `${field}.missRate`);
   requireNonNegative(stat.evPerMissBb, `${field}.evPerMissBb`);
   return stat;
 }
@@ -124,7 +107,7 @@ function requireLeakStat(stat: LeakStat, field: string): LeakStat {
 }
 
 function requireLeakStats(stats: readonly LeakStat[], field: string): readonly LeakStat[] {
-  requireListOf(stats, field);
+  requireList(stats, field);
   stats.forEach((stat, index) => requireLeakStat(stat, `${field}[${index}]`));
   return stats;
 }
@@ -144,13 +127,13 @@ function isMiss(decision: LeakDecision, field: string): boolean {
 /** Spots per 1,000 hands from the equilibrium reach prior: 1,000 x (1 / tableSize) x reach (ADR 0013). */
 export function frequencyPriorPer1000(tableSize: number, reachProbability: number): number {
   const seats = requireIntegerInRange(tableSize, MIN_TABLE_SIZE, MAX_TABLE_SIZE, "tableSize");
-  const reach = requireProbability(reachProbability, "reachProbability");
+  const reach = requireUnitInterval(reachProbability, "reachProbability");
   return HANDS_PER_UNIT * (1 / seats) * reach;
 }
 
 /** Raw stat of a class; with no decisions or no misses the missing ratio is 0 (shrinkage fills it). */
 export function classStat(decisions: readonly LeakDecision[]): ClassStat {
-  requireListOf(decisions, "decisions");
+  requireList(decisions, "decisions");
   const misses = decisions.filter((decision, index) => isMiss(decision, `decisions[${index}]`));
   const n = decisions.length;
   const lossOverMisses = misses.reduce((sum, decision) => sum + decision.evLossBb, 0);
@@ -168,7 +151,7 @@ export function classStat(decisions: readonly LeakDecision[]): ClassStat {
  * zero miss rate: startingLeakCost reads null as "no history" (O-255).
  */
 export function trackAverage(stats: readonly ClassStat[]): TrackAverage | null {
-  requireListOf(stats, "stats");
+  requireList(stats, "stats");
   stats.forEach((stat, index) => requireClassStat(stat, `stats[${index}]`));
   const decisions = stats.reduce((sum, stat) => sum + stat.n, 0);
   const misses = stats.reduce((sum, stat) => sum + stat.misses, 0);
@@ -199,7 +182,7 @@ export function shrinkTowardTrack(stat: ClassStat, track: TrackAverage): ShrunkS
 export function leakCost(input: LeakCostInput): number {
   requireRecord(input, "input");
   const frequency = requireNonNegative(input.frequencyPer1000, "frequencyPer1000");
-  const missRate = requireProbability(input.missRate, "missRate");
+  const missRate = requireUnitInterval(input.missRate, "missRate");
   const evPerMissBb = requireNonNegative(input.evPerMissBb, "evPerMissBb");
   return frequency * missRate * evPerMissBb;
 }
@@ -282,10 +265,12 @@ function requireWeek(week: string): string {
 export function leakHistorySnapshot(week: string, stats: readonly LeakStat[]): readonly LeakHistoryRow[] {
   const checkedWeek = requireWeek(week);
   requireLeakStats(stats, "stats");
+  const seen = new Set<string>();
   stats.forEach((stat, index) => {
-    if (stats.findIndex((other) => other.spotClassKey === stat.spotClassKey) !== index) {
+    if (seen.has(stat.spotClassKey)) {
       throw new RangeError(`stats[${index}].spotClassKey must be unique in one week, got ${stat.spotClassKey} twice`);
     }
+    seen.add(stat.spotClassKey);
   });
   return stats.map((stat) => ({
     spotClassKey: stat.spotClassKey,

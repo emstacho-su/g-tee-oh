@@ -19,8 +19,8 @@ import { describe, expect, it } from "vitest";
 
 import type { ConfidenceAttempt } from "../src/calibration.js";
 import { overdueFactor } from "../src/fsrs.js";
-import { startingLeakCost, trackAverage } from "../src/leak-cost.js";
-import { emptyQueueState, pickNext, queuePriority, recordAttempt } from "../src/queue.js";
+import { classStat, leakStat, startingLeakCost, trackAverage } from "../src/leak-cost.js";
+import { LEAK_COST_FLOOR_BB_PER_1000, emptyQueueState, pickNext, queuePriority, recordAttempt } from "../src/queue.js";
 import type { QueueCandidate, QueuePick, QueueState } from "../src/queue.js";
 import { splitMix64Source } from "../src/random.js";
 import type { RandomSource } from "../src/types.js";
@@ -207,6 +207,61 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
       expect(step.pick).toMatchObject({ spotClassKey: QUEUE_NEW_CLASS_ROW.spotClass, panelsVisible: true, rated: false });
     },
   );
+
+  it("R4.9 priority floor: a zero leak cost still gives LEAK_COST_FLOOR_BB_PER_1000 x overdue factor, so every due class keeps a chance (O-255)", () => {
+    expect(LEAK_COST_FLOOR_BB_PER_1000).toBeGreaterThan(0);
+    expect(queuePriority(0, 1)).toBe(LEAK_COST_FLOOR_BB_PER_1000);
+    expect(queuePriority(0, 2)).toBeCloseTo(2 * LEAK_COST_FLOOR_BB_PER_1000, 12);
+    expect(queuePriority(LEAK_COST_FLOOR_BB_PER_1000 / 2, 1)).toBe(LEAK_COST_FLOOR_BB_PER_1000);
+    // A class that is not due yet (factor 0) stays out of the draw: the floor never overrides spacing.
+    expect(queuePriority(0, 0)).toBe(0);
+    expect(queuePriority(QUEUE_PRIORITY_ROW.leakCostBbPer1000, QUEUE_PRIORITY_ROW.overdueFactor)).toBe(6.75);
+  });
+
+  it("R4.9 a never-practiced class in a track with no misses is still drawn under a fixed seed (O-255, O-254)", () => {
+    const cleanTrack = trackAverage([classStat([{ label: "Best", evLossBb: 0 }, { label: "Correct", evLossBb: 0 }])]);
+    const newClassLeak = startingLeakCost(QUEUE_NEW_CLASS_ROW.frequencyPriorPer1000, cleanTrack);
+    expect(newClassLeak).toBe(0);
+    const newClass: QueueCandidate = {
+      spotClassKey: QUEUE_NEW_CLASS_ROW.spotClass,
+      family: "facing-3bet",
+      priority: queuePriority(newClassLeak, overdueFactor(null, new Date(Date.UTC(2026, 10, 3)))),
+      firstExposure: true,
+    };
+    const candidates = [
+      { spotClassKey: "rfi/CO/100bb/online", family: "rfi", priority: queuePriority(4.5, 1), firstExposure: false },
+      { spotClassKey: "facing-open/BTN-vs-CO/100bb/online", family: "facing-open", priority: queuePriority(4.5, 1), firstExposure: false },
+      newClass,
+    ];
+    const { picks } = runPicks(candidates, INTERLEAVE_PICK_COUNT, splitMix64Source(BigInt(INTERLEAVE_SEED)));
+    const served = picks.filter((pick) => pick.spotClassKey === newClass.spotClassKey);
+    expect(served.length).toBeGreaterThan(0);
+    expect(served[0]).toMatchObject({ firstExposure: true, panelsVisible: true, rated: false });
+  });
+
+  it("R4.9 a class played perfectly 30 or more times is still drawn when overdue (O-255, O-254)", () => {
+    const perfect = leakStat(
+      "bvb/SB-vs-BB/100bb/online",
+      20,
+      Array.from({ length: 40 }, () => ({ label: "Best" as const, evLossBb: 0 })),
+      { missRate: 0.2, evPerMissBb: 1 },
+    );
+    expect(perfect.leakCostBbPer1k).toBe(0);
+    const overdue: QueueCandidate = {
+      spotClassKey: perfect.spotClassKey,
+      family: "blind-vs-blind",
+      priority: queuePriority(perfect.leakCostBbPer1k, 2),
+      firstExposure: false,
+    };
+    const candidates = [
+      { spotClassKey: "rfi/CO/100bb/online", family: "rfi", priority: queuePriority(4.5, 1), firstExposure: false },
+      { spotClassKey: "facing-open/BTN-vs-CO/100bb/online", family: "facing-open", priority: queuePriority(4.5, 1), firstExposure: false },
+      overdue,
+    ];
+    const { picks } = runPicks(candidates, INTERLEAVE_PICK_COUNT, splitMix64Source(BigInt(INTERLEAVE_SEED)));
+    expect(picks.some((pick) => pick.spotClassKey === overdue.spotClassKey)).toBe(true);
+    expectNoConsecutiveFamily(picks);
+  });
 
   it("R4.9 first exposure is a worked example: the first pick of a new class is served with panels visible and rated false (A6 section 3)", () => {
     const fresh = pickNext(emptyQueueState(), [{ ...LOW_PRIORITY_CLASS, firstExposure: true }], () => 0);
