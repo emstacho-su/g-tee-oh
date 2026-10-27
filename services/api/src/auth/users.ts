@@ -11,7 +11,8 @@
  * minimum applies to new accounts only; login accepts any stored password. The password is hashed
  * with argon2id (password.ts) and never leaves this module in any form but the hash. A duplicate is
  * detected from Postgres' unique-violation code rather than by a lookup first, so two concurrent
- * calls cannot both succeed.
+ * calls cannot both succeed. isAdmin sets app_user.is_admin, which the admin builder endpoints
+ * require (O-242); it defaults to false.
  */
 import { z } from "zod";
 
@@ -41,11 +42,14 @@ export class CreateUserError extends Error {
 export interface NewUserInput {
   email: string;
   password: string;
+  /** May use the admin builder endpoints (O-242); false when absent. */
+  isAdmin?: boolean;
 }
 
 export interface CreatedUser {
   id: string;
   email: string;
+  isAdmin: boolean;
   createdAt: Date;
 }
 
@@ -89,10 +93,10 @@ export async function createUser(database: Database, input: NewUserInput): Promi
   try {
     const row = await database
       .insertInto("app_user")
-      .values({ email, password_hash: passwordHash })
-      .returning(["id", "email", "created_at"])
+      .values({ email, password_hash: passwordHash, is_admin: input.isAdmin ?? false })
+      .returning(["id", "email", "is_admin", "created_at"])
       .executeTakeFirstOrThrow();
-    return { id: row.id, email: row.email, createdAt: row.created_at };
+    return { id: row.id, email: row.email, isAdmin: row.is_admin, createdAt: row.created_at };
   } catch (error: unknown) {
     if (pgErrorCode(error) === PG_ERROR.uniqueViolation) {
       throw new CreateUserError("duplicate-email", `A user with the email ${email} already exists.`);

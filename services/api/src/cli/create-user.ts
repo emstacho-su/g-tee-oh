@@ -2,7 +2,9 @@
  * The create-user command (R3.1, O-233), bundled to dist/create-user.js (build.mjs). A5 has no
  * sign-up route, so this is how the owner account is made:
  *
- *   printf '%s\n' "$PASSWORD" | node dist/create-user.js --email owner@example.com
+ *   printf '%s\n' "$PASSWORD" | node dist/create-user.js --email owner@example.com [--admin]
+ *
+ * --admin sets app_user.is_admin, which the admin builder endpoints require (O-242).
  *
  * Mechanism: the arguments and the first line of standard input are parsed by create-user-args.ts,
  * the database settings come from the same environment variables the server reads
@@ -24,12 +26,12 @@ const ARGV_OFFSET = 2;
 async function run(): Promise<void> {
   let password: string | undefined;
   try {
-    const { email } = parseCreateUserArgs(process.argv.slice(ARGV_OFFSET));
+    const { email, admin } = parseCreateUserArgs(process.argv.slice(ARGV_OFFSET));
     password = await readFirstLine(process.stdin);
     const { database: databaseConfig } = loadProcessConfig(process.env);
     const database = createDatabase(databaseConfig);
     try {
-      const user = await createUser(database, { email, password });
+      const user = await createUser(database, { email, password, isAdmin: admin });
       process.stdout.write(`${user.id}\n`);
     } finally {
       await database.destroy();

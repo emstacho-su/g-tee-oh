@@ -93,6 +93,21 @@ describe("R3.1 createUser (O-233)", () => {
     });
   });
 
+  it("R3.5 createUser sets is_admin only when asked (O-242)", async () => {
+    const plain = await createUser(database, { email: uniqueEmail("plain"), password: GOOD_PASSWORD });
+    const admin = await createUser(database, { email: uniqueEmail("admin"), password: GOOD_PASSWORD, isAdmin: true });
+
+    const rows = await database
+      .selectFrom("app_user")
+      .select(["id", "is_admin"])
+      .where("id", "in", [plain.id, admin.id])
+      .execute();
+    const flags = Object.fromEntries(rows.map((row) => [row.id, row.is_admin]));
+    expect(flags).toEqual({ [plain.id]: false, [admin.id]: true });
+    expect(admin.isAdmin).toBe(true);
+    expect(plain.isAdmin).toBe(false);
+  });
+
   it("R3.1 normalizeEmail trims and lowercases", () => {
     expect(normalizeEmail("  Owner@Example.COM\t")).toBe("owner@example.com");
   });
@@ -100,8 +115,19 @@ describe("R3.1 createUser (O-233)", () => {
 
 describe("R3.1 create-user command arguments (O-233)", () => {
   it("R3.1 parseCreateUserArgs reads --email VALUE and --email=VALUE", () => {
-    expect(parseCreateUserArgs(["--email", "owner@example.com"])).toEqual({ email: "owner@example.com" });
-    expect(parseCreateUserArgs(["--email=owner@example.com"])).toEqual({ email: "owner@example.com" });
+    expect(parseCreateUserArgs(["--email", "owner@example.com"])).toEqual({ email: "owner@example.com", admin: false });
+    expect(parseCreateUserArgs(["--email=owner@example.com"])).toEqual({ email: "owner@example.com", admin: false });
+  });
+
+  it("R3.5 parseCreateUserArgs reads the --admin flag before or after the email (O-242)", () => {
+    expect(parseCreateUserArgs(["--admin", "--email", "owner@example.com"])).toEqual({
+      email: "owner@example.com",
+      admin: true,
+    });
+    expect(parseCreateUserArgs(["--email=owner@example.com", "--admin"])).toEqual({
+      email: "owner@example.com",
+      admin: true,
+    });
   });
 
   it("R3.1 parseCreateUserArgs rejects a missing, empty, repeated or unknown argument", () => {
@@ -110,8 +136,12 @@ describe("R3.1 create-user command arguments (O-233)", () => {
       ["--email"],
       ["--email="],
       ["--email", "--password"],
+      ["--email", "--admin"],
       ["--email", "a@example.com", "--email", "b@example.com"],
+      ["--email", "a@example.com", "--admin", "--admin"],
+      ["--email", "a@example.com", "--admin=yes"],
       ["--email", "a@example.com", "--password", "secret"],
+      ["--admin"],
       ["a@example.com"],
     ];
     for (const argv of bad) {
