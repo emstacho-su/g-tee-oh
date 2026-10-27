@@ -127,7 +127,8 @@ describe('R0.6 role app (api)', () => {
       }
       await expectDenied(client, 'app', `update stake set label = label where false`);
       await expectDenied(client, 'app', `insert into solution default values`);
-      await expectDenied(client, 'app', `update builder_setting set value = value where false`);
+      // O-88, O-241: app may upsert builder_setting overrides (S23) but never delete one.
+      await expectDenied(client, 'app', `delete from builder_setting where false`);
     });
   });
 });
@@ -232,6 +233,62 @@ describe('R0.6 role capture (private repo, O-28)', () => {
       await expectDenied(client, 'capture', `insert into build_job default values`);
       await expectDenied(client, 'capture', `insert into scenario default values`);
       await expectDenied(client, 'capture', `insert into app_user default values`);
+    });
+  });
+});
+
+describe('R3.4 to R3.7 api trainer tables (S23, O-240 to O-246)', () => {
+  test('R3.5 app upserts builder_setting but cannot delete it or write other builder tables (O-88, O-241)', async () => {
+    await withRollback(pool, async (client) => {
+      await asRole(
+        client,
+        'app',
+        `insert into builder_setting (key, value) values ('paused', 'true')
+         on conflict (key) do update set value = excluded.value`,
+      );
+      await asRole(client, 'app', `update builder_setting set value = 'false' where key = 'paused'`);
+      await expectDenied(client, 'app', `delete from builder_setting where false`);
+      await expectDenied(client, 'app', `insert into storage_ledger (day, library_bytes, reference_bytes) values (current_date, 0, 0)`);
+      await expectDenied(client, 'app', `update build_job set status = 'running' where false`);
+    });
+  });
+
+  test('R3.4 app records coverage requests but never inserts a build_job (O-240, ADR 0018)', async () => {
+    await withRollback(pool, async (client) => {
+      const user = await client.query(
+        `insert into app_user (email, password_hash) values ('coverage-role@example.invalid', 'x') returning id`,
+      );
+      await asRole(
+        client,
+        'app',
+        `insert into coverage_request (user_id, game_config_id, position_pair) values ($1, $2, 'BB-BTN')`,
+        [user.rows[0].id, SEEDED_CONFIG],
+      );
+      await asRole(client, 'app', 'select * from coverage_request limit 1');
+      await asRole(client, 'builder', 'select * from coverage_request limit 1');
+      await expectDenied(client, 'app', 'delete from coverage_request where false');
+      await expectDenied(
+        client,
+        'app',
+        `insert into build_job (game_config_id, position_pair, flop, preflop_lines, tree_config_hash, k_runouts, priority)
+         values ($1, 'BB-BTN', 'AhKd2c', '{srp}', '\\x00', 20, 1.0)`,
+        [SEEDED_CONFIG],
+      );
+    });
+  });
+
+  test('R3.7 an attempt is graded once per session version (O-246)', async () => {
+    await withRollback(pool, async (client) => {
+      const { rows } = await client.query(
+        `select indexdef from pg_indexes where indexname = 'attempt_session_version_key'`,
+      );
+      assert.equal(rows.length, 1);
+      assert.match(rows[0].indexdef, /UNIQUE INDEX .* \(session_id, state_version\) WHERE \(state_version IS NOT NULL\)/);
+      const admin = await client.query(
+        `select column_default, is_nullable from information_schema.columns
+         where table_name = 'app_user' and column_name = 'is_admin'`,
+      );
+      assert.deepEqual(admin.rows, [{ column_default: 'false', is_nullable: 'NO' }]);
     });
   });
 });

@@ -42,24 +42,36 @@ export interface AppUser {
   created_at: Generated<Timestamp>;
   email: string;
   id: Generated<string>;
+  /**
+   * may use the admin builder endpoints (O-242)
+   */
+  is_admin: Generated<boolean>;
   password_hash: string;
 }
 
 export interface Attempt {
   action_index: number;
   action_token: string;
+  best_action_indexes: number[] | null;
   bucket: string | null;
   confidence: string | null;
   created_at: Generated<Timestamp>;
   ev_best_bb: number;
+  ev_by_action: number[] | null;
   ev_chosen_bb: number;
   ev_loss_bb: number;
   ev_loss_pct_pot: number;
   floor_pct_pot: number;
+  freq_by_action: number[] | null;
+  /**
+   * the action the policy graded: the chosen action, or its group member in Grouped and Simple modes
+   */
+  graded_action_index: number | null;
   hand: string;
   id: Generated<string>;
   item_difficulty: number | null;
   label: string;
+  loss_pct_pot_by_action: number[] | null;
   node_key: string;
   noise_flags: Generated<string[]>;
   rated: boolean;
@@ -70,6 +82,10 @@ export interface Attempt {
   session_id: string;
   solution_id: string;
   spot_class_key: string;
+  /**
+   * the practice_session.state_version the decision was made at (O-246)
+   */
+  state_version: number | null;
   track_ids: string[];
   user_id: string;
   weight: number;
@@ -118,6 +134,16 @@ export interface BuildJob {
 export interface CosmeticUnlock {
   cosmetic_key: string;
   unlocked_at: Timestamp;
+  user_id: string;
+}
+
+export interface CoverageRequest {
+  created_at: Generated<Timestamp>;
+  flop: string | null;
+  game_config_id: string;
+  id: Generated<string>;
+  line: string | null;
+  position_pair: string;
   user_id: string;
 }
 
@@ -377,6 +403,7 @@ export interface DB {
   build_job: BuildJob;
   builder_setting: BuilderSetting;
   cosmetic_unlock: CosmeticUnlock;
+  coverage_request: CoverageRequest;
   drill: Drill;
   explanation: Explanation;
   game_config: GameConfig;
