@@ -25,6 +25,28 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const DEV_SERVER_PORT = 5173;
+
+/**
+ * Files the dev server never serves, even under server.fs.allow (S24 security review M1). Vite's
+ * own defaults (.env files, certificates and keys, .git) plus the private-data guard's inputs and
+ * the Claude Code settings, because under just dev-hot the dev server sits behind the edge Caddy
+ * and /@fs/<path> would otherwise serve any file inside the allowed root. Setting fs.deny replaces
+ * Vite's list, so the defaults are repeated here.
+ *
+ * Vite matches these against absolute paths, and Claude Code keeps its git worktrees under
+ * .claude/worktrees/, so a plain "**\/.claude/**" would deny every source file when the dev server
+ * or vitest runs from a worktree. The .claude patterns therefore deny the files directly in a
+ * .claude directory (settings.json and the like) and every subdirectory except worktrees.
+ */
+export const DEV_SERVER_FS_DENY: readonly string[] = [
+  ".env",
+  ".env.*",
+  "*.{crt,pem}",
+  "**/.git/**",
+  "**/.guard-private/**",
+  "**/.claude/*",
+  "**/.claude/!(worktrees)/**",
+];
 const HARNESS_MODE = "harness";
 const HARNESS_OUT_DIR = "dist-harness";
 const COVERAGE_THRESHOLD_PERCENT = 80;
@@ -39,6 +61,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       port: DEV_SERVER_PORT,
+      fs: { deny: [...DEV_SERVER_FS_DENY] },
     },
     build: harness
       ? {

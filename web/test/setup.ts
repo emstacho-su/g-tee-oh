@@ -11,9 +11,12 @@ import { afterEach, vi } from "vitest";
 
 afterEach(cleanup);
 
-vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+// A test file may opt into the node environment ("// @vitest-environment node"); it has no window.
+const hasWindow = typeof window !== "undefined";
 
-if (typeof window.matchMedia !== "function") {
+if (hasWindow) vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+if (hasWindow && typeof window.matchMedia !== "function") {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,

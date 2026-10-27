@@ -71,3 +71,14 @@ describe('web image security headers', () => {
     assert.equal(headerValue('Referrer-Policy'), 'same-origin');
   });
 });
+
+describe('edge Caddy HSTS', () => {
+  const EDGE_CADDYFILE = resolve(REPO_ROOT, 'infra/compose/Caddyfile');
+  const HTTPS_SITE = /^https:\/\/\{\$CADDY_SITE:localhost\} \{\n([\s\S]*?)\n\}/m;
+
+  it('r3_13 the https site of the edge Caddyfile sends Strict-Transport-Security for a year (A9 section 3)', () => {
+    const site = HTTPS_SITE.exec(readFileSync(EDGE_CADDYFILE, 'utf8'));
+    assert.ok(site, 'the edge Caddyfile has the https CADDY_SITE block');
+    assert.match(site[1], /^\s*header Strict-Transport-Security "max-age=31536000"\s*$/m);
+  });
+});

@@ -30,6 +30,10 @@ http:// {
 https://{$CADDY_SITE:localhost} {
 	tls internal
 
+	# HSTS (HTTP Strict Transport Security, A9 section 3): the browser keeps to https for this site
+	# for a year. No includeSubDomains and no preload, because the site is a LAN host name.
+	header Strict-Transport-Security "max-age=31536000"
+
 	handle /healthz {
 		respond "ok" 200
 	}

@@ -5,7 +5,13 @@
 # Continuous integration (CI) never uses this file: the e2e job runs the built images (just e2e).
 #
 # Mechanism: api and web stop being built images and become node:24-slim containers running the
-# sources from the working tree, bind-mounted at /app. api runs `tsx watch src/main.ts` (tsx is a
+# sources from the working tree. Only what each needs is bind-mounted under /app (S24 security
+# review M1): the root manifests and tsconfig.base.json read-only, packages/, and the service's own
+# directory (web/ or services/api/) plus the other service's package.json read-only for the
+# install. The checkout root is never mounted, so .git, .env, .guard-private, .claude, crates and
+# the rest are not inside either container; web/vite.config.ts also denies .guard-private and
+# .claude to /@fs/ (DEV_SERVER_FS_DENY), and the edge Caddy publishes 80 and 443 on 127.0.0.1
+# only while this override runs. api runs `tsx watch src/main.ts` (tsx is a
 # devDependency of services/api), which restarts the server when a file it imports changes. web
 # runs the Vite dev server on 8080, the port the edge Caddy already proxies to, so the Caddyfile is
 # unchanged; Caddy's reverse_proxy carries the WebSocket upgrade, so hot module replacement (HMR)
@@ -48,20 +54,44 @@ x-hot-node: &hot-node
   working_dir: /app
   read_only: false
   tmpfs: !reset []
-  volumes:
-    - .:/app
-    - hot_node_modules:/app/node_modules
-    - hot_web_node_modules:/app/web/node_modules
-    - hot_api_node_modules:/app/services/api/node_modules
-    - hot_contracts_node_modules:/app/packages/contracts/node_modules
-    - hot_learning_node_modules:/app/packages/learning/node_modules
-    - hot_pnpm:/pnpm
+
+# What both containers need to install the workspace: the root manifests read-only, the shared
+# packages, and every node_modules volume (pnpm --frozen-lockfile wants every importer's
+# package.json, so each service also gets the other one's manifest read-only, never its sources).
+x-hot-shared-volumes:
+  - &root-package ./package.json:/app/package.json:ro
+  - &root-lock ./pnpm-lock.yaml:/app/pnpm-lock.yaml:ro
+  - &root-workspace ./pnpm-workspace.yaml:/app/pnpm-workspace.yaml:ro
+  - &root-npmrc ./.npmrc:/app/.npmrc:ro
+  - &root-tsconfig ./tsconfig.base.json:/app/tsconfig.base.json:ro
+  - &packages ./packages:/app/packages
+  - &nm-root hot_node_modules:/app/node_modules
+  - &nm-web hot_web_node_modules:/app/web/node_modules
+  - &nm-api hot_api_node_modules:/app/services/api/node_modules
+  - &nm-contracts hot_contracts_node_modules:/app/packages/contracts/node_modules
+  - &nm-learning hot_learning_node_modules:/app/packages/learning/node_modules
+  - &pnpm-store hot_pnpm:/pnpm
 
 # Each command installs under the shared lock (CI=true keeps pnpm from prompting without a
 # terminal), then replaces the shell with the watcher so compose's stop signal reaches it.
 services:
   api:
     <<: *hot-node
+    volumes:
+      - *root-package
+      - *root-lock
+      - *root-workspace
+      - *root-npmrc
+      - *root-tsconfig
+      - *packages
+      - ./services/api:/app/services/api
+      - ./web/package.json:/app/web/package.json:ro
+      - *nm-root
+      - *nm-web
+      - *nm-api
+      - *nm-contracts
+      - *nm-learning
+      - *pnpm-store
     environment:
       <<: *hot-env
     entrypoint: ["/bin/sh", "-c"]
@@ -79,6 +109,21 @@ services:
 
   web:
     <<: *hot-node
+    volumes:
+      - *root-package
+      - *root-lock
+      - *root-workspace
+      - *root-npmrc
+      - *root-tsconfig
+      - *packages
+      - ./web:/app/web
+      - ./services/api/package.json:/app/services/api/package.json:ro
+      - *nm-root
+      - *nm-web
+      - *nm-api
+      - *nm-contracts
+      - *nm-learning
+      - *pnpm-store
     environment:
       <<: *hot-env
       __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ${CADDY_SITE:-localhost}
@@ -94,6 +139,13 @@ services:
       timeout: 3s
       retries: 6
       start_period: 10m
+
+  # The edge Caddy answers on this machine only while the dev server runs: the Vite dev server
+  # serves source files and /@fs/ paths a LAN visitor must not reach (S24 security review M1).
+  caddy:
+    ports: !override
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
 
 volumes:
   hot_node_modules: {}
