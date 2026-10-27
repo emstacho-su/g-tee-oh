@@ -169,17 +169,46 @@ fn run_g6a_pack(options: &Options) -> Result<(), String> {
 }
 
 /// Run the preflop spike (R2.21) and write `spike-preflop-<machine>`.
+///
+/// Inputs come from `spike::repo_root` (the `VALIDATE_REPO_ROOT` override inside the
+/// spike image, O-228). Outside a git checkout the context is built from `--commit`
+/// instead of `git status`. The caller's notes come from `SPIKE_CONTAINER` (the docker
+/// run line, with `--memory 5g`) and `SPIKE_CONCURRENT` (other heavy work running). A
+/// 100bb run that errors falls back to a labeled extrapolation, never a silent pass.
 fn run_spike(options: &Options) -> Result<bool, String> {
     use validate::gates::g6a::DEPTHS_BB;
     use validate::spike;
 
-    let repo_root = validate::repo_root();
-    let context = run_context(&repo_root, options)?;
+    let repo_root = spike::repo_root();
+    let context = if spike::is_git_checkout(&repo_root) {
+        run_context(&repo_root, options)?
+    } else {
+        let commit = options.commit.as_deref().ok_or_else(|| {
+            format!("{} is not a git checkout, so pass --commit <sha>", repo_root.display())
+        })?;
+        spike::context_without_git(options.machine.as_deref(), commit, options.allow_dirty)
+            .map_err(|error| error.to_string())?
+    };
+    let container = std::env::var(spike::CONTAINER_ENV).ok();
+    if !spike::records_container_limit(container.as_deref()) {
+        eprintln!(
+            "{BIN_NAME}: {} does not record a {} container run",
+            spike::CONTAINER_ENV,
+            spike::CONTAINER_LIMIT_FLAG
+        );
+    }
+    let concurrent = std::env::var(spike::CONCURRENT_ENV).ok();
+    let notes = spike::caller_notes(container.as_deref(), concurrent.as_deref());
     let equity = equity_table(&repo_root)?;
     let push_fold = spike::run_push_fold(&equity, &DEPTHS_BB).map_err(|error| error.to_string())?;
-    let hu100 =
-        spike::Hu100::Measured(spike::run_hu100(&equity).map_err(|error| error.to_string())?);
-    let gate_report = spike::report(&context.machine.name, &push_fold, &hu100, "");
+    let hu100 = spike::run_hu100(&equity).map_or_else(
+        |error| {
+            eprintln!("{BIN_NAME}: the 100bb run failed, extrapolating: {error}");
+            spike::extrapolate_hu100(&push_fold, &format!("the 100bb run failed: {error}"))
+        },
+        spike::Hu100::Measured,
+    );
+    let gate_report = spike::report(&context.machine.name, &push_fold, &hu100, &notes);
     let out_dir =
         options.out.clone().unwrap_or_else(|| repo_root.join(REPORTS_RELATIVE_TO_REPO_ROOT));
     write_report(&gate_report, &context, &out_dir)

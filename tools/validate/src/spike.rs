@@ -8,12 +8,33 @@
 //! memory.peak; the judged figure is the largest that is available. The report id is
 //! `spike-preflop-<machine>`, so the Zenbook writes spike-preflop-zenbook (O-87) and S20
 //! writes spike-preflop-mac.
+//!
+//! The work is split by concern: `memory` holds the global allocator and the three
+//! readings, `runs` the two measured runs, `judge` the report and its verdicts, and
+//! `host` what the container needs (the repository root override, the run context
+//! without git, the caller's notes, and the labeled 100bb extrapolation). The global
+//! allocator lives in this library rather than in `main.rs`, so the crate's test
+//! binaries account their peak too: off Linux the accounted figure is the only reading.
 
 use std::fmt;
 
 use gto_solve::equity::EquityTable;
 
-use crate::gates::GateReport;
+mod host;
+mod judge;
+mod memory;
+mod runs;
+
+pub use host::{
+    CONCURRENT_ENV, CONTAINER_ENV, CONTAINER_LIMIT_FLAG, HU100_EXTRAPOLATION_FACTOR, REPO_ROOT_ENV,
+    caller_notes, context_without_git, extrapolate_hu100, is_git_checkout, records_container_limit,
+    repo_root,
+};
+pub use judge::report;
+pub use runs::{
+    HU100_CHECK_EVERY, HU100_DEPTH_BB, HU100_MAX_ITERATIONS,
+    SEED_ONLINE_SPEC_RELATIVE_TO_REPO_ROOT, run_hu100_at, run_push_fold,
+};
 
 /// The report id prefix; the machine name follows it.
 pub const REPORT_PREFIX: &str = "spike-preflop";
@@ -129,36 +150,12 @@ impl fmt::Display for SpikeError {
 
 impl std::error::Error for SpikeError {}
 
-/// Runs the push/fold solves at `depths_bb` and measures them.
+/// Runs the minimal heads-up 100bb P2 solve (O-227) and measures it, reading the online
+/// seed sizing spec under [`repo_root`].
 ///
 /// # Errors
 ///
-/// `SpikeError` when a solve or its certificate fails.
-pub fn run_push_fold(equity: &EquityTable, depths_bb: &[u32]) -> Result<SpikeRun, SpikeError> {
-    let _ = (equity, depths_bb);
-    Err(SpikeError::new("run_push_fold is not implemented yet (S19 lane 3)"))
-}
-
-/// Runs the minimal heads-up 100bb P2 solve (O-227) and measures it.
-///
-/// # Errors
-///
-/// `SpikeError` when the tree or the solve fails.
+/// `SpikeError` when the spec, the tree or the solve fails.
 pub fn run_hu100(equity: &EquityTable) -> Result<SpikeRun, SpikeError> {
-    let _ = equity;
-    Err(SpikeError::new("run_hu100 is not implemented yet (S19 lane 3)"))
-}
-
-/// The report for `machine` from the two parts.
-#[must_use]
-pub fn report(machine: &str, push_fold: &SpikeRun, hu100: &Hu100, notes: &str) -> GateReport {
-    let _ = (push_fold, hu100, notes);
-    GateReport {
-        report: format!("{REPORT_PREFIX}-{machine}"),
-        r_ids: vec![R_ID.to_owned()],
-        pass: false,
-        thresholds: std::collections::BTreeMap::new(),
-        measurements: Vec::new(),
-        notes: "spike::report is not implemented yet (S19 lane 3)".to_owned(),
-    }
+    run_hu100_at(equity, &repo_root())
 }

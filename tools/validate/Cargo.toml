@@ -29,6 +29,9 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["float_roundtrip"] }
 # The machine block of every gate report: CPU, cores, memory and operating system.
 sysinfo = { workspace = true }
+# The accounted peak heap bytes of the preflop spike (R2.21, O-228): spike/memory.rs installs
+# it as the global allocator of every binary linking this library, the tool and its tests.
+peak_alloc = { workspace = true }
 
 # Scratch library roots for the G6a pack determinism test (R2.19).
 [dev-dependencies]

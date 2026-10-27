@@ -2780,6 +2780,7 @@ dependencies = [
  "gto-solve",
  "gto-tree",
  "library-pack",
+ "peak_alloc",
  "serde",
  "serde_json",
  "sha2",
