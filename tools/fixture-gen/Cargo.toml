@@ -1,0 +1,30 @@
+[package]
+name = "fixture-gen"
+version = "0.1.0"
+description = "Seeded generator of the labeled synthetic preflop fixture sets (R2.20, O-30, O-57)"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Edges: gto-model, gto-tree (the real pair trees and their node keys), gto-library (the
+# manifest types) and library-pack (the pack with its criterion 2 invariants). Never
+# gto-solve: a synthetic set is not a solve, and the fixture path stays solver-free
+# (ADR 0018, O-225).
+[dependencies]
+gto-model = { workspace = true }
+gto-tree = { workspace = true }
+gto-library = { workspace = true }
+library-pack = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

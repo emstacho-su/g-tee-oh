@@ -52,6 +52,19 @@ pub struct EquityFixture {
     pub commit: String,
 }
 
+impl EquityFixture {
+    /// The table the preflop solver reads (gate G6a and the spike, R2.19, R2.21): the
+    /// labels, equities and pair counts, without the provenance fields.
+    #[must_use]
+    pub fn to_table(&self) -> gto_solve::equity::EquityTable {
+        gto_solve::equity::EquityTable {
+            classes: self.classes.clone(),
+            equity: self.equity.clone(),
+            pairs: self.pairs.clone(),
+        }
+    }
+}
+
 /// Why the fixture could not be read or written.
 #[derive(Debug)]
 pub enum EquityFixtureError {

@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use serde::de::DeserializeOwned;
 
 pub mod g4_spots;
+pub mod g6a_chart;
 pub mod openspiel;
 pub mod toy_game;
 

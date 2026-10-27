@@ -38,6 +38,7 @@ pub mod g2;
 pub mod g3;
 pub mod g4;
 pub mod g4_engine;
+pub mod g6a;
 
 pub use error::GateError;
 
