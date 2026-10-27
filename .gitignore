@@ -21,3 +21,6 @@ Thumbs.db
 # Playwright output (web): the html report and the traces of a run
 web/playwright-report/
 web/test-results/
+
+# Vitest coverage output (packages/learning, just coverage-learning)
+coverage/
