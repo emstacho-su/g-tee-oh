@@ -3,8 +3,9 @@
  * and an injected fake fetch (R3.13, R0.7). Each call builds a fresh api client, token holder,
  * QueryClient and router, so no test sees another test's session or cache.
  */
-import { createMemoryHistory } from "@tanstack/react-router";
-import { render } from "@testing-library/react";
+import type { QueryClient } from "@tanstack/react-query";
+import { createMemoryHistory, type RouterHistory } from "@tanstack/react-router";
+import { render, type RenderResult } from "@testing-library/react";
 
 import { createAppApi } from "../../src/api/index.js";
 import { App } from "../../src/app/index.js";
@@ -18,7 +19,15 @@ export const TEST_ORIGIN = "http://localhost:4173";
 export const SIGNED_IN: FetchScript = { "GET /api/v1/me": [sessionResponse()] };
 export const SIGNED_OUT: FetchScript = { "GET /api/v1/me": [problemResponse(401, "unauthenticated")] };
 
-export function renderApp(path: string, script: FetchScript) {
+export interface RenderedApp extends RenderResult {
+  fake: ReturnType<typeof createFakeFetch>;
+  api: ReturnType<typeof createAppApi>;
+  queryClient: QueryClient;
+  router: ReturnType<typeof createAppRouter>;
+  history: RouterHistory;
+}
+
+export function renderApp(path: string, script: FetchScript): RenderedApp {
   const fake = createFakeFetch(script);
   const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: fake.fetch });
   const queryClient = createQueryClient();
