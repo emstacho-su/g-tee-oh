@@ -75,6 +75,10 @@ async function authenticationPlugin(app: FastifyInstance): Promise<void> {
 
   app.addHook("onRequest", async (request) => {
     request.session = null;
+    // An unknown path answers the 404 problem whether or not the caller is logged in.
+    if (request.is404) {
+      return;
+    }
     const policy = request.routeOptions.config.auth ?? DEFAULT_AUTH_POLICY;
     const token = request.cookies[SESSION_COOKIE_NAME];
     if (token !== undefined && app.database !== null) {
