@@ -15,7 +15,7 @@
  * mastered class at the lower retention of retentionFor in src/fsrs.ts (O-253).
  */
 import { isCorrectLabel } from "./calibration.js";
-import type { GradeLabel, ModulePlaceholder } from "./types.js";
+import type { GradeLabel } from "./types.js";
 import { requireBoolean } from "./validate.js";
 
 /** Starting parameters of 06 section 5, tuned once data exists. */
@@ -92,11 +92,3 @@ export function observationFromLabel(label: GradeLabel): boolean {
 export function isMastered(mastery: Mastery): boolean {
   return requireProbability(mastery.pKnown, "mastery.pKnown") >= MASTERY_THRESHOLD;
 }
-
-/** Placeholder kept until the S30 integration step removes it from src/index.ts (R0.11). */
-export const BKT_MODULE: ModulePlaceholder = Object.freeze({
-  module: "bkt",
-  responsibility: "BKT mastery probability per spot class, mastered at 0.95, gating nothing",
-  session: "S30",
-  requirements: ["R4.7"],
-});

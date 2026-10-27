@@ -21,7 +21,7 @@
  * week boundary and the write (R4.11); this module only shapes the rows and never reads a clock.
  */
 import { isCorrectLabel } from "./calibration.js";
-import type { GradeLabel, ModulePlaceholder } from "./types.js";
+import type { GradeLabel } from "./types.js";
 import { elementAt, isList, requireCount, requireIntegerInRange, requireNonNegative } from "./validate.js";
 
 /** Leak cost is stated per this many hands (06 section 6). */
@@ -73,14 +73,6 @@ export type LeakStat = Readonly<{
 
 /** One A4 leak_history row in camelCase. */
 export type LeakHistoryRow = Readonly<{ spotClassKey: string; week: string; leakCostBbPer1k: number }>;
-
-/** Kept until the integration step removes the placeholders from src/index.ts. */
-export const LEAK_COST_MODULE: ModulePlaceholder = Object.freeze({
-  module: "leak-cost",
-  responsibility: "leak cost per spot class from the reach prior, with shrinkage under 30 decisions",
-  session: "S30",
-  requirements: ["R4.8"],
-});
 
 function requireProbability(value: number, field: string): number {
   if (!Number.isFinite(value) || value < 0 || value > 1) {

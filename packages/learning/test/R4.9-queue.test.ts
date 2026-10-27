@@ -18,6 +18,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConfidenceAttempt } from "../src/calibration.js";
+import { overdueFactor } from "../src/fsrs.js";
+import { startingLeakCost, trackAverage } from "../src/leak-cost.js";
 import { emptyQueueState, pickNext, queuePriority, recordAttempt } from "../src/queue.js";
 import type { QueueCandidate, QueuePick, QueueState } from "../src/queue.js";
 import { splitMix64Source } from "../src/random.js";
@@ -176,8 +178,34 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
     expect(() => queuePriority(1, Number.POSITIVE_INFINITY)).toThrow(/overdueFactor/);
   });
 
-  it.todo(
+  it(
     "R4.9 never-practiced classes start from the frequency prior: a class with no leak_stat row takes priority from its 5.25 per 1,000 reach prior (ADR 0013)",
+    () => {
+      // Integration row (S30 step 3): leak cost from the leak-cost module, overdue factor from the
+      // FSRS adapter, priority and the pick from the queue. A class with no leak_stat row and a track
+      // with no decisions starts at prior x 1 bb (O-255); a class with no card has overdue factor 1
+      // (O-254), so its priority is its 5.25 per 1,000 prior.
+      const reviewTime = new Date(Date.UTC(2026, 10, 3, 12, 0, 0));
+      const leakCostBbPer1000 = startingLeakCost(QUEUE_NEW_CLASS_ROW.frequencyPriorPer1000, trackAverage([]));
+      const priority = queuePriority(leakCostBbPer1000, overdueFactor(null, reviewTime));
+      expect(QUEUE_NEW_CLASS_ROW.leakStatRows).toBe(0);
+      expect(priority).toBe(QUEUE_NEW_CLASS_ROW.frequencyPriorPer1000);
+
+      // With track history the prior is scaled by the track's miss rate and EV per miss instead.
+      const track = { missRate: 0.2, evPerMissBb: 1.5 };
+      expect(queuePriority(startingLeakCost(QUEUE_NEW_CLASS_ROW.frequencyPriorPer1000, track), 1)).toBeCloseTo(
+        5.25 * 0.2 * 1.5,
+        12,
+      );
+
+      // The never-practiced class is served as a worked example: panels visible, unrated.
+      const step = pickNext(
+        emptyQueueState(),
+        [{ spotClassKey: QUEUE_NEW_CLASS_ROW.spotClass, family: "facing-3bet", priority, firstExposure: true }],
+        () => 0,
+      );
+      expect(step.pick).toMatchObject({ spotClassKey: QUEUE_NEW_CLASS_ROW.spotClass, panelsVisible: true, rated: false });
+    },
   );
 
   it("R4.9 first exposure is a worked example: the first pick of a new class is served with panels visible and rated false (A6 section 3)", () => {

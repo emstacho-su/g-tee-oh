@@ -16,7 +16,7 @@
  * exclusion is applied after it by withItemExclusion rather than inside grade().
  */
 import { UNRATED_WEIGHT } from "./grading.js";
-import type { GradeOutput, ModulePlaceholder } from "./types.js";
+import type { GradeOutput } from "./types.js";
 import { requireBoolean, requireCount, requireNonNegative } from "./validate.js";
 
 /** solver-query's DifficultyFeatures (ev_gap_pct_pot, purity, n_actions, mixed, all_within_floor) in camelCase. */
@@ -54,14 +54,6 @@ export const MIX_SLOPE = 2;
 
 /** Upper bound of each hardness term. */
 const MAX_HARDNESS = 1;
-
-/** Kept until the integration step exports the functions from src/index.ts and drops it (R0.11). */
-export const DIFFICULTY_MODULE: ModulePlaceholder = Object.freeze({
-  module: "difficulty",
-  responsibility: "feature-based item difficulty and the rated-play exclusion of all-in-floor items",
-  session: "S30",
-  requirements: ["R4.4"],
-});
 
 function validateFeatures(features: DifficultyFeatures): void {
   requireNonNegative(features.evGapPctPot, "evGapPctPot");

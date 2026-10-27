@@ -20,7 +20,6 @@
  * opponent at the item's difficulty with ITEM_RD 0 (O-250); a session with none leaves the track
  * identical (O-251). Every function validates at the boundary and returns a new frozen object.
  */
-import type { ModulePlaceholder } from "./types.js";
 import { isList, requireBoolean, requireNonNegative } from "./validate.js";
 
 /** A track's Glicko-2 state on the Glicko scale. */
@@ -61,14 +60,6 @@ const DEFAULT_RESULT_WEIGHT = 1;
 
 /** RDs subtracted from the rating for the conservative figure ranking uses (06 section 3.3). */
 const CONSERVATIVE_RD_MULTIPLE = 2;
-
-/** Kept until the integration step exports the functions from src/index.ts and drops it (R0.11). */
-export const GLICKO2_MODULE: ModulePlaceholder = Object.freeze({
-  module: "glicko2",
-  responsibility: "Glicko-2 rating per track with fractional outcomes and one period per session",
-  session: "S30",
-  requirements: ["R4.1", "R4.2", "R4.3", "R4.5"],
-});
 
 /** One result on the internal scale with its g and E (paper, step 3). */
 type ScaledResult = Readonly<{ g: number; e: number; score: number; weight: number }>;

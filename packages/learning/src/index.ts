@@ -1,7 +1,7 @@
 /**
  * @g-tee-oh/learning holds the pure TypeScript learning model. S05 landed the red test vectors and
  * the skeleton (src/types.ts and one placeholder module per A6 section 1 row owned by this
- * package); S22 landed the grading policy (grade, the grouping modes, the RNG band mapping, the
+ * package, all replaced now); S22 landed the grading policy (grade, the grouping modes, the RNG band mapping, the
  * SplitMix64 RandomSource, calibration and the confident-miss rule); S30 lands the Glicko-2
  * rating, item difficulty, FSRS (Free Spaced Repetition Scheduler) scheduling, BKT (Bayesian
  * Knowledge Tracing) mastery, leak-cost and queue modules. This package stays pure: no I/O
@@ -20,7 +20,6 @@ export type {
   GradeMode,
   GradeOutput,
   Grouping,
-  ModulePlaceholder,
   RandomSource,
   Street,
 } from "./types.js";
@@ -55,9 +54,78 @@ export type { SplitMix64, SplitMix64Step } from "./random.js";
 export { aggregateCalibration, isConfidentMiss, isCorrectLabel, promoteConfidentMiss } from "./calibration.js";
 export type { Calibration, CalibrationSide, Confidence, ConfidenceAttempt } from "./calibration.js";
 
-export { GLICKO2_MODULE } from "./glicko2.js";
-export { DIFFICULTY_MODULE } from "./difficulty.js";
-export { FSRS_MODULE } from "./fsrs.js";
-export { BKT_MODULE } from "./bkt.js";
-export { LEAK_COST_MODULE } from "./leak-cost.js";
-export { QUEUE_MODULE } from "./queue.js";
+// S30: rating (R4.1, R4.3, R4.4, R4.5)
+export {
+  GLICKO2_DEFAULTS,
+  GLICKO2_EPSILON,
+  GLICKO2_SCALE,
+  GLICKO2_TAU,
+  INACTIVITY_PERIOD_DAYS,
+  ITEM_RD,
+  applyInactivity,
+  conservativeRating,
+  inactivePeriods,
+  newTrackRating,
+  ratePeriod,
+  rateSession,
+} from "./glicko2.js";
+export type { Opponent, PeriodResult, SessionDecision, TrackRating } from "./glicko2.js";
+export {
+  DIFFICULTY_BASE,
+  GAP_SCALE_PCT_POT,
+  GAP_WEIGHT,
+  MIX_SLOPE,
+  MIX_WEIGHT,
+  itemDifficulty,
+  withItemExclusion,
+} from "./difficulty.js";
+export type { DifficultyFeatures, ItemDifficulty } from "./difficulty.js";
+export { PROMOTION_RD_CAP, TIER_FLOORS, bandTier, overallRating, tierFor, trackWeight } from "./rank.js";
+export type { Tier, TierFloor, TierResult, TrackStanding } from "./rank.js";
+
+// S30: scheduling (R4.6, R4.7, R4.9)
+export {
+  DESIRED_RETENTION,
+  FSRS_LIBRARY_VERSION,
+  GRADE_THRESHOLDS,
+  MASTERED_RETENTION,
+  gradeFromMean,
+  isDue,
+  memoryState,
+  newSpotClassCard,
+  overdueFactor,
+  retentionFor,
+  retrievability,
+  reviewGrade,
+  reviewInDeck,
+  reviewSpotClass,
+} from "./fsrs.js";
+export type { Deck, FsrsGrade, FsrsOptions, MemoryStep, ReviewOutcome, SpotClassCard } from "./fsrs.js";
+export { BKT_PARAMETERS, MASTERY_THRESHOLD, isMastered, newMastery, observationFromLabel, updateMastery } from "./bkt.js";
+export type { BktParameters, Mastery, MasteryUpdate } from "./bkt.js";
+export { emptyQueueState, pickNext, queuePriority, recordAttempt } from "./queue.js";
+export type { QueueCandidate, QueuePick, QueuePickReason, QueueState, QueueStep } from "./queue.js";
+
+// S30: leak cost (R4.8)
+export {
+  HANDS_PER_UNIT,
+  SHRINKAGE_MIN_DECISIONS,
+  classStat,
+  frequencyPriorPer1000,
+  leakCost,
+  leakHistorySnapshot,
+  leakStat,
+  rankLeaks,
+  shrinkTowardTrack,
+  startingLeakCost,
+  trackAverage,
+} from "./leak-cost.js";
+export type {
+  ClassStat,
+  LeakCostInput,
+  LeakDecision,
+  LeakHistoryRow,
+  LeakStat,
+  ShrunkStat,
+  TrackAverage,
+} from "./leak-cost.js";

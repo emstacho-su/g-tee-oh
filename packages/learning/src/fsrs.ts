@@ -35,7 +35,6 @@ import {
 } from "ts-fsrs";
 import type { Card, FSRS, FSRSParameters, FSRSState, Grade } from "ts-fsrs";
 
-import type { ModulePlaceholder } from "./types.js";
 import { elementAt, isList, requireBoolean, requireNonNegative, requireOneOf } from "./validate.js";
 
 /** The version string of the ts-fsrs build this adapter imports, for example "v5.4.2 using FSRS-6.0" (O-35). */
@@ -292,11 +291,3 @@ export function overdueFactor(
   }
   return (1 - retrievability(spotClassCard, at, options)) / (1 - target);
 }
-
-/** Placeholder kept until the S30 integration step removes it from src/index.ts (R0.11). */
-export const FSRS_MODULE: ModulePlaceholder = Object.freeze({
-  module: "fsrs",
-  responsibility: "FSRS scheduling per spot class over ts-fsrs, with the grade mapping from mean score",
-  session: "S30",
-  requirements: ["R4.6"],
-});

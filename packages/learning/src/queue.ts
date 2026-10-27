@@ -22,7 +22,7 @@
  */
 import { promoteConfidentMiss } from "./calibration.js";
 import type { ConfidenceAttempt } from "./calibration.js";
-import type { ModulePlaceholder, RandomSource } from "./types.js";
+import type { RandomSource } from "./types.js";
 import { elementAt, isList, requireBoolean, requireNonNegative, requireStringList } from "./validate.js";
 
 /** One spot class the queue may serve: its key, its action family, its priority, and whether it is new. */
@@ -162,11 +162,3 @@ export function pickNext(
     state: Object.freeze({ lastFamily: pick.family, hypercorrection: Object.freeze(hypercorrection) }),
   });
 }
-
-/** Placeholder kept until the S30 integration step removes it from src/index.ts (R0.11). */
-export const QUEUE_MODULE: ModulePlaceholder = Object.freeze({
-  module: "queue",
-  responsibility: "next spot class from due cards and leak priority under the interleave rule",
-  session: "S30",
-  requirements: ["R4.9"],
-});
