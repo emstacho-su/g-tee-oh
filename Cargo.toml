@@ -97,6 +97,17 @@ jsonschema = { version = "0.59", default-features = false }
 # Peak heap bytes in the R2.10 estimate and refusal tests (O-139), installed as the global
 # allocator of those test binaries only; dev-dependency only.
 peak_alloc = "0.2"
+# The library bucket client of library-builder (S18, O-183, ADR 0019): object_store's S3
+# (Simple Storage Service) client, Apache-2.0 or MIT. The 0.13 line is pinned on purpose:
+# its `aws` feature runs reqwest 0.12 over rustls with the ring provider and the native root
+# store, the pair the lock already holds for sqlx (no cmake or NASM on the Windows MSVC
+# toolchain, O-23), while 0.14 moves to reqwest 0.13, whose `rustls` features select
+# aws-lc-rs and verify certificates through rustls-platform-verifier, which carries
+# webpki-root-certs under CDLA-Permissive-2.0, a license outside deny.toml (ADR 0002).
+# Default features are off because the local `fs` backend is not used: gto-library's
+# FsStore stages a build and this client uploads it. `just licenses` holds the graph to
+# ring and native roots, no aws-lc-sys and no webpki roots.
+object_store = { version = "0.13", default-features = false, features = ["aws"] }
 
 # Vendored solver engine (git subtree, see crates/vendor/UPSTREAM-postflop-engine.md).
 # The package keeps its upstream name "engine" so subtree pulls merge cleanly; the
