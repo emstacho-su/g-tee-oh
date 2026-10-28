@@ -1,7 +1,9 @@
 /**
  * Drill CRUD routes (R3.14, A5 section 3): GET /drills, GET /drills/{id}, POST /drills,
  * PATCH /drills/{id}, DELETE /drills/{id}, every one scoped to the session user (ADR 0001), plus
- * the import and export routes S26 builds (501 until then, O-38).
+ * GET /drills/{id}/export and POST /drills/import over g-tee-oh's export code (S26, O-310,
+ * drills/export-code.ts). Import decodes the code before any write and then creates a new drill
+ * exactly as POST /drills does; it never overwrites one.
  *
  * Mechanism: the user id comes from the session (requireSession), never from the request, and
  * every query in drills/repository.ts filters by it, so another user's drill is a 404 problem,
@@ -15,22 +17,20 @@ import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { mutatingHeadersSchema } from "../http/headers.js";
+import {
+  checkExportable,
+  decodeExportCode,
+  encodeExportCode,
+  ExportCodeError,
+  type ExportCodeIssue,
+} from "../drills/export-code.js";
 import { toDrill } from "../drills/mapper.js";
 import { deleteDrill, findDrill, insertDrill, listDrills, updateDrill } from "../drills/repository.js";
 import { decodeCursor, paginate } from "../http/cursor.js";
 import { requireDatabase } from "../http/database.js";
 import { idempotentWrite } from "../http/idempotent-write.js";
-import { notImplemented, plannedDescription } from "../http/not-implemented.js";
-import {
-  AUTHENTICATED,
-  MUTATE_ONE_PROBLEMS,
-  MUTATE_PROBLEMS,
-  PLANNED_MUTATE_PROBLEMS,
-  PLANNED_READ_PROBLEMS,
-  READ_ONE_PROBLEMS,
-  READ_PROBLEMS,
-} from "../http/openapi.js";
-import { PROBLEM_SLUGS, ProblemError, problemResponses, HTTP_STATUS } from "../http/problem.js";
+import { AUTHENTICATED, MUTATE_ONE_PROBLEMS, MUTATE_PROBLEMS, READ_ONE_PROBLEMS, READ_PROBLEMS } from "../http/openapi.js";
+import { PROBLEM_SLUGS, ProblemError, problemResponses, HTTP_STATUS, type ProblemFieldError } from "../http/problem.js";
 import { requireSession } from "../plugins/authenticate.js";
 import { idParamsSchema, uuidSchema } from "../schemas/common.js";
 import {
@@ -41,16 +41,65 @@ import {
   drillPatchBodySchema,
   drillSchema,
   drillsQuerySchema,
+  type DrillCreateBody,
 } from "../schemas/drills.js";
 
 const TAG = "drills";
-const DRILLS_OWNER = "S26";
 
 const drillCursorSchema = z.strictObject({ id: uuidSchema });
 
 function drillNotFound(): ProblemError {
   return new ProblemError(HTTP_STATUS.notFound, PROBLEM_SLUGS.notFound, { detail: "No drill of yours has this id." });
 }
+
+const EXPORT_CODE_FIELD = "body.export_code";
+
+/** Issues under a field path; "" is the field itself. */
+function fieldErrorsAt(field: string, issues: readonly ExportCodeIssue[]): ProblemFieldError[] {
+  return issues.map((issue) => ({ path: issue.path === "" ? field : `${field}.${issue.path}`, message: issue.message }));
+}
+
+/** The drill an export code holds, or a 400 validation problem pointing at body.export_code. */
+function decodeOrProblem(code: string): DrillCreateBody {
+  try {
+    return decodeExportCode(code);
+  } catch (error: unknown) {
+    if (!(error instanceof ExportCodeError)) {
+      throw error;
+    }
+    const fieldErrors =
+      error.issues.length === 0 ? [{ path: EXPORT_CODE_FIELD, message: error.message }] : fieldErrorsAt(EXPORT_CODE_FIELD, error.issues);
+    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.validation, {
+      detail: error.message,
+      errors: fieldErrors,
+      errorsOmitted: error.omitted,
+    });
+  }
+}
+
+const STORED_DRILL_FIELD = "drill";
+
+/**
+ * The stored drill as today's write rules accept it, or a 422 validation problem naming the first
+ * rule it breaks (MEDIUM 2): export never hands out a code its own import would refuse.
+ */
+function exportableOrProblem(drill: DrillCreateBody): DrillCreateBody {
+  const check = checkExportable(drill);
+  if (check.ok) {
+    return check.drill;
+  }
+  const errors = fieldErrorsAt(STORED_DRILL_FIELD, check.issues);
+  const first = errors[0];
+  const rule = first === undefined ? "it breaks a write rule" : `${first.path}: ${first.message}`;
+  throw new ProblemError(HTTP_STATUS.unprocessable, PROBLEM_SLUGS.validation, {
+    detail: `This drill can no longer be exported: ${rule}. Edit the drill so it meets the rule, then export it again.`,
+    errors,
+    errorsOmitted: check.omitted,
+  });
+}
+
+/** GET /drills/{id}/export also answers 422 for a stored drill the write rules now refuse. */
+const EXPORT_PROBLEMS = [...READ_ONE_PROBLEMS, HTTP_STATUS.unprocessable] as const;
 
 export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
   app.get(
@@ -174,34 +223,56 @@ export const drillRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
   app.post(
     "/drills/import",
     {
-      config: { owner: DRILLS_OWNER },
       schema: {
         tags: [TAG],
         summary: "Import a drill from its export code",
-        description: plannedDescription(DRILLS_OWNER, "Creates a drill from an export code."),
+        description:
+          "Creates a new drill of the session user from an export code (O-310); never overwrites a drill. " +
+          "A code that is too long, of another version, damaged, expanding past its cap or holding a drill " +
+          "the write rules refuse is a 400 validation problem pointing at body.export_code.",
         security: AUTHENTICATED,
         headers: mutatingHeadersSchema,
         body: drillImportBodySchema,
-        response: { 201: drillSchema, ...problemResponses(PLANNED_MUTATE_PROBLEMS) },
+        response: { 201: drillSchema, ...problemResponses(MUTATE_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request, reply) => {
+      const { userId } = requireSession(request);
+      // Decoded before the write, so a refused code never opens a transaction. Under an
+      // Idempotency-Key the key was already claimed in the preHandler (plugins/idempotency.ts),
+      // and onSend stores the refusal's 400, so a retry with the same key replays that 400.
+      const body = decodeOrProblem(request.body.export_code);
+      const drill = await idempotentWrite(app, request, HTTP_STATUS.created, async (transaction) =>
+        toDrill(await insertDrill(transaction, userId, body)),
+      );
+      return reply.code(HTTP_STATUS.created).send(drill);
+    },
   );
 
   app.get(
     "/drills/:id/export",
     {
-      config: { owner: DRILLS_OWNER },
       schema: {
         tags: [TAG],
         summary: "A drill's export code",
-        description: plannedDescription(DRILLS_OWNER, "g-tee-oh's own encoding of the drill."),
+        description:
+          "g-tee-oh's own encoding of the drill's name, tags, spot filter and trainer settings (O-310). " +
+          "A stored drill that today's write rules refuse (written before a rule existed) is a 422 validation " +
+          'problem whose detail starts with "This drill can no longer be exported:" and whose errors name the failing paths.',
         security: AUTHENTICATED,
         params: idParamsSchema,
-        response: { 200: drillExportSchema, ...problemResponses(PLANNED_READ_PROBLEMS) },
+        response: { 200: drillExportSchema, ...problemResponses(EXPORT_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      const { userId } = requireSession(request);
+      const row = await findDrill(requireDatabase(app), userId, request.params.id);
+      if (row === undefined) {
+        throw drillNotFound();
+      }
+      const { name, tags, spot_filter, trainer } = toDrill(row);
+      return { export_code: encodeExportCode(exportableOrProblem({ name, tags, spot_filter, trainer })) };
+    },
   );
 
   done();

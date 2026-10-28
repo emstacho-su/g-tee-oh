@@ -160,7 +160,7 @@ describe("R4.13 holdout retest sessions", () => {
   let sessionId: string;
 
   it(
-    "R4.13 a holdout session replays its item's stored deal: the identical hand at the item's node",
+    "R4.13 R3.13 a holdout session replays its item's stored deal: the identical hand at the item's node, with the hand fields",
     async () => {
       const created = await createHoldout({ track_key: TRACK });
       expect(created.statusCode, created.body).toBe(201);
@@ -179,6 +179,8 @@ describe("R4.13 holdout retest sessions", () => {
       const { prompt, feedback } = await decide(sessionId);
       expect(prompt.hero_hand.join("")).toBe(deal.hero_hand);
       expect(prompt.hero_position).toBe(item?.heroPosition);
+      // S26 (R3.13, O-313, O-335): the shared session machine fills the hand fields in holdout sessions too.
+      expect(prompt).toMatchObject({ hand_decision_no: 1, previous_hand: null });
       expect(feedback).toMatchObject({ solution_id: item?.solutionId, node_key: item?.nodeKey, hand: deal.hero_hand });
       const attempt = await iso.database.selectFrom("attempt").select(["hand_class"]).where("id", "=", feedback.attempt_id).executeTakeFirstOrThrow();
       expect(attempt.hand_class).toBe(item?.hand);

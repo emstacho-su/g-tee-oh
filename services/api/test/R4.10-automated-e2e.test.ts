@@ -6,7 +6,9 @@
  * leak_stat per decided class, the three classes' cards reviewed and their mastery written (the
  * third at the end, as a partial block), a rating and one rating_history row per rated track tagged
  * with the session, a recap whose rating changes match those rows, and a repeat end that answers
- * the same recap and writes nothing.
+ * the same recap and writes nothing. The prompts also carry S26's hand fields (R3.13, O-313, O-335):
+ * automated sessions share the session machine, so each spot-mode hand is decision 1 of its hand and
+ * names the hand before it in previous_hand.
  */
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,6 +23,7 @@ import {
   learningOfSession,
   learningSnapshot,
   ONLINE_100,
+  type PromptBody,
   requireAutomated,
   seedCards,
 } from "./R4.10-automated-kit.js";
@@ -43,6 +46,19 @@ let pool: pg.Pool;
 let app: ApiApp;
 let classKeys: string[];
 
+/** S26 (R3.13): one decision per hand under the stop rule; previous_hand names the hand served before. */
+function expectHandFields(prompt: PromptBody, before: PromptBody | undefined): void {
+  expect(prompt.hand_decision_no).toBe(1);
+  if (before === undefined) {
+    expect(prompt.previous_hand).toBeNull();
+    return;
+  }
+  expect(prompt.hand_no).toBeGreaterThan(before.hand_no);
+  expect(prompt.previous_hand?.hand_no).toBe(before.hand_no);
+  // The hero takes action 0, often a fold; any other action ends the hand by the stop rule.
+  expect(["fold", "stop_rule"]).toContain(prompt.previous_hand?.end);
+}
+
 beforeAll(async () => {
   database = appDatabase();
   pool = adminPool();
@@ -64,7 +80,7 @@ async function cardDue(userId: string): Promise<Map<string, number>> {
 }
 
 describe("R4.10 automated loop end to end", () => {
-  it("R4.10 create, two blocks and a partial one, end: requests, leak stats, cards, mastery, rating and recap", async () => {
+  it("R4.10 R3.13 create, two blocks and a partial one, end: requests, leak stats, cards, mastery, rating, recap and hand fields", async () => {
     const player = await newPlayer(database);
     await seedCards(database, player.userId, classKeys);
     const dueBefore = await cardDue(player.userId);
@@ -78,9 +94,12 @@ describe("R4.10 automated loop end to end", () => {
 
     const blocks: string[] = [session.automated!.spot_class_key];
     const decidedClasses = new Set<string>();
+    let lastPrompt: PromptBody | undefined;
     for (let block = 0; block < FULL_BLOCKS; block += 1) {
       for (let hand = 0; hand < REVIEW_BLOCK_INSTANCES; hand += 1) {
         const { prompt, feedback } = await decideOnce(app, player, session.session_id);
+        expectHandFields(prompt, lastPrompt);
+        lastPrompt = prompt;
         decidedClasses.add(prompt.spot_class_key ?? "");
         const closes = hand === REVIEW_BLOCK_INSTANCES - 1;
         expect(feedback.review_block === null).toBe(!closes);
@@ -92,6 +111,7 @@ describe("R4.10 automated loop end to end", () => {
       blocks.push((await learningOfSession(database, player.userId, session.session_id)).block.spot_class_key);
     }
     const partial = await decideOnce(app, player, session.session_id);
+    expectHandFields(partial.prompt, lastPrompt);
     decidedClasses.add(partial.prompt.spot_class_key ?? "");
     expect([...decidedClasses].sort()).toEqual([...new Set(blocks)].sort());
 

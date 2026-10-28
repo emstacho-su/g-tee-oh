@@ -125,7 +125,7 @@ describe("login page", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: /Sign/ })).toBeDisabled());
     releaseLogin();
-    await screen.findByRole("heading", { level: 1, name: "Drill builder" });
+    await screen.findByRole("heading", { level: 1, name: "New drill" });
     expect(router.state.location.pathname).toBe("/drills/new");
     expect(api.tokens.get()).toBe("login-token");
     expect(await screen.findByText(fixtureSession.user.email)).toBeInTheDocument();

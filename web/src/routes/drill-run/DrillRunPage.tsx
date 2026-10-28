@@ -14,6 +14,11 @@
  * roller and the I key open it at any time. Hotkeys (O-285) go through useHotkey: N next hand (only
  * on the reveal), E end session (opens the confirm), plus 1 to 9, S and U from the trainer
  * components. While a dialog is open the screen's buttons and hotkeys pause.
+ *
+ * S26 (R3.13, R3.14, O-312 to O-314): the drill's run settings (stop rule, pause, speed,
+ * quick_result) go into the session, so street and full-hand modes run on the same screen; above
+ * the table RunProgress shows the covered-part note, the hand and decision counter and how the last
+ * hand ended, and a start refused with 422 no-coverage adds the queued count and a library link.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -23,13 +28,16 @@ import { RngExplainer, useRngExplainer } from "../../components/trainer/index.js
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import { runSettingsOf } from "../../trainer/pause-rule.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
+import { NoCoverageNote } from "./CoverageNote.js";
 import { DecisionArea } from "./DecisionArea.js";
 import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { RunProgress } from "./RunProgress.js";
 import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts.js";
 import { SpotTable } from "./SpotTable.js";
 import { StartPanel } from "./StartPanel.js";
@@ -83,8 +91,10 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
   const { state } = session;
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
+  const context = "context" in state ? state.context : null;
   return (
     <div className="flex flex-col gap-4">
+      {context === null ? null : <RunProgress context={context} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
@@ -127,7 +137,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284).
-  const session = useSpotSession({ drillId: drill.id, seed, paused: !interactive });
+  const session = useSpotSession({ drillId: drill.id, seed, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
   const { state } = session;
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
@@ -150,6 +160,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
         // in a session, a fixed answer offers End instead of a retry that cannot succeed.
         <SessionAlert problem={state.problem} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} />
       ) : null}
+      {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />

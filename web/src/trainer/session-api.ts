@@ -19,6 +19,7 @@ import { AUTO_CSRF_HEADER, problemFromBody } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
 import { IDEMPOTENCY_HEADER } from "./idempotency.js";
+import { sessionProblemFromBody } from "./session-problem.js";
 import type { Drill, PracticeSession, SessionRecap } from "./session-types.js";
 import type { PendingDecision } from "./spot-machine.js";
 
@@ -69,7 +70,8 @@ export async function createSession(api: AppApi, { drillId, rng, seed, key }: St
     params: { header: { ...AUTO_CSRF_HEADER, [IDEMPOTENCY_HEADER]: key } },
     body: { mode: "drill", drill_id: drillId, settings: { rng }, ...(seed === undefined ? {} : { seed }) },
   });
-  if (data === undefined) throw problemFromBody(response.status, error);
+  // A 422 no-coverage keeps its typed pairs_total and pairs_queued (session-problem.ts, MEDIUM 3).
+  if (data === undefined) throw sessionProblemFromBody(response.status, error);
   return data;
 }
 

@@ -14,6 +14,13 @@
  * arrives later writes neither the screen state nor the store; the mount effect activates it again,
  * which React's development double mount needs. The paused option stops the response timer while a
  * dialog covers the screen and restarts it when the dialog closes (O-284).
+ *
+ * Street and full-hand modes (S26, R3.13, O-314): the trainer option (the drill's run settings)
+ * goes into Start. When a reveal does not pause (autoContinueDelay is a number), an effect
+ * schedules auto_continue through the injected timer (trainer-deps.tsx). The effect's cleanup
+ * cancels it whenever the reveal leaves (Next, End, a new state), the screen pauses (a dialog
+ * opens: the automatic continue waits, and starts its full delay again when the dialog closes) or
+ * the screen unmounts; a timer that still fires after dispose meets a stopped driver.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -22,16 +29,30 @@ import { ME_QUERY_KEY, useAppApi } from "../auth/index.js";
 import type { ConfidenceChoice } from "../components/trainer/index.js";
 import { useTrainerTableStore } from "../store/index.js";
 import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision } from "./session-api.js";
+import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
-import { INITIAL_SPOT_STATE, type SpotState } from "./spot-machine.js";
-import { useTrainerDeps } from "./trainer-deps.js";
+import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
+import { useTrainerDeps, type Scheduler } from "./trainer-deps.js";
 
 export interface SpotSessionOptions {
   drillId: string;
   /** The O-288 replay seed, passed to POST /sessions when present. */
   seed: string | undefined;
-  /** True while a dialog covers the screen: the response timer stops (O-284). */
+  /** True while a dialog covers the screen: the response timer stops (O-284), and so does the automatic continue. */
   paused: boolean;
+  /** The drill's run settings (S26, O-314); absent means spot mode. */
+  trainer?: RunSettings;
+}
+
+/** Schedules auto_continue for a reveal that does not pause, and cancels it as the screen moves on. */
+function useAutoContinue(state: SpotState, paused: boolean, schedule: Scheduler, send: (event: SpotEvent) => void): void {
+  const delay = autoContinueDelay(state);
+  // One reveal is one decision; its key tells two reveals in a row apart.
+  const reveal = state.kind === "feedback" ? state.decision.idempotencyKey : null;
+  useEffect(() => {
+    if (delay === null || reveal === null || paused) return undefined;
+    return schedule(() => send({ type: "auto_continue" }), delay);
+  }, [delay, reveal, paused, schedule, send]);
 }
 
 export interface SpotSession {
@@ -46,7 +67,7 @@ export interface SpotSession {
   reset: () => void;
 }
 
-function useSpotIo({ drillId, seed }: Omit<SpotSessionOptions, "paused">): SpotIo {
+function useSpotIo({ drillId, seed }: Pick<SpotSessionOptions, "drillId" | "seed">): SpotIo {
   const api = useAppApi();
   const queryClient = useQueryClient();
   const { now, newKey } = useTrainerDeps();
@@ -76,7 +97,7 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   useLayoutEffect(() => {
     ioRef.current = io;
   });
-  const { now, newKey } = useTrainerDeps();
+  const { now, newKey, schedule } = useTrainerDeps();
   const [state, setState] = useState<SpotState>(INITIAL_SPOT_STATE);
   const [driver] = useState(() => createSpotDriver(() => ioRef.current, setState));
   const clearTable = useTrainerTableStore((store) => store.clear);
@@ -90,13 +111,14 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   const { send } = driver;
   // A newly shown prompt starts its timer running, so it is paused again when a dialog is open.
   const shownPrompt = state.kind === "await_action" ? state.prompt : null;
-  const { paused } = options;
+  const { paused, trainer } = options;
   useEffect(() => {
     send(paused ? { type: "pause", at: now() } : { type: "resume", at: now() });
   }, [paused, shownPrompt, send, now]);
+  useAutoContinue(state, paused, schedule, send);
   return {
     state,
-    start: (rng) => send({ type: "start", key: newKey(), rng }),
+    start: (rng) => send(trainer === undefined ? { type: "start", key: newKey(), rng } : { type: "start", key: newKey(), rng, trainer }),
     chooseAction: (actionIndex) => send({ type: "choose_action", actionIndex, at: now() }),
     tapConfidence: (confidence) => send({ type: "confidence", confidence, key: newKey() }),
     next: () => send({ type: "next" }),

@@ -8,6 +8,8 @@
  * - The stake label matches the format (ADR 0014): online drills use the one online rake profile,
  *   labelled online; live drills name a live stake as small/big blind, such as 1/3 or 2/5.
  * - No list repeats a value: depths, positions, preflop actions and manually chosen hands.
+ * - Every board flop holds three distinct cards (PR #30 review LOW 12): the shared flop pattern
+ *   only fixes the text, and a flop that repeats a card can never be dealt.
  *
  * Each violation is reported at the path of the offending element, so the 400 problem's errors
  * list points the client at the exact entry. The base shape is validated first; these rules run
@@ -27,6 +29,7 @@ interface SpotFilterShape {
   villain_positions: readonly string[];
   preflop_action: readonly string[];
   hands: { mode: string; hands?: readonly string[] };
+  board?: { flops?: readonly string[] | undefined } | undefined;
 }
 
 type Path = ReadonlyArray<string | number>;
@@ -72,6 +75,25 @@ function reportStakeMismatch(context: z.RefinementCtx, filter: SpotFilterShape):
   }
 }
 
+const CARD_TEXT_LENGTH = 2;
+
+/** A board flop's cards ("KhKh3c" as Kh, Kh, 3c); the shape already fixed it at three two-character cards. */
+function cardsOfFlop(flop: string): string[] {
+  return Array.from({ length: flop.length / CARD_TEXT_LENGTH }, (_, index) =>
+    flop.slice(index * CARD_TEXT_LENGTH, (index + 1) * CARD_TEXT_LENGTH),
+  );
+}
+
+/** A flop that repeats a card can never be dealt (PR #30 review LOW 12). */
+function reportRepeatedCards(context: z.RefinementCtx, flops: readonly string[]): void {
+  flops.forEach((flop, index) => {
+    const cards = cardsOfFlop(flop);
+    if (new Set(cards).size !== cards.length) {
+      report(context, ["board", "flops", index], `${flop} repeats a card`);
+    }
+  });
+}
+
 /** The superRefine body of spotFilterSchema. */
 export function checkSpotFilter(filter: SpotFilterShape, context: z.RefinementCtx): void {
   reportUnseated(context, filter);
@@ -83,5 +105,8 @@ export function checkSpotFilter(filter: SpotFilterShape, context: z.RefinementCt
   reportDuplicates(context, filter.preflop_action, ["preflop_action"]);
   if (filter.hands.hands !== undefined) {
     reportDuplicates(context, filter.hands.hands, ["hands", "hands"]);
+  }
+  if (filter.board?.flops !== undefined) {
+    reportRepeatedCards(context, filter.board.flops);
   }
 }

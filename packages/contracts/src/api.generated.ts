@@ -1611,9 +1611,7 @@ export interface paths {
         };
         /**
          * A drill's export code
-         * @description g-tee-oh's own encoding of the drill.
-         *
-         *     Answers 501 until S26 builds it (O-38).
+         * @description g-tee-oh's own encoding of the drill's name, tags, spot filter and trainer settings (O-310). A stored drill that today's write rules refuse (written before a rule existed) is a 422 validation problem whose detail starts with "This drill can no longer be exported:" and whose errors name the failing paths.
          */
         get: {
             parameters: {
@@ -1633,7 +1631,10 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            /** @description g-tee-oh's own encoding of a drill (S26) */
+                            /**
+                             * Format: starts_with
+                             * @description g-tee-oh's own encoding of a drill (O-310); starts with gteeoh1.
+                             */
                             export_code: string;
                         };
                     };
@@ -1665,6 +1666,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -1676,15 +1686,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1713,9 +1714,7 @@ export interface paths {
         put?: never;
         /**
          * Import a drill from its export code
-         * @description Creates a drill from an export code.
-         *
-         *     Answers 501 until S26 builds it (O-38).
+         * @description Creates a new drill of the session user from an export code (O-310); never overwrites a drill. A code that is too long, of another version, damaged, expanding past its cap or holding a drill the write rules refuse is a 400 validation problem pointing at body.export_code.
          */
         post: {
             parameters: {
@@ -1773,15 +1772,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (404) */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
                 /** @description Problem (409) */
                 409: {
                     headers: {
@@ -1829,15 +1819,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3719,13 +3700,13 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (422) */
+                /** @description Problem (422): no-coverage, with pairs_total and pairs_queued, or an Idempotency-Key mismatch */
                 422: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/problem+json": components["schemas"]["Problem"];
+                        "application/problem+json": components["schemas"]["NoCoverageProblem"];
                     };
                 };
                 /** @description Problem (429) */
@@ -5150,6 +5131,54 @@ export interface components {
                 title: string;
             }[];
         };
+        /** @description A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued */
+        NoCoverageProblem: {
+            detail?: string;
+            /** @description Field errors of a validation problem; at most 20 */
+            errors?: {
+                message: string;
+                /** @description Dotted path of the offending field, prefixed by its location */
+                path: string;
+            }[];
+            /** @description How many field errors were left out of errors, which lists at most 20; absent when none were */
+            errors_omitted?: number;
+            /** @description The request path */
+            instance?: string;
+            /** @description No-coverage only: the uncovered candidates, each queued for the builder */
+            pairs_queued?: number;
+            /** @description No-coverage only: the (configuration, position pair) candidates the drill's filter reaches */
+            pairs_total?: number;
+            /** @description The x-request-id of the failed request */
+            request_id?: string;
+            status: number;
+            title: string;
+            /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
+            type: string;
+        };
+        /** @description A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued */
+        NoCoverageProblemInput: {
+            detail?: string;
+            /** @description Field errors of a validation problem; at most 20 */
+            errors?: {
+                message: string;
+                /** @description Dotted path of the offending field, prefixed by its location */
+                path: string;
+            }[];
+            /** @description How many field errors were left out of errors, which lists at most 20; absent when none were */
+            errors_omitted?: number;
+            /** @description The request path */
+            instance?: string;
+            /** @description No-coverage only: the uncovered candidates, each queued for the builder */
+            pairs_queued?: number;
+            /** @description No-coverage only: the (configuration, position pair) candidates the drill's filter reaches */
+            pairs_total?: number;
+            /** @description The x-request-id of the failed request */
+            request_id?: string;
+            status: number;
+            title: string;
+            /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
+            type: string;
+        };
         NodeAction: {
             bucket: string | null;
             index: number;
@@ -5227,6 +5256,8 @@ export interface components {
         PracticeSession: {
             /** @description The current block of an automated session; null otherwise */
             automated: components["schemas"]["AutomatedBlock"] | null;
+            /** @description The covered part of the drill; set by POST /sessions (O-312) */
+            coverage?: components["schemas"]["SessionCoverage"];
             drill_id: string | null;
             /** @description The round progress of a holdout session; null otherwise */
             holdout: components["schemas"]["HoldoutProgress"] | null;
@@ -5248,6 +5279,8 @@ export interface components {
         PracticeSessionInput: {
             /** @description The current block of an automated session; null otherwise */
             automated: components["schemas"]["AutomatedBlockInput"] | null;
+            /** @description The covered part of the drill; set by POST /sessions (O-312) */
+            coverage?: components["schemas"]["SessionCoverageInput"];
             drill_id: string | null;
             /** @description The round progress of a holdout session; null otherwise */
             holdout: components["schemas"]["HoldoutProgressInput"] | null;
@@ -5406,15 +5439,49 @@ export interface components {
                 size: number;
             };
         };
+        PreviousHand: {
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /**
+             * @description fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)
+             * @enum {string}
+             */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+        };
+        PreviousHandInput: {
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /**
+             * @description fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)
+             * @enum {string}
+             */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+        };
         /** @description RFC 9457 problem details (application/problem+json) */
         Problem: {
             detail?: string;
-            /** @description Field errors of a validation problem */
+            /** @description Field errors of a validation problem; at most 20 */
             errors?: {
                 message: string;
                 /** @description Dotted path of the offending field, prefixed by its location */
                 path: string;
             }[];
+            /** @description How many field errors were left out of errors, which lists at most 20; absent when none were */
+            errors_omitted?: number;
             /** @description The request path */
             instance?: string;
             /** @description The x-request-id of the failed request */
@@ -5427,12 +5494,14 @@ export interface components {
         /** @description RFC 9457 problem details (application/problem+json) */
         ProblemInput: {
             detail?: string;
-            /** @description Field errors of a validation problem */
+            /** @description Field errors of a validation problem; at most 20 */
             errors?: {
                 message: string;
                 /** @description Dotted path of the offending field, prefixed by its location */
                 path: string;
             }[];
+            /** @description How many field errors were left out of errors, which lists at most 20; absent when none were */
+            errors_omitted?: number;
             /** @description The request path */
             instance?: string;
             /** @description The x-request-id of the failed request */
@@ -5818,6 +5887,22 @@ export interface components {
             p_known: number | null;
             spot_class_key: string;
         };
+        SessionCoverage: {
+            /** @description Pairs the library covers; the session runs on these */
+            pairs_covered: number;
+            /** @description Uncovered pairs, each queued for the builder */
+            pairs_queued: number;
+            /** @description Configuration and position pairs the drill's filter reaches */
+            pairs_total: number;
+        };
+        SessionCoverageInput: {
+            /** @description Pairs the library covers; the session runs on these */
+            pairs_covered: number;
+            /** @description Uncovered pairs, each queued for the builder */
+            pairs_queued: number;
+            /** @description Configuration and position pairs the drill's filter reaches */
+            pairs_total: number;
+        };
         SessionInfo: {
             /** @description Send as x-csrf-token on every mutating request (O-230) */
             csrf_token: string;
@@ -6048,7 +6133,7 @@ export interface components {
             /** @description Empty means any opponent */
             villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
         };
-        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates, three distinct cards in each board flop) */
         SpotFilterWrite: {
             alternate_seats: boolean;
             board?: {
@@ -6103,7 +6188,7 @@ export interface components {
             /** @description Empty means any opponent */
             villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
         };
-        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates) */
+        /** @description A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates, three distinct cards in each board flop) */
         SpotFilterWriteInput: {
             alternate_seats: boolean;
             board?: {
@@ -6346,6 +6431,10 @@ export interface components {
             board: string[];
             /** @description Generated from the node's tree actions (ADR 0020) */
             buttons: components["schemas"]["NodeAction"][];
+            /** @description The hero's decision index within this hand, from 1; actions the hand was dealt with (its spot's line) do not count (O-335) */
+            hand_decision_no: number;
+            /** @description The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313) */
+            hand_no: number;
             hero_hand: string[];
             /** @enum {string} */
             hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
@@ -6358,6 +6447,8 @@ export interface components {
             pot_cbb: number;
             /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
             previous_board: string[] | null;
+            /** @description How the last ended hand closed; null before the first hand ends (O-313) */
+            previous_hand: components["schemas"]["PreviousHand"] | null;
             /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
             rng_roll: number | null;
             /** Format: uuid */
@@ -6385,6 +6476,10 @@ export interface components {
             board: string[];
             /** @description Generated from the node's tree actions (ADR 0020) */
             buttons: components["schemas"]["NodeActionInput"][];
+            /** @description The hero's decision index within this hand, from 1; actions the hand was dealt with (its spot's line) do not count (O-335) */
+            hand_decision_no: number;
+            /** @description The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313) */
+            hand_no: number;
             hero_hand: string[];
             /** @enum {string} */
             hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
@@ -6397,6 +6492,8 @@ export interface components {
             pot_cbb: number;
             /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
             previous_board: string[] | null;
+            /** @description How the last ended hand closed; null before the first hand ends (O-313) */
+            previous_hand: components["schemas"]["PreviousHandInput"] | null;
             /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
             rng_roll: number | null;
             /** Format: uuid */

@@ -1,8 +1,9 @@
 /**
  * Placeholder screens for the A7 section 2 routes not built yet (R3.13); S25 replaced /study and
- * /drills/$id/run with their screens, S28 /library and /settings, S27 /predict and /paint, S32 /progress. Each shows the screen
- * name from A7 section 2 as its h1 and names the session that builds it, so a visitor (and the
- * router tests) can tell a missing screen from a broken one.
+ * /drills/$id/run with their screens, S28 /library and /settings, S27 /predict and /paint, S26
+ * /drills, /drills/new and /drills/$id, S32 /progress. Each shows the screen name from A7 section 2
+ * as its h1 and names the session that builds it, so a visitor (and the router tests) can tell a
+ * missing screen from a broken one.
  */
 
 export interface PlaceholderScreen {
@@ -13,9 +14,6 @@ export interface PlaceholderScreen {
 
 export const PLACEHOLDER_SCREENS = {
   train: { title: "Automated training session", summary: "Library-served spots with grading.", session: "Phase 4 (S32)" },
-  drills: { title: "Drill library", summary: "Tags, import and export, duplicate.", session: "S26" },
-  drillNew: { title: "Drill builder", summary: "Build a new drill.", session: "S26" },
-  drillEdit: { title: "Drill builder", summary: "Edit this drill.", session: "S26" },
 } as const satisfies Readonly<Record<string, PlaceholderScreen>>;
 
 export type PlaceholderKey = keyof typeof PLACEHOLDER_SCREENS;

@@ -52,6 +52,10 @@ export interface PromptBody {
   spot_class_key: string | null;
   track_key: string | null;
   worked_example: boolean;
+  /** S26 (O-313, O-335): the shared session machine fills these in every graded mode. */
+  hand_no: number;
+  hand_decision_no: number;
+  previous_hand: { hand_no: number; end: string } | null;
 }
 
 export interface FeedbackBody {

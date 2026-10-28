@@ -42,7 +42,7 @@ import {
   streetSchema,
   uuidSchema,
 } from "../schemas/common.js";
-import { hex64Schema, sessionStateSchema, trackKeySchema } from "../schemas/training.js";
+import { hex64Schema, previousHandSchema, sessionStateSchema, trackKeySchema } from "../schemas/training.js";
 import { sessionSpotSchema, type SessionSpot } from "./spot.js";
 
 /** The most hero spots a session keeps; a drill over many pairs keeps the first ones found. */
@@ -94,6 +94,13 @@ export const handStateSchema = z.strictObject({
   end: handEndSchema.nullable(),
   last_action_kind: actionKindSchema.nullable(),
   history: z.array(historyEntrySchema),
+  /**
+   * How many history entries the hand was dealt with: its hero spot's line (S26, O-335). The
+   * hero's decisions in the hand are the hero's entries after these, so a spot dealt facing a
+   * 3-bet (whose line holds the hero's own open) starts at decision 1. Absent on rows written
+   * before S26, which then count from the start of the history.
+   */
+  dealt_history_length: z.number().int().min(0).optional(),
   board: z.array(cardSchema),
   opponent_rng_state: hex64Schema,
   roll_rng_state: hex64Schema,
@@ -161,6 +168,8 @@ export const persistedStateSchema = z.strictObject({
   hand: handStateSchema.nullable(),
   previous_board: z.array(cardSchema).nullable(),
   last_attempt_id: uuidSchema.nullable(),
+  /** How the last ended hand closed (S26, O-313); absent on rows written before S26 and before the first hand ends. */
+  previous_hand: previousHandSchema.optional(),
   /** S31: null for drill and practice sessions and rows written before S31. */
   learning: learningStateSchema.nullable().default(null),
   /** PR #27 review HIGH 2: the session was created with a client-supplied seed (any mode). */
@@ -175,6 +184,7 @@ export type HandEnd = z.infer<typeof handEndSchema>;
 export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 export type HeroSpot = z.infer<typeof heroSpotSchema>;
 export type HandState = z.infer<typeof handStateSchema>;
+export type PreviousHand = z.infer<typeof previousHandSchema>;
 /** The schema's input: learning may be absent in code-built states (read it with learningOf). */
 export type PersistedState = z.input<typeof persistedStateSchema>;
 export type AutomatedBlockState = z.infer<typeof automatedBlockStateSchema>;

@@ -68,7 +68,8 @@ describe("R3.13 drill run start panel", () => {
     renderRun({ script: {} });
     expect(await screen.findByRole("heading", { name: fixtureDrill.name })).toBeInTheDocument();
     expect(screen.getByText("Grouped")).toBeInTheDocument();
-    expect(screen.getByText("After each action")).toBeInTheDocument();
+    // The stop rule reads as the library and the builder name it (src/drills/labels.ts, LOW 10).
+    expect(screen.getByText("Spot")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "RNG mode" })).toHaveAttribute("aria-checked", "false");
   });
 

@@ -79,6 +79,12 @@ describe("R3.14 spot filter cross-field rules (M4)", () => {
     expect(issuePaths(withFields({ hands: { mode: "manual", hands: ["AKs", "AKs"] } }))).toContain("hands.hands.1");
   });
 
+  it("R3.14 a board flop must hold three distinct cards (PR #30 review LOW 12)", () => {
+    expect(issuePaths(withFields({ board: { flops: ["Kh7d2c", "KhKh3c"] } }))).toEqual(["board.flops.1"]);
+    expect(issuePaths(withFields({ board: { flops: ["3c4c3c"] } }))).toEqual(["board.flops.0"]);
+    expect(issuePaths(withFields({ board: { flops: ["Kh7d2c", "KdKh3c"] } }))).toEqual([]);
+  });
+
   it("R3.14 the patch body applies the same rules to a spot filter", () => {
     expect(drillPatchBodySchema.safeParse({ spot_filter: withFields({ hero_positions: ["BTN", "BTN"] }) }).success).toBe(false);
   });
@@ -129,6 +135,34 @@ describe("R3.14 spot filter rules at the HTTP boundary (M4)", () => {
     expect(response.json<{ type: string; errors: Array<{ path: string }> }>()).toMatchObject({
       type: "urn:g-tee-oh:problem:validation",
     });
+  });
+
+  it("R3.14 POST /drills with a board flop that repeats a card is a 400 at that flop (LOW 12)", async () => {
+    const session = await createTestSession(database, (await createTestUser(database)).id);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/drills",
+      headers: mutatingHeaders(session),
+      payload: {
+        name: "repeated card",
+        spot_filter: withFields({ board: { flops: ["KhKh3c"] } }),
+        trainer: {
+          stop_rule: "after_action",
+          input: "actions",
+          grouping: "standard",
+          rng: false,
+          pause: "never",
+          speed: "normal",
+          quick_result: false,
+          tables: 1,
+          timebank_s: null,
+          panels: {},
+        },
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    const paths = response.json<{ errors: Array<{ path: string }> }>().errors.map((error) => error.path);
+    expect(paths).toEqual(["body.spot_filter.board.flops.0"]);
   });
 
   it("R3.14 a stored drill written before the rules (a legacy row) still lists and reads (re-review LOW 3)", async () => {
