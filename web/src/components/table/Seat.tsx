@@ -85,7 +85,7 @@ function Badge({ seat }: { seat: TableSeat }) {
   }
   if (seat.lastAction === undefined) return null;
   return (
-    <span data-testid="seat-action" className="table-seat-badge rounded-full bg-surface-sunken px-2 text-xs font-semibold">
+    <span data-testid="seat-action" className="table-seat-badge whitespace-nowrap rounded-full bg-surface-sunken px-2 text-xs font-semibold">
       {seat.lastAction}
     </span>
   );

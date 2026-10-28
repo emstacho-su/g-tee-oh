@@ -51,7 +51,7 @@ export const MAX_LAYOUT_SEATS = 9;
 
 export const FELT_BOXES: Readonly<Record<TableOrientation, FeltBox>> = {
   landscape: { leftPercent: 26, rightPercent: 26, topPercent: 28, bottomPercent: 38 },
-  portrait: { leftPercent: 32, rightPercent: 32, topPercent: 22, bottomPercent: 32 },
+  portrait: { leftPercent: 30, rightPercent: 30, topPercent: 22, bottomPercent: 32 },
 };
 
 /** The bottom slot's card (the hero's, with the hole cards) and every other card. */
@@ -60,8 +60,11 @@ const SEAT_BOXES: Readonly<Record<TableOrientation, { readonly bottom: SeatBox; 
   portrait: { bottom: { widthPercent: 34, heightPercent: 22 }, other: { widthPercent: 28, heightPercent: 16 } },
 };
 
-/** How far along the line from a card to the felt's centre its bet spot sits. */
-const BET_SPOT_SHARE = 0.55;
+/**
+ * How far along the line from a card to the felt's centre its bet spot sits. Portrait cards sit
+ * close to the narrow felt, so a chip goes further in there to clear the side seats.
+ */
+const BET_SPOT_SHARE: Readonly<Record<TableOrientation, number>> = { landscape: 0.55, portrait: 0.8 };
 
 type Slot = readonly [left: number, top: number];
 
@@ -96,8 +99,8 @@ function slotAt(slot: Slot, isBottom: boolean, orientation: TableOrientation): S
   return {
     seat: { leftPercent: left, topPercent: top },
     bet: {
-      leftPercent: left + BET_SPOT_SHARE * (centre.leftPercent - left),
-      topPercent: top + BET_SPOT_SHARE * (centre.topPercent - top),
+      leftPercent: left + BET_SPOT_SHARE[orientation] * (centre.leftPercent - left),
+      topPercent: top + BET_SPOT_SHARE[orientation] * (centre.topPercent - top),
     },
     box: isBottom ? SEAT_BOXES[orientation].bottom : SEAT_BOXES[orientation].other,
   };

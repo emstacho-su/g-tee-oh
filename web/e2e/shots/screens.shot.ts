@@ -28,16 +28,18 @@ const CRITERIA = {
   home: "Home shell renders after sign in, the smoke flow's landing page (DoD 1, R3.13)",
   placeholder: "Route placeholders render under the shell (DoD 1, A7 section 2)",
   shortcuts: "Keyboard-first: the ? shortcuts overlay (A7 section 4, R3.13 hotkeys)",
-  table: "PokerTable: 6 to 9 seats, stacks, pot, button, bets, straddle marker (R3.13)",
+  table:
+    "R3.13 PokerTable as seat cards around the felt, landscape at 1440 and portrait at 390 by its own width (O-380); each seat's last action as a badge and chip after the replay (O-381 to O-383)",
   cards: "CardView and BoardReveal (R3.13)",
   actionBar: "ActionBar: buttons from the node's tree actions, exact size preflop, bucket with size postflop (R3.13, O-22, ADR 0020)",
   roller: "R3.10 RngRoller revealed: the roll, the cumulative bands grown in from the left and where the roll fell (R3.13, O-213, O-376)",
-  feedback: "FeedbackPanel shell: label, EV loss in bb and percent pot, the hand's frequencies (R3.13)",
-  panels: "ActionFrequencyTable and ThresholdCard (R3.12, R3.13)",
-  matrix: "RangeMatrix canvas with per-cell action frequency bars; color never the only signal (R3.12, A7 section 4)",
-  matrixEv: "RangeMatrix EV mode (R3.12)",
-  matrixWeight: "RangeMatrix range-weight mode (R3.12)",
-  matrixTable: "The accessible table fallback renders the same data (DoD 3, R3.12)",
+  feedback: "R3.13 FeedbackPanel: a short summary (label, your action against the best, loss), every other section collapsed (O-387)",
+  feedbackExpanded: "R3.13 FeedbackPanel with every section expanded inline, never a pop-out to close (O-387, O-388)",
+  panels: "R3.12 ActionFrequencyTable and ThresholdCard in plain words with tooltips on actions, hand position and strongest folding hand, no index or token shown",
+  matrix: "RangeMatrix canvas with per-cell action frequency bars and a swatch legend; color never the only signal (R3.12, A7 section 4)",
+  matrixEv: "R3.12 RangeMatrix EV mode: brick red to blue diverging scale with a neutral middle and a legend in bb (O-384)",
+  matrixWeight: "R3.12 RangeMatrix range-weight mode: single-hue brown scale with a 0 to 100 percent legend (O-385)",
+  matrixPopOut: "R3.12 a clicked cell pops out enlarged with the exact percentage per action beneath it (O-386); no visible table (O-347)",
   explainer: "R3.10 Mixed-frequency mode explainer: what earns Best (the highest EV), how the roll works on the hidden then revealed scale, why practise mixing (05 section 7, ADR 0024, O-283)",
   rollScale: "R3.10 before the decision the roll on the 1 to 100 scale, never the bands (ADR 0024 rule 3, O-344)",
   feedbackWired: "R3.10 R3.13 feedback after the reveal: the same scale with the bands and the followed-the-roll mark, never Best, range view and threshold card (O-281, O-371)",
@@ -51,6 +53,7 @@ const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
   ["action-bar", CRITERIA.actionBar],
   ["rng-roller", CRITERIA.roller],
   ["feedback-panel", CRITERIA.feedback],
+  ["feedback-expanded", CRITERIA.feedbackExpanded],
   ["rng-explainer", CRITERIA.explainer],
   ["roll-scale", CRITERIA.rollScale],
   ["feedback-wired", CRITERIA.feedbackWired],
@@ -59,7 +62,7 @@ const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
   ["range-matrix-frequency", CRITERIA.matrix],
   ["range-matrix-ev", CRITERIA.matrixEv],
   ["range-matrix-weight", CRITERIA.matrixWeight],
-  ["range-matrix-table", CRITERIA.matrixTable],
+  ["range-matrix-popout", CRITERIA.matrixPopOut],
 ];
 
 const records: ShotRecord[] = [];
@@ -95,8 +98,6 @@ async function appScreens(page: Page, theme: Theme, viewport: Viewport): Promise
 
 async function galleryScreens(page: Page, theme: Theme, viewport: Viewport): Promise<void> {
   await page.goto(`/gallery.html?theme=${theme}`);
-  const tableSection = page.getByTestId("gallery-range-matrix-table");
-  await tableSection.getByRole("button", { name: "Show as table" }).click();
   for (const [name, criterion] of GALLERY_SECTIONS) {
     const section = page.getByTestId(`gallery-${name}`);
     await section.scrollIntoViewIfNeeded();

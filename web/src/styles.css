@@ -440,6 +440,7 @@ meter::-moz-meter-bar {
     right: var(--port-felt-r);
     top: var(--port-felt-t);
     bottom: var(--port-felt-b);
+    border-width: 4px;
   }
 
   .table-seat {
@@ -460,6 +461,18 @@ meter::-moz-meter-bar {
 
   .table-chip[data-moving="true"] {
     animation-name: table-chip-slide-portrait;
+  }
+
+  /* The felt is narrow in portrait: the board's streets wrap (the flop, then the turn and river). */
+  .table-center > * {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .table-seat-badge {
+    padding-inline: 0.25rem;
+    font-size: 0.625rem;
   }
 }
 

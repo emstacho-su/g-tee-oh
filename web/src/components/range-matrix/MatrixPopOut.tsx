@@ -174,7 +174,7 @@ export function MatrixPopOut(props: MatrixPopOutProps) {
       data-hand={cell.hand}
       style={style}
       className={cn(
-        "absolute flex w-52 max-w-full flex-col gap-2 rounded-xl border border-border bg-surface-raised p-2 text-text shadow-lg",
+        "absolute flex w-60 max-w-full flex-col gap-2 rounded-xl border border-border bg-surface-raised p-2 text-text shadow-lg",
         TOOLTIP_LAYER_CLASS,
       )}
     >

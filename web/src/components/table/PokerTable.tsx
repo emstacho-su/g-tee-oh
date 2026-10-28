@@ -109,7 +109,7 @@ export function PokerTable({ seats, potCbb, center, fourColor = false, replaying
           className="table-felt absolute flex flex-col items-center justify-center gap-2 rounded-[2rem] border-8 border-felt-edge bg-felt text-white shadow-inner"
         >
           <span className="rounded bg-black/30 px-2 py-0.5 text-sm font-semibold tabular-nums">Pot {pot}</span>
-          {center}
+          {center === undefined ? null : <div className="table-center flex max-w-full justify-center px-1">{center}</div>}
         </div>
         <ul aria-label="Seats" className="absolute inset-0">
           {seats.map((seat, index) => {
