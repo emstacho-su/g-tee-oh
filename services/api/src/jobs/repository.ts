@@ -13,6 +13,11 @@
  * - failJob queues the job again JOB_RETRY_BACKOFF_MS times its attempts later, or marks it failed
  *   once it has made JOB_MAX_ATTEMPTS attempts. A running job whose lease ran out after its last
  *   attempt is never claimed again; failExhaustedJobs marks it failed.
+ * - pruneDoneJobs deletes the done rows of the given kinds last updated more than
+ *   APP_JOB_RETENTION_MS ago (PR #27 review MEDIUM 9), so the queue does not grow by a row per
+ *   period forever. The age is longer than the longest period (holdout_round_monthly), so a pruned
+ *   row is never the current period ensureScheduled would insert again. Failed rows are kept for
+ *   an operator to read.
  * Every instant is passed in (now), never read from the database clock, so tests fix the clock.
  */
 import { sql } from "kysely";
@@ -25,6 +30,8 @@ export const JOB_LEASE_MS = 10 * 60 * 1000;
 export const JOB_RETRY_BACKOFF_MS = 5 * 60 * 1000;
 /** Attempts before a job is marked failed (O-275). */
 export const JOB_MAX_ATTEMPTS = 5;
+/** PR #27 review MEDIUM 9: done jobs are kept this long (90 days, longer than any job period). */
+export const APP_JOB_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 /** last_error keeps at most this many characters of the error message. */
 export const MAX_JOB_ERROR_LENGTH = 1000;
 
@@ -153,4 +160,18 @@ export async function failExhaustedJobs(database: Database, kinds: readonly stri
     .where("locked_at", "<", new Date(now.getTime() - JOB_LEASE_MS))
     .executeTakeFirst();
   return Number(result.numUpdatedRows);
+}
+
+/** Deletes the done jobs of `kinds` last updated before now minus APP_JOB_RETENTION_MS (see the module doc). */
+export async function pruneDoneJobs(database: Database, kinds: readonly string[], now: Date): Promise<number> {
+  if (kinds.length === 0) {
+    return 0;
+  }
+  const result = await database
+    .deleteFrom("app_job")
+    .where("kind", "in", [...kinds])
+    .where("status", "=", JOB_STATUS.done)
+    .where("updated_at", "<", new Date(now.getTime() - APP_JOB_RETENTION_MS))
+    .executeTakeFirst();
+  return Number(result.numDeletedRows);
 }

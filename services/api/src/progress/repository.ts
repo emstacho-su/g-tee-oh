@@ -9,6 +9,7 @@ import { sql } from "kysely";
 import type { Database } from "../db.js";
 import { spotClassCardOf } from "../learning-state/fsrs-card.js";
 import { ratingOnRead } from "../learning-state/rating-period.js";
+import { NOT_SEEDED_SESSION } from "../learning-state/repository.js";
 import { TRACK_KEYS, type TrackKey } from "../learning/tracks.js";
 import { isoDateOf } from "../streaks/calendar.js";
 import { sqlDate } from "../streaks/sql-date.js";
@@ -117,6 +118,8 @@ export async function classMemory(database: Database, userId: string, now: Date)
       .select((eb) => ["attempt.spot_class_key", eb.fn.countAll<string>().as("n")])
       .where("attempt.user_id", "=", userId)
       .where("practice_session.mode", "!=", UNCOUNTED_MODE)
+      // PR #27 review HIGH 2: a client-seeded session's decisions never reach /progress.
+      .where(NOT_SEEDED_SESSION)
       .groupBy("attempt.spot_class_key")
       .execute(),
   ]);

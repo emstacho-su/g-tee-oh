@@ -19,7 +19,7 @@ import { AUTOMATED_HOOK_PART } from "../src/automated/effects.js";
 import { invalidateClassCatalogs, loadClassCatalog } from "../src/automated/class-catalog.js";
 import { REVIEW_BLOCK_INSTANCES } from "../src/automated/queue.js";
 import type { Database } from "../src/db.js";
-import type { DecisionContext } from "../src/learning/effects.js";
+import { EMPTY_PREPARED_LEARNING, type DecisionContext } from "../src/learning/effects.js";
 import { findSession } from "../src/sessions/repository.js";
 import {
   decideOnce,
@@ -76,6 +76,7 @@ async function contextFor(player: Player, sessionId: string, now = new Date()): 
     grade: undefined as never,
     solverQuery: fixtureSolverQuery(),
     request: { id: "r4.10-test" } as FastifyRequest,
+    prepared: EMPTY_PREPARED_LEARNING,
   };
 }
 

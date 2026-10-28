@@ -11,6 +11,7 @@ import type pg from "pg";
 
 import type { ApiApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
+import { canonicalPairs } from "../src/catalog/seats.js";
 import { storedCardOf } from "../src/learning-state/fsrs-card.js";
 import { deriveAwaitHero, type DerivedPrompt } from "../src/sessions/derive.js";
 import { findSession } from "../src/sessions/repository.js";
@@ -171,4 +172,60 @@ export function worstAction(derived: DerivedPrompt): { index: number; lossPctPot
   const losses = derived.node.hands[0]?.loss_pct_pot ?? [];
   const index = losses.reduce((best, loss, at) => (loss > (losses[best] ?? -1) ? at : best), 0);
   return { index, lossPctPot: losses[index] ?? 0 };
+}
+
+export const COVERAGE_PATH = "/v1/coverage";
+/** The 500 a failing coverage call answers; the client maps it to its generic 502 (expectData). */
+const FAILED_STATUS = 500;
+/** v1 serves no ante variants (O-33), so the catalog scope is the no-ante configurations. */
+const NO_ANTE_CBB = 0;
+
+type CoverageBody = Record<string, unknown>;
+
+/**
+ * A fetch over the fixture solver-query whose GET /v1/coverage a test controls (PR #27 review HIGH 3,
+ * MEDIUM 6, MEDIUM 7): `failing` answers every coverage call with a 500, `rewrite` edits each
+ * coverage body before the client reads it; `calls()` counts the coverage calls so far.
+ */
+export interface CoverageControl {
+  fetch: typeof fetch;
+  calls: () => number;
+  failing: boolean;
+  rewrite: ((body: CoverageBody) => CoverageBody) | null;
+}
+
+export function coverageControl(): CoverageControl {
+  let count = 0;
+  const control: CoverageControl = {
+    calls: () => count,
+    failing: false,
+    rewrite: null,
+    fetch: async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname !== COVERAGE_PATH) {
+        return fetch(input, init);
+      }
+      count += 1;
+      if (control.failing) {
+        return new Response(JSON.stringify({ status: FAILED_STATUS, title: "test failure" }), {
+          status: FAILED_STATUS,
+          headers: { "content-type": "application/problem+json" },
+        });
+      }
+      const response = await fetch(input, init);
+      const rewrite = control.rewrite;
+      if (rewrite === null || !response.ok) {
+        return response;
+      }
+      const body = rewrite((await response.json()) as CoverageBody);
+      return new Response(JSON.stringify(body), { status: response.status, headers: { "content-type": "application/json" } });
+    },
+  };
+  return control;
+}
+
+/** Every (configuration, pair) the all-configs catalog asks solver-query about (MEDIUM 6). */
+export async function fullCatalogPairs(database: Database): Promise<number> {
+  const configs = await database.selectFrom("game_config").select("table_size").where("ante_cbb", "=", NO_ANTE_CBB).execute();
+  return configs.reduce((sum, config) => sum + canonicalPairs(config.table_size).length, 0);
 }

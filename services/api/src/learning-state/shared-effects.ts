@@ -9,24 +9,27 @@
  *   learning's itemDifficulty over the grade's difficulty_features, and an all-within-floor item
  *   sets itemExcluded, which decide.ts's post-grade step turns into learning's withItemExclusion
  *   (unrated).
- * - afterInsert, drill and unseeded automated sessions only (holdout attempts change no learning
- *   state, O-274; a client-seeded automated session writes none, PM seed condition): the decided
+ * - afterInsert, drill and automated sessions not created with a client seed only (holdout attempts
+ *   change no learning state, O-274; a client-seeded session of any mode writes none, PM seed
+ *   condition, PR #27 review HIGH 2, sessions/state.ts isSeededSession): the decided
  *   class's leak_stat is recomputed in the decision transaction (O-275, leak-stat.ts). A node
  *   without a class (outside the catalog) has no leak stat.
- * - The frequency prior is the class catalog's (Lane A's automated/class-catalog.ts, O-270) over the
- *   session's scope: the automated session's config_ids (every catalog configuration when empty), or
- *   the drill hand's configuration, so the prior is the one the automated queue sees for that scope.
- *   A class the catalog does not list keeps its stored prior, or 0 without one (O-270). A catalog
- *   that cannot load is logged at warn level and the stored prior is used: a ranking prior never
- *   fails a graded decision, and the next decision or the weekly job recomputes the row.
+ * - The frequency prior is the all-configs class catalog's (Lane A's automated/class-catalog.ts,
+ *   O-270), the one the decision's prepare phase loaded before the transaction opened
+ *   (context.prepared.catalog, learning/prepare.ts, PR #27 review HIGH 3 and MEDIUM 12), so a
+ *   (user, class) row gets the same prior whichever session wrote it (the PM's choice), and the
+ *   decision path never loads the catalog itself. A class the catalog does not list, or a decision
+ *   whose catalog could not load (prepared.catalog null), keeps its stored prior, or 0 without one
+ *   (O-270): a ranking prior never fails a graded decision, and the next decision or the weekly
+ *   job recomputes the row.
+ * - Track ids come from the cached track map (repository.ts, PR #27 review LOW 15), so beforeGrade
+ *   reads nothing and afterInsert's recompute is two statements (leak-stat.ts).
  */
 import { itemDifficulty } from "@g-tee-oh/learning";
 
-import { loadClassCatalog } from "../automated/class-catalog.js";
-import { requireDatabase } from "../http/database.js";
 import type { AfterInsertContext, DecisionContext, GradeOverrides, LearningHookPart } from "../learning/effects.js";
 import { trackFor, type TrackKey } from "../learning/tracks.js";
-import { learningOf } from "../sessions/state.js";
+import { isSeededSession, learningOf } from "../sessions/state.js";
 import { recomputeLeakStat, storedFrequencyPrior } from "./leak-stat.js";
 import { trackIdOf } from "./repository.js";
 
@@ -46,34 +49,17 @@ function trackKeyOf(context: DecisionContext): TrackKey | null {
   return trackFor(context.derived.node.action_family ?? null, context.derived.hand.hero_position);
 }
 
-/** The configurations the session's catalog covers (see the module doc). */
-function catalogScope(context: DecisionContext): readonly string[] | undefined {
-  const learning = learningOf(context.session.state);
-  if (learning?.kind === "automated") {
-    return learning.config_ids.length === 0 ? undefined : learning.config_ids;
-  }
-  return [context.derived.hand.config_id];
-}
-
-/** The catalog's prior for the class, undefined when it is not listed or the catalog cannot load. */
-export const catalogFrequencyPrior: FrequencyPriorSource = async (context, spotClassKey) => {
-  try {
-    // The catalog reads game_config outside the decision transaction, so a failed load cannot abort it.
-    const catalog = await loadClassCatalog(context.solverQuery, requireDatabase(context.request.server), catalogScope(context));
-    return catalog.byKey.get(spotClassKey)?.frequencyPriorPer1k;
-  } catch (error: unknown) {
-    context.request.log.warn({ err: error, spot_class_key: spotClassKey }, "class catalog unavailable; leak stat keeps its stored prior");
-    return undefined;
-  }
-};
+/** The prepared catalog's prior for the class; undefined when it is not listed or no catalog loaded. */
+export const preparedCatalogPrior: FrequencyPriorSource = (context, spotClassKey) =>
+  Promise.resolve(context.prepared.catalog?.byKey.get(spotClassKey)?.frequencyPriorPer1k);
 
 /** True when this session's decisions write learning rows (see the module doc). */
 export function writesLearningState(context: Pick<DecisionContext, "session">): boolean {
-  const learning = learningOf(context.session.state);
-  if (learning === null) {
-    return true;
+  if (isSeededSession(context.session.state)) {
+    return false;
   }
-  return learning.kind === "automated" && !learning.seeded;
+  const learning = learningOf(context.session.state);
+  return learning === null || learning.kind === "automated";
 }
 
 async function beforeGrade(context: DecisionContext): Promise<GradeOverrides> {
@@ -101,9 +87,11 @@ async function priorOf(context: DecisionContext, spotClassKey: string, source: F
 
 /** The shared effects part; tests may inject the prior source. */
 export function createSharedEffectsPart(options: SharedEffectsOptions = {}): LearningHookPart {
-  const source = options.frequencyPrior ?? catalogFrequencyPrior;
+  const source = options.frequencyPrior ?? preparedCatalogPrior;
   return {
     name: SHARED_EFFECTS_PART_NAME,
+    // The leak stat prior reads the all-configs catalog the prepare phase loads (see the module doc).
+    needsCatalog: true,
     beforeGrade,
     async afterInsert(context: AfterInsertContext) {
       const spotClassKey = context.derived.node.spot_class_key ?? null;

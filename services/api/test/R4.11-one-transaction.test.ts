@@ -25,8 +25,8 @@ import { createSharedEffectsPart } from "../src/learning-state/shared-effects.js
 import { TEST_CONFIG } from "./support/app.js";
 import { adminPool, appDatabase } from "./support/database.js";
 import { FAKE_CONFIG, FAKE_PAIR, fakeSolverQuery } from "./sessions-fake-solver-query.js";
-import { createDrill, drillBody, insertSolution, newPlayer, startSession } from "./sessions-test-kit.js";
-import { insertAttemptRow, learningRows, sessionAndAttempts, trackIds } from "./R4.11-learning-state-kit.js";
+import { createDrill, drillBody, insertSolution, newPlayer } from "./sessions-test-kit.js";
+import { insertAttemptRow, learningRows, sessionAndAttempts, startUnseededSession, trackIds } from "./R4.11-learning-state-kit.js";
 
 const SERVER_ERROR = 500;
 const OK = 200;
@@ -66,7 +66,8 @@ async function setUp(parts: readonly LearningHookPart[]) {
   });
   await app.ready();
   const player = await newPlayer(database);
-  const sessionId = await startSession(app, player, await createDrill(app, player, drillBody()));
+  // Unseeded: a client-seeded session writes no learning state (PR #27 review HIGH 2).
+  const sessionId = await startUnseededSession(app, player, await createDrill(app, player, drillBody()));
   const snapshot = async () => ({ ...(await sessionAndAttempts(pool, player.userId)), learning: await learningRows(pool, player.userId) });
   return { app, player, sessionId, snapshot };
 }

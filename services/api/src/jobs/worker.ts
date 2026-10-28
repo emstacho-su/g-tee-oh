@@ -1,8 +1,8 @@
 /**
  * The job worker (R4.11, O-275, ADR 0005, PM conditions): runs due app_job rows outside any request.
  *
- * Mechanism: runDueJobs first marks failed the jobs whose lease ran out after their last attempt,
- * then claims jobs of the kinds it has handlers for, one at a time (repository.ts claimJob, which
+ * Mechanism: runDueJobs first marks failed the jobs whose lease ran out after their last attempt
+ * and prunes its kinds' done jobs past their retention (PR #27 review MEDIUM 9), then claims jobs of the kinds it has handlers for, one at a time (repository.ts claimJob, which
  * commits the claim and its lease on its own), up to MAX_JOBS_PER_RUN. Each job's handler and its
  * completion run in one transaction, so the job is done exactly when its writes commit; a throw rolls
  * the writes back and failJob queues it again after its backoff, or fails it after the last attempt.
@@ -13,6 +13,7 @@
  * (schedule.ts) and runs the due jobs; ticks never overlap. main.ts starts it after the server
  * listens and stops it on shutdown; buildApp and the request path never start it (PM condition).
  */
+import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 
 import type { FastifyInstance } from "fastify";
@@ -20,7 +21,7 @@ import type { FastifyInstance } from "fastify";
 import type { Database } from "../db.js";
 import { requireDatabase } from "../http/database.js";
 import { JOB_DEFINITIONS, handlersOf, type JobDefinition, type JobHandler, type JobServices } from "./registry.js";
-import { claimJob, completeJob, failExhaustedJobs, failJob, type ClaimedJob } from "./repository.js";
+import { claimJob, completeJob, failExhaustedJobs, failJob, pruneDoneJobs, type ClaimedJob } from "./repository.js";
 import { ensureScheduled } from "./schedule.js";
 
 /** The worker polls the queue this often (O-275). */
@@ -43,7 +44,7 @@ export interface JobRunReport {
 async function runOne(database: Database, job: ClaimedJob, handler: JobHandler, now: Date, options: JobRunOptions): Promise<boolean> {
   try {
     await database.transaction().execute(async (transaction) => {
-      await handler({ transaction, job, now, timeZone: options.timeZone, services: options.services });
+      await handler({ transaction, database, job, now, timeZone: options.timeZone, services: options.services });
       await completeJob(transaction, job, now);
     });
     return true;
@@ -63,6 +64,7 @@ export async function runDueJobs(
 ): Promise<JobRunReport> {
   const kinds = Object.keys(handlers);
   await failExhaustedJobs(database, kinds, now);
+  await pruneDoneJobs(database, kinds, now);
   const report: JobRunReport = { done: [], failed: [] };
   for (let taken = 0; taken < MAX_JOBS_PER_RUN; taken += 1) {
     const job = await claimJob(database, { now, workerId: options.workerId, kinds });
@@ -80,6 +82,14 @@ export async function runDueJobs(
     (succeeded ? report.done : report.failed).push(job.id);
   }
   return report;
+}
+
+/**
+ * The worker's app_job.locked_by: host, process and a random id (PR #27 review LOW 14), so two
+ * workers in one process, or a restarted process reusing a pid, never share a lease identity.
+ */
+export function jobWorkerId(): string {
+  return `${hostname()}:${process.pid}:${randomUUID()}`;
 }
 
 export interface JobWorker {
@@ -101,7 +111,7 @@ export function startJobWorker(app: FastifyInstance, options: JobWorkerOptions):
   const handlers = handlersOf(definitions);
   const clock = options.clock ?? (() => new Date());
   const runOptions: JobRunOptions = {
-    workerId: `${hostname()}:${process.pid}`,
+    workerId: jobWorkerId(),
     timeZone: options.timeZone,
     services: { solverQuery: app.solverQuery, learningHooks: app.learningHooks, log: app.log },
   };

@@ -25,13 +25,14 @@ import type { TrainerSettings } from "../src/schemas/drills.js";
 import { TEST_CONFIG } from "./support/app.js";
 import { adminPool, appDatabase, createTestUser } from "./support/database.js";
 import { FAKE_CONFIG, FAKE_PAIR, fakeSolverQuery } from "./sessions-fake-solver-query.js";
-import { createDrill, drillBody, insertSolution, newPlayer, startSession } from "./sessions-test-kit.js";
+import { createDrill, drillBody, insertSolution, newPlayer } from "./sessions-test-kit.js";
 import {
   automatedLearning,
   holdoutLearning,
   insertAttemptRow,
   insertSessionRow,
   learningRows,
+  startUnseededSession,
   trackIds,
 } from "./R4.11-learning-state-kit.js";
 
@@ -71,7 +72,8 @@ async function drillApp(parts: readonly LearningHookPart[], trainer: Partial<Tra
   });
   await app.ready();
   const player = await newPlayer(database);
-  const sessionId = await startSession(app, player, await createDrill(app, player, drillBody(trainer)));
+  // Unseeded: a client-seeded session writes no learning state (PR #27 review HIGH 2).
+  const sessionId = await startUnseededSession(app, player, await createDrill(app, player, drillBody(trainer)));
   const decide = (actionIndex: number) =>
     app.inject({
       method: "POST",

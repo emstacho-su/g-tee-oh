@@ -15,8 +15,9 @@ import { buildApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
 import { NO_LEARNING_HOOKS } from "../src/learning/effects.js";
 import type { JobHandler, JobServices } from "../src/jobs/registry.js";
-import { runDueJobs, startJobWorker, type JobRunOptions } from "../src/jobs/worker.js";
+import { jobWorkerId, runDueJobs, startJobWorker, type JobRunOptions } from "../src/jobs/worker.js";
 import {
+  APP_JOB_RETENTION_MS,
   JOB_LEASE_MS,
   JOB_MAX_ATTEMPTS,
   JOB_RETRY_BACKOFF_MS,
@@ -213,5 +214,31 @@ describe("R4.11 app job queue", () => {
     expect(ran).toEqual(["once"]);
     const rows = await database.selectFrom("app_job").select("status").where("kind", "=", kind).execute();
     expect(rows).toEqual([{ status: "done" }]);
+  });
+
+  it("R4.11 a run prunes its kinds' done jobs older than the retention age and keeps the rest (PR #27 review MEDIUM 9)", async () => {
+    const kind = uniqueKind("prune");
+    const otherKind = uniqueKind("prune_other");
+    const old = at(-APP_JOB_RETENTION_MS - ONE_MS);
+    const recent = at(-APP_JOB_RETENTION_MS + ONE_MS);
+    const insert = (jobKind: string, periodKey: string, status: "done" | "failed", updatedAt: Date) =>
+      database.insertInto("app_job").values({ kind: jobKind, period_key: periodKey, run_at: updatedAt, status, updated_at: updatedAt }).execute();
+    await insert(kind, "old-done", "done", old);
+    await insert(kind, "recent-done", "done", recent);
+    await insert(kind, "old-failed", "failed", old);
+    await insert(otherKind, "old-done", "done", old);
+    await runDueJobs(database, T0, { [kind]: () => Promise.resolve() }, runOptions());
+    const kept = await database.selectFrom("app_job").select(["kind", "period_key"]).where("kind", "in", [kind, otherKind]).orderBy("kind").orderBy("period_key").execute();
+    expect(kept).toEqual([
+      { kind, period_key: "old-failed" },
+      { kind, period_key: "recent-done" },
+      { kind: otherKind, period_key: "old-done" },
+    ]);
+  });
+
+  it("R4.11 each worker id names its host and process and is unique per worker (PR #27 review LOW 14)", () => {
+    const first = jobWorkerId();
+    expect(first).toMatch(new RegExp(`^.+:${process.pid}:[0-9a-f-]{36}$`));
+    expect(jobWorkerId()).not.toBe(first);
   });
 });

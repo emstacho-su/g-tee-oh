@@ -36,6 +36,7 @@ import { authentication } from "./plugins/authenticate.js";
 import { csrfGuard } from "./plugins/csrf.js";
 import { idempotency } from "./plugins/idempotency.js";
 import { security } from "./plugins/security.js";
+import { watchCoverageAdded } from "./automated/class-catalog.js";
 import type { NotificationSource } from "./events/source.js";
 import type { LearningHooks } from "./learning/effects.js";
 import { DEFAULT_LEARNING_HOOKS } from "./learning/hooks.js";
@@ -106,6 +107,9 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   app.decorate("solverQuery", options.solverQuery ?? null);
   app.decorate("notifications", options.notifications ?? null);
   app.decorate("learningHooks", options.learningHooks ?? DEFAULT_LEARNING_HOOKS);
+  // PR #27 review MEDIUM 8: new coverage drops the class catalog cache from the start, not only once
+  // an automated session was created (subscribes once per source).
+  watchCoverageAdded(options.notifications ?? null);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
   void app.register(security, { config });

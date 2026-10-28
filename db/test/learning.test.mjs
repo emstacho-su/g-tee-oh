@@ -1,7 +1,8 @@
 // The api learning migration (R4.11, R4.13, S31, O-271 to O-277): the seven tracks are seeded with their
 // scope, the attempt item columns and indexes exist, holdout items, draws, rounds and summaries carry their
 // keys, and the app job queue has its partial index. Grants: app selects, inserts and updates the four new
-// tables and deletes none; builder, capture and query see none of them (A4 section 3, ADR 0005). Every probe
+// tables and deletes only app_job rows (the done-job prune, PR #27 review MEDIUM 9); builder, capture and
+// query see none of them (A4 section 3, ADR 0005). Every probe
 // runs inside a transaction that rolls back.
 
 import { test, after, describe } from 'node:test';
@@ -105,12 +106,16 @@ describe('R4.11 api learning migration (S31)', () => {
     });
   });
 
-  test('R4.11 app selects, inserts and updates the new tables and deletes none; other roles see none', async () => {
+  test('R4.11 app selects, inserts and updates the new tables and deletes only app_job rows; other roles see none', async () => {
     await withRollback(pool, async (client) => {
       for (const [table, column] of Object.entries(UPDATE_PROBES)) {
         await asRole(client, 'app', `select * from "${table}" limit 1`);
         await asRole(client, 'app', `update "${table}" set ${column} = ${column} where false`);
-        await expectDenied(client, 'app', `delete from "${table}" where false`);
+        if (table === 'app_job') {
+          await asRole(client, 'app', `delete from "${table}" where false`);
+        } else {
+          await expectDenied(client, 'app', `delete from "${table}" where false`);
+        }
         for (const role of OTHER_ROLES) {
           await expectDenied(client, role, `select * from "${table}" limit 1`);
         }

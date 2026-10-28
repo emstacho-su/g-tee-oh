@@ -8,9 +8,12 @@
  * the class, so only panels-hidden attempts are sampled. "Earlier" means before the block under
  * review: the block's own attempts are the class's most recent panels-hidden attempts of the user
  * (a block serves its class in consecutive decisions), so the newest `blockSize` are skipped.
- * Attempts order by created_at, then by id (uuidv7, time ordered) on equal times.
+ * Attempts order by created_at, then by id (uuidv7, time ordered) on equal times. Attempts of a
+ * client-seeded session never count (PR #27 review HIGH 2: a seed writes no learning state, so it
+ * must not move the Easy baseline either).
  */
 import type { Database } from "../db.js";
+import { NOT_SEEDED_SESSION } from "./repository.js";
 
 /** O-273: how many earlier attempts the median takes. */
 export const TYPICAL_RESPONSE_SAMPLE = 20;
@@ -50,13 +53,15 @@ export interface TypicalTimeRequest {
 export async function typicalResponseMs(database: Database, request: TypicalTimeRequest): Promise<number> {
   const rows = await database
     .selectFrom("attempt")
-    .select("response_ms")
-    .where("user_id", "=", request.userId)
-    .where("spot_class_key", "=", request.spotClassKey)
-    .where("panels_revealed", "=", false)
-    .where("response_ms", "is not", null)
-    .orderBy("created_at", "desc")
-    .orderBy("id", "desc")
+    .innerJoin("practice_session", "practice_session.id", "attempt.session_id")
+    .select("attempt.response_ms")
+    .where("attempt.user_id", "=", request.userId)
+    .where("attempt.spot_class_key", "=", request.spotClassKey)
+    .where("attempt.panels_revealed", "=", false)
+    .where("attempt.response_ms", "is not", null)
+    .where(NOT_SEEDED_SESSION)
+    .orderBy("attempt.created_at", "desc")
+    .orderBy("attempt.id", "desc")
     .offset(request.blockSize)
     .limit(TYPICAL_RESPONSE_SAMPLE)
     .execute();

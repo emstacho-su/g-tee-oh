@@ -21,8 +21,8 @@
 -- - app_job is the api's job queue (O-275, ADR 0005): one row per kind and period, claimed with FOR UPDATE
 --   SKIP LOCKED over the queued rows that are due or the running rows whose lease ran out, so a job whose
 --   process died is claimed again. The partial index serves the due scan.
--- - app gets select, insert and update on the four new tables and no delete; builder, capture and query get
---   nothing on them.
+-- - app gets select, insert and update on the four new tables and delete only on app_job (the done-job prune,
+--   PR #27 review MEDIUM 9); builder, capture and query get nothing on them.
 
 -- migrate:up
 
@@ -118,6 +118,9 @@ comment on table app_job is 'the api job queue: one row per kind and period, cla
 create index app_job_due_idx on app_job (run_at) where status = 'queued';
 
 grant select, insert, update on app_job, holdout_draw, holdout_round, holdout_summary to app;
+-- PR #27 review MEDIUM 9: the job worker prunes done app_job rows past their retention (jobs/repository.ts
+-- pruneDoneJobs), the only delete the app makes on the new tables.
+grant delete on app_job to app;
 
 -- migrate:down
 

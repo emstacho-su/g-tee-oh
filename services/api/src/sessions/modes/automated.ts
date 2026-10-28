@@ -2,7 +2,8 @@
  * POST /sessions in automated mode (R4.10, O-270 to O-274, ADR 0018, the PM seed condition).
  *
  * Mechanism: the scope is the body's config_ids, or every catalog configuration (stored as an empty
- * list). The first review block is chosen over the class catalog and the user's learning rows
+ * list), cut from the one all-configs catalog (PR #27 review MEDIUM 6; buildApp subscribes its
+ * coverage_added invalidation, MEDIUM 8). The first review block is chosen over the class catalog and the user's learning rows
  * (automated/next-block.ts): the catalog's uncovered pairs and the pairs of carded classes it no
  * longer lists are recorded as coverage_request rows (O-240), even when the session is refused
  * because no class is covered (422 no-coverage). The session is written in dealing phase at hand 0
@@ -15,7 +16,7 @@
  * picks still run from the queue so the session replays.
  */
 import { chooseNextBlock, noClassProblem } from "../../automated/next-block.js";
-import { watchCoverageAdded } from "../../automated/class-catalog.js";
+import { loadClassCatalog } from "../../automated/class-catalog.js";
 import { emptyLearningQueue } from "../../automated/queue.js";
 import { AUTOMATED_SESSION_SPOT, automatedSettings } from "../../automated/settings.js";
 import { requireDatabase } from "../../http/database.js";
@@ -34,11 +35,12 @@ const NO_LINE = null;
 export async function createAutomatedSession(call: SessionCall, body: SessionCreateBody, now: Date = new Date()): Promise<Session> {
   const database = requireDatabase(call.app);
   const solverQuery = requireSolverQuery(call.app);
-  watchCoverageAdded(call.app.notifications);
   const configIds = [...new Set(body.config_ids ?? [])].sort();
   const seed = body.seed ?? newSessionSeed();
   const queue = emptyLearningQueue();
-  const next = await chooseNextBlock(database, solverQuery, { userId: call.userId, configIds, seed, pickNo: 0, queue, now });
+  // A scope naming a configuration the catalog does not serve is a 400 here (class-catalog.ts).
+  const catalog = await loadClassCatalog(solverQuery, database, configIds.length === 0 ? undefined : configIds);
+  const next = await chooseNextBlock(database, catalog, { userId: call.userId, configIds, seed, pickNo: 0, queue, now });
   if (next.pick === null) {
     await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, next.gaps, NO_LINE));
     throw noClassProblem(next.gaps.length);
@@ -51,7 +53,7 @@ export async function createAutomatedSession(call: SessionCall, body: SessionCre
     queue: next.pick.queue,
     block: next.pick.block,
   };
-  const state = initialState(seed, next.pick.spots, AUTOMATED_SESSION_SPOT, learning);
+  const state = initialState(seed, next.pick.spots, AUTOMATED_SESSION_SPOT, learning, body.seed !== undefined);
   const settings = automatedSettings(body.settings);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, next.gaps, NO_LINE);

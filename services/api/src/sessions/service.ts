@@ -7,12 +7,16 @@
  *   501 naming S27 (O-249).
  * - next: pure (the S23 binding rule). It derives the prompt from the persisted state with the
  *   session's holdout guard (derive-settings.ts, read only) and writes nothing; two calls in a row
- *   answer the same prompt. An ended session is 409 session-ended.
+ *   answer the same prompt. An ended session is 409 session-ended. One exception (PR #27 review
+ *   HIGH 3): an automated session whose closed block waits for its next pick gets that pick first,
+ *   in one write (automated/resume-block.ts); the prompts after it are again write-free.
  * - end: ended_at, phase ended, and the recap aggregated from the session's attempts, plus the
  *   learning hooks' extras (onSessionEnd, inside the same transaction: rating, tier, unlocks). A
  *   second end returns the same recap without writing (repeat-safe; the hooks run with firstEnd
  *   false and write nothing). endLockedSession is the end path inside a caller's transaction, so
- *   the idle-session job ends a session exactly as POST end does (O-275).
+ *   the idle-session job ends a session exactly as POST end does (O-275). The hooks' prepare phase
+ *   (learning/prepare.ts) runs before the end transaction opens, so no end hook loads the class
+ *   catalog under the lock (PR #27 review HIGH 3); the idle job prepares each session the same way.
  */
 import type { z } from "zod";
 
@@ -20,7 +24,9 @@ import { sessionNotFound } from "../grading/decide.js";
 import { requireDatabase } from "../http/database.js";
 import { idempotentWrite } from "../http/idempotent-write.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
-import type { LearningHooks } from "../learning/effects.js";
+import { resumePendingBlock } from "../automated/resume-block.js";
+import type { LearningHooks, PreparedLearning } from "../learning/effects.js";
+import { prepareLearning } from "../learning/prepare.js";
 import type { Database } from "../db.js";
 import type { recapSchema } from "../schemas/training.js";
 import { requireSolverQuery, type SolverQuery } from "../solver-query/client.js";
@@ -58,6 +64,8 @@ export interface SessionEnd {
   timeZone: string;
   /** The app's solver-query client, for the end hooks' class catalog (O-271); null without one. */
   solverQuery: SolverQuery | null;
+  /** What prepareLearning read for this session before the transaction opened. */
+  prepared: PreparedLearning;
 }
 
 /** The clock and APP_TIME_ZONE a create reads (S31: the holdout round's month, O-276, O-247). */
@@ -90,11 +98,12 @@ async function requireSession(call: SessionCall, sessionId: string): Promise<Ses
 }
 
 /** The next prompt, derived and never written (GET is pure). */
-export async function nextPrompt(call: SessionCall, sessionId: string): Promise<Prompt> {
-  const session = await requireSession(call, sessionId);
-  if (session.state.phase === "ended") {
+export async function nextPrompt(call: SessionCall, sessionId: string, now: Date = new Date()): Promise<Prompt> {
+  const stored = await requireSession(call, sessionId);
+  if (stored.state.phase === "ended") {
     throw sessionEndedProblem();
   }
+  const session = await resumePendingBlock(call, stored, now);
   const port = solverPort(requireSolverQuery(call.app), call.request);
   const settings = await deriveSettingsFor(call.app, call.userId, session);
   const derived = await deriveAwaitHero(session.state, settings, port);
@@ -135,6 +144,7 @@ export async function endLockedSession(transaction: Database, end: SessionEnd): 
     userId: end.userId,
     session: locked,
     solverQuery: end.solverQuery,
+    prepared: end.prepared,
   };
   if (locked.state.phase === "ended") {
     const extras = await end.hooks.onSessionEnd({ ...hookContext, ended: locked, firstEnd: false });
@@ -157,6 +167,15 @@ export async function endLockedSession(transaction: Database, end: SessionEnd): 
 
 /** Ends the session and returns its recap; ending an ended session returns the same recap. */
 export async function endSession(call: EndCall, sessionId: string): Promise<Recap> {
+  const session = await requireSession(call, sessionId);
+  const prepared = await prepareLearning(call.app.learningHooks, {
+    database: requireDatabase(call.app),
+    solverQuery: call.app.solverQuery,
+    userId: call.userId,
+    session,
+    now: call.now,
+    log: call.request.log,
+  });
   const end: SessionEnd = {
     hooks: call.app.learningHooks,
     userId: call.userId,
@@ -164,6 +183,7 @@ export async function endSession(call: EndCall, sessionId: string): Promise<Reca
     now: call.now,
     timeZone: call.timeZone,
     solverQuery: call.app.solverQuery,
+    prepared,
   };
   return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, (transaction) => endLockedSession(transaction, end));
 }

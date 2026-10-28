@@ -132,9 +132,24 @@ export async function selectFeedbackRow(database: Database, attemptId: string): 
   return feedbackRows(database).where("attempt.id", "=", attemptId).executeTakeFirstOrThrow();
 }
 
-/** The user's rated attempts since midnight in `timeZone`, as of `now` (O-214, O-247). */
-export async function countRatedToday(database: Database, userId: string, now: Date, timeZone: string): Promise<number> {
-  const row = await database
+/** Narrows countRatedToday: trackId counts only attempts carrying that track (O-274). */
+export interface RatedTodayFilter {
+  trackId?: string;
+}
+
+/**
+ * The user's rated attempts since midnight in `timeZone`, as of `now` (O-214, O-247); with a
+ * trackId, only those carrying the track (O-274's per-track cap). The one count the drill default
+ * and the automated per-track cap share (PR #27 review LOW 15).
+ */
+export async function countRatedToday(
+  database: Database,
+  userId: string,
+  now: Date,
+  timeZone: string,
+  filter: RatedTodayFilter = {},
+): Promise<number> {
+  let query = database
     .selectFrom("attempt")
     .select((eb) => eb.fn.countAll<string>().as("rated"))
     .where("user_id", "=", userId)
@@ -144,7 +159,10 @@ export async function countRatedToday(database: Database, userId: string, now: D
       "created_at",
       ">=",
       sql<Date>`(date_trunc('day', cast(${now.toISOString()} as timestamptz) at time zone ${timeZone}) at time zone ${timeZone})`,
-    )
-    .executeTakeFirstOrThrow();
+    );
+  if (filter.trackId !== undefined) {
+    query = query.where(sql<boolean>`track_ids @> array[${filter.trackId}]::uuid[]`);
+  }
+  const row = await query.executeTakeFirstOrThrow();
   return Number(row.rated);
 }

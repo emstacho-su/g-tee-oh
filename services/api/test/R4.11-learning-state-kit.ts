@@ -8,8 +8,9 @@ import { randomUUID } from "node:crypto";
 
 import type pg from "pg";
 
+import type { ApiApp } from "../src/app.js";
 import { initialState, type LearningState } from "../src/sessions/state.js";
-import { TRAINER } from "./sessions-test-kit.js";
+import { TRAINER, type Player } from "./sessions-test-kit.js";
 
 export const KIT_CONFIG = "cfg_6_online_100";
 export const KIT_PAIR = "BB-BTN";
@@ -45,15 +46,20 @@ export interface SessionFixture {
   mode: "drill" | "automated" | "holdout";
   learning?: LearningState | null;
   startedAt?: Date;
+  /** The session's top-level seeded flag (PR #27 review HIGH 2); false when absent. */
+  seeded?: boolean;
 }
 
 export async function insertSessionRow(pool: pg.Pool, fixture: SessionFixture): Promise<string> {
-  const state = initialState(
-    KIT_SEED,
-    [{ config_id: KIT_CONFIG, pair: KIT_PAIR, line: null, hero_seat: "BTN", history: [] }],
-    { preflop_action: ["rfi"], hands: { mode: "all" }, alternate_seats: false },
-    fixture.learning ?? null,
-  );
+  const state = {
+    ...initialState(
+      KIT_SEED,
+      [{ config_id: KIT_CONFIG, pair: KIT_PAIR, line: null, hero_seat: "BTN", history: [] }],
+      { preflop_action: ["rfi"], hands: { mode: "all" }, alternate_seats: false },
+      fixture.learning ?? null,
+    ),
+    seeded: fixture.seeded ?? false,
+  };
   const settings = { ...TRAINER, stop_rule: "after_action" };
   const result = await pool.query<{ id: string }>(
     `insert into practice_session (user_id, mode, settings, state, started_at)
@@ -65,6 +71,23 @@ export async function insertSessionRow(pool: pg.Pool, fixture: SessionFixture): 
     throw new Error("session insert returned no row");
   }
   return row.id;
+}
+
+/**
+ * POST /sessions for a drill without a seed: sessions-test-kit.ts startSession always sends one, and
+ * a client-seeded session writes no learning state (PR #27 review HIGH 2).
+ */
+export async function startUnseededSession(app: ApiApp, player: Player, drillId: string): Promise<string> {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/v1/sessions",
+    headers: player.write,
+    payload: { mode: "drill", drill_id: drillId },
+  });
+  if (response.statusCode !== 201) {
+    throw new Error(`session create failed: ${response.statusCode} ${response.body}`);
+  }
+  return response.json<{ session_id: string }>().session_id;
 }
 
 export interface AttemptFixture {

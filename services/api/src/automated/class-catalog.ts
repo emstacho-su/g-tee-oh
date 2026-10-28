@@ -18,9 +18,15 @@
  *   frequency prior is the mean over its options of learning's frequencyPriorPer1000(table size,
  *   line reach) (O-270); meanPotBb is the line-reach-weighted mean start-node pot in big blinds,
  *   which the progress lane's effective track weight reads (O-271).
- * - Cache: per solver-query client and scope, for CATALOG_TTL_MS, single flight (concurrent loads
- *   of one scope share one promise; a failed load is dropped so the next call retries), and dropped
- *   whole on a coverage_added notification (watchCoverageAdded), since new coverage changes classes.
+ * - Cache (PR #27 review MEDIUM 6, MEDIUM 7, HIGH 3): one all-configs catalog per solver-query
+ *   client for CATALOG_TTL_MS, single flight (concurrent loads share one promise), an expired entry
+ *   replaced on the next load. A scope (config_ids) is cut from it in memory (scopeCatalog), so
+ *   no subset ever walks solver-query again. A load that fails, that meets a coverage answer whose
+ *   database did not answer (a partial catalog), or that finds no class at all is never cached, so
+ *   the next call asks again. buildApp subscribes watchCoverageAdded once, which drops the cache on
+ *   a coverage_added notification, since new coverage changes classes.
+ * - The decision and end transactions never load it: learning/prepare.ts loads it before the lock
+ *   and hands it to the hooks as context.prepared.catalog (null when it cannot load).
  */
 import { frequencyPriorPer1000 } from "@g-tee-oh/learning";
 
@@ -44,7 +50,8 @@ const MAX_LINE_REACH = 1;
 const NO_ANTE_CBB = 0;
 const COVERAGE_ADDED_CHANNEL = "coverage_added";
 const SCOPE_KEY_SEPARATOR = ",";
-const ALL_CONFIGS_SCOPE = "*";
+/** SqCoverage.database when solver-query could not reach its database (O-172). */
+const DATABASE_UNAVAILABLE = "unavailable";
 
 export type CatalogOption = Readonly<{
   configId: string;
@@ -104,7 +111,10 @@ interface CacheEntry {
   catalog: Promise<ClassCatalog>;
 }
 
-let caches = new WeakMap<SolverQuery, Map<string, CacheEntry>>();
+/** One all-configs entry per client (MEDIUM 6); a WeakMap, so a dropped client frees its catalog. */
+let caches = new WeakMap<SolverQuery, CacheEntry>();
+/** Scope cuts per loaded catalog; freed with the catalog when its entry is replaced or dropped. */
+const scopedCuts = new WeakMap<ClassCatalog, Map<string, ClassCatalog>>();
 const watchedSources = new WeakSet<NotificationSource>();
 
 /** Drops every cached catalog (coverage changed, or a test wants a cold read). */
@@ -228,6 +238,13 @@ export async function scopedConfigs(database: Database, configIds?: readonly str
   return rows.map((row) => ({ id: row.id, tableSize: row.table_size }));
 }
 
+/** solver-query's database did not answer: its classes may be missing, so the answer is a failure (MEDIUM 7). */
+function databaseUnavailableProblem(): ProblemError {
+  return new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, {
+    detail: "solver-query could not reach its database for the spot classes of this spot.",
+  });
+}
+
 async function askPair(solverQuery: SolverQuery, config: ScopedConfig, pair: string, signal: AbortSignal): Promise<PairAnswer> {
   const base = { configId: config.id, pair, tableSize: config.tableSize };
   try {
@@ -235,6 +252,9 @@ async function askPair(solverQuery: SolverQuery, config: ScopedConfig, pair: str
       solverQuery.GET("/v1/coverage", { params: { query: { config_id: config.id, pair, classes: true } }, signal }),
       "the spot classes of this spot",
     );
+    if (coverage.database === DATABASE_UNAVAILABLE) {
+      throw databaseUnavailableProblem();
+    }
     const status = coverage.preflop.available ? "covered" : "uncovered";
     return { ...base, status, spotClasses: coverage.spot_classes };
   } catch (error: unknown) {
@@ -252,19 +272,99 @@ async function readCatalog(solverQuery: SolverQuery, configs: readonly ScopedCon
   return buildClassCatalog(answers);
 }
 
-function cacheFor(solverQuery: SolverQuery): Map<string, CacheEntry> {
-  const existing = caches.get(solverQuery);
-  if (existing !== undefined) {
-    return existing;
+/** Drops the client's entry unless a newer load replaced it. */
+function dropEntry(solverQuery: SolverQuery, entry: CacheEntry): void {
+  if (caches.get(solverQuery) === entry) {
+    caches.delete(solverQuery);
   }
-  const created = new Map<string, CacheEntry>();
-  caches.set(solverQuery, created);
-  return created;
+}
+
+/** The all-configs catalog of the client, cached as the module doc says (one entry per client). */
+function loadAllConfigs(solverQuery: SolverQuery, database: Database, nowMs: number): Promise<ClassCatalog> {
+  const cached = caches.get(solverQuery);
+  if (cached !== undefined && cached.expiresAt > nowMs) {
+    return cached.catalog;
+  }
+  const catalog = scopedConfigs(database).then((configs) => readCatalog(solverQuery, configs));
+  const entry: CacheEntry = { expiresAt: nowMs + CATALOG_TTL_MS, catalog };
+  caches.set(solverQuery, entry);
+  catalog.then(
+    (loaded) => {
+      if (loaded.classes.length === 0) {
+        dropEntry(solverQuery, entry);
+      }
+    },
+    () => dropEntry(solverQuery, entry),
+  );
+  return catalog;
+}
+
+function scopeKeyOf(configIds: readonly string[]): string {
+  return [...new Set(configIds)].sort().join(SCOPE_KEY_SEPARATOR);
+}
+
+/** Every configuration the catalog asked about, whatever solver-query answered for its pairs. */
+function catalogConfigIds(catalog: ClassCatalog): Set<string> {
+  return new Set([...catalog.coveredPairs, ...catalog.uncoveredPairs, ...catalog.unavailablePairs].map((pair) => pair.configId));
+}
+
+function cutScope(catalog: ClassCatalog, scope: ReadonlySet<string>): ClassCatalog {
+  const inScope = (pair: CatalogPair) => scope.has(pair.configId);
+  const classes = catalog.classes.flatMap((cls) => {
+    const options = cls.options.filter(inScope);
+    if (options.length === cls.options.length) {
+      return [cls];
+    }
+    const cut = options.length === 0 ? undefined : classOf(cls.spotClassKey, cls, options);
+    return cut === undefined ? [] : [cut];
+  });
+  return Object.freeze({
+    classes: Object.freeze(classes),
+    byKey: new Map(classes.map((cls) => [cls.spotClassKey, cls])),
+    coveredPairs: Object.freeze(catalog.coveredPairs.filter(inScope)),
+    uncoveredPairs: Object.freeze(catalog.uncoveredPairs.filter(inScope)),
+    unavailablePairs: Object.freeze(catalog.unavailablePairs.filter(inScope)),
+  });
 }
 
 /**
- * The catalog of the scope (every catalog configuration when configIds is undefined), cached per
- * client and scope for CATALOG_TTL_MS with one load in flight per scope.
+ * The catalog of a scope, cut in memory from a wider catalog (PR #27 review MEDIUM 6): only the
+ * options and pairs of the scope's configurations, each class's prior and pot recomputed over its
+ * options in scope, classes with none left dropped. An empty or absent scope is the catalog itself.
+ * Cuts are memoised per catalog, so one scope always answers the same object.
+ */
+export function scopeCatalog(catalog: ClassCatalog, configIds?: readonly string[]): ClassCatalog {
+  if (configIds === undefined || configIds.length === 0) {
+    return catalog;
+  }
+  const scopeKey = scopeKeyOf(configIds);
+  const memo = scopedCuts.get(catalog) ?? new Map<string, ClassCatalog>();
+  scopedCuts.set(catalog, memo);
+  const known = memo.get(scopeKey);
+  if (known !== undefined) {
+    return known;
+  }
+  const cut = cutScope(catalog, new Set(configIds));
+  memo.set(scopeKey, cut);
+  return cut;
+}
+
+/** A 400 for config_ids the catalog does not serve (an ante variant, or no such configuration). */
+function requireKnownConfigs(catalog: ClassCatalog, configIds: readonly string[]): void {
+  const known = catalogConfigIds(catalog);
+  const unknown = [...new Set(configIds)].filter((id) => !known.has(id)).sort();
+  if (unknown.length > 0) {
+    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, {
+      detail: `config_ids names configurations the catalog does not serve: ${unknown.join(", ")}.`,
+    });
+  }
+}
+
+/**
+ * The catalog of the scope (every catalog configuration when configIds is undefined), cut from the
+ * client's one cached all-configs catalog; a scope naming a configuration it does not serve is a 400.
+ * It throws when solver-query cannot answer: callers inside a learning hook read
+ * context.prepared.catalog instead (learning/prepare.ts).
  */
 export async function loadClassCatalog(
   solverQuery: SolverQuery,
@@ -272,20 +372,10 @@ export async function loadClassCatalog(
   configIds?: readonly string[],
   options: CatalogLoadOptions = {},
 ): Promise<ClassCatalog> {
-  const nowMs = (options.nowMs ?? Date.now)();
-  const scopeKey = configIds === undefined ? ALL_CONFIGS_SCOPE : [...new Set(configIds)].sort().join(SCOPE_KEY_SEPARATOR);
-  const cache = cacheFor(solverQuery);
-  const cached = cache.get(scopeKey);
-  if (cached !== undefined && cached.expiresAt > nowMs) {
-    return cached.catalog;
+  const all = await loadAllConfigs(solverQuery, database, (options.nowMs ?? Date.now)());
+  if (configIds === undefined) {
+    return all;
   }
-  const catalog = scopedConfigs(database, configIds).then((configs) => readCatalog(solverQuery, configs));
-  const entry: CacheEntry = { expiresAt: nowMs + CATALOG_TTL_MS, catalog };
-  cache.set(scopeKey, entry);
-  catalog.catch(() => {
-    if (cache.get(scopeKey) === entry) {
-      cache.delete(scopeKey);
-    }
-  });
-  return catalog;
+  requireKnownConfigs(all, configIds);
+  return scopeCatalog(all, configIds);
 }

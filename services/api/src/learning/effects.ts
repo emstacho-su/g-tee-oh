@@ -6,6 +6,11 @@
  * Mechanism: each lane exports one LearningHookPart (learning/hooks.ts lists them, in the order
  * shared effects, automated, holdout); composeLearningHooks turns the list into one LearningHooks,
  * which buildApp decorates the app with (tests may inject their own through BuildAppOptions).
+ * - prepare (PR #27 review HIGH 3, MEDIUM 12) runs before the decision's or the end's transaction
+ *   opens, outside any lock (learning/prepare.ts prepareLearning). It loads the class catalog once
+ *   when any part needsCatalog (null when it cannot load, never an exception) and then each part's
+ *   own prepare, whose result lands in prepared.parts under the part's name. Every hook below reads
+ *   it as context.prepared, so no hook loads the catalog or calls a slow upstream under the lock.
  * - beforeGrade runs in the decision transaction after the session row is locked, before grading.
  *   Each part returns overrides of learning's GradeInput (mode, firstAttempt, panelsRevealed,
  *   ratedTodayInTrack) and of the attempt row (trackIds, itemDifficulty); later parts win per key.
@@ -29,6 +34,7 @@ import type { GradeMode, GradeOutput } from "@g-tee-oh/learning";
 import type { FastifyRequest } from "fastify";
 import type { z } from "zod";
 
+import type { ClassCatalog } from "../automated/class-catalog.js";
 import type { Database } from "../db.js";
 import type { FeedbackRow } from "../grading/feedback.js";
 import type { feedbackSchema, recapSchema } from "../schemas/training.js";
@@ -40,6 +46,29 @@ import type { SolverQuery, SqGrade } from "../solver-query/client.js";
 
 type Feedback = z.infer<typeof feedbackSchema>;
 type Recap = z.infer<typeof recapSchema>;
+
+/** What prepareLearning read before the transaction opened (PR #27 review HIGH 3). */
+export interface PreparedLearning {
+  /** The all-configs class catalog (scopeCatalog cuts a session's scope); null when it could not load. */
+  catalog: ClassCatalog | null;
+  /** Each part's own prepare result, by part name; a part narrows its own entry. */
+  parts: Readonly<Record<string, unknown>>;
+}
+
+/** Nothing prepared: no catalog, no part results. */
+export const EMPTY_PREPARED_LEARNING: PreparedLearning = Object.freeze({ catalog: null, parts: Object.freeze({}) });
+
+/** What a part's prepare sees: no transaction, no lock; the catalog is already loaded (or null). */
+export interface PrepareContext {
+  /** The app's handle, outside any transaction. */
+  database: Database;
+  solverQuery: SolverQuery | null;
+  userId: string;
+  /** The session row as read before the transaction. */
+  session: SessionRow;
+  now: Date;
+  catalog: ClassCatalog | null;
+}
 
 /** One decision, inside its transaction, as every hook sees it. */
 export interface DecisionContext {
@@ -57,6 +86,8 @@ export interface DecisionContext {
   solverQuery: SolverQuery;
   /** The api request, for upstream headers (solver-port.ts). */
   request: FastifyRequest;
+  /** Read before the transaction opened: the class catalog (or null) and each part's own results. */
+  prepared: PreparedLearning;
 }
 
 /** What beforeGrade may change; an absent key keeps S23's default. */
@@ -127,6 +158,8 @@ export interface SessionEndContext {
    * null throws the 503 problem, so the end rolls back (requireSolverQuery).
    */
   solverQuery: SolverQuery | null;
+  /** Read before the transaction opened (prepareLearning): the class catalog (or null) and part results. */
+  prepared: PreparedLearning;
 }
 
 export type RecapExtras = Partial<Pick<Recap, "rating_changes" | "tier" | "unlocks">>;
@@ -141,6 +174,14 @@ export interface HoldoutGuardContext {
 export interface LearningHookPart {
   /** Names the part in logs and errors, for example "shared-effects". */
   name: string;
+  /** True when the part reads context.prepared.catalog, so prepareLearning loads it. */
+  needsCatalog?: boolean;
+  /**
+   * Runs before the transaction, outside the lock; its result is prepared.parts[name]. It must not
+   * throw for a condition the hooks can handle (an upstream that cannot answer): return a value
+   * that says so, so the decision or the end still commits (PR #27 review HIGH 3, HIGH 4).
+   */
+  prepare?(context: PrepareContext): Promise<unknown>;
   beforeGrade?(context: DecisionContext): Promise<GradeOverrides>;
   afterInsert?(context: AfterInsertContext): Promise<Partial<AfterInsertResult>>;
   onSessionEnd?(context: SessionEndContext): Promise<RecapExtras>;
@@ -149,6 +190,10 @@ export interface LearningHookPart {
 
 /** The composed hooks decide.ts and sessions/service.ts call. */
 export interface LearningHooks {
+  /** Whether any part reads the catalog (prepareLearning loads it only then). */
+  needsCatalog: boolean;
+  /** Every part's prepare, in order, as prepared.parts (prepareLearning calls it). */
+  prepareParts(context: PrepareContext): Promise<Readonly<Record<string, unknown>>>;
   beforeGrade(context: DecisionContext): Promise<GradeOverrides>;
   afterInsert(context: AfterInsertContext): Promise<AfterInsertResult>;
   onSessionEnd(context: SessionEndContext): Promise<RecapExtras>;
@@ -179,6 +224,16 @@ function anyGuard(guards: readonly HoldoutGuard[]): HoldoutGuard {
 /** One LearningHooks over the parts, in order (see the module doc for the merge rules). */
 export function composeLearningHooks(parts: readonly LearningHookPart[]): LearningHooks {
   return {
+    needsCatalog: parts.some((part) => part.needsCatalog === true),
+    async prepareParts(context) {
+      const prepared: [string, unknown][] = [];
+      for (const part of parts) {
+        if (part.prepare !== undefined) {
+          prepared.push([part.name, await part.prepare(context)]);
+        }
+      }
+      return Object.freeze(Object.fromEntries(prepared));
+    },
     async beforeGrade(context) {
       let overrides: GradeOverrides = {};
       for (const part of parts) {

@@ -44,6 +44,12 @@ export interface JobServices {
 export interface JobContext {
   /** The transaction the job's completion commits in. */
   transaction: Database;
+  /**
+   * The pool handle outside that transaction, for reads whose failure must not abort it (the idle
+   * closer's prepare phase, PR #27 review HIGH 3). runDueJobs always sets it; optional so direct
+   * handler tests may leave it out.
+   */
+  database?: Database;
   job: ClaimedJob;
   now: Date;
   timeZone: string;

@@ -7,11 +7,12 @@
  *   recordAttempt, so the class returns at the first pick the interleave rule allows. A seeded
  *   session records no hypercorrection (PM seed condition).
  * - isBlockComplete: the block has served its size.
+ * - isPickPending, pendingPickOf: a stored block that is complete waits for its next pick (HIGH 3).
  * - withBlock: the learning state with the next block, its queue state and the pick counter.
  */
 import { recordAttempt, type Confidence, type GradeLabel } from "@g-tee-oh/learning";
 
-import type { AutomatedLearning } from "../sessions/state.js";
+import { learningOf, type AutomatedLearning, type PersistedState } from "../sessions/state.js";
 import { fromQueueState, toQueueState, type BlockPick } from "./queue.js";
 
 export interface DecisionFacts {
@@ -34,6 +35,21 @@ export function recordDecision(learning: AutomatedLearning, decision: DecisionFa
 
 export function isBlockComplete(learning: AutomatedLearning): boolean {
   return learning.block.served >= learning.block.size;
+}
+
+/**
+ * A persisted block that has served its size is closed and waits for its next pick: the decision
+ * that closed it found no catalog (PR #27 review HIGH 3). A picked block always starts at served 0,
+ * so a stored complete block is never one that still needs closing.
+ */
+export function isPickPending(learning: AutomatedLearning): boolean {
+  return isBlockComplete(learning);
+}
+
+/** The automated learning state of a stored session whose pick is pending, else null. */
+export function pendingPickOf(session: { state: Pick<PersistedState, "learning"> }): AutomatedLearning | null {
+  const learning = learningOf(session.state);
+  return learning?.kind === "automated" && isPickPending(learning) ? learning : null;
 }
 
 export function withBlock(learning: AutomatedLearning, pick: BlockPick): AutomatedLearning {

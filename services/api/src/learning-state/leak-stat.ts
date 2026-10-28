@@ -10,15 +10,18 @@
  * decisions, shrinks toward its own raw stat, which leaves it unshrunk. learning's leakStat makes
  * the row with the frequency prior the caller passes (the class catalog's, O-270). A class with no
  * counted decision writes nothing: its cost stays the queue's startingLeakCost (O-255).
- * solver-query's loss_bb is raw and never clamped, so a float residue below zero reads as no loss.
+ *
+ * PR #27 review MEDIUM 12: the class and its track are read in one grouped query
+ * (track-decisions.ts), so a decision transfers classes x labels rows rather than every attempt of
+ * the track, and the track id comes from the cached track map: a decision's recompute is two
+ * statements (the grouped read and the upsert), down from four plus a track read per call.
  */
-import { classStat, leakStat, trackAverage, type LeakDecision, type LeakStat, type TrackAverage } from "@g-tee-oh/learning";
-import { sql } from "kysely";
+import { classStat, leakStat, type LeakStat, type TrackAverage } from "@g-tee-oh/learning";
 
 import type { Database } from "../db.js";
-import { UNCLASSIFIED_SPOT_CLASS } from "../grading/decide.js";
 import type { TrackKey } from "../learning/tracks.js";
-import { countedAttempts, gradeLabelOf, trackIdOf } from "./repository.js";
+import { trackIdOf } from "./repository.js";
+import { classDecisionsOf, decisionGroups, trackAverageOf, type DecisionGroup } from "./track-decisions.js";
 
 /** The pinned cross-lane request (S31-lanes.md): the class, its track and its catalog prior. */
 export interface LeakStatRequest {
@@ -38,56 +41,23 @@ export interface LeakStatByIdRequest {
   now: Date;
 }
 
-const NO_LOSS_BB = 0;
-
-interface DecisionRow {
-  spot_class_key: string;
-  label: string;
-  ev_loss_bb: number;
-}
-
-function decisionOf(row: DecisionRow): LeakDecision {
-  return { label: gradeLabelOf(row.label), evLossBb: Math.max(NO_LOSS_BB, row.ev_loss_bb) };
-}
-
-async function classDecisions(database: Database, userId: string, spotClassKey: string): Promise<LeakDecision[]> {
-  const rows = await countedAttempts(database, userId)
-    .select(["attempt.spot_class_key", "attempt.label", "attempt.ev_loss_bb"])
-    .where("attempt.spot_class_key", "=", spotClassKey)
-    .execute();
-  return rows.map(decisionOf);
-}
-
-async function trackDecisionsByClass(database: Database, userId: string, trackId: string): Promise<Map<string, LeakDecision[]>> {
-  const rows = await countedAttempts(database, userId)
-    .select(["attempt.spot_class_key", "attempt.label", "attempt.ev_loss_bb"])
-    .where("attempt.spot_class_key", "!=", UNCLASSIFIED_SPOT_CLASS)
-    .where(sql<boolean>`attempt.track_ids @> array[${trackId}]::uuid[]`)
-    .execute();
-  const byClass = new Map<string, LeakDecision[]>();
-  for (const row of rows) {
-    byClass.set(row.spot_class_key, [...(byClass.get(row.spot_class_key) ?? []), decisionOf(row)]);
+/** The class's row over already grouped decisions; undefined when the class has none. */
+export function leakStatOf(
+  groups: readonly DecisionGroup[],
+  request: Pick<LeakStatByIdRequest, "spotClassKey" | "trackId" | "frequencyPriorPer1k">,
+): LeakStat | undefined {
+  const decisions = classDecisionsOf(groups, request.spotClassKey);
+  if (decisions.length === 0) {
+    return undefined;
   }
-  return byClass;
-}
-
-/** The average the class shrinks toward: its track's, or its own raw stat without one. */
-async function shrinkTarget(
-  database: Database,
-  request: LeakStatByIdRequest,
-  decisions: readonly LeakDecision[],
-): Promise<TrackAverage> {
   const own = classStat(decisions);
   const ownAverage: TrackAverage = { missRate: own.missRate, evPerMissBb: own.evPerMissBb };
-  if (request.trackId === null) {
-    return ownAverage;
-  }
-  const byClass = await trackDecisionsByClass(database, request.userId, request.trackId);
-  return trackAverage([...byClass.values()].map((classDecisionList) => classStat(classDecisionList))) ?? ownAverage;
+  const track = request.trackId === null ? ownAverage : (trackAverageOf(groups, request.trackId) ?? ownAverage);
+  return leakStat(request.spotClassKey, request.frequencyPriorPer1k, decisions, track);
 }
 
-async function upsertLeakStat(database: Database, userId: string, stat: LeakStat, now: Date): Promise<void> {
-  const values = {
+function rowValues(stat: LeakStat, now: Date) {
+  return {
     freq_prior_per_1k: stat.freqPriorPer1k,
     freq_personal_per_1k: stat.freqPersonalPer1k,
     n: stat.n,
@@ -96,22 +66,37 @@ async function upsertLeakStat(database: Database, userId: string, stat: LeakStat
     leak_cost_bb_per_1k: stat.leakCostBbPer1k,
     computed_at: now,
   };
+}
+
+/** Upserts the user's rows in one statement (the weekly job writes a user's classes together). */
+export async function upsertLeakStats(database: Database, userId: string, stats: readonly LeakStat[], now: Date): Promise<void> {
+  if (stats.length === 0) {
+    return;
+  }
   await database
     .insertInto("leak_stat")
-    .values({ user_id: userId, spot_class_key: stat.spotClassKey, ...values })
-    .onConflict((conflict) => conflict.columns(["user_id", "spot_class_key"]).doUpdateSet(values))
+    .values(stats.map((stat) => ({ user_id: userId, spot_class_key: stat.spotClassKey, ...rowValues(stat, now) })))
+    .onConflict((conflict) =>
+      conflict.columns(["user_id", "spot_class_key"]).doUpdateSet((eb) => ({
+        freq_prior_per_1k: eb.ref("excluded.freq_prior_per_1k"),
+        freq_personal_per_1k: eb.ref("excluded.freq_personal_per_1k"),
+        n: eb.ref("excluded.n"),
+        miss_rate: eb.ref("excluded.miss_rate"),
+        ev_per_miss_bb: eb.ref("excluded.ev_per_miss_bb"),
+        leak_cost_bb_per_1k: eb.ref("excluded.leak_cost_bb_per_1k"),
+        computed_at: eb.ref("excluded.computed_at"),
+      })),
+    )
     .execute();
 }
 
 /** Recomputes and writes one class's row; undefined (and no write) when it has no counted decision. */
 export async function recomputeLeakStatById(database: Database, request: LeakStatByIdRequest): Promise<LeakStat | undefined> {
-  const decisions = await classDecisions(database, request.userId, request.spotClassKey);
-  if (decisions.length === 0) {
-    return undefined;
+  const groups = await decisionGroups(database, request.userId, { spotClassKey: request.spotClassKey, trackId: request.trackId });
+  const stat = leakStatOf(groups, request);
+  if (stat !== undefined) {
+    await upsertLeakStats(database, request.userId, [stat], request.now);
   }
-  const track = await shrinkTarget(database, request, decisions);
-  const stat = leakStat(request.spotClassKey, request.frequencyPriorPer1k, decisions, track);
-  await upsertLeakStat(database, request.userId, stat, request.now);
   return stat;
 }
 

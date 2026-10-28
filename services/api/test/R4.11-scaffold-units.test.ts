@@ -96,7 +96,7 @@ describe("R4.11 hook composition", () => {
 
   it("R4.11 the production list runs the shared effects, then automated, then holdout", () => {
     expect(LEARNING_HOOK_PARTS.map((part) => part.name)).toEqual(["shared-effects", "automated", "holdout"]);
-    expect(Object.keys(DEFAULT_LEARNING_HOOKS).sort()).toEqual(["afterInsert", "beforeGrade", "loadHoldoutGuard", "onSessionEnd"]);
+    expect(Object.keys(DEFAULT_LEARNING_HOOKS).sort()).toEqual(["afterInsert", "beforeGrade", "loadHoldoutGuard", "needsCatalog", "onSessionEnd", "prepareParts"]);
   });
 
   it("R4.11 later parts win per key, and each afterInsert sees the earlier patches", async () => {

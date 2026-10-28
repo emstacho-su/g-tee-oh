@@ -62,7 +62,8 @@ export async function createDrillSession(call: SessionCall, body: SessionCreateB
     const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
     throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
   }
-  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot);
+  // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
+  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, null, body.seed !== undefined);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
     const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });

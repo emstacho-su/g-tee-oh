@@ -4,81 +4,56 @@
  * the same transaction wrote (the next pick reads the block close's card, O-272).
  *
  * - queueInputs: the user's schedule cards (learning-state/fsrs-card.ts reads them back), mastery,
- *   leak stats, and per track the pooled average (learning's classStat per class, then
- *   trackAverage) over the attempts leak stats count (learning-state/repository.ts countedAttempts:
- *   drill and automated, panels hidden, never client-seeded; O-274, O-275).
+ *   leak stats, and per track the pooled average (learning's trackAverage over its classes' stats)
+ *   over the attempts leak stats count. It uses the shared track-decisions helper
+ *   (learning-state/track-decisions.ts decisionGroups: one grouped query over countedAttempts, drill
+ *   and automated, panels hidden, never client-seeded; O-274, O-275, PR #27 review LOW 15).
  * - countEarlierAttemptsAtItem: the first-attempt rule's count over attempt_item_idx (O-274).
- * - countRatedTodayInTrack: rated attempts since local midnight carrying the track (O-274, O-247).
  * - blockAttempts: the last n decisions of a session, oldest first: the open block's instances.
  * - uncoveredCardPairs: the (configuration, pair) of the last attempt of each class the user holds
  *   a card for that the catalog no longer lists, within the scope (A6 section 3 step 4, O-270).
  */
-import { classStat, trackAverage, type ClassStat, type Confidence, type GradeLabel, type TrackAverage } from "@g-tee-oh/learning";
+import type { Confidence, GradeLabel, TrackAverage } from "@g-tee-oh/learning";
 import { sql } from "kysely";
 
 import type { Database } from "../db.js";
-import { UNCLASSIFIED_SPOT_CLASS } from "../grading/decide.js";
 import { TRACK_KEYS, type TrackKey } from "../learning/tracks.js";
 import { spotClassCardOf } from "../learning-state/fsrs-card.js";
-import { countedAttempts, gradeLabelOf } from "../learning-state/repository.js";
+import { gradeLabelOf, trackIdsByKey } from "../learning-state/repository.js";
+import { decisionGroups, trackAverageOf, type DecisionGroup } from "../learning-state/track-decisions.js";
 import type { PairCandidate } from "../sessions/candidates.js";
 import type { ClassCatalog } from "./class-catalog.js";
 import type { QueueInputs } from "./queue.js";
 
 const CONFIDENCES: readonly Confidence[] = ["sure", "unsure"];
-/** solver-query's loss is raw; a float residue below zero reads as no loss (as leak-stat.ts does). */
-const NO_LOSS_BB = 0;
 
 export function confidenceOf(stored: string | null): Confidence | null {
   return CONFIDENCES.find((confidence) => confidence === stored) ?? null;
 }
 
-export interface LeakAttempt {
-  spot_class_key: string;
-  track_key: string;
-  label: string;
-  ev_loss_bb: number;
-}
-
-async function leakAttempts(database: Database, userId: string): Promise<LeakAttempt[]> {
-  return countedAttempts(database, userId)
-    .innerJoin("track", (join) => join.on(sql<boolean>`track.id = any(attempt.track_ids)`))
-    .select(["attempt.spot_class_key", "track.key as track_key", "attempt.label", "attempt.ev_loss_bb"])
-    .where("attempt.spot_class_key", "<>", UNCLASSIFIED_SPOT_CLASS)
-    .execute();
-}
-
-/** Per track, learning's pooled average over its classes' raw stats; null for a track with no decisions. */
-export function trackAveragesOf(attempts: readonly LeakAttempt[]): Map<TrackKey, TrackAverage | null> {
-  const byTrack = new Map<string, Map<string, LeakAttempt[]>>();
-  for (const attempt of attempts) {
-    const classes = byTrack.get(attempt.track_key) ?? new Map<string, LeakAttempt[]>();
-    classes.set(attempt.spot_class_key, [...(classes.get(attempt.spot_class_key) ?? []), attempt]);
-    byTrack.set(attempt.track_key, classes);
-  }
+/** Per track key, learning's pooled average over its classes; null for a track with no decisions. */
+export function trackAveragesOf(groups: readonly DecisionGroup[], trackIds: ReadonlyMap<TrackKey, string>): Map<TrackKey, TrackAverage | null> {
   return new Map(
     TRACK_KEYS.map((key) => {
-      const classes = [...(byTrack.get(key)?.values() ?? [])];
-      const stats: ClassStat[] = classes.map((rows) =>
-        classStat(rows.map((row) => ({ label: gradeLabelOf(row.label), evLossBb: Math.max(NO_LOSS_BB, row.ev_loss_bb) }))),
-      );
-      return [key, trackAverage(stats)];
+      const trackId = trackIds.get(key);
+      return [key, trackId === undefined ? null : trackAverageOf(groups, trackId)];
     }),
   );
 }
 
 export async function queueInputs(database: Database, userId: string): Promise<QueueInputs> {
-  const [cards, mastery, leaks, attempts] = await Promise.all([
+  const [cards, mastery, leaks, groups, trackIds] = await Promise.all([
     database.selectFrom("schedule_card").select(["spot_class_key", "fsrs_state"]).where("user_id", "=", userId).execute(),
     database.selectFrom("mastery").select(["spot_class_key", "p_known"]).where("user_id", "=", userId).execute(),
     database.selectFrom("leak_stat").select(["spot_class_key", "leak_cost_bb_per_1k"]).where("user_id", "=", userId).execute(),
-    leakAttempts(database, userId),
+    decisionGroups(database, userId),
+    trackIdsByKey(database),
   ]);
   return {
     cards: new Map(cards.map((row) => [row.spot_class_key, spotClassCardOf(row.spot_class_key, row.fsrs_state)])),
     pKnown: new Map(mastery.map((row) => [row.spot_class_key, row.p_known])),
     leakCosts: new Map(leaks.map((row) => [row.spot_class_key, row.leak_cost_bb_per_1k])),
-    trackAverages: trackAveragesOf(attempts),
+    trackAverages: trackAveragesOf(groups, trackIds),
   };
 }
 
@@ -98,31 +73,6 @@ export async function countEarlierAttemptsAtItem(database: Database, userId: str
     .where(sql<boolean>`hand_class is not distinct from ${item.handClass}`)
     .executeTakeFirstOrThrow();
   return Number(row.earlier);
-}
-
-/** Rated attempts of the user in the track since midnight in `timeZone`, as of `now` (O-274, O-247). */
-export async function countRatedTodayInTrack(
-  database: Database,
-  userId: string,
-  trackKey: TrackKey,
-  clock: { now: Date; timeZone: string },
-): Promise<number> {
-  const { now, timeZone } = clock;
-  const row = await database
-    .selectFrom("attempt")
-    .innerJoin("track", (join) => join.on(sql<boolean>`track.id = any(attempt.track_ids)`))
-    .select((eb) => eb.fn.countAll<string>().as("rated"))
-    .where("attempt.user_id", "=", userId)
-    .where("track.key", "=", trackKey)
-    .where("attempt.rated", "=", true)
-    .where("attempt.created_at", "<=", now)
-    .where(
-      "attempt.created_at",
-      ">=",
-      sql<Date>`(date_trunc('day', cast(${now.toISOString()} as timestamptz) at time zone ${timeZone}) at time zone ${timeZone})`,
-    )
-    .executeTakeFirstOrThrow();
-  return Number(row.rated);
 }
 
 export interface BlockAttempt {

@@ -22,6 +22,12 @@
  * dealing), hands: all, alternate_seats: false }; a new block replaces spots. The TypeScript type
  * PersistedState is the schema's input, so learning may be absent where a state is built in code;
  * read it through learningOf.
+ *
+ * PR #27 review HIGH 2: seeded is true when POST /sessions took a client-supplied seed, in every
+ * mode (false by default, so rows written before it parse). A seeded session writes no learning
+ * state and its attempts never count toward leak stats, queue picks, /progress or the typical
+ * response time (learning-state/repository.ts countedAttempts, shared-effects.ts); read it through
+ * isSeededSession, which also honours the automated learning state's own seeded flag.
  */
 import { z } from "zod";
 
@@ -144,6 +150,8 @@ export const persistedStateSchema = z.strictObject({
   last_attempt_id: uuidSchema.nullable(),
   /** S31: null for drill sessions and rows written before S31. */
   learning: learningStateSchema.nullable().default(null),
+  /** PR #27 review HIGH 2: the session was created with a client-supplied seed (any mode). */
+  seeded: z.boolean().default(false),
 });
 
 export type HandEnd = z.infer<typeof handEndSchema>;
@@ -162,12 +170,19 @@ export function learningOf(state: Pick<PersistedState, "learning">): LearningSta
   return state.learning ?? null;
 }
 
-/** The state of a new session: dealing hand 0 (A6 section 2). */
+/** True when the session was created with a client-supplied seed (see the module doc). */
+export function isSeededSession(state: Pick<PersistedState, "learning" | "seeded">): boolean {
+  const learning = learningOf(state);
+  return state.seeded === true || (learning?.kind === "automated" && learning.seeded);
+}
+
+/** The state of a new session: dealing hand 0 (A6 section 2); seeded per PR #27 review HIGH 2. */
 export function initialState(
   seed: string,
   spots: readonly HeroSpot[],
   spot: SessionSpot,
   learning: LearningState | null = null,
+  seeded = false,
 ): PersistedState {
   return persistedStateSchema.parse({
     phase: "dealing",
@@ -179,5 +194,6 @@ export function initialState(
     previous_board: null,
     last_attempt_id: null,
     learning,
+    seeded,
   });
 }

@@ -12,16 +12,18 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { classStat, leakStat } from "@g-tee-oh/learning";
+
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
-import { IDLE_CLOSE_JOB, IDLE_SESSION_CLOSE_MS } from "../src/jobs/idle-close.js";
-import { LEAK_HISTORY_JOB } from "../src/jobs/leak-history.js";
+import { closeIdleSessions, IDLE_CLOSE_JOB, IDLE_SESSION_CLOSE_MS } from "../src/jobs/idle-close.js";
+import { LEAK_HISTORY_JOB, weekEndOf } from "../src/jobs/leak-history.js";
 import type { JobHandler, JobServices } from "../src/jobs/registry.js";
 import { runDueJobs } from "../src/jobs/worker.js";
-import { NO_LEARNING_HOOKS, type LearningHooks, type RecapExtras } from "../src/learning/effects.js";
+import { NO_LEARNING_HOOKS, type LearningHooks, type RecapExtras, type SessionEndContext } from "../src/learning/effects.js";
 import { DEFAULT_LEARNING_HOOKS } from "../src/learning/hooks.js";
 import { recomputeLeakStat } from "../src/learning-state/leak-stat.js";
 import { TEST_CONFIG } from "./support/app.js";
@@ -47,6 +49,9 @@ const WEEK_DUE = new Date("2026-10-26T04:00:00.000Z");
 const PRIOR_PER_1K = 40;
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
+/** The end of WEEK in the test time zone; the history counts only attempts before it (PR #27 review MEDIUM 10). */
+const WEEK_END = weekEndOf(WEEK, TEST_CONFIG.timeZone);
+const IN_WEEK = new Date(WEEK_END.getTime() - HOUR_MS);
 
 let database: Database;
 let pool: pg.Pool;
@@ -80,7 +85,7 @@ describe("R4.11 the weekly leak history job (O-275)", () => {
   it("R4.11 the job recomputes leak_stat and snapshots the ended week; a second run leaves identical rows", async () => {
     const user = await createTestUser(database);
     const sessionId = await insertSessionRow(pool, { userId: user.id, mode: "drill" });
-    const base = { userId: user.id, sessionId, solutionId, trackIds: [tracks.opens ?? ""] };
+    const base = { userId: user.id, sessionId, solutionId, trackIds: [tracks.opens ?? ""], createdAt: IN_WEEK };
     await insertAttemptRow(pool, { ...base, spotClassKey: CLASS, label: "mistake", evLossBb: 2 });
     await insertAttemptRow(pool, { ...base, spotClassKey: OTHER_CLASS, label: "blunder", evLossBb: 5 });
     for (const key of [CLASS, OTHER_CLASS]) {
@@ -108,6 +113,30 @@ describe("R4.11 the weekly leak history job (O-275)", () => {
     const second = await runOnce(LEAK_HISTORY_JOB.handler, WEEK, WEEK_DUE, services);
     expect(second.job.status).toBe("done");
     expect(await learningRows(pool, user.id)).toEqual(afterFirst);
+  });
+});
+
+describe("R4.11 the weekly snapshot's week boundary (PR #27 review MEDIUM 10)", () => {
+  it("R4.11 leak_history counts the attempts before the week's end; leak_stat counts every attempt", async () => {
+    const user = await createTestUser(database);
+    const sessionId = await insertSessionRow(pool, { userId: user.id, mode: "drill" });
+    const base = { userId: user.id, sessionId, solutionId, spotClassKey: CLASS, trackIds: [tracks.opens ?? ""] };
+    await insertAttemptRow(pool, { ...base, label: "mistake", evLossBb: 2, createdAt: IN_WEEK });
+    await recomputeLeakStat(database, { userId: user.id, spotClassKey: CLASS, trackKey: "opens", frequencyPriorPer1k: PRIOR_PER_1K, now: WEEK_DUE });
+    // Made after the week ended but before the (late) run: it belongs to the next week.
+    await insertAttemptRow(pool, { ...base, label: "blunder", evLossBb: 5, createdAt: new Date(WEEK_END.getTime() + 10 * MINUTE_MS) });
+    const lateRun = new Date(WEEK_END.getTime() + HOUR_MS);
+    const services: JobServices = { solverQuery: null, learningHooks: NO_LEARNING_HOOKS, log };
+    const run = await runOnce(LEAK_HISTORY_JOB.handler, WEEK, lateRun, services);
+    expect(run.job).toEqual({ status: "done", last_error: null });
+    const weekDecisions = [{ label: "Mistake", evLossBb: 2 }] as const;
+    const own = classStat(weekDecisions);
+    const expected = leakStat(CLASS, PRIOR_PER_1K, weekDecisions, { missRate: own.missRate, evPerMissBb: own.evPerMissBb });
+    const rows = await learningRows(pool, user.id);
+    const history = rows.leak_history as { leak_cost_bb_per_1k: number }[];
+    expect(history).toHaveLength(1);
+    expect(history[0]?.leak_cost_bb_per_1k).toBeCloseTo(expected.leakCostBbPer1k, 3);
+    expect((rows.leak_stat as { n: number }[]).map((row) => row.n)).toEqual([2]);
   });
 });
 
@@ -226,5 +255,76 @@ describe("R4.11 the idle session closer (O-275)", () => {
     expect(automatedEnd?.rating_changes?.map((change) => change.track_key)).toEqual(["opens"]);
     const history = await pool.query("select session_id from rating_history where user_id = $1", [fixture.userId]);
     expect(history.rows).toEqual([{ session_id: fixture.automated }]);
+  });
+
+  it("R4.11 two idle sessions of one user end in start order with strictly increasing rating times (PR #27 review HIGH 5)", async () => {
+    const window = windowAt(2000);
+    const user = await createTestUser(database);
+    const sessions: string[] = [];
+    for (const offsetMs of [0, MINUTE_MS]) {
+      const startedAt = new Date(window.idleStart.getTime() + offsetMs);
+      const sessionId = await insertSessionRow(pool, { userId: user.id, mode: "automated", learning: automatedLearning(CLASS), startedAt });
+      await insertAttemptRow(pool, {
+        userId: user.id,
+        sessionId,
+        solutionId,
+        spotClassKey: CLASS,
+        rated: true,
+        score: 1,
+        itemDifficulty: 1500,
+        trackIds: [tracks.opens ?? ""],
+        createdAt: new Date(startedAt.getTime() + MINUTE_MS),
+      });
+      sessions.push(sessionId);
+    }
+    const ends: { sessionId: string; extras: RecapExtras; prepared: SessionEndContext["prepared"] }[] = [];
+    const capturing: LearningHooks = {
+      ...DEFAULT_LEARNING_HOOKS,
+      async onSessionEnd(context) {
+        const result = await DEFAULT_LEARNING_HOOKS.onSessionEnd(context);
+        ends.push({ sessionId: context.session.id, extras: result, prepared: context.prepared });
+        return result;
+      },
+    };
+    const services: JobServices = { solverQuery: fixtureSolverQuery(), learningHooks: capturing, log };
+    const run = await runOnce(IDLE_CLOSE_JOB.handler, window.now.toISOString(), window.now, services);
+    expect(run.job).toEqual({ status: "done", last_error: null });
+    expect(ends.map((end) => end.sessionId)).toEqual(sessions);
+    const history = await pool.query<{ session_id: string; mu: number; rd: number; recorded_at: Date }>(
+      "select session_id, mu, rd, recorded_at from rating_history where user_id = $1 order by recorded_at, session_id",
+      [user.id],
+    );
+    expect(history.rows.map((row) => row.session_id)).toEqual(sessions);
+    const [first, second] = history.rows;
+    expect(second?.recorded_at.getTime()).toBeGreaterThan(first?.recorded_at.getTime() ?? Number.POSITIVE_INFINITY);
+    const before = ends[1]?.extras.rating_changes?.[0]?.before;
+    expect(before?.mu).toBeCloseTo(first?.mu ?? Number.NaN, 3);
+    const rating = await pool.query<{ mu: number }>("select mu from rating where user_id = $1", [user.id]);
+    expect(rating.rows[0]?.mu).toBeCloseTo(second?.mu ?? Number.NaN, 5);
+    // The prepare phase ran per session before its end: the end hooks see the all-configs catalog.
+    expect(ends.every((end) => end.prepared.catalog !== null)).toBe(true);
+  });
+
+  it("R4.11 a run ends at most its batch and schedules a follow-up run for the rest (PR #27 review MEDIUM 11)", async () => {
+    const window = windowAt(1999);
+    const user = await createTestUser(database);
+    const sessions: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      sessions.push(await insertSessionRow(pool, { userId: user.id, mode: "holdout", learning: holdoutLearning(), startedAt: window.idleStart }));
+    }
+    const services: JobServices = { solverQuery: fixtureSolverQuery(), learningHooks: NO_LEARNING_HOOKS, log };
+    const kind = `test_${randomUUID()}`;
+    await database.insertInto("app_job").values({ kind, period_key: window.now.toISOString(), run_at: window.now }).execute();
+    const smallBatch = 2;
+    const report = await runDueJobs(
+      database,
+      window.now,
+      { [kind]: (context) => closeIdleSessions(context, { batchSize: smallBatch }).then(() => undefined) },
+      { workerId: "r4.11-test", timeZone: TEST_CONFIG.timeZone, services },
+    );
+    expect(report).toEqual({ done: [expect.any(String), expect.any(String)], failed: [] });
+    expect(await endedIds(user.id)).toEqual([...sessions].sort());
+    const jobs = await pool.query("select status from app_job where kind = $1", [kind]);
+    expect(jobs.rows).toEqual([{ status: "done" }, { status: "done" }]);
   });
 });

@@ -26,6 +26,11 @@
  *    state patch is written with the next state, its extras join the feedback). The attempt also
  *    stores hand_class, the hero's row label at the node, and panels_revealed. The derivation loads
  *    the session's holdout guard first (sessions/derive-settings.ts).
+ * 5. PR #27 review HIGH 3 and MEDIUM 12: the hooks' prepare phase (learning/prepare.ts) runs after
+ *    the preview grade and before idempotentWrite opens its transaction, so the class catalog is
+ *    loaded outside the lock (null when it cannot load) and reaches every hook as context.prepared.
+ *    An automated session whose closed block waits for its next pick is 409 stale-state: the
+ *    client fetches GET /next, which picks the block (automated/resume-block.ts).
  */
 import {
   DIFFICULTY_BASE,
@@ -44,7 +49,9 @@ import { idempotentWrite } from "../http/idempotent-write.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { SQ_GRADE_METRIC, timed } from "../http/server-timing.js";
 import type { decisionBodySchema } from "../schemas/training.js";
+import { pendingPickOf } from "../automated/block.js";
 import type { DecisionContext, GradeOverrides } from "../learning/effects.js";
+import { prepareLearning } from "../learning/prepare.js";
 import { actionAt, afterHeroDecision, deriveAwaitHero, type DerivedPrompt } from "../sessions/derive.js";
 import { deriveSettingsFor } from "../sessions/derive-settings.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
@@ -236,7 +243,7 @@ async function readForDecision(decision: DecisionRequest): Promise<SessionRow> {
   if (session.state.phase === "ended") {
     throw sessionEndedProblem();
   }
-  if (session.stateVersion !== decision.body.state_version) {
+  if (session.stateVersion !== decision.body.state_version || pendingPickOf(session) !== null) {
     throw staleStateProblem();
   }
   return session;
@@ -247,6 +254,14 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
   const session = await readForDecision(decision);
   const port = solverPort(requireSolverQuery(decision.app), decision.request);
   const preview = await gradeWithSolverQuery(session, decision, port);
+  const prepared = await prepareLearning(decision.app.learningHooks, {
+    database: requireDatabase(decision.app),
+    solverQuery: decision.app.solverQuery,
+    userId: decision.userId,
+    session,
+    now: decision.now,
+    log: decision.request.log,
+  });
   return idempotentWrite(decision.app, decision.request, HTTP_STATUS.ok, async (transaction) => {
     const locked = await lockSession(transaction, decision.userId, session.id);
     if (locked === undefined) {
@@ -266,6 +281,7 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
       grade: preview.graded.chosen,
       solverQuery: requireSolverQuery(decision.app),
       request: decision.request,
+      prepared,
     };
     const overrides = await hooks.beforeGrade(context);
     const ratedToday =
