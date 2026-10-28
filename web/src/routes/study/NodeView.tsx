@@ -2,14 +2,16 @@
  * One study node on screen (S25, R3.12, A7 sections 3 and 4).
  *
  * Mechanism: the synthetic banner when the node is synthetic (O-57), who acts and the pot, the
- * noise flags, then for a preflop node the matrix with its mode switch (frequency, EV, range
- * weight; the mode lives in the URL) beside the actions tables, the line steps and the selected
- * hand's threshold card. Selecting a matrix cell writes the hand to the URL. A node on a later
- * street renders the v1.5 note and no matrix, so RangeMatrix never meets exact-combination rows
- * (O-196). After each new node renders, an effect completes the pending node switch timing:
+ * noise flags, then for a preflop node the position carousel (S39: the caller's carousel slot,
+ * which replaced the line breadcrumb and line steps) and the acting seat's range in the matrix
+ * with its mode switch (frequency, EV, range weight; the mode lives in the URL) beside the actions
+ * table and the selected hand's threshold card. Selecting a matrix cell writes the hand to the
+ * URL. A node on a later street renders the v1.5 note, a way back (LineEscape) and no carousel or
+ * matrix, so RangeMatrix never meets exact-combination rows (O-196) and no button walks further
+ * into a postflop subtree (review round 1). After each new node renders, an effect completes the pending node switch timing:
  * React runs the matrix's draw effect first, so the switch's frame comes after the draw's (O-287).
  */
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import type { AppApi } from "../../api/index.js";
 import type { MatrixMode } from "../../components/range-matrix/model.js";
@@ -22,7 +24,7 @@ import { lineLabel } from "../../study/line.js";
 import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { HandInsights } from "./HandInsights.js";
-import { LineActions } from "./LineActions.js";
+import { LineEscape } from "./LineEscape.js";
 import { NodeActionsPanel } from "./NodeActionsPanel.js";
 import { SyntheticBanner } from "../../components/ui/index.js";
 import { NoiseFlags, PostflopNote } from "./StudyNotices.js";
@@ -38,8 +40,11 @@ export interface NodeViewProps {
   api: AppApi;
   node: StudyNode;
   search: StudySearch;
+  /** The position carousel for this node's line; rendered for a preflop node only. */
+  carousel: ReactNode;
   onModeChange: (mode: MatrixMode) => void;
   onSelectHand: (hand: string) => void;
+  onOpenLine: (line: string) => void;
 }
 
 function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string | undefined): void {
@@ -51,7 +56,7 @@ function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string |
   }, [metrics, nodeKey, preflop, label]);
 }
 
-export function NodeView({ api, node, search, onModeChange, onSelectHand }: NodeViewProps) {
+export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine }: NodeViewProps) {
   const theme = useThemeStore((state) => state.theme);
   const sizePx = useMatrixSize();
   const preflop = node.street === "preflop";
@@ -63,9 +68,11 @@ export function NodeView({ api, node, search, onModeChange, onSelectHand }: Node
       {node.synthetic ? <SyntheticBanner /> : null}
       <p className="text-sm">{`${node.to_act} to act, pot ${formatCbb(node.pot_cbb)}`}</p>
       <NoiseFlags flags={node.noise_flags} />
+      {preflop ? carousel : null}
       {preflop ? (
         <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
+            <h2 className="text-base font-semibold">{`${node.to_act}'s range at this node`}</h2>
             <ToggleGroup label="Matrix mode" value={mode} options={MODE_OPTIONS} onValueChange={onModeChange} />
             <RangeMatrix
               node={node}
@@ -78,12 +85,14 @@ export function NodeView({ api, node, search, onModeChange, onSelectHand }: Node
           </div>
           <div className="flex min-w-0 flex-col gap-4">
             <NodeActionsPanel node={node} hand={search.hand} />
-            <LineActions node={node} search={search} />
             <HandInsights api={api} node={node} hand={search.hand} />
           </div>
         </div>
       ) : (
-        <PostflopNote street={node.street} />
+        <>
+          <PostflopNote street={node.street} />
+          <LineEscape line={search.line} onOpenLine={onOpenLine} />
+        </>
       )}
     </div>
   );

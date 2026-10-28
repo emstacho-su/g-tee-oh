@@ -5,11 +5,12 @@
  * sign-in.e2e.ts.
  *
  * Mechanism: sign in, open /study from the main navigation, choose the online 6-max 100 bb
- * configuration and BB-BTN through the selects (the synthetic set, validation/fixtures/library
- * preflop/cfg_6_online_100, seeded by db/migrations seed_catalog), switch the matrix through
- * frequency, EV and range weight, step down the next likely action (or the first continuing one
- * when the likeliest ends the solution) and back with the breadcrumb, select a cell and see its
- * threshold card, and assert the synthetic banner. The page's node switch lines (console.info,
+ * configuration and BTN against BB in the settings panel and Confirm (S39; the synthetic set,
+ * validation/fixtures/library preflop/cfg_6_online_100, seeded by db/migrations seed_catalog),
+ * switch the matrix through frequency, EV and range weight, step down the next likely action in
+ * the position carousel's drop-down (or the first continuing one when the likeliest ends the
+ * solution) and back by pressing the seat that acted, select a cell and see its threshold card,
+ * and assert the synthetic banner. The page's node switch lines (console.info,
  * O-287) are collected through page.on("console") and written to test-results/node-switch.json
  * with the count, each time, the median and the 95th percentile; dev-stack numbers for the
  * latency report, never the O-40 guard. With SCREENSHOT_DIR set, each mode, the threshold card
@@ -45,7 +46,7 @@ const CRITERIA = {
   ev: "R3.12 flow 3 on the stack: EV mode (A7 section 5)",
   weight: "R3.12 flow 3 on the stack: range-weight mode (A7 section 5)",
   threshold: "R3.12 flow 3 on the stack: threshold card for the selected hand (O-286)",
-  line: "R3.12 flow 3 on the stack: one step down the line with the breadcrumb (O-286)",
+  line: "R3.12 flow 3 on the stack: one step down the line in the position carousel (O-286, O-354)",
 } as const;
 
 interface NodeSwitch {
@@ -92,14 +93,22 @@ async function captureThemes(page: Page, screen: string, criterion: string): Pro
   }
 }
 
-async function chooseFilters(page: Page): Promise<void> {
+/** One segmented choice in the settings panel (a Radix radiogroup per field). */
+async function choose(page: Page, field: string, name: string | RegExp): Promise<void> {
+  await page.getByRole("radiogroup", { name: field }).getByRole("radio", { name }).click();
+}
+
+async function chooseSettings(page: Page): Promise<void> {
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Study" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Solution browser" })).toBeVisible();
-  await page.getByLabel("Format", { exact: true }).selectOption("online");
-  await page.getByLabel("Table size", { exact: true }).selectOption("6");
-  await page.getByLabel("Stake", { exact: true }).selectOption({ label: "online" });
-  await page.getByLabel("Depth", { exact: true }).selectOption({ label: "100bb" });
-  await page.getByLabel("Pair", { exact: true }).selectOption("BB-BTN");
+  await choose(page, "Format", "Online");
+  await choose(page, "Table size", /^6 players/);
+  await choose(page, "Stake", /^online/);
+  await choose(page, "Depth", /^100bb/);
+  await choose(page, "First to act", /^BTN/);
+  await choose(page, "Against", /^BB/);
+  await expect(matrix(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "Confirm" }).click();
   await expect(matrix(page)).toHaveAccessibleName(/frequency mode/);
 }
 
@@ -115,16 +124,17 @@ async function switchModes(page: Page): Promise<void> {
 }
 
 async function stepDownAndBack(page: Page): Promise<void> {
-  const actions = page.getByRole("list", { name: "Actions at this node" });
+  const actions = page.getByRole("region", { name: /'s actions$/ });
   const nextLikely = actions.locator('[data-next-likely="true"]');
-  const step = (await nextLikely.count()) > 0 ? nextLikely.first() : actions.getByRole("link").first();
+  const step = (await nextLikely.count()) > 0 ? nextLikely.first() : actions.locator('button:not([aria-disabled="true"])').first();
   await step.click();
   await expect(page).toHaveURL(/[?&]line=/);
-  const crumbs = page.getByRole("navigation", { name: "Line" });
-  await expect(crumbs.getByRole("link", { name: "Root" })).toBeVisible();
+  const positions = page.getByRole("list", { name: "Positions" });
+  const acted = positions.locator('[data-state="acted"]').first();
+  await expect(acted).toBeVisible();
   await expect(matrix(page)).toBeVisible();
   await captureThemes(page, "flow3-study-line-step", CRITERIA.line);
-  await crumbs.getByRole("link", { name: "Root" }).click();
+  await acted.click();
   await expect(page).not.toHaveURL(/[?&]line=/);
   await expect(matrix(page)).toBeVisible();
 }
@@ -153,7 +163,7 @@ test("R3.12 flow 3: study browser over the fixture library, node switch times lo
   await page.setViewportSize({ width: DESKTOP.width, height: DESKTOP.height });
 
   await signInOnce(page, credentials);
-  await chooseFilters(page);
+  await chooseSettings(page);
   await expect(page.getByTestId("synthetic-banner")).toBeVisible();
   await switchModes(page);
   await stepDownAndBack(page);
