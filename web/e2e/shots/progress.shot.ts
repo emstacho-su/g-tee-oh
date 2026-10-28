@@ -29,6 +29,7 @@ const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 const TOOLTIP_CELL = /^facing-open BB-CO, online 100 bb:/;
 
 const CRITERIA = {
+  tracks: "R4.12 track breakdown: each track rating as a dot with its deviation whisker on one shared axis with tier floors, weight and rated decisions in words, a track with no coverage dimmed and named (O-320)",
   page: "R4.12 /progress: rating with deviation and tier, streak, track breakdown, leak-cost trend, mastery heat map and holdout card (06 section 7, A7 section 3)",
   trend: "R4.12 leak-cost trend: top 10 classes weekly on one shared scale, the partial week hollow, a gap for a missing week, a drill button per row (O-320, O-321)",
   heatmap: "R4.12 mastery heat map: five-bin ramp with percents, new cells hatched, mastered checked, due dots and recall bars, legend (O-320)",
@@ -63,6 +64,7 @@ async function chartShots(page: Page, shot: ReturnType<typeof shooter>): Promise
   const heatmap = page.getByTestId("mastery-heatmap");
   await expect(page.getByTestId("leak-row")).toHaveCount(10);
   await shot("progress-page", CRITERIA.page);
+  await shot("progress-tracks", CRITERIA.tracks, page.getByTestId("track-breakdown"));
   await shot("progress-leak-trend", CRITERIA.trend, trend);
   await shot("progress-heatmap", CRITERIA.heatmap, heatmap);
 

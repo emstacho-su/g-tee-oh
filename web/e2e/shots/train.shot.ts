@@ -35,6 +35,7 @@ const CRITERIA = {
   worked: "R4.10 worked example prompt: banner says Worked example: panels visible, not rated (O-272, O-325)",
   confirm: "R4.10 end confirm: End this session? with Keep playing and End session (O-285)",
   recap: "R4.10 recap: decisions, rated decisions, mean score percent, EV loss, per-track rating before (new) and after with RD, tier held by a named track, the unlocked badge, Train again and See progress (O-325)",
+  holdoutStart: "R4.12 holdout retest start: what the retest is, that it is never rated, and an explicit Start (O-328)",
   holdout: "R4.10 holdout retest in the session view: banner says Holdout retest: not rated with answered of total (O-328)",
 } as const;
 
@@ -90,6 +91,8 @@ async function trainScreens(page: Page, theme: Theme, viewport: Viewport): Promi
   await shot("train-recap", CRITERIA.recap);
 
   await page.goto("/train?mode=holdout");
+  await expect(page.getByTestId("holdout-start")).toBeVisible();
+  await shot("train-holdout-start", CRITERIA.holdoutStart);
   await page.getByRole("button", { name: "Start the retest" }).click();
   await expect(page.getByTestId("holdout-answered")).toHaveText("12 of 30 answered");
   await shot("train-holdout", CRITERIA.holdout);

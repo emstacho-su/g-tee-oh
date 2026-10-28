@@ -33,6 +33,7 @@ const CRITERIA = {
   home: "R4.12 home: today's queue with due and new counts, top 3 leaks and Start training; streak tile; rating card with the equipped badge pill and Open progress (O-322, O-323)",
   homeFresh: "R4.12 home for a fresh learner: nothing due, every class new, no leaks yet, Unrated rating, zero-day streak (O-322)",
   settings: "R4.12 /settings: builder schedule, session defaults (grouping, RNG, configuration scope), cosmetics and read-only hotkeys (O-323, O-327)",
+  defaults: "R4.12 session defaults: grouping, RNG and configuration scope for automated sessions, stored in this browser, never a seed (O-323)",
   cosmetics: "R4.14 cosmetics: unlocked items selectable, locked items named with their unlock rule, card back and felt equipped with previews (O-323)",
   hotkeys: "O-327 hotkeys: the trainer and app shortcuts listed read only, rebinding noted as later",
 } as const;
@@ -81,13 +82,17 @@ for (const theme of THEMES) {
       await expect(page.getByTestId("queue-due")).toBeVisible();
       await expect(page.getByTestId("badge-pill")).toHaveText(/Seven-day streak badge/);
       await expect(page.getByTestId("streak-current")).toBeVisible();
-      await shot("home", CRITERIA.home);
+      await shot("home-queue", CRITERIA.home);
 
       await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Settings" }).click();
       await expect(page.getByRole("form", { name: "Builder schedule" })).toBeVisible();
       await expect(page.getByRole("group", { name: "Card back" })).toBeVisible();
       await expect(page.locator("html")).toHaveAttribute("data-felt", EQUIPPED.felt);
       await shot("settings", CRITERIA.settings);
+
+      const defaults = page.getByRole("region", { name: "Session defaults" });
+      await defaults.scrollIntoViewIfNeeded();
+      await shot("settings-session-defaults", CRITERIA.defaults, defaults);
 
       const cosmetics = page.getByRole("region", { name: "Cosmetics" });
       await expect(cosmetics.getByRole("radio", { name: /Fourteen-day streak card back/ })).toBeChecked();
