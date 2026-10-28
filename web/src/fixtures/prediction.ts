@@ -8,7 +8,8 @@
  * big blind facing a button open with two raise sizes, so the size question has two answers. Each
  * prompt has a fixed truth; fixturePredictionResult judges an answer against it with the api's
  * rules. The range level 1 window holds 17 of 19 correct, so a right answer there is the 18th of 20
- * and unlocks level 2: the result view's unlock banner has a fixture. Every number is test data
+ * and unlocks level 2; that full window also passes the level (S41 level_passed, O-410), so the
+ * result view's unlock banner and passed mark have a fixture. Every number is test data
  * chosen here: nothing is a real solution and nothing comes from any reference tool (O-26).
  */
 import type { NodeAction, PracticeSession, PredictionPrompt, PredictionResult } from "../contracts.js";
@@ -25,6 +26,7 @@ const PROMPT_ID_PREFIX = "00000000-0000-8000-8000-0000000001";
 const WINDOW_SIZE = 20;
 const REQUIRED_PCT = 90;
 const PERCENT_TOLERANCE = 2.5;
+const PERCENT_SCALE = 100;
 /** The fixture windows before an answer: 17 of 19 on range level 1 (one right answer unlocks), 6 of 8 elsewhere. */
 const UNLOCKING_WINDOW = { answers: 19, correct: 17 } as const;
 const OTHER_WINDOW = { answers: 8, correct: 6 } as const;
@@ -148,17 +150,24 @@ function windowAfter(entry: FixturePrediction, correct: boolean): PredictionResu
   return { answers: before.answers + 1, correct: before.correct + (correct ? 1 : 0), size: WINDOW_SIZE, required_pct: REQUIRED_PCT };
 }
 
+/** A full window at or above the required share passes its level, as the api judges it (O-410). */
+function windowPasses(window: PredictionResult["window"]): boolean {
+  return window.answers >= window.size && window.correct * PERCENT_SCALE >= window.required_pct * window.answers;
+}
+
 /** The result of answering a fixture prompt at a state version, judged against its truth. */
 export function fixturePredictionResult(entry: FixturePrediction, answer: PredictionAnswer, stateVersion: number): PredictionResult {
   const correct = judgeFixture(entry.truth, answer, entry.prompt.threshold_pct);
   const unlocked = correct && unlocks(entry);
+  const window = windowAfter(entry, correct);
   return {
     prompt_id: entry.prompt.prompt_id,
     correct,
     ladder: entry.prompt.ladder,
     level: entry.prompt.level,
+    level_passed: windowPasses(window),
     truth: entry.truth,
-    window: windowAfter(entry, correct),
+    window,
     next_level_unlocked: unlocked,
     new_level: unlocked ? entry.prompt.level + 1 : entry.prompt.level,
     state_version: stateVersion + 1,

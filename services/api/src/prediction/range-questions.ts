@@ -139,10 +139,17 @@ function regionsQuestion(input: QuestionInput): PredictionQuestion {
   };
 }
 
-/** The range ladder's question at the input's level; undefined when the node has no non-fold action. */
+/**
+ * The range ladder's question at the input's level; undefined when the node has no non-fold action,
+ * or, at an exact level 3 (a quiz, O-411 amended, PR #39 review finding 2), when the node is not in
+ * the 169-class space the regions question needs.
+ */
 export function rangeQuestion(input: QuestionInput): PredictionQuestion | undefined {
   if (input.level === LEVEL_REGIONS && input.node.hand_space === CLASS_SPACE) {
     return regionsQuestion(input);
+  }
+  if (input.level === LEVEL_REGIONS && input.exactLevel === true) {
+    return undefined;
   }
   const target = targetShare(input.node);
   if (target === undefined) {

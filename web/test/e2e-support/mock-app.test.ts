@@ -1,6 +1,6 @@
 // Tests for e2e/support/mock-app.ts (S27, R3.16, R3.17, O-264): the composed app mock answers GET
-// /drills once for every screen, so both the /predict and the /paint pickers find their fixture
-// drills whichever feature route answers first.
+// /drills once for every screen, so the drill library and old drill-backed /quiz and /paint links
+// find their fixture drills whichever feature route answers first.
 import { describe, expect, it } from "vitest";
 
 import { createAppMockApi } from "../../e2e/support/mock-app.js";

@@ -1,5 +1,5 @@
 /**
- * The answer input of a prediction prompt, by answer kind (S27 lane A, R3.16, O-301, ADR 0020, A7
+ * The answer input of a quiz prompt, by answer kind (S27 lane A, S41, R3.16, O-301, ADR 0020, A7
  * section 4): yes and no buttons; a number input from 0 to 100 in steps of 5; one checkbox per
  * hand region; the node's actions as buttons with their swatch (the tree's actions, ADR 0020); the
  * four frequency bands; and the node's aggressive actions for the size question. Every choice is a
@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 
 import { ActionSwatch } from "../../components/trainer/ActionSwatch.js";
-import { Button } from "../../components/ui/index.js";
+import { Button, FIELD_CLASS, cn } from "../../components/ui/index.js";
 import type { NodeAction, PredictionPrompt } from "../../contracts.js";
 import { PERCENT_MAX, PERCENT_MIN, PERCENT_STEP, aggressiveActions, toggleRegion, type AnswerDraft } from "../../prediction/draft.js";
 import { BAND_LABELS, PREDICTION_TEXT, REGION_LABELS } from "../../prediction/labels.js";
@@ -112,7 +112,7 @@ function PercentInput({ draft, disabled, onChange }: AnswerInputProps) {
         value={draft.text}
         disabled={disabled}
         onChange={(event) => onChange({ kind: "percent", text: event.target.value })}
-        className="h-10 w-32 rounded-md border border-border-strong bg-surface px-2 text-base"
+        className={cn(FIELD_CLASS, "h-10 w-32 px-2 text-base")}
       />
     </label>
   );

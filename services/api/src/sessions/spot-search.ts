@@ -47,6 +47,8 @@ export interface SpotSearch {
   spot: SessionSpot;
   /** The drill's line, or null for the pair's root. */
   line: string | null;
+  /** S41 (O-411 amended): a hero node is kept only when this accepts it (a quiz that can ask its level there). */
+  accept?: (node: SqNode) => boolean;
 }
 
 interface Pending {
@@ -116,7 +118,7 @@ async function spotsIn(candidate: PairCandidate, search: SpotSearch, port: Solve
       continue;
     }
     const hero = wanted.includes(node.to_act) && familyMatches(search.spot.preflop_action, node.action_family);
-    if (hero && anyRowPasses(search.spot.hands, node.hands)) {
+    if (hero && anyRowPasses(search.spot.hands, node.hands) && (search.accept?.(node) ?? true)) {
       found.push(heroSpotAt(candidate, node, pending));
     }
     for (const child of children(node, pending)) {

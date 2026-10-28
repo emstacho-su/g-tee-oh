@@ -10,6 +10,8 @@
  * arrow-key order and its reason, shown as visible text inside the item, is part of its
  * accessible name; choosing it does nothing.
  *
+ * S41 (R3.16, O-415) adds MultiToggleGroup, a choice of any number over the same track and items.
+ *
  * Look: a sunken track; every item takes the shared tactile press, the unchosen ones flat and the
  * chosen one raised out of the track in bold, so the choice never rests on colour alone.
  */
@@ -90,12 +92,25 @@ export function ToggleGroup<T extends string>({ label, value, options, onValueCh
         const chosen = options.find((option) => option.value === next);
         if (chosen !== undefined && chosen.disabled !== true) onValueChange(chosen.value);
       }}
-      className={cn(
-        "inline-flex gap-0.5 rounded-xl bg-surface-sunken p-1 shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]",
-        wrap && "max-w-full flex-wrap",
-        CONTROL_EDGE_CLASS,
-      )}
+      className={trackClasses(wrap)}
     >
+      <Items options={options} />
+    </RadixToggleGroup.Root>
+  );
+}
+
+function trackClasses(wrap: boolean): string {
+  return cn(
+    "inline-flex gap-0.5 rounded-xl bg-surface-sunken p-1 shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]",
+    wrap && "max-w-full flex-wrap",
+    CONTROL_EDGE_CLASS,
+  );
+}
+
+/** The items of either control; an unavailable one is aria-disabled and stays in the arrow-key order (S39). */
+function Items<T extends string>({ options }: { options: readonly ToggleOption<T>[] }) {
+  return (
+    <>
       {options.map((option) => {
         const unavailable = option.disabled === true;
         return (
@@ -113,6 +128,40 @@ export function ToggleGroup<T extends string>({ label, value, options, onValueCh
           </RadixToggleGroup.Item>
         );
       })}
+    </>
+  );
+}
+
+export interface MultiToggleGroupProps<T extends string> {
+  label: string;
+  value: readonly T[];
+  options: readonly ToggleOption<T>[];
+  onValueChange: (value: T[]) => void;
+}
+
+/**
+ * S41 (R3.16, O-415): a choice of any number (the quiz's positions, spot types and question kinds).
+ * Each item is a toggle button with aria-pressed; the reported value keeps the options' order
+ * whatever order the items were pressed in, and never holds an unavailable option. It always wraps,
+ * since its lists run long on a phone.
+ */
+export function MultiToggleGroup<T extends string>({ label, value, options, onValueChange }: MultiToggleGroupProps<T>) {
+  return (
+    <RadixToggleGroup.Root
+      type="multiple"
+      role="group"
+      aria-label={label}
+      value={[...value]}
+      onValueChange={(next) => {
+        const picked = new Set(next);
+        const chosen = options.filter((option) => picked.has(option.value) && option.disabled !== true).map((option) => option.value);
+        // Pressing an unavailable item changes nothing, so nothing is reported.
+        const unchanged = chosen.length === value.length && chosen.every((choice) => value.includes(choice));
+        if (!unchanged) onValueChange(chosen);
+      }}
+      className={trackClasses(true)}
+    >
+      <Items options={options} />
     </RadixToggleGroup.Root>
   );
 }

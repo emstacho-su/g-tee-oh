@@ -22,7 +22,7 @@ const NAV_LINKS: readonly (readonly [string, string])[] = [
   ["Drills", "/drills"],
   ["New drill", "/drills/new"],
   ["Study", "/study"],
-  ["Predict", "/predict"],
+  ["Quizzes", "/quiz"],
   ["Paint", "/paint"],
   ["Progress", "/progress"],
   ["Library", "/library"],

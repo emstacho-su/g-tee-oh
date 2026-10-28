@@ -11,7 +11,7 @@ export const NAV_ITEMS = [
   { to: "/drills", label: "Drills", exact: true },
   { to: "/drills/new", label: "New drill", exact: true },
   { to: "/study", label: "Study", exact: true },
-  { to: "/predict", label: "Predict", exact: true },
+  { to: "/quiz", label: "Quizzes", exact: true },
   { to: "/paint", label: "Paint", exact: true },
   { to: "/progress", label: "Progress", exact: true },
   { to: "/library", label: "Library", exact: true },

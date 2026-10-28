@@ -12,7 +12,9 @@
  *    PR #29 review L11);
  * 3. the ladder alternates by n (even: range, odd: hand) unless that ladder has no question at the
  *    node, then the other; the level is learning's levelFor over the user's answers for the node's
- *    spot class ("unclassified" when solver-query gives none, as grading stores it) and ladder;
+ *    spot class ("unclassified" when solver-query gives none, as grading stores it) and ladder. A
+ *    quiz (S41, O-410, O-411 amended) instead asks its difficulty's exact level, reads no history,
+ *    and asks only its own ladders (quizLaddersFor, quiz-questions.ts);
  * 4. the prompt id is sha256 of the session id, n and the shown question's ladder and level,
  *    formatted as a version 8 UUID, so a repeat GET answers the same id and an answer to an older
  *    prompt is told apart.
@@ -36,9 +38,10 @@ import { fromHex64, pickIndex } from "../sessions/randomness.js";
 import type { SessionRow } from "../sessions/repository.js";
 import type { SolverPort } from "../sessions/solver-port.js";
 import { SPOT_SEARCH_SEED } from "../sessions/spot-search.js";
-import type { HeroSpot, PracticeState } from "../sessions/state.js";
+import type { HeroSpot, PracticeState, QuizState } from "../sessions/state.js";
 import { handQuestion } from "./hand-questions.js";
 import type { PredictionLadder, PredictionQuestion, QuestionDraws, QuestionInput } from "./question.js";
+import { noQuizQuestionsProblem, quizQuestion } from "./quiz-questions.js";
 import { rangeQuestion } from "./range-questions.js";
 
 /** Draws each prompt takes from the session stream: spot, hand, threshold. */
@@ -152,9 +155,14 @@ async function promptContext(session: SessionRow, port: SolverPort): Promise<Pro
   return { sessionId: session.id, counter, spot, node, spotClassKey, draws: { hand: draws.hand, threshold: draws.threshold } };
 }
 
-/** The prompt of `context` at one ladder and level, its id that of the question as it is shown. */
-function promptAt(context: PromptContext, ladder: PredictionLadder, level: number): DerivedPrediction | undefined {
-  const question = questionFor(ladder, { node: context.node, level, draws: context.draws });
+/**
+ * The prompt of `context` at one ladder and level, its id that of the question as it is shown. A
+ * quiz's question is built at the exact level (quiz-questions.ts), never a lower one.
+ */
+function promptAt(context: PromptContext, ladder: PredictionLadder, level: number, exactLevel = false): DerivedPrediction | undefined {
+  const question = exactLevel
+    ? quizQuestion(context.node, ladder, level, context.draws)
+    : questionFor(ladder, { node: context.node, level, draws: context.draws });
   if (question === undefined) {
     return undefined;
   }
@@ -162,9 +170,36 @@ function promptAt(context: PromptContext, ladder: PredictionLadder, level: numbe
   return { promptId: promptIdOf(sessionId, counter, question), counter, spot, node, spotClassKey, question };
 }
 
-/** The prompt the session answers next (see the module doc). */
+/**
+ * The ladders a quiz prompt tries, in laddersFor's order: only the quiz's own (O-411 amended, PR #39
+ * review finding 2 and 5), never one the user did not choose.
+ */
+export function quizLaddersFor(counter: number, quiz: QuizState): readonly PredictionLadder[] {
+  return laddersFor(counter).filter((ladder) => quiz.ladders.includes(ladder));
+}
+
+/**
+ * A quiz's prompt: its difficulty's exact level on its own ladders, no history read (O-410, O-411
+ * amended). The quiz start kept only spots that can ask it, so none answering means the library
+ * changed since: the 422 no-quiz-questions problem ends the prompt stream.
+ */
+function quizPrompt(context: PromptContext, quiz: QuizState): DerivedPrediction {
+  for (const ladder of quizLaddersFor(context.counter, quiz)) {
+    const prompt = promptAt(context, ladder, quiz.level, true);
+    if (prompt !== undefined) {
+      return prompt;
+    }
+  }
+  throw noQuizQuestionsProblem(quiz);
+}
+
+/** The prompt the session answers next (see the module doc); a quiz asks its own level (S41). */
 export async function derivePrediction(session: SessionRow, port: SolverPort, readHistory: HistoryReader): Promise<DerivedPrediction> {
   const context = await promptContext(session, port);
+  const { quiz } = practiceOf(session);
+  if (quiz !== undefined) {
+    return quizPrompt(context, quiz);
+  }
   const history = await readHistory(context.spotClassKey);
   for (const ladder of laddersFor(context.counter)) {
     const level = levelFor(history, { spotClassKey: context.spotClassKey, ladder }).level;
@@ -183,6 +218,11 @@ export async function derivePrediction(session: SessionRow, port: SolverPort, re
  */
 export async function deriveShownPrediction(session: SessionRow, port: SolverPort, promptId: string): Promise<DerivedPrediction | undefined> {
   const context = await promptContext(session, port);
+  const { quiz } = practiceOf(session);
+  if (quiz !== undefined) {
+    const shown = quizLaddersFor(context.counter, quiz).map((ladder) => promptAt(context, ladder, quiz.level, true));
+    return shown.find((prompt) => prompt?.promptId === promptId);
+  }
   for (const ladder of laddersFor(context.counter)) {
     for (let level = FIRST_LEVEL; level <= MAX_PREDICTION_LEVEL; level += 1) {
       const prompt = promptAt(context, ladder, level);
