@@ -7,7 +7,8 @@
  * stateful routes, so two pages never share a mocked drill, session or queue. The drill route
  * (mock-drills.ts) comes before the session route, so GET /drills/{id} reads the drill store, and
  * the session route starts sessions on any drill in that store through drillOf (S26). A member app
- * mock (admin false) signs in as the member fixture and is refused the admin routes (O-290, O-242).
+ * mock (admin false) signs in as the member fixture and is refused the admin routes (O-290, O-242),
+ * the S42 invite routes among them.
  */
 import type { Page } from "@playwright/test";
 
@@ -16,6 +17,7 @@ import { createMockApi, installMockApi, type MockApi } from "./mock-api.js";
 import { createMockDrillRoute } from "./mock-drills.js";
 import { createMockExplainRoute } from "./mock-explain.js";
 import { createMockInsightsRoute } from "./mock-insights.js";
+import { createMockInvitesRoute } from "./mock-join.js";
 import { createMockLibraryRoute } from "./mock-library.js";
 import { createMockPaintRoute } from "./mock-paint.js";
 import { createMockPredictionRoute } from "./mock-prediction.js";
@@ -49,6 +51,7 @@ export function createAppMockApi(options: AppMockOptions = {}): MockApi {
       // S32 (mock flow 1): an ended session with rated decisions gives the learner a rating.
       createMockSessionRoute({ drillOf: drills.drillOf, onEnd: (recap) => (recap.rated_decisions > 0 ? progress.setLearner("seasoned") : undefined) }),
       createMockLibraryRoute({ admin }),
+      createMockInvitesRoute({ admin }),
       createMockInsightsRoute(),
       createMockExplainRoute(),
       progress.route,
