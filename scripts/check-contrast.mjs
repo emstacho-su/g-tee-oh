@@ -18,8 +18,11 @@
 // so the report always says where every colour came from, and the palette itself is written only
 // once, in styles.css. The ratio is the WCAG 2 relative luminance formula. GATING_PAIRS are
 // the pairs the app paints: text at 4.5:1 (1.4.3) and control edges and the focus ring at 3:1
-// (1.4.11). The solver surface colours (web/src/theme/action-style.ts and the felt) are owned by
-// S38; they are listed against the grounds at 3:1 for information only and never fail the run.
+// (1.4.11). The solver surface colours (S38, O-389) gate too: every action colour and every bet and
+// raise size shade of web/src/theme/action-style.ts, the theme felt and every cosmetic felt
+// ([data-felt] blocks, light and .dark) at 3:1 against surface and surface-raised (1.4.11, the
+// table and the matrix sit on those grounds), and the table's white text (TABLE_INK, PokerTable's
+// text-white) at 4.5:1 on every felt (1.4.3).
 //
 // Command line:
 //   node scripts/check-contrast.mjs           check: exit 1 on a failing pair or a stale report
@@ -44,6 +47,10 @@ export const PRIMITIVE_PREFIX = "p-";
 const TEXT_AA = 4.5;
 const NON_TEXT_AA = 3;
 const GROUNDS = ["surface", "surface-raised", "surface-sunken"];
+/** The grounds the solver surfaces (table, matrix, action bars and swatches) are painted on. */
+const SOLVER_GROUNDS = ["surface", "surface-raised"];
+/** The text colour PokerTable prints on the felt (Tailwind text-white): pot, board and chips. */
+export const TABLE_INK = "#ffffff";
 const TEXT_ROLES = [
   ["text", "body text"],
   ["text-muted", "secondary text"],
@@ -241,30 +248,89 @@ export function readActionColours(source) {
   return colours;
 }
 
-function solverRows(themes, actionColours) {
-  const rows = [];
+const HEX_LIST = /#[0-9a-f]{6}/gi;
+
+/** The bet and raise size shades of action-style.ts (SIZE_SHADES), light and dark, in order. */
+export function readSizeShades(source) {
+  const block = /SIZE_SHADES[^=]*=\s*\{([\s\S]*?)\};/.exec(source);
+  const shades = { light: [], dark: [] };
+  if (block === null) return shades;
   for (const theme of ["light", "dark"]) {
-    const felt = themes[theme].get("felt");
-    const surfaces = [...actionColours.map((colour) => ({ name: `${colour.name} (action)`, value: colour[theme] }))];
-    if (felt !== undefined) surfaces.push({ name: "felt", value: felt.value });
-    for (const surface of surfaces) {
-      for (const ground of ["surface", "surface-raised"]) {
+    const list = new RegExp(`${theme}:\\s*\\[([^\\]]*)\\]`).exec(block[1]);
+    shades[theme] = list === null ? [] : [...list[1].matchAll(HEX_LIST)].map(([hex]) => hex.toLowerCase());
+  }
+  return shades;
+}
+
+/** The --felt value of a block body, or null. */
+function feltOf(body) {
+  const match = /--felt\s*:\s*(#[0-9a-f]{3,6})\s*;/i.exec(body);
+  return match === null ? null : expandHex(match[1]);
+}
+
+/**
+ * Every felt the table can wear, per theme: the theme's --felt, then each cosmetic felt in file
+ * order. A light cosmetic is a block opened by [data-felt="name"]; a dark one by a selector list
+ * starting .dark[data-felt="name"].
+ */
+export function readFelts(css, themes) {
+  const cosmetic = { light: [], dark: [] };
+  for (const [, dark, name, body] of css.matchAll(/(?:^|\n)(\.dark)?\[data-felt="([^"]+)"\][^{]*\{([^}]*)\}/g)) {
+    const value = feltOf(body);
+    if (value !== null) cosmetic[dark === undefined ? "light" : "dark"].push({ name: `felt ${name}`, value });
+  }
+  return ["light", "dark"].flatMap((theme) => {
+    const base = themes[theme].get("felt");
+    const own = base === undefined ? [] : [{ name: "felt", value: base.value }];
+    return [...own, ...cosmetic[theme]].map((felt) => ({ theme, ...felt }));
+  });
+}
+
+/** One gating check: a colour against a ground, recorded as a row and, under its minimum, a failure. */
+function check(rows, failures, row) {
+  const ratio = contrastRatio(row.value, row.groundValue);
+  const pass = ratio >= row.min;
+  if (!pass) failures.push(`${row.theme}: ${row.name} ${row.value} on ${row.groundLabel} is ${ratio.toFixed(2)}:1, under ${row.min}:1`);
+  rows.push({ theme: row.theme, name: row.name, value: row.value, ground: row.ground, ratio, min: row.min, pass });
+}
+
+/**
+ * The solver surface colours as gating pairs (O-389): each action colour and size shade and each
+ * felt at 3:1 on surface and surface-raised, and TABLE_INK at 4.5:1 on each felt.
+ */
+export function evaluateSolver(themes, actionColours, sizeShades, felts) {
+  const rows = [];
+  const failures = [];
+  for (const theme of ["light", "dark"]) {
+    const shades = (sizeShades[theme] ?? []).map((value, rank) => ({ name: `raise and bet size shade ${rank + 1}`, value }));
+    const actions = actionColours.map((colour) => ({ name: `${colour.name} (action)`, value: colour[theme] }));
+    const themeFelts = felts.filter((felt) => felt.theme === theme);
+    for (const colour of [...actions, ...shades, ...themeFelts]) {
+      for (const ground of SOLVER_GROUNDS) {
         const bg = themes[theme].get(ground);
-        if (bg === undefined) continue;
-        const ratio = contrastRatio(surface.value, bg.value);
-        rows.push({ theme, name: surface.name, value: surface.value, ground, ratio, meets: ratio >= NON_TEXT_AA });
+        if (bg === undefined) {
+          failures.push(`${theme}: --${ground} is not a hex colour token`);
+          continue;
+        }
+        check(rows, failures, { theme, ...colour, ground, groundValue: bg.value, groundLabel: `--${ground}`, min: NON_TEXT_AA });
       }
     }
+    for (const felt of themeFelts) {
+      const where = `${felt.name} ${felt.value}`;
+      check(rows, failures, { theme, name: "table ink", value: TABLE_INK, ground: where, groundValue: felt.value, groundLabel: where, min: TEXT_AA });
+    }
   }
-  return rows;
+  return { rows, failures: [...new Set(failures)] };
 }
 
 function sourceText(token) {
   return token.source ?? "none";
 }
 
-/** The Markdown report: gating pairs, then the solver surface colours for information. */
-export function renderReport(result, solver, palette = []) {
+const NO_SOLVER = Object.freeze({ rows: [], failures: [] });
+
+/** The Markdown report: gating pairs, then the solver surface colours (gating since O-389). */
+export function renderReport(result, solver = NO_SOLVER, palette = []) {
   const lines = [
     "# Colour contrast report (R3.13, O-346, O-365)",
     "",
@@ -283,19 +349,20 @@ export function renderReport(result, solver, palette = []) {
     );
   }
   lines.push("", `Failures: ${result.failures.length === 0 ? "none" : result.failures.length}.`);
-  if (solver.length > 0) {
+  if (solver.rows.length > 0) {
     lines.push(
       "",
-      "## Solver surface colours (information for S38, not gating)",
+      "## Solver surface colours (gating, O-389)",
       "",
-      "Action colours (web/src/theme/action-style.ts) and the table felt against the grounds, at the 3:1 non-text guide. Every action also carries a pattern or a printed label (A7 section 4), so colour is never the only signal.",
+      "Action colours and the bet and raise size shades (web/src/theme/action-style.ts), the theme felt and every cosmetic felt (styles.css) at 3:1 on the grounds the table and the matrix sit on (1.4.11), and the table's white text at 4.5:1 on every felt (1.4.3). Every action also carries a pattern or a printed label (A7 section 4), so colour is never the only signal.",
       "",
-      "| Theme | Colour | Value | Ground | Ratio | At least 3:1 |",
-      "|---|---|---|---|---|---|",
+      "| Theme | Colour | Value | Ground | Ratio | Minimum | Result |",
+      "|---|---|---|---|---|---|---|",
     );
-    for (const row of solver) {
-      lines.push(`| ${row.theme} | ${row.name} | ${row.value} | ${row.ground} | ${row.ratio.toFixed(2)} | ${row.meets ? "yes" : "no"} |`);
+    for (const row of solver.rows) {
+      lines.push(`| ${row.theme} | ${row.name} | ${row.value} | ${row.ground} | ${row.ratio.toFixed(2)} | ${row.min} | ${row.pass ? "pass" : "FAIL"} |`);
     }
+    lines.push("", `Solver failures: ${solver.failures.length === 0 ? "none" : solver.failures.length}.`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -312,8 +379,11 @@ function main(argv) {
     return 1;
   }
   const result = evaluate(themes, GATING_PAIRS);
-  const report = renderReport(result, solverRows(themes, readActionColours(readFileSync(ACTION_STYLE_PATH, "utf8"))), paletteOf(themes));
-  for (const failure of result.failures) console.error(`check-contrast: ${failure}`);
+  const css = readFileSync(STYLES_PATH, "utf8");
+  const actionSource = readFileSync(ACTION_STYLE_PATH, "utf8");
+  const solver = evaluateSolver(themes, readActionColours(actionSource), readSizeShades(actionSource), readFelts(css, themes));
+  const report = renderReport(result, solver, paletteOf(themes));
+  for (const failure of [...result.failures, ...solver.failures]) console.error(`check-contrast: ${failure}`);
   if (write) {
     writeFileSync(REPORT_PATH, report);
     console.log(`check-contrast: wrote ${REPORT_PATH}`);
@@ -329,8 +399,10 @@ function main(argv) {
       return 1;
     }
   }
-  if (result.failures.length > 0) return 1;
-  console.log(`check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks (R3.13, O-365)`);
+  if (result.failures.length > 0 || solver.failures.length > 0) return 1;
+  console.log(
+    `check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks, and ${solver.rows.length} solver surface checks (R3.13, O-365, O-389)`,
+  );
   return 0;
 }
 
