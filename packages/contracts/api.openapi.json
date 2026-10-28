@@ -68,441 +68,6 @@
         ],
         "description": "RFC 9457 problem details (application/problem+json)"
       },
-      "BuilderStatusInput": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "running",
-              "paused",
-              "throttled",
-              "idle",
-              "unknown"
-            ],
-            "description": "paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)"
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "queue": {
-            "type": "object",
-            "properties": {
-              "queued": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "running": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "failed": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "blocked_budget": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "queued",
-              "running",
-              "failed",
-              "blocked_budget"
-            ]
-          },
-          "throughput_per_hour": {
-            "type": "number",
-            "description": "Builds done in the last 24 hours, divided by 24"
-          },
-          "storage": {
-            "type": "object",
-            "properties": {
-              "library_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "reference_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "library_bytes",
-              "reference_bytes"
-            ]
-          },
-          "settings": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {},
-            "description": "The stored overrides; an absent key means the builder's default (O-188)"
-          }
-        },
-        "required": [
-          "state",
-          "reason",
-          "queue",
-          "throughput_per_hour",
-          "storage",
-          "settings"
-        ]
-      },
-      "BuilderSettingsPatchInput": {
-        "type": "object",
-        "properties": {
-          "paused": {
-            "type": "boolean"
-          },
-          "cpu_share": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 1,
-            "description": "A share of the solve threads, above 0 and at most 1"
-          },
-          "overnight": {
-            "type": "object",
-            "properties": {
-              "start_hour": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 23
-              },
-              "end_hour": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 23
-              },
-              "utc_offset_minutes": {
-                "type": "integer",
-                "minimum": -1439,
-                "maximum": 1439
-              },
-              "cpu_share": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 1,
-                "description": "A share of the solve threads, above 0 and at most 1"
-              }
-            },
-            "required": [
-              "start_hour",
-              "end_hour",
-              "utc_offset_minutes",
-              "cpu_share"
-            ],
-            "additionalProperties": false
-          },
-          "budget_bytes": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
-          },
-          "bytes_per_runout": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 1073741824
-          },
-          "bytes_per_flop_tree": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 1073741824
-          },
-          "k_runouts": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 2352
-          },
-          "k_runouts_rare": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 2352
-          },
-          "k_frequent_pairs": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 1326
-          },
-          "plan_configs": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-              "description": "A game_config identifier, for example cfg_9_live_13_150"
-            },
-            "description": "Configuration ids the planner enumerates; [] turns planning off"
-          },
-          "target_pct_pot": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 100
-          },
-          "max_iterations": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 1000000
-          },
-          "max_seconds_per_line": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 86400
-          },
-          "storage_bits": {
-            "type": "number",
-            "enum": [
-              16,
-              32
-            ]
-          },
-          "memory_cap_bytes": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
-          },
-          "max_attempts": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 100
-          },
-          "stale_hours": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 168
-          },
-          "verify_interval_hours": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 720
-          },
-          "plan_interval_minutes": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 10080
-          },
-          "poll_seconds": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 3600
-          }
-        },
-        "additionalProperties": false
-      },
-      "SessionInfoInput": {
-        "type": "object",
-        "properties": {
-          "user": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              "email": {
-                "type": "string"
-              },
-              "created_at": {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-                "description": "RFC 3339 timestamp"
-              }
-            },
-            "required": [
-              "id",
-              "email",
-              "created_at"
-            ]
-          },
-          "csrf_token": {
-            "type": "string",
-            "description": "Send as x-csrf-token on every mutating request (O-230)"
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-            "description": "When the session cookie stops being accepted (O-231)"
-          }
-        },
-        "required": [
-          "user",
-          "csrf_token",
-          "expires_at"
-        ]
-      },
-      "StakeInput": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "format": {
-            "type": "string",
-            "enum": [
-              "online",
-              "live"
-            ]
-          },
-          "label": {
-            "type": "string",
-            "description": "1/3, 2/5, or online for the online rake profile"
-          },
-          "bb_cents": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "rake_percent_bp": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Rake in basis points: 1000 is 10 percent"
-          },
-          "rake_cap_cents": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "no_flop_no_drop": {
-            "type": "boolean"
-          },
-          "note": {
-            "description": "A flag such as the unverified 2/5 cap (O-66, O-71)",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "format",
-          "label",
-          "bb_cents",
-          "rake_percent_bp",
-          "rake_cap_cents",
-          "no_flop_no_drop",
-          "note"
-        ]
-      },
-      "GameConfigInput": {
-        "type": "object",
-        "properties": {
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "format": {
-            "type": "string",
-            "enum": [
-              "online",
-              "live"
-            ]
-          },
-          "table_size": {
-            "type": "integer",
-            "minimum": 2,
-            "maximum": 9
-          },
-          "stake_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "stake_label": {
-            "type": "string"
-          },
-          "depth_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Effective stack in centi-big-blinds"
-          },
-          "straddle": {
-            "type": "boolean"
-          },
-          "ante_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Ante in centi-big-blinds; stored but not served in v1 (O-33)"
-          }
-        },
-        "required": [
-          "config_id",
-          "format",
-          "table_size",
-          "stake_id",
-          "stake_label",
-          "depth_cbb",
-          "straddle",
-          "ante_cbb"
-        ]
-      },
-      "PositionPairEntryInput": {
-        "type": "object",
-        "properties": {
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "oop": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "ip": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "preflop_available": {
-            "type": "boolean",
-            "description": "A published preflop solution covers this pair"
-          }
-        },
-        "required": [
-          "pair",
-          "oop",
-          "ip",
-          "preflop_available"
-        ]
-      },
       "NodeActionInput": {
         "type": "object",
         "properties": {
@@ -1972,6 +1537,87 @@
         },
         "additionalProperties": false
       },
+      "AutomatedBlockInput": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "track_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "opens",
+                  "facing-open-ip",
+                  "blind-defense",
+                  "facing-3bet",
+                  "four-bet-plus",
+                  "blind-vs-blind",
+                  "live-limped-straddled"
+                ],
+                "description": "A v1 rating track (O-271)"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family": {
+            "type": "string"
+          },
+          "served": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Hands of the block served so far"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Hands in the block (O-272)"
+          },
+          "worked_example": {
+            "type": "boolean",
+            "description": "A first exposure: every panel visible, unrated (O-272)"
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "track_key",
+          "family",
+          "served",
+          "size",
+          "worked_example"
+        ]
+      },
+      "HoldoutProgressInput": {
+        "type": "object",
+        "properties": {
+          "round_month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the round's month"
+          },
+          "answered": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "round_month",
+          "answered",
+          "total"
+        ]
+      },
       "PracticeSessionInput": {
         "type": "object",
         "properties": {
@@ -2025,6 +1671,32 @@
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "description": "RFC 3339 timestamp"
+          },
+          "rated_eligible": {
+            "type": "boolean",
+            "description": "True when decisions may be rated: false for drill, holdout and seeded automated sessions"
+          },
+          "automated": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutomatedBlockInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current block of an automated session; null otherwise"
+          },
+          "holdout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldoutProgressInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The round progress of a holdout session; null otherwise"
           }
         },
         "required": [
@@ -2033,7 +1705,10 @@
           "drill_id",
           "state",
           "state_version",
-          "started_at"
+          "started_at",
+          "rated_eligible",
+          "automated",
+          "holdout"
         ]
       },
       "TrainerPromptInput": {
@@ -2192,6 +1867,38 @@
           "synthetic": {
             "type": "boolean",
             "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
+          },
+          "spot_class_key": {
+            "description": "The decision's spot class, as solver-query names it",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "track_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "opens",
+                  "facing-open-ip",
+                  "blind-defense",
+                  "facing-3bet",
+                  "four-bet-plus",
+                  "blind-vs-blind",
+                  "live-limped-straddled"
+                ],
+                "description": "A v1 rating track (O-271)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The class's rating track; null for a class no track takes"
+          },
+          "worked_example": {
+            "type": "boolean",
+            "description": "True on a worked-example block of an automated session (O-272)"
           }
         },
         "required": [
@@ -2209,7 +1916,64 @@
           "street",
           "rng_roll",
           "previous_board",
-          "synthetic"
+          "synthetic",
+          "spot_class_key",
+          "track_key",
+          "worked_example"
+        ]
+      },
+      "ReviewBlockInput": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "fsrs_grade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Again",
+                  "Hard",
+                  "Good",
+                  "Easy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for a worked-example block (O-272)"
+          },
+          "next_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p_known": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "closed",
+          "fsrs_grade",
+          "next_due",
+          "p_known"
         ]
       },
       "DecisionFeedbackInput": {
@@ -2304,6 +2068,24 @@
           "hand": {
             "type": "string",
             "description": "The hero's hand as graded"
+          },
+          "item_difficulty": {
+            "description": "The item's difficulty for rating (O-274); null when not computed",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "review_block": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewBlockInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this decision closed an automated review block"
           }
         },
         "required": [
@@ -2322,7 +2104,9 @@
           "node_key",
           "config_id",
           "pair",
-          "hand"
+          "hand",
+          "item_difficulty",
+          "review_block"
         ]
       },
       "SessionRecapInput": {
@@ -2357,6 +2141,141 @@
           },
           "ev_loss_bb_total": {
             "type": "number"
+          },
+          "rating_changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "track_key": {
+                  "type": "string",
+                  "enum": [
+                    "opens",
+                    "facing-open-ip",
+                    "blind-defense",
+                    "facing-3bet",
+                    "four-bet-plus",
+                    "blind-vs-blind",
+                    "live-limped-straddled"
+                  ],
+                  "description": "A v1 rating track (O-271)"
+                },
+                "before": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mu": {
+                          "type": "number"
+                        },
+                        "rd": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "mu",
+                        "rd"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "after": {
+                  "type": "object",
+                  "properties": {
+                    "mu": {
+                      "type": "number"
+                    },
+                    "rd": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mu",
+                    "rd"
+                  ]
+                }
+              },
+              "required": [
+                "track_key",
+                "before",
+                "after"
+              ]
+            },
+            "description": "One entry per track the session rated (O-27)"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "overall": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "band_tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "blocked_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    }
+                  }
+                },
+                "required": [
+                  "overall",
+                  "tier",
+                  "band_tier",
+                  "blocked_by"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The overall tier after the session; null when nothing was rated"
+          },
+          "unlocks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cosmetic keys the session unlocked (O-279)"
           }
         },
         "required": [
@@ -2365,66 +2284,677 @@
           "decisions",
           "rated_decisions",
           "mean_score",
-          "ev_loss_bb_total"
+          "ev_loss_bb_total",
+          "rating_changes",
+          "tier",
+          "unlocks"
         ]
       },
-      "Problem": {
+      "ProgressRatingInput": {
         "type": "object",
         "properties": {
-          "type": {
+          "overall": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mu": {
+                    "type": "number",
+                    "description": "Weighted mean of the track ratings (O-271)"
+                  },
+                  "rd": {
+                    "type": "number",
+                    "description": "Weighted rating deviation, the band around mu"
+                  },
+                  "conservative": {
+                    "type": "number",
+                    "description": "The figure the tier ranks on"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "band_tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ],
+                    "description": "The tier the conservative figure alone would give"
+                  },
+                  "blocked_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    },
+                    "description": "Tracks whose deviation holds the tier below band_tier"
+                  }
+                },
+                "required": [
+                  "mu",
+                  "rd",
+                  "conservative",
+                  "tier",
+                  "band_tier",
+                  "blocked_by"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null before any rated session"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "overall",
+          "updated_at"
+        ]
+      },
+      "TrackProgressInput": {
+        "type": "object",
+        "properties": {
+          "track_key": {
             "type": "string",
-            "description": "A URN naming the problem, urn:g-tee-oh:problem:<slug>"
+            "enum": [
+              "opens",
+              "facing-open-ip",
+              "blind-defense",
+              "facing-3bet",
+              "four-bet-plus",
+              "blind-vs-blind",
+              "live-limped-straddled"
+            ],
+            "description": "A v1 rating track (O-271)"
           },
-          "title": {
+          "name": {
             "type": "string"
           },
-          "status": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "equilibrium",
+              "exploit"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "mtt"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Effective weight, normalized over tracks with a covered class (O-271)"
+          },
+          "mu": {
+            "type": "number"
+          },
+          "rd": {
+            "type": "number"
+          },
+          "conservative": {
+            "type": "number"
+          },
+          "rated_decisions": {
             "type": "integer",
-            "minimum": 400,
-            "maximum": 599
+            "minimum": 0,
+            "maximum": 9007199254740991
           },
-          "detail": {
-            "type": "string"
+          "last_rated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "track_key",
+          "name",
+          "family",
+          "format",
+          "weight",
+          "mu",
+          "rd",
+          "conservative",
+          "rated_decisions",
+          "last_rated_at"
+        ]
+      },
+      "ProgressTracksInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackProgressInput"
+            }
           },
-          "instance": {
-            "description": "The request path",
-            "type": "string"
+          "next_cursor": {
+            "description": "Pass as cursor for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ]
+      },
+      "ProgressLeaksInput": {
+        "type": "object",
+        "properties": {
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "description": "Mondays, oldest first; the last is the current partial week"
           },
-          "request_id": {
-            "description": "The x-request-id of the failed request",
-            "type": "string"
-          },
-          "errors": {
-            "description": "Field errors of a validation problem",
+          "items": {
+            "maxItems": 10,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "path": {
-                  "type": "string",
-                  "description": "Dotted path of the offending field, prefixed by its location"
+                "spot_class_key": {
+                  "type": "string"
                 },
-                "message": {
+                "family": {
+                  "type": "string"
+                },
+                "track_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "leak_cost_bb_per_1k": {
+                  "type": "number"
+                },
+                "series": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "week": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "leak_cost_bb_per_1k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "partial": {
+                        "type": "boolean",
+                        "description": "True for the current week, computed live"
+                      }
+                    },
+                    "required": [
+                      "week",
+                      "leak_cost_bb_per_1k",
+                      "partial"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "spot_class_key",
+                "family",
+                "track_key",
+                "leak_cost_bb_per_1k",
+                "series"
+              ]
+            },
+            "description": "The top 10 classes by current leak cost"
+          }
+        },
+        "required": [
+          "weeks",
+          "items"
+        ]
+      },
+      "ProgressHeatmapInput": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "family": {
+                  "type": "string"
+                },
+                "pair": {
                   "type": "string"
                 }
               },
               "required": [
-                "path",
-                "message"
-              ],
-              "additionalProperties": false
+                "family",
+                "pair"
+              ]
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "depth_band": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "depth_band",
+                "format"
+              ]
+            }
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "spot_class_key": {
+                  "type": "string"
+                },
+                "row": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Index into rows"
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Index into columns"
+                },
+                "p_known": {
+                  "description": "Null when never practiced",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "mastered": {
+                  "type": "boolean"
+                },
+                "retrievability": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "n": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "spot_class_key",
+                "row",
+                "column",
+                "p_known",
+                "mastered",
+                "retrievability",
+                "n"
+              ]
             }
           }
         },
         "required": [
-          "type",
-          "title",
-          "status"
-        ],
-        "additionalProperties": false,
-        "description": "RFC 9457 problem details (application/problem+json)"
+          "rows",
+          "columns",
+          "cells"
+        ]
       },
-      "BuilderStatus": {
+      "HoldoutRoundInput": {
+        "type": "object",
+        "properties": {
+          "round_month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the round's month"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "track_key": {
+                  "type": "string",
+                  "enum": [
+                    "opens",
+                    "facing-open-ip",
+                    "blind-defense",
+                    "facing-3bet",
+                    "four-bet-plus",
+                    "blind-vs-blind",
+                    "live-limped-straddled"
+                  ],
+                  "description": "A v1 rating track (O-271)"
+                },
+                "answered": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "mean_score": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "mu": {
+                  "description": "The track rating at the round's close",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "goodhart_flag": {
+                  "type": "boolean",
+                  "description": "Rating rose while holdout scores did not (O-277)"
+                }
+              },
+              "required": [
+                "track_key",
+                "answered",
+                "total",
+                "mean_score",
+                "mu",
+                "goodhart_flag"
+              ]
+            }
+          }
+        },
+        "required": [
+          "round_month",
+          "opened_at",
+          "closed_at",
+          "tracks"
+        ]
+      },
+      "ProgressHoldoutInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldoutRoundInput"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass as cursor for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "open": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "round_month": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "answered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "round_month",
+                  "answered",
+                  "total"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The open round's progress; null when no round is open"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "open"
+        ]
+      },
+      "ProgressStreakInput": {
+        "type": "object",
+        "properties": {
+          "current_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "longest_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "today_rated": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "day_minimum": {
+            "type": "number",
+            "const": 5
+          },
+          "freezes_left_this_week": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "repairable": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "deadline": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  "progress": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "needed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "day",
+                  "deadline",
+                  "progress",
+                  "needed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A missed day that can still be repaired (O-278)"
+          },
+          "unlocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cosmetic_key": {
+                  "type": "string"
+                },
+                "unlocked_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                  "description": "RFC 3339 timestamp"
+                }
+              },
+              "required": [
+                "cosmetic_key",
+                "unlocked_at"
+              ]
+            }
+          },
+          "next_milestone": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "cosmetic_key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "days",
+                  "cosmetic_key"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "current_days",
+          "longest_days",
+          "today_rated",
+          "day_minimum",
+          "freezes_left_this_week",
+          "repairable",
+          "unlocks",
+          "next_milestone"
+        ]
+      },
+      "BuilderStatusInput": {
         "type": "object",
         "properties": {
           "state": {
@@ -2473,8 +3003,7 @@
               "running",
               "failed",
               "blocked_budget"
-            ],
-            "additionalProperties": false
+            ]
           },
           "throughput_per_hour": {
             "type": "number",
@@ -2497,8 +3026,7 @@
             "required": [
               "library_bytes",
               "reference_bytes"
-            ],
-            "additionalProperties": false
+            ]
           },
           "settings": {
             "type": "object",
@@ -2516,10 +3044,9 @@
           "throughput_per_hour",
           "storage",
           "settings"
-        ],
-        "additionalProperties": false
+        ]
       },
-      "BuilderSettingsPatch": {
+      "BuilderSettingsPatchInput": {
         "type": "object",
         "properties": {
           "paused": {
@@ -2658,7 +3185,7 @@
         },
         "additionalProperties": false
       },
-      "SessionInfo": {
+      "SessionInfoInput": {
         "type": "object",
         "properties": {
           "user": {
@@ -2683,8 +3210,7 @@
               "id",
               "email",
               "created_at"
-            ],
-            "additionalProperties": false
+            ]
           },
           "csrf_token": {
             "type": "string",
@@ -2701,10 +3227,9 @@
           "user",
           "csrf_token",
           "expires_at"
-        ],
-        "additionalProperties": false
+        ]
       },
-      "Stake": {
+      "StakeInput": {
         "type": "object",
         "properties": {
           "id": {
@@ -2759,10 +3284,9 @@
           "rake_cap_cents",
           "no_flop_no_drop",
           "note"
-        ],
-        "additionalProperties": false
+        ]
       },
-      "GameConfig": {
+      "GameConfigInput": {
         "type": "object",
         "properties": {
           "config_id": {
@@ -2815,10 +3339,9 @@
           "depth_cbb",
           "straddle",
           "ante_cbb"
-        ],
-        "additionalProperties": false
+        ]
       },
-      "PositionPairEntry": {
+      "PositionPairEntryInput": {
         "type": "object",
         "properties": {
           "pair": {
@@ -2864,8 +3387,63 @@
           "oop",
           "ip",
           "preflop_available"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URN naming the problem, urn:g-tee-oh:problem:<slug>"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "description": "The request path",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "The x-request-id of the failed request",
+            "type": "string"
+          },
+          "errors": {
+            "description": "Field errors of a validation problem",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Dotted path of the offending field, prefixed by its location"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "RFC 9457 problem details (application/problem+json)"
       },
       "NodeAction": {
         "type": "object",
@@ -4355,6 +4933,89 @@
         },
         "additionalProperties": false
       },
+      "AutomatedBlock": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "track_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "opens",
+                  "facing-open-ip",
+                  "blind-defense",
+                  "facing-3bet",
+                  "four-bet-plus",
+                  "blind-vs-blind",
+                  "live-limped-straddled"
+                ],
+                "description": "A v1 rating track (O-271)"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "family": {
+            "type": "string"
+          },
+          "served": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Hands of the block served so far"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Hands in the block (O-272)"
+          },
+          "worked_example": {
+            "type": "boolean",
+            "description": "A first exposure: every panel visible, unrated (O-272)"
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "track_key",
+          "family",
+          "served",
+          "size",
+          "worked_example"
+        ],
+        "additionalProperties": false
+      },
+      "HoldoutProgress": {
+        "type": "object",
+        "properties": {
+          "round_month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the round's month"
+          },
+          "answered": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "round_month",
+          "answered",
+          "total"
+        ],
+        "additionalProperties": false
+      },
       "PracticeSession": {
         "type": "object",
         "properties": {
@@ -4408,6 +5069,32 @@
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "description": "RFC 3339 timestamp"
+          },
+          "rated_eligible": {
+            "type": "boolean",
+            "description": "True when decisions may be rated: false for drill, holdout and seeded automated sessions"
+          },
+          "automated": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutomatedBlock"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current block of an automated session; null otherwise"
+          },
+          "holdout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldoutProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The round progress of a holdout session; null otherwise"
           }
         },
         "required": [
@@ -4416,7 +5103,10 @@
           "drill_id",
           "state",
           "state_version",
-          "started_at"
+          "started_at",
+          "rated_eligible",
+          "automated",
+          "holdout"
         ],
         "additionalProperties": false
       },
@@ -4577,6 +5267,38 @@
           "synthetic": {
             "type": "boolean",
             "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
+          },
+          "spot_class_key": {
+            "description": "The decision's spot class, as solver-query names it",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "track_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "opens",
+                  "facing-open-ip",
+                  "blind-defense",
+                  "facing-3bet",
+                  "four-bet-plus",
+                  "blind-vs-blind",
+                  "live-limped-straddled"
+                ],
+                "description": "A v1 rating track (O-271)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The class's rating track; null for a class no track takes"
+          },
+          "worked_example": {
+            "type": "boolean",
+            "description": "True on a worked-example block of an automated session (O-272)"
           }
         },
         "required": [
@@ -4594,7 +5316,65 @@
           "street",
           "rng_roll",
           "previous_board",
-          "synthetic"
+          "synthetic",
+          "spot_class_key",
+          "track_key",
+          "worked_example"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewBlock": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "fsrs_grade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Again",
+                  "Hard",
+                  "Good",
+                  "Easy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for a worked-example block (O-272)"
+          },
+          "next_due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p_known": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "closed",
+          "fsrs_grade",
+          "next_due",
+          "p_known"
         ],
         "additionalProperties": false
       },
@@ -4690,6 +5470,24 @@
           "hand": {
             "type": "string",
             "description": "The hero's hand as graded"
+          },
+          "item_difficulty": {
+            "description": "The item's difficulty for rating (O-274); null when not computed",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "review_block": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewBlock"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this decision closed an automated review block"
           }
         },
         "required": [
@@ -4708,7 +5506,9 @@
           "node_key",
           "config_id",
           "pair",
-          "hand"
+          "hand",
+          "item_difficulty",
+          "review_block"
         ],
         "additionalProperties": false
       },
@@ -4744,6 +5544,145 @@
           },
           "ev_loss_bb_total": {
             "type": "number"
+          },
+          "rating_changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "track_key": {
+                  "type": "string",
+                  "enum": [
+                    "opens",
+                    "facing-open-ip",
+                    "blind-defense",
+                    "facing-3bet",
+                    "four-bet-plus",
+                    "blind-vs-blind",
+                    "live-limped-straddled"
+                  ],
+                  "description": "A v1 rating track (O-271)"
+                },
+                "before": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mu": {
+                          "type": "number"
+                        },
+                        "rd": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "mu",
+                        "rd"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "after": {
+                  "type": "object",
+                  "properties": {
+                    "mu": {
+                      "type": "number"
+                    },
+                    "rd": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "mu",
+                    "rd"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "track_key",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "One entry per track the session rated (O-27)"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "overall": {
+                    "type": "number"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "band_tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "blocked_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    }
+                  }
+                },
+                "required": [
+                  "overall",
+                  "tier",
+                  "band_tier",
+                  "blocked_by"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The overall tier after the session; null when nothing was rated"
+          },
+          "unlocks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cosmetic keys the session unlocked (O-279)"
           }
         },
         "required": [
@@ -4752,7 +5691,1136 @@
           "decisions",
           "rated_decisions",
           "mean_score",
-          "ev_loss_bb_total"
+          "ev_loss_bb_total",
+          "rating_changes",
+          "tier",
+          "unlocks"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressRating": {
+        "type": "object",
+        "properties": {
+          "overall": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mu": {
+                    "type": "number",
+                    "description": "Weighted mean of the track ratings (O-271)"
+                  },
+                  "rd": {
+                    "type": "number",
+                    "description": "Weighted rating deviation, the band around mu"
+                  },
+                  "conservative": {
+                    "type": "number",
+                    "description": "The figure the tier ranks on"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ]
+                  },
+                  "band_tier": {
+                    "type": "string",
+                    "enum": [
+                      "I",
+                      "II",
+                      "III",
+                      "IV",
+                      "V",
+                      "VI",
+                      "VII",
+                      "VIII"
+                    ],
+                    "description": "The tier the conservative figure alone would give"
+                  },
+                  "blocked_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    },
+                    "description": "Tracks whose deviation holds the tier below band_tier"
+                  }
+                },
+                "required": [
+                  "mu",
+                  "rd",
+                  "conservative",
+                  "tier",
+                  "band_tier",
+                  "blocked_by"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null before any rated session"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "overall",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "TrackProgress": {
+        "type": "object",
+        "properties": {
+          "track_key": {
+            "type": "string",
+            "enum": [
+              "opens",
+              "facing-open-ip",
+              "blind-defense",
+              "facing-3bet",
+              "four-bet-plus",
+              "blind-vs-blind",
+              "live-limped-straddled"
+            ],
+            "description": "A v1 rating track (O-271)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string",
+            "enum": [
+              "equilibrium",
+              "exploit"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "mtt"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Effective weight, normalized over tracks with a covered class (O-271)"
+          },
+          "mu": {
+            "type": "number"
+          },
+          "rd": {
+            "type": "number"
+          },
+          "conservative": {
+            "type": "number"
+          },
+          "rated_decisions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "last_rated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "track_key",
+          "name",
+          "family",
+          "format",
+          "weight",
+          "mu",
+          "rd",
+          "conservative",
+          "rated_decisions",
+          "last_rated_at"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressTracks": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackProgress"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass as cursor for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressLeaks": {
+        "type": "object",
+        "properties": {
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "description": "Mondays, oldest first; the last is the current partial week"
+          },
+          "items": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "spot_class_key": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string"
+                },
+                "track_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "opens",
+                        "facing-open-ip",
+                        "blind-defense",
+                        "facing-3bet",
+                        "four-bet-plus",
+                        "blind-vs-blind",
+                        "live-limped-straddled"
+                      ],
+                      "description": "A v1 rating track (O-271)"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "leak_cost_bb_per_1k": {
+                  "type": "number"
+                },
+                "series": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "week": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "leak_cost_bb_per_1k": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "partial": {
+                        "type": "boolean",
+                        "description": "True for the current week, computed live"
+                      }
+                    },
+                    "required": [
+                      "week",
+                      "leak_cost_bb_per_1k",
+                      "partial"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "spot_class_key",
+                "family",
+                "track_key",
+                "leak_cost_bb_per_1k",
+                "series"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The top 10 classes by current leak cost"
+          }
+        },
+        "required": [
+          "weeks",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressHeatmap": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "family": {
+                  "type": "string"
+                },
+                "pair": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "family",
+                "pair"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "depth_band": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "depth_band",
+                "format"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "spot_class_key": {
+                  "type": "string"
+                },
+                "row": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Index into rows"
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Index into columns"
+                },
+                "p_known": {
+                  "description": "Null when never practiced",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "mastered": {
+                  "type": "boolean"
+                },
+                "retrievability": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "n": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "spot_class_key",
+                "row",
+                "column",
+                "p_known",
+                "mastered",
+                "retrievability",
+                "n"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "rows",
+          "columns",
+          "cells"
+        ],
+        "additionalProperties": false
+      },
+      "HoldoutRound": {
+        "type": "object",
+        "properties": {
+          "round_month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the round's month"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "track_key": {
+                  "type": "string",
+                  "enum": [
+                    "opens",
+                    "facing-open-ip",
+                    "blind-defense",
+                    "facing-3bet",
+                    "four-bet-plus",
+                    "blind-vs-blind",
+                    "live-limped-straddled"
+                  ],
+                  "description": "A v1 rating track (O-271)"
+                },
+                "answered": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "mean_score": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "mu": {
+                  "description": "The track rating at the round's close",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "goodhart_flag": {
+                  "type": "boolean",
+                  "description": "Rating rose while holdout scores did not (O-277)"
+                }
+              },
+              "required": [
+                "track_key",
+                "answered",
+                "total",
+                "mean_score",
+                "mu",
+                "goodhart_flag"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "round_month",
+          "opened_at",
+          "closed_at",
+          "tracks"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressHoldout": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldoutRound"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass as cursor for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "open": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "round_month": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "answered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "round_month",
+                  "answered",
+                  "total"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The open round's progress; null when no round is open"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressStreak": {
+        "type": "object",
+        "properties": {
+          "current_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "longest_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "today_rated": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "day_minimum": {
+            "type": "number",
+            "const": 5
+          },
+          "freezes_left_this_week": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "repairable": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "deadline": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  "progress": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "needed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "day",
+                  "deadline",
+                  "progress",
+                  "needed"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A missed day that can still be repaired (O-278)"
+          },
+          "unlocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cosmetic_key": {
+                  "type": "string"
+                },
+                "unlocked_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                  "description": "RFC 3339 timestamp"
+                }
+              },
+              "required": [
+                "cosmetic_key",
+                "unlocked_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_milestone": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "cosmetic_key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "days",
+                  "cosmetic_key"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "current_days",
+          "longest_days",
+          "today_rated",
+          "day_minimum",
+          "freezes_left_this_week",
+          "repairable",
+          "unlocks",
+          "next_milestone"
+        ],
+        "additionalProperties": false
+      },
+      "BuilderStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused",
+              "throttled",
+              "idle",
+              "unknown"
+            ],
+            "description": "paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "queue": {
+            "type": "object",
+            "properties": {
+              "queued": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "running": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "blocked_budget": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "queued",
+              "running",
+              "failed",
+              "blocked_budget"
+            ],
+            "additionalProperties": false
+          },
+          "throughput_per_hour": {
+            "type": "number",
+            "description": "Builds done in the last 24 hours, divided by 24"
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "library_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reference_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "library_bytes",
+              "reference_bytes"
+            ],
+            "additionalProperties": false
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "The stored overrides; an absent key means the builder's default (O-188)"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "queue",
+          "throughput_per_hour",
+          "storage",
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "BuilderSettingsPatch": {
+        "type": "object",
+        "properties": {
+          "paused": {
+            "type": "boolean"
+          },
+          "cpu_share": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "description": "A share of the solve threads, above 0 and at most 1"
+          },
+          "overnight": {
+            "type": "object",
+            "properties": {
+              "start_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "end_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "utc_offset_minutes": {
+                "type": "integer",
+                "minimum": -1439,
+                "maximum": 1439
+              },
+              "cpu_share": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "description": "A share of the solve threads, above 0 and at most 1"
+              }
+            },
+            "required": [
+              "start_hour",
+              "end_hour",
+              "utc_offset_minutes",
+              "cpu_share"
+            ],
+            "additionalProperties": false
+          },
+          "budget_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "bytes_per_runout": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "bytes_per_flop_tree": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "k_runouts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_runouts_rare": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_frequent_pairs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1326
+          },
+          "plan_configs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+              "description": "A game_config identifier, for example cfg_9_live_13_150"
+            },
+            "description": "Configuration ids the planner enumerates; [] turns planning off"
+          },
+          "target_pct_pot": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "max_iterations": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "max_seconds_per_line": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 86400
+          },
+          "storage_bits": {
+            "type": "number",
+            "enum": [
+              16,
+              32
+            ]
+          },
+          "memory_cap_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "max_attempts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "stale_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 168
+          },
+          "verify_interval_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 720
+          },
+          "plan_interval_minutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10080
+          },
+          "poll_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          }
+        },
+        "additionalProperties": false
+      },
+      "SessionInfo": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "email": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "created_at"
+            ],
+            "additionalProperties": false
+          },
+          "csrf_token": {
+            "type": "string",
+            "description": "Send as x-csrf-token on every mutating request (O-230)"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "When the session cookie stops being accepted (O-231)"
+          }
+        },
+        "required": [
+          "user",
+          "csrf_token",
+          "expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "Stake": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "online",
+              "live"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "1/3, 2/5, or online for the online rake profile"
+          },
+          "bb_cents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "rake_percent_bp": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Rake in basis points: 1000 is 10 percent"
+          },
+          "rake_cap_cents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "no_flop_no_drop": {
+            "type": "boolean"
+          },
+          "note": {
+            "description": "A flag such as the unverified 2/5 cap (O-66, O-71)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "label",
+          "bb_cents",
+          "rake_percent_bp",
+          "rake_cap_cents",
+          "no_flop_no_drop",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "GameConfig": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "online",
+              "live"
+            ]
+          },
+          "table_size": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 9
+          },
+          "stake_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "stake_label": {
+            "type": "string"
+          },
+          "depth_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Effective stack in centi-big-blinds"
+          },
+          "straddle": {
+            "type": "boolean"
+          },
+          "ante_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Ante in centi-big-blinds; stored but not served in v1 (O-33)"
+          }
+        },
+        "required": [
+          "config_id",
+          "format",
+          "table_size",
+          "stake_id",
+          "stake_label",
+          "depth_cbb",
+          "straddle",
+          "ante_cbb"
+        ],
+        "additionalProperties": false
+      },
+      "PositionPairEntry": {
+        "type": "object",
+        "properties": {
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "oop": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "ip": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "preflop_available": {
+            "type": "boolean",
+            "description": "A published preflop solution covers this pair"
+          }
+        },
+        "required": [
+          "pair",
+          "oop",
+          "ip",
+          "preflop_available"
         ],
         "additionalProperties": false
       }
@@ -7213,9 +9281,33 @@
                     "additionalProperties": false
                   },
                   "seed": {
-                    "description": "The session seed; the same seed and choices replay the same session (O-249). Random when absent",
+                    "description": "The session seed; the same seed and choices replay the same session (O-249). Random when absent. A session created with a seed is never rated and writes no learning state; holdout sessions refuse a seed with 400",
                     "type": "string",
                     "pattern": "^[0-9a-f]{16}$"
+                  },
+                  "config_ids": {
+                    "description": "Automated mode: the configurations in scope; every catalog configuration with preflop coverage when absent",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+                      "description": "A game_config identifier, for example cfg_9_live_13_150"
+                    }
+                  },
+                  "track_key": {
+                    "description": "Holdout mode: retest one track only; every track when absent",
+                    "type": "string",
+                    "enum": [
+                      "opens",
+                      "facing-open-ip",
+                      "blind-defense",
+                      "facing-3bet",
+                      "four-bet-plus",
+                      "blind-vs-blind",
+                      "live-limped-straddled"
+                    ]
                   }
                 },
                 "required": [
@@ -8538,6 +10630,525 @@
         }
       }
     },
+    "/api/v1/progress/rating": {
+      "get": {
+        "summary": "The overall rank: weighted rating, deviation band and tier",
+        "tags": [
+          "progress"
+        ],
+        "description": "The overall rank: weighted rating, deviation band and tier\n\nAnswers 501 until S31 builds it (O-38).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressRating"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/progress/tracks": {
+      "get": {
+        "summary": "Per-track ratings with their effective weights",
+        "tags": [
+          "progress"
+        ],
+        "description": "Per-track ratings with their effective weights\n\nAnswers 501 until S31 builds it (O-38).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "description": "The next_cursor of the previous page; absent for the first page"
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size, 1 to 200"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressTracks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/progress/leaks": {
+      "get": {
+        "summary": "The top leaks by spot class with their weekly series",
+        "tags": [
+          "progress"
+        ],
+        "description": "The top leaks by spot class with their weekly series\n\nAnswers 501 until S31 builds it (O-38).",
+        "parameters": [
+          {
+            "schema": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 52
+            },
+            "in": "query",
+            "name": "weeks",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressLeaks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/progress/heatmap": {
+      "get": {
+        "summary": "Mastery heat map: family by pair against depth band by format",
+        "tags": [
+          "progress"
+        ],
+        "description": "Mastery heat map: family by pair against depth band by format\n\nAnswers 501 until S31 builds it (O-38).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressHeatmap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/progress/holdout": {
+      "get": {
+        "summary": "Monthly holdout retest rounds, newest first, and the open round",
+        "tags": [
+          "progress"
+        ],
+        "description": "Monthly holdout retest rounds, newest first, and the open round\n\nAnswers 501 until S31 builds it (O-38).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "description": "The next_cursor of the previous page; absent for the first page"
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size, 1 to 200"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressHoldout"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/progress/streak": {
+      "get": {
+        "summary": "Streak state: days, freezes, the repair window and cosmetic unlocks",
+        "tags": [
+          "progress"
+        ],
+        "description": "Streak state: days, freezes, the repair window and cosmetic unlocks\n\nAnswers 501 until S31 builds it (O-38).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressStreak"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Problem (501)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/study/turn-roots": {
       "get": {
         "summary": "Every turn root at a flop node",
@@ -9254,751 +11865,6 @@
           },
           "422": {
             "description": "Problem (422)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/rating": {
-      "get": {
-        "summary": "The overall rank",
-        "tags": [
-          "progress"
-        ],
-        "description": "The overall rank\n\nAnswers 501 until S31 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "overall": {
-                      "type": "object",
-                      "properties": {
-                        "mu": {
-                          "type": "number"
-                        },
-                        "rd": {
-                          "type": "number"
-                        },
-                        "tier": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "mu",
-                        "rd",
-                        "tier"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "updated_at": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-                          "description": "RFC 3339 timestamp"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "overall",
-                    "updated_at"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/tracks": {
-      "get": {
-        "summary": "Per-track ratings",
-        "tags": [
-          "progress"
-        ],
-        "description": "Per-track ratings\n\nAnswers 501 until S31 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "track_id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          },
-                          "key": {
-                            "type": "string"
-                          },
-                          "family": {
-                            "type": "string",
-                            "enum": [
-                              "equilibrium",
-                              "exploit"
-                            ]
-                          },
-                          "mu": {
-                            "type": "number"
-                          },
-                          "rd": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "track_id",
-                          "key",
-                          "family",
-                          "mu",
-                          "rd"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "items"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/leaks": {
-      "get": {
-        "summary": "Leak cost by spot class over recent weeks",
-        "tags": [
-          "progress"
-        ],
-        "description": "Leak cost by spot class over recent weeks\n\nAnswers 501 until S31 builds it (O-38).",
-        "parameters": [
-          {
-            "schema": {
-              "default": 8,
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 52
-            },
-            "in": "query",
-            "name": "weeks",
-            "required": false
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "spot_class_key": {
-                            "type": "string"
-                          },
-                          "leak_cost_bb_per_1k": {
-                            "type": "number"
-                          },
-                          "trend": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "week": {
-                                  "type": "string",
-                                  "format": "date",
-                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                                },
-                                "leak_cost_bb_per_1k": {
-                                  "type": "number"
-                                }
-                              },
-                              "required": [
-                                "week",
-                                "leak_cost_bb_per_1k"
-                              ],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": [
-                          "spot_class_key",
-                          "leak_cost_bb_per_1k",
-                          "trend"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "items"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/heatmap": {
-      "get": {
-        "summary": "Mastery heat map",
-        "tags": [
-          "progress"
-        ],
-        "description": "Mastery heat map\n\nAnswers 501 until S31 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "cells": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "spot_class_key": {
-                            "type": "string"
-                          },
-                          "p_known": {
-                            "type": "number"
-                          },
-                          "n": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          }
-                        },
-                        "required": [
-                          "spot_class_key",
-                          "p_known",
-                          "n"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "cells"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/holdout": {
-      "get": {
-        "summary": "Holdout results",
-        "tags": [
-          "progress"
-        ],
-        "description": "Holdout results\n\nAnswers 501 until S31 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "taken": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "mean_score": {
-                      "type": [
-                        "number",
-                        "null"
-                      ]
-                    },
-                    "last_taken_at": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-                          "description": "RFC 3339 timestamp"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "taken",
-                    "mean_score",
-                    "last_taken_at"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/progress/streak": {
-      "get": {
-        "summary": "Streak state",
-        "tags": [
-          "progress"
-        ],
-        "description": "Streak state\n\nAnswers 501 until S31 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "current_days": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "longest_days": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "freezes_available": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "current_days",
-                    "longest_days",
-                    "freezes_available"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
             "content": {
               "application/problem+json": {
                 "schema": {

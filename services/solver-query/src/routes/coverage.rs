@@ -11,8 +11,13 @@
 //! `QUERY_DB_PASSWORD` those blocks are empty and `database` is `unconfigured`; when the
 //! connection or a read fails, the registry side is still served, those blocks are empty
 //! and `database` is `unavailable`, never a 500 (the failure is logged by `db`).
+//!
+//! With `classes=true` (S31, O-270) the response also carries the spot-class catalog of the
+//! pair (`spot_classes::spot_classes`), walked on the blocking pool; a solution the reader marks
+//! unavailable during the walk is a 503, as on `/v1/nodes`.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Query, State};
@@ -28,6 +33,7 @@ use crate::app::AppState;
 use crate::db::{DbCoverage, FlopRow, QueueRow};
 use crate::error::ApiError;
 use crate::library::SolutionInfo;
+use crate::routes::spot_classes;
 
 /// The texture family reported for a stored flop text `gto_model` cannot parse; such a
 /// row is a data fault logged here, not a request the caller can fix.
@@ -40,6 +46,8 @@ pub const UNKNOWN_TEXTURE_FAMILY: &str = "unknown";
 ///
 /// `ApiError::BadRequest` (400) for a configuration identifier or a pair that does not
 /// parse. A database that does not answer is reported in the body, not as an error.
+/// `ApiError::Unavailable` (503) when `classes=true` and the pair's preflop solution is
+/// marked unavailable.
 #[utoipa::path(
     get,
     path = "/v1/coverage",
@@ -48,6 +56,8 @@ pub const UNKNOWN_TEXTURE_FAMILY: &str = "unknown";
     responses(
         (status = 200, description = "The coverage", body = CoverageResponse),
         (status = 400, description = "A malformed configuration identifier or pair",
+            body = Problem, content_type = "application/problem+json"),
+        (status = 503, description = "The solution the class walk reads is marked unavailable",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -70,6 +80,12 @@ pub async fn coverage(
     };
     let flops = flop_coverage(&held.flops);
     let textures = texture_coverage(&flops);
+    let spot_classes = if query.classes.unwrap_or(false) {
+        spot_classes::spot_classes_blocking(Arc::clone(&state.library), config_id.clone(), pair)
+            .await?
+    } else {
+        Vec::new()
+    };
     Ok(Json(CoverageResponse {
         config_id: config_id.to_string(),
         pair: pair.to_string(),
@@ -78,6 +94,7 @@ pub async fn coverage(
         textures,
         queue: queue_entries(&held.queue),
         database,
+        spot_classes,
     }))
 }
 

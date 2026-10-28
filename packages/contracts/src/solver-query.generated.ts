@@ -57,6 +57,8 @@ export interface paths {
          *
          *     `ApiError::BadRequest` (400) for a configuration identifier or a pair that does not
          *     parse. A database that does not answer is reported in the body, not as an error.
+         *     `ApiError::Unavailable` (503) when `classes=true` and the pair's preflop solution is
+         *     marked unavailable.
          */
         get: operations["coverage"];
         put?: never;
@@ -314,6 +316,58 @@ export interface components {
              */
             villain_reach_removed_share: number;
         };
+        /**
+         * @description One action on the way from the pair's root to a class spot, labelled as `/v1/nodes`
+         *     labels its buttons.
+         */
+        ClassHistoryEntry: {
+            /**
+             * @description The button label of the action.
+             * @example Raise to 2.5bb
+             */
+            label: string;
+            /**
+             * @description The seat that took the action.
+             * @example BTN
+             */
+            position: string;
+            /**
+             * @description The action token text.
+             * @example r250
+             */
+            token: string;
+        };
+        /** @description One decision node of a spot class: where a hand of the class is dealt. */
+        ClassSpot: {
+            /**
+             * @description The seat to act at the node, the hero of a hand dealt there.
+             * @example BB
+             */
+            hero_position: string;
+            /** @description The actions of the line, in order. */
+            history: components["schemas"]["ClassHistoryEntry"][];
+            /**
+             * @description The dotted preflop line from the pair's root; null for the root itself.
+             * @example r250
+             */
+            line?: string | null;
+            /**
+             * Format: float
+             * @description The probability that play reaches the node from the root: the product, over the
+             *     line, of the acting seat's reach-weighted share of each action taken (O-270).
+             */
+            line_reach: number;
+            /**
+             * Format: int32
+             * @description The pot at the node in centi-big-blinds (cbb).
+             */
+            pot_cbb: number;
+            /**
+             * @description The node key of the decision.
+             * @example cfg_6_online_100/BB-BTN/r250
+             */
+            start_node_key: string;
+        };
         /** @description The body of `GET /v1/coverage`. */
         CoverageResponse: {
             /** @description The configuration identifier as given. */
@@ -328,6 +382,12 @@ export interface components {
             preflop: components["schemas"]["PreflopCoverage"];
             /** @description Queued build jobs, from the database; empty without one. */
             queue: components["schemas"]["QueueEntry"][];
+            /**
+             * @description The spot classes of the pair's first indexed preflop solution, by key (O-270).
+             *     Always present; empty unless `classes=true`, and empty when the pair holds no
+             *     preflop solution or the configuration is outside the v1 catalog.
+             */
+            spot_classes: components["schemas"]["SpotClassEntry"][];
             /** @description Texture families held, from the database; empty without one. */
             textures: components["schemas"]["TextureCoverage"][];
         };
@@ -994,6 +1054,48 @@ export interface components {
              */
             reach_weighted_combos: number;
         };
+        /** @description One spot class of a (configuration, pair), with its most frequent spots (O-270). */
+        SpotClassEntry: {
+            /**
+             * @description The configuration's depth band.
+             * @example 100
+             */
+            depth_band: string;
+            /**
+             * @description The action family, as `/v1/nodes` names it in `action_family`.
+             * @example facing-open
+             */
+            family: string;
+            /**
+             * @description The configuration's format.
+             * @example online
+             */
+            format: string;
+            /**
+             * Format: float
+             * @description The probability that any decision of the class arises in the pair's tree: the sum
+             *     of the line reach of the class's first nodes along each line (a node under another
+             *     node of the same class is not counted again), in (0, 1].
+             */
+            line_reach: number;
+            /** @description The solution the class was read from. */
+            solution_id: string;
+            /**
+             * @description The spot-class key, as `/v1/nodes` names it.
+             * @example preflop/online/100/facing-open/BB-BTN
+             */
+            spot_class_key: string;
+            /**
+             * @description The class's spots, by line reach descending then line, at most
+             *     `MAX_SPOTS_PER_CLASS` (8).
+             */
+            spots: components["schemas"]["ClassSpot"][];
+            /**
+             * Format: int32
+             * @description The configuration's seats.
+             */
+            table_size: number;
+        };
         /** @description One texture family with its counts. */
         TextureCoverage: {
             /** @description The texture family. */
@@ -1097,6 +1199,12 @@ export interface operations {
         parameters: {
             query: {
                 /**
+                 * @description True to list the pair's spot classes in `spot_classes` (O-270); absent or false
+                 *     leaves it empty, so a plain coverage call walks no tree.
+                 * @example false
+                 */
+                classes?: boolean;
+                /**
                  * @description The configuration identifier.
                  * @example cfg_6_online_100
                  */
@@ -1124,6 +1232,15 @@ export interface operations {
             };
             /** @description A malformed configuration identifier or pair */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution the class walk reads is marked unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

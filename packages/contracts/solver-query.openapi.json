@@ -59,7 +59,7 @@
           "coverage"
         ],
         "summary": "What the library holds for a configuration and pair: preflop availability, flops by\ntexture family and the build queue.",
-        "description": "# Errors\n\n`ApiError::BadRequest` (400) for a configuration identifier or a pair that does not\nparse. A database that does not answer is reported in the body, not as an error.",
+        "description": "# Errors\n\n`ApiError::BadRequest` (400) for a configuration identifier or a pair that does not\nparse. A database that does not answer is reported in the body, not as an error.\n`ApiError::Unavailable` (503) when `classes=true` and the pair's preflop solution is\nmarked unavailable.",
         "operationId": "coverage",
         "parameters": [
           {
@@ -81,6 +81,16 @@
               "type": "string"
             },
             "example": "BB-BTN"
+          },
+          {
+            "name": "classes",
+            "in": "query",
+            "description": "True to list the pair's spot classes in `spot_classes` (O-270); absent or false\nleaves it empty, so a plain coverage call walks no tree.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "example": false
           }
         ],
         "responses": {
@@ -96,6 +106,16 @@
           },
           "400": {
             "description": "A malformed configuration identifier or pair",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution the class walk reads is marked unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -681,6 +701,81 @@
           }
         }
       },
+      "ClassHistoryEntry": {
+        "type": "object",
+        "description": "One action on the way from the pair's root to a class spot, labelled as `/v1/nodes`\nlabels its buttons.",
+        "required": [
+          "position",
+          "token",
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The button label of the action.",
+            "example": "Raise to 2.5bb"
+          },
+          "position": {
+            "type": "string",
+            "description": "The seat that took the action.",
+            "example": "BTN"
+          },
+          "token": {
+            "type": "string",
+            "description": "The action token text.",
+            "example": "r250"
+          }
+        }
+      },
+      "ClassSpot": {
+        "type": "object",
+        "description": "One decision node of a spot class: where a hand of the class is dealt.",
+        "required": [
+          "start_node_key",
+          "hero_position",
+          "pot_cbb",
+          "line_reach",
+          "history"
+        ],
+        "properties": {
+          "hero_position": {
+            "type": "string",
+            "description": "The seat to act at the node, the hero of a hand dealt there.",
+            "example": "BB"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassHistoryEntry"
+            },
+            "description": "The actions of the line, in order."
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The dotted preflop line from the pair's root; null for the root itself.",
+            "example": "r250"
+          },
+          "line_reach": {
+            "type": "number",
+            "format": "float",
+            "description": "The probability that play reaches the node from the root: the product, over the\nline, of the acting seat's reach-weighted share of each action taken (O-270)."
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The pot at the node in centi-big-blinds (cbb).",
+            "minimum": 0
+          },
+          "start_node_key": {
+            "type": "string",
+            "description": "The node key of the decision.",
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          }
+        }
+      },
       "CoverageResponse": {
         "type": "object",
         "description": "The body of `GET /v1/coverage`.",
@@ -691,7 +786,8 @@
           "flops",
           "textures",
           "queue",
-          "database"
+          "database",
+          "spot_classes"
         ],
         "properties": {
           "config_id": {
@@ -723,6 +819,13 @@
               "$ref": "#/components/schemas/QueueEntry"
             },
             "description": "Queued build jobs, from the database; empty without one."
+          },
+          "spot_classes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpotClassEntry"
+            },
+            "description": "The spot classes of the pair's first indexed preflop solution, by key (O-270).\nAlways present; empty unless `classes=true`, and empty when the pair holds no\npreflop solution or the configuration is outside the v1 catalog."
           },
           "textures": {
             "type": "array",
@@ -1979,6 +2082,64 @@
             "type": "number",
             "format": "float",
             "description": "The reach-weighted combo count."
+          }
+        }
+      },
+      "SpotClassEntry": {
+        "type": "object",
+        "description": "One spot class of a (configuration, pair), with its most frequent spots (O-270).",
+        "required": [
+          "spot_class_key",
+          "family",
+          "format",
+          "depth_band",
+          "table_size",
+          "solution_id",
+          "line_reach",
+          "spots"
+        ],
+        "properties": {
+          "depth_band": {
+            "type": "string",
+            "description": "The configuration's depth band.",
+            "example": "100"
+          },
+          "family": {
+            "type": "string",
+            "description": "The action family, as `/v1/nodes` names it in `action_family`.",
+            "example": "facing-open"
+          },
+          "format": {
+            "type": "string",
+            "description": "The configuration's format.",
+            "example": "online"
+          },
+          "line_reach": {
+            "type": "number",
+            "format": "float",
+            "description": "The probability that any decision of the class arises in the pair's tree: the sum\nof the line reach of the class's first nodes along each line (a node under another\nnode of the same class is not counted again), in (0, 1]."
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution the class was read from."
+          },
+          "spot_class_key": {
+            "type": "string",
+            "description": "The spot-class key, as `/v1/nodes` names it.",
+            "example": "preflop/online/100/facing-open/BB-BTN"
+          },
+          "spots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClassSpot"
+            },
+            "description": "The class's spots, by line reach descending then line, at most\n`MAX_SPOTS_PER_CLASS` (8)."
+          },
+          "table_size": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The configuration's seats.",
+            "minimum": 0
           }
         }
       },

@@ -73,6 +73,10 @@ function toSession(row: SessionRow): Session {
     state: row.state.phase,
     state_version: row.stateVersion,
     started_at: row.startedAt.toISOString(),
+    // Drill sessions are never rated (05 section 1); S31's automated and holdout modes fill these.
+    rated_eligible: false,
+    automated: null,
+    holdout: null,
   };
 }
 
@@ -153,6 +157,9 @@ async function recapOf(database: Parameters<typeof recapStats>[0], row: SessionR
     rated_decisions: stats.ratedDecisions,
     mean_score: stats.meanScore,
     ev_loss_bb_total: stats.evLossBbTotal,
+    rating_changes: [],
+    tier: null,
+    unlocks: [],
   };
 }
 

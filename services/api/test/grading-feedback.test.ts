@@ -59,6 +59,7 @@ const ROW: FeedbackRow = {
   solution_id: "0190f000-0000-7000-8000-0000000000aa",
   node_key: "cfg_6_online_100/BB-BTN/",
   hand: "AhKd",
+  item_difficulty: null,
   game_config_id: "cfg_6_online_100",
   position_pair: "BB-BTN",
 };
@@ -161,6 +162,8 @@ describe("R3.7 grading inputs and feedback", () => {
       config_id: "cfg_6_online_100",
       pair: "BB-BTN",
       hand: "AhKd",
+      item_difficulty: null,
+      review_block: null,
     });
     expect(renderFeedback(ROW)).toEqual(feedback);
   });

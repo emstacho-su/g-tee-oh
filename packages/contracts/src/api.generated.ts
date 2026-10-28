@@ -2563,8 +2563,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Mastery heat map
-         * @description Mastery heat map
+         * Mastery heat map: family by pair against depth band by format
+         * @description Mastery heat map: family by pair against depth band by format
          *
          *     Answers 501 until S31 builds it (O-38).
          */
@@ -2583,13 +2583,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            cells: {
-                                n: number;
-                                p_known: number;
-                                spot_class_key: string;
-                            }[];
-                        };
+                        "application/json": components["schemas"]["ProgressHeatmap"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2603,15 +2597,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2664,14 +2649,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Holdout results
-         * @description Holdout results
+         * Monthly holdout retest rounds, newest first, and the open round
+         * @description Monthly holdout retest rounds, newest first, and the open round
          *
          *     Answers 501 until S31 builds it (O-38).
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2684,11 +2674,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            last_taken_at: string | null;
-                            mean_score: number | null;
-                            taken: number;
-                        };
+                        "application/json": components["schemas"]["ProgressHoldout"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2702,15 +2688,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2763,8 +2740,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Leak cost by spot class over recent weeks
-         * @description Leak cost by spot class over recent weeks
+         * The top leaks by spot class with their weekly series
+         * @description The top leaks by spot class with their weekly series
          *
          *     Answers 501 until S31 builds it (O-38).
          */
@@ -2785,17 +2762,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            items: {
-                                leak_cost_bb_per_1k: number;
-                                spot_class_key: string;
-                                trend: {
-                                    leak_cost_bb_per_1k: number;
-                                    /** Format: date */
-                                    week: string;
-                                }[];
-                            }[];
-                        };
+                        "application/json": components["schemas"]["ProgressLeaks"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2809,15 +2776,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2870,8 +2828,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The overall rank
-         * @description The overall rank
+         * The overall rank: weighted rating, deviation band and tier
+         * @description The overall rank: weighted rating, deviation band and tier
          *
          *     Answers 501 until S31 builds it (O-38).
          */
@@ -2890,14 +2848,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            overall: {
-                                mu: number;
-                                rd: number;
-                                tier: string;
-                            };
-                            updated_at: string | null;
-                        };
+                        "application/json": components["schemas"]["ProgressRating"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2911,15 +2862,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2972,8 +2914,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Streak state
-         * @description Streak state
+         * Streak state: days, freezes, the repair window and cosmetic unlocks
+         * @description Streak state: days, freezes, the repair window and cosmetic unlocks
          *
          *     Answers 501 until S31 builds it (O-38).
          */
@@ -2992,11 +2934,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            current_days: number;
-                            freezes_available: number;
-                            longest_days: number;
-                        };
+                        "application/json": components["schemas"]["ProgressStreak"];
                     };
                 };
                 /** @description Problem (400) */
@@ -3010,15 +2948,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3071,14 +3000,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Per-track ratings
-         * @description Per-track ratings
+         * Per-track ratings with their effective weights
+         * @description Per-track ratings with their effective weights
          *
          *     Answers 501 until S31 builds it (O-38).
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -3091,17 +3025,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            items: {
-                                /** @enum {string} */
-                                family: "equilibrium" | "exploit";
-                                key: string;
-                                mu: number;
-                                rd: number;
-                                /** Format: uuid */
-                                track_id: string;
-                            }[];
-                        };
+                        "application/json": components["schemas"]["ProgressTracks"];
                     };
                 };
                 /** @description Problem (400) */
@@ -3115,15 +3039,6 @@ export interface paths {
                 };
                 /** @description Problem (401) */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3361,6 +3276,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** @description Automated mode: the configurations in scope; every catalog configuration with preflop coverage when absent */
+                        config_ids?: string[];
                         /**
                          * Format: uuid
                          * @description Required when mode is drill
@@ -3368,7 +3285,7 @@ export interface paths {
                         drill_id?: string;
                         /** @enum {string} */
                         mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
-                        /** @description The session seed; the same seed and choices replay the same session (O-249). Random when absent */
+                        /** @description The session seed; the same seed and choices replay the same session (O-249). Random when absent. A session created with a seed is never rated and writes no learning state; holdout sessions refuse a seed with 400 */
                         seed?: string;
                         settings?: {
                             /** @enum {string} */
@@ -3403,6 +3320,11 @@ export interface paths {
                             /** @description Seconds per decision; null is off */
                             timebank_s?: (7 | 15 | 25) | null;
                         };
+                        /**
+                         * @description Holdout mode: retest one track only; every track when absent
+                         * @enum {string}
+                         */
+                        track_key?: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
                     };
                 };
             };
@@ -4386,6 +4308,28 @@ export interface components {
             index: number;
             share: number;
         };
+        AutomatedBlock: {
+            family: string;
+            /** @description Hands of the block served so far */
+            served: number;
+            /** @description Hands in the block (O-272) */
+            size: number;
+            spot_class_key: string;
+            track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
+            /** @description A first exposure: every panel visible, unrated (O-272) */
+            worked_example: boolean;
+        };
+        AutomatedBlockInput: {
+            family: string;
+            /** @description Hands of the block served so far */
+            served: number;
+            /** @description Hands in the block (O-272) */
+            size: number;
+            spot_class_key: string;
+            track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
+            /** @description A first exposure: every panel visible, unrated (O-272) */
+            worked_example: boolean;
+        };
         Blockers: {
             hand: string;
             top_blocked: {
@@ -4578,6 +4522,8 @@ export interface components {
             freq_by_action: number[];
             /** @description The hero's hand as graded */
             hand: string;
+            /** @description The item's difficulty for rating (O-274); null when not computed */
+            item_difficulty: number | null;
             /** @enum {string} */
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
             /** @description The node the hero decided at */
@@ -4585,6 +4531,8 @@ export interface components {
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             rated: boolean;
+            /** @description Set when this decision closed an automated review block */
+            review_block: components["schemas"]["ReviewBlock"] | null;
             rng_roll: number | null;
             score: number;
             /**
@@ -4606,6 +4554,8 @@ export interface components {
             freq_by_action: number[];
             /** @description The hero's hand as graded */
             hand: string;
+            /** @description The item's difficulty for rating (O-274); null when not computed */
+            item_difficulty: number | null;
             /** @enum {string} */
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
             /** @description The node the hero decided at */
@@ -4613,6 +4563,8 @@ export interface components {
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             rated: boolean;
+            /** @description Set when this decision closed an automated review block */
+            review_block: components["schemas"]["ReviewBlockInput"] | null;
             rng_roll: number | null;
             score: number;
             /**
@@ -4724,6 +4676,78 @@ export interface components {
             straddle: boolean;
             table_size: number;
         };
+        HoldoutProgress: {
+            answered: number;
+            /**
+             * Format: date
+             * @description The first day of the round's month
+             */
+            round_month: string;
+            total: number;
+        };
+        HoldoutProgressInput: {
+            answered: number;
+            /**
+             * Format: date
+             * @description The first day of the round's month
+             */
+            round_month: string;
+            total: number;
+        };
+        HoldoutRound: {
+            closed_at: string | null;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            opened_at: string;
+            /**
+             * Format: date
+             * @description The first day of the round's month
+             */
+            round_month: string;
+            tracks: {
+                answered: number;
+                /** @description Rating rose while holdout scores did not (O-277) */
+                goodhart_flag: boolean;
+                mean_score: number | null;
+                /** @description The track rating at the round's close */
+                mu: number | null;
+                total: number;
+                /**
+                 * @description A v1 rating track (O-271)
+                 * @enum {string}
+                 */
+                track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            }[];
+        };
+        HoldoutRoundInput: {
+            closed_at: string | null;
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp
+             */
+            opened_at: string;
+            /**
+             * Format: date
+             * @description The first day of the round's month
+             */
+            round_month: string;
+            tracks: {
+                answered: number;
+                /** @description Rating rose while holdout scores did not (O-277) */
+                goodhart_flag: boolean;
+                mean_score: number | null;
+                /** @description The track rating at the round's close */
+                mu: number | null;
+                total: number;
+                /**
+                 * @description A v1 rating track (O-271)
+                 * @enum {string}
+                 */
+                track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            }[];
+        };
         NodeAction: {
             bucket: string | null;
             index: number;
@@ -4795,9 +4819,15 @@ export interface components {
             preflop_available: boolean;
         };
         PracticeSession: {
+            /** @description The current block of an automated session; null otherwise */
+            automated: components["schemas"]["AutomatedBlock"] | null;
             drill_id: string | null;
+            /** @description The round progress of a holdout session; null otherwise */
+            holdout: components["schemas"]["HoldoutProgress"] | null;
             /** @enum {string} */
             mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+            /** @description True when decisions may be rated: false for drill, holdout and seeded automated sessions */
+            rated_eligible: boolean;
             /** Format: uuid */
             session_id: string;
             /**
@@ -4810,9 +4840,15 @@ export interface components {
             state_version: number;
         };
         PracticeSessionInput: {
+            /** @description The current block of an automated session; null otherwise */
+            automated: components["schemas"]["AutomatedBlockInput"] | null;
             drill_id: string | null;
+            /** @description The round progress of a holdout session; null otherwise */
+            holdout: components["schemas"]["HoldoutProgressInput"] | null;
             /** @enum {string} */
             mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+            /** @description True when decisions may be rated: false for drill, holdout and seeded automated sessions */
+            rated_eligible: boolean;
             /** Format: uuid */
             session_id: string;
             /**
@@ -4860,6 +4896,226 @@ export interface components {
             /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
             type: string;
         };
+        ProgressHeatmap: {
+            cells: {
+                /** @description Index into columns */
+                column: number;
+                mastered: boolean;
+                n: number;
+                /** @description Null when never practiced */
+                p_known: number | null;
+                retrievability: number | null;
+                /** @description Index into rows */
+                row: number;
+                spot_class_key: string;
+            }[];
+            columns: {
+                depth_band: string;
+                format: string;
+            }[];
+            rows: {
+                family: string;
+                pair: string;
+            }[];
+        };
+        ProgressHeatmapInput: {
+            cells: {
+                /** @description Index into columns */
+                column: number;
+                mastered: boolean;
+                n: number;
+                /** @description Null when never practiced */
+                p_known: number | null;
+                retrievability: number | null;
+                /** @description Index into rows */
+                row: number;
+                spot_class_key: string;
+            }[];
+            columns: {
+                depth_band: string;
+                format: string;
+            }[];
+            rows: {
+                family: string;
+                pair: string;
+            }[];
+        };
+        ProgressHoldout: {
+            items: components["schemas"]["HoldoutRound"][];
+            /** @description Pass as cursor for the next page; null on the last page */
+            next_cursor: string | null;
+            /** @description The open round's progress; null when no round is open */
+            open: {
+                answered: number;
+                /** Format: date */
+                round_month: string;
+                total: number;
+            } | null;
+        };
+        ProgressHoldoutInput: {
+            items: components["schemas"]["HoldoutRoundInput"][];
+            /** @description Pass as cursor for the next page; null on the last page */
+            next_cursor: string | null;
+            /** @description The open round's progress; null when no round is open */
+            open: {
+                answered: number;
+                /** Format: date */
+                round_month: string;
+                total: number;
+            } | null;
+        };
+        ProgressLeaks: {
+            /** @description The top 10 classes by current leak cost */
+            items: {
+                family: string;
+                leak_cost_bb_per_1k: number;
+                series: {
+                    leak_cost_bb_per_1k: number | null;
+                    /** @description True for the current week, computed live */
+                    partial: boolean;
+                    /** Format: date */
+                    week: string;
+                }[];
+                spot_class_key: string;
+                track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
+            }[];
+            /** @description Mondays, oldest first; the last is the current partial week */
+            weeks: string[];
+        };
+        ProgressLeaksInput: {
+            /** @description The top 10 classes by current leak cost */
+            items: {
+                family: string;
+                leak_cost_bb_per_1k: number;
+                series: {
+                    leak_cost_bb_per_1k: number | null;
+                    /** @description True for the current week, computed live */
+                    partial: boolean;
+                    /** Format: date */
+                    week: string;
+                }[];
+                spot_class_key: string;
+                track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
+            }[];
+            /** @description Mondays, oldest first; the last is the current partial week */
+            weeks: string[];
+        };
+        ProgressRating: {
+            /** @description Null before any rated session */
+            overall: {
+                /**
+                 * @description The tier the conservative figure alone would give
+                 * @enum {string}
+                 */
+                band_tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+                /** @description Tracks whose deviation holds the tier below band_tier */
+                blocked_by: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled")[];
+                /** @description The figure the tier ranks on */
+                conservative: number;
+                /** @description Weighted mean of the track ratings (O-271) */
+                mu: number;
+                /** @description Weighted rating deviation, the band around mu */
+                rd: number;
+                /** @enum {string} */
+                tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+            } | null;
+            updated_at: string | null;
+        };
+        ProgressRatingInput: {
+            /** @description Null before any rated session */
+            overall: {
+                /**
+                 * @description The tier the conservative figure alone would give
+                 * @enum {string}
+                 */
+                band_tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+                /** @description Tracks whose deviation holds the tier below band_tier */
+                blocked_by: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled")[];
+                /** @description The figure the tier ranks on */
+                conservative: number;
+                /** @description Weighted mean of the track ratings (O-271) */
+                mu: number;
+                /** @description Weighted rating deviation, the band around mu */
+                rd: number;
+                /** @enum {string} */
+                tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+            } | null;
+            updated_at: string | null;
+        };
+        ProgressStreak: {
+            current_days: number;
+            /** @constant */
+            day_minimum: 5;
+            freezes_left_this_week: number;
+            longest_days: number;
+            next_milestone: {
+                cosmetic_key: string;
+                days: number;
+            } | null;
+            /** @description A missed day that can still be repaired (O-278) */
+            repairable: {
+                /** Format: date */
+                day: string;
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                deadline: string;
+                needed: number;
+                progress: number;
+            } | null;
+            today_rated: number;
+            unlocks: {
+                cosmetic_key: string;
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                unlocked_at: string;
+            }[];
+        };
+        ProgressStreakInput: {
+            current_days: number;
+            /** @constant */
+            day_minimum: 5;
+            freezes_left_this_week: number;
+            longest_days: number;
+            next_milestone: {
+                cosmetic_key: string;
+                days: number;
+            } | null;
+            /** @description A missed day that can still be repaired (O-278) */
+            repairable: {
+                /** Format: date */
+                day: string;
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                deadline: string;
+                needed: number;
+                progress: number;
+            } | null;
+            today_rated: number;
+            unlocks: {
+                cosmetic_key: string;
+                /**
+                 * Format: date-time
+                 * @description RFC 3339 timestamp
+                 */
+                unlocked_at: string;
+            }[];
+        };
+        ProgressTracks: {
+            items: components["schemas"]["TrackProgress"][];
+            /** @description Pass as cursor for the next page; null on the last page */
+            next_cursor: string | null;
+        };
+        ProgressTracksInput: {
+            items: components["schemas"]["TrackProgressInput"][];
+            /** @description Pass as cursor for the next page; null on the last page */
+            next_cursor: string | null;
+        };
         RangeAdvantage: {
             ip_mean_equity: number;
             oop_mean_equity: number;
@@ -4869,6 +5125,22 @@ export interface components {
             ip_mean_equity: number;
             oop_mean_equity: number;
             to_act_advantage_pct_points: number;
+        };
+        ReviewBlock: {
+            closed: boolean;
+            /** @description Null for a worked-example block (O-272) */
+            fsrs_grade: ("Again" | "Hard" | "Good" | "Easy") | null;
+            next_due: string | null;
+            p_known: number | null;
+            spot_class_key: string;
+        };
+        ReviewBlockInput: {
+            closed: boolean;
+            /** @description Null for a worked-example block (O-272) */
+            fsrs_grade: ("Again" | "Hard" | "Good" | "Easy") | null;
+            next_due: string | null;
+            p_known: number | null;
+            spot_class_key: string;
         };
         SessionInfo: {
             /** @description Send as x-csrf-token on every mutating request (O-230) */
@@ -4918,8 +5190,35 @@ export interface components {
             ev_loss_bb_total: number;
             mean_score: number | null;
             rated_decisions: number;
+            /** @description One entry per track the session rated (O-27) */
+            rating_changes: {
+                after: {
+                    mu: number;
+                    rd: number;
+                };
+                before: {
+                    mu: number;
+                    rd: number;
+                } | null;
+                /**
+                 * @description A v1 rating track (O-271)
+                 * @enum {string}
+                 */
+                track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            }[];
             /** Format: uuid */
             session_id: string;
+            /** @description The overall tier after the session; null when nothing was rated */
+            tier: {
+                /** @enum {string} */
+                band_tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+                blocked_by: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled")[];
+                overall: number;
+                /** @enum {string} */
+                tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+            } | null;
+            /** @description Cosmetic keys the session unlocked (O-279) */
+            unlocks: string[];
         };
         SessionRecapInput: {
             decisions: number;
@@ -4931,8 +5230,35 @@ export interface components {
             ev_loss_bb_total: number;
             mean_score: number | null;
             rated_decisions: number;
+            /** @description One entry per track the session rated (O-27) */
+            rating_changes: {
+                after: {
+                    mu: number;
+                    rd: number;
+                };
+                before: {
+                    mu: number;
+                    rd: number;
+                } | null;
+                /**
+                 * @description A v1 rating track (O-271)
+                 * @enum {string}
+                 */
+                track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            }[];
             /** Format: uuid */
             session_id: string;
+            /** @description The overall tier after the session; null when nothing was rated */
+            tier: {
+                /** @enum {string} */
+                band_tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+                blocked_by: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled")[];
+                overall: number;
+                /** @enum {string} */
+                tier: "I" | "II" | "III" | "IV" | "V" | "VI" | "VII" | "VIII";
+            } | null;
+            /** @description Cosmetic keys the session unlocked (O-279) */
+            unlocks: string[];
         };
         SpotFilter: {
             alternate_seats: boolean;
@@ -5298,6 +5624,44 @@ export interface components {
             };
             strongest_folding_hand: string | null;
         };
+        TrackProgress: {
+            conservative: number;
+            /** @enum {string} */
+            family: "equilibrium" | "exploit";
+            /** @enum {string} */
+            format: "cash" | "mtt";
+            last_rated_at: string | null;
+            mu: number;
+            name: string;
+            rated_decisions: number;
+            rd: number;
+            /**
+             * @description A v1 rating track (O-271)
+             * @enum {string}
+             */
+            track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            /** @description Effective weight, normalized over tracks with a covered class (O-271) */
+            weight: number;
+        };
+        TrackProgressInput: {
+            conservative: number;
+            /** @enum {string} */
+            family: "equilibrium" | "exploit";
+            /** @enum {string} */
+            format: "cash" | "mtt";
+            last_rated_at: string | null;
+            mu: number;
+            name: string;
+            rated_decisions: number;
+            rd: number;
+            /**
+             * @description A v1 rating track (O-271)
+             * @enum {string}
+             */
+            track_key: "opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled";
+            /** @description Effective weight, normalized over tracks with a covered class (O-271) */
+            weight: number;
+        };
         TrainerPrompt: {
             board: string[];
             /** @description Generated from the node's tree actions (ADR 0020) */
@@ -5318,6 +5682,8 @@ export interface components {
             rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
+            /** @description The decision's spot class, as solver-query names it */
+            spot_class_key: string | null;
             stacks_cbb: number[];
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
@@ -5329,7 +5695,11 @@ export interface components {
             street: "preflop" | "flop" | "turn" | "river";
             /** @description True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280) */
             synthetic: boolean;
+            /** @description The class's rating track; null for a class no track takes */
+            track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
             visible_panels: string[];
+            /** @description True on a worked-example block of an automated session (O-272) */
+            worked_example: boolean;
         };
         TrainerPromptInput: {
             board: string[];
@@ -5351,6 +5721,8 @@ export interface components {
             rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
+            /** @description The decision's spot class, as solver-query names it */
+            spot_class_key: string | null;
             stacks_cbb: number[];
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
@@ -5362,7 +5734,11 @@ export interface components {
             street: "preflop" | "flop" | "turn" | "river";
             /** @description True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280) */
             synthetic: boolean;
+            /** @description The class's rating track; null for a class no track takes */
+            track_key: ("opens" | "facing-open-ip" | "blind-defense" | "facing-3bet" | "four-bet-plus" | "blind-vs-blind" | "live-limped-straddled") | null;
             visible_panels: string[];
+            /** @description True on a worked-example block of an automated session (O-272) */
+            worked_example: boolean;
         };
         TrainerSettings: {
             /** @enum {string} */

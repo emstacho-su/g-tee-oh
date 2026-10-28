@@ -77,6 +77,9 @@ export const PROBLEM_SLUGS = {
   sessionEnded: "session-ended",
   noCoverage: "no-coverage",
   tooManyStreams: "too-many-streams",
+  // S31: holdout sessions (R4.13, O-276).
+  noHoldoutItems: "no-holdout-items",
+  holdoutComplete: "holdout-complete",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -104,6 +107,8 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "session-ended": "The session has ended",
   "no-coverage": "The library covers no spot this request selects",
   "too-many-streams": "Too many open event streams",
+  "no-holdout-items": "No holdout items are drawn for this scope yet",
+  "holdout-complete": "Every holdout item of this round is answered",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

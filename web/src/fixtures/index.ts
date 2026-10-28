@@ -136,6 +136,9 @@ export const fixturePrompt: TrainerPrompt = {
   rng_roll: null,
   previous_board: null,
   synthetic: true,
+  spot_class_key: "preflop/online/100/rfi/BB-BTN",
+  track_key: "opens",
+  worked_example: false,
 };
 
 export const fixtureFeedback: DecisionFeedback = {
@@ -155,4 +158,6 @@ export const fixtureFeedback: DecisionFeedback = {
   config_id: "cfg_6_online_100",
   pair: "BB-BTN",
   hand: "AJo",
+  item_difficulty: null,
+  review_block: null,
 };

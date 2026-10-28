@@ -51,6 +51,7 @@ export type FeedbackRow = Pick<
   | "solution_id"
   | "node_key"
   | "hand"
+  | "item_difficulty"
 > &
   Pick<Selectable<DB["solution"]>, "game_config_id" | "position_pair">;
 
@@ -70,6 +71,7 @@ export const FEEDBACK_COLUMNS = [
   "solution_id",
   "node_key",
   "hand",
+  "item_difficulty",
 ] as const;
 
 export function toContractLabel(label: GradeLabel): ContractLabel {
@@ -104,5 +106,8 @@ export function renderFeedback(row: FeedbackRow): Feedback {
     config_id: row.game_config_id,
     pair: required(row.position_pair, "position_pair"),
     hand: row.hand,
+    item_difficulty: row.item_difficulty,
+    // S31: set by the learning hooks when the decision closes an automated review block (O-272).
+    review_block: null,
   };
 }

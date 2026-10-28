@@ -22,6 +22,7 @@ function coverage(overrides: Partial<SqCoverage> = {}): SqCoverage {
     textures: [],
     queue: [{ job_id: JOB_ID, flop: "Qc9h4d", priority: 3, status: "queued", position: 2 }],
     database: "connected",
+    spot_classes: [],
     ...overrides,
   };
 }

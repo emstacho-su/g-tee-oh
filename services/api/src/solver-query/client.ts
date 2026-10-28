@@ -30,6 +30,11 @@ export type SqNode = SqSchemas["NodeResponse"];
 export type SqAction = SqSchemas["ActionView"];
 export type SqGrade = SqSchemas["GradeResponse"];
 export type SqCoverage = SqSchemas["CoverageResponse"];
+/** One spot class of a (configuration, pair) from GET /v1/coverage?classes=true (S31, O-270). */
+export type SqSpotClassEntry = SqSchemas["SpotClassEntry"];
+/** One decision node of a spot class, with its line, hero seat, pot, line reach and history (O-270). */
+export type SqClassSpot = SqSchemas["ClassSpot"];
+export type SqClassHistoryEntry = SqSchemas["ClassHistoryEntry"];
 export type SqInsights = SqSchemas["InsightsResponse"];
 export type SqDeal = SqSchemas["DealResponse"];
 export type SqReveal = SqSchemas["RevealResponse"];

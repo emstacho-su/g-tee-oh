@@ -41,7 +41,10 @@
       "street": "preflop",
       "rng_roll": 80,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -66,7 +69,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qc4d"
+      "hand": "Qc4d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -111,7 +116,10 @@
       "street": "preflop",
       "rng_roll": 39,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -136,7 +144,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "6d2c"
+      "hand": "6d2c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -181,7 +191,10 @@
       "street": "preflop",
       "rng_roll": 29,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -206,7 +219,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7c3s"
+      "hand": "7c3s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -251,7 +266,10 @@
       "street": "preflop",
       "rng_roll": 30,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -276,7 +294,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8s7c"
+      "hand": "8s7c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -321,7 +341,10 @@
       "street": "preflop",
       "rng_roll": 92,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -346,7 +369,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "9d4h"
+      "hand": "9d4h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -391,7 +416,10 @@
       "street": "preflop",
       "rng_roll": 43,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -416,7 +444,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8d7h"
+      "hand": "8d7h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -461,7 +491,10 @@
       "street": "preflop",
       "rng_roll": 88,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -486,7 +519,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ah9s"
+      "hand": "Ah9s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -531,7 +566,10 @@
       "street": "preflop",
       "rng_roll": 13,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -556,7 +594,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad4h"
+      "hand": "Ad4h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -601,7 +641,10 @@
       "street": "preflop",
       "rng_roll": 8,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -626,7 +669,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc5c"
+      "hand": "Kc5c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -671,7 +716,10 @@
       "street": "preflop",
       "rng_roll": 8,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -696,7 +744,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Td2d"
+      "hand": "Td2d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -741,7 +791,10 @@
       "street": "preflop",
       "rng_roll": 99,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -766,7 +819,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qc5s"
+      "hand": "Qc5s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -811,7 +866,10 @@
       "street": "preflop",
       "rng_roll": 2,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -836,7 +894,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7c2s"
+      "hand": "7c2s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -881,7 +941,10 @@
       "street": "preflop",
       "rng_roll": 30,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -906,7 +969,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kh9d"
+      "hand": "Kh9d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -951,7 +1016,10 @@
       "street": "preflop",
       "rng_roll": 75,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -976,7 +1044,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "As6h"
+      "hand": "As6h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1041,7 +1111,10 @@
       "street": "preflop",
       "rng_roll": 58,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
+      "track_key": "facing-3bet",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1068,7 +1141,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "As6h"
+      "hand": "As6h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1117,7 +1192,10 @@
         "5c",
         "6s"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1142,7 +1220,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jd7c"
+      "hand": "Jd7c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1187,7 +1267,10 @@
       "street": "preflop",
       "rng_roll": 5,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1212,7 +1295,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7d5c"
+      "hand": "7d5c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1261,7 +1346,10 @@
         "4d",
         "Th"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -1286,7 +1374,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "QcJc"
+      "hand": "QcJc",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1331,7 +1421,10 @@
       "street": "preflop",
       "rng_roll": 32,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1356,7 +1449,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "9d8s"
+      "hand": "9d8s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1401,7 +1496,10 @@
       "street": "preflop",
       "rng_roll": 27,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -1426,7 +1524,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ac9s"
+      "hand": "Ac9s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1471,7 +1571,10 @@
       "street": "preflop",
       "rng_roll": 74,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1496,7 +1599,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jh5c"
+      "hand": "Jh5c",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1541,7 +1646,10 @@
       "street": "preflop",
       "rng_roll": 93,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1566,7 +1674,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8s6d"
+      "hand": "8s6d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1611,7 +1721,10 @@
       "street": "preflop",
       "rng_roll": 65,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -1636,7 +1749,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc7s"
+      "hand": "Kc7s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1701,7 +1816,10 @@
       "street": "preflop",
       "rng_roll": 5,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
+      "track_key": "facing-3bet",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1728,7 +1846,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc7s"
+      "hand": "Kc7s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1777,7 +1897,10 @@
         "Ts",
         "Tc"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -1802,7 +1925,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qs3s"
+      "hand": "Qs3s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1847,7 +1972,10 @@
       "street": "preflop",
       "rng_roll": 24,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -1872,7 +2000,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad7d"
+      "hand": "Ad7d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -1937,7 +2067,10 @@
       "street": "preflop",
       "rng_roll": 36,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
+      "track_key": "facing-3bet",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -1964,7 +2097,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad7d"
+      "hand": "Ad7d",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2013,7 +2148,10 @@
         "4d",
         "Th"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2038,7 +2176,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jc6s"
+      "hand": "Jc6s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2083,7 +2223,10 @@
       "street": "preflop",
       "rng_roll": 19,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2108,7 +2251,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ts4h"
+      "hand": "Ts4h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2153,7 +2298,10 @@
       "street": "preflop",
       "rng_roll": 31,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2178,7 +2326,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Tc4s"
+      "hand": "Tc4s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2223,7 +2373,10 @@
       "street": "preflop",
       "rng_roll": 60,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2248,7 +2401,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7h3s"
+      "hand": "7h3s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2293,7 +2448,10 @@
       "street": "preflop",
       "rng_roll": 39,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2318,7 +2476,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "AdTc"
+      "hand": "AdTc",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2383,7 +2543,10 @@
       "street": "preflop",
       "rng_roll": 10,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
+      "track_key": "facing-3bet",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2410,7 +2573,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "AdTc"
+      "hand": "AdTc",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2459,7 +2624,10 @@
         "9h",
         "4s"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2484,7 +2652,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Td3h"
+      "hand": "Td3h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2533,7 +2703,10 @@
         "7h",
         "5c"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2558,7 +2731,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qs8h"
+      "hand": "Qs8h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2603,7 +2778,10 @@
       "street": "preflop",
       "rng_roll": 19,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2628,7 +2806,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ah2h"
+      "hand": "Ah2h",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2673,7 +2853,10 @@
       "street": "preflop",
       "rng_roll": 6,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2698,7 +2881,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ac8s"
+      "hand": "Ac8s",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2743,7 +2928,10 @@
       "street": "preflop",
       "rng_roll": 68,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "best",
@@ -2768,7 +2956,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "JhJs"
+      "hand": "JhJs",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2833,7 +3023,10 @@
       "street": "preflop",
       "rng_roll": 92,
       "previous_board": null,
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
+      "track_key": "facing-3bet",
+      "worked_example": false
     },
     "feedback": {
       "label": "inaccuracy",
@@ -2860,7 +3053,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "JhJs"
+      "hand": "JhJs",
+      "item_difficulty": null,
+      "review_block": null
     }
   },
   {
@@ -2909,7 +3104,10 @@
         "6c",
         "7s"
       ],
-      "synthetic": true
+      "synthetic": true,
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN",
+      "track_key": "opens",
+      "worked_example": false
     },
     "feedback": {
       "label": "blunder",
@@ -2934,7 +3132,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "6c4s"
+      "hand": "6c4s",
+      "item_difficulty": null,
+      "review_block": null
     }
   }
 ]

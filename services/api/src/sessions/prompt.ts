@@ -9,6 +9,7 @@ import type { promptSchema } from "../schemas/training.js";
 import { streetSchema } from "../schemas/common.js";
 import { actionKindSchema } from "../schemas/study.js";
 import type { SqAction } from "../solver-query/client.js";
+import { trackFor } from "../learning/tracks.js";
 import { cardsOf, type DerivedPrompt } from "./derive.js";
 import type { z } from "zod";
 
@@ -51,5 +52,9 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     rng_roll: roll === null ? null : roll.roll,
     previous_board: state.previous_board === null ? null : [...state.previous_board],
     synthetic: node.synthetic,
+    // S31 (O-270, O-271): the class and its track come from solver-query's names for the node.
+    spot_class_key: node.spot_class_key ?? null,
+    track_key: trackFor(node.action_family ?? null, hand.hero_position),
+    worked_example: false,
   };
 }
