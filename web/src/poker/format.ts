@@ -30,6 +30,22 @@ export function formatPercent(percent: number, decimals = 2): string {
   return `${percent.toFixed(decimals)}%`;
 }
 
+const BASIS_POINTS_PER_PERCENT = 100;
+const CENTS_PER_DOLLAR = 100;
+
+/**
+ * A stored rake rate in basis points as a percent: formatBasisPoints(500) is "5%", 450 is "4.5%".
+ * Display only; no rake is computed in TypeScript (ADR 0004).
+ */
+export function formatBasisPoints(basisPoints: number): string {
+  return `${formatNumber(basisPoints / BASIS_POINTS_PER_PERCENT, 2)}%`;
+}
+
+/** A stored amount in cents as dollars: formatCents(150) is "$1.50". Display only. */
+export function formatCents(cents: number): string {
+  return `$${(cents / CENTS_PER_DOLLAR).toFixed(2)}`;
+}
+
 function formatNumber(value: number, maxDecimals: number): string {
   return Number(value.toFixed(maxDecimals)).toString();
 }

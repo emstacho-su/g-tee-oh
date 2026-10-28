@@ -26,8 +26,9 @@ afterEach(() => {
   spies.forEach((spy) => spy.mockRestore());
 });
 
+/** A settings field: Radix renders a single-choice toggle group as a radiogroup. */
 function field(name: string): HTMLElement {
-  return screen.getByRole("group", { name });
+  return screen.getByRole("radiogroup", { name });
 }
 
 function choice(fieldName: string, name: RegExp | string): HTMLElement {

@@ -19,11 +19,13 @@ import { renderStudy } from "./render-study.js";
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
 
 let spies: { mockRestore: () => void }[] = [];
-let scrollIntoView: ReturnType<typeof vi.fn>;
+// The strip scrolls itself (Element.scrollTo), never the page, so a phone does not jump.
+let stripScroll: ReturnType<typeof vi.fn>;
+const originalScrollTo = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTo");
 
 beforeEach(() => {
-  scrollIntoView = vi.fn();
-  Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, writable: true, value: scrollIntoView });
+  stripScroll = vi.fn();
+  Object.defineProperty(Element.prototype, "scrollTo", { configurable: true, writable: true, value: stripScroll });
   spies = [
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null),
     vi.spyOn(console, "info").mockImplementation(() => undefined),
@@ -32,7 +34,8 @@ beforeEach(() => {
 
 afterEach(() => {
   spies.forEach((spy) => spy.mockRestore());
-  Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  if (originalScrollTo === undefined) Reflect.deleteProperty(Element.prototype, "scrollTo");
+  else Object.defineProperty(Element.prototype, "scrollTo", originalScrollTo);
 });
 
 function seats(): HTMLElement[] {
@@ -133,12 +136,18 @@ describe("R3.12 position carousel", () => {
     expect(nodeRequests().map((request) => request.query["line"])).toEqual([undefined, FIXTURE_CHILD_LINE]);
   });
 
-  it("R3.12 the current seat is scrolled into view, smoothly unless reduced motion is asked for", async () => {
+  it("R3.12 the strip scrolls the current seat into view, smoothly unless reduced motion is asked for", async () => {
+    const user = userEvent.setup();
     renderStudy(BASE);
-    await screen.findByRole("region", { name: "BTN's actions" });
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-    expect(scrollIntoView.mock.contexts.at(-1)).toBe(seat(/^BTN/));
-    expect(scrollIntoView.mock.calls.at(-1)?.[0]).toEqual({ block: "nearest", inline: "center", behavior: "smooth" });
+    const actions = await screen.findByRole("region", { name: "BTN's actions" });
+    await waitFor(() => expect(stripScroll).toHaveBeenCalled());
+    expect(stripScroll.mock.contexts.at(-1)).toBe(screen.getByTestId("position-strip"));
+    expect(stripScroll.mock.calls.at(-1)?.[0]).toEqual({ left: 0, behavior: "smooth" });
+
+    stripScroll.mockClear();
+    await user.click(within(actions).getByRole("button", { name: /^Raise 2\.5bb/ }));
+    await screen.findByRole("region", { name: "BB's actions" });
+    await waitFor(() => expect(stripScroll).toHaveBeenCalled());
   });
 
   it("R3.12 under reduced motion the current seat jumps into view", async () => {
@@ -158,7 +167,7 @@ describe("R3.12 position carousel", () => {
     spies.push(matchMedia);
     renderStudy(BASE);
     await screen.findByRole("region", { name: "BTN's actions" });
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-    expect(scrollIntoView.mock.calls.at(-1)?.[0]).toMatchObject({ behavior: "auto" });
+    await waitFor(() => expect(stripScroll).toHaveBeenCalled());
+    expect(stripScroll.mock.calls.at(-1)?.[0]).toMatchObject({ behavior: "auto" });
   });
 });
