@@ -33,9 +33,19 @@ export function GallerySection({ name, title, note, children }: GallerySectionPr
   );
 }
 
+/** The end of a replay (S38, O-381): the HJ open shows as a badge and a chip at its bet spot. */
 const SIX_MAX: readonly TableSeat[] = [
   { position: "UTG", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
-  { position: "HJ", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
+  {
+    position: "HJ",
+    stackCbb: 10000,
+    isHero: false,
+    hasFolded: false,
+    isButton: false,
+    isStraddle: false,
+    lastAction: "Raise 2.5bb",
+    chip: { label: "Raise 2.5bb", moving: false, durationMs: 0 },
+  },
   { position: "CO", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "BTN", stackCbb: 10000, isHero: true, hasFolded: false, isButton: true, isStraddle: false, cards: ["Ah", "Jd"] },
   { position: "SB", stackCbb: 9950, betCbb: 50, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
@@ -47,9 +57,27 @@ const NINE_LIVE: readonly TableSeat[] = [
   { position: "UTG1", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "UTG2", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "LJ", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
-  { position: "HJ", stackCbb: 14200, betCbb: 800, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
+  {
+    position: "HJ",
+    stackCbb: 14200,
+    isHero: false,
+    hasFolded: false,
+    isButton: false,
+    isStraddle: false,
+    lastAction: "Raise 8bb",
+    chip: { label: "Raise 8bb", moving: false, durationMs: 0 },
+  },
   { position: "CO", stackCbb: 15000, isHero: true, hasFolded: false, isButton: false, isStraddle: false, cards: ["Ks", "Qs"] },
-  { position: "BTN", stackCbb: 15000, isHero: false, hasFolded: false, isButton: true, isStraddle: false },
+  {
+    position: "BTN",
+    stackCbb: 14200,
+    isHero: false,
+    hasFolded: false,
+    isButton: true,
+    isStraddle: false,
+    lastAction: "Call 8bb",
+    chip: { label: "Call 8bb", moving: false, durationMs: 0 },
+  },
   { position: "SB", stackCbb: 14950, betCbb: 50, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
   { position: "BB", stackCbb: 14900, betCbb: 100, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
 ];
@@ -65,13 +93,17 @@ const POSTFLOP_ACTIONS: readonly NodeAction[] = [
 export function TableSections() {
   return (
     <>
-      <GallerySection name="poker-table-6" title="PokerTable, 6 seats" note="Preflop, hero on the button, blinds posted.">
+      <GallerySection
+        name="poker-table-6"
+        title="PokerTable, 6 seats"
+        note="Seat cards around the felt after the replay: the HJ open as a badge and a chip, hero on the button. Below 600 px of its own width the table turns portrait."
+      >
         <PokerTable seats={SIX_MAX} potCbb={fixturePrompt.pot_cbb} center={<BoardReveal cards={[]} />} />
       </GallerySection>
       <GallerySection
         name="poker-table-9"
         title="PokerTable, 9 seats with a straddle"
-        note="Live table, UTG straddle marker, a flop on the board."
+        note="Live table after the replay: UTG straddle marker, HJ raise and BTN call chips, a flop on the board."
       >
         <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={["Kh", "7d", "2c"]} />} />
       </GallerySection>
