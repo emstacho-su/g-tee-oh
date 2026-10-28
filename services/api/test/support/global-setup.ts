@@ -24,6 +24,7 @@ const POSTGRES_IMAGE = "postgres:18-alpine";
 const DATABASE_NAME = "gto";
 const APP_TEST_LOGIN = "app_test_login";
 const MIGRATIONS_DIR = fileURLToPath(new URL("../../../../db/migrations", import.meta.url));
+const FIXTURE_SOLUTIONS_SCRIPT = fileURLToPath(new URL("../../../../scripts/fixture-solutions.mjs", import.meta.url));
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -41,6 +42,17 @@ declare module "vitest" {
 function migrate(databaseUrl: string): void {
   execFileSync(resolveBinary(), ["--migrations-dir", MIGRATIONS_DIR, "--no-dump-schema", "up"], {
     env: { ...process.env, DATABASE_URL: databaseUrl },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+/**
+ * Solution rows for the committed fixture library (scripts/fixture-solutions.mjs), as the e2e
+ * stack writes them, so an attempt graded against a fixture solution satisfies its foreign key.
+ */
+function seedFixtureSolutions(databaseUrl: string): void {
+  execFileSync(process.execPath, [FIXTURE_SOLUTIONS_SCRIPT], {
+    env: { ...process.env, DATABASE_URL: databaseUrl, FIXTURE_LIBRARY_PATH: "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -70,6 +82,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase(DATABASE_NAME).start();
   const adminUrl = `${container.getConnectionUri()}?sslmode=disable`;
   migrate(adminUrl);
+  seedFixtureSolutions(adminUrl);
   const appPassword = randomBytes(16).toString("hex");
   await createAppLogin(adminUrl, appPassword);
 

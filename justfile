@@ -145,6 +145,10 @@ shots:
 db-migrate:
     dbmate --wait --no-dump-schema up
 
+# Solution rows for the fixture library, so attempts graded on the dev stack can be stored; idempotent (R3.7, O-53)
+fixture-solutions:
+    node scripts/fixture-solutions.mjs
+
 # Migration status
 db-status:
     dbmate status

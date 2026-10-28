@@ -91,5 +91,5 @@ test('r3_13 e2eWebEnv adds the owner to a new object and leaves the parent envir
 });
 
 test('r3_13 the e2e chain creates the owner after the database steps and before smoke', () => {
-  assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', OWNER_STEP, 'smoke', 'e2e-web']);
+  assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', OWNER_STEP, 'smoke', 'e2e-web']);
 });
