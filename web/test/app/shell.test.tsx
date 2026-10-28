@@ -64,6 +64,18 @@ describe("home shell", () => {
     expect(screen.getByText(/Press \? for shortcuts/)).toBeInTheDocument();
   });
 
+  it("R3.13 at phone width the header keeps the app name and buttons on one line and shortens the email", async () => {
+    renderApp("/", SIGNED_IN);
+
+    const header = await screen.findByTestId("app-header");
+    expect(within(header).getByText("g-tee-oh")).toHaveClass("whitespace-nowrap");
+    const email = await within(header).findByText(fixtureSession.user.email);
+    expect(email).toHaveClass("truncate");
+    expect(email).toHaveAttribute("title", fixtureSession.user.email);
+    expect(within(header).getByRole("button", { name: "Sign out" })).toHaveClass("whitespace-nowrap");
+    for (const button of within(header).getAllByRole("button")) expect(button).toHaveClass("whitespace-nowrap");
+  });
+
   it("R3.13 the Main navigation links every app route and marks the active one", async () => {
     renderApp("/study", SIGNED_IN);
 

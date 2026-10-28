@@ -11,7 +11,7 @@ export function ThemeToggle() {
   const toggle = useThemeStore((state) => state.toggle);
   const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
   return (
-    <Button variant="ghost" size="sm" onClick={toggle} aria-label={label}>
+    <Button variant="ghost" size="sm" className="whitespace-nowrap" onClick={toggle} aria-label={label}>
       {theme === "dark" ? "Light theme" : "Dark theme"}
     </Button>
   );
