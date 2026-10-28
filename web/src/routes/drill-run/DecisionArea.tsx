@@ -10,7 +10,9 @@
  * decision response. Spot mode then pauses on the reveal until Next (O-284), with the bar
  * disabled. The feedback panel gets the range view and the threshold card of the decided node,
  * and, when the session has the mode on, the same roll scale with its bands revealed and the
- * followed-the-roll mark (FeedbackRoller, O-281, O-344, O-371). All action indexes are
+ * followed-the-roll mark (FeedbackRoller, O-281, O-344, O-371), the insights and More info as the
+ * inline Explanation section (S38, O-388), each in a section that expands and collapses, with the
+ * prompt's worked-example flag and the session's remembered choices (O-387). All action indexes are
  * NodeAction.index (O-198). In street and full-hand modes a reveal that does not pause (O-314)
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
  * available (S26).
@@ -22,8 +24,10 @@ import {
   FeedbackRoller,
   FeedbackThreshold,
   RngRoller,
+  type FeedbackSectionsControl,
 } from "../../components/trainer/index.js";
 import { ExplainControls } from "../../components/explain/ExplainControls.js";
+import { MoreInfoSection } from "../../components/explain/MoreInfoSection.js";
 import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
@@ -43,14 +47,19 @@ export interface DecisionAreaProps {
   onChoose: (actionIndex: number) => void;
   onNext: () => void;
   onExplain: () => void;
-  /** More info or Ask opened or closed (S27): the screen pauses its hotkeys while one is open. */
+  /** Ask's dialog opened or closed (S27, S38 O-388): the screen pauses its hotkeys while it is open. */
   onExplainDialog?: (open: boolean) => void;
+  /**
+   * The session's remembered feedback sections (useFeedbackSections, O-387), held by the screen
+   * because this area unmounts between hands; without it each panel starts from the defaults.
+   */
+  feedbackSections?: FeedbackSectionsControl;
 }
 
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
 
-function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog }: DecisionAreaProps) {
+function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
   useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
@@ -81,7 +90,10 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           thresholdCard={<FeedbackThreshold feedback={feedback} />}
           roller={roller}
           insights={<FeedbackInsights feedback={feedback} />}
+          explanation={<MoreInfoSection key={`more-info-${feedback.attempt_id}`} attemptId={feedback.attempt_id} />}
           explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
+          workedExample={prompt.worked_example}
+          {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}
         />
       )}
       <Button variant="primary" size="lg" aria-keyshortcuts={NEXT_HAND_KEY} disabled={!interactive} onClick={onNext} className="self-start">

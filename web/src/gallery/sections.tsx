@@ -13,6 +13,7 @@ import type { TableSeat } from "../components/table/index.js";
 import { ActionBar, FeedbackPanel, RngRoller } from "../components/trainer/index.js";
 import type { NodeAction } from "../contracts.js";
 import { fixtureActions, fixtureFeedback, fixtureInsights, fixturePrompt } from "../fixtures/index.js";
+import { GalleryExplanationBody, GalleryInsightsBody, GalleryRangeBody } from "./feedback-gallery-parts.js";
 
 const noop = (): void => undefined;
 
@@ -122,12 +123,19 @@ export function TrainerSections() {
           onExplain={noop}
         />
       </GallerySection>
-      <GallerySection name="feedback-panel" title="FeedbackPanel" note="Label, EV loss in bb and percent pot, the hand's frequencies.">
+      <GallerySection
+        name="feedback-panel"
+        title="FeedbackPanel"
+        note="As a decision first shows it: the summary (label, your action against the best, the loss, Unrated, the roll), every other section collapsed (O-387)."
+      >
         <FeedbackPanel
           feedback={fixtureFeedback}
           actions={fixtureActions}
           chosenIndex={1}
+          rangeView={<GalleryRangeBody />}
           thresholdCard={<ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" />}
+          insights={<GalleryInsightsBody />}
+          explanation={<GalleryExplanationBody />}
         />
       </GallerySection>
       <GallerySection name="action-frequency-table" title="ActionFrequencyTable" note="Frequencies and EV as given by the api.">
