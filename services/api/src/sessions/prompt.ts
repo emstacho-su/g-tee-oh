@@ -54,7 +54,8 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     stacks_cbb: [...node.stacks_cbb],
     history: hand.history.map((entry) => ({ ...entry })),
     buttons: node.actions.map(toButton),
-    visible_panels: visiblePanels(settings),
+    // O-272: a worked-example block shows every panel; its decisions are unrated.
+    visible_panels: workedExample(derived) ? [...PANEL_KEYS] : visiblePanels(settings),
     street: streetSchema.parse(node.street),
     rng_roll: roll === null ? null : roll.roll,
     previous_board: state.previous_board === null ? null : [...state.previous_board],
