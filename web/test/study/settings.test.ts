@@ -121,17 +121,29 @@ describe("R3.12 study settings choices", () => {
   });
 
   it("R3.12 against lists the seats after the first; an uncovered pair is disabled", () => {
-    const draft: SettingsDraft = { ...ONLINE_100, first: "CO" };
-    expect(summary(settingChoices(CATALOG, draft).against)).toEqual([
-      { value: "BTN", disabled: true, reason: "Not in the library" },
-      { value: "SB", disabled: true, reason: "Not in the library" },
-      { value: "BB", disabled: true, reason: "Not in the library" },
-    ]);
     const btn: SettingsDraft = { ...ONLINE_100, first: "BTN" };
     expect(summary(settingChoices(CATALOG, btn).against)).toEqual([
       { value: "SB", disabled: false, reason: undefined },
       { value: "BB", disabled: false, reason: undefined },
     ]);
+    // With SB-BTN not covered, BTN still has a covered pair (BB-BTN), so SB is listed but disabled.
+    const partial: SettingsCatalog = {
+      ...CATALOG,
+      pairsOf: () => [
+        { pair: "BB-BTN", oop: "BB", ip: "BTN", preflop_available: true },
+        { pair: "SB-BTN", oop: "SB", ip: "BTN", preflop_available: false },
+      ],
+    };
+    expect(summary(settingChoices(partial, btn).against)).toEqual([
+      { value: "SB", disabled: true, reason: "Not in the library" },
+      { value: "BB", disabled: false, reason: undefined },
+    ]);
+  });
+
+  it("R3.12 against waits, naming the seat, when the first seat chosen is unavailable", () => {
+    const draft: SettingsDraft = { ...ONLINE_100, first: "CO" };
+    expect(settingChoices(CATALOG, draft).against).toBeUndefined();
+    expect(fieldStates(CATALOG, draft).against).toMatchObject({ kind: "waiting", reason: "Choose an available seat to act first." });
   });
 });
 

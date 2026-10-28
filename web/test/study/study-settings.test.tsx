@@ -54,7 +54,8 @@ describe("R3.12 study settings panel", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Solution browser" })).toBeInTheDocument();
     const panel = screen.getByRole("region", { name: "Spot settings" });
     expect(within(panel).getByText("Choose the settings, then Confirm.")).toBeInTheDocument();
-    expect(within(panel).getByText("Choose a format first.")).toBeInTheDocument();
+    // Every field below the format names the format, the first upper field missing (PR 37 round 1).
+    expect(within(panel).getAllByText("Choose a format first.")).toHaveLength(5);
     expect(within(panel).getByRole("button", { name: "Confirm" })).toBeDisabled();
     expect(nodeRequests()).toEqual([]);
     expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();

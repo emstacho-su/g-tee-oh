@@ -32,9 +32,8 @@ import {
   draftFromSearch,
   draftPair,
   draftUncoveredPair,
-  fieldWaitText,
+  fieldStates,
   searchFromDraft,
-  settingChoices,
   settingsSignature,
   settingsSummary,
   withSetting,
@@ -72,10 +71,10 @@ interface SettingsAreaProps {
 }
 
 function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose }: SettingsAreaProps) {
-  const { catalog, draftReads, draftSeatsFailed } = entry;
-  const choices = useMemo(() => (catalog === undefined ? undefined : settingChoices(catalog, draft)), [catalog, draft]);
-  const blocker = confirmBlocker(catalog, draft, choices, { seatsFailed: draftSeatsFailed });
-  const waitText = (key: SettingKey) => fieldWaitText(catalog, draft, key, draftSeatsFailed);
+  const { catalog, draftSeats } = entry;
+  const seatsFailed = draftSeats.failed;
+  const fields = useMemo(() => fieldStates(catalog, draft, { seatsFailed }), [catalog, draft, seatsFailed]);
+  const blocker = confirmBlocker(catalog, draft, { states: fields, seatsFailed });
   const uncovered = catalog === undefined ? undefined : draftUncoveredPair(catalog, draft);
   const onConfirm = () => {
     if (catalog === undefined || blocker !== undefined) return;
@@ -91,12 +90,11 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
   };
   return (
     <StudySettingsPanel
-      choices={choices}
+      fields={fields}
       draft={draft}
       blocker={blocker}
-      waitText={waitText}
       {...(uncovered === undefined ? {} : { notice: uncoveredNotice(uncovered) })}
-      {...(draftReads.error === null ? {} : { seatsFailure: { onRetry: draftReads.retry } })}
+      {...(seatsFailed ? { seatsFailure: { onRetry: draftSeats.retry } } : {})}
       onChange={onChange}
       onConfirm={onConfirm}
       {...(onClose === undefined ? {} : { onCancel: onClose })}
