@@ -13,7 +13,7 @@
  * scrolls sideways at 390 px. A legend explains every mark. The cell buttons are the one accessible
  * representation: each name states the class and every value (S36 review, O-347; no table).
  */
-import { useId, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 import {
   cellLookup,
@@ -28,7 +28,7 @@ import {
 } from "../../progress/heatmap-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
-import { cn } from "../ui/index.js";
+import { cn, STICKY_LAYER_CLASS } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
@@ -81,19 +81,17 @@ function Legend() {
 interface CellButtonProps {
   view: HeatCellView;
   pending: boolean;
-  describedBy: string | undefined;
   onDrill: (target: DrillTarget) => void;
   onShow: (view: HeatCellView, element: Element) => void;
   onHide: () => void;
 }
 
-function CellButton({ view, pending, describedBy, onDrill, onShow, onHide }: CellButtonProps) {
+function CellButton({ view, pending, onDrill, onShow, onHide }: CellButtonProps) {
   const practiced = view.bin !== null;
   return (
     <button
       type="button"
       aria-label={view.label}
-      aria-describedby={describedBy}
       disabled={pending}
       data-testid="heat-cell"
       data-state={practiced ? "practiced" : "new"}
@@ -120,11 +118,12 @@ function CellButton({ view, pending, describedBy, onDrill, onShow, onHide }: Cel
   );
 }
 
-const STICKY = "sticky left-0 z-10 bg-surface-raised";
+// Everything that sticks while the grid scrolls sideways (the pair column, the family labels) sits
+// on the sticky layer below the header, on the card's ground so cells never show through.
+const STICKY = cn("sticky left-0 bg-surface-raised", STICKY_LAYER_CLASS);
 
 function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; pendingKey: string | null; onDrill: (target: DrillTarget) => void }) {
   const lookup = cellLookup(heatmap);
-  const tooltipId = useId();
   const tooltip = useTooltipAnchor();
   const [active, setActive] = useState<HeatCellView | null>(null);
   const show = (view: HeatCellView, element: Element) => {
@@ -154,7 +153,7 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
           <tbody key={group.family}>
             <tr>
               <th scope="colgroup" colSpan={columnCount} className="pt-2 text-xs font-semibold text-muted">
-                <span className="sticky left-0">{group.family}</span>
+                <span className={cn(STICKY, "inline-block pr-2")}>{group.family}</span>
               </th>
             </tr>
             {group.rows.map((entry) => (
@@ -168,7 +167,6 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
                         <CellButton
                           view={view}
                           pending={pendingKey === view.cell.spot_class_key}
-                          describedBy={active?.cell.spot_class_key === view.cell.spot_class_key ? tooltipId : undefined}
                           onDrill={onDrill}
                           onShow={show}
                           onHide={hide}
@@ -182,7 +180,7 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
           </tbody>
         ))}
       </table>
-      <ChartTooltip id={tooltipId} anchor={active === null ? null : tooltip.anchor}>
+      <ChartTooltip anchor={active === null ? null : tooltip.anchor}>
         {active === null ? null : (
           <>
             <p className="font-semibold">{active.classText}</p>

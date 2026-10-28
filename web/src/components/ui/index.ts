@@ -6,7 +6,7 @@ export type { CardHeadingLevel, CardProps, PanelProps } from "./Card.js";
 export { PageHeader } from "./PageHeader.js";
 export type { PageHeaderProps } from "./PageHeader.js";
 export { CONTROL_EDGE_CLASS, FIELD_CLASS, FLAT_REST_CLASS, RAISED_CLASS, TACTILE_CLASS } from "./tactile.js";
-export { DIALOG_LAYER_CLASS, HEADER_LAYER_CLASS, OVERLAY_LAYER_CLASS, TOOLTIP_LAYER_CLASS } from "./layers.js";
+export { DIALOG_LAYER_CLASS, HEADER_LAYER_CLASS, OVERLAY_LAYER_CLASS, STICKY_LAYER_CLASS, TOOLTIP_LAYER_CLASS } from "./layers.js";
 export { NAV_PILL_LINK_PROPS, PillNav } from "./PillNav.js";
 export type { PillNavProps } from "./PillNav.js";
 export { Dialog } from "./Dialog.js";
