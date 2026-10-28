@@ -42,3 +42,20 @@ export function contrastRatio(first: string, second: string): number {
   const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort((left, right) => right - left);
   return ((lighter ?? 0) + FLARE) / ((darker ?? 0) + FLARE);
 }
+
+/** The ink of the two with the higher contrast ratio on the fill (the matrix's printed numbers). */
+export function inkFor(fill: string, darkInk: string, lightInk: string): string {
+  return contrastRatio(darkInk, fill) >= contrastRatio(lightInk, fill) ? darkInk : lightInk;
+}
+
+/**
+ * The one lightness split for patterns drawn over a fill (review round 1, 5): a fill with a relative
+ * luminance below it is dark and takes light hatch lines, on the action swatches (hatchInkFor) and
+ * on the range matrix's canvas alike.
+ */
+export const DARK_FILL_LUMINANCE = 0.2;
+
+/** True when lines drawn over this fill should be light. */
+export function isDarkFill(fill: string): boolean {
+  return relativeLuminance(fill) < DARK_FILL_LUMINANCE;
+}

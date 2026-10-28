@@ -21,7 +21,7 @@
 import type { NodeAction } from "../../contracts.js";
 import { actionColor, actionStyle, sizeRank, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
 import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatWeightShort } from "./cell-text.js";
-import { isDarkFill } from "./color.js";
+import { isDarkFill } from "../../theme/color-contrast.js";
 import { MATRIX_PALETTES, evFill, evInk, weightFill, weightInk, type ResolvedPalette } from "./matrix-theme.js";
 import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
 import type { MatrixCell, MatrixMode, MatrixModel } from "./model.js";

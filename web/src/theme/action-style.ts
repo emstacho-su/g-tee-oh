@@ -26,7 +26,7 @@
  * shape, so their entries stay on one line each and carry no comments.
  */
 import type { ActionKind, NodeAction } from "../contracts.js";
-import { contrastRatio, relativeLuminance } from "./color-contrast.js";
+import { DARK_FILL_LUMINANCE, inkFor, isDarkFill } from "./color-contrast.js";
 
 export type ThemeName = "light" | "dark";
 export type HatchPattern = "none" | "diagonal" | "cross" | "dots" | "vertical" | "horizontal" | "reverse";
@@ -72,12 +72,12 @@ export const SIZE_SHADES: Readonly<Record<ThemeName, readonly string[]>> = {
 export const HATCH_INK = {
   onDark: "rgba(255, 255, 255, 0.5)",
   onLight: "rgba(0, 0, 0, 0.35)",
-  lightnessSplit: 0.2,
+  lightnessSplit: DARK_FILL_LUMINANCE,
 } as const;
 
 /** The hatch ink for one fill color (a hex value). */
 export function hatchInkFor(fill: string): string {
-  return relativeLuminance(fill) < HATCH_INK.lightnessSplit ? HATCH_INK.onDark : HATCH_INK.onLight;
+  return isDarkFill(fill) ? HATCH_INK.onDark : HATCH_INK.onLight;
 }
 
 /**
@@ -92,7 +92,7 @@ export const ACTION_INK = {
 
 /** The text ink for one fill color (a hex value): the one of the two with the higher contrast. */
 export function actionInkFor(fill: string): string {
-  return contrastRatio(ACTION_INK.onDark, fill) >= contrastRatio(ACTION_INK.onLight, fill) ? ACTION_INK.onDark : ACTION_INK.onLight;
+  return inkFor(fill, ACTION_INK.onDark, ACTION_INK.onLight);
 }
 
 const SIZED_KINDS: ReadonlySet<ActionKind> = new Set<ActionKind>(["bet", "raise"]);

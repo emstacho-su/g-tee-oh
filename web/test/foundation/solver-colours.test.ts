@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { ACTION_INK_CLASSES, actionFillStyle } from "../../src/components/trainer/ActionSwatch.js";
-import { contrastRatio, relativeLuminance } from "../../src/theme/color-contrast.js";
+import { DARK_FILL_LUMINANCE, contrastRatio, inkFor, isDarkFill, relativeLuminance } from "../../src/theme/color-contrast.js";
 import {
   ACTION_INK,
   ACTION_STYLES,
@@ -150,5 +150,17 @@ describe("R3.13 colour contrast helpers", () => {
 
   it("R3.13 rejects a value that is not a hex colour", () => {
     expect(() => relativeLuminance("red")).toThrow(RangeError);
+  });
+
+  it("R3.13 inkFor picks the ink with the higher contrast on a fill (review round 1, 5)", () => {
+    expect(inkFor("#ffffff", "#000000", "#ffffff")).toBe("#000000");
+    expect(inkFor("#1c1210", "#000000", "#fbf7f1")).toBe("#fbf7f1");
+  });
+
+  it("R3.13 one lightness split: the swatch's hatch ink and the matrix's hatch follow isDarkFill (review round 1, 5)", () => {
+    expect(HATCH_INK.lightnessSplit).toBe(DARK_FILL_LUMINANCE);
+    for (const colour of [...SIZE_SHADES.light, ...SIZE_SHADES.dark, "#2563eb", "#15803d", "#a78bfa"]) {
+      expect(hatchInkFor(colour)).toBe(isDarkFill(colour) ? HATCH_INK.onDark : HATCH_INK.onLight);
+    }
   });
 });

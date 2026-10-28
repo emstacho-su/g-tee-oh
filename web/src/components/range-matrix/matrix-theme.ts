@@ -15,7 +15,7 @@
  * simulation in both themes.
  */
 import type { ThemeName } from "../../theme/action-style.js";
-import { inkFor } from "./color.js";
+import { inkFor } from "../../theme/color-contrast.js";
 import { EV_STEPS, evStep, weightStep } from "./scales.js";
 
 export interface MatrixPalette {

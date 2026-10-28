@@ -14,7 +14,7 @@ import { buildMatrixModel, type MatrixCell, type MatrixModel } from "../../src/c
 import { MISSING_PATTERN_KEY } from "../../src/components/range-matrix/patterns.js";
 import { fixtureStudyNode } from "../../src/fixtures/index.js";
 import { actionColor, actionStyle } from "../../src/theme/action-style.js";
-import { luminance } from "../support/color-math.js";
+import { isDarkFill } from "../../src/theme/color-contrast.js";
 import { fakePatternSource, isFakePattern, recordingContext, type RecordedOp } from "./recording-context.js";
 
 const SIZE_PX = 520;
@@ -201,7 +201,8 @@ describe("R3.12 range matrix drawing", () => {
     const source = fakePatternSource();
     draw(buildMatrixModel({ actions, hands }), { patterns: source });
     for (const action of actions.slice(1)) {
-      const dark = luminance(actionColor(action, actions, "light")) < 0.18;
+      // One shared lightness split decides light or dark hatch everywhere (review round 1, 5).
+      const dark = isDarkFill(actionColor(action, actions, "light"));
       const keys = source.requested.filter((key) => key.startsWith(`${actionStyle(action.kind).pattern}:`));
       expect(keys.length).toBeGreaterThan(0);
       expect(keys.every((key) => key.endsWith(dark ? ":light" : ":dark"))).toBe(true);
