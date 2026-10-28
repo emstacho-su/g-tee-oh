@@ -6,7 +6,8 @@
  * - level 1 (action): the hand's highest-EV action. An answer is correct when its loss is at or
  *   below the node's floor, what grading labels Best or Correct (O-379); the reveal names the
  *   lowest-loss action or actions (learning's lowestLossIndexes, the one tie rule, O-370) and lists
- *   every correct action with its frequency (ADR 0024 consequence 2, O-374). Levels 2 and 3 ask
+ *   the other correct actions with their frequencies, leaving the clause out when there are none
+ *   (ADR 0024 consequence 2, O-374; S41 fixed the repeat). Levels 2 and 3 ask
  *   about frequency by their wording and keep the frequency rule.
  * - level 2 (band): the band (0 to 25, 25 to 50, 50 to 75, 75 to 100 percent; lower edge
  *   inclusive, 100 in the top band) of the hand's most frequent action (lowest index on a tie).
@@ -85,18 +86,30 @@ function labels(node: SqNode, indexes: readonly number[]): string {
   return indexes.map((index) => actionLabel(node, index)).join(" or ");
 }
 
+/**
+ * The reveal's "also correct" clause (S37 review LOW, fixed in S41): only the correct actions that
+ * are not already named as the highest EV, each with its frequency; empty when there are none.
+ */
+function alsoCorrect(node: SqNode, row: SqHandRow, correct: readonly number[], best: readonly number[]): string {
+  const others = correct.filter((index) => !best.includes(index));
+  if (others.length === 0) {
+    return "";
+  }
+  const listed = others.map((index) => `${actionLabel(node, index)} ${formatPct(frequencyOf(row, index) * PERCENT)}`).join(", ");
+  return ` Within the noise floor, so also correct: ${listed}.`;
+}
+
 function actionQuestion(node: SqNode, row: SqHandRow): PredictionQuestion {
   const indexes = node.actions.map((action) => action.index);
   const best = highestEvIndexes(row, indexes);
   const correct = correctActionIndexes(row, indexes, node.floor_pct_pot, best);
   const frequencyPct = best.reduce((sum, index) => sum + frequencyOf(row, index), 0) * PERCENT;
-  const within = correct.map((index) => `${actionLabel(node, index)} ${formatPct(frequencyOf(row, index) * PERCENT)}`).join(", ");
   return {
     ...base(LEVEL_ACTION, row),
     answer_kind: "action",
     question: `What is ${node.to_act}'s highest-EV action with ${row.hand}?`,
     truth: {
-      text: `${node.to_act}'s highest-EV action with ${row.hand} is ${labels(node, best)}. Within the noise floor, so also correct: ${within}.`,
+      text: `${node.to_act}'s highest-EV action with ${row.hand} is ${labels(node, best)}.${alsoCorrect(node, row, correct, best)}`,
       share_pct: null,
       frequency_pct: frequencyPct,
       action_indexes: correct,

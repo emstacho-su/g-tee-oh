@@ -47,6 +47,9 @@ import { sessionSpotSchema, type SessionSpot } from "./spot.js";
 
 /** The most hero spots a session keeps; a drill over many pairs keeps the first ones found. */
 export const MAX_HERO_SPOTS = 128;
+/** A quiz asks levels 1 to 3 (O-410) on at most the two prediction ladders (O-411). */
+const MAX_QUIZ_LEVEL = 3;
+const QUIZ_LADDERS = ["range", "hand"] as const;
 
 /** Why the hand stops at its current node: a fold, the street closing, or a hand the solution never holds there. */
 export const handEndSchema = z.enum(["fold", "street_closed", "off_range"]);
@@ -158,10 +161,21 @@ export const learningStateSchema = z.discriminatedUnion("kind", [automatedLearni
  * and range-paint/ parse with their own schemas. Drill sessions have none.
  */
 export const practiceKindSchema = z.enum(["prediction", "range_paint"]);
+/**
+ * S41 (O-410, O-411): a quiz's options, set at POST /sessions from the body's quiz. Every prompt asks
+ * `level` (the difficulty's level, never levelFor's) on the `ladders` it names. Absent on
+ * drill-backed prediction sessions started without quiz options and on rows written before S41,
+ * which keep levelFor's unlocks.
+ */
+export const quizStateSchema = z.strictObject({
+  level: z.number().int().min(1).max(MAX_QUIZ_LEVEL),
+  ladders: z.array(z.enum(QUIZ_LADDERS)).min(1).max(QUIZ_LADDERS.length),
+});
 export const practiceStateSchema = z.strictObject({
   kind: practiceKindSchema,
   counter: z.number().int().min(0),
   data: z.record(z.string(), z.unknown()),
+  quiz: quizStateSchema.optional(),
 });
 
 export const persistedStateSchema = z.strictObject({
@@ -186,6 +200,7 @@ export const persistedStateSchema = z.strictObject({
 
 export type PracticeKind = z.infer<typeof practiceKindSchema>;
 export type PracticeState = z.infer<typeof practiceStateSchema>;
+export type QuizState = z.infer<typeof quizStateSchema>;
 export type HandEnd = z.infer<typeof handEndSchema>;
 export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 export type HeroSpot = z.infer<typeof heroSpotSchema>;
@@ -217,6 +232,12 @@ export interface InitialStateExtras {
   seeded?: boolean;
   /** S27 (O-302): a prediction or range_paint session's kind. */
   practice?: PracticeKind;
+  /** S41 (O-410, O-411): a prediction session's quiz options. */
+  quiz?: QuizState;
+}
+
+function initialPractice(kind: PracticeKind, quiz: QuizState | undefined): PracticeState {
+  return { kind, counter: 0, data: {}, ...(quiz === undefined ? {} : { quiz }) };
 }
 
 /**
@@ -241,6 +262,6 @@ export function initialState(
     last_attempt_id: null,
     learning: extras.learning ?? null,
     seeded: extras.seeded ?? false,
-    ...(extras.practice === undefined ? {} : { practice: { kind: extras.practice, counter: 0, data: {} } }),
+    ...(extras.practice === undefined ? {} : { practice: initialPractice(extras.practice, extras.quiz) }),
   });
 }

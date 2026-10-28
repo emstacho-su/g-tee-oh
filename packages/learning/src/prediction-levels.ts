@@ -80,6 +80,25 @@ function sameLadder(record: PredictionAnswerRecord, key: PredictionLadderKey): b
   return record.spotClassKey === key.spotClassKey && record.ladder === key.ladder;
 }
 
+/** A quiz level's window and whether it is passed (S41, O-410). */
+export interface LevelWindow {
+  window: PredictionWindow;
+  passed: boolean;
+}
+
+/**
+ * The window of the answers at exactly `level` of `key`'s ladder (S41, O-410): the last
+ * PREDICTION_WINDOW of them in `history` (time order, oldest first), passed when windowUnlocks
+ * holds. A quiz asks the level its difficulty names whatever levelFor says, so answers at a level
+ * the ladder never unlocked count here, and level 3 can be passed.
+ */
+export function windowAtLevel(history: readonly PredictionAnswerRecord[], key: PredictionLadderKey, level: number): LevelWindow {
+  const asked = requireLevel(level);
+  const atLevel = history.filter((record) => sameLadder(record, key) && record.level === asked).map((record) => record.correct);
+  const window = windowOf(atLevel);
+  return { window, passed: windowUnlocks(window) };
+}
+
 /** The level of `key`'s ladder after replaying `history` (time order, oldest first). */
 export function levelFor(history: readonly PredictionAnswerRecord[], key: PredictionLadderKey): PredictionLevel {
   let level = FIRST_LEVEL;

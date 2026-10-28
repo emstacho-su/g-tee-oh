@@ -4,7 +4,9 @@
  *
  * - create: dispatches by mode (the S31 mode split): drill, and S27's drill-backed prediction and
  *   range_paint modes (O-302, which start with a practice state instead of a hand), to
- *   sessions/modes/drill.ts (S23's code); automated to modes/automated.ts; holdout to
+ *   sessions/modes/drill.ts (S23's code), or, when the body names a catalog_spot instead of a
+ *   drill (S41, O-415), to modes/catalog-spot.ts, after practice-rules.ts has checked the S41
+ *   fields fit the mode; automated to modes/automated.ts; holdout to
  *   modes/holdout.ts (which ends the user's open holdout session through endLockedSession first,
  *   PR #27 review HIGH 1).
  * - next: pure (the S23 binding rule). It serves the graded modes only (drill, automated, holdout;
@@ -38,7 +40,9 @@ import { deriveAwaitHero } from "./derive.js";
 import { deriveSettingsFor } from "./derive-settings.js";
 import { transition } from "./machine.js";
 import { createAutomatedSession } from "./modes/automated.js";
+import { createCatalogSpotSession } from "./modes/catalog-spot.js";
 import { createDrillSession } from "./modes/drill.js";
+import { checkPracticeStartRules } from "./modes/practice-rules.js";
 import { createHoldoutSession, type ReplaceOpenSession } from "./modes/holdout.js";
 import { requireGradedSessionMode, sessionEndedProblem } from "./problems.js";
 import { toPrompt, type Prompt } from "./prompt.js";
@@ -77,11 +81,17 @@ export interface CreateClock {
 }
 
 export async function createSession(call: SessionCall, body: SessionCreateBody, clock: CreateClock): Promise<Session> {
+  checkPracticeStartRules(body);
   switch (body.mode) {
     case "drill":
-    case "prediction":
-    case "range_paint":
       return createDrillSession(call, body, body.mode);
+    case "prediction":
+    case "range_paint": {
+      const { catalog_spot: catalogSpot } = body;
+      return catalogSpot === undefined
+        ? createDrillSession(call, body, body.mode)
+        : createCatalogSpotSession(call, { ...body, catalog_spot: catalogSpot }, body.mode);
+    }
     case "automated":
       return createAutomatedSession(call, body, clock.now);
     case "holdout":

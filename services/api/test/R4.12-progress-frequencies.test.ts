@@ -152,7 +152,9 @@ describe("R4.12 GET /progress/frequencies", () => {
     expect(spot).toMatchObject({ config_id: CONFIG, pair: PAIR, hero_position: "BB", spot_class_key: defend.spot_class_key });
     expect(spot?.action_family).toBe(defend.action_family ?? null);
     expect(spot?.actions).toEqual(defend.actions.map((action) => ({ index: action.index, label: action.label, kind: action.kind })));
-    expect(spot?.pooled?.your_freq).toEqual([9 / 31, 16 / 31, 6 / 31].map((value) => expect.closeTo(value, 6)));
+    const yours = [9 / 31, 16 / 31, 6 / 31];
+    expect(spot?.pooled?.your_freq).toHaveLength(yours.length);
+    spot?.pooled?.your_freq.forEach((value, index) => expect(Math.abs(value - (yours[index] ?? 0))).toBeLessThan(CLOSE));
     const pooledRows: Array<[number[], number]> = [
       [strategyOf(defend, "AKs"), 12],
       [strategyOf(defend, "QJs"), 10],
@@ -197,10 +199,10 @@ describe("R4.12 GET /progress/frequencies", () => {
     const owner = await newPlayer(database);
     const counted = await sessionFor(owner);
     await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 31 });
-    await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 40, nodeKey: `${DEFEND_NODE}.c` });
+    await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 40, nodeKey: `${DEFEND_NODE}.r9000` });
     expect((await read(owner)).spots.map((spot) => spot.node_key)).toEqual([DEFEND_NODE]);
     for (let gone = 0; gone < MAX_FREQUENCY_SPOTS; gone += 1) {
-      await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 50, nodeKey: `${DEFEND_NODE}.r${gone + 900}` });
+      await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 50, nodeKey: `${DEFEND_NODE}.r${9001 + gone}` });
     }
     expect((await read(owner)).spots, "r250 is the 13th most played node now").toEqual([]);
   });

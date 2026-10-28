@@ -133,11 +133,12 @@ export type {
 } from "./leak-cost.js";
 
 // S27: prediction levels (R3.16)
-export { MAX_PREDICTION_LEVEL, PREDICTION_UNLOCK_PCT, PREDICTION_WINDOW, levelFor, windowUnlocks } from "./prediction-levels.js";
+export { MAX_PREDICTION_LEVEL, PREDICTION_UNLOCK_PCT, PREDICTION_WINDOW, levelFor, windowAtLevel, windowUnlocks } from "./prediction-levels.js";
 export type {
   PredictionAnswerRecord,
   PredictionLadder,
   PredictionLadderKey,
+  LevelWindow,
   PredictionLevel,
   PredictionWindow,
 } from "./prediction-levels.js";
