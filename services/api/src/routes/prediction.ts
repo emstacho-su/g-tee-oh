@@ -26,8 +26,11 @@ import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "prediction";
 
-/** GET next also answers 409 for an ended session or a session of another mode (O-302). */
-const NEXT_PROBLEMS = [...UPSTREAM_READ_PROBLEMS, HTTP_STATUS.conflict] as const;
+/**
+ * GET next also answers 409 for an ended session or a session of another mode (O-302), and 422
+ * no-quiz-questions when a quiz's spots can no longer ask its level on its kinds (O-411 amended).
+ */
+const NEXT_PROBLEMS = [...UPSTREAM_READ_PROBLEMS, HTTP_STATUS.conflict, HTTP_STATUS.unprocessable] as const;
 
 export const predictionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, _options, done) => {
   app.get(

@@ -2672,6 +2672,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (422) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -6487,6 +6496,11 @@ export interface components {
             pair: string;
             /** @description Every hand pooled; null below min_spot_decisions */
             pooled: components["schemas"]["FrequencyRow"] | null;
+            /**
+             * Format: uuid
+             * @description The solution the decisions were graded on; a rebuilt node is its own spot (PR #39 review finding 6)
+             */
+            solution_id: string;
             spot_class_key: string;
         };
         SpotFrequencyInput: {
@@ -6507,6 +6521,11 @@ export interface components {
             pair: string;
             /** @description Every hand pooled; null below min_spot_decisions */
             pooled: components["schemas"]["FrequencyRowInput"] | null;
+            /**
+             * Format: uuid
+             * @description The solution the decisions were graded on; a rebuilt node is its own spot (PR #39 review finding 6)
+             */
+            solution_id: string;
             spot_class_key: string;
         };
         Stake: {

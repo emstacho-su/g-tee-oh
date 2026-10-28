@@ -10,7 +10,9 @@
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../../http/problem.js";
 import { levelOfDifficulty, type QuizOptions } from "../../schemas/practice-start.js";
 import type { SessionCreateBody } from "../session-call.js";
+import { canAskQuiz, noQuizQuestionsProblem } from "../../prediction/quiz-questions.js";
 import type { QuizState } from "../state.js";
+import type { SpotFilter } from "./spot-start.js";
 
 const PRACTICE_MODES: readonly string[] = ["prediction", "range_paint"];
 
@@ -30,6 +32,17 @@ export function checkPracticeStartRules(body: SessionCreateBody): void {
   if (body.quiz !== undefined && body.mode !== "prediction") {
     throw badRequest("Only a prediction session takes quiz.");
   }
+}
+
+/**
+ * The spot filter of a quiz (O-411 amended, PR #39 review finding 2): only hero spots that can ask the
+ * quiz's exact level on a chosen ladder, else the 422 no-quiz-questions problem; none without a quiz.
+ */
+export function quizSpotFilter(quiz: QuizState | undefined): SpotFilter | undefined {
+  if (quiz === undefined) {
+    return undefined;
+  }
+  return { accept: (node) => canAskQuiz(node, quiz), refused: () => noQuizQuestionsProblem(quiz) };
 }
 
 /** The quiz state a body's quiz options set (O-410, O-411); undefined without them. */

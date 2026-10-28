@@ -23,7 +23,9 @@ export const MAX_PREDICTION_LEVEL = 3;
 const FIRST_LEVEL = 1;
 const PERCENT = 100;
 
-export type PredictionLadder = "range" | "hand";
+/** The two ladders, the one list every ladder enum and loop reads (PR #39 review finding 8). */
+export const PREDICTION_LADDERS = ["range", "hand"] as const;
+export type PredictionLadder = (typeof PREDICTION_LADDERS)[number];
 
 /** The (spot class, ladder) a level belongs to; levels are never shared across either. */
 export interface PredictionLadderKey {

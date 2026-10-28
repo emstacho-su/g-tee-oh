@@ -27,7 +27,7 @@ import type { SessionCall, SessionCreateBody } from "../session-call.js";
 import type { Session } from "../session-view.js";
 import { spotOf } from "../spot.js";
 import { initialState } from "../state.js";
-import { quizStateOf } from "./practice-rules.js";
+import { quizSpotFilter, quizStateOf } from "./practice-rules.js";
 import { findHeroSpots, writeSpotSession } from "./spot-start.js";
 
 /** The modes a drill backs: drill itself (S23) and S27's practice modes (O-302). */
@@ -57,8 +57,10 @@ export async function createDrillSession(call: SessionCall, body: SessionCreateB
   const candidates = candidatesFor(await configIdsFor(database, filter), pairsFor(filter));
   const line = filter.line ?? null;
   const spot = spotOf(filter);
-  const found = await findHeroSpots(call, { candidates, heroPositions: filter.hero_positions, spot, line });
   const quiz = quizStateOf(body.quiz);
+  const quizFilter = quizSpotFilter(quiz);
+  const search = { candidates, heroPositions: filter.hero_positions, spot, line };
+  const found = await findHeroSpots(call, quizFilter === undefined ? search : { ...search, filter: quizFilter });
   // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
   const state = initialState(body.seed ?? newSessionSeed(), found.heroSpots, spot, {
     seeded: body.seed !== undefined,

@@ -21,20 +21,18 @@ import { requireDatabase } from "../../http/database.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../../http/problem.js";
 import { trainerSettingsSchema } from "../../schemas/drills.js";
 import type { CatalogSpot } from "../../schemas/practice-start.js";
-import { candidatesFor, pairsAt } from "../candidates.js";
+import { candidatesFor, NO_ANTE_CBB, pairsAt } from "../candidates.js";
 import { newSessionSeed } from "../randomness.js";
 import type { SessionCall, SessionCreateBody } from "../session-call.js";
 import type { Session } from "../session-view.js";
 import { sessionSpotSchema } from "../spot.js";
 import { initialState } from "../state.js";
-import { quizStateOf } from "./practice-rules.js";
+import { quizSpotFilter, quizStateOf } from "./practice-rules.js";
 import { findHeroSpots, writeSpotSession } from "./spot-start.js";
 
 /** The modes a catalog spot starts (O-415). */
 export type CatalogSpotMode = "prediction" | "range_paint";
 
-/** Ante variants are stored but not served in v1 (O-33). */
-const SERVED_ANTE_CBB = 0;
 /** A catalog spot's search starts at each pair's root. */
 const ROOT_LINE = null;
 
@@ -49,7 +47,7 @@ async function servedTableSize(database: Database, configId: string): Promise<nu
     .select(["table_size", "ante_cbb"])
     .where("id", "=", configId)
     .executeTakeFirst();
-  if (row === undefined || row.ante_cbb !== SERVED_ANTE_CBB) {
+  if (row === undefined || row.ante_cbb !== NO_ANTE_CBB) {
     throw badRequest("No catalog configuration has this id.");
   }
   return row.table_size;
@@ -75,8 +73,10 @@ export async function createCatalogSpotSession(
   const pairs = pairsAt(tableSize, catalogSpot.hero_positions, catalogSpot.villain_positions ?? []);
   const candidates = candidatesFor([catalogSpot.config_id], pairs);
   const spot = sessionSpotSchema.parse({ preflop_action: catalogSpot.spot_types, hands: { mode: "all" }, alternate_seats: false });
-  const found = await findHeroSpots(call, { candidates, heroPositions: catalogSpot.hero_positions, spot, line: ROOT_LINE });
   const quiz = quizStateOf(body.quiz);
+  const quizFilter = quizSpotFilter(quiz);
+  const search = { candidates, heroPositions: catalogSpot.hero_positions, spot, line: ROOT_LINE };
+  const found = await findHeroSpots(call, quizFilter === undefined ? search : { ...search, filter: quizFilter });
   // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
   const state = initialState(body.seed ?? newSessionSeed(), found.heroSpots, spot, {
     seeded: body.seed !== undefined,

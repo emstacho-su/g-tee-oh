@@ -13,9 +13,9 @@
  */
 import { requireDatabase } from "../../http/database.js";
 import { idempotentWrite } from "../../http/idempotent-write.js";
-import { HTTP_STATUS } from "../../http/problem.js";
+import { HTTP_STATUS, type ProblemError } from "../../http/problem.js";
 import type { TrainerSettings } from "../../schemas/drills.js";
-import { requireSolverQuery } from "../../solver-query/client.js";
+import { requireSolverQuery, type SqNode } from "../../solver-query/client.js";
 import { splitByCoverage, type PairCandidate } from "../candidates.js";
 import { filterUnmetProblem } from "../problems.js";
 import { insertCoverageRequests, insertSession } from "../repository.js";
@@ -32,6 +32,13 @@ export interface SpotSearchInput {
   spot: SessionSpot;
   /** The line to start every search at, or null for each pair's root. */
   line: string | null;
+  /** S41 (O-411 amended): keeps only the hero nodes `accept` takes; `refused` is the 422 when it took none. */
+  filter?: SpotFilter;
+}
+
+export interface SpotFilter {
+  accept: (node: SqNode) => boolean;
+  refused: () => ProblemError;
 }
 
 export interface FoundSpots {
@@ -45,11 +52,26 @@ export async function findHeroSpots(call: SessionCall, input: SpotSearchInput): 
   const database = requireDatabase(call.app);
   const port = solverPort(requireSolverQuery(call.app), call.request);
   const { covered, gaps } = await splitByCoverage(input.candidates, port);
-  const heroSpots = await heroSpotsFor(covered, { heroPositions: input.heroPositions, spot: input.spot, line: input.line }, port);
+  // Whether the filter turned away a hero node, so an empty result names the filter, not the library.
+  let refusedAny = false;
+  const filter = input.filter;
+  const accept =
+    filter === undefined
+      ? undefined
+      : (node: SqNode): boolean => {
+          const taken = filter.accept(node);
+          refusedAny = refusedAny || !taken;
+          return taken;
+        };
+  const search = { heroPositions: input.heroPositions, spot: input.spot, line: input.line, ...(accept === undefined ? {} : { accept }) };
+  const heroSpots = await heroSpotsFor(covered, search, port);
   const total = input.candidates.length;
   if (heroSpots.length === 0) {
     // The gap rows are recorded even though the session is refused (05 section 1, O-240).
     await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, input.line));
+    if (refusedAny && filter !== undefined) {
+      throw filter.refused();
+    }
     const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
     throw filterUnmetProblem(reason, `${gaps.length} of its ${total} spots were queued for the builder.`, {
       pairsTotal: total,

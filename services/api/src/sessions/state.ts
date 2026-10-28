@@ -29,6 +29,7 @@
  * response time (learning-state/repository.ts countedAttempts, shared-effects.ts); read it through
  * isSeededSession, which also honours the automated learning state's own seeded flag.
  */
+import { MAX_PREDICTION_LEVEL, PREDICTION_LADDERS } from "@g-tee-oh/learning";
 import { z } from "zod";
 
 import { actionKindSchema } from "../schemas/study.js";
@@ -47,9 +48,6 @@ import { sessionSpotSchema, type SessionSpot } from "./spot.js";
 
 /** The most hero spots a session keeps; a drill over many pairs keeps the first ones found. */
 export const MAX_HERO_SPOTS = 128;
-/** A quiz asks levels 1 to 3 (O-410) on at most the two prediction ladders (O-411). */
-const MAX_QUIZ_LEVEL = 3;
-const QUIZ_LADDERS = ["range", "hand"] as const;
 
 /** Why the hand stops at its current node: a fold, the street closing, or a hand the solution never holds there. */
 export const handEndSchema = z.enum(["fold", "street_closed", "off_range"]);
@@ -168,8 +166,8 @@ export const practiceKindSchema = z.enum(["prediction", "range_paint"]);
  * which keep levelFor's unlocks.
  */
 export const quizStateSchema = z.strictObject({
-  level: z.number().int().min(1).max(MAX_QUIZ_LEVEL),
-  ladders: z.array(z.enum(QUIZ_LADDERS)).min(1).max(QUIZ_LADDERS.length),
+  level: z.number().int().min(1).max(MAX_PREDICTION_LEVEL),
+  ladders: z.array(z.enum(PREDICTION_LADDERS)).min(1).max(PREDICTION_LADDERS.length),
 });
 export const practiceStateSchema = z.strictObject({
   kind: practiceKindSchema,

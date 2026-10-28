@@ -10,21 +10,20 @@
  * - quiz sets a prediction session's difficulty (Easy, Medium and Hard ask levels 1, 2 and 3,
  *   O-410) and its question kinds (the range and hand ladders, O-411).
  */
+import { PREDICTION_LADDERS } from "@g-tee-oh/learning";
 import { z } from "zod";
 
 import { configIdSchema, positionSchema } from "./common.js";
 import { MAX_POSITIONS, PREFLOP_ACTIONS } from "./drills.js";
-/**
- * The question kinds: the prediction ladders (schemas/prediction.ts predictionLadderSchema, held equal
- * by test). Declared here so this module does not import the prediction schemas, which would
- * reorder the contract components.
- */
-export const QUIZ_QUESTION_KINDS = ["range", "hand"] as const;
 
-/** The quiz difficulties in level order: Easy is level 1, Medium 2, Hard 3 (O-350, O-410). */
+/**
+ * The quiz difficulties in level order: Easy is level 1, Medium 2, Hard 3 (O-350, O-410), one per
+ * prediction level (learning's MAX_PREDICTION_LEVEL). The question kinds are learning's
+ * PREDICTION_LADDERS, the one ladder list (PR #39 review finding 8).
+ */
 export const QUIZ_DIFFICULTIES = ["easy", "medium", "hard"] as const;
 export type QuizDifficulty = (typeof QUIZ_DIFFICULTIES)[number];
-const LADDER_COUNT = QUIZ_QUESTION_KINDS.length;
+const LADDER_COUNT = PREDICTION_LADDERS.length;
 
 /** The prediction level a difficulty asks (O-410). */
 export function levelOfDifficulty(difficulty: QuizDifficulty): number {
@@ -70,7 +69,7 @@ export const quizOptionsSchema = z
   .strictObject({
     difficulty: z.enum(QUIZ_DIFFICULTIES).describe("easy, medium or hard: prediction levels 1, 2 and 3 (O-410)"),
     question_kinds: z
-      .array(z.enum(QUIZ_QUESTION_KINDS))
+      .array(z.enum(PREDICTION_LADDERS))
       .min(1)
       .max(LADDER_COUNT)
       .describe("range asks about the whole range, hand about one hand class (O-411)"),

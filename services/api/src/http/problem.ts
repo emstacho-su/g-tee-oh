@@ -97,6 +97,8 @@ export const PROBLEM_SLUGS = {
   wrongSessionMode: "wrong-session-mode",
   askDisabled: "ask-disabled",
   askCapReached: "ask-cap-reached",
+  // S41: a quiz whose spots cannot ask its difficulty on its chosen kinds (O-411 amended).
+  noQuizQuestions: "no-quiz-questions",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -129,6 +131,7 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "wrong-session-mode": "This route does not serve this session's mode",
   "ask-disabled": "Ask is off until a model key is configured",
   "ask-cap-reached": "This month's Ask budget is used",
+  "no-quiz-questions": "No questions at this difficulty in these spots",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

@@ -20,7 +20,8 @@ import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "./concurrency.js";
 
 /** Centi-big-blinds per big blind: the catalog stores depths in cbb (A4 section 1). */
 export const CBB_PER_BB = 100;
-const NO_ANTE_CBB = 0;
+/** v1 serves no ante variant (O-33); the drill and catalog-spot starts both read this. */
+export const NO_ANTE_CBB = 0;
 
 /** A (configuration, pair) a drill reaches, before its seats are searched (spot-search.ts). */
 export interface PairCandidate {

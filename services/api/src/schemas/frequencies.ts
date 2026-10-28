@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 
-import { configIdSchema, handClassSchema, nodeKeySchema, positionPairSchema, positionSchema } from "./common.js";
+import { configIdSchema, handClassSchema, nodeKeySchema, positionPairSchema, positionSchema, uuidSchema } from "./common.js";
 
 /** A spot's pooled comparison shows from this many counted decisions at its node (O-417). */
 export const MIN_SPOT_DECISIONS = 30;
@@ -41,6 +41,7 @@ export const handFrequencySchema = frequencyRowSchema
 
 export const spotFrequencySchema = z
   .object({
+    solution_id: uuidSchema.describe("The solution the decisions were graded on; a rebuilt node is its own spot (PR #39 review finding 6)"),
     node_key: nodeKeySchema,
     spot_class_key: z.string(),
     config_id: configIdSchema,

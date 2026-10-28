@@ -2,7 +2,8 @@
  * GET /progress/frequencies (R4.12, S41, O-353, O-417, O-418): your preflop action frequencies against
  * the solver's, per node and hand class.
  *
- * Mechanism: frequency-repository.ts reads the counted decisions of the user's most played nodes.
+ * Mechanism: frequency-repository.ts reads the counted decisions of the user's most played spots (a
+ * node of the solution the decisions were graded on, PR #39 review finding 6).
  * Each node's labels, seat, pair, configuration and family come from one solver-query node read for
  * its most played hand class (frequency-labels.ts, under one request deadline, a few at a time); a
  * node the library no longer holds is left out. Per node: your frequency of each action is the share
@@ -84,6 +85,7 @@ function spotOf(spot: FrequencySpotRow, node: SqNode, cells: readonly FrequencyC
     return undefined;
   }
   return {
+    solution_id: spot.solutionId,
     node_key: spot.nodeKey,
     spot_class_key: spot.spotClassKey,
     config_id: node.config_id,
@@ -112,7 +114,7 @@ export async function frequencyProgress(call: FrequencyCall): Promise<FrequencyC
     const built = spotOf(
       spot,
       node,
-      rows.cells.filter((cell) => cell.nodeKey === spot.nodeKey),
+      rows.cells.filter((cell) => cell.solutionId === spot.solutionId && cell.nodeKey === spot.nodeKey),
     );
     return built === undefined ? [] : [built];
   });

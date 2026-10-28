@@ -162,15 +162,18 @@ export async function answerPrediction(call: PredictionCall, sessionId: string, 
     const history = await answerHistory(transaction, call.userId, spotClassKey);
     const key = { spotClassKey, ladder: question.ladder };
     const after = levelFor(history, key);
+    // A quiz asks its own level, so its window and passed mark are that level's (PR #39 review finding 1).
+    const asked = windowAtLevel(history, key, question.level);
+    const isQuiz = practiceOf(locked).quiz !== undefined;
     return {
       prompt_id: derived.promptId,
       correct,
       ladder: question.ladder,
       level: question.level,
       truth: { ...question.truth },
-      window: after.window,
+      window: isQuiz ? asked.window : after.window,
       next_level_unlocked: after.unlockedNow,
-      level_passed: windowAtLevel(history, key, question.level).passed,
+      level_passed: asked.passed,
       new_level: after.level,
       state_version: written.stateVersion,
     };
