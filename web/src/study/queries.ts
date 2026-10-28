@@ -69,6 +69,36 @@ export function studyNodeQuery(api: AppApi, params: StudyNodeParams) {
   });
 }
 
+export interface StudyNodeByKeyParams {
+  configId: string;
+  pair: string;
+  /** A node key the api handed out (DecisionFeedback.node_key, a next_likely_node_key). */
+  nodeKey: string;
+}
+
+export function studyNodeByKeyKey({ configId, pair, nodeKey }: StudyNodeByKeyParams) {
+  return [STUDY_QUERY_ROOT, "node-key", configId, pair, nodeKey] as const;
+}
+
+/**
+ * The node a key names (S25 lane C, R3.13, O-281): the trainer's feedback panel knows the decided
+ * node by its key, not by its line, and GET /study/node takes node_key in place of line (O-245).
+ */
+export function studyNodeByKeyQuery(api: AppApi, params: StudyNodeByKeyParams) {
+  return queryOptions({
+    queryKey: studyNodeByKeyKey(params),
+    queryFn: async () => {
+      const { data, error, response } = await api.client.GET("/api/v1/study/node", {
+        params: { query: { config_id: params.configId, pair: params.pair, node_key: params.nodeKey } },
+      });
+      if (data === undefined) throw problemFromBody(response.status, error);
+      return data;
+    },
+    staleTime: STUDY_STALE_MS,
+    retry: false,
+  });
+}
+
 export function studyInsightsQuery(api: AppApi, params: StudyInsightsParams) {
   return queryOptions({
     queryKey: [STUDY_QUERY_ROOT, "insights", params.solutionId, params.nodeKey, params.hand] as const,
@@ -127,6 +157,27 @@ export function pairsQuery(api: AppApi, configId: string) {
     queryFn: async (): Promise<PositionPairEntry[]> => {
       const { data, error, response } = await api.client.GET("/api/v1/configs/{id}/pairs", {
         params: { path: { id: configId }, query: { limit: CATALOG_PAGE_LIMIT } },
+      });
+      if (data === undefined) throw problemFromBody(response.status, error);
+      return data.items;
+    },
+    staleTime: CATALOG_STALE_MS,
+    retry: false,
+  });
+}
+
+/**
+ * Every configuration of one format, over all table sizes and stakes (S25, R3.12). The study
+ * filters derive the table size, stake and depth choices from this one list and resolve the
+ * config_id from it (src/study/filters.ts), so choosing a filter never waits on another read.
+ * configsQuery stays the narrower read for callers that already know all three filters.
+ */
+export function formatConfigsQuery(api: AppApi, format: ConfigsParams["format"]) {
+  return queryOptions({
+    queryKey: [CATALOG_QUERY_ROOT, "configs-of-format", format] as const,
+    queryFn: async (): Promise<GameConfig[]> => {
+      const { data, error, response } = await api.client.GET("/api/v1/configs", {
+        params: { query: { format, limit: CATALOG_PAGE_LIMIT } },
       });
       if (data === undefined) throw problemFromBody(response.status, error);
       return data.items;
