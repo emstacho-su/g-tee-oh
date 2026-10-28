@@ -12,14 +12,16 @@
  *    decision was graded (ADR 0004: Rust names the kinds and gives the frequencies).
  * 3. learning's rangeDrift computes the shares, the total variation distance and its bootstrap
  *    interval, hidden below 30 decisions; this module only maps the result to the RangeDrift
- *    schema (nulls and an empty by_kind while hidden).
+ *    schema (nulls and an empty by_kind while hidden). drift-cache.ts runs these steps and caches the
+ *    result per user, spot class and newest attempt, so a repeat read runs no bootstrap (PR #29
+ *    review M9).
  *
  * It only reads: no score, rated flag, weight or label changes, and drift is never an input of
  * grading (O-304). A stored row that does not parse (kinds and frequencies of different lengths,
  * an unknown kind, an action index outside the lists) is a 500: grading wrote it, so it means a
  * corrupted row, not a user error, and the detail names no row content.
  */
-import { DRIFT_CONFIDENCE, DRIFT_MIN_DECISIONS, rangeDrift, type DriftDecision, type DriftResult } from "@g-tee-oh/learning";
+import { DRIFT_CONFIDENCE, DRIFT_MIN_DECISIONS, type DriftDecision, type DriftResult } from "@g-tee-oh/learning";
 import { z } from "zod";
 
 import type { Database } from "../db.js";
@@ -63,11 +65,19 @@ export function toDriftDecision(row: unknown): DriftDecision {
   };
 }
 
-/** The user's newest drift-ready attempts in one spot class (O-304). */
-export async function readDriftRows(database: Database, userId: string, spotClassKey: string): Promise<unknown[]> {
+/** One stored attempt row as drift reads it: the id keys the cache (drift-cache.ts), the rest is parsed by toDriftDecision. */
+export interface DriftRow {
+  id: string;
+  action_index: unknown;
+  action_kinds: unknown;
+  freq_by_action: unknown;
+}
+
+/** The user's newest drift-ready attempts in one spot class (O-304), newest first. */
+export async function readDriftRows(database: Database, userId: string, spotClassKey: string): Promise<readonly DriftRow[]> {
   return database
     .selectFrom("attempt")
-    .select(["action_index", "action_kinds", "freq_by_action"])
+    .select(["id", "action_index", "action_kinds", "freq_by_action"])
     .where("user_id", "=", userId)
     .where("spot_class_key", "=", spotClassKey)
     .where("action_kinds", "is not", null)
@@ -92,10 +102,4 @@ export function toRangeDrift(spotClassKey: string, result: DriftResult): RangeDr
     ci_high: result.ciHigh,
     by_kind: result.byKind.map((share) => ({ kind: share.kind, user_share: share.userShare, solver_share: share.solverShare })),
   };
-}
-
-/** GET /insights/drift: the session user's range drift in one node family; reads only. */
-export async function driftFor(database: Database, userId: string, spotClassKey: string): Promise<RangeDrift> {
-  const rows = await readDriftRows(database, userId, spotClassKey);
-  return toRangeDrift(spotClassKey, rangeDrift(rows.map(toDriftDecision)));
 }

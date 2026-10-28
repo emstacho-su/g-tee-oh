@@ -5,16 +5,21 @@
  * practice_session row the foreign key needs), so the tests fix the decision count exactly:
  * hidden at 29 and shown at 30, another user's rows never count, rows without action_kinds are
  * excluded, and reading drift changes no score, rated flag, weight or label. Drift is no input of
- * grading: buildGradeInput's keys name nothing drift related.
+ * grading: buildGradeInput's keys name nothing drift related. The drift cache (PR #29 review M9)
+ * serves a repeat read without recomputing, recomputes after a new attempt, stays bounded and is
+ * keyed by user, so one user never reads another user's entry.
  */
 import { randomUUID } from "node:crypto";
 
+import { rangeDrift, type DriftDecision } from "@g-tee-oh/learning";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "../src/db.js";
 import { buildGradeInput } from "../src/grading/policy.js";
-import { DRIFT_DECISIONS_CAP, toDriftDecision } from "../src/insights/drift.js";
+import { DRIFT_DECISIONS_CAP, toDriftDecision, type RangeDrift } from "../src/insights/drift.js";
+import { createDriftReader, DRIFT_CACHE_ENTRIES, DRIFT_CACHE_TTL_MS, driftCacheKey } from "../src/insights/drift-cache.js";
+import { createNodeCache } from "../src/study/node-cache.js";
 import { driftSchema } from "../src/schemas/explain.js";
 import { contractErrors } from "./support/contract.js";
 import { adminPool, appDatabase } from "./support/database.js";
@@ -198,5 +203,79 @@ describe("R3.18 drift query validation", () => {
     const anonymous = await app.inject({ method: "GET", url: `${DRIFT_PATH}?spot_class_key=x` });
     expect(anonymous.statusCode).toBe(401);
     await app.close();
+  });
+});
+
+/** A drift reader whose compute counts its calls, so a test can tell a cache hit from a recompute. */
+function countingReader(maxEntries?: number) {
+  let computes = 0;
+  const compute = (decisions: readonly DriftDecision[]) => {
+    computes += 1;
+    return rangeDrift(decisions);
+  };
+  const reader = createDriftReader({ cache: createNodeCache<RangeDrift>(maxEntries === undefined ? {} : { maxEntries }), compute });
+  return { reader, computes: () => computes };
+}
+
+describe("R3.18 drift cache (PR #29 review M9)", () => {
+  it("R3.18 names its bounds as constants and keys by user, spot class and newest attempt", () => {
+    expect(DRIFT_CACHE_ENTRIES).toBe(512);
+    expect(DRIFT_CACHE_TTL_MS).toBe(600_000);
+    const base = driftCacheKey("user-a", "class-k", "attempt-1");
+    expect(driftCacheKey("user-b", "class-k", "attempt-1")).not.toBe(base);
+    expect(driftCacheKey("user-a", "class-j", "attempt-1")).not.toBe(base);
+    expect(driftCacheKey("user-a", "class-k", "attempt-2")).not.toBe(base);
+    expect(driftCacheKey("user-a", "class-k", null)).not.toBe(base);
+    expect(driftCacheKey("user-a", "class-k", "attempt-1")).toBe(base);
+  });
+
+  it("R3.18 a second read with no new attempt does not recompute, and a new attempt recomputes", async () => {
+    const { app, player, sessionId } = await setUp();
+    const key = spotClass();
+    await insertAttempts(player.userId, sessionId, key, handSet(30));
+    const { reader, computes } = countingReader();
+    const first = await reader.read(database, player.userId, key);
+    const second = await reader.read(database, player.userId, key);
+    expect(computes()).toBe(1);
+    expect(second).toEqual(first);
+    await insertAttempts(player.userId, sessionId, key, handSet(31).slice(30), 30);
+    const third = await reader.read(database, player.userId, key);
+    expect(computes()).toBe(2);
+    expect(third.decisions).toBe(31);
+    await app.close();
+  });
+
+  it("R3.18 the cache is bounded: past its entries the least recently used class is recomputed", async () => {
+    const { app, player, sessionId } = await setUp();
+    const keys = [spotClass(), spotClass(), spotClass()];
+    for (const [index, key] of keys.entries()) {
+      await insertAttempts(player.userId, sessionId, key, handSet(30), index * 30);
+    }
+    const { reader, computes } = countingReader(2);
+    for (const key of keys) {
+      await reader.read(database, player.userId, key);
+    }
+    expect(computes()).toBe(3);
+    await reader.read(database, player.userId, keys[2] as string);
+    expect(computes()).toBe(3);
+    await reader.read(database, player.userId, keys[0] as string);
+    expect(computes()).toBe(4);
+    await app.close();
+  });
+
+  it("R3.18 a different user never gets another user's cached entry", async () => {
+    const owner = await setUp();
+    const other = await setUp();
+    const key = spotClass();
+    await insertAttempts(owner.player.userId, owner.sessionId, key, handSet(40));
+    await insertAttempts(other.player.userId, other.sessionId, key, handSet(5));
+    const { reader, computes } = countingReader();
+    expect((await reader.read(database, owner.player.userId, key)).decisions).toBe(40);
+    expect((await reader.read(database, other.player.userId, key)).decisions).toBe(5);
+    expect(computes()).toBe(2);
+    const response = await getDrift(other.app, other.player, key);
+    expect(driftSchema.parse(response.json())).toMatchObject({ decisions: 5, shown: false });
+    await owner.app.close();
+    await other.app.close();
   });
 });
