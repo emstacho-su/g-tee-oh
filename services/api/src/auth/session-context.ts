@@ -9,6 +9,8 @@ export interface SessionContext {
   sessionId: string;
   userId: string;
   email: string;
+  /** app_user.display_name (S42, O-426): the name given at join; null for the owner's CLI account. */
+  displayName: string | null;
   userCreatedAt: Date;
   /**
    * app_user.is_admin, read with the session on every request, so GET /me reports it and the web

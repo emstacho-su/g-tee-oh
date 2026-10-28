@@ -42,6 +42,7 @@ import type { NotificationSource } from "./events/source.js";
 import type { LearningHooks } from "./learning/effects.js";
 import { DEFAULT_LEARNING_HOOKS } from "./learning/hooks.js";
 import { adminRoutes } from "./routes/admin.js";
+import { adminInviteRoutes } from "./routes/admin-invites.js";
 import { authRoutes } from "./routes/auth.js";
 import { catalogRoutes } from "./routes/catalog.js";
 import { coverageRoutes } from "./routes/coverage.js";
@@ -50,6 +51,7 @@ import { eventRoutes } from "./routes/events.js";
 import { explainRoutes } from "./routes/explain.js";
 import { healthzRoutes } from "./routes/healthz.js";
 import { insightRoutes } from "./routes/insights.js";
+import { joinRoutes } from "./routes/join.js";
 import { plannedRoutes } from "./routes/planned.js";
 import { predictionRoutes } from "./routes/prediction.js";
 import { progressRoutes } from "./routes/progress.js";
@@ -143,6 +145,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(healthzRoutes, { prefix: API_PREFIX, documented: true });
   void app.register(healthzRoutes, { documented: false });
   void app.register(authRoutes, { prefix: API_PREFIX, config });
+  void app.register(joinRoutes, { prefix: API_PREFIX, config });
   void app.register(catalogRoutes, { prefix: API_PREFIX });
   void app.register(drillRoutes, { prefix: API_PREFIX });
   void app.register(studyRoutes, { prefix: API_PREFIX, config });
@@ -150,6 +153,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(sessionRoutes, { prefix: API_PREFIX, config });
   void app.register(eventRoutes, { prefix: API_PREFIX, config });
   void app.register(adminRoutes, { prefix: API_PREFIX, config });
+  void app.register(adminInviteRoutes, { prefix: API_PREFIX, config });
   void app.register(progressRoutes, { prefix: API_PREFIX, config });
   // S27 (R3.16 to R3.20): prediction, range painting, insight cards and explanations.
   void app.register(predictionRoutes, { prefix: API_PREFIX, config });

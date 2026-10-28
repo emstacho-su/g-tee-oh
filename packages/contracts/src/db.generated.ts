@@ -54,6 +54,10 @@ export interface AppJob {
 
 export interface AppUser {
   created_at: Generated<Timestamp>;
+  /**
+   * the name a member gave when joining by invite (O-426); null for the owner made by create-user
+   */
+  display_name: string | null;
   email: string;
   id: Generated<string>;
   /**
@@ -300,6 +304,21 @@ export interface IdempotencyKey {
   user_id: string;
 }
 
+export interface Invite {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  email: string;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  revoked_at: Timestamp | null;
+  /**
+   * sha256 of the secret half of the link; the link itself is shown once and never stored
+   */
+  secret_hash: Buffer;
+  used_at: Timestamp | null;
+  used_by: string | null;
+}
+
 export interface LeakHistory {
   leak_cost_bb_per_1k: number | null;
   spot_class_key: string;
@@ -508,6 +527,7 @@ export interface DB {
   holdout_round: HoldoutRound;
   holdout_summary: HoldoutSummary;
   idempotency_key: IdempotencyKey;
+  invite: Invite;
   leak_history: LeakHistory;
   leak_stat: LeakStat;
   llm_spend: LlmSpend;

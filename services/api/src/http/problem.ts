@@ -41,6 +41,7 @@ export const HTTP_STATUS = {
   forbidden: 403,
   notFound: 404,
   conflict: 409,
+  gone: 410,
   unprocessable: 422,
   tooManyRequests: 429,
   internal: 500,
@@ -97,6 +98,8 @@ export const PROBLEM_SLUGS = {
   wrongSessionMode: "wrong-session-mode",
   askDisabled: "ask-disabled",
   askCapReached: "ask-cap-reached",
+  // S42: invite links (O-422).
+  inviteInvalid: "invite-invalid",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -129,6 +132,7 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "wrong-session-mode": "This route does not serve this session's mode",
   "ask-disabled": "Ask is off until a model key is configured",
   "ask-cap-reached": "This month's Ask budget is used",
+  "invite-invalid": "This invite link is not valid",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

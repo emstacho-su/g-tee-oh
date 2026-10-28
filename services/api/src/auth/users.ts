@@ -47,11 +47,17 @@ export interface NewUserInput {
   password: string;
   /** May use the admin builder endpoints (O-242); false when absent. */
   isAdmin?: boolean;
+  /**
+   * The member's name (S42, O-426), already validated by the join schema (schemas/invites.ts);
+   * absent for an account made by create-user, which stores null.
+   */
+  displayName?: string;
 }
 
 export interface CreatedUser {
   id: string;
   email: string;
+  displayName: string | null;
   isAdmin: boolean;
   createdAt: Date;
 }
@@ -59,6 +65,7 @@ export interface CreatedUser {
 export interface UserCredentials {
   id: string;
   email: string;
+  displayName: string | null;
   passwordHash: string;
   createdAt: Date;
   /** app_user.is_admin, returned by login as user.is_admin (O-290). */
@@ -98,14 +105,14 @@ export async function createUser(database: Database, input: NewUserInput): Promi
   try {
     // A plain account never names is_admin: the app role may insert email and password_hash only
     // (PR #25 review L1), and the column defaults to false. Only the owner connection may set it.
-    const account = { email, password_hash: passwordHash };
+    const account = { email, password_hash: passwordHash, display_name: input.displayName ?? null };
     const values = input.isAdmin === true ? { ...account, is_admin: true } : account;
     const row = await database
       .insertInto("app_user")
       .values(values)
-      .returning(["id", "email", "is_admin", "created_at"])
+      .returning(["id", "email", "display_name", "is_admin", "created_at"])
       .executeTakeFirstOrThrow();
-    return { id: row.id, email: row.email, isAdmin: row.is_admin, createdAt: row.created_at };
+    return { id: row.id, email: row.email, displayName: row.display_name, isAdmin: row.is_admin, createdAt: row.created_at };
   } catch (error: unknown) {
     if (pgErrorCode(error) === PG_ERROR.uniqueViolation) {
       throw new CreateUserError("duplicate-email", `A user with the email ${email} already exists.`);
@@ -118,10 +125,17 @@ export async function createUser(database: Database, input: NewUserInput): Promi
 export async function findUserCredentials(database: Database, rawEmail: string): Promise<UserCredentials | undefined> {
   const row = await database
     .selectFrom("app_user")
-    .select(["id", "email", "password_hash", "created_at", "is_admin"])
+    .select(["id", "email", "display_name", "password_hash", "created_at", "is_admin"])
     .where("email", "=", normalizeEmail(rawEmail))
     .executeTakeFirst();
   return row === undefined
     ? undefined
-    : { id: row.id, email: row.email, passwordHash: row.password_hash, createdAt: row.created_at, isAdmin: row.is_admin };
+    : {
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        passwordHash: row.password_hash,
+        createdAt: row.created_at,
+        isAdmin: row.is_admin,
+      };
 }

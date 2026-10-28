@@ -37,6 +37,14 @@ export const mutatingHeadersSchema = z.looseObject({
 });
 
 /**
+ * Headers of an authenticated mutating route that takes no Idempotency-Key (S42: invite create,
+ * whose response holds a link that must never be stored, O-427). A key that is sent is ignored.
+ */
+export const csrfOnlyHeadersSchema = z.looseObject({
+  [CSRF_HEADER]: csrfTokenHeaderSchema,
+});
+
+/**
  * Headers of logout: the CSRF token is required when a live session is presented and unnecessary
  * when none is (route-config.ts, auth "optional"), so the schema leaves it optional and the CSRF
  * guard decides.
