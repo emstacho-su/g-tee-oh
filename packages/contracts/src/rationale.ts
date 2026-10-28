@@ -12,7 +12,12 @@
  * characters, a letter, a number or a punctuation mark (\p{L}, \p{N}, \p{P}) counted by code point.
  * Spaces, symbols such as the blank braille pattern U+2800, and bare combining marks never count, so
  * a reason that only looks typed is refused. RATIONALE_MAX_CHARS bounds the raw text in UTF-16 units,
- * as the body schema and a textarea's maxLength both count.
+ * as the body schema and a textarea's maxLength both count, and the cleaned text in code points, as
+ * the database check counts.
+ *
+ * checkRationale does all of it in one pass and returns the cleaned text with the verdict, so the
+ * api stores exactly what it judged and the web counts and explains exactly what it will send
+ * (PR #41 review round 1, findings 7 and 8); rationaleReady and visibleRationaleChars read from it.
  */
 
 export const RATIONALE_MIN_CHARS = 3;
@@ -36,12 +41,38 @@ export function cleanRationale(text: string): string {
     .trim();
 }
 
-/** The visible characters (letters, numbers, punctuation) in the cleaned reason, by code point. */
-export function visibleRationaleChars(text: string): number {
-  return [...cleanRationale(text)].filter((character) => VISIBLE.test(character)).length;
+export interface RationaleCheck {
+  /** The reason as the api stores it. */
+  cleaned: string;
+  /** The cleaned reason's length in code points, what the database's char_length counts. */
+  length: number;
+  /** Its visible characters (letters, numbers, punctuation), by code point. */
+  visible: number;
+  /**
+   * Over a bound: the raw text past RATIONALE_MAX_CHARS UTF-16 units, or the cleaned text past
+   * RATIONALE_MAX_CHARS code points (NFC can lengthen a text, so U+FB2C, one unit, becomes three
+   * code points, PR #39 re-review MEDIUM).
+   */
+  tooLong: boolean;
+  /** The api accepts it: not too long and at least RATIONALE_MIN_CHARS visible characters. */
+  ready: boolean;
 }
 
-/** True when the api will accept the reason: within the raw bound and at least RATIONALE_MIN_CHARS visible. */
+/** The one rule: cleans the reason once and judges the cleaned text. */
+export function checkRationale(text: string): RationaleCheck {
+  const cleaned = cleanRationale(text);
+  const characters = [...cleaned];
+  const visible = characters.filter((character) => VISIBLE.test(character)).length;
+  const tooLong = text.length > RATIONALE_MAX_CHARS || characters.length > RATIONALE_MAX_CHARS;
+  return { cleaned, length: characters.length, visible, tooLong, ready: !tooLong && visible >= RATIONALE_MIN_CHARS };
+}
+
+/** The visible characters (letters, numbers, punctuation) in the cleaned reason, by code point. */
+export function visibleRationaleChars(text: string): number {
+  return checkRationale(text).visible;
+}
+
+/** True when the api will accept the reason (checkRationale's verdict). */
 export function rationaleReady(text: string): boolean {
-  return text.length <= RATIONALE_MAX_CHARS && visibleRationaleChars(text) >= RATIONALE_MIN_CHARS;
+  return checkRationale(text).ready;
 }

@@ -1,9 +1,10 @@
 /**
- * Free text at the api boundary (R3.20, R3.16, O-307, O-412): the one cleaning rule the Ask question
- * (explain/question.ts) and the quiz answer's reason (prediction/rationale.ts) share. After the body
+ * The Ask question's cleaning rule (R3.20, O-307), used by explain/question.ts. After the body
  * schema has trimmed and capped the text, every control character becomes a space, every invisible
  * format character (zero-width and bidirectional marks) is removed, and runs of whitespace collapse
- * to one space; the result is trimmed again.
+ * to one space; the result is trimmed again. The quiz answer's reason does not use it: it follows
+ * the stricter shared rule in @g-tee-oh/contracts (rationale.ts: NFC, default-ignorable code points,
+ * visible characters, the code-point bound), which the web applies too (PR #39 review finding 3).
  */
 
 const CONTROL_CHARACTERS = /\p{Cc}/gu;

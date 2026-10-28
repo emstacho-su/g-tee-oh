@@ -5,7 +5,9 @@
  * the start screen's catalog choice (POST /sessions with mode prediction, the optional seed and one
  * Idempotency-Key kept for the life of the screen, so a repeated start replays instead of opening a
  * second session). The page mounts the run only after the player presses Start (PR #39 security
- * LOW 2), never because a link was opened. The prompt is read through predictionPromptQuery at a
+ * LOW 2), never because a link was opened. The session's life, its start and its one end however
+ * the run is left, is practice/use-practice-session.ts's (PR #41 review round 1); the run hands
+ * End quiz its lifecycle. The prompt is read through predictionPromptQuery at a
  * local cursor; the answer being composed and its typed reason are held per prompt id (draft.ts),
  * so leaving to review an earlier answer and coming back finds them intact. Submit needs a complete
  * answer and a reason the shared rule accepts (rationaleReady from @g-tee-oh/contracts, the api's
@@ -21,11 +23,12 @@
  */
 import { rationaleReady } from "@g-tee-oh/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { HTTP_STATUS, isApiProblem } from "../api/index.js";
 import { useAppApi } from "../auth/index.js";
-import type { PredictionPrompt, PredictionResult } from "../contracts.js";
+import type { PracticeSession, PredictionPrompt, PredictionResult } from "../contracts.js";
+import { usePracticeSession, type PracticeSessionLife } from "../practice/use-practice-session.js";
 import { useTrainerDeps } from "../trainer/trainer-deps.js";
 import { appendAnswered, type AnsweredItem } from "./answered.js";
 import { answerPrediction, predictionPromptQuery, startPredictionSession, type PredictionSource } from "./api.js";
@@ -40,6 +43,8 @@ export interface PredictionRunInput {
 }
 
 export interface PredictionRun {
+  /** The session's lifecycle: End quiz ends through it, so leaving afterwards sends no second end. */
+  life: PracticeSessionLife<PracticeSession>;
   starting: boolean;
   sessionId: string | undefined;
   prompt: PredictionPrompt | undefined;
@@ -77,19 +82,11 @@ function isStale(error: unknown): boolean {
 }
 
 /** Starts the session once per mounted screen; the key makes a repeated start a replay (O-232). */
-function useStart(input: PredictionRunInput) {
+function useStart(input: PredictionRunInput): PracticeSessionLife<PracticeSession> {
   const api = useAppApi();
   const { newKey } = useTrainerDeps();
   const [key] = useState(newKey);
-  const start = useMutation({ mutationFn: () => startPredictionSession(api, { source: input.source, seed: input.seed, key }) });
-  const requested = useRef(false);
-  const { mutate } = start;
-  useEffect(() => {
-    if (requested.current) return;
-    requested.current = true;
-    mutate();
-  }, [mutate]);
-  return start;
+  return usePracticeSession(() => startPredictionSession(api, { source: input.source, seed: input.seed, key }));
 }
 
 /** One Idempotency-Key per prompt id, so a retried answer to the same prompt replays (O-232). */
@@ -125,8 +122,8 @@ function useAnswer(sessionId: string | undefined, onAnswered: (item: AnsweredIte
 
 export function usePredictionRun(input: PredictionRunInput): PredictionRun {
   const api = useAppApi();
-  const start = useStart(input);
-  const sessionId = start.data?.session_id;
+  const life = useStart(input);
+  const { start, sessionId } = life;
   const [cursor, setCursor] = useState(0);
   const [staleNotice, setStaleNotice] = useState(false);
   const [held, setHeld] = useState<Held | null>(null);
@@ -159,6 +156,7 @@ export function usePredictionRun(input: PredictionRunInput): PredictionRun {
   };
 
   return {
+    life,
     starting: start.isPending,
     sessionId,
     prompt,

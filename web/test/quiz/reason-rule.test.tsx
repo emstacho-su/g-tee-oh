@@ -18,6 +18,7 @@ import { APP_SUITE } from "./app-suite-timeout.js";
 const QUIZ = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&kinds=range,hand&difficulty=easy";
 const REASON_LABEL = "Your reason (required)";
 const REFUSED_TEXT = "Your reason was not accepted: type at least 3 letters, numbers or punctuation marks.";
+const TOO_LONG_TEXT = "Your reason is over 1,000 characters once some letters are counted in full. Shorten it to send it.";
 const GENERIC_TEXT = "That answer could not be read. Check it and submit again.";
 const LOOKS_TYPED = ["ㅤㅤㅤ", "⠀⠀⠀", "a️️b", "́́́", "ab"];
 /** Six whole-app passes through one field, each pasted and checked, outgrow vitest's 5 second default. */
@@ -86,10 +87,22 @@ describe("R3.16 the web reads the shared reason rule (PR #39 review finding 3)",
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
   });
 
-  it("R3.16 the live count shows the raw length out of 1000", async () => {
+  it("R3.16 the live count shows the cleaned length in code points out of 1000 (PR #41 review round 1, finding 8)", async () => {
     await openQuestion({ [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)] });
     await replaceReason("ㅤㅤㅤ");
-    expect(screen.getByText("3 / 1000")).toBeInTheDocument();
+    expect(screen.getByText("0 / 1000")).toBeInTheDocument();
+  });
+
+  it("R3.16 a reason NFC pushes past 1,000 code points disables Submit and says why (PR #41 review round 1, finding 8)", async () => {
+    await openQuestion({ [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)] });
+    // 400 UTF-16 units, inside the textarea limit, but 1,200 code points once normalised.
+    await replaceReason("\uFB2C".repeat(400));
+    expect(screen.getByRole("button", { name: "Submit answer" })).toBeDisabled();
+    expect(screen.getByText("1200 / 1000")).toBeInTheDocument();
+    const textarea = screen.getByRole("textbox", { name: REASON_LABEL });
+    expect(textarea).toHaveAttribute("aria-invalid", "true");
+    expect(textarea).toHaveAccessibleDescription(expect.stringContaining(TOO_LONG_TEXT));
+    expect(within(screen.getByTestId("reason-field")).getByText(TOO_LONG_TEXT)).toBeInTheDocument();
   });
 });
 

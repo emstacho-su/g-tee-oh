@@ -2,11 +2,14 @@
  * Test helper for the /quiz screen (S27 lane A, S41, R3.16). Renders the whole app at a path over
  * a memory history (so the route's search validation and the /predict redirect are the real ones)
  * and an injected fake fetch, signed in, with the catalog reads the start screen needs, and records
- * every request with its Idempotency-Key and csrf headers and its parsed body.
+ * every request with its Idempotency-Key and csrf headers, its keepalive flag and its parsed body.
+ * The strict option wraps the app in React's StrictMode, as main.tsx does, so a test sees the
+ * development double mount.
  */
 import { createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, type RenderResult } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { expect } from "vitest";
 
 import { createAppApi } from "../../src/api/index.js";
@@ -31,7 +34,13 @@ export interface SentRequest {
   key: string;
   idempotencyKey: string | null;
   csrf: string | null;
+  keepalive: boolean;
   body: unknown;
+}
+
+export interface RenderQuizOptions {
+  /** Wrap the app in StrictMode (React's development double mount), as main.tsx does. */
+  strict?: boolean;
 }
 
 export interface QuizView extends RenderResult {
@@ -60,7 +69,7 @@ export function catalogScript(): Record<string, readonly ResponseFactory[]> {
   return { [CONFIGS_PATH]: [jsonResponse(200, { items: fixtureConfigs, next_cursor: null })], ...Object.fromEntries(pairs) };
 }
 
-export function renderQuiz(path: string, script: FetchScript): QuizView {
+export function renderQuiz(path: string, script: FetchScript, { strict = false }: RenderQuizOptions = {}): QuizView {
   const fake = createFakeFetch({
     "GET /api/v1/me": [sessionResponse()],
     [START_PATH]: [jsonResponse(201, fixturePredictionSession)],
@@ -74,6 +83,7 @@ export function renderQuiz(path: string, script: FetchScript): QuizView {
       key: `${request.method} ${url.pathname}`,
       idempotencyKey: request.headers.get("idempotency-key"),
       csrf: request.headers.get("x-csrf-token"),
+      keepalive: request.keepalive,
       body: parseBody(await request.clone().text()),
     });
     return fake.fetch(request);
@@ -82,7 +92,8 @@ export function renderQuiz(path: string, script: FetchScript): QuizView {
   const queryClient = createQueryClient();
   const history = createMemoryHistory({ initialEntries: [path] });
   const router = createAppRouter({ queryClient, api, history });
-  const view = render(<App router={router} queryClient={queryClient} api={api} />);
+  const app = <App router={router} queryClient={queryClient} api={api} />;
+  const view = render(strict ? <StrictMode>{app}</StrictMode> : app);
   return { ...view, sent, history, router, queryClient, sentTo: (key) => sent.filter((request) => request.key === key) };
 }
 
