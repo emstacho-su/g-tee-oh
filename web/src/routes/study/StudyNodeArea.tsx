@@ -17,7 +17,8 @@ import { nodeFailure } from "../../study/problem-text.js";
 import { studyNodeQuery } from "../../study/queries.js";
 import type { StudySearch } from "../../study/search.js";
 import { NodeView } from "./NodeView.js";
-import { FailureAlert, LoadingNote } from "./StudyNotices.js";
+import { LoadingNote } from "../../components/ui/index.js";
+import { FailureAlert } from "./StudyNotices.js";
 
 export interface StudyNodeAreaProps {
   api: AppApi;

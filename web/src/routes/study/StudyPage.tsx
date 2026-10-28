@@ -23,7 +23,8 @@ import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-
 import { LineBreadcrumb } from "./LineBreadcrumb.js";
 import { StudyFilters } from "./StudyFilters.js";
 import { StudyNodeArea } from "./StudyNodeArea.js";
-import { FailureAlert, LoadingNote } from "./StudyNotices.js";
+import { LoadingNote } from "../../components/ui/index.js";
+import { FailureAlert } from "./StudyNotices.js";
 
 export interface StudyPageProps {
   search: StudySearch;

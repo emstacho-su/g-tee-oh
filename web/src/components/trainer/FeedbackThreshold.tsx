@@ -12,24 +12,17 @@
  */
 import { useQuery } from "@tanstack/react-query";
 
-import { isApiProblem } from "../../api/index.js";
+import { isHandNotInRange } from "../../api/index.js";
 import { useAppApi } from "../../auth/index.js";
 import type { DecisionFeedback } from "../../contracts.js";
 import { heroHandClass } from "../../poker/hand-class.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { ThresholdCard } from "../panels/ThresholdCard.js";
-import { QueryFailure, QueryLoading } from "./FeedbackQueryState.js";
+import { LoadingNote } from "../ui/index.js";
+import { QueryFailure } from "./FeedbackQueryState.js";
 
 export interface FeedbackThresholdProps {
   feedback: DecisionFeedback;
-}
-
-/** The problem slug the api sends when the hand is not in the node's range (S23). */
-export const HAND_NOT_IN_RANGE_SLUG = "hand-not-in-range";
-const NOT_FOUND_STATUS = 404;
-
-function isHandNotInRange(error: unknown): boolean {
-  return isApiProblem(error) && error.status === NOT_FOUND_STATUS && error.slug === HAND_NOT_IN_RANGE_SLUG;
 }
 
 export function FeedbackThreshold({ feedback }: FeedbackThresholdProps) {
@@ -38,7 +31,7 @@ export function FeedbackThreshold({ feedback }: FeedbackThresholdProps) {
     studyInsightsQuery(api, { solutionId: feedback.solution_id, nodeKey: feedback.node_key, hand: feedback.hand }),
   );
   const heroHand = heroHandClass(feedback.hand) ?? feedback.hand;
-  if (query.isPending) return <QueryLoading text="Loading the threshold card" />;
+  if (query.isPending) return <LoadingNote text="Loading the threshold card" />;
   if (query.isError) {
     if (isHandNotInRange(query.error)) {
       return (

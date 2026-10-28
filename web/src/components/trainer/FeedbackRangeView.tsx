@@ -20,7 +20,8 @@ import { useThemeStore } from "../../store/index.js";
 import { studyNodeByKeyQuery } from "../../study/queries.js";
 import { RangeMatrix } from "../range-matrix/RangeMatrix.js";
 import type { MatrixMode } from "../range-matrix/model.js";
-import { QueryFailure, QueryLoading } from "./FeedbackQueryState.js";
+import { LoadingNote } from "../ui/index.js";
+import { QueryFailure } from "./FeedbackQueryState.js";
 
 export interface FeedbackRangeViewProps {
   feedback: DecisionFeedback;
@@ -79,7 +80,7 @@ export function FeedbackRangeView({ feedback }: FeedbackRangeViewProps) {
   const query = useQuery(
     studyNodeByKeyQuery(api, { configId: feedback.config_id, pair: feedback.pair, nodeKey: feedback.node_key }),
   );
-  if (query.isPending) return <QueryLoading text="Loading the range at this decision" />;
+  if (query.isPending) return <LoadingNote text="Loading the range at this decision" />;
   if (query.isError) {
     return (
       <QueryFailure

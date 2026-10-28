@@ -12,7 +12,8 @@ import { ThresholdCard } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { insightsFailure } from "../../study/problem-text.js";
 import { studyInsightsQuery } from "../../study/queries.js";
-import { FailureAlert, LoadingNote } from "./StudyNotices.js";
+import { LoadingNote } from "../../components/ui/index.js";
+import { FailureAlert } from "./StudyNotices.js";
 
 export const PICK_A_CELL = "Pick a cell in the matrix to see that hand's threshold card.";
 

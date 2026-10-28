@@ -6,21 +6,16 @@
  * 502 (solver-query failed) and 503 (a transient stall: retry, no state change). Anything else,
  * a network failure included, is a generic retryable failure.
  */
-import { isApiProblem } from "../api/index.js";
+import { HTTP_STATUS, isApiProblem, isHandNotInRange } from "../api/index.js";
 
 export interface StudyFailure {
   readonly message: string;
   readonly retryable: boolean;
 }
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_BAD_GATEWAY = 502;
-const STATUS_UNAVAILABLE = 503;
-export const HAND_NOT_IN_RANGE_SLUG = "hand-not-in-range";
-
 const UPSTREAM_FAILURES: Readonly<Record<number, StudyFailure>> = {
-  [STATUS_BAD_GATEWAY]: { message: "The solver service failed to answer.", retryable: true },
-  [STATUS_UNAVAILABLE]: { message: "The solver service is busy right now.", retryable: true },
+  [HTTP_STATUS.badGateway]: { message: "The solver service failed to answer.", retryable: true },
+  [HTTP_STATUS.unavailable]: { message: "The solver service is busy right now.", retryable: true },
 };
 
 function statusOf(error: unknown): number | undefined {
@@ -29,7 +24,7 @@ function statusOf(error: unknown): number | undefined {
 
 export function nodeFailure(error: unknown): StudyFailure {
   const status = statusOf(error);
-  if (status === STATUS_NOT_FOUND) {
+  if (status === HTTP_STATUS.notFound) {
     return { message: "The library holds no solution for this pair and line.", retryable: false };
   }
   return (status === undefined ? undefined : UPSTREAM_FAILURES[status]) ?? {
@@ -39,11 +34,10 @@ export function nodeFailure(error: unknown): StudyFailure {
 }
 
 export function insightsFailure(error: unknown, hand: string): StudyFailure {
-  if (isApiProblem(error) && error.status === STATUS_NOT_FOUND) {
-    const message =
-      error.slug === HAND_NOT_IN_RANGE_SLUG
-        ? `${hand} is not in the range at this node, so it has no threshold card.`
-        : `The library holds no insights for ${hand} at this node.`;
+  if (isApiProblem(error) && error.status === HTTP_STATUS.notFound) {
+    const message = isHandNotInRange(error)
+      ? `${hand} is not in the range at this node, so it has no threshold card.`
+      : `The library holds no insights for ${hand} at this node.`;
     return { message, retryable: false };
   }
   const status = statusOf(error);

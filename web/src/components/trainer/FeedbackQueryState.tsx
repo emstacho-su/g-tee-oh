@@ -1,6 +1,6 @@
 /**
- * Loading and failure states shared by the feedback panel's range view and threshold card (S25,
- * R3.13, O-281).
+ * The failure state shared by the feedback panel's range view and threshold card (S25, R3.13,
+ * O-281); their loading state is the shared LoadingNote (components/ui).
  *
  * Mechanism: a failed read becomes an explicit alert naming what failed and why in a short safe
  * form: the HTTP status of an ApiProblem, or "network error" when the request never reached the
@@ -13,18 +13,6 @@ import { Button } from "../ui/index.js";
 /** "status 503" for an api problem, "network error" for anything that never got an answer. */
 export function failureReason(error: unknown): string {
   return isApiProblem(error) ? `status ${error.status}` : "network error";
-}
-
-export interface QueryLoadingProps {
-  text: string;
-}
-
-export function QueryLoading({ text }: QueryLoadingProps) {
-  return (
-    <p role="status" className="text-sm text-muted">
-      {text}
-    </p>
-  );
 }
 
 export interface QueryFailureProps {

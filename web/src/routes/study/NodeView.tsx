@@ -24,7 +24,8 @@ import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { HandInsights } from "./HandInsights.js";
 import { LineActions } from "./LineActions.js";
 import { NodeActionsPanel } from "./NodeActionsPanel.js";
-import { NoiseFlags, PostflopNote, SyntheticBanner } from "./StudyNotices.js";
+import { SyntheticBanner } from "../../components/ui/index.js";
+import { NoiseFlags, PostflopNote } from "./StudyNotices.js";
 import { useMatrixSize } from "./use-matrix-size.js";
 
 export const MODE_OPTIONS: readonly ToggleOption<MatrixMode>[] = [
