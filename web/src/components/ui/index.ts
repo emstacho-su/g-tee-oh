@@ -12,6 +12,8 @@ export type { PillNavProps } from "./PillNav.js";
 export { Dialog } from "./Dialog.js";
 export { Disclosure } from "./Disclosure.js";
 export type { DisclosureHeadingLevel, DisclosureProps } from "./Disclosure.js";
+export { GearIcon } from "./Icon.js";
+export type { IconProps } from "./Icon.js";
 export { InfoTip } from "./InfoTip.js";
 export type { InfoTipProps } from "./InfoTip.js";
 export type { DialogProps } from "./Dialog.js";

@@ -8,7 +8,9 @@
  * read their key factory from it).
  */
 import { createMemoryHistory } from "@tanstack/react-router";
-import { render, type RenderResult } from "@testing-library/react";
+import { render, screen, waitFor, within, type RenderResult } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
+import { expect } from "vitest";
 
 import type { MockRequest } from "../../e2e/support/mock-api.js";
 import { createMockDrillRoute, type MockDrillRoute } from "../../e2e/support/mock-drills.js";
@@ -50,6 +52,18 @@ async function toMockRequest(input: Request): Promise<MockRequest> {
     body = undefined;
   }
   return { method: input.method, path: url.pathname, query: Object.fromEntries(url.searchParams), headers: Object.fromEntries(input.headers.entries()), body };
+}
+
+/**
+ * Opens a builder page through the "Drill sections" list (S40, O-405) and waits for its card; the
+ * link's name starts with the page label (a marked page adds ", needs a fix").
+ */
+export async function openSection(user: UserEvent, label: string): Promise<void> {
+  const nav = screen.getByRole("navigation", { name: "Drill sections" });
+  const link = within(nav).getAllByRole("link").find((candidate) => candidate.textContent?.startsWith(label) === true);
+  if (link === undefined) throw new Error(`no builder page ${label}`);
+  await user.click(link);
+  await waitFor(() => expect(link).toHaveAttribute("aria-current", "page"));
 }
 
 export function renderDrills(path: string, options: RenderDrillsOptions = {}): RenderedDrills {

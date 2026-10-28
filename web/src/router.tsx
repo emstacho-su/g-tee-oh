@@ -36,10 +36,12 @@ import { PaintPage } from "./routes/paint/PaintPage.js";
 import { PredictPage } from "./routes/predict/PredictPage.js";
 import { ProgressPage } from "./routes/progress/ProgressPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
+import { DEFAULT_BUILDER_SECTION, isBuilderSection } from "./drills/builder-sections.js";
 import { validateDrillBuilderSearch, validateDrillsSearch } from "./drills/search.js";
 import { DrillBuilderPage } from "./routes/drills/DrillBuilderPage.js";
 import { DrillsPage } from "./routes/drills/DrillsPage.js";
 import { validateLibrarySearch } from "./library/search.js";
+import { DEFAULT_LIBRARY_SECTION, isLibrarySection } from "./library/sections.js";
 import { LibraryPage } from "./routes/library/LibraryPage.js";
 import { DEFAULT_SETTINGS_SECTION, isSettingsSection } from "./routes/settings/sections.js";
 import { SettingsPage } from "./routes/settings/SettingsPage.js";
@@ -127,15 +129,68 @@ export const drillsRoute = createRoute({
     return <DrillsPage search={validateDrillsSearch(drillsRoute.useSearch())} />;
   },
 });
-export const drillNewRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/drills/new", component: () => <DrillBuilderPage /> });
+// The drill builder is one container with a page per section (S40, R3.14, O-405): the bare builder
+// URLs and any section not in the list redirect (replace) to the first page, keeping ?saved=1. The
+// segment is untrusted input, so it is checked against the fixed list before the page renders. The
+// builder stays mounted while only the section changes (same route, keyed by the drill id), so one
+// draft spans every page. A static segment ranks over $section, so /drills/$id/run keeps its route.
+export const drillNewRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/new",
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({ to: "/drills/new/$section", params: { section: DEFAULT_BUILDER_SECTION }, replace: true });
+  },
+});
+export const drillNewSectionRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/new/$section",
+  beforeLoad: ({ params }) => {
+    if (!isBuilderSection(params.section)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+      throw redirect({ to: "/drills/new/$section", params: { section: DEFAULT_BUILDER_SECTION }, replace: true });
+    }
+    return { section: params.section };
+  },
+  component: function DrillNewRouteScreen() {
+    return <DrillBuilderPage section={drillNewSectionRoute.useRouteContext().section} />;
+  },
+});
 export const drillRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/drills/$id",
   validateSearch: validateDrillBuilderSearch,
+  beforeLoad: ({ params, search }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({
+      to: "/drills/$id/$section",
+      params: { id: params.id, section: DEFAULT_BUILDER_SECTION },
+      search: validateDrillBuilderSearch(search),
+      replace: true,
+    });
+  },
+});
+export const drillSectionRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/$id/$section",
+  validateSearch: validateDrillBuilderSearch,
+  beforeLoad: ({ params, search }) => {
+    if (!isBuilderSection(params.section)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+      throw redirect({
+        to: "/drills/$id/$section",
+        params: { id: params.id, section: DEFAULT_BUILDER_SECTION },
+        search: validateDrillBuilderSearch(search),
+        replace: true,
+      });
+    }
+    return { section: params.section };
+  },
   component: function DrillBuilderRouteScreen() {
-    const { id } = drillRoute.useParams();
-    const { saved } = validateDrillBuilderSearch(drillRoute.useSearch());
-    return <DrillBuilderPage key={id} drillId={id} justCreated={saved === "1"} />;
+    const { id } = drillSectionRoute.useParams();
+    const { saved } = validateDrillBuilderSearch(drillSectionRoute.useSearch());
+    const { section } = drillSectionRoute.useRouteContext();
+    return <DrillBuilderPage key={id} drillId={id} section={section} justCreated={saved === "1"} />;
   },
 });
 // /study and /drills/$id/run are real screens (S25, O-286, O-288). validateSearch types the
@@ -181,13 +236,32 @@ export const paintRoute = createRoute({
 // /progress is a real screen (S32, R4.12); it takes no search, so it needs no re-validation.
 export const progressRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/progress", component: ProgressPage });
 // /library and /settings are real screens (S28, R3.4, R3.5); /library re-validates its search in
-// the route component for the same parent-merge reason as /study above.
+// the route component for the same parent-merge reason as /study above. Since S40 (O-406) /library
+// is one container with a page per section: /library itself and any section not in the list
+// redirect (replace) to the coverage page, keeping the coverage search.
 export const libraryRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/library",
   validateSearch: validateLibrarySearch,
+  beforeLoad: ({ search }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({ to: "/library/$section", params: { section: DEFAULT_LIBRARY_SECTION }, search: validateLibrarySearch(search), replace: true });
+  },
+});
+export const librarySectionRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/library/$section",
+  validateSearch: validateLibrarySearch,
+  beforeLoad: ({ params, search }) => {
+    if (!isLibrarySection(params.section)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+      throw redirect({ to: "/library/$section", params: { section: DEFAULT_LIBRARY_SECTION }, search: validateLibrarySearch(search), replace: true });
+    }
+    return { section: params.section };
+  },
   component: function LibraryRouteScreen() {
-    return <LibraryPage search={validateLibrarySearch(libraryRoute.useSearch())} />;
+    const { section } = librarySectionRoute.useRouteContext();
+    return <LibraryPage section={section} search={validateLibrarySearch(librarySectionRoute.useSearch())} />;
   },
 });
 // /settings is one container with a page per section (S36, O-360): /settings itself and any
@@ -226,13 +300,16 @@ export const routeTree = rootRoute.addChildren([
     trainRoute,
     drillsRoute,
     drillNewRoute,
+    drillNewSectionRoute,
     drillRoute,
+    drillSectionRoute,
     drillRunRoute,
     studyRoute,
     predictRoute,
     paintRoute,
     progressRoute,
     libraryRoute,
+    librarySectionRoute,
     settingsRoute,
     settingsSectionRoute,
   ]),

@@ -1,15 +1,18 @@
 /**
- * /drills/new and /drills/$id: the drill builder (S26, R3.14, A7 section 2). A new drill starts
- * from the default draft (drills/draft.ts); an existing one is read (GET /drills/{id}) and shown
- * with its spot summary and its Run, Export and Duplicate actions above the form. The form is
- * keyed by the drill id, so opening another drill starts from that drill's stored values. A
- * missing drill (404) or a failed read shows its sentence with a way back to the library.
+ * /drills/new/<page> and /drills/<id>/<page>: the drill builder (S26, R3.14, A7 section 2; S40,
+ * O-405), one container with a page per section like /settings. A new drill starts from the
+ * default draft (drills/draft.ts) under the heading "New drill"; an existing one is read (GET
+ * /drills/{id}) and its header names it, with its spot summary and its Run, Export and Duplicate
+ * actions. The form is keyed by the drill id, so opening another drill starts from that drill's
+ * stored values, while moving between pages of one drill keeps the draft. A missing drill (404) or
+ * a failed read shows its sentence with a way back to the library.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
+import type { BuilderSectionSlug } from "../../drills/builder-sections.js";
 import { draftFromDrill, newDrillDraft } from "../../drills/draft.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { drillDetailQuery } from "../../drills/queries.js";
@@ -19,12 +22,15 @@ import { DrillForm } from "./DrillForm.js";
 
 export const BUILDER_TEXT = {
   newHeading: "New drill",
+  newDescription: "Build the drill page by page; Save drill saves every page.",
   editHeading: "Edit drill",
   loading: "Loading the drill",
   back: "Back to the drill library",
 } as const;
 
 export interface DrillBuilderPageProps {
+  /** The open page of the builder container (S40, O-405). */
+  section: BuilderSectionSlug;
   /** The drill to edit; absent on /drills/new. */
   drillId?: string;
   /** True right after this drill was created (?saved=1). */
@@ -39,44 +45,53 @@ function BackLink() {
   );
 }
 
-function ExistingDrill({ drillId, justCreated }: { drillId: string; justCreated: boolean }) {
+function ExistingDrill({ drillId, section, justCreated }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean }) {
   const api = useAppApi();
   const drill = useQuery(drillDetailQuery(api, drillId));
   if (drill.data === undefined) {
-    if (!drill.isError) return <LoadingNote text={BUILDER_TEXT.loading} />;
     return (
-      <div role="alert" className="flex flex-col items-start gap-2 text-sm">
-        <p className="text-danger">{drillFailureText(drill.error)}</p>
-        <Button size="sm" onClick={() => void drill.refetch()}>
-          Try again
-        </Button>
-        <BackLink />
-      </div>
+      <>
+        <PageHeader title={BUILDER_TEXT.editHeading} actions={<BackLink />} />
+        {drill.isError ? (
+          <div role="alert" className="flex flex-col items-start gap-2 text-sm">
+            <p className="text-danger">{drillFailureText(drill.error)}</p>
+            <Button size="sm" onClick={() => void drill.refetch()}>
+              Try again
+            </Button>
+            <BackLink />
+          </div>
+        ) : (
+          <LoadingNote text={BUILDER_TEXT.loading} />
+        )}
+      </>
     );
   }
   const stored = drill.data;
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <p className="text-lg font-medium">{stored.name}</p>
-        <p data-testid="spot-summary" className="text-sm text-muted">
+      <div className="flex flex-col gap-2">
+        <PageHeader title={stored.name} actions={<BackLink />} />
+        <p data-testid="spot-summary" className="text-sm text-muted md:text-base">
           {spotSummary(stored.spot_filter)}
         </p>
       </div>
       <BuilderActions api={api} drill={stored} />
-      <DrillForm key={stored.id} initial={draftFromDrill(stored)} drill={stored} justCreated={justCreated} />
+      <DrillForm key={stored.id} initial={draftFromDrill(stored)} section={section} drill={stored} justCreated={justCreated} />
     </>
   );
 }
 
-export function DrillBuilderPage({ drillId, justCreated = false }: DrillBuilderPageProps) {
+export function DrillBuilderPage({ section, drillId, justCreated = false }: DrillBuilderPageProps) {
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold">{drillId === undefined ? BUILDER_TEXT.newHeading : BUILDER_TEXT.editHeading}</h1>
-        <BackLink />
-      </div>
-      {drillId === undefined ? <DrillForm initial={newDrillDraft()} /> : <ExistingDrill drillId={drillId} justCreated={justCreated} />}
+    <section className="flex flex-col gap-6">
+      {drillId === undefined ? (
+        <>
+          <PageHeader title={BUILDER_TEXT.newHeading} description={BUILDER_TEXT.newDescription} actions={<BackLink />} />
+          <DrillForm initial={newDrillDraft()} section={section} />
+        </>
+      ) : (
+        <ExistingDrill drillId={drillId} section={section} justCreated={justCreated} />
+      )}
     </section>
   );
 }

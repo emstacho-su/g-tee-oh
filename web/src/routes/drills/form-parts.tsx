@@ -1,13 +1,14 @@
 /**
  * The builder form's labeled controls (S26, R3.14, A7 section 4): a section, a text field, a
- * select, a radio group, a checkbox group, a single checkbox and the v1 note (O-317). Every
+ * select, a radio group, a checkbox group, a single checkbox and the v1 note (O-317). Since S40 the
+ * fields take the shared FIELD_CLASS edge and a section is the components/ui Card. Every
  * control has a visible label; an error line is tied to its control through aria-describedby and
  * aria-invalid and starts with the word "Error", so color is never the only signal; native inputs
  * keep every control keyboard operable (Tab, arrows within a radio group, Space to toggle).
  */
 import { useId, type ReactNode } from "react";
 
-import { cn } from "../../components/ui/index.js";
+import { Card, cn, FIELD_CLASS } from "../../components/ui/index.js";
 
 export interface Choice<T extends string> {
   readonly value: T;
@@ -15,7 +16,8 @@ export interface Choice<T extends string> {
   readonly hint?: string;
 }
 
-const INPUT_CLASSES = "h-9 rounded-md border border-border-strong bg-surface-raised px-2 text-sm aria-[invalid=true]:border-danger";
+/** Every text field and select of the builder: the shared field edge (S36, O-369), red when invalid. */
+const INPUT_CLASSES = cn(FIELD_CLASS, "h-9 px-2 text-sm aria-[invalid=true]:border-danger");
 
 function describedBy(...ids: (string | undefined)[]): string | undefined {
   const present = ids.filter((id): id is string => id !== undefined);
@@ -49,15 +51,12 @@ export interface FormSectionProps {
   children: ReactNode;
 }
 
+/** One builder page's card (S40): the components/ui Card, so the depth and heading are shared. */
 export function FormSection({ title, children }: FormSectionProps) {
-  const id = useId();
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-4 rounded-lg border border-border bg-surface-raised p-4">
-      <h2 id={id} className="text-lg font-semibold">
-        {title}
-      </h2>
-      {children}
-    </section>
+    <Card title={title}>
+      <div className="flex flex-col gap-4">{children}</div>
+    </Card>
   );
 }
 
