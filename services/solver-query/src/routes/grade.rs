@@ -100,7 +100,7 @@ fn grade_response(
     };
     let numbers = grade::hand_numbers(view, hand.index).ok_or_else(|| {
         let label = ApiError::quoted(&hand.label(record.hand_space));
-        ApiError::NotFound(format!("hand {label} is not in the node's range"))
+        ApiError::HandNotInRange(format!("hand {label} is not in the node's range"))
     })?;
     let floor = grade::floor(view, exploitability_pct_pot);
     let units = numbers.loss_units[action];

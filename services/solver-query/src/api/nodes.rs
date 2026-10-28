@@ -151,6 +151,13 @@ pub struct NodeResponse {
     pub accuracy_pct_pot: Option<f32>,
     /// The grading floor at this node in percent of the pot (O-22, O-150).
     pub floor_pct_pot: f32,
+    /// The preflop action family of the decision at this node, from
+    /// `gto_model::ActionFamily::classify` over the key's pair and preflop line, as
+    /// `ActionFamily::as_str` (`rfi`, `facing-open`, ...); null at a postflop node. The api
+    /// matches drill families against it and never classifies a line itself (ADR 0004,
+    /// PR #25 re-review); additive.
+    #[schema(example = "facing-open")]
+    pub action_family: Option<String>,
     /// The spot-class key of a preflop node under a catalog configuration; null otherwise.
     #[schema(example = "preflop/online/100/facing-open/BB-BTN")]
     pub spot_class_key: Option<String>,

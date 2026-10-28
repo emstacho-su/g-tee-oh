@@ -1,0 +1,86 @@
+{
+  "regenerate": "UPDATE_VECTORS=1 cargo test -p gto-model --test action_family_vectors",
+  "source": "gto_model::spot_class::ActionFamily::classify",
+  "vectors": [
+    {
+      "family": "rfi",
+      "line": "",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "facing-open",
+      "line": "r250",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "facing-3bet",
+      "line": "r250.r900",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "facing-4bet",
+      "line": "r250.r900.r2200",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "facing-4bet",
+      "line": "r250.r900.a",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "squeeze",
+      "line": "r250.c",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "limped-isolation",
+      "line": "l",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "facing-open",
+      "line": "l.r400",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "squeeze",
+      "line": "l.r400.c",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "straddled-pot",
+      "line": "s200",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "straddled-pot",
+      "line": "s200.r600",
+      "pair": "BB-BTN"
+    },
+    {
+      "family": "blind-vs-blind",
+      "line": "",
+      "pair": "SB-BB"
+    },
+    {
+      "family": "blind-vs-blind",
+      "line": "r300",
+      "pair": "SB-BB"
+    },
+    {
+      "family": "blind-vs-blind",
+      "line": "l",
+      "pair": "SB-BB"
+    },
+    {
+      "family": "facing-3bet",
+      "line": "r250.r800",
+      "pair": "BB-UTG"
+    },
+    {
+      "family": "facing-open",
+      "line": "r250",
+      "pair": "CO-BTN"
+    }
+  ]
+}

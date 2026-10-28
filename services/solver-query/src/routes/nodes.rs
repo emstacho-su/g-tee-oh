@@ -22,7 +22,9 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Query, State};
 use gto_library::{HandSpace, NodeView, RecordAction, narrow_f32};
-use gto_model::{ActionToken, Bucket, Cbb, ComboId, HandClass, NodeKey, SpotClass, Street};
+use gto_model::{
+    ActionFamily, ActionToken, Bucket, Cbb, ComboId, HandClass, NodeKey, SpotClass, Street,
+};
 
 use crate::api::nodes::{
     ActionKind, ActionShare, ActionView, HandRow, NodeResponse, NodesQuery, RangeSummary, SeatRange,
@@ -152,6 +154,7 @@ fn node_response(
         hand_space: record.hand_space.into(),
         accuracy_pct_pot: record.accuracy_pct_pot,
         floor_pct_pot: grade::floor(view, exploitability_pct_pot).pct_pot,
+        action_family: action_family(key),
         spot_class_key: spot_class_key(key),
         actions: action_views(view, next_keys),
         hands: hand_rows(view, filter)?,
@@ -159,6 +162,12 @@ fn node_response(
         noise_flags: grade::node_noise_flags(view),
         synthetic,
     })
+}
+
+/// The preflop action family of a preflop node (`ActionFamily::classify`); `None` postflop.
+fn action_family(key: &NodeKey) -> Option<String> {
+    (key.street() == Street::Preflop)
+        .then(|| ActionFamily::classify(key.pair, &key.preflop).as_str().to_owned())
 }
 
 /// The spot-class key of a preflop node under a catalog configuration; `None` for a
@@ -243,7 +252,7 @@ fn hand_rows(view: &NodeView, filter: &HandsFilter) -> Result<Vec<HandRow>, ApiE
             let label = hand.label(space);
             match hand_numbers(view, hand.index) {
                 Some(numbers) => Ok(vec![row(label, &numbers)]),
-                None => Err(ApiError::NotFound(format!(
+                None => Err(ApiError::HandNotInRange(format!(
                     "hand {} is not in the node's range",
                     ApiError::quoted(&label)
                 ))),

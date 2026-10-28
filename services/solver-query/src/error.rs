@@ -85,6 +85,9 @@ pub enum ApiError {
     BadRequest(String),
     /// The solution, node, hand or deal does not exist (404).
     NotFound(String),
+    /// The node exists but the asked hand has no row there (404, its own problem type, so a
+    /// caller can tell an off-range hand from a missing solution or node; PR #25 review LOW 3).
+    HandNotInRange(String),
     /// The request is well formed but out of order with the deal's state: a street
     /// revealed before the one that precedes it (409, plan C.4).
     Conflict(String),
@@ -109,7 +112,7 @@ impl ApiError {
     pub const fn status(&self) -> StatusCode {
         match self {
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
-            ApiError::NotFound(_) => StatusCode::NOT_FOUND,
+            ApiError::NotFound(_) | ApiError::HandNotInRange(_) => StatusCode::NOT_FOUND,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::Unavailable { .. } | ApiError::DatabaseUnavailable(_) => {
                 StatusCode::SERVICE_UNAVAILABLE
@@ -125,6 +128,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(_) => "bad-request",
             ApiError::NotFound(_) => "not-found",
+            ApiError::HandNotInRange(_) => "hand-not-in-range",
             ApiError::Conflict(_) => "conflict",
             ApiError::Unavailable { .. } => "unavailable",
             ApiError::DatabaseUnavailable(_) => "database-unavailable",
@@ -139,6 +143,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(_) => "Bad request",
             ApiError::NotFound(_) => "Not found",
+            ApiError::HandNotInRange(_) => "Hand not in range",
             ApiError::Conflict(_) => "Conflict",
             ApiError::Unavailable { .. } => "Solution unavailable",
             ApiError::DatabaseUnavailable(_) => "Database unavailable",
@@ -153,6 +158,7 @@ impl ApiError {
         match self {
             ApiError::BadRequest(message)
             | ApiError::NotFound(message)
+            | ApiError::HandNotInRange(message)
             | ApiError::Conflict(message) => message.clone(),
             ApiError::Unavailable { prefix, class } => {
                 format!("solution {prefix} is unavailable: {}", class.as_str())

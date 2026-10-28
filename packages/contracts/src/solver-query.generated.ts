@@ -705,6 +705,15 @@ export interface components {
              * @description The solve's accuracy at this node in percent of the pot, when the record carries it.
              */
             accuracy_pct_pot?: number | null;
+            /**
+             * @description The preflop action family of the decision at this node, from
+             *     `gto_model::ActionFamily::classify` over the key's pair and preflop line, as
+             *     `ActionFamily::as_str` (`rfi`, `facing-open`, ...); null at a postflop node. The api
+             *     matches drill families against it and never classifies a line itself (ADR 0004,
+             *     PR #25 re-review); additive.
+             * @example facing-open
+             */
+            action_family?: string | null;
             /** @description The actions in record order. */
             actions: components["schemas"]["ActionView"][];
             /**

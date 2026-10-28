@@ -1499,6 +1499,14 @@
             "format": "float",
             "description": "The solve's accuracy at this node in percent of the pot, when the record carries it."
           },
+          "action_family": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The preflop action family of the decision at this node, from\n`gto_model::ActionFamily::classify` over the key's pair and preflop line, as\n`ActionFamily::as_str` (`rfi`, `facing-open`, ...); null at a postflop node. The api\nmatches drill families against it and never classifies a line itself (ADR 0004,\nPR #25 re-review); additive.",
+            "example": "facing-open"
+          },
           "actions": {
             "type": "array",
             "items": {

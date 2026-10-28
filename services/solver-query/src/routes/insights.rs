@@ -62,7 +62,7 @@ pub async fn insights(
     let view = library.node_blocking(query.solution_id.clone(), key).await?;
     let hand = parse_hand(&query.hand, view.record().hand_space)?;
     if view.frequencies(hand.index).is_none() {
-        return Err(ApiError::NotFound(format!(
+        return Err(ApiError::HandNotInRange(format!(
             "hand {} is not in the node's range",
             ApiError::quoted(&query.hand)
         )));
