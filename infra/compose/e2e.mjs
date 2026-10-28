@@ -4,7 +4,8 @@
 //   2. db-migrate    applies the migrations
 //   3. db-test       migration, role and seed tests (each in a rolled-back transaction)
 //   3b. fixture-solutions  solution rows for the fixture library, so graded attempts can be stored (S23)
-//   4. create-owner  a fresh owner account with a random per-run password (O-263)
+//   3c. fixture-queue  queued build jobs for one fixture spot, so flow 5 sees a queue position (S28, O-293)
+//   4. create-owner  a fresh admin owner account with a random per-run password (O-263, O-294)
 //   5. smoke         health of every service through Caddy
 //   6. e2e-web       the Playwright stack project, with the owner in its environment only
 //   and always dev-down.
@@ -18,11 +19,14 @@
 // E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD in its own environment.
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import {
+  adminDatabaseUrl,
   createOwnerArgs,
+  createOwnerEnv,
   createOwnerInput,
   e2eWebEnv,
   generateOwnerPassword,
@@ -31,7 +35,9 @@ import {
 
 export const OWNER_STEP = 'create-owner';
 const E2E_WEB_STEP = 'e2e-web';
-export const STEPS = ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', OWNER_STEP, 'smoke', E2E_WEB_STEP];
+export const STEPS = ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, 'smoke', E2E_WEB_STEP];
+// The repo .env, read only for DATABASE_URL when the environment lacks it (create-owner --admin).
+const ENV_FILE = '.env';
 
 // The same project arguments as the justfile's compose recipes.
 export const COMPOSE_ARGS = [
@@ -53,10 +59,20 @@ function just(recipe, env = process.env) {
 
 // The api container's create-user command reads the password as the first line of stdin;
 // its stdout (the new user id) and stderr (one redacted line on failure) go to the log.
+function readEnvFile() {
+  try {
+    return readFileSync(ENV_FILE, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') return '';
+    throw error;
+  }
+}
+
 function createOwner(owner) {
   const args = createOwnerArgs(COMPOSE_ARGS, owner.email);
   const result = spawnSync('docker', args, {
     ...SPAWN_DEFAULTS,
+    env: createOwnerEnv(process.env, adminDatabaseUrl(process.env, readEnvFile())),
     input: createOwnerInput(owner.password),
     stdio: ['pipe', 'inherit', 'inherit'],
   });
