@@ -7,13 +7,19 @@
  * "Holdout retest: not rated" with the round's answered of total. Every fact is in words, so the
  * accent border is never the only signal. The values come from block-progress.ts.
  */
-import { cn } from "../../components/ui/index.js";
+import { RAISED_CLASS, cn } from "../../components/ui/index.js";
 import { trackName } from "../../progress/format.js";
 import type { TrackKey } from "../../progress/types.js";
 import type { BlockView, HoldoutView } from "./block-progress.js";
 import { TRAIN_TEXT } from "./train-text.js";
 
-const BANNER_CLASSES = "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border bg-surface-raised px-3 py-2 text-sm";
+/**
+ * S38 (R3.13, O-346, screen review rows 89 and 94): a raised strip on the S36 ground; a worked
+ * example (and the holdout) carries an accent bar on its leading edge, the words still saying so.
+ */
+const BANNER_CLASSES = cn("flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border-l-4 bg-surface-raised px-4 py-2 text-sm", RAISED_CLASS);
+/** The block's place reads as a pill so it stands apart from the class name. */
+const COUNT_CLASSES = "rounded-full bg-surface-sunken px-2.5 py-0.5 tabular-nums";
 
 export interface BlockBannerProps {
   block: BlockView | null;
@@ -36,20 +42,22 @@ function ratingText(block: BlockView, ratedEligible: boolean): string {
 export function BlockBanner({ block, holdout, ratedEligible, trackNames }: BlockBannerProps) {
   if (holdout !== null) {
     return (
-      <section aria-label={TRAIN_TEXT.holdoutHeading} data-testid="block-banner" className={cn(BANNER_CLASSES, "border-border")}>
+      <section aria-label={TRAIN_TEXT.holdoutHeading} data-testid="block-banner" className={cn(BANNER_CLASSES, "border-accent")}>
         <p className="font-semibold">{TRAIN_TEXT.holdoutBanner}</p>
-        <p data-testid="holdout-answered" className="tabular-nums">{`${holdout.answered} of ${holdout.total} answered`}</p>
+        <p data-testid="holdout-answered" className={COUNT_CLASSES}>{`${holdout.answered} of ${holdout.total} answered`}</p>
       </section>
     );
   }
   if (block === null) return null;
   return (
-    <section aria-label="Review block" data-testid="block-banner" className={cn(BANNER_CLASSES, block.workedExample ? "border-accent" : "border-border")}>
+    <section aria-label="Review block" data-testid="block-banner" className={cn(BANNER_CLASSES, block.workedExample ? "border-accent" : "border-transparent")}>
       <p className="font-semibold" data-testid="block-class">
         {classText(block, trackNames)}
       </p>
-      <p data-testid="block-hand" className="tabular-nums">{`Hand ${block.hand} of ${block.size} in this block`}</p>
-      <p data-testid="block-rating">{ratingText(block, ratedEligible)}</p>
+      <p data-testid="block-hand" className={COUNT_CLASSES}>{`Hand ${block.hand} of ${block.size} in this block`}</p>
+      <p data-testid="block-rating" className="text-muted">
+        {ratingText(block, ratedEligible)}
+      </p>
     </section>
   );
 }
