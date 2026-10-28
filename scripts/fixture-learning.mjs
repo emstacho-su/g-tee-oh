@@ -15,8 +15,9 @@
 // container (solver-query publishes no host port), never composed here (ADR 0004). For the owner
 // it inserts one schedule_card per class (two Good reviews 60 and 30 days back, the card S31's
 // seedCards builds; services/api/test/fixture-learning-card.test.ts holds the values to learning's
-// FSRS adapter), and for the first LEAK_CLASSES classes in key order a leak_stat, a mastery row
-// and leak_history for the PAST_WEEKS Mondays before this week (in APP_TIME_ZONE, the api's week).
+// FSRS adapter) with its mastery row (the api writes the two together), and for the first
+// LEAK_CLASSES classes in key order a leak_stat and leak_history for the PAST_WEEKS Mondays before
+// this week (in APP_TIME_ZONE, the api's week).
 // Every value is synthetic, from a fixed formula over the class's index. Inserts are idempotent (on
 // conflict do nothing), run as the superuser of DATABASE_URL (the app role writes these tables
 // only through the api), and, like fixture-solutions, refuse a database that is not on this
@@ -79,9 +80,14 @@ export function leakSeed(index) {
     freqPer1k,
     missRate,
     evPerMissBb: Number((cost / (freqPer1k * missRate)).toFixed(4)),
-    pKnown: Number(Math.min(0.97, 0.2 + 0.08 * index).toFixed(2)),
     history,
   };
+}
+
+/** Synthetic mastery for the class at `index`: 0.2 to 0.92 in a cycle of ten, plus mastered 0.97. */
+export function masteryOf(index) {
+  const step = index % (LEAK_CLASSES + 1);
+  return step === LEAK_CLASSES ? 0.97 : Number((0.2 + 0.08 * step).toFixed(2));
 }
 
 /** The code the api container runs: reads [[config, pair], ...] on stdin, prints sorted class keys. */
@@ -150,11 +156,18 @@ export async function seedLearning(client, { userId, classKeys, now, timeZone })
     counts.present += result.rowCount === 0 ? 1 : 0;
   };
   const card = seededCard(now);
-  for (const key of classKeys) {
+  // The api writes a class's card and its mastery together at a block's end, so every seeded
+  // card gets a mastery row too.
+  for (const [index, key] of classKeys.entries()) {
     count(await client.query(
       `insert into schedule_card (user_id, spot_class_key, fsrs_state, due) values ($1, $2, $3::jsonb, $4)
        on conflict (user_id, spot_class_key) do nothing`,
       [userId, key, JSON.stringify(card), card.due],
+    ));
+    count(await client.query(
+      `insert into mastery (user_id, spot_class_key, p_known, updated_at) values ($1, $2, $3, $4)
+       on conflict (user_id, spot_class_key) do nothing`,
+      [userId, key, masteryOf(index), now],
     ));
   }
   for (const [index, key] of classKeys.slice(0, LEAK_CLASSES).entries()) {
@@ -163,11 +176,6 @@ export async function seedLearning(client, { userId, classKeys, now, timeZone })
       `insert into leak_stat (user_id, spot_class_key, freq_prior_per_1k, n, miss_rate, ev_per_miss_bb, leak_cost_bb_per_1k, computed_at)
        values ($1, $2, $3, $4, $5, $6, $7, $8) on conflict (user_id, spot_class_key) do nothing`,
       [userId, key, seed.freqPer1k, seed.n, seed.missRate, seed.evPerMissBb, seed.cost, now],
-    ));
-    count(await client.query(
-      `insert into mastery (user_id, spot_class_key, p_known, updated_at) values ($1, $2, $3, $4)
-       on conflict (user_id, spot_class_key) do nothing`,
-      [userId, key, seed.pKnown, now],
     ));
     for (const [back, cost] of seed.history.entries()) {
       count(await client.query(

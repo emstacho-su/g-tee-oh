@@ -13,6 +13,7 @@ import {
   fetchClassKeys,
   leakSeed,
   main,
+  masteryOf,
   ownerId,
   parseClassKeys,
   seedLearning,
@@ -48,14 +49,20 @@ test('R4.12 leak seeds fall with the index and carry six past weeks', () => {
   assert.equal(first.history.length, PAST_WEEKS);
   assert.ok(first.history.every((cost) => cost >= 0));
   assert.ok(Math.abs(first.freqPer1k * first.missRate * first.evPerMissBb - first.cost) < 0.01);
-  assert.ok(leakSeed(LEAK_CLASSES - 1).pKnown <= 0.97);
 });
 
-test('R4.10 seedLearning writes a card per class and leak, mastery and history rows for the first ten, idempotent', async () => {
+test('R4.12 mastery cycles from 0.2 to 0.92 with one mastered class in every eleven', () => {
+  assert.equal(masteryOf(0), 0.2);
+  assert.equal(masteryOf(9), 0.92);
+  assert.equal(masteryOf(10), 0.97);
+  assert.equal(masteryOf(11), 0.2);
+});
+
+test('R4.10 seedLearning writes a card and mastery per class and leak and history rows for the first ten, idempotent', async () => {
   const keys = Array.from({ length: 12 }, (_, index) => `preflop/online/100/rfi/k${String(index).padStart(2, '0')}`);
   const client = fakeClient((_, __, index) => ({ rowCount: index % 5 === 0 ? 0 : 1, rows: [] }));
   const counts = await seedLearning(client, { userId: 'u1', classKeys: keys, now: NOW, timeZone: 'UTC' });
-  const expectedCalls = keys.length + LEAK_CLASSES * (2 + PAST_WEEKS);
+  const expectedCalls = 2 * keys.length + LEAK_CLASSES * (1 + PAST_WEEKS);
   assert.equal(client.calls.length, expectedCalls);
   assert.equal(counts.inserted + counts.present, expectedCalls);
   assert.ok(counts.present > 0);
@@ -66,6 +73,8 @@ test('R4.10 seedLearning writes a card per class and leak, mastery and history r
   const cards = client.calls.filter((call) => call.text.includes('schedule_card'));
   assert.equal(cards.length, keys.length);
   assert.deepEqual(JSON.parse(cards[0].values[2]), seededCard(NOW));
+  const mastery = client.calls.filter((call) => call.text.includes('into mastery'));
+  assert.deepEqual(mastery.map((call) => call.values[2]), keys.map((_, index) => masteryOf(index)));
   const history = client.calls.filter((call) => call.text.includes('leak_history'));
   assert.deepEqual(history.slice(0, PAST_WEEKS).map((call) => call.values[4]), [1, 2, 3, 4, 5, 6]);
   assert.match(history[0].text, /date_trunc\('week', \$3::timestamptz at time zone \$4\)/);
