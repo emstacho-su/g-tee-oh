@@ -31,6 +31,9 @@ import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
+import { validateLibrarySearch } from "./library/search.js";
+import { LibraryPage } from "./routes/library/LibraryPage.js";
+import { SettingsPage } from "./routes/settings/SettingsPage.js";
 import { placeholderRoute } from "./routes/placeholders.js";
 import type { PlaceholderKey } from "./routes/placeholders.js";
 import { StudyPage } from "./routes/study/StudyPage.js";
@@ -121,8 +124,17 @@ export const studyRoute = createRoute({
 export const predictRoute = screenRoute("/predict", "predict");
 export const paintRoute = screenRoute("/paint", "paint");
 export const progressRoute = screenRoute("/progress", "progress");
-export const libraryRoute = screenRoute("/library", "library");
-export const settingsRoute = screenRoute("/settings", "settings");
+// /library and /settings are real screens (S28, R3.4, R3.5); /library re-validates its search in
+// the route component for the same parent-merge reason as /study above.
+export const libraryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/library",
+  validateSearch: validateLibrarySearch,
+  component: function LibraryRouteScreen() {
+    return <LibraryPage search={validateLibrarySearch(libraryRoute.useSearch())} />;
+  },
+});
+export const settingsRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/settings", component: SettingsPage });
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,

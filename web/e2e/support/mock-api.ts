@@ -21,7 +21,7 @@ import type { Page, Request, Route } from "@playwright/test";
 
 import { HTTP_STATUS } from "../../src/api/http-status.js";
 import { API_PATHS, CSRF_HEADER } from "../../src/api/paths.js";
-import type { Problem } from "../../src/contracts.js";
+import type { Problem, SessionInfo } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL, fixtureSession } from "../../src/fixtures/index.js";
 
 // The paths and the header come from the app's own module, so the mock and the app can never
@@ -86,6 +86,8 @@ export interface MockRouteContext {
 export interface MockApiOptions {
   /** Feature routes tried in order after the auth routes; none by default (auth only). */
   readonly routes?: readonly MockRoute[];
+  /** The session /me and login answer; the admin owner fixture by default (S28, O-290). */
+  readonly session?: SessionInfo;
 }
 
 interface ProblemSpec {
@@ -121,8 +123,8 @@ export function json(status: number, body: unknown): MockResponse {
 export type { ProblemSpec };
 export { UNAUTHENTICATED };
 
-function session(): MockResponse {
-  return { status: STATUS.ok, contentType: JSON_TYPE, body: fixtureSession };
+function session(body: SessionInfo): MockResponse {
+  return { status: STATUS.ok, contentType: JSON_TYPE, body };
 }
 
 function isLoginBody(body: unknown): body is LoginBody {
@@ -138,17 +140,18 @@ function acceptsLogin(body: LoginBody): boolean {
 /** A fresh mocked api, signed out, with an empty request log. */
 export function createMockApi(options: MockApiOptions = {}): MockApi {
   const featureRoutes = options.routes ?? [];
+  const sessionBody = options.session ?? fixtureSession;
   let signedIn = false;
   let log: readonly MockRequest[] = [];
 
   function route(request: MockRequest): MockResponse {
     const key = `${request.method.toUpperCase()} ${request.path}`;
-    if (key === `GET ${ME_PATH}`) return signedIn ? session() : problem(UNAUTHENTICATED, request.path);
+    if (key === `GET ${ME_PATH}`) return signedIn ? session(sessionBody) : problem(UNAUTHENTICATED, request.path);
     if (key === `POST ${LOGIN_PATH}`) {
       if (!isLoginBody(request.body)) return problem(VALIDATION, request.path);
       if (!acceptsLogin(request.body)) return problem(UNAUTHENTICATED, request.path);
       signedIn = true;
-      return session();
+      return session(sessionBody);
     }
     if (key === `POST ${LOGOUT_PATH}`) {
       if (request.headers[CSRF_HEADER] !== FIXTURE_CSRF_TOKEN) return problem(CSRF, request.path);

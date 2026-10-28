@@ -10,6 +10,12 @@ export interface SessionContext {
   userId: string;
   email: string;
   userCreatedAt: Date;
+  /**
+   * app_user.is_admin, read with the session on every request, so GET /me reports it and the web
+   * shows the builder controls from it (O-290). It is display only: the admin routes still check
+   * the column themselves (requireAdmin, O-242), and no route can write it.
+   */
+  isAdmin: boolean;
   csrfToken: string;
   expiresAt: Date;
 }

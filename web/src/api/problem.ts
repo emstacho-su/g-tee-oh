@@ -15,6 +15,8 @@ export const PROBLEM_SLUG = {
   unauthenticated: "unauthenticated",
   csrf: "csrf",
   forbiddenOrigin: "forbidden-origin",
+  /** An admin route refused a member (O-242, S28). */
+  forbidden: "forbidden",
   rateLimited: "rate-limited",
   validation: "validation",
   notImplemented: "not-implemented",

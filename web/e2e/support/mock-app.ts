@@ -1,19 +1,32 @@
 /**
- * The whole mocked app api (S25, O-264): the auth routes plus the study and session routes, for
- * the shots project and any mock flow that walks past the home shell. createMockApi() alone stays
- * auth only, so the S24 sign-in tests keep their 501 expectations for unbuilt paths. Each app mock
- * gets its own session route state, so two pages never share a mocked session.
+ * The whole mocked app api (S25, S28, O-264): the auth routes plus the study, session and library
+ * routes, for the shots project and any mock flow that walks past the home shell. createMockApi()
+ * alone stays auth only, so the S24 sign-in tests keep their 501 expectations for unbuilt paths.
+ * Each app mock gets its own session and library route state, so two pages never share a mocked
+ * session or queue. A member app mock (admin false) signs in as the member fixture and is refused
+ * the admin routes (O-290, O-242).
  */
 import type { Page } from "@playwright/test";
 
+import { fixtureMemberSession, fixtureSession } from "../../src/fixtures/index.js";
 import { createMockApi, installMockApi, type MockApi } from "./mock-api.js";
+import { createMockLibraryRoute } from "./mock-library.js";
 import { createMockSessionRoute } from "./mock-sessions.js";
 import { mockStudyRoute } from "./mock-study.js";
 
-export function createAppMockApi(): MockApi {
-  return createMockApi({ routes: [mockStudyRoute, createMockSessionRoute()] });
+export interface AppMockOptions {
+  /** Sign in as the admin owner (default) or as a member. */
+  readonly admin?: boolean;
 }
 
-export function installAppMockApi(page: Page): Promise<MockApi> {
-  return installMockApi(page, createAppMockApi());
+export function createAppMockApi(options: AppMockOptions = {}): MockApi {
+  const admin = options.admin ?? true;
+  return createMockApi({
+    routes: [mockStudyRoute, createMockSessionRoute(), createMockLibraryRoute({ admin })],
+    session: admin ? fixtureSession : fixtureMemberSession,
+  });
+}
+
+export function installAppMockApi(page: Page, options: AppMockOptions = {}): Promise<MockApi> {
+  return installMockApi(page, createAppMockApi(options));
 }

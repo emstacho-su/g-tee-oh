@@ -5186,6 +5186,8 @@ export interface components {
                 email: string;
                 /** Format: uuid */
                 id: string;
+                /** @description app_user.is_admin, read only: whether the builder controls are shown (O-290); the admin routes check it again (O-242) */
+                is_admin: boolean;
             };
         };
         SessionInfoInput: {
@@ -5205,6 +5207,8 @@ export interface components {
                 email: string;
                 /** Format: uuid */
                 id: string;
+                /** @description app_user.is_admin, read only: whether the builder controls are shown (O-290); the admin routes check it again (O-242) */
+                is_admin: boolean;
             };
         };
         SessionRecap: {

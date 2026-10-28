@@ -43,8 +43,6 @@ const PLACEHOLDERS: readonly (readonly [string, string, string])[] = [
   ["/predict", "Prediction drills", "S27"],
   ["/paint", "Range painting", "S27"],
   ["/progress", "Progress", "S32"],
-  ["/library", "Coverage and builder health", "S28"],
-  ["/settings", "Settings", "S28 and S32"],
 ];
 
 describe("@g-tee-oh/web router", () => {
