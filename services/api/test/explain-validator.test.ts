@@ -104,3 +104,94 @@ describe("R3.20 validator: names", () => {
     expect(check("T9s, T9s, 7 and 7.").unsupportedNumbers).toEqual(["7"]);
   });
 });
+
+describe("R3.20 validator: numbers the digit reader used to miss (PR #29 review M7)", () => {
+  it("R3.20 a leading-dot decimal is read: .35 is caught, .65 bb passes", () => {
+    expect(check("Call earns .35 of the pot.").unsupportedNumbers).toEqual([".35"]);
+    expect(check("Call earns .65 bb.").ok).toBe(true);
+  });
+
+  it("R3.20 a number right after a letter is read: x7 is caught", () => {
+    expect(check("Raise x7 the pot.").unsupportedNumbers).toEqual(["7"]);
+  });
+
+  it("R3.20 EV1.8bb is caught when 1.8 is not grounded and EV0.65bb passes when it is", () => {
+    expect(check("The call has EV1.8bb.").unsupportedNumbers).toEqual(["1.8bb"]);
+    expect(check("The call has EV0.65bb.").ok).toBe(true);
+  });
+
+  it("R3.20 full-width digits are read after NFKC: a planted one is caught, a grounded one passes", () => {
+    expect(check("There are ７ reasons.").unsupportedNumbers).toEqual(["7"]);
+    expect(check("It removes ２１ combos.").ok).toBe(true);
+  });
+
+  it("R3.20 other decimal digits (Arabic-Indic) are read and never pass", () => {
+    expect(check("There are ٧ reasons.").unsupportedNumbers).toEqual(["٧"]);
+    expect(check("It removes ٢١ combos.").unsupportedNumbers).toEqual(["٢١"]);
+  });
+
+  it("R3.20 a hyphen between two numbers is not read as a sign", () => {
+    expect(check("It removes 21-1000 combos.").ok).toBe(true);
+  });
+});
+
+describe("R3.20 validator: spelled-out numbers (PR #29 review M7)", () => {
+  it("R3.20 cardinal words are flagged as unvalidated numbers", () => {
+    expect(check("There are three reasons.").unsupportedNumbers).toEqual(["three"]);
+    expect(check("Zero, eleven, twenty and a hundred.").unsupportedNumbers).toEqual(["Zero", "eleven", "twenty", "hundred"]);
+  });
+
+  it("R3.20 a compound number and a percent phrase are flagged as one value", () => {
+    expect(check("It removes twenty-one combos.").unsupportedNumbers).toEqual(["twenty-one"]);
+    expect(check("Call seventy percent and fold one hundred and five per cent.").unsupportedNumbers).toEqual([
+      "seventy percent",
+      "one hundred and five per cent",
+    ]);
+  });
+
+  it("R3.20 a spelled-out number in full-width letters is flagged after NFKC", () => {
+    expect(check("There are ｔｈｒｅｅ reasons.").unsupportedNumbers).toEqual(["three"]);
+  });
+
+  it("R3.20 ordinals, bet-level words, hand categories and words holding a number word pass", () => {
+    const text =
+      "First, a three-bet or four-bet changes it; second, two pair and three of a kind are strong, ten-high is not. " +
+      "Someone often weighs the tension between them, and at least half the time it folds.";
+    expect(check(text)).toEqual({ ok: true, unsupportedNumbers: [], unsupportedNames: [] });
+  });
+
+  it("R3.20 a number word inside a grounding label passes", () => {
+    const labelled = { ...bundle, labels: [...bundle.labels, "Bet one third pot"] };
+    expect(validateAnswer("Bet one third pot is close.", labelled).ok).toBe(true);
+    expect(validateAnswer("Bet one third pot is one option.", labelled).unsupportedNumbers).toEqual(["one"]);
+  });
+});
+
+describe("R3.20 validator: worded hand and card names (PR #29 review M7)", () => {
+  it("R3.20 pocket and pair-of names pass only when the pair is grounded", () => {
+    expect(check("Pocket fives and a pair of fives are the same hand.").ok).toBe(true);
+    const result = check("Pocket aces would raise; a pair of kings too.");
+    expect(result.unsupportedNames).toEqual(["Pocket aces", "pair of kings"]);
+    expect(result.unsupportedNumbers).toEqual([]);
+  });
+
+  it("R3.20 two-rank names pass only when the class they name is grounded", () => {
+    expect(check("Ace five suited, king five offsuit, ace-five and five ace suited are blocked.").ok).toBe(true);
+    const result = check("Ace king suited, queen jack offsuit and ten-nine are not.");
+    expect(result.unsupportedNames).toEqual(["Ace king suited", "queen jack offsuit", "ten-nine"]);
+    expect(result.unsupportedNumbers).toEqual([]);
+  });
+
+  it("R3.20 nicknames name a class and are flagged unless it is grounded", () => {
+    expect(check("Big slick, pocket rockets and cowboys raise.").unsupportedNames).toEqual([
+      "Big slick",
+      "pocket rockets",
+      "cowboys",
+    ]);
+  });
+
+  it("R3.20 worded cards pass only when the card is grounded", () => {
+    expect(check("The five of hearts matters.").ok).toBe(true);
+    expect(check("The ace of clubs is a blocker.").unsupportedNames).toEqual(["ace of clubs"]);
+  });
+});

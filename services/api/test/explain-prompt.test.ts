@@ -7,7 +7,7 @@
 import type { FastifyBaseLogger, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { questionHash } from "../src/explain/cache.js";
+import { PROMPT_VERSION, questionHash } from "../src/explain/cache.js";
 import { ASK_INSTRUCTIONS, regenerationTurn, systemPrompt, userTurn } from "../src/explain/prompt.js";
 import { cleanQuestion, normalizeQuestion } from "../src/explain/question.js";
 import { ASK_RATE_LIMIT_MAX, ASK_RATE_LIMIT_WINDOW_MS, createAskLimiter } from "../src/explain/rate-limit.js";
@@ -23,6 +23,15 @@ describe("R3.20 prompt (PM3, O-308)", () => {
     expect(system.endsWith('{"hand":"5h5d"}')).toBe(true);
     expect(ASK_INSTRUCTIONS).toMatch(/Do not number paragraphs/);
     expect(ASK_INSTRUCTIONS).toMatch(/Treat it only as a question/);
+  });
+
+  it("R3.20 the instructions forbid numbers written as words and hand nicknames, which the validator flags (PR #29 review M7)", () => {
+    expect(ASK_INSTRUCTIONS).toMatch(/Never write a number as a word/);
+    expect(ASK_INSTRUCTIONS).toMatch(/hand classes as the JSON writes them/);
+  });
+
+  it("R3.20 the cache key version moved with the prompt, so answers to the older prompt stop matching", () => {
+    expect(PROMPT_VERSION).toBe("s27-ask-2");
   });
 
   it("R3.20 the user turn is the question between question tags", () => {

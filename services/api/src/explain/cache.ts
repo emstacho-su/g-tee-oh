@@ -16,7 +16,7 @@ import { canonicalJson } from "../http/canonical-json.js";
 import { normalizeQuestion } from "./question.js";
 
 /** Bump when the system prompt or the grounding shape changes, so old answers stop matching. */
-export const PROMPT_VERSION = "s27-ask-1";
+export const PROMPT_VERSION = "s27-ask-2";
 
 export interface CacheKey {
   solutionId: string;
