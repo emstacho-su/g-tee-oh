@@ -1,0 +1,634 @@
+{
+  "version": 1,
+  "source": "synthetic",
+  "library_note": "Runs against the committed fixture library (validation/fixtures/library): synthetic online 6-max at 100, 150 and 200 bb and live 9-handed 1/3 and 2/5 at 100 bb (O-225); CI runs this set until the owner's build card is exported (O-24, O-64).",
+  "cases": [
+    {
+      "name": "RFI boundary hands, BTN",
+      "drill": {
+        "name": "RFI boundary hands, BTN",
+        "tags": [
+          "synthetic",
+          "rfi",
+          "boundary"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "BTN"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "close_decisions"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 1 of 05 section 4 (O-67) at one seat: hero BTN against any opponent, close decisions; the variant flow 2 builds on the stack (cfg_6_online_100)."
+    },
+    {
+      "name": "RFI boundary hands, every opening seat",
+      "drill": {
+        "name": "RFI boundary hands, every opening seat",
+        "tags": [
+          "synthetic",
+          "rfi",
+          "boundary"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "UTG",
+            "HJ",
+            "CO",
+            "BTN",
+            "SB"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "close_decisions"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 1 of 05 section 4 (O-67) at every 6-max opening seat."
+    },
+    {
+      "name": "BB vs BTN mixed region",
+      "drill": {
+        "name": "BB vs BTN mixed region",
+        "tags": [
+          "synthetic",
+          "vs-open",
+          "bb"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "BB"
+          ],
+          "villain_positions": [
+            "BTN"
+          ],
+          "preflop_action": [
+            "vs_open"
+          ],
+          "hands": {
+            "mode": "close_decisions"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 2 of 05 section 4 (O-67)."
+    },
+    {
+      "name": "BB vs CO mixed region",
+      "drill": {
+        "name": "BB vs CO mixed region",
+        "tags": [
+          "synthetic",
+          "vs-open",
+          "bb"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "BB"
+          ],
+          "villain_positions": [
+            "CO"
+          ],
+          "preflop_action": [
+            "vs_open"
+          ],
+          "hands": {
+            "mode": "close_decisions"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 3 of 05 section 4 (O-67)."
+    },
+    {
+      "name": "Live-depth opens, 1/3",
+      "drill": {
+        "name": "Live-depth opens, 1/3",
+        "tags": [
+          "synthetic",
+          "live",
+          "rfi"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "live",
+            "table_size": 9,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "1/3",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "UTG",
+            "UTG1",
+            "UTG2",
+            "LJ",
+            "HJ",
+            "CO",
+            "BTN",
+            "SB"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 4 of 05 section 4 (O-67) at 1/3. The fixture library holds live configurations at 100 bb only (O-316); one drill names one stake, so 2/5 is its own case."
+    },
+    {
+      "name": "Live-depth opens, 2/5",
+      "drill": {
+        "name": "Live-depth opens, 2/5",
+        "tags": [
+          "synthetic",
+          "live",
+          "rfi"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "live",
+            "table_size": 9,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "2/5",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "UTG",
+            "UTG1",
+            "UTG2",
+            "LJ",
+            "HJ",
+            "CO",
+            "BTN",
+            "SB"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Fallback drill 4 of 05 section 4 (O-67) at 2/5, 100 bb only (O-316)."
+    },
+    {
+      "name": "BTN vs three-bet from the blinds",
+      "drill": {
+        "name": "BTN vs three-bet from the blinds",
+        "tags": [
+          "synthetic",
+          "vs-3bet"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "BTN"
+          ],
+          "villain_positions": [
+            "SB",
+            "BB"
+          ],
+          "preflop_action": [
+            "vs_three_bet"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "every_action",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      }
+    },
+    {
+      "name": "Street mode, BB vs BTN at 150 bb",
+      "drill": {
+        "name": "Street mode, BB vs BTN at 150 bb",
+        "tags": [
+          "synthetic",
+          "street"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              150
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "BB"
+          ],
+          "villain_positions": [
+            "BTN"
+          ],
+          "preflop_action": [
+            "vs_open"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "end_of_street",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "never",
+          "speed": "fast",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      }
+    },
+    {
+      "name": "Full hand, CO opens at 200 bb",
+      "drill": {
+        "name": "Full hand, CO opens at 200 bb",
+        "tags": [
+          "synthetic",
+          "full-hand"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              200
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "CO"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "end_of_hand",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": true,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": true,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      }
+    },
+    {
+      "name": "Live 2/5 blind versus blind, alternating seats",
+      "drill": {
+        "name": "Live 2/5 blind versus blind, alternating seats",
+        "tags": [
+          "synthetic",
+          "live",
+          "bvb"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "live",
+            "table_size": 9,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "2/5",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "SB",
+            "BB"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi",
+            "vs_open"
+          ],
+          "hands": {
+            "mode": "all"
+          },
+          "alternate_seats": true
+        },
+        "trainer": {
+          "stop_rule": "end_of_street",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      }
+    },
+    {
+      "name": "Manual boundary list, HJ opens at three depths",
+      "drill": {
+        "name": "Manual boundary list, HJ opens at three depths",
+        "tags": [
+          "synthetic",
+          "rfi",
+          "manual"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100,
+              150,
+              200
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "HJ"
+          ],
+          "villain_positions": [],
+          "preflop_action": [
+            "rfi"
+          ],
+          "hands": {
+            "mode": "manual",
+            "hands": [
+              "A5s",
+              "K9s",
+              "QTs",
+              "J9s",
+              "T9s",
+              "98s",
+              "KJo",
+              "QJo",
+              "ATo",
+              "66",
+              "55"
+            ]
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": 15,
+          "panels": {
+            "hero_range_matrix": true,
+            "streak_counter": true
+          }
+        }
+      }
+    },
+    {
+      "name": "CO three-bets the HJ open",
+      "drill": {
+        "name": "CO three-bets the HJ open",
+        "tags": [
+          "synthetic",
+          "3bet"
+        ],
+        "spot_filter": {
+          "game_config": {
+            "format": "online",
+            "table_size": 6,
+            "depths_bb": [
+              100
+            ]
+          },
+          "stake": "online",
+          "sizing": {
+            "mode": "convention"
+          },
+          "start_street": "preflop",
+          "hero_positions": [
+            "CO"
+          ],
+          "villain_positions": [
+            "HJ"
+          ],
+          "preflop_action": [
+            "three_bet"
+          ],
+          "hands": {
+            "mode": "close_decisions"
+          },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      }
+    }
+  ]
+}

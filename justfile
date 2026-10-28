@@ -214,6 +214,22 @@ guard-test:
 test-tags:
     node scripts/check-test-tags.mjs
 
+# FILE is absolute or relative to the repo root; the runner builds the api over the test container and
+# the fixture solver-query (SOLVER_QUERY_URL points it elsewhere, O-244). Without the recipe, plain
+# vitest runs the default file, validation/fixtures/drills/synthetic-drill-set.json (just ts-test, CI).
+# Drill acceptance runner: express and run every drill case of an acceptance FILE (R3.15, O-315)
+[unix]
+drill-acceptance FILE:
+    DRILL_ACCEPTANCE_FILE='{{FILE}}' pnpm --filter @g-tee-oh/api exec vitest run test/acceptance/drill-acceptance.test.ts --reporter=verbose
+
+# FILE is absolute or relative to the repo root; the runner builds the api over the test container and
+# the fixture solver-query (SOLVER_QUERY_URL points it elsewhere, O-244). Without the recipe, plain
+# vitest runs the default file, validation/fixtures/drills/synthetic-drill-set.json (just ts-test, CI).
+# Drill acceptance runner: express and run every drill case of an acceptance FILE (R3.15, O-315)
+[windows]
+drill-acceptance FILE:
+    $env:DRILL_ACCEPTANCE_FILE = '{{FILE}}'; pnpm --filter @g-tee-oh/api exec vitest run test/acceptance/drill-acceptance.test.ts --reporter=verbose
+
 # Container images; skips until infra/docker/*.Dockerfile exists (S02)
 [unix]
 images:
