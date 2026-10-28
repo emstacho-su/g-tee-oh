@@ -23,6 +23,7 @@ import {
   WEIGHT_STEPS,
   evLegend,
   evStep,
+  weightBounds,
   weightLegend,
   weightStep,
 } from "../../src/components/range-matrix/scales.js";
@@ -108,8 +109,22 @@ describe("R3.12 range matrix EV and weight steps", () => {
     const legend = weightLegend();
     expect(legend.map((entry) => entry.step)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(legend[0]?.long).toBe("0%: not in the range");
-    expect(legend[1]?.long).toBe("1% to 20%");
-    expect(legend[5]?.long).toBe("81% to 100%");
+    // Review round 1, 7: the ranges come from the same buckets as weightStep, with no gaps.
+    expect(legend[1]?.long).toBe("more than 0% up to 20%");
+    expect(legend[5]?.long).toBe("more than 80% up to 100%");
+  });
+
+  it("R3.12 every weight falls in the legend range of its own step, with no gaps between ranges (review round 1, 7)", () => {
+    for (const weight of [0.001, 0.005, 0.2, 0.2001, 0.205, 0.4, 0.6, 0.8000001, 0.95, 1]) {
+      const step = weightStep(weight);
+      if (step === null || step === 0) throw new Error(`weight ${weight} has no step`);
+      const { above, upTo } = weightBounds(step);
+      expect(weight, `weight ${weight} in step ${step}`).toBeGreaterThan(above);
+      expect(weight).toBeLessThanOrEqual(upTo);
+    }
+    for (let step = 2; step <= 5; step += 1) expect(weightBounds(step).above).toBe(weightBounds(step - 1).upTo);
+    expect(weightBounds(1).above).toBe(0);
+    expect(weightBounds(5).upTo).toBe(1);
   });
 });
 

@@ -378,6 +378,6 @@ describe("R3.12 RangeMatrix legends", () => {
     render(<RangeMatrix node={fixtureStudyNode} mode="weight" theme="light" onSelectHand={() => undefined} />);
     const legend = screen.getByRole("list", { name: /Weight legend/ });
     expect(within(legend).getAllByRole("listitem")).toHaveLength(6);
-    expect(legend).toHaveTextContent("81% to 100%");
+    expect(legend).toHaveTextContent("more than 80% up to 100%");
   });
 });

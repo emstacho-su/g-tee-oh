@@ -87,11 +87,30 @@ export function evLegend(scaleBb: number): readonly LegendStep[] {
   });
 }
 
-/** The six weight steps from the empty ground to 100 percent. */
+export interface WeightBounds {
+  /** The step holds weights strictly above this share. */
+  readonly above: number;
+  /** ...and up to and including this one. */
+  readonly upTo: number;
+}
+
+/**
+ * The shares a weight step from 1 to 5 holds, the same buckets weightStep uses (ceil(weight x 5)):
+ * more than (step - 1) / 5 up to step / 5, so the ranges meet with no gap (review round 1, 7).
+ */
+export function weightBounds(step: number): WeightBounds {
+  return { above: (step - 1) / WEIGHT_STEPS, upTo: step / WEIGHT_STEPS };
+}
+
+function percentOf(share: number): string {
+  return `${Math.round(share * PERCENT)}%`;
+}
+
+/** The six weight steps from the empty ground to 100 percent, worded from weightBounds. */
 export function weightLegend(): readonly LegendStep[] {
-  const width = PERCENT / WEIGHT_STEPS;
   return Array.from({ length: WEIGHT_STEPS + 1 }, (_, step) => {
     if (step === 0) return { step, short: "0%", long: "0%: not in the range" };
-    return { step, short: `${step * width}%`, long: `${(step - 1) * width + 1}% to ${step * width}%` };
+    const { above, upTo } = weightBounds(step);
+    return { step, short: percentOf(upTo), long: `more than ${percentOf(above)} up to ${percentOf(upTo)}` };
   });
 }
