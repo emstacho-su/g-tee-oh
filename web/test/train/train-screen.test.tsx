@@ -1,8 +1,8 @@
 /**
- * /train's start panels and running session (S32, R4.10, R3.11, O-272, O-284, O-323, O-325,
- * O-328): the start body per mode (never a seed for automated), the scope named from /configs,
- * the block banner for a rated block and a worked example, the holdout banner, the confidence tap
- * before any decision, and the problems a start or a session can meet.
+ * /train's start panels and running session (S32, S37, R4.10, R3.13, O-272, O-284, O-323, O-325,
+ * O-328, O-345): the start body per mode (never a seed for automated), the scope named from
+ * /configs, the block banner for a rated block and a worked example, the holdout banner, choosing an
+ * action submits it (the confidence tap is retired), and the problems a start or a session can meet.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -50,7 +50,6 @@ async function chooseFirstAction(): Promise<void> {
 
 async function decide(): Promise<void> {
   await chooseFirstAction();
-  await userEvent.click(screen.getByRole("button", { name: "Sure" }));
   await screen.findByTestId("feedback-panel");
 }
 
@@ -142,23 +141,23 @@ describe("R4.10 automated session", () => {
     await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("facing-open, Facing an open in position"));
   });
 
-  it("R3.11 R4.10 nothing is sent and nothing revealed before the confidence tap (O-284)", async () => {
+  it("R3.13 R4.10 nothing is sent or revealed before the choice, and the choice submits without a confidence field (O-345, O-373)", async () => {
     const view = await renderTrain("automated", automatedScript());
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
-    await chooseFirstAction();
-    expect(screen.getByTestId("confidence-tap")).toBeInTheDocument();
+    await screen.findByRole("group", { name: "Actions" });
     expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
     expect(view.sentTo(AUTOMATED_PATHS.decide)).toHaveLength(0);
-    await userEvent.keyboard("u");
+    await chooseFirstAction();
     await screen.findByTestId("feedback-panel");
-    expect(view.sentTo(AUTOMATED_PATHS.decide)[0]?.body).toMatchObject({ confidence: "unsure", state_version: 1 });
+    const body = view.sentTo(AUTOMATED_PATHS.decide)[0]?.body;
+    expect(body).toMatchObject({ state_version: 1 });
+    expect(body).not.toHaveProperty("confidence");
   });
 
   it("R4.10 a network failure on a decision offers Try again, which resends the same key", async () => {
     const view = await renderTrain("automated", { ...automatedScript(), [AUTOMATED_PATHS.decide]: [networkFailure(), jsonResponse(200, ratedFeedback)] });
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     await chooseFirstAction();
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The request did not reach the server.");
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
@@ -220,7 +219,6 @@ describe("R4.10 holdout retest (O-328)", () => {
     expect(await screen.findByRole("alert")).not.toHaveTextContent("retest is complete");
     await userEvent.click(screen.getByRole("button", { name: "Start the retest" }));
     await chooseFirstAction();
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The request failed (status 422).");
     expect(alert).not.toHaveTextContent("No retest spots");

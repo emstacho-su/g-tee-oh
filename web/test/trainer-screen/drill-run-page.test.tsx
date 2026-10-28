@@ -1,7 +1,8 @@
 /**
- * The drill run screen in spot mode (S25, R3.13, R3.11, O-284, O-285, O-288, ADR 0018): the start
- * panel, the confidence tap before any reveal, the decision request and its Idempotency-Key, the
- * 409 and 422 paths, the next-prompt prefetch, the hotkeys and the recap.
+ * The drill run screen in spot mode (S25, S37, R3.13, R3.10, O-284, O-285, O-288, O-345, ADR 0018,
+ * ADR 0024): the start panel, choosing an action submits it (the confidence tap is retired), the
+ * decision request and its Idempotency-Key, the 409 and 422 paths, the next-prompt prefetch, the
+ * hidden-then-revealed roll scale of Mixed-frequency mode, the hotkeys and the recap.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -59,7 +60,6 @@ async function closeExplainerIfOpen(): Promise<void> {
 async function playToFeedback(view: RunView): Promise<void> {
   await startSession(view);
   await chooseRaise(view);
-  await userEvent.click(screen.getByRole("button", { name: "Sure" }));
   await screen.findByTestId("feedback-panel");
 }
 
@@ -70,15 +70,15 @@ describe("R3.13 drill run start panel", () => {
     expect(screen.getByText("Grouped")).toBeInTheDocument();
     // The stop rule reads as the library and the builder name it (src/drills/labels.ts, LOW 10).
     expect(screen.getByText("Spot")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "RNG mode" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("R3.13 the start request carries mode drill, the drill id, settings.rng, the seed and an Idempotency-Key (O-288)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT, seed: FIXTURE_SEED });
     await screen.findByRole("heading", { name: fixtureDrill.name });
-    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await closeExplainerIfOpen();
-    expect(screen.getByRole("switch", { name: "RNG mode" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "true");
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     await screen.findByRole("group", { name: "Actions" });
     const [start] = view.sentTo(START_PATH);
@@ -126,7 +126,7 @@ describe("R3.13 drill run start panel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     await waitFor(() => expect(view.sentTo(START_PATH)).toHaveLength(2));
     await screen.findByRole("alert");
-    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await closeExplainerIfOpen();
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     await screen.findByRole("group", { name: "Actions" });
@@ -152,37 +152,24 @@ describe("R3.13 drill run start panel", () => {
   });
 });
 
-describe("R3.11 confidence tap before any reveal", () => {
-  it("R3.11 no feedback panel and no decision request before the tap; one request after it (O-198, O-284)", async () => {
+describe("R3.13 choosing an action submits it (O-345)", () => {
+  it("R3.13 no feedback panel and no decision request before the choice; the choice sends one request with no confidence field (O-198, O-345, O-373)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await startSession(view);
-    expect(screen.queryByTestId("confidence-tap")).not.toBeInTheDocument();
-    await chooseRaise(view);
-    expect(screen.getByTestId("confidence-tap")).toBeInTheDocument();
     expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
     expect(view.sentTo(DECIDE_PATH)).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Sure" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unsure" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Unsure" }));
+    await chooseRaise(view);
     await screen.findByTestId("feedback-panel");
     const decisions = view.sentTo(DECIDE_PATH);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.body).toEqual({
       state_version: fixturePlainPrompt.state_version,
       action_index: 2,
-      confidence: "unsure",
       response_ms: COMMITTED_AT - SHOWN_AT,
     });
-  });
-
-  it("R3.11 choosing another action before the tap replaces the choice", async () => {
-    const view = renderRun({ script: PLAY_SCRIPT });
-    await startSession(view);
-    await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Call" }));
-    expect(screen.getByText("Your choice: Call")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
-    await screen.findByTestId("feedback-panel");
-    expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ action_index: 1, confidence: "sure" });
   });
 });
 
@@ -193,7 +180,6 @@ describe("R3.13 decision requests", () => {
     });
     await startSession(view);
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("did not reach the server");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByTestId("feedback-panel");
@@ -212,14 +198,12 @@ describe("R3.13 decision requests", () => {
     });
     await startSession(view);
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("did not answer in time");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByTestId("feedback-panel");
     await userEvent.click(screen.getByRole("button", { name: "Next hand" }));
     await screen.findByRole("button", { name: RAISE_NAME });
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     await screen.findByTestId("feedback-panel");
     const keys = view.sentTo(DECIDE_PATH).map((request) => request.idempotencyKey);
     expect(keys).toHaveLength(3);
@@ -231,7 +215,6 @@ describe("R3.13 decision requests", () => {
     const view = renderRun({ script: { ...PLAY_SCRIPT, [DECIDE_PATH]: [problemResponse(400, "validation")] } });
     await startSession(view);
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The request failed (status 400).");
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "End session" }));
@@ -252,20 +235,19 @@ describe("R3.13 decision requests", () => {
       script: { ...PLAY_SCRIPT, [NEXT_PATH]: [jsonResponse(200, fixtureRngPrompt)], [DECIDE_PATH]: [jsonResponse(200, fixtureRngFeedback)] },
     });
     await screen.findByRole("heading", { name: fixtureDrill.name });
-    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await closeExplainerIfOpen();
     view.clock.now = SHOWN_AT;
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
-    const badge = await screen.findByTestId("roll-badge");
+    const badge = await screen.findByTestId("rng-roller");
     await closeExplainerIfOpen();
     view.clock.now = 2_000;
-    await userEvent.click(within(badge).getByRole("button", { name: "How RNG mode works" }));
+    await userEvent.click(within(badge).getByRole("button", { name: "How Mixed-frequency mode works" }));
     await screen.findByRole("dialog");
     view.clock.now = 5_000;
     await closeExplainerIfOpen();
     view.clock.now = 6_000;
     await userEvent.click(screen.getByRole("button", { name: RAISE_NAME }));
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     await screen.findByTestId("feedback-panel");
     expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ response_ms: 2_000 });
   });
@@ -289,7 +271,6 @@ describe("R3.13 decision requests", () => {
     });
     await startSession(view);
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     expect(await screen.findByText(/The session moved on/)).toBeInTheDocument();
     expect(view.sentTo(NEXT_PATH)).toHaveLength(2);
     expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
@@ -300,7 +281,6 @@ describe("R3.13 decision requests", () => {
     const view = renderRun({ script: { ...PLAY_SCRIPT, [DECIDE_PATH]: [problemResponse(401, "unauthenticated")] } });
     await startSession(view);
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("signed out");
     expect(view.queryClient.getQueryData(ME_QUERY_KEY)).toBeNull();
   });
@@ -341,34 +321,43 @@ describe("R3.13 feedback, next and prefetch", () => {
     expect(screen.getByTestId("synthetic-banner")).toHaveTextContent(SYNTHETIC_TEXT);
   });
 
-  it("R3.10 with RNG on the roll shows before the decision and the roller after it", async () => {
+  it("R3.10 with Mixed-frequency mode on, the scale shows the roll and no bands before the decision, and the same scale reveals the bands after it (ADR 0024, O-344)", async () => {
     const view = renderRun({
       script: { ...PLAY_SCRIPT, [NEXT_PATH]: [jsonResponse(200, fixtureRngPrompt)], [DECIDE_PATH]: [jsonResponse(200, fixtureRngFeedback)] },
     });
     await screen.findByRole("heading", { name: fixtureDrill.name });
-    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await closeExplainerIfOpen();
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
-    expect(await screen.findByTestId("roll-badge")).toHaveTextContent("37");
+    const hidden = await screen.findByTestId("rng-roller");
+    expect(hidden).toHaveAttribute("data-revealed", "false");
+    expect(hidden).toHaveTextContent("Roll 37");
+    expect(within(hidden).queryByRole("list", { name: "Mixed-frequency bands" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("roll-badge")).not.toBeInTheDocument();
     await closeExplainerIfOpen();
     await chooseRaise(view);
-    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
     const panel = await screen.findByTestId("feedback-panel");
-    expect(screen.queryByTestId("roll-badge")).not.toBeInTheDocument();
-    expect(within(panel).getAllByTestId(/feedback-roller|rng-roller/).length).toBeGreaterThan(0);
+    const revealed = within(panel).getByTestId("rng-roller");
+    expect(revealed).toHaveAttribute("data-revealed", "true");
+    expect(within(revealed).getByRole("list", { name: "Mixed-frequency bands" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("rng-roller"), "one scale on screen, now revealed").toHaveLength(1);
   });
 });
 
 describe("R3.13 hotkeys drive the same transitions as clicks (O-285)", () => {
-  it("R3.13 1 to 9 choose, S taps, N goes to the next hand, E then the confirm ends the session", async () => {
+  it("R3.13 1 to 9 choose and submit, N goes to the next hand, E then the confirm ends the session (O-345)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await startSession(view);
     view.clock.now = COMMITTED_AT;
     await userEvent.keyboard("3");
-    expect(screen.getByText(`Your choice: ${RAISE_NAME}`)).toBeInTheDocument();
-    await userEvent.keyboard("s");
     await screen.findByTestId("feedback-panel");
-    expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ action_index: 2, confidence: "sure" });
+    expect(view.sentTo(DECIDE_PATH)[0]?.body).toEqual({
+      state_version: fixturePlainPrompt.state_version,
+      action_index: 2,
+      response_ms: COMMITTED_AT - SHOWN_AT,
+    });
+    await userEvent.keyboard("s");
+    expect(view.sentTo(DECIDE_PATH), "S is no longer a key").toHaveLength(1);
     await userEvent.keyboard("n");
     expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
     await userEvent.keyboard("e");

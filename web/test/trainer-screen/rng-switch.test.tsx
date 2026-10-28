@@ -28,7 +28,7 @@ describe("R3.10 RNG switch and the explainer's first use", () => {
   it("R3.10 switching RNG on asks for the first-use explainer; switching it off does not", async () => {
     renderRun({ script: {} });
     await screen.findByRole("heading", { name: fixtureDrill.name });
-    const rngSwitch = screen.getByRole("switch", { name: "RNG mode" });
+    const rngSwitch = screen.getByRole("switch", { name: "Mixed-frequency mode" });
     await userEvent.click(rngSwitch);
     expect(control.showIfFirstUse).toHaveBeenCalledTimes(1);
     await userEvent.click(rngSwitch);
@@ -40,7 +40,7 @@ describe("R3.10 RNG switch and the explainer's first use", () => {
     control.showIfFirstUse.mockClear();
     renderRun({ script: { [NEXT_PATH]: [jsonResponse(200, fixtureRngPrompt)] } });
     await screen.findByRole("heading", { name: fixtureDrill.name });
-    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     await screen.findByTestId("roll-badge");
     expect(control.showIfFirstUse).toHaveBeenCalledTimes(2);

@@ -47,8 +47,7 @@ function decided(state: SpotState, prompt: TrainerPrompt, feedback: DecisionFeed
   return run(
     state,
     { type: "prompt_loaded", prompt, at },
-    { type: "choose_action", actionIndex: 1, at: at + 100 },
-    { type: "confidence", confidence: "sure", key: `key-${at}` },
+    { type: "choose_action", actionIndex: 1, at: at + 100, key: `key-${at}` },
     { type: "decision_succeeded", feedback },
   );
 }

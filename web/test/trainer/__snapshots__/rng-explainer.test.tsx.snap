@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot: why randomize, how the roll works, why it is optional 1`] = `
+exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot: what earns Best, how the roll works, why practise mixing (ADR 0024) 1`] = `
 <div
   class="flex flex-col gap-4 text-sm"
   data-testid="rng-explainer-content"
