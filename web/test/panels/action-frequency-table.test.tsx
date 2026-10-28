@@ -105,6 +105,31 @@ describe("R3.12 ActionFrequencyTable", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
+  it("R3.12 R3.13 keeps the column headers for screen readers but hides them visually, so it reads as a list (row 14)", () => {
+    render(<ActionFrequencyTable actions={fixtureActions} frequencies={fixtureFeedback.freq_by_action} caption="c" />);
+    const head = screen.getByRole("table").querySelector("thead");
+    expect(head).not.toBeNull();
+    expect(head).toHaveClass("sr-only");
+  });
+
+  it("R3.12 R3.13 draws one combined mix bar on top, a segment per action at its share, hidden from screen readers", () => {
+    render(<ActionFrequencyTable actions={fixtureActions} frequencies={fixtureFeedback.freq_by_action} caption="c" />);
+    const mix = screen.getByTestId("frequency-mix");
+    expect(mix).toHaveAttribute("aria-hidden", "true");
+    const segments = within(mix).getAllByTestId("frequency-mix-segment");
+    const shown = fixtureFeedback.freq_by_action.filter((share) => share > 0);
+    expect(segments).toHaveLength(shown.length);
+    expect(segments[segments.length - 1]).toHaveStyle({ width: `${(shown[shown.length - 1] ?? 0) * 100}%` });
+  });
+
+  it("R3.12 R3.13 shows Best as a chip in the row", () => {
+    render(
+      <ActionFrequencyTable actions={fixtureActions} frequencies={fixtureFeedback.freq_by_action} highlightIndexes={[2]} caption="c" />,
+    );
+    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    expect(within(raise).getByTestId("highlight-chip")).toHaveTextContent("Best");
+  });
+
   it("R3.12 rejects mismatched lengths and frequencies outside 0 to 1", () => {
     const { rerender } = render(<ActionFrequencyTable actions={fixtureActions} frequencies={[0.5, 0.5]} caption="c" />);
     expect(screen.getByRole("alert")).toHaveTextContent("4 actions but 2 frequencies");

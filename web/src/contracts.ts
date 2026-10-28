@@ -16,6 +16,8 @@ export type NodeAction = Schemas["NodeAction"];
 export type NodeHandRow = Schemas["NodeHandRow"];
 export type StudyNode = Schemas["StudyNode"];
 export type StudyInsights = Schemas["StudyInsights"];
+/** The threshold card S23 pinned from solver-query's insights (S38 renders it in plain words). */
+export type ThresholdCardData = Schemas["ThresholdCard"];
 export type TrainerPrompt = Schemas["TrainerPrompt"];
 export type TrainerSettings = Schemas["TrainerSettings"];
 export type DecisionFeedback = Schemas["DecisionFeedback"];

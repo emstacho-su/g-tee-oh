@@ -12,6 +12,8 @@ export type { PillNavProps } from "./PillNav.js";
 export { Dialog } from "./Dialog.js";
 export { Disclosure } from "./Disclosure.js";
 export type { DisclosureHeadingLevel, DisclosureProps } from "./Disclosure.js";
+export { InfoTip } from "./InfoTip.js";
+export type { InfoTipProps } from "./InfoTip.js";
 export type { DialogProps } from "./Dialog.js";
 export { ToggleGroup } from "./ToggleGroup.js";
 export type { ToggleGroupProps, ToggleOption } from "./ToggleGroup.js";

@@ -170,17 +170,29 @@ export function TrainerSections() {
           explanation={<GalleryExplanationBody />}
         />
       </GallerySection>
-      <GallerySection name="action-frequency-table" title="ActionFrequencyTable" note="Frequencies and EV as given by the api.">
-        <ActionFrequencyTable
-          actions={fixtureActions}
-          frequencies={fixtureFeedback.freq_by_action}
-          evBb={fixtureFeedback.ev_by_action}
-          highlightIndexes={fixtureFeedback.best_action_indexes}
-          caption="AJo at the button open"
-        />
+      <GallerySection
+        name="action-frequency-table"
+        title="ActionFrequencyTable"
+        note="A list on screen (mix bar, rows, Best chip) and a table for screen readers; frequencies and EV as given by the api."
+      >
+        <div className="max-w-md">
+          <ActionFrequencyTable
+            actions={fixtureActions}
+            frequencies={fixtureFeedback.freq_by_action}
+            evBb={fixtureFeedback.ev_by_action}
+            highlightIndexes={fixtureFeedback.best_action_indexes}
+            caption="AJo at the button open"
+          />
+        </div>
       </GallerySection>
-      <GallerySection name="threshold-card" title="ThresholdCard" note="Rendered generically until S23 pins the shape.">
-        <ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" />
+      <GallerySection
+        name="threshold-card"
+        title="ThresholdCard"
+        note="Plain words in three tiles, actions named from the node, an info tip on each tile's heading."
+      >
+        <div className="max-w-xl">
+          <ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" actions={fixtureActions} />
+        </div>
       </GallerySection>
     </>
   );
