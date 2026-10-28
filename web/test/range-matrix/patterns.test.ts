@@ -13,6 +13,7 @@ import {
   type TileCanvas,
   type TileContext,
 } from "../../src/components/range-matrix/patterns.js";
+import { MATRIX_PALETTES } from "../../src/components/range-matrix/matrix-theme.js";
 import { fakePattern } from "./recording-context.js";
 
 interface FakeTile extends TileCanvas {
@@ -106,6 +107,38 @@ describe("R3.12 range matrix hatch patterns", () => {
     expect(source.get(patternKey("none", 0))).toBeNull();
     expect(source.get("bogus:0")).toBeNull();
     expect(tiles).toHaveLength(0);
+  });
+
+  it("R3.12 the ink variant picks the palette's dark or light hatch ink, as separate cached tiles", () => {
+    const inks: unknown[] = [];
+    const { make } = tileFactory();
+    const recordInk = (size: number) => {
+      const tile = make(size);
+      const context = tile.getContext("2d");
+      return {
+        ...tile,
+        getContext: () =>
+          context === null
+            ? null
+            : {
+                ...context,
+                set strokeStyle(value: unknown) {
+                  inks.push(value);
+                },
+                get strokeStyle() {
+                  return "";
+                },
+              },
+      };
+    };
+    const source = createPatternSource(target(), "light", 1, recordInk);
+    expect(patternKey("diagonal", 0, "light")).toBe("diagonal:0:light");
+    expect(patternKey("diagonal", 0)).toBe("diagonal:0:dark");
+    const onLight = source.get(patternKey("diagonal", 0, "dark"));
+    const onDark = source.get(patternKey("diagonal", 0, "light"));
+    expect(onLight).not.toBe(onDark);
+    expect(inks).toEqual([MATRIX_PALETTES.light.hatchInkDark, MATRIX_PALETTES.light.hatchInkLight]);
+    expect(source.get("diagonal:0:purple")).toBeNull();
   });
 
   it("R3.12 a tile without a 2D context gives no pattern and is not retried every frame", () => {

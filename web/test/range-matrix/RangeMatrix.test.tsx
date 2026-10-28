@@ -1,16 +1,19 @@
 /**
- * Tests for the RangeMatrix component (S24, R3.12) in jsdom: the canvas is an image with a label
- * and a description that points at the table fallback, arrow keys move the focused cell and
- * Enter or Space selects it, a click selects the cell under the pointer, the toggle reveals the
- * table, drawing goes through one animation frame per change, and a browser without a 2D
- * context still renders the table without crashing.
+ * Tests for the RangeMatrix component (S24, S38, R3.12) in jsdom: the canvas is an image with a
+ * label and a description that points at the screen-reader-only table (O-347, no visible
+ * toggle), arrow keys move the focused cell and Enter or Space selects it, a click selects the
+ * cell under the pointer, the pop-out opens and closes by mouse and keyboard (O-386), each mode
+ * has its legend (O-384, O-385), drawing goes through one animation frame per change, and a
+ * browser without a 2D context still renders the table without crashing.
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { POP_OUT_GAP_PX, popOutPosition } from "../../src/components/range-matrix/MatrixPopOut.js";
 import { RangeMatrix } from "../../src/components/range-matrix/RangeMatrix.js";
 import { fixtureStudyNode } from "../../src/fixtures/index.js";
+import { formatBb, formatShare } from "../../src/poker/format.js";
 import { fakePattern, recordingContext } from "./recording-context.js";
 
 type FrameCallback = (time: number) => void;
@@ -204,15 +207,177 @@ describe("R3.12 RangeMatrix component", () => {
     expect(onSelectHand).toHaveBeenCalledTimes(1);
   });
 
-  it("R3.12 the toggle reveals the table and reports its state through aria-pressed", async () => {
+  it("R3.12 has no visible Show as table toggle; the table stays in the DOM for screen readers only (O-347)", () => {
     stubContext(null);
     render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />);
-    const toggle = screen.getByRole("button", { name: "Show as table" });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Show as table" })).not.toBeInTheDocument();
     const table = screen.getByRole("table", { hidden: true });
-    expect(table.closest("[data-table-visible]")).toHaveAttribute("data-table-visible", "false");
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
-    expect(table.closest("[data-table-visible]")).toHaveAttribute("data-table-visible", "true");
+    expect(table.parentElement).toHaveClass("sr-only");
+  });
+});
+
+/** The fixture's numbers for one hand, as the pop-out prints them. */
+function rowOf(hand: string) {
+  const row = fixtureStudyNode.hands.find((candidate) => candidate.hand === hand);
+  if (row === undefined) throw new Error(`fixture has no ${hand}`);
+  return row;
+}
+
+/** Clicks the cell at a grid row and column on a 520 pixel canvas placed at (10, 20). */
+function clickCell(canvas: HTMLElement, row: number, col: number): void {
+  fireEvent.click(canvas, { clientX: 10 + 40 * col + 5, clientY: 20 + 40 * row + 5 });
+}
+
+function placedCanvas(): HTMLElement {
+  const canvas = screen.getByRole("img");
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(DOMRect.fromRect({ x: 10, y: 20, width: 520, height: 520 }));
+  return canvas;
+}
+
+describe("R3.12 RangeMatrix pop-out (O-386)", () => {
+  it("R3.12 a click selects the cell and pops it out with each action's exact frequency and EV and the weight", () => {
+    stubContext(null);
+    const onSelectHand = vi.fn();
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={onSelectHand} />);
+    clickCell(placedCanvas(), 1, 2);
+    expect(onSelectHand).toHaveBeenCalledWith("KQs");
+    const popOut = screen.getByTestId("matrix-popout");
+    expect(popOut).toHaveAttribute("data-hand", "KQs");
+    const row = rowOf("KQs");
+    fixtureStudyNode.actions.forEach((action, position) => {
+      const line = within(popOut).getByTestId(`popout-action-${action.index}`);
+      expect(line).toHaveTextContent(action.label);
+      expect(line).toHaveTextContent(formatShare(row.strategy[position] ?? 0, 1));
+      expect(line).toHaveTextContent(formatBb(row.ev_bb[position] ?? 0, 2));
+    });
+    expect(popOut).toHaveTextContent(`Range weight ${formatShare(row.reach?.[0] ?? 0, 1)}`);
+    expect(popOut).toHaveClass("z-(--layer-tooltip)");
+    expect(popOut).not.toHaveAttribute("tabindex");
+  });
+
+  it("R3.12 the next click anywhere closes it; a click on another cell opens that cell instead", () => {
+    stubContext(null);
+    render(<RangeMatrix node={fixtureStudyNode} mode="ev" theme="dark" onSelectHand={() => undefined} />);
+    const canvas = placedCanvas();
+    clickCell(canvas, 0, 0);
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AA");
+    clickCell(canvas, 0, 1);
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+    clickCell(canvas, 0, 1);
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+    clickCell(canvas, 2, 2);
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "QQ");
+    fireEvent.click(document.body);
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a click inside the pop-out also closes it", () => {
+    stubContext(null);
+    render(<RangeMatrix node={fixtureStudyNode} mode="weight" theme="light" onSelectHand={() => undefined} />);
+    clickCell(placedCanvas(), 0, 0);
+    fireEvent.click(screen.getByTestId("matrix-popout"));
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 Enter or Space opens it on the focused cell, Escape and the arrow keys close it, focus stays on the grid", async () => {
+    stubContext(null);
+    const onSelectHand = vi.fn();
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={onSelectHand} />);
+    grid().focus();
+    await userEvent.keyboard("{ArrowRight}{Enter}");
+    expect(onSelectHand).toHaveBeenLastCalledWith("AKs");
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+    expect(grid()).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent(/^AKs: Fold .*%, EV .*bb; .*range weight .*%$/);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+    await userEvent.keyboard("{ }");
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+    await userEvent.keyboard("{ArrowDown}");
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/^KK: /);
+  });
+
+  it("R3.12 Tab away closes it", async () => {
+    stubContext(null);
+    render(
+      <>
+        <RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />
+        <button type="button">after</button>
+      </>,
+    );
+    grid().focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByTestId("matrix-popout")).toBeInTheDocument();
+    await userEvent.tab();
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 popOut false keeps selection and never pops out", async () => {
+    stubContext(null);
+    const onSelectHand = vi.fn();
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" popOut={false} onSelectHand={onSelectHand} />);
+    clickCell(placedCanvas(), 0, 0);
+    grid().focus();
+    await userEvent.keyboard("{Enter}");
+    expect(onSelectHand).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 initialPopOutHand opens the pop-out on that hand, and a missing hand says not in range", () => {
+    stubContext(null);
+    const sparse = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.filter((row) => row.hand !== "72o") };
+    render(<RangeMatrix node={sparse} mode="frequency" theme="light" initialPopOutHand="72o" onSelectHand={() => undefined} />);
+    const popOut = screen.getByTestId("matrix-popout");
+    expect(popOut).toHaveAttribute("data-hand", "72o");
+    expect(popOut).toHaveTextContent("not in range");
+  });
+});
+
+describe("R3.12 pop-out placement", () => {
+  const box = { boxW: 520, boxH: 520, popW: 180, popH: 200 };
+
+  it("R3.12 sits beside the cell, on the right when it fits and on the left when not", () => {
+    expect(popOutPosition({ row: 0, col: 0, ...box })).toEqual({ left: 40 + POP_OUT_GAP_PX, top: 0 });
+    expect(popOutPosition({ row: 3, col: 12, ...box })).toEqual({ left: 480 - 180 - POP_OUT_GAP_PX, top: 120 });
+  });
+
+  it("R3.12 is clamped inside the matrix box, even on a phone-sized box", () => {
+    expect(popOutPosition({ row: 12, col: 6, ...box })).toEqual({ left: 280 + POP_OUT_GAP_PX, top: 320 });
+    const phone = popOutPosition({ row: 12, col: 6, boxW: 300, boxH: 300, popW: 180, popH: 200 });
+    expect(phone.left).toBeGreaterThanOrEqual(0);
+    expect(phone.left + 180).toBeLessThanOrEqual(300);
+    expect(phone.top + 200).toBeLessThanOrEqual(300);
+    expect(popOutPosition({ row: 5, col: 5, boxW: 100, boxH: 100, popW: 180, popH: 200 })).toEqual({ left: 0, top: 0 });
+  });
+});
+
+describe("R3.12 RangeMatrix legends", () => {
+  it("R3.12 frequency mode lists every action with its swatch, name and pattern", () => {
+    stubContext(null);
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />);
+    const legend = screen.getByRole("list", { name: "Action legend" });
+    const items = within(legend).getAllByRole("listitem");
+    expect(items).toHaveLength(fixtureStudyNode.actions.length);
+    expect(items[2]).toHaveTextContent("Raise to 2.5bb");
+    expect(items[2]).toHaveTextContent("diagonal pattern");
+    expect(within(items[2] as HTMLElement).getByTestId("action-swatch")).toBeInTheDocument();
+  });
+
+  it("R3.12 EV mode shows the stepped scale with bb boundaries and a named neutral middle", () => {
+    stubContext(null);
+    render(<RangeMatrix node={fixtureStudyNode} mode="ev" theme="dark" onSelectHand={() => undefined} />);
+    const legend = screen.getByRole("list", { name: /EV legend/ });
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(11);
+    expect(legend).toHaveTextContent("near 0");
+    expect(legend).toHaveTextContent(/more than \+\d/);
+  });
+
+  it("R3.12 weight mode shows the 0 to 100 percent ramp", () => {
+    stubContext(null);
+    render(<RangeMatrix node={fixtureStudyNode} mode="weight" theme="light" onSelectHand={() => undefined} />);
+    const legend = screen.getByRole("list", { name: /Weight legend/ });
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(6);
+    expect(legend).toHaveTextContent("81% to 100%");
   });
 });
