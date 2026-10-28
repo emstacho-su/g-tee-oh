@@ -2473,6 +2473,8 @@ export interface paths {
                         };
                         /** Format: uuid */
                         prompt_id: string;
+                        /** @description Why the player answered so (S41, O-350, O-412): required, 3 to 1,000 characters after control and invisible characters are cleaned; stored with the answer, never graded */
+                        rationale: string;
                         state_version: number;
                     };
                 };
@@ -2663,6 +2665,108 @@ export interface paths {
                 };
                 /** @description Problem (409) */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/frequencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your preflop action frequencies against the solver's, per node and hand class
+         * @description Counted decisions only (no holdout, client-seeded or answer-revealing-panel decisions), preflop only, the 12 most played nodes, shown from a minimum sample (O-353, O-417, O-418). Labels come from one solver-query node read per spot, so it also answers the upstream problems.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FrequencyComparison"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3575,6 +3679,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        catalog_spot?: components["schemas"]["CatalogSpotInput"];
                         /** @description Automated mode: the configurations in scope; every catalog configuration with preflop coverage when absent */
                         config_ids?: string[];
                         /**
@@ -3584,6 +3689,7 @@ export interface paths {
                         drill_id?: string;
                         /** @enum {string} */
                         mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+                        quiz?: components["schemas"]["QuizOptionsInput"];
                         /** @description The session seed; the same seed and choices replay the same session (O-249). Random when absent. A session created with a seed is never rated and writes no learning state; holdout sessions refuse a seed with 400 */
                         seed?: string;
                         settings?: {
@@ -4809,6 +4915,28 @@ export interface components {
             /** @description Builds done in the last 24 hours, divided by 24 */
             throughput_per_hour: number;
         };
+        /** @description A preflop spot from the catalog: configuration, seats and spot types (O-415) */
+        CatalogSpot: {
+            /** @description A catalog configuration (GET /catalog/configs); checked to exist and be served */
+            config_id: string;
+            /** @description The seats to practise; each seated at the configuration */
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description Preflop spot types, such as rfi (an open) or vs_open (facing an open) */
+            spot_types: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            /** @description The opponents; absent or empty means any seat */
+            villain_positions?: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        /** @description A preflop spot from the catalog: configuration, seats and spot types (O-415) */
+        CatalogSpotInput: {
+            /** @description A catalog configuration (GET /catalog/configs); checked to exist and be served */
+            config_id: string;
+            /** @description The seats to practise; each seated at the configuration */
+            hero_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+            /** @description Preflop spot types, such as rfi (an open) or vs_open (facing an open) */
+            spot_types: ("rfi" | "vs_open" | "srp" | "three_bet" | "vs_three_bet" | "four_bet" | "squeeze" | "limp_iso" | "straddle")[];
+            /** @description The opponents; absent or empty means any seat */
+            villain_positions?: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
         Coverage: {
             /** @description A game_config identifier, for example cfg_9_live_13_150 */
             config_id: string;
@@ -5009,6 +5137,42 @@ export interface components {
             ip: number[];
             oop: number[];
         };
+        FrequencyAction: {
+            /** @description NodeAction.index, the position in the node's actions */
+            index: number;
+            kind: string;
+            label: string;
+        };
+        FrequencyActionInput: {
+            /** @description NodeAction.index, the position in the node's actions */
+            index: number;
+            kind: string;
+            label: string;
+        };
+        FrequencyComparison: {
+            min_hand_decisions: number;
+            min_spot_decisions: number;
+            /** @description The most played preflop nodes, most decisions first */
+            spots: components["schemas"]["SpotFrequency"][];
+        };
+        FrequencyComparisonInput: {
+            min_hand_decisions: number;
+            min_spot_decisions: number;
+            /** @description The most played preflop nodes, most decisions first */
+            spots: components["schemas"]["SpotFrequencyInput"][];
+        };
+        FrequencyRow: {
+            /** @description The mean of the solver's frequency of each action for the hands you were dealt */
+            solver_freq: number[];
+            /** @description The share of your decisions that chose each action */
+            your_freq: number[];
+        };
+        FrequencyRowInput: {
+            /** @description The mean of the solver's frequency of each action for the hands you were dealt */
+            solver_freq: number[];
+            /** @description The share of your decisions that chose each action */
+            your_freq: number[];
+        };
         GameConfig: {
             /** @description Ante in centi-big-blinds; stored but not served in v1 (O-33) */
             ante_cbb: number;
@@ -5038,6 +5202,24 @@ export interface components {
             stake_label: string;
             straddle: boolean;
             table_size: number;
+        };
+        HandFrequency: {
+            decisions: number;
+            /** @description A hand class, for example AKs */
+            hand_class: string;
+            /** @description The mean of the solver's frequency of each action for the hands you were dealt */
+            solver_freq: number[];
+            /** @description The share of your decisions that chose each action */
+            your_freq: number[];
+        };
+        HandFrequencyInput: {
+            decisions: number;
+            /** @description A hand class, for example AKs */
+            hand_class: string;
+            /** @description The mean of the solver's frequency of each action for the hands you were dealt */
+            solver_freq: number[];
+            /** @description The share of your decisions that chose each action */
+            your_freq: number[];
         };
         HoldoutProgress: {
             answered: number;
@@ -5399,6 +5581,8 @@ export interface components {
             ladder: "range" | "hand";
             /** @description The level the answer was given at */
             level: number;
+            /** @description The last 20 answers at this spot class, ladder and level hold at least 90 percent correct (S41, O-410) */
+            level_passed: boolean;
             /** @description The ladder's level for this spot class after the answer */
             new_level: number;
             next_level_unlocked: boolean;
@@ -5428,6 +5612,8 @@ export interface components {
             ladder: "range" | "hand";
             /** @description The level the answer was given at */
             level: number;
+            /** @description The last 20 answers at this spot class, ladder and level hold at least 90 percent correct (S41, O-410) */
+            level_passed: boolean;
             /** @description The ladder's level for this spot class after the answer */
             new_level: number;
             next_level_unlocked: boolean;
@@ -5752,6 +5938,24 @@ export interface components {
             items: components["schemas"]["TrackProgressInput"][];
             /** @description Pass as cursor for the next page; null on the last page */
             next_cursor: string | null;
+        };
+        QuizOptions: {
+            /**
+             * @description easy, medium or hard: prediction levels 1, 2 and 3 (O-410)
+             * @enum {string}
+             */
+            difficulty: "easy" | "medium" | "hard";
+            /** @description range asks about the whole range, hand about one hand class (O-411) */
+            question_kinds: ("range" | "hand")[];
+        };
+        QuizOptionsInput: {
+            /**
+             * @description easy, medium or hard: prediction levels 1, 2 and 3 (O-410)
+             * @enum {string}
+             */
+            difficulty: "easy" | "medium" | "hard";
+            /** @description range asks about the whole range, hand about one hand class (O-411) */
+            question_kinds: ("range" | "hand")[];
         };
         RangeAdvantage: {
             ip_mean_equity: number;
@@ -6264,6 +6468,46 @@ export interface components {
             start_street: "preflop" | "flop" | "turn" | "river";
             /** @description Empty means any opponent */
             villain_positions: ("UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB")[];
+        };
+        SpotFrequency: {
+            /** @description solver-query's action family of the node */
+            action_family: string | null;
+            actions: components["schemas"]["FrequencyAction"][];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            /** @description Your counted decisions at this node */
+            decisions: number;
+            /** @description Hand classes at or above min_hand_decisions, the largest gap first */
+            hands: components["schemas"]["HandFrequency"][];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @description An opaque node key */
+            node_key: string;
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            /** @description Every hand pooled; null below min_spot_decisions */
+            pooled: components["schemas"]["FrequencyRow"] | null;
+            spot_class_key: string;
+        };
+        SpotFrequencyInput: {
+            /** @description solver-query's action family of the node */
+            action_family: string | null;
+            actions: components["schemas"]["FrequencyActionInput"][];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
+            /** @description Your counted decisions at this node */
+            decisions: number;
+            /** @description Hand classes at or above min_hand_decisions, the largest gap first */
+            hands: components["schemas"]["HandFrequencyInput"][];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            /** @description An opaque node key */
+            node_key: string;
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
+            /** @description Every hand pooled; null below min_spot_decisions */
+            pooled: components["schemas"]["FrequencyRowInput"] | null;
+            spot_class_key: string;
         };
         Stake: {
             bb_cents: number;

@@ -28,6 +28,7 @@ import {
   uuidSchema,
 } from "./common.js";
 import { trainerSettingsSchema } from "./drills.js";
+import { catalogSpotSchema, quizOptionsSchema } from "./practice-start.js";
 import { TRACK_KEYS } from "../learning/tracks.js";
 
 export const practiceModeSchema = z.enum(["automated", "drill", "holdout", "prediction", "range_paint"]);
@@ -68,6 +69,10 @@ export const sessionCreateBodySchema = z.strictObject({
     .optional()
     .describe("Automated mode: the configurations in scope; every catalog configuration with preflop coverage when absent"),
   track_key: trackKeySchema.optional().describe("Holdout mode: retest one track only; every track when absent"),
+  catalog_spot: catalogSpotSchema
+    .optional()
+    .describe("Prediction and range_paint: a catalog spot instead of a drill; exactly one of drill_id or catalog_spot (S41, O-415)"),
+  quiz: quizOptionsSchema.optional().describe("Prediction only: the quiz difficulty and question kinds (S41, O-410, O-411)"),
 });
 
 /**

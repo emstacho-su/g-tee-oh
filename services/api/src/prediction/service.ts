@@ -153,6 +153,7 @@ export async function answerPrediction(call: PredictionCall, sessionId: string, 
       truth: { ...question.truth },
       window: after.window,
       next_level_unlocked: after.unlockedNow,
+      level_passed: false,
       new_level: after.level,
       state_version: written.stateVersion,
     };

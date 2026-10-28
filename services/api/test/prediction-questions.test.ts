@@ -208,7 +208,7 @@ describe("R3.16 range ladder", () => {
 describe("R3.16 hand ladder", () => {
   const facts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true })]);
 
-  it("R3.16 level 1 accepts every action at or below the floor, as grading labels Best or Correct, and the reveal names the lowest-loss action with the frequencies (ADR 0024, O-374, O-379)", () => {
+  it("R3.16 level 1 accepts every action at or below the floor, as grading labels Best or Correct, and the reveal names the lowest-loss action and lists only the other correct actions, leaving the clause out when there are none (ADR 0024, O-374, O-379, S41)", () => {
     // Floor 0.5 (the node's floor_pct_pot): raise to 10bb (0) and raise to 25bb (0.1) are within it, call (0.8) and fold (5) are not.
     const evFacts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true, loss: [5, 0.8, 0, 0.1] })]);
     const question = handQuestion({ node: evFacts, level: 1, draws: DRAWS });
@@ -219,13 +219,13 @@ describe("R3.16 hand ladder", () => {
     expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 1 }), "an action above the floor is wrong").toBe(false);
     expect(question.truth).toMatchObject({ action_indexes: [2, 3], frequency_pct: 30 });
     expect(question.truth.text).toBe(
-      "BB's highest-EV action with AKs is Raise to 10bb. Within the noise floor, so also correct: Raise to 10bb 30.0 percent, Raise to 25bb 50.0 percent.",
+      "BB's highest-EV action with AKs is Raise to 10bb. Within the noise floor, so also correct: Raise to 25bb 50.0 percent.",
     );
     const tied = node([row("55", [0, 0.9, 0.1, 0], { loss: [1, 0, 0.0005, 2] })]);
     const tie = handQuestion({ node: tied, level: 1, draws: DRAWS });
     expect(tie?.truth.action_indexes).toEqual([1, 2]);
     expect(tie?.truth.text).toBe(
-      "BB's highest-EV action with 55 is Call or Raise to 10bb. Within the noise floor, so also correct: Call 90.0 percent, Raise to 10bb 10.0 percent.",
+      "BB's highest-EV action with 55 is Call or Raise to 10bb.",
     );
   });
 

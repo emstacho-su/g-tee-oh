@@ -1,6 +1,6 @@
 /**
  * Progress routes (R4.12, A5 section 3, O-271 to O-279): GET /progress/rating, /tracks, /leaks,
- * /heatmap, /holdout and /streak, each scoped to the session user (ADR 0001; 401 without one) and
+ * /heatmap, /holdout, /streak and S41's /frequencies (O-353), each scoped to the session user (ADR 0001; 401 without one) and
  * each a pure read: nothing here writes, and streaks, tiers and effective weights are recomputed on
  * every read (O-252, O-278). The handlers only read the request and call progress/service.ts, where
  * the mechanism is described. The rating, tracks, leaks and heat map read solver-query's class
@@ -32,6 +32,8 @@ import {
   tracksQuerySchema,
   tracksSchema,
 } from "../schemas/insights.js";
+import { frequencyProgress } from "../progress/frequencies.js";
+import { frequencyComparisonSchema } from "../schemas/frequencies.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "progress";
@@ -124,6 +126,21 @@ export const progressRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = 
       },
     },
     (request) => streakProgress(callOf(request)),
+  );
+
+  app.get(
+    "/progress/frequencies",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Your preflop action frequencies against the solver's, per node and hand class",
+        description:
+          "Counted decisions only (no holdout, client-seeded or answer-revealing-panel decisions), preflop only, the 12 most played nodes, shown from a minimum sample (O-353, O-417, O-418). Labels come from one solver-query node read per spot, so it also answers the upstream problems.",
+        security: AUTHENTICATED,
+        response: { 200: frequencyComparisonSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
+      },
+    },
+    (request) => frequencyProgress({ app, request, userId: requireSession(request).userId }),
   );
 
   done();
