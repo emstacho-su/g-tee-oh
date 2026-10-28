@@ -20,6 +20,8 @@ import { isIP } from "node:net";
 
 import { z } from "zod";
 
+import { DEFAULT_SOLVER_QUERY_TIMEOUT_MS } from "./solver-query/client.js";
+
 export const DEFAULT_API_PORT = 8080;
 export const LISTEN_HOST = "0.0.0.0";
 export const DEFAULT_APP_ORIGIN = "https://localhost";
@@ -66,7 +68,11 @@ export interface ProcessConfig {
   database: DatabaseConfig;
   /** solver-query's base URL on the compose network (A5 section 1, O-244). */
   solverQueryUrl: string;
+  /** How long one solver-query call may take before it is aborted as a 502 (PR #25 review M1). */
+  solverQueryTimeoutMs: number;
 }
+
+const MAX_SOLVER_QUERY_TIMEOUT_MS = 60_000;
 
 /** solver-query inside the compose network: its service name and its internal port (A5 section 1). */
 export const DEFAULT_SOLVER_QUERY_URL = "http://solver-query:7070";
@@ -163,6 +169,10 @@ const envSchema = z.object({
       .refine(isServiceBaseUrl, "an absolute http or https URL with no query or fragment")
       .default(DEFAULT_SOLVER_QUERY_URL),
   ),
+  SOLVER_QUERY_TIMEOUT_MS: z.preprocess(
+    trimmedOrUndefined,
+    z.coerce.number().int().min(1).max(MAX_SOLVER_QUERY_TIMEOUT_MS).default(DEFAULT_SOLVER_QUERY_TIMEOUT_MS),
+  ),
   APP_TIME_ZONE: z.preprocess(
     trimmedOrUndefined,
     z.string().refine(isTimeZone, "an IANA time zone such as UTC or America/New_York").default(DEFAULT_TIME_ZONE),
@@ -191,6 +201,7 @@ export function loadProcessConfig(env: Readonly<Record<string, string | undefine
       timeZone: parsed.APP_TIME_ZONE,
     },
     solverQueryUrl: parsed.SOLVER_QUERY_URL,
+    solverQueryTimeoutMs: parsed.SOLVER_QUERY_TIMEOUT_MS,
     database: {
       host: parsed.PGHOST,
       port: parsed.PGPORT,

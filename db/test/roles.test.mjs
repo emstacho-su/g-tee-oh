@@ -277,6 +277,39 @@ describe('R3.4 to R3.7 api trainer tables (S23, O-240 to O-246)', () => {
     });
   });
 
+  test('R3.5 app writes account email and password but can never set is_admin (O-242, PR #25 L1)', async () => {
+    await withRollback(pool, async (client) => {
+      const inserted = await asRole(
+        client,
+        'app',
+        `insert into app_user (email, password_hash) values ('admin-flag@example.invalid', 'x') returning id, is_admin`,
+      );
+      assert.equal(inserted.rows[0].is_admin, false);
+      const id = inserted.rows[0].id;
+      await asRole(client, 'app', `update app_user set password_hash = 'y' where id = $1`, [id]);
+      await expectDenied(client, 'app', `update app_user set is_admin = true where id = $1`, [id]);
+      await expectDenied(
+        client,
+        'app',
+        `insert into app_user (email, password_hash, is_admin) values ('self-admin@example.invalid', 'x', true)`,
+      );
+    });
+  });
+
+  test('R3.4 a user records one coverage request per spot (PR #25 M4)', async () => {
+    await withRollback(pool, async (client) => {
+      const user = await client.query(
+        `insert into app_user (email, password_hash) values ('coverage-once@example.invalid', 'x') returning id`,
+      );
+      const insert = `insert into coverage_request (user_id, game_config_id, position_pair, flop)
+        values ($1, $2, 'BB-BTN', null)
+        on conflict (user_id, game_config_id, position_pair, coalesce(flop, ''), coalesce(line, '')) do nothing`;
+      const first = await asRole(client, 'app', insert, [user.rows[0].id, SEEDED_CONFIG]);
+      const second = await asRole(client, 'app', insert, [user.rows[0].id, SEEDED_CONFIG]);
+      assert.deepEqual([first.rowCount, second.rowCount], [1, 0]);
+    });
+  });
+
   test('R3.7 an attempt is graded once per session version (O-246)', async () => {
     await withRollback(pool, async (client) => {
       const { rows } = await client.query(

@@ -29,6 +29,13 @@ alter table app_user add column is_admin boolean not null default false;
 
 comment on column app_user.is_admin is 'may use the admin builder endpoints (O-242)';
 
+-- PR #25 security review L1: the app role may write only the account columns the api writes, so it
+-- can never grant itself is_admin. Table-wide insert and update give way to column grants; defaults
+-- (id, created_at, is_admin false) need no column privilege. create-user --admin runs as the owner.
+revoke insert, update on app_user from app;
+grant insert (email, password_hash) on app_user to app;
+grant update (email, password_hash) on app_user to app;
+
 create table coverage_request (
   id uuid primary key default uuidv7(),
   user_id uuid not null references app_user (id) on delete cascade,
@@ -42,6 +49,11 @@ create table coverage_request (
 comment on table coverage_request is 'gap requests with no build_job to raise; the builder planner reads them later (O-240)';
 
 create index coverage_request_spot_idx on coverage_request (game_config_id, position_pair, created_at desc);
+
+-- PR #25 review M4: one row per user and spot; a repeated request inserts nothing
+-- (insert ... on conflict do nothing against this index).
+create unique index coverage_request_once_key on coverage_request
+  (user_id, game_config_id, position_pair, coalesce(flop, ''), coalesce(line, ''));
 
 grant select, insert on coverage_request to app;
 grant select on coverage_request to builder;
@@ -72,5 +84,7 @@ alter table attempt
   drop column if exists state_version;
 revoke all privileges on coverage_request from app, builder;
 drop table if exists coverage_request;
+revoke insert (email, password_hash), update (email, password_hash) on app_user from app;
+grant insert, update on app_user to app;
 alter table app_user drop column if exists is_admin;
 revoke insert, update on builder_setting from app;

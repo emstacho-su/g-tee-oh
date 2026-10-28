@@ -19,7 +19,7 @@
 import "fastify";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import { createSolverQueryClient, type ClientFactoryOptions, type SolverQueryComponents } from "@g-tee-oh/contracts";
+import { createSolverQueryClient, type SolverQueryComponents } from "@g-tee-oh/contracts";
 
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 
@@ -43,8 +43,30 @@ declare module "fastify" {
 
 export const REQUEST_ID_HEADER = "x-request-id";
 
-export function createSolverQuery(baseUrl: string, options: ClientFactoryOptions = {}): SolverQuery {
-  return createSolverQueryClient(baseUrl, options);
+/** PR #25 security review M1: no solver-query call may hold a request open longer than this. */
+export const DEFAULT_SOLVER_QUERY_TIMEOUT_MS = 5000;
+
+export interface SolverQueryOptions {
+  /** Lets a test answer, count or delay calls without a socket. */
+  fetch?: typeof fetch;
+  /** Abort a call after this many milliseconds; the abort maps to the generic 502 (expectData). */
+  timeoutMs?: number;
+}
+
+/** `fetchImpl` with every call aborted after `timeoutMs`, keeping any signal the caller gave. */
+export function withTimeout(fetchImpl: typeof fetch, timeoutMs: number): typeof fetch {
+  return (input, init) => {
+    const given = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = given === undefined || given === null ? timeout : AbortSignal.any([given, timeout]);
+    return fetchImpl(input, { ...init, signal });
+  };
+}
+
+export function createSolverQuery(baseUrl: string, options: SolverQueryOptions = {}): SolverQuery {
+  const fetchImpl: typeof fetch = options.fetch ?? ((input, init) => fetch(input, init));
+  const timeoutMs = options.timeoutMs ?? DEFAULT_SOLVER_QUERY_TIMEOUT_MS;
+  return createSolverQueryClient(baseUrl, { fetch: withTimeout(fetchImpl, timeoutMs) });
 }
 
 export function requireSolverQuery(app: FastifyInstance): SolverQuery {

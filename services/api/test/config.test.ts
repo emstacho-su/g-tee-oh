@@ -107,6 +107,14 @@ describe("R3.1 process configuration", () => {
     }
   });
 
+  it("R3.3 SOLVER_QUERY_TIMEOUT_MS bounds every solver-query call, 5000 by default (PR #25 M1)", () => {
+    expect(loadProcessConfig(COMPLETE_ENV).solverQueryTimeoutMs).toBe(5000);
+    expect(loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_TIMEOUT_MS: "1500" }).solverQueryTimeoutMs).toBe(1500);
+    for (const bad of ["0", "-1", "abc", "600000"]) {
+      expect(() => loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_TIMEOUT_MS: bad }), bad).toThrow(/SOLVER_QUERY_TIMEOUT_MS/);
+    }
+  });
+
   it("R3.7 APP_TIME_ZONE is an IANA zone that starts the training day (O-247)", () => {
     expect(loadProcessConfig({ ...COMPLETE_ENV, APP_TIME_ZONE: "America/New_York" }).app.timeZone).toBe(
       "America/New_York",

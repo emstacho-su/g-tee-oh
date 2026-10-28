@@ -51,5 +51,8 @@ export const configIdParamsSchema = z.object({ id: configIdSchema });
 /** Session routes take the same uuid id parameter as every other resource. */
 export const sessionParamsSchema = idParamsSchema;
 
-/** The body of a mutating route that takes none. */
-export const emptyBodySchema = z.strictObject({}).optional();
+/**
+ * The body of a mutating route that takes none. Fastify validates a request with no body as null,
+ * so the schema accepts null as well as an absent or empty JSON object (PR #25 review LOW 12).
+ */
+export const emptyBodySchema = z.strictObject({}).nullable().optional();

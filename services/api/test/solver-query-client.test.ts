@@ -12,6 +12,7 @@ import {
   requireSolverQuery,
   REQUEST_ID_HEADER,
   upstreamHeaders,
+  withTimeout,
 } from "../src/solver-query/client.js";
 import { fixtureSolverQuery } from "./support/solver-query.js";
 
@@ -62,6 +63,35 @@ describe("R3.3 solver-query client", () => {
     const client = createSolverQuery(BASE, { fetch: failing });
     const problem = await problemOf(expectData(client.GET("/healthz"), "the health probe"));
     expect([problem.status, problem.slug]).toEqual([502, "upstream"]);
+  });
+
+  it("R3.3 a call that outlasts the timeout is aborted and answers the generic 502 (PR #25 M1)", async () => {
+    let aborted = false;
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          aborted = true;
+          reject(new Error("aborted by the timeout"));
+        });
+      });
+    const client = createSolverQuery(BASE, { fetch: hanging, timeoutMs: 20 });
+    const started = performance.now();
+    const problem = await problemOf(expectData(client.GET("/healthz"), "the health probe"));
+    expect([problem.status, problem.slug]).toEqual([502, "upstream"]);
+    expect(aborted).toBe(true);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
+  it("R3.3 the timeout keeps a caller's own abort signal (PR #25 M1)", async () => {
+    const controller = new AbortController();
+    const seen: Array<AbortSignal | null | undefined> = [];
+    const wrapped = withTimeout((_input, init) => {
+      seen.push(init?.signal);
+      return Promise.resolve(new Response("{}"));
+    }, 1000);
+    await wrapped("http://x.test/", { signal: controller.signal });
+    controller.abort();
+    expect(seen[0]?.aborted).toBe(true);
   });
 
   it("R3.3 a success returns the body and carries the request id (O-158)", async () => {
