@@ -1,64 +1,73 @@
 /**
- * The feedback panel shown after a decision (S24, 05, A7, R3.13). A shell: S25 wires it to the
- * session and S27 fills More info and Ask.
+ * The feedback panel shown after a decision (S24, S25, S27, S38, R3.13, A7, O-387, O-388, ADR
+ * 0024).
  *
- * It shows the grade label as text with a symbol (chess-style marks, so color is never the only
- * signal), the EV (expected value) loss in big blinds and in percent of the pot as the api sends
- * them (ADR 0004: nothing is recomputed), the action the hero chose, the hand's frequency and EV
- * per action through ActionFrequencyTable with the best actions marked "Best" in text, the RNG
- * roll when there was one, and "Unrated" when the attempt does not count toward the rating. Slots
- * take the range view, the threshold card, the insight cards (S27) and the explain controls
- * (S27); without the explain slot, More info and Ask render disabled with a note when their
- * handlers are absent.
+ * The owner's review: show "a condensed set of what is actually relevant and let the user drill
+ * down", with sections that "just expand and collapse" rather than a pop-out to exit. So the panel
+ * is a short summary (FeedbackSummary: the label, your action against the best, the loss,
+ * Unrated, the roll) and, under it, one Disclosure per section the caller gives: Roll (the roll
+ * scale with its followed-the-roll mark, S37), Strategy (the hand's frequency and EV per action,
+ * best actions marked Best), Range, Where your hand sits (the threshold card), Insights (noise
+ * flags and drift, S27) and Explanation (More info's template sections, S27). A section whose slot
+ * is absent has no button; Strategy always exists. Defaults and the remembered choices follow
+ * feedback-sections.ts (O-387); sections mount on their first open, so the range, threshold,
+ * drift and More info reads run only when wanted. The controls row (Ask, S27) stays under the
+ * sections; without it, More info and Ask render as disabled shell buttons with a note, or call
+ * onMoreInfo and onAsk when given (the S24 shell, kept for callers that still pass them).
  *
  * Numbering (O-198): chosenIndex and feedback.best_action_indexes are NodeAction.index values,
  * never positions in actions; freq_by_action and ev_by_action are positional, as the contract
- * defines them. A chosen index that names no action renders an alert, and a best action index
- * that names none makes the table render its own alert, so no wrong row is ever marked.
+ * defines them. A chosen index that names no action renders an alert instead of the panel.
  */
 import type { ReactNode } from "react";
 
-import { Button, cn } from "../ui/index.js";
-import type { DecisionFeedback, FeedbackLabel, NodeAction } from "../../contracts.js";
+import { Button, Disclosure, RAISED_CLASS, cn } from "../ui/index.js";
+import type { DecisionFeedback, NodeAction } from "../../contracts.js";
 import { actionOfIndex } from "../../poker/action-index.js";
-import { exactActionLabel, formatBb, formatPercent } from "../../poker/format.js";
 import { ActionFrequencyTable } from "../panels/ActionFrequencyTable.js";
+import {
+  FEEDBACK_SECTION_ORDER,
+  FEEDBACK_SECTION_TITLES,
+  resolveSectionOpen,
+  useFeedbackSections,
+  type FeedbackOpenState,
+  type FeedbackSectionKey,
+  type FeedbackSectionsControl,
+} from "./feedback-sections.js";
+import { FeedbackSummary } from "./FeedbackSummary.js";
 
 export interface FeedbackPanelProps {
   feedback: DecisionFeedback;
   actions: readonly NodeAction[];
   /** The NodeAction.index the hero chose (O-198), not a position in actions. */
   chosenIndex: number;
+  /** The Range section's body. */
   rangeView?: ReactNode;
+  /** The Where your hand sits section's body. */
   thresholdCard?: ReactNode;
-  /** The RNG roller after the reveal, when the session has Mixed-frequency mode on (S25, O-282). */
+  /** The Roll section's body: the roller after the reveal, in Mixed-frequency mode (S25, S37). */
   roller?: ReactNode;
-  /** The insight cards: noise flags and range drift (S27, R3.18, O-304). */
+  /** The Insights section's body: noise flags and range drift (S27, R3.18, O-304). */
   insights?: ReactNode;
+  /** The Explanation section's body: More info's template sections (S27, R3.19, O-388). */
+  explanation?: ReactNode;
   /**
-   * The More info and Ask controls with their dialogs and states (S27, R3.19, R3.20). When given
-   * they replace the two shell buttons below.
+   * The controls row under the sections (S27: Ask with its dialog). When given it replaces the
+   * two shell buttons below.
    */
   explain?: ReactNode;
   onMoreInfo?: () => void;
   onAsk?: () => void;
+  /** The prompt was a worked example: Strategy starts open (O-387, O-272). */
+  workedExample?: boolean;
+  /** The session's remembered section choices (useFeedbackSections); the panel keeps its own without. */
+  sections?: FeedbackSectionsControl;
+  /** Sections to open by default, over the built-in defaults (the gallery's expanded view). */
+  defaultOpen?: FeedbackOpenState;
 }
-
-interface LabelLook {
-  readonly text: string;
-  readonly symbol: string;
-  readonly className: string;
-}
-
-const LABEL_LOOKS: Readonly<Record<FeedbackLabel, LabelLook>> = {
-  best: { text: "Best", symbol: "★", className: "text-success" },
-  correct: { text: "Correct", symbol: "✓", className: "text-success" },
-  inaccuracy: { text: "Inaccuracy", symbol: "?!", className: "text-warning" },
-  mistake: { text: "Mistake", symbol: "?", className: "text-danger" },
-  blunder: { text: "Blunder", symbol: "??", className: "text-danger" },
-};
 
 export const LATER_SESSION_NOTE = "Arrives in S27";
+const STRATEGY_CAPTION = "This hand's strategy";
 
 function LaterButton({ label, onClick }: { label: string; onClick: (() => void) | undefined }) {
   if (onClick === undefined) {
@@ -71,18 +80,31 @@ function LaterButton({ label, onClick }: { label: string; onClick: (() => void) 
   return <Button onClick={onClick}>{label}</Button>;
 }
 
-export function FeedbackPanel({
-  feedback,
-  actions,
-  chosenIndex,
-  rangeView,
-  thresholdCard,
-  roller,
-  insights,
-  explain,
-  onMoreInfo,
-  onAsk,
-}: FeedbackPanelProps) {
+/** Each section's body, or undefined when the caller gave none (Strategy always has one). */
+function sectionBodies(props: FeedbackPanelProps): Readonly<Record<FeedbackSectionKey, ReactNode | undefined>> {
+  const { feedback, actions } = props;
+  return {
+    roll: props.roller,
+    strategy: (
+      <ActionFrequencyTable
+        actions={actions}
+        frequencies={feedback.freq_by_action}
+        evBb={feedback.ev_by_action}
+        highlightIndexes={feedback.best_action_indexes}
+        caption={STRATEGY_CAPTION}
+      />
+    ),
+    range: props.rangeView,
+    threshold: props.thresholdCard,
+    insights: props.insights,
+    explanation: props.explanation,
+  };
+}
+
+export function FeedbackPanel(props: FeedbackPanelProps) {
+  const { feedback, actions, chosenIndex, explain, onMoreInfo, onAsk, workedExample = false, sections, defaultOpen } = props;
+  const own = useFeedbackSections(null);
+  const control = sections ?? own;
   const chosen = actionOfIndex(actions, chosenIndex);
   if (chosen === undefined) {
     return (
@@ -91,34 +113,31 @@ export function FeedbackPanel({
       </p>
     );
   }
-  const look = LABEL_LOOKS[feedback.label];
+  const bodies = sectionBodies(props);
   return (
-    <section data-testid="feedback-panel" aria-label="Decision feedback" className="flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <p data-testid="feedback-label" data-label={feedback.label} className={cn("text-xl font-bold", look.className)}>
-          <span aria-hidden="true" className="mr-1 font-mono">
-            {look.symbol}
-          </span>
-          {look.text}
-        </p>
-        {feedback.rated ? null : <span className="rounded bg-surface-sunken px-2 text-sm text-muted">Unrated</span>}
-        {feedback.rng_roll === null ? null : <span className="text-sm tabular-nums">Roll {feedback.rng_roll}</span>}
+    <section
+      data-testid="feedback-panel"
+      aria-label="Decision feedback"
+      className={cn("flex w-full min-w-0 max-w-md flex-col gap-3 rounded-2xl border border-border/50 bg-surface-raised p-3 sm:p-4", RAISED_CLASS)}
+    >
+      <FeedbackSummary feedback={feedback} actions={actions} chosen={chosen} />
+      <div className="flex flex-col gap-2">
+        {FEEDBACK_SECTION_ORDER.map((key) => {
+          const body = bodies[key];
+          if (body === undefined || body === null) return null;
+          return (
+            <Disclosure
+              key={key}
+              title={FEEDBACK_SECTION_TITLES[key]}
+              testId={`feedback-section-${key}`}
+              open={resolveSectionOpen(key, control.open, defaultOpen, { workedExample })}
+              onOpenChange={(open) => control.setOpen(key, open)}
+            >
+              <div className="pt-1">{body}</div>
+            </Disclosure>
+          );
+        })}
       </div>
-      <p className="tabular-nums">
-        {`EV loss ${formatBb(feedback.ev_loss_bb)} (${formatPercent(feedback.ev_loss_pct_pot)} of pot)`}
-      </p>
-      <p>{`Your action: ${exactActionLabel(chosen)}`}</p>
-      <ActionFrequencyTable
-        actions={actions}
-        frequencies={feedback.freq_by_action}
-        evBb={feedback.ev_by_action}
-        highlightIndexes={feedback.best_action_indexes}
-        caption="This hand's strategy"
-      />
-      {roller}
-      {rangeView}
-      {thresholdCard}
-      {insights}
       {explain ?? (
         <div className="flex gap-2">
           <LaterButton label="More info" onClick={onMoreInfo} />

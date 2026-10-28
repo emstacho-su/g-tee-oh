@@ -24,8 +24,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
-import { RngExplainer, useRngExplainer } from "../../components/trainer/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
+import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
@@ -87,22 +87,27 @@ interface InSessionProps {
 }
 
 function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
-  const { state } = session;
+  // The table's replay of the line before the decision, owned by the session (S38, O-381 to O-383).
+  const { state, replay } = session;
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   const context = "context" in state ? state.context : null;
+  // The feedback sections the user opened or closed stay that way for the session (O-387).
+  const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : <RunProgress context={context} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
-          <SpotTable prompt={prompt} />
           <DecisionArea
+            table={<SpotTable prompt={prompt} replay={replay} />}
             state={state}
             prompt={prompt}
             grouping={drill.trainer.grouping}
             interactive={interactive}
+            replaying={replay.replaying}
+            feedbackSections={feedbackSections}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
@@ -134,8 +139,13 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
-  // Time under the explainer or the end confirm is not response time (O-284).
-  const session = useSpotSession({ spec: { mode: "drill", drillId: drill.id, seed }, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
+  // Time under the explainer or the end confirm is not response time (O-284); the session pauses
+  // the timer for the table's replay itself (O-381), at the drill's speed.
+  const session = useSpotSession({
+    spec: { mode: "drill", drillId: drill.id, seed },
+    paused: !interactive,
+    trainer: runSettingsOf(drill.trainer),
+  });
   const { state } = session;
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
@@ -181,7 +191,7 @@ export function DrillRunPage({ drillId, seed: rawSeed }: DrillRunPageProps) {
   const { seed } = validateDrillRunSearch(rawSeed === undefined ? {} : { seed: rawSeed });
   return (
     <section className="flex flex-col gap-4" data-drill-id={drillId}>
-      <h1 className="text-2xl font-semibold">{SESSION_TEXT.heading}</h1>
+      <PageHeader title={SESSION_TEXT.heading} />
       {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
       {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
       {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}

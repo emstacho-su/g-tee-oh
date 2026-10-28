@@ -69,7 +69,8 @@ test("R4.10 R4.12 flow 1: five automated decisions on the stack give the fresh o
 
   const rated = await endAndReadRecap(page);
   expect(rated, "the recap lists at least one rated decision").toBeGreaterThanOrEqual(MIN_RATED);
-  await expect(page.getByRole("table", { name: "Rating by track" })).toBeVisible();
+  // The recap lists each rated track as a card in the "Rating by track" list (S38 restyle).
+  await expect(page.getByRole("list", { name: "Rating by track" })).toBeVisible();
   await shot("flow1-recap", CRITERIA.recap);
 
   await expectRatedCard(page);

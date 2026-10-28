@@ -6102,6 +6102,11 @@ export interface components {
                 label: string;
                 /** @enum {string} */
                 position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
                 token: string;
             }[];
         };
@@ -6118,6 +6123,11 @@ export interface components {
                 label: string;
                 /** @enum {string} */
                 position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
                 token: string;
             }[];
         };
@@ -7106,6 +7116,11 @@ export interface components {
                 label: string;
                 /** @enum {string} */
                 position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
                 token: string;
             }[];
             pot_cbb: number;
@@ -7151,6 +7166,11 @@ export interface components {
                 label: string;
                 /** @enum {string} */
                 position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
                 token: string;
             }[];
             pot_cbb: number;

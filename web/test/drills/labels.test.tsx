@@ -12,11 +12,13 @@ import * as runLabels from "../../src/routes/drill-run/labels.js";
 import { StartPanel } from "../../src/routes/drill-run/StartPanel.js";
 import type { Drill } from "../../src/trainer/session-types.js";
 
-/** The start panel's value for a term of its settings list. */
+/** The start panel's value for a setting of its chip list (S38: chips, name then value). */
 function shownValue(term: string): string {
-  const panel = within(screen.getByTestId("start-panel"));
-  const index = panel.getAllByRole("term").findIndex((element) => element.textContent === term);
-  return panel.getAllByRole("definition")[index]?.textContent ?? "";
+  const chips = within(screen.getByTestId("start-panel")).getByRole("list", { name: "Drill settings" });
+  const chip = within(chips)
+    .getAllByRole("listitem")
+    .find((item) => item.firstElementChild?.textContent === term);
+  return chip?.lastElementChild?.textContent ?? "";
 }
 
 function renderPanel(drill: Drill): void {

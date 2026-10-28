@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useRngExplainer } from "../../components/trainer/index.js";
-import { LoadingNote } from "../../components/ui/index.js";
+import { LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { Grouping } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { heatmapQuery, tracksQuery } from "../../progress/queries.js";
@@ -84,6 +84,8 @@ function TrainRun({ mode }: TrainPageProps) {
   const rng = mode === "automated" && defaults.rng;
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
+  // Time under a dialog is not response time (O-284); the session pauses the timer for the table's
+  // replay itself (O-381), at the normal speed (automated and holdout sessions have no run settings).
   const session = useSpotSession({
     spec: startSpec(mode, defaults),
     paused: !interactive,
@@ -141,7 +143,7 @@ function TrainRun({ mode }: TrainPageProps) {
 export function TrainPage({ mode }: TrainPageProps) {
   return (
     <section className="flex flex-col gap-4" data-train-mode={mode}>
-      <h1 className="text-2xl font-semibold">{mode === "holdout" ? TRAIN_TEXT.holdoutHeading : TRAIN_TEXT.automatedHeading}</h1>
+      <PageHeader title={mode === "holdout" ? TRAIN_TEXT.holdoutHeading : TRAIN_TEXT.automatedHeading} />
       {/* A new mode is a new screen: the key drops the other mode's session state. */}
       <TrainRun key={mode} mode={mode} />
     </section>

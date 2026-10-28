@@ -1797,6 +1797,16 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "street": {
+                  "description": "The street the action was taken on; absent on entries stored before S38",
+                  "type": "string",
+                  "enum": [
+                    "preflop",
+                    "flop",
+                    "turn",
+                    "river"
+                  ]
                 }
               },
               "required": [
@@ -1925,6 +1935,16 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "street": {
+                  "description": "The street the action was taken on; absent on entries stored before S38",
+                  "type": "string",
+                  "enum": [
+                    "preflop",
+                    "flop",
+                    "turn",
+                    "river"
+                  ]
                 }
               },
               "required": [
@@ -6365,6 +6385,16 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "street": {
+                  "description": "The street the action was taken on; absent on entries stored before S38",
+                  "type": "string",
+                  "enum": [
+                    "preflop",
+                    "flop",
+                    "turn",
+                    "river"
+                  ]
                 }
               },
               "required": [
@@ -6495,6 +6525,16 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "street": {
+                  "description": "The street the action was taken on; absent on entries stored before S38",
+                  "type": "string",
+                  "enum": [
+                    "preflop",
+                    "flop",
+                    "turn",
+                    "river"
+                  ]
                 }
               },
               "required": [

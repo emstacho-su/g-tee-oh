@@ -109,8 +109,8 @@
   --danger: #f08a7e; /* from bf4342 brick, lifted further */
   --success: #9cc48f; /* from no palette hue: the olive, lifted (O-363) */
   --warning: #e4b066; /* from no palette hue: the ochre, lifted (O-363) */
-  --felt: #14532d;
-  --felt-edge: #052e16;
+  --felt: #15803d;
+  --felt-edge: #166534;
   --focus: var(--p-cream);
   --shadow-raised:
     inset 0 1px 0 rgb(231 215 193 / 0.07), 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 14px -4px rgb(0 0 0 / 0.55),
@@ -275,10 +275,14 @@ meter::-moz-meter-bar {
  * on a wrapper, so the selectors match any element and the values inherit. "none" restores the
  * standard look inside a preview while another item is equipped on <html>.
  *
- * Felts keep the table's white text readable. White on each felt, by the WCAG relative luminance
- * formula (a node calculation): standard light #166534 7.13:1, dark #14532d 9.11:1; Tier III blue
- * light #1e40af 8.72:1, dark #1e3a8a 10.36:1; Tier V burgundy light #9f1239 8.02:1, dark #881337
- * 9.57:1; Tier VII violet light #5b21b6 8.98:1, dark #4c1d95 10.95:1. All are 4.5:1 or more.
+ * Felts keep the table's white text readable and stand out from the grounds (S38, O-346, O-389;
+ * `just contrast` gates both). White on each felt, by the WCAG relative luminance formula:
+ * standard light #166534 7.13:1, dark #15803d 5.02:1; Tier III blue light #1e40af 8.72:1, dark
+ * #2563eb 5.17:1; Tier V burgundy light #9f1239 8.02:1, dark #e11d48 4.70:1; Tier VII violet light
+ * #5b21b6 8.98:1, dark #8244f0 5.21:1. All are 4.5:1 or more. Against the grounds every light felt
+ * is 6:1 or more; the dark felts are lifted from the old deep shades, which sat near 2:1 on the
+ * deep brown grounds, to 3.2:1 or more on surface-raised, the narrow band where white text still
+ * holds 4.5:1. Each cosmetic keeps its hue.
  *
  * Card backs are three custom properties CardView's face-down card reads. The defaults reproduce
  * the earlier fixed classes exactly (Tailwind's blue-800 fill, blue-900 border and the light
@@ -329,24 +333,159 @@ meter::-moz-meter-bar {
 
 .dark[data-felt="none"],
 .dark [data-felt="none"] {
-  --felt: #14532d;
-  --felt-edge: #052e16;
+  --felt: #15803d;
+  --felt-edge: #166534;
 }
 
 .dark[data-felt="felt-tier-III"],
 .dark [data-felt="felt-tier-III"] {
-  --felt: #1e3a8a;
-  --felt-edge: #172554;
+  --felt: #2563eb;
+  --felt-edge: #1d4ed8;
 }
 
 .dark[data-felt="felt-tier-V"],
 .dark [data-felt="felt-tier-V"] {
-  --felt: #881337;
-  --felt-edge: #4c0519;
+  --felt: #e11d48;
+  --felt-edge: #be123c;
 }
 
 .dark[data-felt="felt-tier-VII"],
 .dark [data-felt="felt-tier-VII"] {
-  --felt: #4c1d95;
-  --felt-edge: #2e1065;
+  --felt: #8244f0;
+  --felt-edge: #6d28d9;
+}
+
+/*
+ * The game-style table (S38, R3.13, O-380, O-381; components/table). Every seat card, the felt and
+ * each action chip carry their landscape and portrait spots as custom properties (seat-layout.ts);
+ * these rules place them. The table root is the "poker-table" inline-size container, and below
+ * 600 px of its own width (PORTRAIT_BELOW_PX) the portrait spots, the 4 by 5 box and the compact
+ * card apply, so a phone or a narrow column turns the table without any script. A moving chip
+ * slides from its seat to its bet spot over its step's duration (--chip-ms); the active seat lifts
+ * slightly. Reduced motion: no slide and no lift (the replay also shows its end state at once).
+ * Stacking is by document order only: no z-index.
+ */
+.poker-table {
+  container: poker-table / inline-size;
+}
+
+.table-box {
+  aspect-ratio: 16 / 9;
+}
+
+.table-felt {
+  left: var(--land-felt-l);
+  right: var(--land-felt-r);
+  top: var(--land-felt-t);
+  bottom: var(--land-felt-b);
+}
+
+.table-seat {
+  position: absolute;
+  left: var(--land-x);
+  top: var(--land-y);
+  width: var(--land-w);
+  transform: translate(-50%, -50%);
+  transition: transform 150ms ease-out;
+}
+
+.table-seat-active {
+  transform: translate(-50%, calc(-50% - 3px)) scale(1.04);
+}
+
+.table-chip {
+  position: absolute;
+  left: var(--land-bet-x);
+  top: var(--land-bet-y);
+  transform: translate(-50%, -50%);
+}
+
+.table-chip[data-moving="true"] {
+  animation: table-chip-slide var(--chip-ms) ease-out both;
+}
+
+@keyframes table-chip-slide {
+  from {
+    left: var(--land-x);
+    top: var(--land-y);
+    opacity: 0.3;
+  }
+  to {
+    left: var(--land-bet-x);
+    top: var(--land-bet-y);
+    opacity: 1;
+  }
+}
+
+@keyframes table-chip-slide-portrait {
+  from {
+    left: var(--port-x);
+    top: var(--port-y);
+    opacity: 0.3;
+  }
+  to {
+    left: var(--port-bet-x);
+    top: var(--port-bet-y);
+    opacity: 1;
+  }
+}
+
+@container poker-table (max-width: 599.98px) {
+  .table-box {
+    aspect-ratio: 4 / 5;
+  }
+
+  .table-felt {
+    left: var(--port-felt-l);
+    right: var(--port-felt-r);
+    top: var(--port-felt-t);
+    bottom: var(--port-felt-b);
+    border-width: 4px;
+  }
+
+  .table-seat {
+    left: var(--port-x);
+    top: var(--port-y);
+    width: var(--port-w);
+    gap: 0;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .table-chip {
+    left: var(--port-bet-x);
+    top: var(--port-bet-y);
+    gap: 0.125rem;
+    padding: 0 0.375rem;
+    font-size: 0.625rem;
+  }
+
+  .table-chip[data-moving="true"] {
+    animation-name: table-chip-slide-portrait;
+  }
+
+  /* The felt is narrow in portrait: the board's streets wrap (the flop, then the turn and river). */
+  .table-center > * {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .table-seat-badge {
+    padding-inline: 0.25rem;
+    font-size: 0.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-chip[data-moving="true"] {
+    animation: none;
+  }
+
+  .table-seat,
+  .table-seat-active {
+    transition: none;
+    transform: translate(-50%, -50%);
+  }
 }

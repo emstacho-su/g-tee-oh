@@ -51,4 +51,6 @@ export const SESSION_TEXT = {
   flop: "Flop",
   continuing: "Continuing by itself",
   openLibrary: "Open the library",
+  /** The start panel's chip list (S38). */
+  drillSettings: "Drill settings",
 } as const;

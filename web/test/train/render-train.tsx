@@ -20,6 +20,7 @@ import type { TrainMode } from "../../src/routes/train/train-text.js";
 import { DEFAULT_SESSION_DEFAULTS, useSessionDefaultsStore, type SessionDefaults } from "../../src/store/session-defaults.js";
 import { TrainerDepsProvider, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
 import { createFakeFetch, jsonResponse, type FetchScript } from "../api/fake-fetch.js";
+import { setReducedMotion } from "../support/motion.js";
 import { createScreenRouter, ScreenRouterView, type ScreenRouter } from "../trainer-screen/screen-router.js";
 
 const ORIGIN = "http://localhost:4173";
@@ -74,8 +75,13 @@ export function resetDefaults(): void {
   useSessionDefaultsStore.setState({ defaults: DEFAULT_SESSION_DEFAULTS });
 }
 
-/** Renders the page and waits until the router has shown its heading. */
-export async function renderTrain(mode: TrainMode, script: FetchScript): Promise<TrainView> {
+/**
+ * Renders the page and waits until the router has shown its heading. The screen renders under
+ * prefers-reduced-motion unless motion is asked for, so the opponent-action replay (S38, O-381)
+ * shows its end at once (test/support/motion.ts).
+ */
+export async function renderTrain(mode: TrainMode, script: FetchScript, { motion = false }: { motion?: boolean } = {}): Promise<TrainView> {
+  setReducedMotion(!motion);
   const fake = createFakeFetch({ ...SIDE_READS, ...script });
   const sent: SentRequest[] = [];
   const fetch = async (request: Request): Promise<Response> => {

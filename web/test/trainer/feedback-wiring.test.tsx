@@ -4,7 +4,7 @@
  * an injected fake fetch; the hero's hand may arrive as a class or as two cards.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +13,7 @@ import { createAppApi } from "../../src/api/index.js";
 import { ApiProvider } from "../../src/auth/index.js";
 import { FeedbackRangeView, FeedbackThreshold } from "../../src/components/trainer/index.js";
 import type { DecisionFeedback, StudyInsights, StudyNode } from "../../src/contracts.js";
-import { fixtureFeedback, fixtureInsights, fixtureStudyNode } from "../../src/fixtures/index.js";
+import { fixtureActions, fixtureFeedback, fixtureInsights, fixtureStudyNode } from "../../src/fixtures/index.js";
 import { heroHandClass } from "../../src/poker/hand-class.js";
 import { studyNodeByKeyKey, studyNodeByKeyQuery } from "../../src/study/queries.js";
 import { createFakeFetch, jsonResponse, networkFailure, problemResponse } from "../api/fake-fetch.js";
@@ -177,6 +177,14 @@ describe("R3.13 FeedbackThreshold", () => {
       node_key: fixtureFeedback.node_key,
       hand: "AhJd",
     });
+  });
+
+  it("R3.13 names the card's actions from the decided node's buttons, with their swatches (S38, O-198)", async () => {
+    setup({ [INSIGHTS_PATH]: [jsonResponse(200, fixtureInsights)] }, <FeedbackThreshold feedback={fixtureFeedback} actions={fixtureActions} />);
+    const card = await screen.findByTestId("threshold-card");
+    expect(within(card).getAllByTestId("action-swatch").length).toBeGreaterThan(0);
+    expect(card).toHaveTextContent("Raise 2.5bb");
+    expect(card).not.toHaveTextContent("r250");
   });
 
   it("R3.13 a node with no threshold card says so", async () => {

@@ -122,6 +122,18 @@ export const sessionSchema = z
   .meta({ id: "PracticeSession" });
 
 /**
+ * One action of a hand's history as a prompt shows it. street names the street the action was
+ * taken on (S38 review round 1), so the table clears the last street's bets when a new street
+ * starts without inferring streets in the web; entries stored before it have none.
+ */
+const promptHistoryEntrySchema = z.object({
+  position: positionSchema,
+  token: z.string(),
+  label: z.string(),
+  street: streetSchema.optional().describe("The street the action was taken on; absent on entries stored before S38"),
+});
+
+/**
  * How a hand ended (S26, O-313), recorded on the transition that ended it (sessions/hand-end.ts,
  * PR #30 review MEDIUM 5): a fold; the street closing (in full-hand mode the hand ends when the
  * flop is shown, and the flop is then in the board); the hand leaving the solution's range; or the
@@ -137,7 +149,7 @@ export const previousHandEndSchema = z
 export const previousHandSchema = z
   .object({
     hand_no: z.number().int().min(0),
-    history: z.array(z.object({ position: positionSchema, token: z.string(), label: z.string() })),
+    history: z.array(promptHistoryEntrySchema),
     board: z.array(cardSchema).describe("The board the hand reached; the flop when a full hand ended there"),
     end: previousHandEndSchema,
   })
@@ -153,7 +165,7 @@ export const promptSchema = z
     board: z.array(cardSchema),
     pot_cbb: z.number().int(),
     stacks_cbb: z.array(z.number().int()),
-    history: z.array(z.object({ position: positionSchema, token: z.string(), label: z.string() })),
+    history: z.array(promptHistoryEntrySchema),
     buttons: z.array(nodeActionSchema).describe("Generated from the node's tree actions (ADR 0020)"),
     visible_panels: z.array(z.string()),
     street: streetSchema.describe("The street of the node the hero acts at"),

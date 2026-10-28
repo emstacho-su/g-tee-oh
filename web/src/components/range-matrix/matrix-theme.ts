@@ -1,80 +1,165 @@
 /**
- * Canvas colors of the range matrix per theme (S24, R3.12, O-266).
+ * Canvas colours of the range matrix per theme (S24, S38, R3.12, O-266, O-346, O-384, O-385).
  *
- * Mechanism: a canvas cannot read CSS custom properties per pixel, so the matrix keeps its own
- * hex palette beside the semantic tokens of src/styles.css (surface, border, text and focus
- * match those tokens). The expected value (EV) scale is diverging and quantized into a fixed
- * number of steps per side, orange for negative and teal for positive, which stays readable for
- * the common color-vision deficiencies; the EV number is printed in every cell anyway, so color
- * is never the only signal (A7 section 4). Quantizing means a frame picks colors from these
- * arrays and allocates no color strings.
+ * Mechanism: a canvas cannot read CSS custom properties per pixel, so the matrix keeps its own hex
+ * palette, and every value names its source the way the S36 tokens in src/styles.css do: the
+ * ground, text, grid and focus come from the S36 tokens; the expected value (EV) scale is built in
+ * OKLCH from two hues, brick red (bf4342, the owner's palette, OKLCH hue 24) for a loss and blue
+ * (OKLCH hue 255) for a gain, which stay apart under protanopia, deuteranopia and tritanopia,
+ * unlike red against green. Lightness runs monotonically away from the neutral middle (light
+ * theme: the neutral lightest; dark theme: the neutral darkest), so the order also reads in
+ * grayscale. The weight scale copies the progress heat map's five steps (--heat-1 to --heat-5,
+ * O-362; a test reads styles.css so the copies never drift). The ink printed on each step is the
+ * dark or light ink with the higher contrast, chosen once at module load (inkFor), so a frame only
+ * indexes arrays. test/range-matrix/scales.test.ts checks every pairing and the colour-vision
+ * simulation in both themes.
  */
 import type { ThemeName } from "../../theme/action-style.js";
+import { inkFor } from "../../theme/color-contrast.js";
+import { EV_STEPS, evStep, weightStep } from "./scales.js";
 
 export interface MatrixPalette {
   readonly background: string;
   readonly gridLine: string;
   readonly text: string;
-  /** Behind the hand label, so it reads over any bar color. */
+  /** Behind the hand label over frequency bars and missing cells, so it reads over any fill. */
   readonly labelChip: string;
   readonly labelText: string;
   readonly missingFill: string;
   readonly missingInk: string;
-  /** Hatch lines over action bars. */
-  readonly hatchInk: string;
+  /** Hatch lines over a light action fill. */
+  readonly hatchInkDark: string;
+  /** Hatch lines over a dark action fill. */
+  readonly hatchInkLight: string;
   /** From the weakest to the strongest negative step. */
   readonly evNegative: readonly string[];
   readonly evNeutral: string;
   /** From the weakest to the strongest positive step. */
   readonly evPositive: readonly string[];
-  readonly weightTrack: string;
-  readonly weightFill: string;
+  /** Weight steps 1 to 5, the progress heat ramp. */
+  readonly weightSteps: readonly string[];
+  /** The two inks printed on a filled step. */
+  readonly inkDark: string;
+  readonly inkLight: string;
   readonly focus: string;
+  /** A thin line inside the focus ring, so the ring shows on any fill. */
+  readonly focusHalo: string;
   readonly selected: string;
 }
 
-export const MATRIX_PALETTES: Readonly<Record<ThemeName, MatrixPalette>> = {
-  light: {
-    background: "#ffffff",
-    gridLine: "#cbd5e1",
-    text: "#0f172a",
-    labelChip: "rgba(255, 255, 255, 0.82)",
-    labelText: "#0f172a",
-    missingFill: "#e5e7eb",
-    missingInk: "rgba(71, 85, 105, 0.55)",
-    hatchInk: "rgba(15, 23, 42, 0.45)",
-    evNegative: ["#fed7aa", "#fdba74", "#fb923c", "#f97316", "#ea580c", "#c2410c"],
-    evNeutral: "#f1f5f9",
-    evPositive: ["#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf", "#14b8a6", "#0d9488"],
-    weightTrack: "#f1f5f9",
-    weightFill: "#818cf8",
-    focus: "#f59e0b",
-    selected: "#0f172a",
-  },
-  dark: {
-    background: "#111827",
-    gridLine: "#334155",
-    text: "#e5e7eb",
-    labelChip: "rgba(17, 24, 39, 0.78)",
-    labelText: "#f8fafc",
-    missingFill: "#1f2937",
-    missingInk: "rgba(148, 163, 184, 0.5)",
-    hatchInk: "rgba(248, 250, 252, 0.4)",
-    evNegative: ["#431407", "#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316"],
-    evNeutral: "#1f2937",
-    evPositive: ["#042f2e", "#134e4a", "#115e59", "#0f766e", "#0d9488", "#14b8a6"],
-    weightTrack: "#1f2937",
-    weightFill: "#6366f1",
-    focus: "#fbbf24",
-    selected: "#f8fafc",
-  },
+/** A palette with the ink per step resolved once. */
+export interface ResolvedPalette extends MatrixPalette {
+  readonly evNegativeInk: readonly string[];
+  readonly evNeutralInk: string;
+  readonly evPositiveInk: readonly string[];
+  readonly weightInk: readonly string[];
+}
+
+const LIGHT: MatrixPalette = {
+  background: "#fbf7f1", // --surface-raised: e7d7c1 cream, lifted further
+  gridLine: "#fbf7f1", // the ground again, so cells read as tiles with a cream gutter
+  text: "#2b1a16", // --text: 735751 umber, deepened
+  labelChip: "rgba(251, 247, 241, 0.85)", // --surface-raised, translucent
+  labelText: "#2b1a16", // --text
+  missingFill: "#e7d7c1", // --surface-sunken: the e7d7c1 cream palette value
+  missingInk: "rgba(115, 87, 81, 0.5)", // --p-umber 735751, translucent
+  hatchInkDark: "rgba(43, 26, 22, 0.45)", // --text, translucent
+  hatchInkLight: "rgba(251, 247, 241, 0.6)", // --surface-raised, translucent
+  evNegative: [
+    "#f1cecb", // bf4342 brick hue, OKLCH lightness 0.88
+    "#e6a9a4", // bf4342 brick hue, OKLCH lightness 0.79
+    "#d8847e", // bf4342 brick hue, OKLCH lightness 0.70
+    "#aa4240", // bf4342 brick hue, OKLCH lightness 0.52
+    "#940017", // bf4342 brick hue, OKLCH lightness 0.42, chroma at the sRGB edge
+  ],
+  evNeutral: "#f1eae3", // e7d7c1 cream hue, OKLCH lightness 0.94, nearly grey
+  evPositive: [
+    "#c6d9f2", // blue, OKLCH hue 255, lightness 0.88
+    "#9ebde6", // blue, OKLCH hue 255, lightness 0.79
+    "#76a1d9", // blue, OKLCH hue 255, lightness 0.70
+    "#336aae", // blue, OKLCH hue 255, lightness 0.52
+    "#004b96", // blue, OKLCH hue 255, lightness 0.42
+  ],
+  weightSteps: ["#d1a195", "#b87f70", "#9d5f4f", "#7d4234", "#5b2a1e"], // --heat-1 to --heat-5, light (O-362)
+  inkDark: "#2b1a16", // --heat-ink-low: 735751 umber, deepened
+  inkLight: "#fbf7f1", // --heat-ink-high: e7d7c1 cream, lifted
+  focus: "#bf4342", // --focus: the bf4342 brick palette value
+  focusHalo: "#fbf7f1", // --surface-raised
+  selected: "#2b1a16", // --text
 };
 
-/** The fill for a best EV on the diverging scale whose ends are minus and plus scaleBb. */
+const DARK: MatrixPalette = {
+  background: "#281a17", // --surface-raised: 735751 umber, deepened less
+  gridLine: "#281a17", // the ground again
+  text: "#efe4d6", // --text: e7d7c1 cream, lifted
+  labelChip: "rgba(40, 26, 23, 0.8)", // --surface-raised, translucent
+  labelText: "#efe4d6", // --text
+  missingFill: "#140c0a", // --surface-sunken: 735751 umber, deepened most
+  missingInk: "rgba(167, 138, 127, 0.45)", // --p-taupe a78a7f, translucent
+  hatchInkDark: "rgba(28, 18, 16, 0.5)", // --surface: 735751 umber deepened, translucent
+  hatchInkLight: "rgba(239, 228, 214, 0.5)", // --text, translucent
+  evNegative: [
+    "#593d3a", // bf4342 brick hue, OKLCH lightness 0.39
+    "#7c4744", // bf4342 brick hue, OKLCH lightness 0.46
+    "#a0514d", // bf4342 brick hue, OKLCH lightness 0.53
+    "#f2827c", // bf4342 brick hue, OKLCH lightness 0.73
+    "#ffb0a9", // bf4342 brick hue, OKLCH lightness 0.83
+  ],
+  evNeutral: "#37322c", // e7d7c1 cream hue, OKLCH lightness 0.32, nearly grey
+  evPositive: [
+    "#37465a", // blue, OKLCH hue 255, lightness 0.39
+    "#3e5a7d", // blue, OKLCH hue 255, lightness 0.46
+    "#446da2", // blue, OKLCH hue 255, lightness 0.53
+    "#71aaf3", // blue, OKLCH hue 255, lightness 0.73
+    "#a2caff", // blue, OKLCH hue 255, lightness 0.83
+  ],
+  weightSteps: ["#7e4739", "#9d5f4f", "#c48777", "#e1ac9f", "#f7d5cc"], // --heat-1 to --heat-5, dark (O-362)
+  inkDark: "#1c1210", // --heat-ink-high (dark): 735751 umber, deepened
+  inkLight: "#fbf7f1", // --heat-ink-low (dark): e7d7c1 cream, lifted
+  focus: "#e7d7c1", // --focus (dark): the e7d7c1 cream palette value
+  focusHalo: "#281a17", // --surface-raised
+  selected: "#efe4d6", // --text
+};
+
+function resolve(palette: MatrixPalette): ResolvedPalette {
+  const ink = (fill: string) => inkFor(fill, palette.inkDark, palette.inkLight);
+  return {
+    ...palette,
+    evNegativeInk: palette.evNegative.map(ink),
+    evNeutralInk: ink(palette.evNeutral),
+    evPositiveInk: palette.evPositive.map(ink),
+    weightInk: palette.weightSteps.map(ink),
+  };
+}
+
+export const MATRIX_PALETTES: Readonly<Record<ThemeName, ResolvedPalette>> = { light: resolve(LIGHT), dark: resolve(DARK) };
+
+/** The fill of a best EV on the diverging scale whose ends are minus and plus scaleBb. */
 export function evFill(palette: MatrixPalette, evBb: number, scaleBb: number): string {
-  if (evBb === 0) return palette.evNeutral;
-  const steps = evBb > 0 ? palette.evPositive : palette.evNegative;
-  const share = Math.min(1, Math.abs(evBb) / scaleBb);
-  const step = Math.max(0, Math.ceil(share * steps.length) - 1);
-  return steps[step] ?? palette.evNeutral;
+  const step = evStep(evBb, scaleBb);
+  if (step === 0) return palette.evNeutral;
+  const steps = step > 0 ? palette.evPositive : palette.evNegative;
+  return steps[Math.min(EV_STEPS, Math.abs(step)) - 1] ?? palette.evNeutral;
+}
+
+/** The ink printed on a best EV's fill. */
+export function evInk(palette: ResolvedPalette, evBb: number, scaleBb: number): string {
+  const step = evStep(evBb, scaleBb);
+  if (step === 0) return palette.evNeutralInk;
+  const inks = step > 0 ? palette.evPositiveInk : palette.evNegativeInk;
+  return inks[Math.abs(step) - 1] ?? palette.evNeutralInk;
+}
+
+/** The fill of a weight: the ground for 0, a heat step for 1 to 5, null when unknown. */
+export function weightFill(palette: MatrixPalette, weight: number | null): string | null {
+  const step = weightStep(weight);
+  if (step === null) return null;
+  return step === 0 ? palette.background : (palette.weightSteps[step - 1] ?? palette.background);
+}
+
+/** The ink printed on a weight's fill (the text colour on the ground, for 0 or unknown). */
+export function weightInk(palette: ResolvedPalette, weight: number | null): string {
+  const step = weightStep(weight);
+  if (step === null || step === 0) return palette.text;
+  return palette.weightInk[step - 1] ?? palette.text;
 }

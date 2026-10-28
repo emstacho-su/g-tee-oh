@@ -16,7 +16,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import type { NodeAction } from "../../contracts.js";
 import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
 import { actionStyle } from "../../theme/action-style.js";
-import { ACTION_FILL_CLASSES, actionFillStyle } from "../trainer/ActionSwatch.js";
+import { ACTION_FILL_CLASSES, ACTION_INK_CLASSES, actionFillStyle } from "../trainer/ActionSwatch.js";
 import { cn } from "../ui/index.js";
 import type { Paint } from "./paint-model.js";
 
@@ -128,7 +128,7 @@ export function PaintGrid({ paint, actions, enabled, onBegin, onExtend, onEnd, o
                   }}
                   className={cn(
                     "flex aspect-square w-full flex-col items-center justify-center rounded-sm border border-black/10 font-mono text-[0.6rem] leading-tight sm:text-xs",
-                    held ? cn(ACTION_FILL_CLASSES, "text-black") : "bg-surface-sunken text-muted line-through",
+                    held ? cn(ACTION_FILL_CLASSES, ACTION_INK_CLASSES) : "bg-surface-sunken text-muted line-through",
                   )}
                 >
                   <span aria-hidden="true">{cell.hand}</span>

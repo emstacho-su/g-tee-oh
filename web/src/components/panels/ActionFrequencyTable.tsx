@@ -1,13 +1,15 @@
 /**
- * The action frequency table (S24, A7, R3.12 study panel, also used by the feedback panel for
- * R3.13). A real <table> with a caption, column headers and one row header per action, so screen
- * readers navigate it as a table.
+ * The action frequency table (S24, S38, A7, R3.12 study panel, also used by the feedback panel for
+ * R3.13, screen review row 14). A real <table> with a caption, column headers and one row header
+ * per action, so screen readers navigate it as a table; on screen it reads as a list.
  *
- * Each row shows the action's swatch and short letter (color is never the only signal), its name
- * and exact size, the frequency as a percent with an inline bar, and the EV (expected value) in
- * big blinds when given. Highlighted rows say so in text ("Best" by default). The table does no
- * aggregation: callers pass the numbers the api sent, in action order (ADR 0004). Lists of other
- * lengths, or a frequency outside 0 to 1, render an alert instead of a misleading table.
+ * Look (S38): the caption is the heading, with one combined mix bar under it (every action's share
+ * side by side, hidden from screen readers, who read the rows); the column headers are visually
+ * hidden; each row shows the action's swatch and short letter (color is never the only signal),
+ * its name and exact size, a Best chip when highlighted, the frequency as a percent with an inline
+ * bar, and the EV (expected value) in big blinds when given. The table does no aggregation: callers
+ * pass the numbers the api sent, in action order (ADR 0004). Lists of other lengths, or a frequency
+ * outside 0 to 1, render an alert instead of a misleading table.
  *
  * Numbering (O-198): highlightIndexes holds NodeAction.index values, the numbering the contract's
  * best_action_indexes carries, and a row is highlighted when its action's index is listed.
@@ -62,6 +64,74 @@ export function highlightProblem(
   return unknown === undefined ? null : `${highlightLabel} action ${unknown} is not one of the ${actions.length} actions`;
 }
 
+interface MixBarProps {
+  actions: readonly NodeAction[];
+  frequencies: readonly number[];
+}
+
+/** Every action's share side by side in one bar; decoration only, the rows carry the numbers. */
+function MixBar({ actions, frequencies }: MixBarProps) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="frequency-mix"
+      className="mt-2 flex h-3 w-full overflow-hidden rounded-full bg-surface-sunken"
+    >
+      {actions.map((action, position) => {
+        const share = frequencies[position] ?? 0;
+        return share > 0 ? (
+          <span
+            key={action.index}
+            data-testid="frequency-mix-segment"
+            style={{ ...actionFillStyle(action, actions), width: `${share * PERCENT}%` }}
+            className={cn("block h-full", ACTION_FILL_CLASSES)}
+          />
+        ) : null;
+      })}
+    </span>
+  );
+}
+
+interface RowProps {
+  action: NodeAction;
+  actions: readonly NodeAction[];
+  share: number;
+  ev: number | undefined;
+  highlighted: boolean;
+  highlightLabel: string;
+}
+
+function ActionRow({ action, actions, share, ev, highlighted, highlightLabel }: RowProps) {
+  return (
+    <tr data-highlight={highlighted ? "true" : "false"} className={cn("align-middle", highlighted && "bg-surface-sunken/70 font-semibold")}>
+      <th scope="row" className="rounded-l-lg py-1.5 pr-2 pl-2 text-left font-normal">
+        <span className="flex flex-wrap items-center gap-2">
+          <ActionSwatch action={action} actions={actions} />
+          <span className={highlighted ? "font-semibold" : undefined}>{exactActionLabel(action)}</span>
+          {highlighted ? (
+            <span data-testid="highlight-chip" className="rounded-full bg-accent px-2 text-xs font-semibold text-accent-text">
+              {highlightLabel}
+            </span>
+          ) : null}
+        </span>
+      </th>
+      <td className={cn("py-1.5 pr-2", ev === undefined && "rounded-r-lg")}>
+        <span className="flex items-center gap-2">
+          <span className="w-14 text-right tabular-nums">{formatShare(share)}</span>
+          <span aria-hidden="true" className="h-2 min-w-12 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+            <span
+              data-testid="frequency-bar"
+              style={{ ...actionFillStyle(action, actions), width: `${share * PERCENT}%` }}
+              className={cn("block h-full", ACTION_FILL_CLASSES)}
+            />
+          </span>
+        </span>
+      </td>
+      {ev === undefined ? null : <td className="rounded-r-lg py-1.5 pr-2 text-right tabular-nums">{formatBb(ev)}</td>}
+    </tr>
+  );
+}
+
 export function ActionFrequencyTable({
   actions,
   frequencies,
@@ -79,59 +149,30 @@ export function ActionFrequencyTable({
     );
   }
   return (
-    <table data-testid="action-frequency-table" className="w-full border-collapse text-sm">
-      <caption className="pb-1 text-left font-semibold">{caption}</caption>
-      <thead>
-        <tr className="border-b border-border text-left text-muted">
-          <th scope="col" className="py-1 font-medium">
-            Action
-          </th>
-          <th scope="col" className="py-1 font-medium">
-            Frequency
-          </th>
-          {evBb === undefined ? null : (
-            <th scope="col" className="py-1 text-right font-medium">
-              EV
-            </th>
-          )}
+    <table data-testid="action-frequency-table" className="w-full border-separate border-spacing-y-1 text-sm">
+      <caption className="pb-1 text-left font-semibold">
+        {caption}
+        <MixBar actions={actions} frequencies={frequencies} />
+      </caption>
+      <thead className="sr-only">
+        <tr>
+          <th scope="col">Action</th>
+          <th scope="col">Frequency</th>
+          {evBb === undefined ? null : <th scope="col">EV</th>}
         </tr>
       </thead>
       <tbody>
-        {actions.map((action, position) => {
-          const share = frequencies[position] ?? 0;
-          const highlighted = highlightIndexes.includes(action.index);
-          const ev = evBb?.[position];
-          return (
-            <tr
-              key={action.index}
-              data-highlight={highlighted ? "true" : "false"}
-              className={cn("border-b border-border/60", highlighted && "bg-surface-sunken font-semibold")}
-            >
-              <th scope="row" className="py-1 text-left font-normal">
-                <span className="flex items-center gap-2">
-                  <ActionSwatch action={action} actions={actions} />
-                  <span>{exactActionLabel(action)}</span>
-                  {highlighted ? (
-                    <span className="rounded bg-accent px-1 text-xs text-accent-text">{highlightLabel}</span>
-                  ) : null}
-                </span>
-              </th>
-              <td className="py-1">
-                <span className="flex items-center gap-2">
-                  <span className="w-14 text-right tabular-nums">{formatShare(share)}</span>
-                  <span aria-hidden="true" className="h-2.5 flex-1 overflow-hidden rounded bg-surface-sunken">
-                    <span
-                      data-testid="frequency-bar"
-                      style={{ ...actionFillStyle(action, actions), width: `${share * PERCENT}%` }}
-                      className={cn("block h-full", ACTION_FILL_CLASSES)}
-                    />
-                  </span>
-                </span>
-              </td>
-              {ev === undefined ? null : <td className="py-1 text-right tabular-nums">{formatBb(ev)}</td>}
-            </tr>
-          );
-        })}
+        {actions.map((action, position) => (
+          <ActionRow
+            key={action.index}
+            action={action}
+            actions={actions}
+            share={frequencies[position] ?? 0}
+            ev={evBb?.[position]}
+            highlighted={highlightIndexes.includes(action.index)}
+            highlightLabel={highlightLabel}
+          />
+        ))}
       </tbody>
     </table>
   );

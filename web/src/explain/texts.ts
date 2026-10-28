@@ -1,5 +1,6 @@
 /**
- * Fixed texts of the More info and Ask controls (S27 lane D, R3.19, R3.20, O-305 to O-308).
+ * Fixed texts of More info and Ask (S27 lane D, S38, R3.19, R3.20, O-305 to O-308, O-388). More
+ * info is the feedback panel's inline Explanation section since S38; Ask keeps its dialog.
  *
  * Mechanism: the Ask button is disabled with a visible reason whenever GET /explain/status says
  * Ask is unavailable; the reason comes from the status's reason field (flag_off while no model key
@@ -16,7 +17,8 @@ export const ASK_QUESTION_MAX_CHARS = 500;
 
 export const EXPLAIN_TEXT = {
   moreInfo: "More info",
-  moreInfoTitle: "More info about this decision",
+  /** The feedback panel's inline section that holds More info's template sections (S38, O-388). */
+  explanation: "Explanation",
   moreInfoLoading: "Loading the explanation",
   moreInfoSubject: "The explanation",
   moreInfoRetry: "Retry the explanation",

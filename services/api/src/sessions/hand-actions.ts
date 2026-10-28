@@ -16,7 +16,8 @@ export function withAction(hand: HandState, position: HandState["hero_position"]
   const end = next === null ? (action.kind === "fold" ? "fold" : "street_closed") : null;
   return {
     ...hand,
-    history: [...hand.history, { position, token: action.token, label: action.label }],
+    // The action is taken at the hand's current node, so its street is the hand's street (S38 review round 1).
+    history: [...hand.history, { position, token: action.token, label: action.label, street: hand.street }],
     node_key: next,
     end,
     last_action_kind: action.kind,

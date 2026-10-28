@@ -21,7 +21,7 @@
  * contradicting itself: a 502 upstream problem, never a 404 for the drill (re-review LOW 6).
  */
 import { HTTP_STATUS, ProblemError } from "../http/problem.js";
-import { positionSchema } from "../schemas/common.js";
+import { positionSchema, streetSchema } from "../schemas/common.js";
 import type { SqNode } from "../solver-query/client.js";
 import { familyMatches } from "./action-family.js";
 import type { PairCandidate } from "./candidates.js";
@@ -88,7 +88,7 @@ function children(node: SqNode, pending: Pending): Pending[] {
     if (next === null) {
       return [];
     }
-    const entry = { position: seat, token: action.token, label: action.label };
+    const entry = { position: seat, token: action.token, label: action.label, street: streetSchema.parse(node.street) };
     return [{ key: next, tokens: [...pending.tokens, action.token], history: [...pending.history, entry] }];
   });
 }

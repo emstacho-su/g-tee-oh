@@ -1,7 +1,7 @@
 /**
  * The /train recap and what ending a session does (S32, R4.10, R4.12, O-8, O-252, O-279, O-325,
  * O-326): decisions, rated decisions, mean score as a percent, EV loss in bb, the per-track rating
- * table with "new" for a track rated for the first time, the tier with the tracks that hold it,
+ * cards (S38: cards, not a visible table) with "new" for a track rated for the first time, the tier with the tracks that hold it,
  * the unlocked cosmetics by name, the note when nothing was rated, Train again, and every progress
  * read invalidated once the recap arrives.
  */
@@ -58,17 +58,18 @@ describe("R4.10 training recap", () => {
     expect(within(recap).queryByTestId("nothing-rated")).not.toBeInTheDocument();
   });
 
-  it("R4.10 the rating table gives each track before and after with RD, new for a first rating, and the change", async () => {
+  it("R4.10 R3.13 the rating cards give each track before and after with RD, new for a first rating, and the change (S38: cards, not a table)", async () => {
     const view = await renderTrain("automated", endScript(fixtureTrainingRecap));
     const recap = await startAndEnd(view);
-    const table = within(recap).getByRole("table", { name: "Rating by track" });
-    await waitFor(() => expect(within(table).getByRole("rowheader", { name: "Opens" })).toBeInTheDocument());
-    const [, opens, facing] = within(table).getAllByRole("row");
+    const cards = within(recap).getByRole("list", { name: "Rating by track" });
+    await waitFor(() => expect(within(cards).getByRole("listitem", { name: "Opens" })).toBeInTheDocument());
+    const opens = within(cards).getByRole("listitem", { name: "Opens" });
+    const facing = within(cards).getByRole("listitem", { name: "Facing an open in position" });
+    expect(within(recap).queryByRole("table")).not.toBeInTheDocument();
     expect(opens).toHaveTextContent("1584 ± 96");
     expect(opens).toHaveTextContent("1602 ± 92");
     expect(opens).toHaveTextContent("+18");
-    expect(facing).toHaveTextContent("Facing an open in position");
-    expect(within(facing as HTMLElement).getAllByText("new")).toHaveLength(2);
+    expect(within(facing).getAllByText("new")).toHaveLength(2);
     expect(facing).toHaveTextContent("1532 ± 290");
   });
 
@@ -83,13 +84,13 @@ describe("R4.10 training recap", () => {
     expect(within(recap).getByRole("link", { name: "See progress" })).toHaveAttribute("href", "/progress");
   });
 
-  it("R4.10 when nothing was rated the recap says so and why, with no rating table, tier or unlocks", async () => {
+  it("R4.10 R3.13 when nothing was rated the recap says so and why, with no rating cards, tier or unlocks", async () => {
     const view = await renderTrain("automated", endScript(fixtureUnratedRecap));
     const recap = await startAndEnd(view);
     expect(within(recap).getByTestId("nothing-rated")).toHaveTextContent("worked example");
     expect(within(recap).getByTestId("nothing-rated")).toHaveTextContent("holdout retest");
     expect(within(recap).getByTestId("recap-summary")).toHaveTextContent("Mean scoreNone rated");
-    expect(within(recap).queryByRole("table")).not.toBeInTheDocument();
+    expect(within(recap).queryByRole("list", { name: "Rating by track" })).not.toBeInTheDocument();
     expect(within(recap).queryByTestId("recap-tier")).not.toBeInTheDocument();
     expect(within(recap).queryByTestId("recap-unlocks")).not.toBeInTheDocument();
   });
