@@ -4,26 +4,16 @@
  * queue, streak and rating cards live in routes/home-cards/. The builder status card (S28, R3.5,
  * O-290) shows an admin the builder's state and queue depth and links everyone to /library.
  */
-import { useId, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../auth/index.js";
+import { Card, PageHeader } from "../components/ui/index.js";
 import { BUILDER_STATE_TEXT } from "../library/format.js";
 import { useBuilderStatus, useIsAdmin } from "../library/use-builder.js";
 import { QueueCard } from "./home-cards/QueueCard.js";
 import { HomeRatingCard, HomeStreakCard } from "./home-cards/StatCards.js";
 
-function CardFrame({ title, children }: { title: string; children: ReactNode }) {
-  const headingId = useId();
-  return (
-    <section aria-labelledby={headingId} className="rounded-lg border border-border bg-surface-raised p-4">
-      <h2 id={headingId} className="text-lg font-semibold">
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
+export const HOME_DESCRIPTION = "What to practise today, your streak and rating, and the library builder.";
 
 function BuilderStatusCard() {
   const isAdmin = useIsAdmin();
@@ -35,24 +25,38 @@ function BuilderStatusCard() {
     summary = "The builder status could not be loaded.";
   }
   return (
-    <CardFrame title="Builder status">
-      <p className="text-muted">{summary}</p>
-      <Link to="/library" className="text-sm underline">
+    <Card title="Builder status">
+      <p className="text-sm text-muted">{summary}</p>
+      <Link to="/library" className="self-start text-sm font-medium text-accent underline underline-offset-4">
         Open the library
       </Link>
-    </CardFrame>
+    </Card>
   );
 }
 
+/**
+ * Layout (S36, O-346): on a wide screen today's queue takes two columns and two rows, the streak
+ * and rating stack beside it, and the builder status runs underneath; one column at phone width.
+ * Cards keep their own height (items-start), so a short queue leaves no empty card body. Every
+ * grid item is min-w-0, so a long line wraps instead of widening the page at 390 px.
+ */
 export function HomePage() {
   return (
-    <section className="space-y-4">
-      <h1 className="text-2xl font-semibold">Home</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <QueueCard />
-        <HomeStreakCard />
-        <HomeRatingCard />
-        <BuilderStatusCard />
+    <section className="flex flex-col gap-6">
+      <PageHeader title="Home" description={HOME_DESCRIPTION} />
+      <div data-testid="home-grid" className="grid gap-4 lg:grid-cols-3 lg:items-start">
+        <div className="min-w-0 lg:col-span-2 lg:row-span-2">
+          <QueueCard />
+        </div>
+        <div className="min-w-0">
+          <HomeStreakCard />
+        </div>
+        <div className="min-w-0">
+          <HomeRatingCard />
+        </div>
+        <div className="min-w-0 lg:col-span-3">
+          <BuilderStatusCard />
+        </div>
       </div>
     </section>
   );

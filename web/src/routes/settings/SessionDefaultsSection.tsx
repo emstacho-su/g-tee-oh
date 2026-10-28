@@ -4,7 +4,7 @@
  * session defaults store at once and a status line says so; a seed is never offered.
  *
  * Mechanism: grouping is a ToggleGroup and RNG a checkbox, both written straight to the store. The
- * scope is all covered configurations or a chosen list (ConfigScopePicker) from GET /configs.
+ * configuration scope has its own page since S36 (ConfigScopeSection, O-360).
  */
 import { useState } from "react";
 
@@ -12,7 +12,6 @@ import { ToggleGroup } from "../../components/ui/index.js";
 import type { Grouping } from "../../contracts.js";
 import { GROUPINGS, useSessionDefaultsStore } from "../../store/index.js";
 import { SESSION_TEXT } from "../drill-run/labels.js";
-import { ConfigScopePicker } from "./ConfigScopePicker.js";
 import { GROUPING_LABELS } from "../../drills/labels.js";
 import { SESSION_DEFAULTS_TEXT } from "./settings-text.js";
 import { SettingsSection } from "./SettingsSection.js";
@@ -52,7 +51,6 @@ export function SessionDefaultsSection() {
           {SESSION_TEXT.rngHint}
         </p>
       </div>
-      <ConfigScopePicker onSaved={() => setSaved(true)} />
       <p role="status" className="text-sm text-success">
         {saved ? SESSION_DEFAULTS_TEXT.saved : ""}
       </p>

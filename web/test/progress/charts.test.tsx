@@ -51,14 +51,20 @@ describe("R4.12 TrackBreakdown", () => {
     expect(rows[0]?.className).not.toContain("opacity-60");
   });
 
-  it("R4.12 the table fallback lists the same figures", () => {
+  it("R4.12 the track table is for screen readers only, beside the chart, with no toggle (O-347)", () => {
     render(<TrackBreakdown tracks={fixtureTracks} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show table: track breakdown" }));
+    expect(screen.queryByRole("button", { name: /Show (table|chart)/ })).toBeNull();
     const table = screen.getByRole("table", { name: "Rating by track" });
+    expect(table.closest(".sr-only")).not.toBeNull();
     expect(within(table).getAllByRole("row")).toHaveLength(8);
     expect(within(table).getByRole("rowheader", { name: "Blind defense" }).closest("tr")).toHaveTextContent("1551± 821387");
-    fireEvent.click(screen.getByRole("button", { name: "Show chart: track breakdown" }));
     expect(screen.getAllByTestId("track-row")).toHaveLength(7);
+  });
+
+  it("R4.12 the visual rows are hidden from screen readers, so the table is the one representation (S36 review)", () => {
+    render(<TrackBreakdown tracks={fixtureTracks} />);
+    expect(screen.getByTestId("track-visual")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByTestId("track-row")[0]).toBeVisible();
   });
 
   it("R4.12 no tracks says so", () => {
@@ -82,8 +88,9 @@ describe("R4.12 LeakTrendChart", () => {
     expect(rows[0]).toHaveTextContent("1rfi BB-UTG, live 100 bb42.0 bb per 1,000 hours".replace("hours", "hands"));
     expect(screen.getAllByTestId("leak-sparkline")).toHaveLength(10);
     expect(screen.getAllByTestId("leak-partial-marker")).toHaveLength(10);
-    expect(screen.getAllByText("The last point is this week (partial), still counting.")).toHaveLength(10);
-    expect(screen.getByRole("img", { name: "rfi BB-UTG, live 100 bb: leak cost over 8 weeks, from 58.8 to 42.0 bb per 1,000 hands" })).toBeInTheDocument();
+    // S36 review: the name lists every week, so the partial week is named there, not in a second note.
+    expect(screen.queryByText(/still counting/)).toBeNull();
+    expect(screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb: Week of Sep 7: 58\.8 bb per 1,000 hands; .*Oct 26, this week \(partial\): 42\.0 bb per 1,000 hands$/ })).toBeInTheDocument();
   });
 
   it("R4.12 a drill button opens that row's class; the pending one is disabled", () => {
@@ -112,20 +119,23 @@ describe("R4.12 LeakTrendChart", () => {
     expect(onWeeksChange).toHaveBeenCalledWith(26);
   });
 
-  it("R4.12 the table lists every week, the partial one marked and gaps as no data", () => {
+  it("R4.12 each row's sparkline names every week, the partial one marked and gaps as no data; no second table (O-347, S36 review)", () => {
     renderTrend();
-    fireEvent.click(screen.getByRole("button", { name: "Show table: leak cost trend" }));
-    const table = screen.getByTestId("leak-table");
-    expect(within(table).getAllByRole("row")).toHaveLength(11);
-    expect(within(table).getByRole("columnheader", { name: "Oct 26 (this week (partial))" })).toBeInTheDocument();
-    const first = within(table).getByRole("rowheader", { name: "rfi BB-UTG, live 100 bb" }).closest("tr");
-    expect(first).toHaveTextContent("rfi BB-UTG, live 100 bb42.058.856.4no data51.649.246.844.442.0");
+    expect(screen.queryByRole("button", { name: /Show (table|chart)/ })).toBeNull();
+    expect(screen.queryByTestId("leak-table")).toBeNull();
+    expect(screen.getAllByTestId("leak-row")).toHaveLength(10);
+    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb:/ });
+    const name = line.getAttribute("aria-label") ?? "";
+    expect(name).toContain("Week of Sep 7: 58.8 bb per 1,000 hands");
+    expect(name).toContain("Week of Sep 21: no data");
+    expect(name).toContain("Oct 26, this week (partial): 42.0 bb per 1,000 hands");
+    expect(name.split("; ")).toHaveLength(8);
   });
 
-  it("R4.12 no leaks shows the empty state and no table toggle", () => {
+  it("R4.12 no leaks shows the empty state and no table", () => {
     renderTrend({ leaks: fixtureFreshLeaks });
     expect(screen.getByText(NO_LEAKS_TEXT)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Show table/ })).toBeNull();
+    expect(screen.queryByTestId("leak-table")).toBeNull();
   });
 
   it("R4.12 the sparkline tooltip follows focus, arrow keys and hover", () => {
@@ -167,8 +177,10 @@ describe("R4.12 MasteryHeatMap", () => {
 
   it("R4.12 rows are grouped under their family with sticky pair headers", () => {
     render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
-    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Pair", "live 100 bb", "online 100 bb", "online 150 bb", "online 200 bb", "rfi", "facing-open", "facing-3bet", "blind-vs-blind"]);
-    expect(screen.getAllByRole("rowheader")).toHaveLength(10);
+    // Scoped to the grid: the screen-reader table beside it has headers of its own (O-347).
+    const grid = screen.getByTestId("heat-grid");
+    expect(within(grid).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Pair", "live 100 bb", "online 100 bb", "online 150 bb", "online 200 bb", "rfi", "facing-open", "facing-3bet", "blind-vs-blind"]);
+    expect(within(grid).getAllByRole("rowheader")).toHaveLength(10);
   });
 
   it("R4.12 the tooltip shows on focus and hover; a click opens the cell's drill", () => {
@@ -198,13 +210,17 @@ describe("R4.12 MasteryHeatMap", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Could not open a drill: Not found.");
   });
 
-  it("R4.12 the table fallback lists every class with the same values", () => {
+  it("R4.12 the labelled cell buttons are the one representation: every value in each name, no second table (O-347, S36 review)", () => {
     render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show table: mastery heat map" }));
-    const table = screen.getByTestId("heat-table");
-    expect(within(table).getAllByRole("row")).toHaveLength(CELL_COUNT + 1);
-    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("rfi BB-UTGlive 100 bb12%98%6nono");
-    expect(within(table).getAllByRole("row")[3]).toHaveTextContent("rfi BB-UTGonline 150 bbnewnot scheduled0nono");
+    expect(screen.queryByRole("button", { name: /Show (table|chart)/ })).toBeNull();
+    expect(screen.queryByTestId("heat-table")).toBeNull();
+    // The grid of cell buttons is the card's only table.
+    const tables = screen.getAllByRole("table");
+    expect(tables).toHaveLength(1);
+    expect(screen.getByTestId("heat-grid").contains(tables[0] ?? null) || tables[0] === screen.getByTestId("heat-grid")).toBe(true);
+    const cells = screen.getAllByTestId("heat-cell");
+    expect(cells).toHaveLength(CELL_COUNT);
+    expect(cells[0]).toHaveAccessibleName(/^rfi BB-UTG, live 100 bb: .*12%.*98%.*6.*Mastered: no.*Due for review: no$/);
   });
 
   it("R4.12 an empty heat map says so", () => {

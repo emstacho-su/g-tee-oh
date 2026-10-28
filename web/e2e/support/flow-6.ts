@@ -1,8 +1,9 @@
 /**
  * The steps of flow 6 (S32, R4.12, A7 section 5, O-321), shared by the mock twin
  * (e2e/mock/flow-6-progress.e2e.ts) and the stack flow (e2e/stack/flow-6-progress.e2e.ts): open
- * /progress, check the leak-cost trend rows and their sparklines, check the heat map cells, toggle
- * both table fallbacks and back, and open a drill from a heat map cell. Each step asserts
+ * /progress, check the leak-cost trend rows and their sparklines, check the heat map cells, check
+ * one accessible representation per chart (S36, O-347: no visible toggle, no second table), and
+ * open a drill from a heat map cell. Each step asserts
  * structure; the callers add the exact counts the mocked fixtures allow.
  */
 import { expect, type Locator, type Page } from "@playwright/test";
@@ -33,18 +34,17 @@ export async function expectHeatCells(page: Page): Promise<number> {
   return cells.count();
 }
 
-async function toggleTable(page: Page, subject: string, table: Locator, rows: number): Promise<void> {
-  await page.getByRole("button", { name: `Show table: ${subject}` }).click();
-  await expect(table).toBeVisible();
-  await expect(table.locator("tbody tr")).toHaveCount(rows);
-  await page.getByRole("button", { name: `Show chart: ${subject}` }).click();
-  await expect(table).toBeHidden();
-}
-
-/** Both table fallbacks list one row per trend row and per heat map cell, then go back to the charts. */
-export async function toggleBothTables(page: Page, trendRows: number, heatCells: number): Promise<void> {
-  await toggleTable(page, "leak cost trend", page.getByTestId("leak-table"), trendRows);
-  await toggleTable(page, "mastery heat map", page.getByTestId("heat-table"), heatCells);
+/**
+ * One accessible representation per chart and no visible table toggle (S36 review, O-347): every
+ * trend row's sparkline is named with its weekly values, every heat map cell button is named with
+ * its values, and no second table repeats them.
+ */
+export async function expectAccessibleCharts(page: Page, trendRows: number, heatCells: number): Promise<void> {
+  await expect(page.getByRole("button", { name: /^Show (table|chart)/ })).toHaveCount(0);
+  await expect(page.getByTestId("leak-table")).toHaveCount(0);
+  await expect(page.getByTestId("heat-table")).toHaveCount(0);
+  await expect(page.getByRole("img", { name: /: (Week of|.*this week \(partial\))/ })).toHaveCount(trendRows);
+  await expect(page.getByTestId("heat-cell").and(page.getByRole("button", { name: /Due for review: (yes|no)$/ }))).toHaveCount(heatCells);
 }
 
 /** Clicks a heat map cell and waits for the drill run screen; answers the drill's path. */

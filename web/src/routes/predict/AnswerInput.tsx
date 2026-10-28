@@ -84,7 +84,7 @@ function RegionChoices({ prompt, draft, disabled, onChange }: AnswerInputProps) 
   return (
     <Group legend={PREDICTION_TEXT.regionsLegend}>
       {offered.map((region) => (
-        <label key={region} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+        <label key={region} className="inline-flex items-center gap-2 rounded-md border border-border-strong px-3 py-2 text-sm">
           <input
             type="checkbox"
             checked={draft.value.includes(region)}
@@ -112,7 +112,7 @@ function PercentInput({ draft, disabled, onChange }: AnswerInputProps) {
         value={draft.text}
         disabled={disabled}
         onChange={(event) => onChange({ kind: "percent", text: event.target.value })}
-        className="h-10 w-32 rounded-md border border-border bg-surface px-2 text-base"
+        className="h-10 w-32 rounded-md border border-border-strong bg-surface px-2 text-base"
       />
     </label>
   );

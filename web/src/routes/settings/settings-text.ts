@@ -19,6 +19,18 @@ export const SESSION_DEFAULTS_TEXT = {
   removeStale: "Remove them",
 } as const;
 
+export const CONFIG_SCOPE_TEXT = {
+  title: "Configuration scope",
+  description: "The game configurations automated sessions draw from. Kept on this browser only.",
+} as const;
+
+export const SETTINGS_TEXT = {
+  title: "Settings",
+  description: "How training starts, what the app looks like and the keys it answers to.",
+  sections: "Settings sections",
+  scheduleMemberNote: "The builder schedule is for admins.",
+} as const;
+
 export function staleConfigsText(ids: readonly string[]): string {
   return `Saved configurations no longer offered: ${ids.join(", ")}.`;
 }

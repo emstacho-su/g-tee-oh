@@ -31,13 +31,13 @@ export function AuthLayout() {
       <HotkeyRoot />
       <CosmeticsRoot />
       <AppHeader />
-      <div className="flex flex-1 flex-col gap-4 p-4 md:flex-row">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 md:flex-row md:gap-6 md:px-6 md:py-6">
         <MainNav />
         <main className="min-w-0 flex-1">
           <Outlet />
         </main>
       </div>
-      <p className="border-t border-border px-4 py-2 text-sm text-muted">{SHORTCUTS_HINT}</p>
+      <p className="border-t border-border/50 px-4 py-2 text-center text-xs text-muted md:px-6">{SHORTCUTS_HINT}</p>
     </div>
   );
 }

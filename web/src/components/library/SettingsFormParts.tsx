@@ -33,7 +33,7 @@ export function NumberField({ label, hint, value, current, invalid, onChange, st
         aria-invalid={invalid}
         aria-describedby={hintId}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-40 rounded-md border border-border bg-surface-raised px-2"
+        className="h-9 w-40 rounded-md border border-border-strong bg-surface-raised px-2"
       />
       <span id={hintId} className="text-xs text-muted">
         {`${current}. Use ${hint}.`}

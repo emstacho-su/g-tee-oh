@@ -83,7 +83,7 @@ export function GapRequest({ pair, preflopAvailable, request }: GapRequestProps)
             placeholder="KhQd4s"
             aria-invalid={flopError !== null}
             onChange={(event) => setFlopText(event.target.value)}
-            className="h-9 w-32 rounded-md border border-border bg-surface-raised px-2 font-mono"
+            className="h-9 w-32 rounded-md border border-border-strong bg-surface-raised px-2 font-mono"
           />
         </div>
         <Button type="submit" disabled={request.pending}>

@@ -6,8 +6,8 @@
  * Mechanism: the geometry comes from leak-model.ts. The SVG is focusable: hovering moves a
  * crosshair to the nearest week, focus starts it at the last week and the left and right arrow
  * keys step it, and a tooltip states the week and its value ("this week (partial)" for the live
- * week, "no data" for a gap). The image's name summarizes the line in words, and an sr-only note
- * says the last point is partial, so nothing rests on the shape alone. Colors are Tailwind token
+ * week, "no data" for a gap). The image's name lists every week the same way (S36 review), so
+ * nothing rests on the shape alone and no second table repeats it. Colors are Tailwind token
  * utilities, so both themes follow.
  */
 import { useId, useState, type KeyboardEvent, type MouseEvent } from "react";
@@ -38,12 +38,13 @@ function weekText(item: LeakItem, index: number): string {
   return `${week}: ${value}`;
 }
 
+/**
+ * The image's name: every week in order with its value, the partial week and the gaps named (S36
+ * review). With the table gone this is the screen-reader view of the line (O-347), the same words
+ * the tooltip shows week by week.
+ */
 function summary(item: LeakItem, label: string): string {
-  const valued = item.series.filter((point) => point.leak_cost_bb_per_1k !== null);
-  const first = valued[0]?.leak_cost_bb_per_1k;
-  const last = valued.at(-1)?.leak_cost_bb_per_1k;
-  if (first === undefined || first === null || last === undefined || last === null) return `${label}: no weekly values yet`;
-  return `${label}: leak cost over ${item.series.length} weeks, from ${formatLeak(first)} to ${formatLeak(last)} ${UNIT}`;
+  return `${label}: ${item.series.map((_, index) => weekText(item, index)).join("; ")}`;
 }
 
 function nearestIndex(weekX: readonly number[], x: number): number {
@@ -126,7 +127,6 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
           />
         )}
       </svg>
-      {geometry.partialPoint === null ? null : <span className="sr-only">The last point is {PARTIAL_WEEK_TEXT}, still counting.</span>}
       <ChartTooltip id={tooltipId} anchor={active === null ? null : tooltip.anchor}>
         {active === null ? null : weekText(item, active)}
       </ChartTooltip>

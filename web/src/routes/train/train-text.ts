@@ -5,12 +5,15 @@
  * words. A problem sentence is fixed per kind (S24 precedent), so no server detail is shown.
  */
 import { problemMessage, type SpotProblem } from "../../trainer/spot-problem.js";
+import type { SettingsSectionSlug } from "../settings/sections.js";
 
 export type TrainMode = "automated" | "holdout";
 
 export const TRAIN_PATH = "/train";
 export const PROGRESS_PATH = "/progress";
-export const SETTINGS_PATH = "/settings";
+// Each start-panel link opens the settings page that holds what it changes (S36, O-360).
+export const SCOPE_SETTINGS_SECTION = "configurations" satisfies SettingsSectionSlug;
+export const DEFAULTS_SETTINGS_SECTION = "session-defaults" satisfies SettingsSectionSlug;
 export const HOLDOUT_SEARCH = { mode: "holdout" } as const;
 
 export const TRAIN_TEXT = {
@@ -31,7 +34,8 @@ export const TRAIN_TEXT = {
   rng: "RNG mode",
   on: "On",
   off: "Off",
-  changeSettings: "Change these in Settings",
+  changeScope: "Change the configurations",
+  changeDefaults: "Change the session defaults",
   retry: "Try again",
   workedExample: "Worked example: panels visible, not rated",
   ratedBlock: "Rated block: first attempts count toward your rating",

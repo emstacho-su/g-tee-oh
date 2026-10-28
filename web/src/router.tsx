@@ -39,6 +39,7 @@ import { DrillBuilderPage } from "./routes/drills/DrillBuilderPage.js";
 import { DrillsPage } from "./routes/drills/DrillsPage.js";
 import { validateLibrarySearch } from "./library/search.js";
 import { LibraryPage } from "./routes/library/LibraryPage.js";
+import { DEFAULT_SETTINGS_SECTION, isSettingsSection } from "./routes/settings/sections.js";
 import { SettingsPage } from "./routes/settings/SettingsPage.js";
 import { StudyPage } from "./routes/study/StudyPage.js";
 import { TrainPage } from "./routes/train/TrainPage.js";
@@ -180,7 +181,33 @@ export const libraryRoute = createRoute({
     return <LibraryPage search={validateLibrarySearch(libraryRoute.useSearch())} />;
   },
 });
-export const settingsRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/settings", component: SettingsPage });
+// /settings is one container with a page per section (S36, O-360): /settings itself and any
+// section not in the list redirect to the default page. The segment is untrusted input, so it is
+// checked against the fixed list before the page renders.
+const DEFAULT_SETTINGS_TARGET = { to: "/settings/$section", params: { section: DEFAULT_SETTINGS_SECTION }, replace: true } as const;
+export const settingsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/settings",
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect(DEFAULT_SETTINGS_TARGET);
+  },
+});
+export const settingsSectionRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/settings/$section",
+  // The one check: a valid segment goes on in the route context as a typed section.
+  beforeLoad: ({ params }) => {
+    if (!isSettingsSection(params.section)) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+      throw redirect(DEFAULT_SETTINGS_TARGET);
+    }
+    return { section: params.section };
+  },
+  component: function SettingsRouteScreen() {
+    return <SettingsPage section={settingsSectionRoute.useRouteContext().section} />;
+  },
+});
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -197,6 +224,7 @@ export const routeTree = rootRoute.addChildren([
     progressRoute,
     libraryRoute,
     settingsRoute,
+    settingsSectionRoute,
   ]),
 ]);
 

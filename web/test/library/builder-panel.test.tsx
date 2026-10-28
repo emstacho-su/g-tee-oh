@@ -176,7 +176,7 @@ describe("R3.5 builder settings round trip", () => {
 describe("R3.5 /settings builder schedule", () => {
   it("R3.5 the schedule round trip sends the whole overnight window and shows it stored", async () => {
     const user = userEvent.setup();
-    const { sent } = renderLibrary("/settings");
+    const { sent } = renderLibrary("/settings/builder-schedule");
     const form = await screen.findByRole("form", { name: "Builder schedule" });
     expect(within(form).getByText("Now 00:00 to 07:00 at UTC offset 0 minutes, CPU share 1 (builder default)")).toBeInTheDocument();
 
@@ -197,7 +197,7 @@ describe("R3.5 /settings builder schedule", () => {
 
   it("R3.5 an invalid hour is named and nothing is sent", async () => {
     const user = userEvent.setup();
-    const { sent } = renderLibrary("/settings");
+    const { sent } = renderLibrary("/settings/builder-schedule");
     const start = await screen.findByRole("spinbutton", { name: "Window starts (hour)" });
 
     await user.clear(start);
@@ -213,7 +213,7 @@ describe("R3.5 /settings builder schedule", () => {
   it("R3.5 a failed settings read shows an alert with a retry", async () => {
     const user = userEvent.setup();
     let fail = true;
-    renderLibrary("/settings", {
+    renderLibrary("/settings/builder-schedule", {
       override: (request) => (request.path === BUILDER_PATH && fail ? jsonBody(500, { status: 500 }) : undefined),
     });
 
@@ -224,7 +224,7 @@ describe("R3.5 /settings builder schedule", () => {
   });
 
   it("R3.5 a member sees that the schedule is for admins and no admin read is made (O-290)", async () => {
-    const { sent } = renderLibrary("/settings", { admin: false });
+    const { sent } = renderLibrary("/settings/builder-schedule", { admin: false });
 
     expect(await screen.findByText("The builder schedule is for admins.")).toBeInTheDocument();
     expect(sent("GET", BUILDER_PATH)).toEqual([]);

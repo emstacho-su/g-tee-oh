@@ -7,24 +7,22 @@
  * (packages/learning TIER_FLOORS, the bands the overall rating ranks on) that fall inside the
  * axis. Each row also states its figures in words: rating with deviation, conservative rating,
  * weight and rated decisions. A track with weight 0 has no covered class: its row is dimmed and
- * says "no coverage", never color alone. "Show table" swaps the chart for a table of the same
- * figures. Built as positioned HTML, so the axis stretches with the card at any width.
+ * says "no coverage", never color alone. A table of the same figures is the screen-reader view
+ * and the visual is aria-hidden, so each value is read once (S36 review, O-347). Built as
+ * positioned HTML, so the axis stretches with the card at any width.
  */
 import { TIER_FLOORS } from "@g-tee-oh/learning";
-import { useState } from "react";
 
 import { formatDeviation, formatPercent, formatRating } from "../../progress/format.js";
 import type { TrackProgress } from "../../progress/types.js";
 import { cn } from "../ui/index.js";
 import { ProgressCard } from "./ProgressCard.js";
-import { TableToggle } from "./TableToggle.js";
 
 export const NO_COVERAGE_TEXT = "no coverage";
 export const NO_TRACKS_TEXT = "No rating tracks yet.";
 /** The axis ends snap to this many rating points. */
 export const AXIS_STEP = 100;
 const PERCENT = 100;
-const SUBJECT = "track breakdown";
 
 export interface RatingAxis {
   readonly min: number;
@@ -132,7 +130,6 @@ export interface TrackBreakdownProps {
 }
 
 export function TrackBreakdown({ tracks }: TrackBreakdownProps) {
-  const [showTable, setShowTable] = useState(false);
   if (tracks.length === 0) {
     return (
       <ProgressCard title="Tracks" testId="track-breakdown">
@@ -142,20 +139,20 @@ export function TrackBreakdown({ tracks }: TrackBreakdownProps) {
   }
   const axis = ratingAxis(tracks);
   return (
-    <ProgressCard title="Tracks" testId="track-breakdown" actions={<TableToggle showTable={showTable} onChange={setShowTable} subject={SUBJECT} />}>
-      {showTable ? (
+    <ProgressCard title="Tracks" testId="track-breakdown">
+      {/* The visual is hidden from screen readers: the table below is the one representation. */}
+      <div data-testid="track-visual" aria-hidden="true" className="flex flex-col gap-2">
+        <p className="text-xs text-muted">Dot: rating. Line: plus or minus the deviation. Dashed lines: tier floors, named above the axis.</p>
+        <AxisRow axis={axis} />
+        <ul className="flex flex-col gap-3">
+          {tracks.map((track) => (
+            <TrackRow key={track.track_key} track={track} axis={axis} />
+          ))}
+        </ul>
+      </div>
+      <div className="sr-only">
         <TrackTable tracks={tracks} />
-      ) : (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted">Dot: rating. Line: plus or minus the deviation. Dashed lines: tier floors, named above the axis.</p>
-          <AxisRow axis={axis} />
-          <ul className="flex flex-col gap-3">
-            {tracks.map((track) => (
-              <TrackRow key={track.track_key} track={track} axis={axis} />
-            ))}
-          </ul>
-        </div>
-      )}
+      </div>
     </ProgressCard>
   );
 }

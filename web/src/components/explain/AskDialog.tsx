@@ -82,7 +82,7 @@ function AskForm({ attemptId }: AskFormProps) {
         rows={3}
         aria-describedby={counterId}
         onChange={(event) => setQuestion(event.target.value)}
-        className="rounded-md border border-border bg-surface p-2 text-sm text-text"
+        className="rounded-md border border-border-strong bg-surface p-2 text-sm text-text"
       />
       <p id={counterId} data-testid="ask-counter" className="text-xs text-muted tabular-nums">
         {questionCounterText(question.length)}
