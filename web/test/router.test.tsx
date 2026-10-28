@@ -40,8 +40,6 @@ const PLACEHOLDERS: readonly (readonly [string, string, string])[] = [
   ["/drills", "Drill library", "S26"],
   ["/drills/new", "Drill builder", "S26"],
   ["/drills/abc", "Drill builder", "S26"],
-  ["/predict", "Prediction drills", "S27"],
-  ["/paint", "Range painting", "S27"],
   ["/progress", "Progress", "S32"],
   ["/library", "Coverage and builder health", "S28"],
   ["/settings", "Settings", "S28 and S32"],

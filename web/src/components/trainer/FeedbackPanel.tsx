@@ -6,9 +6,10 @@
  * signal), the EV (expected value) loss in big blinds and in percent of the pot as the api sends
  * them (ADR 0004: nothing is recomputed), the action the hero chose, the hand's frequency and EV
  * per action through ActionFrequencyTable with the best actions marked "Best" in text, the RNG
- * roll when there was one, and "Unrated" when the attempt does not count toward the rating. Two
- * slots take the range view and the threshold card. More info and Ask render disabled with a
- * note when their handlers are absent.
+ * roll when there was one, and "Unrated" when the attempt does not count toward the rating. Slots
+ * take the range view, the threshold card, the insight cards (S27) and the explain controls
+ * (S27); without the explain slot, More info and Ask render disabled with a note when their
+ * handlers are absent.
  *
  * Numbering (O-198): chosenIndex and feedback.best_action_indexes are NodeAction.index values,
  * never positions in actions; freq_by_action and ev_by_action are positional, as the contract
@@ -32,6 +33,13 @@ export interface FeedbackPanelProps {
   thresholdCard?: ReactNode;
   /** The RNG roller after the reveal, when the session has RNG mode on (S25, O-282). */
   roller?: ReactNode;
+  /** The insight cards: noise flags and range drift (S27, R3.18, O-304). */
+  insights?: ReactNode;
+  /**
+   * The More info and Ask controls with their dialogs and states (S27, R3.19, R3.20). When given
+   * they replace the two shell buttons below.
+   */
+  explain?: ReactNode;
   onMoreInfo?: () => void;
   onAsk?: () => void;
 }
@@ -70,6 +78,8 @@ export function FeedbackPanel({
   rangeView,
   thresholdCard,
   roller,
+  insights,
+  explain,
   onMoreInfo,
   onAsk,
 }: FeedbackPanelProps) {
@@ -108,10 +118,13 @@ export function FeedbackPanel({
       {roller}
       {rangeView}
       {thresholdCard}
-      <div className="flex gap-2">
-        <LaterButton label="More info" onClick={onMoreInfo} />
-        <LaterButton label="Ask" onClick={onAsk} />
-      </div>
+      {insights}
+      {explain ?? (
+        <div className="flex gap-2">
+          <LaterButton label="More info" onClick={onMoreInfo} />
+          <LaterButton label="Ask" onClick={onAsk} />
+        </div>
+      )}
     </section>
   );
 }

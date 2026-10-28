@@ -22,6 +22,8 @@ const FIXTURE_USER_ID = "00000000-0000-4000-8000-000000000001";
 const FIXTURE_SOLUTION_ID = "00000000-0000-4000-8000-000000000002";
 const FIXTURE_SESSION_ID = "00000000-0000-4000-8000-000000000003";
 const FIXTURE_ATTEMPT_ID = "00000000-0000-4000-8000-000000000004";
+/** The synthetic node family of the fixture node and feedback (S27: range drift reads it, O-304). */
+export const FIXTURE_SPOT_CLASS_KEY = "synthetic-rfi-btn";
 
 export const fixtureSession: SessionInfo = {
   user: { id: FIXTURE_USER_ID, email: FIXTURE_USER_EMAIL, created_at: "2026-10-27T12:00:00Z" },
@@ -46,6 +48,9 @@ function round(value: number, decimals = 4): number {
   return Math.round(value * factor) / factor;
 }
 
+/** The frequency at which the fixture counts an action as played, mirroring solver-query's MIX_EPSILON. */
+const FIXTURE_MIX_EPSILON = 0.05;
+
 /** A synthetic hand row: strength falls with the grid distance from AA. */
 export function fixtureHandRow(hand: string, row: number, col: number): NodeHandRow {
   const strength = 1 - (row + col) / STRENGTH_SCALE;
@@ -58,13 +63,16 @@ export function fixtureHandRow(hand: string, row: number, col: number): NodeHand
   const evAllIn = round((strength - 0.6) * EV_SPAN_BB * 2);
   const ev = [FOLD_EV_BB, evCall, evRaise, evAllIn];
   const best = Math.max(...ev);
+  const strategy = [fold, call, raise, allIn];
   return {
     hand,
-    strategy: [fold, call, raise, allIn],
+    strategy,
     ev_bb: ev,
     ev_best_bb: best,
     loss_pct_pot: ev.map((value) => round(((best - value) / 1.5) * 100, 2)),
     reach: [round(0.2 + strength * 0.8)],
+    // Synthetic test data only: the flag solver-query computes in Rust (O-301), imitated for the fixture.
+    mixed: strategy.filter((frequency) => frequency >= FIXTURE_MIX_EPSILON).length >= 2,
   };
 }
 
@@ -78,7 +86,7 @@ export const fixtureStudyNode: StudyNode = {
   pot_cbb: 150,
   stacks_cbb: [10000, 10000, 10000, 10000, 9950, 9900],
   floor_pct_pot: 0.2,
-  spot_class_key: "synthetic-rfi-btn",
+  spot_class_key: FIXTURE_SPOT_CLASS_KEY,
   actions: [...fixtureActions],
   hands: HAND_GRID.map((cell) => fixtureHandRow(cell.hand, cell.row, cell.col)),
   noise_flags: [],
@@ -155,4 +163,7 @@ export const fixtureFeedback: DecisionFeedback = {
   config_id: "cfg_6_online_100",
   pair: "BB-BTN",
   hand: "AJo",
+  // S27 (O-303): the flags the decision was graded with and its Rust spot class (range drift's node family).
+  noise_flags: ["close_ev_mix"],
+  spot_class_key: FIXTURE_SPOT_CLASS_KEY,
 };

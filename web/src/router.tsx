@@ -30,10 +30,13 @@ import { SessionError } from "./app/SessionError.js";
 import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
+import { PaintPage } from "./routes/paint/PaintPage.js";
+import { PredictPage } from "./routes/predict/PredictPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { placeholderRoute } from "./routes/placeholders.js";
 import type { PlaceholderKey } from "./routes/placeholders.js";
 import { StudyPage } from "./routes/study/StudyPage.js";
+import { validatePracticeSearch } from "./practice/search.js";
 import { validateStudySearch } from "./study/search.js";
 import { validateDrillRunSearch } from "./trainer/run-search.js";
 
@@ -118,8 +121,23 @@ export const studyRoute = createRoute({
     return <StudyPage search={validateStudySearch(studyRoute.useSearch())} />;
   },
 });
-export const predictRoute = screenRoute("/predict", "predict");
-export const paintRoute = screenRoute("/paint", "paint");
+// /predict and /paint are real screens (S27, O-302) with the same re-validation rule as /study.
+export const predictRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/predict",
+  validateSearch: validatePracticeSearch,
+  component: function PredictRouteScreen() {
+    return <PredictPage search={validatePracticeSearch(predictRoute.useSearch())} />;
+  },
+});
+export const paintRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/paint",
+  validateSearch: validatePracticeSearch,
+  component: function PaintRouteScreen() {
+    return <PaintPage search={validatePracticeSearch(paintRoute.useSearch())} />;
+  },
+});
 export const progressRoute = screenRoute("/progress", "progress");
 export const libraryRoute = screenRoute("/library", "library");
 export const settingsRoute = screenRoute("/settings", "settings");

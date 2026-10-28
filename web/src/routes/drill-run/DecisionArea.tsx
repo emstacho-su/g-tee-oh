@@ -22,6 +22,8 @@ import {
   actionButtonLabel,
   type ConfidenceChoice,
 } from "../../components/trainer/index.js";
+import { ExplainControls } from "../../components/explain/ExplainControls.js";
+import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
@@ -70,6 +72,8 @@ function Feedback({ state, prompt, interactive, onNext, onExplain }: DecisionAre
         rangeView={<FeedbackRangeView feedback={feedback} />}
         thresholdCard={<FeedbackThreshold feedback={feedback} />}
         roller={context.rng ? <FeedbackRoller feedback={feedback} actions={prompt.buttons} onExplain={onExplain} /> : undefined}
+        insights={<FeedbackInsights feedback={feedback} />}
+        explain={<ExplainControls feedback={feedback} />}
       />
       <Button variant="primary" size="lg" aria-keyshortcuts={NEXT_HAND_KEY} disabled={!interactive} onClick={onNext} className="self-start">
         <kbd aria-hidden="true" className="font-mono text-xs">
