@@ -83,18 +83,29 @@ export const fixtureStudyNode: StudyNode = {
   hands: HAND_GRID.map((cell) => fixtureHandRow(cell.hand, cell.row, cell.col)),
   noise_flags: [],
   next_likely_line: "r250",
+  next_likely_node_key: "cfg_6_online_100/BB-BTN/r250",
+  synthetic: true,
 };
 
+// The insight shapes S23 pinned from solver-query's InsightsResponse; invented numbers.
 export const fixtureInsights: StudyInsights = {
   threshold_card: {
-    raise: { weakest_hand: "K9o", frequency: 0.52 },
-    fold: { strongest_hand: "Q8o", frequency: 0.61 },
-    hero: { hand: "AJo", position: "above the raise threshold" },
+    actions: [
+      { index: 0, token: "f", share_taking: 0.48, weakest_hand_taking_half: null },
+      { index: 2, token: "r250", share_taking: 0.52, weakest_hand_taking_half: "K9o" },
+    ],
+    hand_position: {
+      hand: "AJo",
+      equity_vs_villain: 0.61,
+      rank_in_range: 0.18,
+      relative: [{ index: 2, position: "above" }],
+    },
+    strongest_folding_hand: "Q8o",
   },
-  equity_distribution: {},
-  range_advantage: {},
-  nut_advantage: {},
-  blockers: {},
+  equity_distribution: { bin_edges: [0, 0.5, 1], ip: [0.4, 0.6], oop: [0.55, 0.45] },
+  range_advantage: { ip_mean_equity: 0.52, oop_mean_equity: 0.48, to_act_advantage_pct_points: 4 },
+  nut_advantage: { ip_share: 0.12, oop_share: 0.08, threshold_equity: 0.8, to_act_advantage: 0.04 },
+  blockers: { hand: "AJo", top_blocked: [{ hand: "AA", reach_removed: 0.5 }], villain_combos_removed: 6, villain_reach_removed_share: 0.03 },
   hand_role: "value",
   noise_flags: ["close_ev_mix"],
 };
@@ -115,6 +126,9 @@ export const fixturePrompt: TrainerPrompt = {
   ],
   buttons: [...fixtureActions],
   visible_panels: ["hero_range_matrix", "action_frequency_table", "threshold_card"],
+  street: "preflop",
+  rng_roll: null,
+  previous_board: null,
 };
 
 export const fixtureFeedback: DecisionFeedback = {

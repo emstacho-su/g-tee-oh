@@ -12,15 +12,10 @@ import { mutatingHeadersSchema } from "../http/headers.js";
 import { notImplemented, plannedDescription } from "../http/not-implemented.js";
 import { AUTHENTICATED, PLANNED_MUTATE_PROBLEMS, PLANNED_READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
-import { emptyBodySchema, sessionParamsSchema } from "../schemas/common.js";
 import {
   askBodySchema,
   askResultSchema,
   attemptParamsSchema,
-  builderSettingsPatchSchema,
-  builderSettingsSchema,
-  builderStatusSchema,
-  eventStreamSchema,
   heatmapSchema,
   holdoutSchema,
   leaksQuerySchema,
@@ -30,34 +25,16 @@ import {
   streakSchema,
   tracksSchema,
 } from "../schemas/insights.js";
+import { turnRootsQuerySchema, turnRootsSchema } from "../schemas/study.js";
 import {
-  coverageQuerySchema,
-  coverageRequestBodySchema,
-  coverageRequestResultSchema,
-  coverageSchema,
-  studyInsightsQuerySchema,
-  studyInsightsSchema,
-  studyNodeQuerySchema,
-  studyNodeSchema,
-  turnRootsQuerySchema,
-  turnRootsSchema,
-} from "../schemas/study.js";
-import {
-  decisionBodySchema,
-  feedbackSchema,
   predictionAnswerBodySchema,
   predictionParamsSchema,
   predictionPromptSchema,
   predictionResultSchema,
-  promptSchema,
   rangePaintBodySchema,
   rangePaintResultSchema,
-  recapSchema,
-  sessionCreateBodySchema,
-  sessionSchema,
 } from "../schemas/training.js";
 
-const S23 = "S23";
 const S27 = "S27";
 const S31 = "S31";
 const V1_5 = "a v1.5 session (O-15)";
@@ -78,36 +55,6 @@ export interface PlannedRoute {
   /** The success body's media type when it is not JSON (the event stream). */
   successContentType?: string;
 }
-
-/**
- * S23's routes until each lane builds them (scaffold only): the lane route files register these
- * through registerPlannedRoutes, and the S23 integration step deletes this table.
- */
-export const S23_STUBS = {
-  study: [
-    { method: "GET", url: "/study/node", owner: S23, tag: "study", summary: "One preflop node from the library", successStatus: 200, success: studyNodeSchema, querystring: studyNodeQuerySchema },
-    { method: "GET", url: "/study/insights", owner: S23, tag: "study", summary: "Insight data for a hand at a node", successStatus: 200, success: studyInsightsSchema, querystring: studyInsightsQuerySchema },
-  ],
-  coverage: [
-    { method: "GET", url: "/coverage", owner: S23, tag: "coverage", summary: "What the library holds for a configuration and pair", successStatus: 200, success: coverageSchema, querystring: coverageQuerySchema },
-    { method: "POST", url: "/coverage/requests", owner: S23, tag: "coverage", summary: "Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)", successStatus: 202, success: coverageRequestResultSchema, body: coverageRequestBodySchema },
-  ],
-  sessions: [
-    { method: "POST", url: "/sessions", owner: S23, tag: "sessions", summary: "Start a practice session", successStatus: 201, success: sessionSchema, body: sessionCreateBodySchema },
-    { method: "GET", url: "/sessions/:id/next", owner: S23, tag: "sessions", summary: "The next prompt: table state and the buttons from the tree", successStatus: 200, success: promptSchema, params: sessionParamsSchema },
-    { method: "POST", url: "/sessions/:id/decisions", owner: S23, tag: "sessions", summary: "Submit a decision and receive its feedback; a double submission is graded once", successStatus: 200, success: feedbackSchema, params: sessionParamsSchema, body: decisionBodySchema },
-    { method: "POST", url: "/sessions/:id/end", owner: S23, tag: "sessions", summary: "End a session and receive its recap", successStatus: 200, success: recapSchema, params: sessionParamsSchema, body: emptyBodySchema },
-  ],
-  events: [
-    { method: "GET", url: "/events", owner: S23, tag: "events", summary: "Server-sent events: coverage_added, builder_state, session nudges", successStatus: 200, success: eventStreamSchema, successContentType: "text/event-stream" },
-  ],
-  admin: [
-    { method: "GET", url: "/admin/builder", owner: S23, tag: "admin", summary: "Builder queue, throughput, storage and settings", successStatus: 200, success: builderStatusSchema },
-    { method: "PATCH", url: "/admin/builder/settings", owner: S23, tag: "admin", summary: "Change builder settings", successStatus: 200, success: builderSettingsSchema, body: builderSettingsPatchSchema },
-    { method: "POST", url: "/admin/builder/pause", owner: S23, tag: "admin", summary: "Pause the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
-    { method: "POST", url: "/admin/builder/resume", owner: S23, tag: "admin", summary: "Resume the builder", successStatus: 200, success: builderStatusSchema, body: emptyBodySchema },
-  ],
-} satisfies Record<string, readonly PlannedRoute[]>;
 
 export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "GET", url: "/study/turn-roots", owner: V1_5, tag: "study", summary: "Every turn root at a flop node", successStatus: 200, success: turnRootsSchema, querystring: turnRootsQuerySchema },

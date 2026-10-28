@@ -11,12 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Builder queue, throughput, storage and settings
-         * @description Builder queue, throughput, storage and settings
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Builder queue, throughput, storage and settings */
         get: {
             parameters: {
                 query?: never;
@@ -35,15 +30,6 @@ export interface paths {
                         "application/json": components["schemas"]["BuilderStatus"];
                     };
                 };
-                /** @description Problem (400) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
                 /** @description Problem (401) */
                 401: {
                     headers: {
@@ -53,8 +39,8 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (404) */
-                404: {
+                /** @description Problem (403) */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -73,15 +59,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -108,12 +85,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Pause the builder
-         * @description Pause the builder
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Pause the builder */
         post: {
             parameters: {
                 query?: never;
@@ -128,7 +100,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, never> | null;
                 };
             };
             responses: {
@@ -161,15 +133,6 @@ export interface paths {
                 };
                 /** @description Problem (403) */
                 403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -224,15 +187,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -257,12 +211,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Resume the builder
-         * @description Resume the builder
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Resume the builder */
         post: {
             parameters: {
                 query?: never;
@@ -277,7 +226,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, never> | null;
                 };
             };
             responses: {
@@ -310,15 +259,6 @@ export interface paths {
                 };
                 /** @description Problem (403) */
                 403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (404) */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -373,15 +313,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -410,12 +341,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /**
-         * Change builder settings
-         * @description Change builder settings
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Change builder settings; returns every stored override */
         patch: {
             parameters: {
                 query?: never;
@@ -430,9 +356,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BuilderSettingsPatchInput"];
                 };
             };
             responses: {
@@ -443,6 +367,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            /** @description The stored overrides; an absent key means the builder's default (O-188) */
                             settings: {
                                 [key: string]: unknown;
                             };
@@ -476,15 +401,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (404) */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
                 /** @description Problem (409) */
                 409: {
                     headers: {
@@ -532,15 +448,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -912,12 +819,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * What the library holds for a configuration and pair
-         * @description What the library holds for a configuration and pair
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** What the library holds for a configuration and pair */
         get: {
             parameters: {
                 query: {
@@ -986,8 +888,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1014,12 +925,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)
-         * @description Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018) */
         post: {
             parameters: {
                 query?: never;
@@ -1151,8 +1057,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1938,12 +1853,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Server-sent events: coverage_added, builder_state, session nudges
-         * @description Server-sent events: coverage_added, builder_state, session nudges
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Server-sent events: coverage_added and builder_state, and build_progress for admins */
         get: {
             parameters: {
                 query?: never;
@@ -1953,7 +1863,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Server-sent events: coverage_added, builder_state, session nudges */
+                /** @description The event stream */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1980,15 +1890,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (404) */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -2000,15 +1901,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3445,9 +3337,7 @@ export interface paths {
         put?: never;
         /**
          * Start a practice session
-         * @description Start a practice session
-         *
-         *     Answers 501 until S23 builds it (O-38).
+         * @description Drill mode in S23; automated and holdout answer 501 until S31, prediction and range_paint until S27 (O-249).
          */
         post: {
             parameters: {
@@ -3471,6 +3361,8 @@ export interface paths {
                         drill_id?: string;
                         /** @enum {string} */
                         mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
+                        /** @description The session seed; the same seed and choices replay the same session (O-249). Random when absent */
+                        seed?: string;
                         settings?: {
                             /** @enum {string} */
                             grouping?: "standard" | "grouped" | "simple";
@@ -3616,6 +3508,24 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -3633,12 +3543,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Submit a decision and receive its feedback; a double submission is graded once
-         * @description Submit a decision and receive its feedback; a double submission is graded once
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Submit a decision and receive its feedback; a double submission is graded once */
         post: {
             parameters: {
                 query?: never;
@@ -3766,8 +3671,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3792,12 +3706,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * End a session and receive its recap
-         * @description End a session and receive its recap
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** End a session and receive its recap */
         post: {
             parameters: {
                 query?: never;
@@ -3814,7 +3723,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, never> | null;
                 };
             };
             responses: {
@@ -3917,15 +3826,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
             };
         };
         delete?: never;
@@ -3943,9 +3843,7 @@ export interface paths {
         };
         /**
          * The next prompt: table state and the buttons from the tree
-         * @description The next prompt: table state and the buttons from the tree
-         *
-         *     Answers 501 until S23 builds it (O-38).
+         * @description Derived from the session state on every call; writes nothing, so a repeat answers the same prompt.
          */
         get: {
             parameters: {
@@ -3994,6 +3892,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -4012,8 +3919,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4120,12 +4036,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Insight data for a hand at a node
-         * @description Insight data for a hand at a node
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** Insight data for a hand at a node */
         get: {
             parameters: {
                 query: {
@@ -4195,8 +4106,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4221,12 +4141,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * One preflop node from the library
-         * @description One preflop node from the library
-         *
-         *     Answers 501 until S23 builds it (O-38).
-         */
+        /** One preflop node from the library */
         get: {
             parameters: {
                 query: {
@@ -4238,6 +4153,8 @@ export interface paths {
                     hand?: string;
                     /** @description The preflop action path; the pair's root when absent */
                     line?: string;
+                    /** @description A node key solver-query handed out (a next_likely_node_key); excludes line (O-245) */
+                    node_key?: string;
                     /** @description Two positions, out of position first, for example BB-BTN */
                     pair: string;
                 };
@@ -4301,8 +4218,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4436,45 +4362,142 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Blockers: {
+            hand: string;
+            top_blocked: {
+                hand: string;
+                reach_removed: number;
+            }[];
+            villain_combos_removed: number;
+            villain_reach_removed_share: number;
+        };
+        BlockersInput: {
+            hand: string;
+            top_blocked: {
+                hand: string;
+                reach_removed: number;
+            }[];
+            villain_combos_removed: number;
+            villain_reach_removed_share: number;
+        };
+        BuilderSettingsPatch: {
+            budget_bytes?: number;
+            bytes_per_flop_tree?: number;
+            bytes_per_runout?: number;
+            /** @description A share of the solve threads, above 0 and at most 1 */
+            cpu_share?: number;
+            k_frequent_pairs?: number;
+            k_runouts?: number;
+            k_runouts_rare?: number;
+            max_attempts?: number;
+            max_iterations?: number;
+            max_seconds_per_line?: number;
+            memory_cap_bytes?: number;
+            overnight?: {
+                /** @description A share of the solve threads, above 0 and at most 1 */
+                cpu_share: number;
+                end_hour: number;
+                start_hour: number;
+                utc_offset_minutes: number;
+            };
+            paused?: boolean;
+            /** @description Configuration ids the planner enumerates; [] turns planning off */
+            plan_configs?: string[];
+            plan_interval_minutes?: number;
+            poll_seconds?: number;
+            stale_hours?: number;
+            /** @enum {number} */
+            storage_bits?: 16 | 32;
+            target_pct_pot?: number;
+            verify_interval_hours?: number;
+        };
+        BuilderSettingsPatchInput: {
+            budget_bytes?: number;
+            bytes_per_flop_tree?: number;
+            bytes_per_runout?: number;
+            /** @description A share of the solve threads, above 0 and at most 1 */
+            cpu_share?: number;
+            k_frequent_pairs?: number;
+            k_runouts?: number;
+            k_runouts_rare?: number;
+            max_attempts?: number;
+            max_iterations?: number;
+            max_seconds_per_line?: number;
+            memory_cap_bytes?: number;
+            overnight?: {
+                /** @description A share of the solve threads, above 0 and at most 1 */
+                cpu_share: number;
+                end_hour: number;
+                start_hour: number;
+                utc_offset_minutes: number;
+            };
+            paused?: boolean;
+            /** @description Configuration ids the planner enumerates; [] turns planning off */
+            plan_configs?: string[];
+            plan_interval_minutes?: number;
+            poll_seconds?: number;
+            stale_hours?: number;
+            /** @enum {number} */
+            storage_bits?: 16 | 32;
+            target_pct_pot?: number;
+            verify_interval_hours?: number;
+        };
         BuilderStatus: {
             queue: {
+                blocked_budget: number;
                 failed: number;
                 queued: number;
                 running: number;
             };
             reason: string | null;
+            /** @description The stored overrides; an absent key means the builder's default (O-188) */
             settings: {
                 [key: string]: unknown;
             };
-            /** @enum {string} */
-            state: "running" | "paused" | "throttled";
+            /**
+             * @description paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)
+             * @enum {string}
+             */
+            state: "running" | "paused" | "throttled" | "idle" | "unknown";
             storage: {
                 library_bytes: number;
                 reference_bytes: number;
             };
+            /** @description Builds done in the last 24 hours, divided by 24 */
             throughput_per_hour: number;
         };
         BuilderStatusInput: {
             queue: {
+                blocked_budget: number;
                 failed: number;
                 queued: number;
                 running: number;
             };
             reason: string | null;
+            /** @description The stored overrides; an absent key means the builder's default (O-188) */
             settings: {
                 [key: string]: unknown;
             };
-            /** @enum {string} */
-            state: "running" | "paused" | "throttled";
+            /**
+             * @description paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)
+             * @enum {string}
+             */
+            state: "running" | "paused" | "throttled" | "idle" | "unknown";
             storage: {
                 library_bytes: number;
                 reference_bytes: number;
             };
+            /** @description Builds done in the last 24 hours, divided by 24 */
             throughput_per_hour: number;
         };
         Coverage: {
             /** @description A game_config identifier, for example cfg_9_live_13_150 */
             config_id: string;
+            /**
+             * @description Whether solver-query's database answered; flops and queue are empty unless connected (O-172)
+             * @enum {string}
+             */
+            database: "connected" | "unconfigured" | "unavailable";
             flops: {
                 flop: string;
                 scenarios: number;
@@ -4490,10 +4513,17 @@ export interface components {
                 position: number;
                 priority: number;
             }[];
+            /** @description True when a held preflop solution is synthetic test data (O-229, O-57) */
+            synthetic: boolean;
         };
         CoverageInput: {
             /** @description A game_config identifier, for example cfg_9_live_13_150 */
             config_id: string;
+            /**
+             * @description Whether solver-query's database answered; flops and queue are empty unless connected (O-172)
+             * @enum {string}
+             */
+            database: "connected" | "unconfigured" | "unavailable";
             flops: {
                 flop: string;
                 scenarios: number;
@@ -4509,6 +4539,8 @@ export interface components {
                 position: number;
                 priority: number;
             }[];
+            /** @description True when a held preflop solution is synthetic test data (O-229, O-57) */
+            synthetic: boolean;
         };
         DecisionFeedback: {
             /** Format: uuid */
@@ -4602,6 +4634,16 @@ export interface components {
             tags?: string[];
             trainer?: components["schemas"]["TrainerSettingsInput"];
         };
+        EquityDistribution: {
+            bin_edges: number[];
+            ip: number[];
+            oop: number[];
+        };
+        EquityDistributionInput: {
+            bin_edges: number[];
+            ip: number[];
+            oop: number[];
+        };
         GameConfig: {
             /** @description Ante in centi-big-blinds; stored but not served in v1 (O-33) */
             ante_cbb: number;
@@ -4665,6 +4707,18 @@ export interface components {
             loss_pct_pot: number[];
             reach: number[] | null;
             strategy: number[];
+        };
+        NutAdvantage: {
+            ip_share: number;
+            oop_share: number;
+            threshold_equity: number;
+            to_act_advantage: number;
+        };
+        NutAdvantageInput: {
+            ip_share: number;
+            oop_share: number;
+            threshold_equity: number;
+            to_act_advantage: number;
         };
         PositionPairEntry: {
             /** @enum {string} */
@@ -4751,6 +4805,16 @@ export interface components {
             title: string;
             /** @description A URN naming the problem, urn:g-tee-oh:problem:<slug> */
             type: string;
+        };
+        RangeAdvantage: {
+            ip_mean_equity: number;
+            oop_mean_equity: number;
+            to_act_advantage_pct_points: number;
+        };
+        RangeAdvantageInput: {
+            ip_mean_equity: number;
+            oop_mean_equity: number;
+            to_act_advantage_pct_points: number;
         };
         SessionInfo: {
             /** @description Send as x-csrf-token on every mutating request (O-230) */
@@ -5064,45 +5128,25 @@ export interface components {
             /** @description Rake in basis points: 1000 is 10 percent */
             rake_percent_bp: number;
         };
-        /** @description solver-query's InsightsResponse relayed as is; S23 pins the inner shapes */
+        /** @description solver-query's InsightsResponse relayed as is; a part it cannot answer at the node is null */
         StudyInsights: {
-            blockers: {
-                [key: string]: unknown;
-            };
-            equity_distribution: {
-                [key: string]: unknown;
-            };
-            hand_role: string;
+            blockers: components["schemas"]["Blockers"];
+            equity_distribution: components["schemas"]["EquityDistribution"] | null;
+            hand_role: ("value" | "marginal" | "bluff" | "fold" | "trap") | null;
             noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
-            nut_advantage: {
-                [key: string]: unknown;
-            };
-            range_advantage: {
-                [key: string]: unknown;
-            };
-            threshold_card: {
-                [key: string]: unknown;
-            };
+            nut_advantage: components["schemas"]["NutAdvantage"] | null;
+            range_advantage: components["schemas"]["RangeAdvantage"] | null;
+            threshold_card: components["schemas"]["ThresholdCard"] | null;
         };
-        /** @description solver-query's InsightsResponse relayed as is; S23 pins the inner shapes */
+        /** @description solver-query's InsightsResponse relayed as is; a part it cannot answer at the node is null */
         StudyInsightsInput: {
-            blockers: {
-                [key: string]: unknown;
-            };
-            equity_distribution: {
-                [key: string]: unknown;
-            };
-            hand_role: string;
+            blockers: components["schemas"]["BlockersInput"];
+            equity_distribution: components["schemas"]["EquityDistributionInput"] | null;
+            hand_role: ("value" | "marginal" | "bluff" | "fold" | "trap") | null;
             noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
-            nut_advantage: {
-                [key: string]: unknown;
-            };
-            range_advantage: {
-                [key: string]: unknown;
-            };
-            threshold_card: {
-                [key: string]: unknown;
-            };
+            nut_advantage: components["schemas"]["NutAdvantageInput"] | null;
+            range_advantage: components["schemas"]["RangeAdvantageInput"] | null;
+            threshold_card: components["schemas"]["ThresholdCardInput"] | null;
         };
         StudyNode: {
             actions: components["schemas"]["NodeAction"][];
@@ -5112,6 +5156,8 @@ export interface components {
             hands: components["schemas"]["NodeHandRow"][];
             /** @description The line the api prefetched next (R3.3) */
             next_likely_line: string | null;
+            /** @description The node the api prefetched next; null when the likeliest action ends the solution (R3.3) */
+            next_likely_node_key: string | null;
             /** @description An opaque node key */
             node_key: string;
             noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
@@ -5124,6 +5170,8 @@ export interface components {
             stacks_cbb: number[];
             /** @enum {string} */
             street: "preflop" | "flop" | "turn" | "river";
+            /** @description True when the solution is synthetic test data (O-229, O-57) */
+            synthetic: boolean;
             /** @enum {string} */
             to_act: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
         };
@@ -5135,6 +5183,8 @@ export interface components {
             hands: components["schemas"]["NodeHandRowInput"][];
             /** @description The line the api prefetched next (R3.3) */
             next_likely_line: string | null;
+            /** @description The node the api prefetched next; null when the likeliest action ends the solution (R3.3) */
+            next_likely_node_key: string | null;
             /** @description An opaque node key */
             node_key: string;
             noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
@@ -5147,8 +5197,48 @@ export interface components {
             stacks_cbb: number[];
             /** @enum {string} */
             street: "preflop" | "flop" | "turn" | "river";
+            /** @description True when the solution is synthetic test data (O-229, O-57) */
+            synthetic: boolean;
             /** @enum {string} */
             to_act: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+        };
+        ThresholdCard: {
+            actions: {
+                index: number;
+                share_taking: number;
+                token: string;
+                weakest_hand_taking_half: string | null;
+            }[];
+            hand_position: {
+                equity_vs_villain: number;
+                hand: string;
+                rank_in_range: number;
+                relative: {
+                    index: number;
+                    /** @enum {string} */
+                    position: "above" | "at" | "below";
+                }[];
+            };
+            strongest_folding_hand: string | null;
+        };
+        ThresholdCardInput: {
+            actions: {
+                index: number;
+                share_taking: number;
+                token: string;
+                weakest_hand_taking_half: string | null;
+            }[];
+            hand_position: {
+                equity_vs_villain: number;
+                hand: string;
+                rank_in_range: number;
+                relative: {
+                    index: number;
+                    /** @enum {string} */
+                    position: "above" | "at" | "below";
+                }[];
+            };
+            strongest_folding_hand: string | null;
         };
         TrainerPrompt: {
             board: string[];
@@ -5164,12 +5254,21 @@ export interface components {
                 token: string;
             }[];
             pot_cbb: number;
+            /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
+            previous_board: string[] | null;
+            /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
+            rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
             stacks_cbb: number[];
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
             state_version: number;
+            /**
+             * @description The street of the node the hero acts at
+             * @enum {string}
+             */
+            street: "preflop" | "flop" | "turn" | "river";
             visible_panels: string[];
         };
         TrainerPromptInput: {
@@ -5186,12 +5285,21 @@ export interface components {
                 token: string;
             }[];
             pot_cbb: number;
+            /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
+            previous_board: string[] | null;
+            /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
+            rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
             stacks_cbb: number[];
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
             state_version: number;
+            /**
+             * @description The street of the node the hero acts at
+             * @enum {string}
+             */
+            street: "preflop" | "flop" | "turn" | "river";
             visible_panels: string[];
         };
         TrainerSettings: {

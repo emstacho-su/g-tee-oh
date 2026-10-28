@@ -10,7 +10,8 @@
 import { useId, type ReactNode } from "react";
 
 export interface ThresholdCardProps {
-  card: Record<string, unknown>;
+  /** Null when solver-query has no threshold card at the node (S23 pinned shape). */
+  card: Readonly<Record<string, unknown>> | null;
   heroHand?: string;
   title?: string;
 }
@@ -79,14 +80,14 @@ function renderRecord(record: Record<string, unknown>, depth: number, heroHand: 
 
 export function ThresholdCard({ card, heroHand, title = DEFAULT_TITLE }: ThresholdCardProps) {
   const titleId = useId();
-  const empty = Object.keys(card).length === 0;
+  const empty = card === null || Object.keys(card).length === 0;
   return (
     <section data-testid="threshold-card" aria-labelledby={titleId} className="flex flex-col gap-2 rounded-lg border border-border bg-surface-raised p-4 text-sm">
       <h3 id={titleId} className="font-semibold">
         {title}
       </h3>
       {heroHand === undefined ? null : <p>{`Your hand: ${heroHand}`}</p>}
-      {empty ? <p className="text-muted">No threshold data for this node</p> : renderRecord(card, 1, heroHand)}
+      {empty ? <p className="text-muted">No threshold data for this node</p> : renderRecord({ ...card }, 1, heroHand)}
     </section>
   );
 }
