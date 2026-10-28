@@ -10,7 +10,7 @@ import type { sessionCreateBodySchema } from "../schemas/training.js";
 
 declare module "fastify" {
   interface FastifyInstance {
-    /** The seed of a session created without a client seed (BuildAppOptions.newSessionSeed). */
+    /** The seed of an automated session created without a client seed (BuildAppOptions.newSessionSeed). */
     newSessionSeed: () => string;
   }
 }

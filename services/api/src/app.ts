@@ -109,9 +109,9 @@ export interface BuildAppOptions {
   /** Where the logger writes when `logger` is on; stdout when absent. Tests capture log lines with it. */
   logStream?: LogStream;
   /**
-   * The seed of a drill or automated session created without a client seed: 64 random bits
+   * The seed of an automated session created without a client seed: 64 random bits
    * (newSessionSeed) when absent. A test pins it to deal a known hand while the session stays
-   * unseeded, so rated eligible. Holdout sessions always draw their own (sessions/modes/holdout.ts).
+   * unseeded, so rated eligible. Other modes draw their own (sessions/modes/*).
    */
   newSessionSeed?: () => string;
 }
