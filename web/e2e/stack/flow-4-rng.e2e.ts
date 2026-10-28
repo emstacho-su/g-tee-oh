@@ -97,6 +97,9 @@ const CRITERIA = {
 } as const;
 
 const records: ShotRecord[] = [];
+/** The decision route's path, anchored at both ends. */
+const DECISION_PATH = /^\/api\/v1\/sessions\/[^/]+\/decisions$/;
+const DECISION_TIMEOUT_MS = 15_000;
 
 function isPath(response: Response, method: string, suffix: RegExp): boolean {
   return response.request().method() === method && suffix.test(new URL(response.url()).pathname);
@@ -161,7 +164,12 @@ async function playToMixedHand(page: Page, prompts: Map<number, TrainerPrompt>, 
     await expect(page.getByTestId("confidence-tap")).toBeVisible();
     await expect(page.getByTestId("feedback-panel")).toHaveCount(0);
     if (hand === 1) await shot("flow4-confidence", CRITERIA.tap);
-    const answer = page.waitForResponse((response) => isPath(response, "POST", /\/sessions\/[^/]+\/decisions$/));
+    // Exactly POST /api/v1/sessions/{id}/decisions; a missing answer fails with a named reason.
+    const answer = page
+      .waitForResponse((response) => isPath(response, "POST", DECISION_PATH), { timeout: DECISION_TIMEOUT_MS })
+      .catch((error: unknown) => {
+        throw new Error(`flow 4 hand ${hand}: no POST decisions response after the tap (${String(error)})`);
+      });
     await page.getByRole("button", { name: "Sure", exact: true }).click();
     const response = await answer;
     expect(response.status(), "POST decisions").toBe(HTTP_OK);
