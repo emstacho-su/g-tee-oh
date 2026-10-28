@@ -81,15 +81,15 @@ describe("R3.13 street and full-hand machine", () => {
     expect(transition(failed, { type: "retry" })).toEqual({ kind: "starting", key: "k", rng: false, trainer: STREET });
   });
 
-  it("R3.13 a hand with two hero decisions stays one hand; the next hand carries the ended hand", () => {
+  it("R3.13 a hand with two hero decisions stays one hand; the next hand starts a new one", () => {
     const first = run(started(STREET), { type: "prompt_loaded", prompt: FIRST, at: 0 });
-    expect(first).toMatchObject({ kind: "await_action", context: { hand: { handNo: 0, decision: 1, endedHand: null } } });
+    expect(first).toMatchObject({ kind: "await_action", context: { hand: { handNo: 0, ordinal: 1, decision: 1 } } });
     const second = run(decided(started(STREET), FIRST, BEST, 0), { type: "auto_continue" }, { type: "prompt_loaded", prompt: SECOND, at: 2_000 });
-    expect(second).toMatchObject({ kind: "await_action", context: { hand: { handNo: 0, decision: 2, endedHand: null } } });
+    expect(second).toMatchObject({ kind: "await_action", context: { hand: { handNo: 0, ordinal: 1, decision: 2 } } });
     const next = run(decided(second, SECOND, MISTAKE, 2_000), { type: "next" }, { type: "prompt_loaded", prompt: NEXT_HAND, at: 5_000 });
     expect(next).toMatchObject({
       kind: "await_action",
-      context: { hand: { handNo: 1, decision: 1, endedHand: { hand: NEXT_HAND.previous_hand, heroPosition: "BTN" } } },
+      context: { hand: { handNo: 1, ordinal: 2, decision: 1 } },
     });
   });
 

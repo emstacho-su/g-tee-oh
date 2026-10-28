@@ -21,7 +21,7 @@ import { capture, prepareShotPage, SHOT_TEST_TIMEOUT_MS, THEMES, VIEWPORTS, type
 import { submitLogin } from "../support/sign-in-flow.js";
 
 const OUT_DIR = shotDirectory();
-const SESSION = "S26";
+const SESSION = "S40";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 const FILTER_TAG = "synthetic";

@@ -25,7 +25,7 @@ import { capture, prepareShotPage, SHOT_TEST_TIMEOUT_MS, THEMES, VIEWPORTS, type
 import { submitLogin } from "../support/sign-in-flow.js";
 
 const OUT_DIR = shotDirectory();
-const SESSION = "S28";
+const SESSION = "S40";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 const LIBRARY_PATH = `/library?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000`;
