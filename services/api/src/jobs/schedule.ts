@@ -17,19 +17,30 @@ export interface JobSchedule {
   kind: string;
   /** The period current at `now`, in `timeZone` (APP_TIME_ZONE, O-247). Pure. */
   nextPeriod(now: Date, timeZone: string): JobPeriod;
+  /**
+   * True once the kind has nothing left to do, so no new period is scheduled (PR #27 review MEDIUM 9:
+   * the one-shot holdout draw). Absent means the kind recurs forever.
+   */
+  isComplete?(database: Database): Promise<boolean>;
 }
 
-/** Inserts each schedule's period current at `now`; an existing row is left as it is. */
+async function stillDue(database: Database, schedules: readonly JobSchedule[]): Promise<JobSchedule[]> {
+  const complete = await Promise.all(schedules.map((schedule) => schedule.isComplete?.(database) ?? Promise.resolve(false)));
+  return schedules.filter((_schedule, index) => complete[index] !== true);
+}
+
+/** Inserts each schedule's period current at `now` unless the kind is complete; an existing row is left as it is. */
 export async function ensureScheduled(
   database: Database,
   schedules: readonly JobSchedule[],
   now: Date,
   timeZone: string,
 ): Promise<void> {
-  if (schedules.length === 0) {
+  const due = await stillDue(database, schedules);
+  if (due.length === 0) {
     return;
   }
-  const rows = schedules.map((schedule) => {
+  const rows = due.map((schedule) => {
     const period = schedule.nextPeriod(now, timeZone);
     return { kind: schedule.kind, period_key: period.periodKey, run_at: period.runAt };
   });

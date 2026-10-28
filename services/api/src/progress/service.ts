@@ -11,7 +11,9 @@ import { z } from "zod";
 
 import { loadClassCatalog, type ClassCatalog } from "../automated/class-catalog.js";
 import type { Database } from "../db.js";
-import { holdoutItems, itemTotals, roundScores, roundsPage, summariesOf, type HoldoutRound } from "../holdout/repository.js";
+import { itemTotals, roundsPage, type HoldoutRound } from "../holdout/repository.js";
+import { roundScores } from "../holdout/results.js";
+import { summariesOf } from "../holdout/summaries.js";
 import { decodeCursor, paginate } from "../http/cursor.js";
 import { requireDatabase } from "../http/database.js";
 import type { PageQuery } from "../http/pagination.js";
@@ -158,14 +160,16 @@ export async function holdoutProgress(call: ProgressCall, query: PageQuery): Pro
   return { items, next_cursor: page.next_cursor, open: await openProgress(database, call.userId) };
 }
 
+/** The open round's answered (scored) items and the item count, from the per-track counts (PR #27 review LOW 15). */
 async function openProgress(database: Database, userId: string): Promise<Holdout["open"]> {
   const [latest] = await roundsPage(database, userId, 1, null);
   if (latest === undefined || latest.closedAt !== null) {
     return null;
   }
-  const scores = await roundScores(database, latest.id);
+  const [scores, totals] = await Promise.all([roundScores(database, latest.id), itemTotals(database)]);
   const answered = [...scores.values()].reduce((sum, score) => sum + score.answered, 0);
-  return { round_month: latest.month, answered, total: (await holdoutItems(database)).length };
+  const total = [...totals.values()].reduce((sum, track) => sum + track.total, 0);
+  return { round_month: latest.month, answered, total };
 }
 
 /** GET /progress/streak. */

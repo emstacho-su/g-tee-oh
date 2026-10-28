@@ -1,12 +1,13 @@
 /**
  * The monthly holdout round job (R4.13, O-276, O-277): on the 1st at 00:00 APP_TIME_ZONE it closes
  * every user's round of an earlier month that is still open, writing its per-track summaries with
- * the Goodhart flag (holdout/repository.ts closeRound), and opens that user's round of the new
+ * the Goodhart flag (holdout/summaries.ts closeRound), and opens that user's round of the new
  * month. A user's first holdout session of a month opens the round itself when the job has not
  * (sessions/modes/holdout.ts). Idempotent: a second run finds no open round of an earlier month,
  * and an existing round is never opened twice (unique user and month).
  */
-import { closeRound, openRound, openRoundsBefore } from "../holdout/repository.js";
+import { openRound, openRoundsBefore } from "../holdout/repository.js";
+import { closeRound } from "../holdout/summaries.js";
 import { localDay, monthOf, startOfDay } from "../streaks/calendar.js";
 import type { JobContext, JobDefinition } from "./registry.js";
 import type { JobPeriod } from "./schedule.js";
