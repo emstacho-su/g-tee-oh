@@ -73,45 +73,89 @@ Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and 
 
 Failures: none.
 
-## Solver surface colours (information for S38, not gating)
+## Solver surface colours (gating, O-389)
 
-Action colours (web/src/theme/action-style.ts) and the table felt against the grounds, at the 3:1 non-text guide. Every action also carries a pattern or a printed label (A7 section 4), so colour is never the only signal.
+Action colours and the bet and raise size shades (web/src/theme/action-style.ts), the theme felt and every cosmetic felt (styles.css) at 3:1 on the grounds the table and the matrix sit on (1.4.11), and the table's white text at 4.5:1 on every felt (1.4.3). Every action also carries a pattern or a printed label (A7 section 4), so colour is never the only signal.
 
-| Theme | Colour | Value | Ground | Ratio | At least 3:1 |
-|---|---|---|---|---|---|
-| light | Fold (action) | #60a5fa | surface | 2.15 | no |
-| light | Fold (action) | #60a5fa | surface-raised | 2.38 | no |
-| light | Check (action) | #4ade80 | surface | 1.47 | no |
-| light | Check (action) | #4ade80 | surface-raised | 1.63 | no |
-| light | Call (action) | #4ade80 | surface | 1.47 | no |
-| light | Call (action) | #4ade80 | surface-raised | 1.63 | no |
-| light | Limp (action) | #a3e635 | surface | 1.28 | no |
-| light | Limp (action) | #a3e635 | surface-raised | 1.41 | no |
-| light | Straddle (action) | #c084fc | surface | 2.23 | no |
-| light | Straddle (action) | #c084fc | surface-raised | 2.48 | no |
-| light | Bet (action) | #f87171 | surface | 2.34 | no |
-| light | Bet (action) | #f87171 | surface-raised | 2.59 | no |
-| light | Raise (action) | #f87171 | surface | 2.34 | no |
-| light | Raise (action) | #f87171 | surface-raised | 2.59 | no |
-| light | All-in (action) | #7f1d1d | surface | 8.47 | yes |
-| light | All-in (action) | #7f1d1d | surface-raised | 9.39 | yes |
-| light | felt | #166534 | surface | 6.03 | yes |
-| light | felt | #166534 | surface-raised | 6.68 | yes |
-| dark | Fold (action) | #3b82f6 | surface | 4.99 | yes |
-| dark | Fold (action) | #3b82f6 | surface-raised | 4.57 | yes |
-| dark | Check (action) | #22c55e | surface | 8.06 | yes |
-| dark | Check (action) | #22c55e | surface-raised | 7.37 | yes |
-| dark | Call (action) | #22c55e | surface | 8.06 | yes |
-| dark | Call (action) | #22c55e | surface-raised | 7.37 | yes |
-| dark | Limp (action) | #84cc16 | surface | 9.30 | yes |
-| dark | Limp (action) | #84cc16 | surface-raised | 8.50 | yes |
-| dark | Straddle (action) | #a855f7 | surface | 4.64 | yes |
-| dark | Straddle (action) | #a855f7 | surface-raised | 4.24 | yes |
-| dark | Bet (action) | #ef4444 | surface | 4.88 | yes |
-| dark | Bet (action) | #ef4444 | surface-raised | 4.46 | yes |
-| dark | Raise (action) | #ef4444 | surface | 4.88 | yes |
-| dark | Raise (action) | #ef4444 | surface-raised | 4.46 | yes |
-| dark | All-in (action) | #991b1b | surface | 2.21 | no |
-| dark | All-in (action) | #991b1b | surface-raised | 2.02 | no |
-| dark | felt | #14532d | surface | 2.02 | no |
-| dark | felt | #14532d | surface-raised | 1.84 | no |
+| Theme | Colour | Value | Ground | Ratio | Minimum | Result |
+|---|---|---|---|---|---|---|
+| light | Fold (action) | #2563eb | surface | 4.37 | 3 | pass |
+| light | Fold (action) | #2563eb | surface-raised | 4.84 | 3 | pass |
+| light | Check (action) | #15803d | surface | 4.24 | 3 | pass |
+| light | Check (action) | #15803d | surface-raised | 4.70 | 3 | pass |
+| light | Call (action) | #15803d | surface | 4.24 | 3 | pass |
+| light | Call (action) | #15803d | surface-raised | 4.70 | 3 | pass |
+| light | Limp (action) | #4d7c0f | surface | 4.22 | 3 | pass |
+| light | Limp (action) | #4d7c0f | surface-raised | 4.68 | 3 | pass |
+| light | Straddle (action) | #6d28d9 | surface | 6.01 | 3 | pass |
+| light | Straddle (action) | #6d28d9 | surface-raised | 6.66 | 3 | pass |
+| light | Bet (action) | #dc2626 | surface | 4.08 | 3 | pass |
+| light | Bet (action) | #dc2626 | surface-raised | 4.52 | 3 | pass |
+| light | Raise (action) | #dc2626 | surface | 4.08 | 3 | pass |
+| light | Raise (action) | #dc2626 | surface-raised | 4.52 | 3 | pass |
+| light | All-in (action) | #86198f | surface | 6.97 | 3 | pass |
+| light | All-in (action) | #86198f | surface-raised | 7.72 | 3 | pass |
+| light | raise and bet size shade 1 | #dc2626 | surface | 4.08 | 3 | pass |
+| light | raise and bet size shade 1 | #dc2626 | surface-raised | 4.52 | 3 | pass |
+| light | raise and bet size shade 2 | #b91c1c | surface | 5.47 | 3 | pass |
+| light | raise and bet size shade 2 | #b91c1c | surface-raised | 6.06 | 3 | pass |
+| light | raise and bet size shade 3 | #991b1b | surface | 7.03 | 3 | pass |
+| light | raise and bet size shade 3 | #991b1b | surface-raised | 7.79 | 3 | pass |
+| light | raise and bet size shade 4 | #7f1d1d | surface | 8.47 | 3 | pass |
+| light | raise and bet size shade 4 | #7f1d1d | surface-raised | 9.39 | 3 | pass |
+| light | felt | #166534 | surface | 6.03 | 3 | pass |
+| light | felt | #166534 | surface-raised | 6.68 | 3 | pass |
+| light | felt none | #166534 | surface | 6.03 | 3 | pass |
+| light | felt none | #166534 | surface-raised | 6.68 | 3 | pass |
+| light | felt felt-tier-III | #1e40af | surface | 7.38 | 3 | pass |
+| light | felt felt-tier-III | #1e40af | surface-raised | 8.17 | 3 | pass |
+| light | felt felt-tier-V | #9f1239 | surface | 6.78 | 3 | pass |
+| light | felt felt-tier-V | #9f1239 | surface-raised | 7.51 | 3 | pass |
+| light | felt felt-tier-VII | #5b21b6 | surface | 7.60 | 3 | pass |
+| light | felt felt-tier-VII | #5b21b6 | surface-raised | 8.42 | 3 | pass |
+| light | table ink | #ffffff | felt #166534 | 7.13 | 4.5 | pass |
+| light | table ink | #ffffff | felt none #166534 | 7.13 | 4.5 | pass |
+| light | table ink | #ffffff | felt felt-tier-III #1e40af | 8.72 | 4.5 | pass |
+| light | table ink | #ffffff | felt felt-tier-V #9f1239 | 8.02 | 4.5 | pass |
+| light | table ink | #ffffff | felt felt-tier-VII #5b21b6 | 8.98 | 4.5 | pass |
+| dark | Fold (action) | #3b82f6 | surface | 4.99 | 3 | pass |
+| dark | Fold (action) | #3b82f6 | surface-raised | 4.57 | 3 | pass |
+| dark | Check (action) | #22c55e | surface | 8.06 | 3 | pass |
+| dark | Check (action) | #22c55e | surface-raised | 7.37 | 3 | pass |
+| dark | Call (action) | #22c55e | surface | 8.06 | 3 | pass |
+| dark | Call (action) | #22c55e | surface-raised | 7.37 | 3 | pass |
+| dark | Limp (action) | #84cc16 | surface | 9.30 | 3 | pass |
+| dark | Limp (action) | #84cc16 | surface-raised | 8.50 | 3 | pass |
+| dark | Straddle (action) | #a78bfa | surface | 6.75 | 3 | pass |
+| dark | Straddle (action) | #a78bfa | surface-raised | 6.17 | 3 | pass |
+| dark | Bet (action) | #ef4444 | surface | 4.88 | 3 | pass |
+| dark | Bet (action) | #ef4444 | surface-raised | 4.46 | 3 | pass |
+| dark | Raise (action) | #ef4444 | surface | 4.88 | 3 | pass |
+| dark | Raise (action) | #ef4444 | surface-raised | 4.46 | 3 | pass |
+| dark | All-in (action) | #e879f9 | surface | 7.46 | 3 | pass |
+| dark | All-in (action) | #e879f9 | surface-raised | 6.83 | 3 | pass |
+| dark | raise and bet size shade 1 | #ef4444 | surface | 4.88 | 3 | pass |
+| dark | raise and bet size shade 1 | #ef4444 | surface-raised | 4.46 | 3 | pass |
+| dark | raise and bet size shade 2 | #f87171 | surface | 6.64 | 3 | pass |
+| dark | raise and bet size shade 2 | #f87171 | surface-raised | 6.07 | 3 | pass |
+| dark | raise and bet size shade 3 | #fca5a5 | surface | 9.68 | 3 | pass |
+| dark | raise and bet size shade 3 | #fca5a5 | surface-raised | 8.85 | 3 | pass |
+| dark | raise and bet size shade 4 | #fecaca | surface | 12.70 | 3 | pass |
+| dark | raise and bet size shade 4 | #fecaca | surface-raised | 11.61 | 3 | pass |
+| dark | felt | #15803d | surface | 3.66 | 3 | pass |
+| dark | felt | #15803d | surface-raised | 3.35 | 3 | pass |
+| dark | felt none | #15803d | surface | 3.66 | 3 | pass |
+| dark | felt none | #15803d | surface-raised | 3.35 | 3 | pass |
+| dark | felt felt-tier-III | #2563eb | surface | 3.55 | 3 | pass |
+| dark | felt felt-tier-III | #2563eb | surface-raised | 3.25 | 3 | pass |
+| dark | felt felt-tier-V | #e11d48 | surface | 3.91 | 3 | pass |
+| dark | felt felt-tier-V | #e11d48 | surface-raised | 3.58 | 3 | pass |
+| dark | felt felt-tier-VII | #8244f0 | surface | 3.53 | 3 | pass |
+| dark | felt felt-tier-VII | #8244f0 | surface-raised | 3.23 | 3 | pass |
+| dark | table ink | #ffffff | felt #15803d | 5.02 | 4.5 | pass |
+| dark | table ink | #ffffff | felt none #15803d | 5.02 | 4.5 | pass |
+| dark | table ink | #ffffff | felt felt-tier-III #2563eb | 5.17 | 4.5 | pass |
+| dark | table ink | #ffffff | felt felt-tier-V #e11d48 | 4.70 | 4.5 | pass |
+| dark | table ink | #ffffff | felt felt-tier-VII #8244f0 | 5.21 | 4.5 | pass |
+
+Solver failures: none.
