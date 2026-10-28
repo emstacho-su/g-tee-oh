@@ -8,9 +8,17 @@ import { createMockSessionRoute, mockSessionRoute } from "../../e2e/support/mock
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
 import {
   FIXTURE_DRILL_ID,
+  FIXTURE_FULL_HAND_DRILL_ID,
+  FIXTURE_PART_COVERED_DRILL_ID,
   FIXTURE_SEED,
+  FIXTURE_STREET_DRILL_ID,
   FIXTURE_UNCOVERED_DRILL_ID,
   fixtureDrill,
+  fixtureFullCoverage,
+  fixtureFullHandDrill,
+  fixturePartCoverage,
+  fixtureStreetDrill,
+  fixtureStreetHands,
   fixtureTrainerHands,
 } from "../../src/fixtures/trainer.js";
 
@@ -150,5 +158,89 @@ describe("R3.13 mocked session routes", () => {
     expect(next(api, id).status).toBe(409);
     expect(decide(api, id, { state_version: version + 1, action_index: 0, response_ms: 1 }).status).toBe(409);
     expect(api.handle(request("POST", "/api/v1/sessions/unknown/end", { headers: SIGNED, body: {} })).status).toBe(404);
+  });
+});
+
+interface HandPrompt extends PromptBody {
+  hand_no: number;
+  history: { position: string; token: string; label: string }[];
+  previous_hand: { hand_no: number; history: { position: string; label: string }[]; board: string[]; end: string } | null;
+}
+
+function startDrill(api: MockApi, drillId: string) {
+  return api.handle(request("POST", "/api/v1/sessions", { headers: SIGNED, body: { mode: "drill", drill_id: drillId } }));
+}
+
+function play(api: MockApi, id: string, actionIndex: number): HandPrompt {
+  const version = (next(api, id).body as HandPrompt).state_version;
+  expect(decide(api, id, { state_version: version, action_index: actionIndex, response_ms: 1 }).status).toBe(200);
+  return next(api, id).body as HandPrompt;
+}
+
+const RAISE = 2;
+const FOLD = 0;
+const CALL = 1;
+
+describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)", () => {
+  it("R3.14 POST /sessions answers coverage: full for the fixture drill, part for the partly covered drill (O-312)", () => {
+    const api = signedInApi();
+    expect(startDrill(api, FIXTURE_DRILL_ID).body).toMatchObject({ drill_id: FIXTURE_DRILL_ID, coverage: fixtureFullCoverage });
+    expect(startDrill(api, FIXTURE_PART_COVERED_DRILL_ID).body).toMatchObject({ coverage: fixturePartCoverage });
+  });
+
+  it("R3.14 the uncovered drill's 422 names the queued count in its detail", () => {
+    const refused = startDrill(signedInApi(), FIXTURE_UNCOVERED_DRILL_ID);
+    expect(refused.status).toBe(422);
+    expect((refused.body as { detail: string }).detail).toMatch(/1 of its 1 spots were queued for the builder/);
+  });
+
+  it("R3.13 drillOf supplies drills from another mocked route; the fixtures stay the fallback", () => {
+    const custom = { ...fixtureStreetDrill, id: "custom-drill" };
+    const api = createMockApi({ routes: [createMockSessionRoute({ drillOf: (id) => (id === custom.id ? custom : undefined) })] });
+    api.handle(request("POST", "/api/v1/auth/login", { body: { email: FIXTURE_USER_EMAIL, password: "x" } }));
+    expect(api.handle(request("GET", "/api/v1/drills/custom-drill")).body).toEqual(custom);
+    const started = startDrill(api, custom.id);
+    expect(started.status).toBe(201);
+    expect(started.body).toMatchObject({ drill_id: custom.id });
+    expect(startDrill(api, FIXTURE_DRILL_ID).status).toBe(201);
+    expect(api.handle(request("GET", `/api/v1/drills/${FIXTURE_FULL_HAND_DRILL_ID}`)).body).toEqual(fixtureFullHandDrill);
+  });
+
+  it("R3.13 street mode: two hero decisions in one hand, the opponents' answer between them, then previous_hand", () => {
+    const api = signedInApi();
+    const id = (startDrill(api, FIXTURE_STREET_DRILL_ID).body as { session_id: string }).session_id;
+    const first = next(api, id).body as HandPrompt;
+    expect(first).toMatchObject({ hand_no: 0, previous_hand: null, hero_position: "BTN" });
+    const second = play(api, id, RAISE);
+    expect(second).toMatchObject({ hand_no: 0, hero_position: "BTN", previous_hand: null });
+    expect(second.history.slice(-3).map((entry) => `${entry.position} ${entry.label}`)).toEqual(["BTN Raise to 2.5bb", "SB Fold", "BB Raise to 9bb"]);
+    const third = play(api, id, RAISE);
+    expect(third).toMatchObject({ hand_no: 1, hero_position: "CO" });
+    expect(third.previous_hand).toMatchObject({ hand_no: 0, board: [], end: "street_closed" });
+    expect(third.previous_hand?.history.slice(-2).map((entry) => `${entry.position} ${entry.label}`)).toEqual(["BTN Raise to 22bb", "BB Call"]);
+  });
+
+  it("R3.13 full-hand mode: the ended hand carries the three flop cards", () => {
+    const api = signedInApi();
+    const id = (startDrill(api, FIXTURE_FULL_HAND_DRILL_ID).body as { session_id: string }).session_id;
+    play(api, id, RAISE);
+    const nextHand = play(api, id, CALL);
+    expect(nextHand.previous_hand).toMatchObject({ hand_no: 0, end: "street_closed", board: fixtureStreetHands[0]?.flop });
+    expect(nextHand.previous_hand?.history.at(-1)).toMatchObject({ position: "BTN", label: "Call" });
+  });
+
+  it("R3.13 a fold at the first decision ends the hand with end fold and no board", () => {
+    const api = signedInApi();
+    const id = (startDrill(api, FIXTURE_FULL_HAND_DRILL_ID).body as { session_id: string }).session_id;
+    const nextHand = play(api, id, FOLD);
+    expect(nextHand).toMatchObject({ hand_no: 1, previous_hand: { hand_no: 0, end: "fold", board: [] } });
+  });
+
+  it("R3.13 the second decision checks the action against its own buttons and grades it", () => {
+    const api = signedInApi();
+    const id = (startDrill(api, FIXTURE_STREET_DRILL_ID).body as { session_id: string }).session_id;
+    const second = play(api, id, RAISE);
+    const graded = decide(api, id, { state_version: second.state_version, action_index: CALL, response_ms: 1 });
+    expect(graded.body).toMatchObject({ label: "best", state_version: second.state_version + 1 });
   });
 });

@@ -9,6 +9,8 @@
  * mode then pauses on the reveal until Next (O-284), with the bar disabled. The feedback panel
  * gets the range view and the threshold card of the decided node, and the roller when the session
  * has RNG on (lane C's components, O-281, O-282). All action indexes are NodeAction.index (O-198).
+ * In street and full-hand modes a reveal that does not pause (O-314) shows the result chip instead
+ * of the panel while the screen continues by itself; Next stays available (S26).
  */
 import {
   ActionBar,
@@ -26,9 +28,10 @@ import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { actionOfIndex } from "../../poker/action-index.js";
-import type { SpotState } from "../../trainer/spot-machine.js";
+import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
 import { NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { ResultChip } from "./ResultChip.js";
 
 export interface DecisionAreaProps {
   state: SpotState;
@@ -61,16 +64,22 @@ function Feedback({ state, prompt, interactive, onNext, onExplain }: DecisionAre
   useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
   const { feedback, decision, context } = state;
+  // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
+  const continuesByItself = autoContinueDelay(state) !== null;
   return (
     <div className="flex flex-col gap-3">
-      <FeedbackPanel
-        feedback={feedback}
-        actions={prompt.buttons}
-        chosenIndex={decision.actionIndex}
-        rangeView={<FeedbackRangeView feedback={feedback} />}
-        thresholdCard={<FeedbackThreshold feedback={feedback} />}
-        roller={context.rng ? <FeedbackRoller feedback={feedback} actions={prompt.buttons} onExplain={onExplain} /> : undefined}
-      />
+      {continuesByItself ? (
+        <ResultChip feedback={feedback} />
+      ) : (
+        <FeedbackPanel
+          feedback={feedback}
+          actions={prompt.buttons}
+          chosenIndex={decision.actionIndex}
+          rangeView={<FeedbackRangeView feedback={feedback} />}
+          thresholdCard={<FeedbackThreshold feedback={feedback} />}
+          roller={context.rng ? <FeedbackRoller feedback={feedback} actions={prompt.buttons} onExplain={onExplain} /> : undefined}
+        />
+      )}
       <Button variant="primary" size="lg" aria-keyshortcuts={NEXT_HAND_KEY} disabled={!interactive} onClick={onNext} className="self-start">
         <kbd aria-hidden="true" className="font-mono text-xs">
           {NEXT_HAND_KEY}

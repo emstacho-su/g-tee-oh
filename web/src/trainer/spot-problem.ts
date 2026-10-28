@@ -13,6 +13,10 @@
  * a stale end (the api says to end again). A fixed answer (400, 403, 404, 422, another 409) is not
  * retried; the screen offers End or Start instead. problemMessage gives the screen a fixed, safe
  * sentence per kind, so the server's detail text is never shown to the user (S24 precedent).
+ *
+ * S26 (R3.14, O-312): a 422 no-coverage detail names how many of the drill's spots were queued
+ * for the builder ("3 of its 3 spots were queued"). problemOf reads those two numbers into queued,
+ * so the screen can say them in its own sentence; the detail text itself is still never shown.
  */
 import { HTTP_STATUS } from "../api/http-status.js";
 import { isApiProblem } from "../api/index.js";
@@ -27,10 +31,27 @@ export type SpotProblemKind =
   | "signed_out"
   | "other";
 
+/** The queued and total spot counts a 422 no-coverage names (O-312). */
+export interface QueuedCount {
+  readonly queued: number;
+  readonly total: number;
+}
+
 export interface SpotProblem {
   readonly kind: SpotProblemKind;
   /** The HTTP status, or null when no response arrived. */
   readonly status: number | null;
+  /** Read from a 422 no-coverage detail when it names the counts. */
+  readonly queued?: QueuedCount;
+}
+
+/** The api's wording in services/api/src/sessions/service.ts: "<gaps> of its <candidates> spots were queued". */
+const QUEUED_PATTERN = /(\d+) of its (\d+) spots were queued/;
+
+function queuedCountOf(detail: string | undefined): QueuedCount | null {
+  const match = detail === undefined ? null : QUEUED_PATTERN.exec(detail);
+  if (match === null) return null;
+  return { queued: Number(match[1]), total: Number(match[2]) };
 }
 
 /** The api's problem slugs the trainer branches on (services/api/src/http/problem.ts). */
@@ -59,7 +80,11 @@ function kindOfApiProblem(status: number, slug: string): SpotProblemKind {
 }
 
 export function problemOf(error: unknown): SpotProblem {
-  if (isApiProblem(error)) return { kind: kindOfApiProblem(error.status, error.slug), status: error.status };
+  if (isApiProblem(error)) {
+    const kind = kindOfApiProblem(error.status, error.slug);
+    const queued = kind === "no_coverage" ? queuedCountOf(error.detail) : null;
+    return queued === null ? { kind, status: error.status } : { kind, status: error.status, queued };
+  }
   if (error instanceof TypeError) return { kind: "network", status: null };
   if (error instanceof DOMException && INTERRUPTED_REQUEST_NAMES.has(error.name)) return { kind: "network", status: null };
   return { kind: "other", status: null };

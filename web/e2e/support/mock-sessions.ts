@@ -1,32 +1,49 @@
 /**
- * Mocked drill and session routes for the shots and mock projects (S25, R3.13, O-264): GET
- * /drills/{id}, POST /sessions, GET /sessions/{id}/next, POST /sessions/{id}/decisions and POST
+ * Mocked drill and session routes for the shots and mock projects (S25, S26, R3.13, R3.14, O-264):
+ * GET /drills/{id}, POST /sessions, GET /sessions/{id}/next, POST /sessions/{id}/decisions and POST
  * /sessions/{id}/end over the synthetic fixtures in src/fixtures/trainer.ts.
  *
  * Mechanism: createMockSessionRoute returns a route with its own in-memory state: the sessions it
- * started, each with its RNG setting, the hand it is at (the fixture hands in a cycle), its state
- * version, the decisions graded so far, the Idempotency-Key replies and the recap once ended. Every
- * route answers 401 when signed out, and the three POSTs answer 403 csrf unless x-csrf-token equals
- * the fixture token, as the api does (O-230). POST /sessions takes mode drill with the fixture
- * drill (201), answers 422 no-coverage for the uncovered fixture drill (ADR 0018) and 400 for a bad
- * body or seed. GET /next is pure: the current hand's prompt, with the roll only in RNG mode
- * (O-282). A decision for an older state version is a 409 stale-state; a repeat with the same
- * Idempotency-Key replays the first answer (O-232); a correct one advances the hand and the
- * version. In RNG mode or not, choosing an action in best_action_indexes is labeled best. End
- * answers the recap of the decisions made and the session then refuses more with 409
- * session-ended. mockSessionRoute is one ready-made instance; mock-app.ts may build a fresh one
- * per mocked api with createMockSessionRoute.
+ * started, each with its RNG setting, its drill's stop rule, the hand it is at, its state version,
+ * the decisions graded so far, the Idempotency-Key replies and the recap once ended. Every route
+ * answers 401 when signed out, and the three POSTs answer 403 csrf unless x-csrf-token equals the
+ * fixture token, as the api does (O-230). POST /sessions takes mode drill with a known drill (201,
+ * with its coverage, O-312), answers 422 no-coverage for the uncovered fixture drill with the
+ * queued count in its detail (ADR 0018) and 400 for a bad body or seed. GET /next is pure: the
+ * current prompt, with the roll only in RNG mode (O-282). A decision for an older state version is
+ * a 409 stale-state; a repeat with the same Idempotency-Key replays the first answer (O-232); a
+ * correct one advances the hand and the version. Choosing an action in best_action_indexes is
+ * labeled best. End answers the recap of the decisions made and the session then refuses more
+ * with 409 session-ended. mockSessionRoute is one ready-made instance.
+ *
+ * Drills (S26): options.drillOf lets another mocked route (mock-drills.ts) supply drills; the
+ * fixture drills stay the fallback. The drill's trainer.stop_rule drives the session:
+ * - after_action (spot mode) deals the fixture hands in a cycle exactly as S25 did;
+ * - end_of_street and end_of_hand deal the street hands: the hero's first decision, then (unless
+ *   the hero folded) the opponents' answer appended to the history and the hero's second decision;
+ *   the hand then ends and the next hand's prompt has a larger hand_no and previous_hand: a fold
+ *   ends with end fold, otherwise the street closes (with the opponent's call after a raise), and
+ *   in end_of_hand mode the board holds the three flop cards (v1 ends a full hand at the flop).
  */
-import type { DecisionFeedback, TrainerPrompt } from "../../src/contracts.js";
+import type { DecisionFeedback, NodeAction, Problem, TrainerPrompt } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import {
-  FIXTURE_DRILL_ID,
+  FIXTURE_PART_COVERED_DRILL_ID,
   FIXTURE_UNCOVERED_DRILL_ID,
   fixtureDrill,
+  fixtureFullCoverage,
+  fixtureFullHandDrill,
+  fixturePartCoverage,
+  fixturePartCoveredDrill,
+  fixtureStreetDrill,
+  fixtureStreetHands,
   fixtureTrainerHands,
+  heroEntry,
   type FixtureHand,
+  type FixtureHistoryEntry,
+  type FixtureStreetHand,
 } from "../../src/fixtures/trainer.js";
-import type { PracticeSession, SessionRecap } from "../../src/trainer/session-types.js";
+import type { Drill, PracticeSession, PreviousHand, SessionRecap, StopRule } from "../../src/trainer/session-types.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
 
 const STATUS = { ok: 200, created: 201 } as const;
@@ -38,6 +55,9 @@ const PROBLEMS = {
   ended: { status: 409, slug: "session-ended", title: "Session ended" },
   noCoverage: { status: 422, slug: "no-coverage", title: "No coverage" },
 } as const satisfies Readonly<Record<string, ProblemSpec>>;
+/** The api's 422 wording (services/api/src/sessions/service.ts), with the uncovered drill's one pair queued. */
+const NO_COVERAGE_DETAIL =
+  "This drill cannot be dealt: the library covers none of this drill's spots. 1 of its 1 spots were queued for the builder.";
 
 const DRILL_PATH = /^\/api\/v1\/drills\/([^/]+)$/;
 const SESSIONS_PATH = "/api/v1/sessions";
@@ -51,16 +71,41 @@ const STARTED_AT = "2026-10-27T12:00:00Z";
 const ENDED_AT = "2026-10-27T12:20:00Z";
 const BEST_SCORE = 1;
 
+export interface MockSessionOptions {
+  /** Drills another mocked route holds; the fixture drills answer when it has none by that id. */
+  readonly drillOf?: (id: string) => Drill | undefined;
+}
+
+const FIXTURE_DRILLS: readonly Drill[] = [
+  fixtureDrill,
+  { ...fixtureDrill, id: FIXTURE_UNCOVERED_DRILL_ID, name: "A drill the library does not cover" },
+  fixtureStreetDrill,
+  fixtureFullHandDrill,
+  fixturePartCoveredDrill,
+];
+
+function fixtureDrillOf(id: string): Drill | undefined {
+  return FIXTURE_DRILLS.find((drill) => drill.id === id);
+}
+
 interface Graded {
   readonly score: number;
   readonly evLossBb: number;
 }
 
+/** In street and full-hand modes: the hero's first action once taken, for the second decision. */
+interface StreetStep {
+  readonly opened: NodeAction | null;
+  readonly previous: PreviousHand | null;
+}
+
 interface MockSession {
   readonly id: string;
   readonly rng: boolean;
+  readonly stopRule: StopRule;
   readonly hand: number;
   readonly version: number;
+  readonly street: StreetStep;
   readonly graded: readonly Graded[];
   readonly replies: ReadonlyMap<string, MockResponse>;
   readonly recap: SessionRecap | null;
@@ -88,22 +133,62 @@ function isDecisionBody(body: unknown): body is DecisionBody {
   return isNonNegativeInteger(body["state_version"]) && isNonNegativeInteger(body["action_index"]) && isNonNegativeInteger(body["response_ms"]) && confidenceOk;
 }
 
-function handAt(session: MockSession): FixtureHand {
-  const hand = fixtureTrainerHands[session.hand % fixtureTrainerHands.length];
-  if (hand === undefined) throw new RangeError("the fixture session has no hands");
-  return hand;
+function cycled<T>(items: readonly T[], index: number): T {
+  const item = items[index % items.length];
+  if (item === undefined) throw new RangeError("the fixture session has no hands");
+  return item;
+}
+
+function isSpotMode(session: MockSession): boolean {
+  return session.stopRule === "after_action";
+}
+
+function streetHandOf(session: MockSession): FixtureStreetHand {
+  return cycled(fixtureStreetHands, session.hand);
+}
+
+/** The decision the session is at: a spot hand, or a street hand's first or second decision. */
+function decisionAt(session: MockSession): FixtureHand {
+  if (isSpotMode(session)) return cycled(fixtureTrainerHands, session.hand);
+  const street = streetHandOf(session);
+  return session.street.opened === null ? street.first : street.second;
+}
+
+function streetPrompt(session: MockSession, hand: FixtureHand): TrainerPrompt {
+  const street = streetHandOf(session);
+  const { opened, previous } = session.street;
+  const history = opened === null ? hand.prompt.history : [...street.first.prompt.history, heroEntry(street.first.prompt, opened), ...street.answer];
+  return { ...hand.prompt, history, hand_no: session.hand, previous_hand: previous };
 }
 
 function promptOf(session: MockSession): TrainerPrompt {
-  const hand = handAt(session);
-  return { ...hand.prompt, session_id: session.id, state_version: session.version, rng_roll: session.rng ? hand.roll : null };
+  const hand = decisionAt(session);
+  const prompt = isSpotMode(session) ? hand.prompt : streetPrompt(session, hand);
+  return { ...prompt, session_id: session.id, state_version: session.version, rng_roll: session.rng ? hand.roll : null };
 }
 
 function feedbackOf(session: MockSession, actionIndex: number): DecisionFeedback {
-  const hand = handAt(session);
+  const hand = decisionAt(session);
   const best = hand.feedback.best_action_indexes.includes(actionIndex);
   const graded = best ? { label: "best" as const, score: BEST_SCORE, ev_loss_bb: 0, ev_loss_pct_pot: 0 } : {};
   return { ...hand.feedback, ...graded, state_version: session.version + 1, rng_roll: session.rng ? hand.roll : null };
+}
+
+/** How a street hand ends after the hero's action: a fold, or the street closing (the flop in full-hand mode). */
+function endedHand(session: MockSession, history: readonly FixtureHistoryEntry[], action: NodeAction): PreviousHand {
+  const street = streetHandOf(session);
+  if (action.kind === "fold") return { hand_no: session.hand, history: [...history], board: [], end: "fold" };
+  const closed = action.kind === "call" ? history : [...history, street.closing];
+  const board = session.stopRule === "end_of_hand" ? [...street.flop] : [];
+  return { hand_no: session.hand, history: [...closed], board, end: "street_closed" };
+}
+
+/** The session after the hero's action in street or full-hand mode. */
+function afterStreetAction(session: MockSession, action: NodeAction): Pick<MockSession, "hand" | "street"> {
+  const prompt = promptOf(session);
+  const history = [...prompt.history, heroEntry(prompt, action)];
+  if (session.street.opened === null && action.kind !== "fold") return { hand: session.hand, street: { ...session.street, opened: action } };
+  return { hand: session.hand + 1, street: { opened: null, previous: endedHand(session, history, action) } };
 }
 
 function recapOf(session: MockSession): SessionRecap {
@@ -122,46 +207,57 @@ function hasCsrf(request: MockRequest): boolean {
   return request.headers[CSRF_HEADER] === FIXTURE_CSRF_TOKEN;
 }
 
-function drillResponse(id: string, path: string): MockResponse {
-  if (id === FIXTURE_DRILL_ID) return json(STATUS.ok, fixtureDrill);
-  if (id === FIXTURE_UNCOVERED_DRILL_ID) return json(STATUS.ok, { ...fixtureDrill, id, name: "A drill the library does not cover" });
-  return problem(PROBLEMS.notFound, path);
+function noCoverage(path: string): MockResponse {
+  const refused = problem(PROBLEMS.noCoverage, path);
+  return { ...refused, body: { ...(refused.body as Problem), detail: NO_COVERAGE_DETAIL } };
 }
 
-/** The problem a POST /sessions body earns, or null when it starts a session. */
-function startProblem(body: unknown): ProblemSpec | null {
+/** The problem a POST /sessions body earns, or the drill it starts a session on. */
+function startTarget(body: unknown, drillOf: (id: string) => Drill | undefined): ProblemSpec | Drill {
   if (!isRecord(body) || body["mode"] !== "drill" || typeof body["drill_id"] !== "string") return PROBLEMS.validation;
   const seed = body["seed"];
   if (seed !== undefined && (typeof seed !== "string" || !SEED_PATTERN.test(seed))) return PROBLEMS.validation;
   if (body["drill_id"] === FIXTURE_UNCOVERED_DRILL_ID) return PROBLEMS.noCoverage;
-  if (body["drill_id"] !== FIXTURE_DRILL_ID) return PROBLEMS.notFound;
-  return null;
+  return drillOf(body["drill_id"]) ?? PROBLEMS.notFound;
 }
 
-function rngOf(body: unknown): boolean {
+function rngOf(body: unknown, drill: Drill): boolean {
   const settings = isRecord(body) ? body["settings"] : undefined;
   const rng = isRecord(settings) ? settings["rng"] : undefined;
-  return typeof rng === "boolean" ? rng : fixtureDrill.trainer.rng;
+  return typeof rng === "boolean" ? rng : drill.trainer.rng;
 }
 
 /** A fresh set of session routes with their own state. */
-export function createMockSessionRoute(): MockRoute {
+export function createMockSessionRoute(options: MockSessionOptions = {}): MockRoute {
   let sessions: ReadonlyMap<string, MockSession> = new Map();
   let started = 0;
+  const drillOf = (id: string): Drill | undefined => options.drillOf?.(id) ?? fixtureDrillOf(id);
 
   function save(session: MockSession): void {
     sessions = new Map([...sessions, [session.id, session]]);
   }
 
   function startSession(request: MockRequest): MockResponse {
-    const failure = startProblem(request.body);
-    if (failure !== null) return problem(failure, request.path);
+    const target = startTarget(request.body, drillOf);
+    if (target === PROBLEMS.noCoverage) return noCoverage(request.path);
+    if (!("trainer" in target)) return problem(target, request.path);
     const number = FIRST_SESSION_NUMBER + started;
     started += 1;
     const id = `${SESSION_ID_PREFIX}${number.toString(16).padStart(SESSION_ID_DIGITS, "0")}`;
-    const session: MockSession = { id, rng: rngOf(request.body), hand: 0, version: 1, graded: [], replies: new Map(), recap: null };
+    const session: MockSession = {
+      id,
+      rng: rngOf(request.body, target),
+      stopRule: target.trainer.stop_rule,
+      hand: 0,
+      version: 1,
+      street: { opened: null, previous: null },
+      graded: [],
+      replies: new Map(),
+      recap: null,
+    };
     save(session);
-    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: FIXTURE_DRILL_ID, state: "await_hero", state_version: session.version, started_at: STARTED_AT };
+    const coverage = target.id === FIXTURE_PART_COVERED_DRILL_ID ? fixturePartCoverage : fixtureFullCoverage;
+    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, coverage };
     return json(STATUS.created, body);
   }
 
@@ -172,12 +268,14 @@ export function createMockSessionRoute(): MockRoute {
     if (!isDecisionBody(request.body)) return problem(PROBLEMS.validation, request.path);
     if (request.body.state_version !== session.version) return problem(PROBLEMS.stale, request.path);
     const actionIndex = request.body.action_index;
-    if (!handAt(session).prompt.buttons.some((button) => button.index === actionIndex)) return problem(PROBLEMS.validation, request.path);
+    const action = decisionAt(session).prompt.buttons.find((button) => button.index === actionIndex);
+    if (action === undefined) return problem(PROBLEMS.validation, request.path);
     const feedback = feedbackOf(session, actionIndex);
     const response = json(STATUS.ok, feedback);
+    const moved = isSpotMode(session) ? { hand: session.hand + 1 } : afterStreetAction(session, action);
     save({
       ...session,
-      hand: session.hand + 1,
+      ...moved,
       version: feedback.state_version,
       graded: [...session.graded, { score: feedback.score, evLossBb: feedback.ev_loss_bb }],
       replies: key === undefined ? session.replies : new Map([...session.replies, [key, response]]),
@@ -203,6 +301,11 @@ export function createMockSessionRoute(): MockRoute {
     return reading ? json(STATUS.ok, promptOf(session)) : decide(session, request);
   }
 
+  function drillResponse(id: string, path: string): MockResponse {
+    const drill = drillOf(id);
+    return drill === undefined ? problem(PROBLEMS.notFound, path) : json(STATUS.ok, drill);
+  }
+
   return (request, { signedIn }) => {
     const method = request.method.toUpperCase();
     const drill = DRILL_PATH.exec(request.path);
@@ -216,5 +319,5 @@ export function createMockSessionRoute(): MockRoute {
   };
 }
 
-/** One ready-made instance, used by mock-app.ts until it builds one per mocked api. */
+/** One ready-made instance, used where a mocked api needs no state of its own. */
 export const mockSessionRoute: MockRoute = createMockSessionRoute();

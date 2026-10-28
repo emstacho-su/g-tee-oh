@@ -13,7 +13,7 @@ import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import { FIXTURE_DRILL_ID, fixtureDrill, fixturePracticeSession } from "../../src/fixtures/trainer.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { DrillRunPage } from "../../src/routes/drill-run/DrillRunPage.js";
-import { TrainerDepsProvider, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
+import { TrainerDepsProvider, type Scheduler, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
 import { createFakeFetch, jsonResponse, type FetchScript } from "../api/fake-fetch.js";
 
 export const ORIGIN = "http://localhost:4173";
@@ -48,6 +48,8 @@ export interface RenderRunOptions {
   script: FetchScript;
   seed?: string;
   drillId?: string;
+  /** The timer for the automatic continue (S26, O-314); the app's setTimeout when absent. */
+  schedule?: Scheduler;
 }
 
 /** The drill read plus a 201 session, the usual first two answers. */
@@ -65,7 +67,7 @@ function parseBody(text: string): unknown {
   }
 }
 
-export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID }: RenderRunOptions): RunView {
+export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule }: RenderRunOptions): RunView {
   const fake = createFakeFetch({ ...BASE_SCRIPT, ...script });
   const sent: SentRequest[] = [];
   const fetch = async (request: Request): Promise<Response> => {
@@ -90,6 +92,7 @@ export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID }: RenderRu
       keyCount += 1;
       return `key-${keyCount}`;
     },
+    ...(schedule === undefined ? {} : { schedule }),
   };
   const view = render(
     <QueryClientProvider client={queryClient}>
