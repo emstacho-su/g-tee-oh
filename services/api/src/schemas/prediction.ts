@@ -9,14 +9,15 @@
  * a named action, 3 the size the hand raises with most). Every truth is a Rust number or flag read
  * from solver-query and only compared here (ADR 0004). Answers are unrated and write no attempt row.
  */
+import { RATIONALE_MAX_CHARS } from "@g-tee-oh/contracts";
+import { MAX_PREDICTION_LEVEL, PREDICTION_LADDERS } from "@g-tee-oh/learning";
 import { z } from "zod";
 
 import { nodeActionSchema } from "./study.js";
 import { handClassSchema, nodeKeySchema, positionSchema, uuidSchema } from "./common.js";
 
-export const predictionLadderSchema = z.enum(["range", "hand"]);
-export const PREDICTION_LEVELS = [1, 2, 3] as const;
-export const predictionLevelSchema = z.number().int().min(1).max(PREDICTION_LEVELS.length);
+export const predictionLadderSchema = z.enum(PREDICTION_LADDERS);
+export const predictionLevelSchema = z.number().int().min(1).max(MAX_PREDICTION_LEVEL);
 
 /** The answer kind each ladder level asks for (O-301). */
 export const predictionAnswerKindSchema = z.enum(["yes_no", "percent", "regions", "action", "band", "size"]);
@@ -79,6 +80,14 @@ export const predictionAnswerBodySchema = z.strictObject({
   prompt_id: uuidSchema,
   state_version: z.number().int().min(0),
   answer: predictionAnswerSchema,
+  rationale: z
+    .string()
+    .trim()
+    .min(1)
+    .max(RATIONALE_MAX_CHARS)
+    .describe(
+      "Why the player answered so (S41, O-350, O-412): required, 3 to 1,000 characters after control and invisible characters are cleaned; stored with the answer, never graded",
+    ),
 });
 
 export const predictionResultSchema = z
@@ -102,6 +111,9 @@ export const predictionResultSchema = z
       required_pct: z.number(),
     }),
     next_level_unlocked: z.boolean(),
+    level_passed: z
+      .boolean()
+      .describe("The last 20 answers at this spot class, ladder and level hold at least 90 percent correct (S41, O-410)"),
     new_level: predictionLevelSchema.describe("The ladder's level for this spot class after the answer"),
     state_version: z.number().int().min(0),
   })

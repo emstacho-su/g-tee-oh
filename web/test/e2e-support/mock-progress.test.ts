@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createAppMockApi } from "../../e2e/support/mock-app.js";
 import { createMockApi, type MockApi, type MockRequest } from "../../e2e/support/mock-api.js";
 import { PROGRESS_PATH_PREFIX, createMockProgressRoute, type MockProgress } from "../../e2e/support/mock-progress.js";
+import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import { FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
 import { fixtureFreshRating, fixtureLeaks, fixtureRating, fixtureTracks } from "../../src/fixtures/progress.js";
 
@@ -60,6 +61,22 @@ describe("R4.12 mocked progress routes", () => {
     progress.setLearner("seasoned");
     expect(progress.learner()).toBe("seasoned");
     expect(get(api, "rating").body).toEqual(fixtureRating);
+  });
+
+  it("R4.12 the frequencies read: two spots for a seasoned learner (one above both minimums, one below the spot minimum), none for a fresh one", () => {
+    const progress = createMockProgressRoute();
+    const api = signedInApi(progress);
+    const seasoned = get(api, "frequencies");
+    expect(seasoned).toMatchObject({ status: 200, body: fixtureFrequencies });
+    const spots = fixtureFrequencies.spots;
+    expect(spots.some((spot) => spot.pooled !== null && spot.hands.length > 0)).toBe(true);
+    expect(spots.some((spot) => spot.pooled === null && spot.decisions < fixtureFrequencies.min_spot_decisions)).toBe(true);
+    // PR #39 review finding 6: every served spot names the solution it was graded on.
+    const served = (seasoned.body as typeof fixtureFrequencies).spots;
+    expect(served.every((spot) => /^[0-9a-f-]{36}$/.test(spot.solution_id))).toBe(true);
+    progress.setLearner("fresh");
+    expect(get(api, "frequencies").body).toEqual(fixtureFreshFrequencies);
+    expect(get(createMockApi({ routes: [createMockProgressRoute().route] }), "frequencies").status).toBe(401);
   });
 
   it("R4.12 the app mock serves progress and hands the control to the caller", () => {

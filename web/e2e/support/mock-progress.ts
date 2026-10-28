@@ -1,6 +1,8 @@
 /**
  * Mocked S31 progress routes for the shots and mock projects (S32, R4.12, O-264): GET
- * /progress/rating, /tracks, /leaks, /heatmap, /holdout and /streak.
+ * /progress/rating, /tracks, /leaks, /heatmap, /holdout and /streak, and since S41 /frequencies
+ * (R4.12, O-353: two spots for the seasoned learner, one above both minimums and one below the
+ * spot minimum, src/fixtures/frequencies.ts; none for a fresh learner, the card's empty state).
  *
  * Mechanism: createMockProgressRoute returns a route with one piece of state, the learner: "fresh"
  * (a new account, no rated session) or "seasoned" (eight weeks of history), both from the
@@ -24,6 +26,7 @@ import {
   fixtureStreak,
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
+import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import { UNAUTHENTICATED, json, problem, type MockRoute, type ProblemSpec } from "./mock-api.js";
 
 export type MockLearner = "fresh" | "seasoned";
@@ -62,6 +65,8 @@ function body(path: string, learner: MockLearner): unknown {
       return seasoned ? fixtureHoldout : fixtureFreshHoldout;
     case "streak":
       return seasoned ? fixtureStreak : fixtureFreshStreak;
+    case "frequencies":
+      return seasoned ? fixtureFrequencies : fixtureFreshFrequencies;
     default:
       return undefined;
   }

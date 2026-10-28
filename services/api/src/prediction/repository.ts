@@ -3,12 +3,15 @@
  * always scoped by user_id. A prediction is never an attempt: nothing here touches the attempt,
  * rating, scheduling or leak tables, so an answer can never move a rating (unrated, 05 section 8).
  * Reads come back oldest first (created_at, then the time-ordered uuidv7 id) for learning's
- * levelFor replay.
+ * levelFor replay. S41 (O-412, O-413) stores the cleaned reason and the validated answer with each
+ * row; nothing reads them back in v1.
  */
 import type { PredictionAnswerRecord, PredictionLadder } from "@g-tee-oh/learning";
 
 import type { Database } from "../db.js";
 import { predictionLadderSchema } from "../schemas/prediction.js";
+import { toJsonb } from "../sessions/repository.js";
+import type { PredictionAnswer } from "./judge.js";
 
 export interface NewPredictionAnswer {
   userId: string;
@@ -17,6 +20,10 @@ export interface NewPredictionAnswer {
   ladder: PredictionLadder;
   level: number;
   correct: boolean;
+  /** S41 (O-412): the cleaned reason (prediction/rationale.ts). */
+  rationale: string;
+  /** S41 (O-413): the validated answer the reason explains. */
+  answer: PredictionAnswer;
 }
 
 /** The user's answers for one spot class, both ladders, oldest first. */
@@ -47,6 +54,8 @@ export async function insertAnswer(database: Database, answer: NewPredictionAnsw
       ladder: answer.ladder,
       level: answer.level,
       correct: answer.correct,
+      rationale: answer.rationale,
+      answer: toJsonb(answer.answer),
     })
     .execute();
 }

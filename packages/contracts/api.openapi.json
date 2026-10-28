@@ -1549,6 +1549,114 @@
         },
         "additionalProperties": false
       },
+      "CatalogSpotInput": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A catalog configuration (GET /catalog/configs); checked to exist and be served"
+          },
+          "hero_positions": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            },
+            "description": "The seats to practise; each seated at the configuration"
+          },
+          "villain_positions": {
+            "description": "The opponents; absent or empty means any seat",
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            }
+          },
+          "spot_types": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "rfi",
+                "vs_open",
+                "srp",
+                "three_bet",
+                "vs_three_bet",
+                "four_bet",
+                "squeeze",
+                "limp_iso",
+                "straddle"
+              ]
+            },
+            "description": "Preflop spot types, such as rfi (an open) or vs_open (facing an open)"
+          }
+        },
+        "required": [
+          "config_id",
+          "hero_positions",
+          "spot_types"
+        ],
+        "additionalProperties": false,
+        "description": "A preflop spot from the catalog: configuration, seats and spot types (O-415)"
+      },
+      "QuizOptionsInput": {
+        "type": "object",
+        "properties": {
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard"
+            ],
+            "description": "easy, medium or hard: prediction levels 1, 2 and 3 (O-410)"
+          },
+          "question_kinds": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "range",
+                "hand"
+              ]
+            },
+            "description": "range asks about the whole range, hand about one hand class (O-411)"
+          }
+        },
+        "required": [
+          "difficulty",
+          "question_kinds"
+        ],
+        "additionalProperties": false
+      },
       "SessionCoverageInput": {
         "type": "object",
         "properties": {
@@ -4357,6 +4465,10 @@
           "next_level_unlocked": {
             "type": "boolean"
           },
+          "level_passed": {
+            "type": "boolean",
+            "description": "The last 20 answers at this spot class, ladder and level hold at least 90 percent correct (S41, O-410)"
+          },
           "new_level": {
             "type": "integer",
             "minimum": 1,
@@ -4377,8 +4489,219 @@
           "truth",
           "window",
           "next_level_unlocked",
+          "level_passed",
           "new_level",
           "state_version"
+        ]
+      },
+      "FrequencyActionInput": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "NodeAction.index, the position in the node's actions"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "label",
+          "kind"
+        ]
+      },
+      "FrequencyRowInput": {
+        "type": "object",
+        "properties": {
+          "your_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The share of your decisions that chose each action"
+          },
+          "solver_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The mean of the solver's frequency of each action for the hands you were dealt"
+          }
+        },
+        "required": [
+          "your_freq",
+          "solver_freq"
+        ]
+      },
+      "HandFrequencyInput": {
+        "type": "object",
+        "properties": {
+          "your_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The share of your decisions that chose each action"
+          },
+          "solver_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The mean of the solver's frequency of each action for the hands you were dealt"
+          },
+          "hand_class": {
+            "type": "string",
+            "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+            "description": "A hand class, for example AKs"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "your_freq",
+          "solver_freq",
+          "hand_class",
+          "decisions"
+        ]
+      },
+      "SpotFrequencyInput": {
+        "type": "object",
+        "properties": {
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decisions were graded on; a rebuilt node is its own spot (PR #39 review finding 6)"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "action_family": {
+            "description": "solver-query's action family of the node",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Your counted decisions at this node"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrequencyActionInput"
+            }
+          },
+          "pooled": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrequencyRowInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every hand pooled; null below min_spot_decisions"
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HandFrequencyInput"
+            },
+            "description": "Hand classes at or above min_hand_decisions, the largest gap first"
+          }
+        },
+        "required": [
+          "solution_id",
+          "node_key",
+          "spot_class_key",
+          "config_id",
+          "pair",
+          "hero_position",
+          "action_family",
+          "decisions",
+          "actions",
+          "pooled",
+          "hands"
+        ]
+      },
+      "FrequencyComparisonInput": {
+        "type": "object",
+        "properties": {
+          "min_spot_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "min_hand_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "spots": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpotFrequencyInput"
+            },
+            "description": "The most played preflop nodes, most decisions first"
+          }
+        },
+        "required": [
+          "min_spot_decisions",
+          "min_hand_decisions",
+          "spots"
         ]
       },
       "RangePaintPromptInput": {
@@ -6248,6 +6571,114 @@
             "$ref": "#/components/schemas/TrainerSettings"
           }
         },
+        "additionalProperties": false
+      },
+      "CatalogSpot": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A catalog configuration (GET /catalog/configs); checked to exist and be served"
+          },
+          "hero_positions": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            },
+            "description": "The seats to practise; each seated at the configuration"
+          },
+          "villain_positions": {
+            "description": "The opponents; absent or empty means any seat",
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "UTG",
+                "UTG1",
+                "UTG2",
+                "LJ",
+                "HJ",
+                "CO",
+                "BTN",
+                "SB",
+                "BB"
+              ]
+            }
+          },
+          "spot_types": {
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "rfi",
+                "vs_open",
+                "srp",
+                "three_bet",
+                "vs_three_bet",
+                "four_bet",
+                "squeeze",
+                "limp_iso",
+                "straddle"
+              ]
+            },
+            "description": "Preflop spot types, such as rfi (an open) or vs_open (facing an open)"
+          }
+        },
+        "required": [
+          "config_id",
+          "hero_positions",
+          "spot_types"
+        ],
+        "additionalProperties": false,
+        "description": "A preflop spot from the catalog: configuration, seats and spot types (O-415)"
+      },
+      "QuizOptions": {
+        "type": "object",
+        "properties": {
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard"
+            ],
+            "description": "easy, medium or hard: prediction levels 1, 2 and 3 (O-410)"
+          },
+          "question_kinds": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "range",
+                "hand"
+              ]
+            },
+            "description": "range asks about the whole range, hand about one hand class (O-411)"
+          }
+        },
+        "required": [
+          "difficulty",
+          "question_kinds"
+        ],
         "additionalProperties": false
       },
       "SessionCoverage": {
@@ -9115,6 +9546,10 @@
           "next_level_unlocked": {
             "type": "boolean"
           },
+          "level_passed": {
+            "type": "boolean",
+            "description": "The last 20 answers at this spot class, ladder and level hold at least 90 percent correct (S41, O-410)"
+          },
           "new_level": {
             "type": "integer",
             "minimum": 1,
@@ -9135,8 +9570,224 @@
           "truth",
           "window",
           "next_level_unlocked",
+          "level_passed",
           "new_level",
           "state_version"
+        ],
+        "additionalProperties": false
+      },
+      "FrequencyAction": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "NodeAction.index, the position in the node's actions"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "label",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "FrequencyRow": {
+        "type": "object",
+        "properties": {
+          "your_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The share of your decisions that chose each action"
+          },
+          "solver_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The mean of the solver's frequency of each action for the hands you were dealt"
+          }
+        },
+        "required": [
+          "your_freq",
+          "solver_freq"
+        ],
+        "additionalProperties": false
+      },
+      "HandFrequency": {
+        "type": "object",
+        "properties": {
+          "your_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The share of your decisions that chose each action"
+          },
+          "solver_freq": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "The mean of the solver's frequency of each action for the hands you were dealt"
+          },
+          "hand_class": {
+            "type": "string",
+            "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+            "description": "A hand class, for example AKs"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "your_freq",
+          "solver_freq",
+          "hand_class",
+          "decisions"
+        ],
+        "additionalProperties": false
+      },
+      "SpotFrequency": {
+        "type": "object",
+        "properties": {
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decisions were graded on; a rebuilt node is its own spot (PR #39 review finding 6)"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "action_family": {
+            "description": "solver-query's action family of the node",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Your counted decisions at this node"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrequencyAction"
+            }
+          },
+          "pooled": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrequencyRow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every hand pooled; null below min_spot_decisions"
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HandFrequency"
+            },
+            "description": "Hand classes at or above min_hand_decisions, the largest gap first"
+          }
+        },
+        "required": [
+          "solution_id",
+          "node_key",
+          "spot_class_key",
+          "config_id",
+          "pair",
+          "hero_position",
+          "action_family",
+          "decisions",
+          "actions",
+          "pooled",
+          "hands"
+        ],
+        "additionalProperties": false
+      },
+      "FrequencyComparison": {
+        "type": "object",
+        "properties": {
+          "min_spot_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "min_hand_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "spots": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpotFrequency"
+            },
+            "description": "The most played preflop nodes, most decisions first"
+          }
+        },
+        "required": [
+          "min_spot_decisions",
+          "min_hand_decisions",
+          "spots"
         ],
         "additionalProperties": false
       },
@@ -12172,6 +12823,12 @@
                       "blind-vs-blind",
                       "live-limped-straddled"
                     ]
+                  },
+                  "catalog_spot": {
+                    "$ref": "#/components/schemas/CatalogSpotInput"
+                  },
+                  "quiz": {
+                    "$ref": "#/components/schemas/QuizOptionsInput"
                   }
                 },
                 "required": [
@@ -14638,6 +15295,102 @@
         }
       }
     },
+    "/api/v1/progress/frequencies": {
+      "get": {
+        "summary": "Your preflop action frequencies against the solver's, per node and hand class",
+        "tags": [
+          "progress"
+        ],
+        "description": "Counted decisions only (no holdout, client-seeded or answer-revealing-panel decisions), preflop only, the 12 most played nodes, shown from a minimum sample (O-353, O-417, O-418). Labels come from one solver-query node read per spot, so it also answers the upstream problems.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrequencyComparison"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/prediction/{session}/next": {
       "get": {
         "summary": "The next prediction prompt",
@@ -14705,6 +15458,16 @@
           },
           "409": {
             "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14922,12 +15685,19 @@
                         "additionalProperties": false
                       }
                     ]
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Why the player answered so (S41, O-350, O-412): required, 3 to 1,000 characters after control and invisible characters are cleaned; stored with the answer, never graded"
                   }
                 },
                 "required": [
                   "prompt_id",
                   "state_version",
-                  "answer"
+                  "answer",
+                  "rationale"
                 ],
                 "additionalProperties": false
               }

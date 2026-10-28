@@ -411,11 +411,19 @@ export interface PracticeSession {
 }
 
 export interface PredictionAnswer {
+  /**
+   * the validated answer the reason explains (O-413)
+   */
+  answer: Json | null;
   correct: boolean;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   ladder: string;
   level: number;
+  /**
+   * the typed reason, cleaned at the api boundary; never graded (O-350, O-412)
+   */
+  rationale: string | null;
   session_id: string;
   spot_class_key: string;
   user_id: string;

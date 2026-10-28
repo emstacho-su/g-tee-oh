@@ -33,7 +33,7 @@ import { HomePage } from "./routes/home.js";
 import { JoinPage } from "./routes/join.js";
 import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
-import { PredictPage } from "./routes/predict/PredictPage.js";
+import { QuizPage } from "./routes/quiz/QuizPage.js";
 import { ProgressPage } from "./routes/progress/ProgressPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { DEFAULT_BUILDER_SECTION, isBuilderSection } from "./drills/builder-sections.js";
@@ -48,7 +48,8 @@ import { SettingsPage } from "./routes/settings/SettingsPage.js";
 import { StudyPage } from "./routes/study/StudyPage.js";
 import { TrainPage } from "./routes/train/TrainPage.js";
 import { trainModeOf, validateTrainSearch } from "./routes/train/train-search.js";
-import { validatePracticeSearch } from "./practice/search.js";
+import { validatePaintSearch } from "./practice/paint-search.js";
+import { predictRedirectSearch, validateQuizSearch } from "./practice/quiz-search.js";
 import { validateStudySearch } from "./study/search.js";
 import { validateDrillRunSearch } from "./trainer/run-search.js";
 
@@ -216,21 +217,31 @@ export const studyRoute = createRoute({
     return <StudyPage search={validateStudySearch(studyRoute.useSearch())} />;
   },
 });
-// /predict and /paint are real screens (S27, O-302) with the same re-validation rule as /study.
+// /quiz and /paint are real screens (S27, S41, O-302, O-415) with the same re-validation rule as
+// /study. /quiz replaced /predict (O-419): an old /predict link redirects, keeping drill and seed,
+// which mean the same on /quiz, and dropping every other parameter (the PM's rule).
+export const quizRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/quiz",
+  validateSearch: validateQuizSearch,
+  component: function QuizRouteScreen() {
+    return <QuizPage search={validateQuizSearch(quizRoute.useSearch())} />;
+  },
+});
 export const predictRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/predict",
-  validateSearch: validatePracticeSearch,
-  component: function PredictRouteScreen() {
-    return <PredictPage search={validatePracticeSearch(predictRoute.useSearch())} />;
+  beforeLoad: ({ search }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({ to: "/quiz", search: predictRedirectSearch(search), replace: true });
   },
 });
 export const paintRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/paint",
-  validateSearch: validatePracticeSearch,
+  validateSearch: validatePaintSearch,
   component: function PaintRouteScreen() {
-    return <PaintPage search={validatePracticeSearch(paintRoute.useSearch())} />;
+    return <PaintPage search={validatePaintSearch(paintRoute.useSearch())} />;
   },
 });
 // /progress is a real screen (S32, R4.12); it takes no search, so it needs no re-validation.
@@ -305,6 +316,7 @@ export const routeTree = rootRoute.addChildren([
     drillSectionRoute,
     drillRunRoute,
     studyRoute,
+    quizRoute,
     predictRoute,
     paintRoute,
     progressRoute,

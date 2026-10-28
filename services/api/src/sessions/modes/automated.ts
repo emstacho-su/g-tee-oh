@@ -11,9 +11,10 @@
  * class spots as its hero spots, so S23 dealing serves the block unchanged (O-272). Settings: stop
  * rule after_action, the body's grouping and rng, answer-revealing panels off (automated/settings.ts).
  *
- * Seed: the body's seed, or 64 random bits. A client-supplied seed marks the session seeded: every
- * decision is unrated and no learning state is written (the hook part honours it), while the class
- * picks still run from the queue so the session replays.
+ * Seed: the body's seed, or the app's newSessionSeed (64 random bits unless a test pins it). A
+ * client-supplied seed marks the session seeded: every decision is unrated and no learning state is
+ * written (the hook part honours it), while the class picks still run from the queue so the session
+ * replays.
  */
 import { chooseNextBlock, noClassProblem } from "../../automated/next-block.js";
 import { loadClassCatalog } from "../../automated/class-catalog.js";
@@ -23,7 +24,6 @@ import { requireDatabase } from "../../http/database.js";
 import { idempotentWrite } from "../../http/idempotent-write.js";
 import { HTTP_STATUS } from "../../http/problem.js";
 import { requireSolverQuery } from "../../solver-query/client.js";
-import { newSessionSeed } from "../randomness.js";
 import { insertCoverageRequests, insertSession } from "../repository.js";
 import type { SessionCall, SessionCreateBody } from "../session-call.js";
 import { toSession, type Session } from "../session-view.js";
@@ -36,7 +36,7 @@ export async function createAutomatedSession(call: SessionCall, body: SessionCre
   const database = requireDatabase(call.app);
   const solverQuery = requireSolverQuery(call.app);
   const configIds = [...new Set(body.config_ids ?? [])].sort();
-  const seed = body.seed ?? newSessionSeed();
+  const seed = body.seed ?? call.app.newSessionSeed();
   const queue = emptyLearningQueue();
   // A scope naming a configuration the catalog does not serve is a 400 here (class-catalog.ts).
   const catalog = await loadClassCatalog(solverQuery, database, configIds.length === 0 ? undefined : configIds);

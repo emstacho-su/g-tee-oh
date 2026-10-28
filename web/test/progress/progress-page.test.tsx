@@ -1,10 +1,12 @@
 // /progress through the whole app (S32, R4.12, O-321, O-326): the six cards over a fake fetch,
 // per-card error with Try again, the weeks selector, and click to drill from the heat map and
-// the leak trend (find by tag, create when missing, no matching configuration).
+// the leak trend (find by tag, create when missing, no matching configuration). S41 scripts the
+// frequency card's read too; the card itself is tested in frequency.test.tsx.
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { drillListKey } from "../../src/drills/queries.js";
+import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
 import {
@@ -32,6 +34,7 @@ const PROGRESS: FetchScript = {
   "GET /api/v1/progress/heatmap": [jsonResponse(200, fixtureHeatmap)],
   "GET /api/v1/progress/holdout": [jsonResponse(200, fixtureHoldout)],
   "GET /api/v1/progress/streak": [jsonResponse(200, fixtureStreak)],
+  "GET /api/v1/progress/frequencies": [jsonResponse(200, fixtureFrequencies)],
 };
 
 const FRESH: FetchScript = {
@@ -42,6 +45,7 @@ const FRESH: FetchScript = {
   "GET /api/v1/progress/heatmap": [jsonResponse(200, fixtureFreshHeatmap)],
   "GET /api/v1/progress/holdout": [jsonResponse(200, fixtureFreshHoldout)],
   "GET /api/v1/progress/streak": [jsonResponse(200, fixtureFreshStreak)],
+  "GET /api/v1/progress/frequencies": [jsonResponse(200, fixtureFreshFrequencies)],
 };
 
 const NO_DRILLS = jsonResponse(200, { items: [], next_cursor: null });

@@ -12,7 +12,8 @@ import { MAX_SESSION_CONFIG_IDS } from "../src/schemas/training.js";
 import { buildTestApp, mutatingHeaders, readHeaders } from "./support/app.js";
 import { appDatabase, createTestSession, createTestUser, type TestSession } from "./support/database.js";
 
-const PROGRESS_PATHS = ["rating", "tracks", "leaks", "heatmap", "holdout", "streak"] as const;
+// S41 added frequencies (O-353): with no decisions it reads no solver-query node, so it answers 200 here.
+const PROGRESS_PATHS = ["rating", "tracks", "leaks", "heatmap", "holdout", "streak", "frequencies"] as const;
 const CONFIG = "cfg_6_online_100";
 
 let database: Database;

@@ -5,14 +5,17 @@
  *
  * Mechanism: one test per theme and width (1440 and 390). The seasoned learner's test captures
  * /progress full page, then element shots of the leak-cost trend, the mastery heat map, the heat
- * map with the tooltip of a focused cell and the holdout card with its Goodhart flag; since S36 the
+ * map with the tooltip of a focused cell, the holdout card with its Goodhart flag and (S41, O-353)
+ * the frequency card; the fresh learner's run adds the frequency card's empty state; since S36 the
  * tables are screen-reader only (O-347) and not shot. A second test per theme and width captures
- * the fresh learner's /progress (createAppMockApi learner "fresh") for the empty states. afterAll merges the records into the manifest;
- * each record's criterion names what it proves.
+ * the fresh learner's /progress (createAppMockApi learner "fresh") for the empty states. afterAll
+ * merges the records into the manifest: the screens S41 changed (progress-page,
+ * progress-frequencies, progress-frequencies-empty) under session S41, the rest under S36. Each
+ * record's criterion names what it proves.
  */
 import { mkdirSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
 import { installAppMockApi } from "../support/mock-app.js";
@@ -23,6 +26,7 @@ import { submitLogin } from "../support/sign-in-flow.js";
 
 const OUT_DIR = shotDirectory();
 const SESSION = "S36";
+const S41_SESSION = "S41";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 /** A practiced, due class in the middle of the grid, so its tooltip sits inside the card. */
@@ -36,14 +40,26 @@ const CRITERIA = {
   tooltip: "R4.12 heat map tooltip on a focused cell: class, known, recall, attempts, mastered and due (A7 section 4)",
   holdout: "R4.12 holdout card: open round progress and the latest closed round per track with the Goodhart flag in words (O-277)",
   fresh: "R4.12 /progress for a fresh learner: unrated, no leaks yet, every class new, no holdout round yet (empty states)",
+  frequencies:
+    "R4.12 frequency card: a spot select named in words, paired bars per action with your share and the solver's written next to each bar, hand rows largest gap first (O-353, O-417)",
+  frequenciesEmpty: "R4.12 frequency card with no spot yet: how many preflop decisions at one spot fill it (O-417)",
 } as const;
 
+/** The screens S41 changed are filed under S41; S36's other progress shots stay under S36. */
+const S41_SCREENS: ReadonlySet<string> = new Set(["progress-frequencies", "progress-frequencies-empty", "progress-page"]);
 const records: ShotRecord[] = [];
+const s41Records: ShotRecord[] = [];
 
 function shooter(page: Page, theme: Theme, viewport: Viewport) {
   return async (screen: string, criterion: string, target: Parameters<typeof capture>[0] = page) => {
-    records.push(await capture(target, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE }));
+    const record = await capture(target, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE });
+    (S41_SCREENS.has(screen) ? s41Records : records).push(record);
   };
+}
+
+/** Centres a card in the viewport, so the sticky app header does not cover its heading in an element shot. */
+async function clearOfHeader(card: Locator): Promise<void> {
+  await card.evaluate((element) => element.scrollIntoView({ block: "center" }));
 }
 
 async function openProgress(page: Page, learner: MockLearner): Promise<void> {
@@ -76,6 +92,10 @@ async function chartShots(page: Page, shot: ReturnType<typeof shooter>): Promise
   await expect(page.getByTestId("goodhart-flag")).toBeVisible();
   await shot("progress-holdout", CRITERIA.holdout, page.getByTestId("holdout-card"));
 
+  await expect(page.getByTestId("frequency-bars")).toBeVisible();
+  await clearOfHeader(page.getByTestId("frequency-card"));
+  await shot("progress-frequencies", CRITERIA.frequencies, page.getByTestId("frequency-card"));
+
   // S36, O-347: no visible table toggle and no table to picture (the old progress-leak-table and
   // progress-heatmap-table shots); the rows and cells carry the values for screen readers.
   await expect(page.getByRole("button", { name: /^Show (table|chart)/ })).toHaveCount(0);
@@ -88,6 +108,7 @@ test.beforeAll(() => {
 
 test.afterAll(() => {
   mergeShotManifest(OUT_DIR, SESSION, records);
+  mergeShotManifest(OUT_DIR, S41_SESSION, s41Records);
 });
 
 for (const theme of THEMES) {
@@ -106,6 +127,9 @@ for (const theme of THEMES) {
       await expect(page.getByText("No leaks yet: finish an automated session to see where you lose the most")).toBeVisible();
       await expect(page.getByText("No holdout round yet")).toBeVisible();
       await shooter(page, theme, viewport)("progress-fresh", CRITERIA.fresh);
+      await expect(page.getByText("Play 30 preflop decisions at one spot to compare your frequencies with the solver's.")).toBeVisible();
+      await clearOfHeader(page.getByTestId("frequency-card"));
+      await shooter(page, theme, viewport)("progress-frequencies-empty", CRITERIA.frequenciesEmpty, page.getByTestId("frequency-card"));
     });
   }
 }
