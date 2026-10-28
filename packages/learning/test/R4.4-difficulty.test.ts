@@ -35,6 +35,7 @@ const RATED_OUTPUT: GradeOutput = Object.freeze({
   rated: true,
   weight: 1,
   gradedActionIndex: 1,
+  followedRoll: null,
 });
 
 const gap = fc.double({ min: 0, max: 1000, noNaN: true });

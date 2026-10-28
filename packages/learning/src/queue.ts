@@ -8,22 +8,17 @@
  * the frequency prior, ADR 0013, O-255; the floor keeps every due class drawable, O-255). pickNext then applies the rules of O-256 in order:
  *   1. The interleave rule: only candidates whose action family differs from the last pick's are
  *      eligible. With one family only, the rule relaxes and every candidate is eligible.
- *   2. Hypercorrection (05 section 5, O-215): the first key of state.hypercorrection (most recent
- *      first) that is eligible is served next and leaves the list, whatever its priority. A miss in
- *      the family just played therefore waits exactly one pick. A key that is not on offer stays.
- *   3. Otherwise one eligible candidate is drawn with probability proportional to priority, with
- *      exactly one call of the injected RandomSource (A1 section 2); if every eligible priority is
- *      0 the draw is uniform.
- *   4. A first exposure is served as a worked example: panels visible and not rated (A6 section 3).
+ *   2. One eligible candidate is drawn with probability proportional to priority, with exactly one
+ *      call of the injected RandomSource (A1 section 2); if every eligible priority is 0 the draw is
+ *      uniform. (S30's hypercorrection step, which served a confident miss first, was retired with
+ *      the confidence tap and R3.11, O-345.)
+ *   3. A first exposure is served as a worked example: panels visible and not rated (A6 section 3).
  *      Any other pick is eligible to be rated; grade() still applies the anti-farming rules.
- * recordAttempt files a confident miss at the front of the hypercorrection list through S22's
- * promoteConfidentMiss. Mastery is not an input: it gates nothing (ADR 0012). Every function
+ * Mastery is not an input: it gates nothing (ADR 0012). Every function
  * returns new frozen objects and never mutates its arguments.
  */
-import { promoteConfidentMiss } from "./calibration.js";
-import type { ConfidenceAttempt } from "./calibration.js";
 import type { RandomSource } from "./types.js";
-import { elementAt, isList, requireBoolean, requireKey, requireNonNegative, requireStringList } from "./validate.js";
+import { elementAt, isList, requireBoolean, requireKey, requireNonNegative } from "./validate.js";
 
 /** One spot class the queue may serve: its key, its action family, its priority, and whether it is new. */
 export type QueueCandidate = Readonly<{
@@ -33,11 +28,11 @@ export type QueueCandidate = Readonly<{
   firstExposure: boolean;
 }>;
 
-/** The picker's memory: the last pick's family and the pending confident misses, most recent first. */
-export type QueueState = Readonly<{ lastFamily: string | null; hypercorrection: readonly string[] }>;
+/** The picker's memory: the last pick's family. */
+export type QueueState = Readonly<{ lastFamily: string | null }>;
 
-/** Why a class was picked: a pending confident miss, or the priority-weighted draw. */
-export type QueuePickReason = "hypercorrection" | "priority";
+/** Why a class was picked: the priority-weighted draw, the only rule since O-345. */
+export type QueuePickReason = "priority";
 
 /** The served class and how to serve it; rated means eligible to be rated (A6 section 3). */
 export type QueuePick = Readonly<{
@@ -69,16 +64,15 @@ export function queuePriority(leakCostBbPer1000: number, overdueFactor: number):
   return Math.max(leakCost, LEAK_COST_FLOOR_BB_PER_1000) * requireNonNegative(overdueFactor, "overdueFactor");
 }
 
-/** The state before the first pick: no last family and no pending miss. */
+/** The state before the first pick: no last family. */
 export function emptyQueueState(): QueueState {
-  return Object.freeze({ lastFamily: null, hypercorrection: Object.freeze([]) });
+  return Object.freeze({ lastFamily: null });
 }
 
 function requireState(state: QueueState): QueueState {
   if (state.lastFamily !== null) {
     requireKey(state.lastFamily, "state.lastFamily");
   }
-  requireStringList(state.hypercorrection, "state.hypercorrection");
   return state;
 }
 
@@ -98,14 +92,6 @@ function requireCandidates(candidates: readonly QueueCandidate[]): readonly Queu
     requireBoolean(candidate.firstExposure, `candidates[${index}].firstExposure`);
   });
   return candidates;
-}
-
-/** The state after one graded attempt: a confident miss moves its class to the front (O-215). */
-export function recordAttempt(state: QueueState, spotClassKey: string, attempt: ConfidenceAttempt): QueueState {
-  const valid = requireState(state);
-  const key = requireKey(spotClassKey, "spotClassKey");
-  const hypercorrection = promoteConfidentMiss(valid.hypercorrection, key, attempt, (entry) => entry);
-  return Object.freeze({ lastFamily: valid.lastFamily, hypercorrection: Object.freeze(hypercorrection) });
 }
 
 /** A draw of the injected RandomSource, checked to lie in [0, 1). */
@@ -159,14 +145,6 @@ export function pickNext(
   const offered = requireCandidates(candidates);
   const outsideLast = offered.filter((candidate) => candidate.family !== valid.lastFamily);
   const eligible = outsideLast.length === 0 ? offered : outsideLast;
-  const pendingKey = valid.hypercorrection.find((key) => eligible.some((candidate) => candidate.spotClassKey === key));
-  const pending = eligible.find((candidate) => candidate.spotClassKey === pendingKey);
-  const pick =
-    pending === undefined ? pickOf(drawByPriority(eligible, random), "priority") : pickOf(pending, "hypercorrection");
-  const servedKey = pending?.spotClassKey;
-  const hypercorrection = valid.hypercorrection.filter((key) => key !== servedKey);
-  return Object.freeze({
-    pick,
-    state: Object.freeze({ lastFamily: pick.family, hypercorrection: Object.freeze(hypercorrection) }),
-  });
+  const pick = pickOf(drawByPriority(eligible, random), "priority");
+  return Object.freeze({ pick, state: Object.freeze({ lastFamily: pick.family }) });
 }

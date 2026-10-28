@@ -1,8 +1,9 @@
 /**
  * @g-tee-oh/learning holds the pure TypeScript learning model. S05 landed the red test vectors and
  * the skeleton (src/types.ts and one placeholder module per A6 section 1 row owned by this
- * package, all replaced now); S22 landed the grading policy (grade, the grouping modes, the RNG band mapping, the
- * SplitMix64 RandomSource, calibration and the confident-miss rule); S30 lands the Glicko-2
+ * package, all replaced now); S22 landed the grading policy (grade, the grouping modes, the RNG band mapping and the
+ * SplitMix64 RandomSource; S37 moved Best to the highest-EV rule of ADR 0024 in src/best.ts and retired
+ * calibration and the confident-miss rule with R3.11, O-345); S30 lands the Glicko-2
  * rating, item difficulty, FSRS (Free Spaced Repetition Scheduler) scheduling, BKT (Bayesian
  * Knowledge Tracing) mastery, leak-cost and queue modules. This package stays pure: no I/O
  * (input/output), no clock, no randomness except an injected random number generator (A1
@@ -37,6 +38,9 @@ export {
   isRated,
   scoreFor,
 } from "./grading.js";
+export { LOSS_TIE_TOLERANCE_PCT_POT, bestActionIndexes, followsRoll } from "./best.js";
+export type { BestActionsInput, RollFollowInput } from "./best.js";
+export { GRADE_LABELS, isCorrectLabel } from "./labels.js";
 export { ACTION_KINDS, BUCKETS, passiveToAggressiveOrder } from "./actions.js";
 export { groupKeys } from "./grouping.js";
 export {
@@ -51,8 +55,6 @@ export {
 export type { RngBand } from "./rng-bands.js";
 export { createSplitMix64, splitMix64Source, splitMix64Step } from "./random.js";
 export type { SplitMix64, SplitMix64Step } from "./random.js";
-export { aggregateCalibration, isConfidentMiss, isCorrectLabel, promoteConfidentMiss } from "./calibration.js";
-export type { Calibration, CalibrationSide, Confidence, ConfidenceAttempt } from "./calibration.js";
 
 // S30: rating (R4.1, R4.3, R4.4, R4.5)
 export {
@@ -103,7 +105,7 @@ export {
 export type { Deck, FsrsGrade, FsrsOptions, MemoryStep, ReviewOutcome, SpotClassCard } from "./fsrs.js";
 export { BKT_PARAMETERS, MASTERY_THRESHOLD, isMastered, newMastery, observationFromLabel, updateMastery } from "./bkt.js";
 export type { BktParameters, Mastery, MasteryUpdate } from "./bkt.js";
-export { emptyQueueState, pickNext, queuePriority, recordAttempt } from "./queue.js";
+export { emptyQueueState, pickNext, queuePriority } from "./queue.js";
 export type { QueueCandidate, QueuePick, QueuePickReason, QueueState, QueueStep } from "./queue.js";
 
 // S30: leak cost (R4.8)

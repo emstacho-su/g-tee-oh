@@ -11,7 +11,7 @@
  * never merge. Simple keys by action type: fold, check, call (a limp is a call of the big blind),
  * bet, raise; an all-in joins the node's bet or raise type, or stands alone when the node has
  * neither; a straddle stands alone. A group grades at its lowest-loss member (the best size of the
- * type), its frequency is the sum of its members', and the per-action losses arrive from Rust
+ * type), and the per-action losses arrive from Rust
  * (O-210, ADR 0004).
  */
 import type { ActionKind, GradeAction, Grouping, Street } from "./types.js";
@@ -64,15 +64,6 @@ export function groupKeys(actions: readonly GradeAction[], grouping: Grouping, s
     case "simple":
       return simpleKeys(actions);
   }
-}
-
-/** Summed frequency per group key. */
-export function groupFrequencies(keys: readonly string[], freqByAction: readonly number[]): ReadonlyMap<string, number> {
-  const totals = new Map<string, number>();
-  keys.forEach((key, index) => {
-    totals.set(key, (totals.get(key) ?? 0) + elementAt(freqByAction, index, "freqByAction"));
-  });
-  return totals;
 }
 
 /**
