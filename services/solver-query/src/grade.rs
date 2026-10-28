@@ -263,10 +263,19 @@ fn reach_share(view: &NodeView, seat: usize) -> Option<f64> {
 pub fn seat_totals(view: &NodeView, seat: usize) -> (u32, f64) {
     let space = view.record().hand_space;
     view.hands().into_iter().fold((0, 0.0), |(combos, weighted), hand| {
-        let weight = hand_weight(space, hand);
-        let reach = view.reach(hand).map_or(1.0, |reach| f64::from(reach[seat]));
-        (combos.saturating_add(weight), weighted + f64::from(weight) * reach)
+        let combos = combos.saturating_add(hand_weight(space, hand));
+        (combos, weighted + reach_weighted_combos(view, seat, hand))
     })
+}
+
+/// How many of the seat's combos `hand` stands for at the node: its combos
+/// (`hand_weight`) times the seat's reach, the reach taken as 1 when the record has none.
+/// Summed over the held hands it is `seat_totals`' weighted total, so it is the numerator
+/// of a hand's range share (`/v1/grade-range`, O-300).
+#[must_use]
+pub fn reach_weighted_combos(view: &NodeView, seat: usize, hand: u16) -> f64 {
+    let combos = f64::from(hand_weight(view.record().hand_space, hand));
+    combos * view.reach(hand).map_or(1.0, |reach| f64::from(reach[seat]))
 }
 
 /// The reach-weighted share of the acting seat's range taking each action, in record
@@ -275,7 +284,6 @@ pub fn seat_totals(view: &NodeView, seat: usize) -> (u32, f64) {
 #[must_use]
 pub fn action_shares(view: &NodeView) -> Vec<f64> {
     let actions = view.actions().len();
-    let space = view.record().hand_space;
     let seat = acting_seat(view).unwrap_or_default();
     let mut taken = vec![0.0; actions];
     let mut total = 0.0;
@@ -283,14 +291,21 @@ pub fn action_shares(view: &NodeView) -> Vec<f64> {
         let Some(frequencies) = view.frequencies(hand) else {
             continue;
         };
-        let reach = view.reach(hand).map_or(1.0, |reach| f64::from(reach[seat]));
-        let weight = f64::from(hand_weight(space, hand)) * reach;
+        let weight = reach_weighted_combos(view, seat, hand);
         total += weight;
         for (share, frequency) in taken.iter_mut().zip(frequencies) {
             *share += weight * f64::from(frequency);
         }
     }
     if total > 0.0 { taken.into_iter().map(|share| share / total).collect() } else { taken }
+}
+
+/// True when two or more actions are played at `MIX_EPSILON` or more (O-153, O-301): the
+/// one mix rule behind `DifficultyFeatures::mixed` on `/v1/grade` and `HandRow::mixed` on
+/// `/v1/nodes`, so the two routes cannot disagree.
+#[must_use]
+pub fn is_mixed(frequencies: &[f32]) -> bool {
+    frequencies.iter().filter(|frequency| **frequency >= MIX_EPSILON).count() >= 2
 }
 
 /// The difficulty features of a hand (R4.4, plan C.2 step 8) from its frequencies and
@@ -305,12 +320,11 @@ pub fn difficulty_features(
 ) -> DifficultyFeatures {
     let mut sorted = loss_units.to_vec();
     sorted.sort_unstable();
-    let played = frequencies.iter().filter(|frequency| **frequency >= MIX_EPSILON).count();
     DifficultyFeatures {
         ev_gap_pct_pot: sorted.get(1).map_or(0.0, |units| loss_pct_pot(*units)),
         purity: frequencies.iter().copied().fold(0.0, f32::max),
         n_actions: u8::try_from(loss_units.len()).unwrap_or(u8::MAX),
-        mixed: played >= 2,
+        mixed: is_mixed(frequencies),
         all_within_floor: loss_units
             .iter()
             .filter(|units| **units > 0)

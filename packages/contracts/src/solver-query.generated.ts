@@ -145,6 +145,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/grade-range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grades a painted range: each hand's expected value (EV) loss in bb and percent of the
+         *     pot at its painted action, its share of the acting seat's range, the weighted loss and
+         *     the total, with the node's floor (O-22).
+         * @description # Errors
+         *
+         *     `ApiError::BadRequest` for a malformed solution id or node key, a paint over 1,326
+         *     entries, a hand that is not a class, a class painted twice, a 1,326-combo node, an
+         *     action index out of range, a hand the node does not hold or a held hand left unpainted;
+         *     `ApiError::NotFound` for a solution or node that does not exist; `ApiError::Unavailable`
+         *     for a solution the reader marked unavailable.
+         */
+        post: operations["grade_range"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/insights": {
         parameters: {
             query?: never;
@@ -494,6 +522,46 @@ export interface components {
              */
             texture_family: string;
         };
+        /** @description The body of `POST /v1/grade-range`. */
+        GradeRangeRequest: {
+            /**
+             * @description The node key in the A3 section 1 grammar; a `preflop_169` node in v1.
+             * @example cfg_6_online_100/BB-BTN/r250
+             */
+            node_key: string;
+            /**
+             * @description Every hand the node holds, each exactly once, with its painted action; at most
+             *     1,326 entries.
+             */
+            paint: components["schemas"]["PaintedHand"][];
+            /**
+             * @description The solution to grade against.
+             * @example 5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d
+             */
+            solution_id: string;
+        };
+        /** @description The body of a `POST /v1/grade-range` answer. */
+        GradeRangeResponse: {
+            /**
+             * Format: float
+             * @description The floor in percent of the pot the policy subtracts per hand (O-22).
+             */
+            floor_pct_pot: number;
+            /** @description Which term set the floor. */
+            floor_source: components["schemas"]["FloorSource"];
+            /** @description The node key in its canonical text. */
+            node_key: string;
+            /** @description One entry per held hand, in the record's hand order. */
+            per_hand: components["schemas"]["PaintedHandGrade"][];
+            /** @description The solution graded against. */
+            solution_id: string;
+            /**
+             * Format: double
+             * @description The sum of `weighted_loss_bb`: the painted range's EV loss in bb per hand dealt to
+             *     the acting seat at this node.
+             */
+            total_weighted_loss_bb: number;
+        };
         /** @description The body of `POST /v1/grade`. */
         GradeRequest: {
             /**
@@ -624,6 +692,13 @@ export interface components {
             hand: string;
             /** @description The loss of each action in percent of the pot, in record order; 0 for the best. */
             loss_pct_pot: number[];
+            /**
+             * @description True when two or more actions are played at 5 percent or more (O-153, O-301), the
+             *     rule behind `/v1/grade`'s `difficulty_features.mixed`; a class row of a 1,326-combo
+             *     node reads it from the aggregated strategy, so a class whose combos each play one
+             *     different action is mixed; additive.
+             */
+            mixed: boolean;
             /** @description Reach per seat in pair order (out of position first); null when the record has none. */
             reach?: number[] | null;
             /** @description The frequency of each action in record order, summing to 1. */
@@ -799,6 +874,60 @@ export interface components {
              * @description The acting seat's share minus the other seat's.
              */
             to_act_advantage: number;
+        };
+        /** @description One painted hand: a class and the action it is painted with. */
+        PaintedHand: {
+            /**
+             * Format: int32
+             * @description The index of the painted action, in the node's record order.
+             */
+            action_index: number;
+            /**
+             * @description The hand, a class name such as `AKs`.
+             * @example AKs
+             */
+            hand: string;
+        };
+        /** @description One painted hand graded. */
+        PaintedHandGrade: {
+            /**
+             * Format: int32
+             * @description The painted action.
+             */
+            action_index: number;
+            /**
+             * Format: int32
+             * @description The first action with zero loss: the highest EV, the first on ties (O-130).
+             */
+            best_action_index: number;
+            /**
+             * @description The hand's canonical class name.
+             * @example AKs
+             */
+            hand: string;
+            /**
+             * Format: float
+             * @description The painted action's loss in bb, raw and never clamped; equal to `POST /v1/grade`'s
+             *     `loss_bb` for the same hand and action.
+             */
+            loss_bb: number;
+            /**
+             * Format: float
+             * @description The painted action's loss in percent of the pot, raw and never clamped.
+             */
+            loss_pct_pot: number;
+            /**
+             * Format: double
+             * @description The hand's share of the acting seat's range: its reach times its combos over the
+             *     same sum across every hand the node holds (reach 1 when the record has none), so
+             *     the weights sum to 1; every weight is 0 when the seat holds no reach-weighted combo.
+             */
+            weight: number;
+            /**
+             * Format: double
+             * @description `loss_bb` times `weight`, in bb.
+             */
+            weighted_loss_bb: number;
         };
         /** @description Preflop availability for the configuration and pair. */
         PreflopCoverage: {
@@ -1272,6 +1401,57 @@ export interface operations {
                 };
             };
             /** @description No such solution, node or hand */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The solution is marked unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    grade_range: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeRangeRequest"];
+            };
+        };
+        responses: {
+            /** @description The graded range */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeRangeResponse"];
+                };
+            };
+            /** @description A malformed solution id or node key, a paint over 1,326 entries, a hand that is not a class, a class painted twice, a 1,326-combo node, an action index out of range, a hand the node does not hold, or a held hand left unpainted */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such solution or node */
             404: {
                 headers: {
                     [name: string]: unknown;

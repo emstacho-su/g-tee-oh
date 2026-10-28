@@ -304,6 +304,68 @@
         }
       }
     },
+    "/v1/grade-range": {
+      "post": {
+        "tags": [
+          "grade"
+        ],
+        "summary": "Grades a painted range: each hand's expected value (EV) loss in bb and percent of the\npot at its painted action, its share of the acting seat's range, the weighted loss and\nthe total, with the node's floor (O-22).",
+        "description": "# Errors\n\n`ApiError::BadRequest` for a malformed solution id or node key, a paint over 1,326\nentries, a hand that is not a class, a class painted twice, a 1,326-combo node, an\naction index out of range, a hand the node does not hold or a held hand left unpainted;\n`ApiError::NotFound` for a solution or node that does not exist; `ApiError::Unavailable`\nfor a solution the reader marked unavailable.",
+        "operationId": "grade_range",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeRangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The graded range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeRangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed solution id or node key, a paint over 1,326 entries, a hand that is not a class, a class painted twice, a 1,326-combo node, an action index out of range, a hand the node does not hold, or a held hand left unpainted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such solution or node",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The solution is marked unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/insights": {
       "get": {
         "tags": [
@@ -1035,6 +1097,78 @@
           }
         }
       },
+      "GradeRangeRequest": {
+        "type": "object",
+        "description": "The body of `POST /v1/grade-range`.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "paint"
+        ],
+        "properties": {
+          "node_key": {
+            "type": "string",
+            "description": "The node key in the A3 section 1 grammar; a `preflop_169` node in v1.",
+            "example": "cfg_6_online_100/BB-BTN/r250"
+          },
+          "paint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaintedHand"
+            },
+            "description": "Every hand the node holds, each exactly once, with its painted action; at most\n1,326 entries.",
+            "maxItems": 1326
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution to grade against.",
+            "example": "5e7a1c2b-3d4f-8a6b-9c0d-1e2f3a4b5c6d"
+          }
+        }
+      },
+      "GradeRangeResponse": {
+        "type": "object",
+        "description": "The body of a `POST /v1/grade-range` answer.",
+        "required": [
+          "solution_id",
+          "node_key",
+          "floor_pct_pot",
+          "floor_source",
+          "per_hand",
+          "total_weighted_loss_bb"
+        ],
+        "properties": {
+          "floor_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The floor in percent of the pot the policy subtracts per hand (O-22)."
+          },
+          "floor_source": {
+            "$ref": "#/components/schemas/FloorSource",
+            "description": "Which term set the floor."
+          },
+          "node_key": {
+            "type": "string",
+            "description": "The node key in its canonical text."
+          },
+          "per_hand": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaintedHandGrade"
+            },
+            "description": "One entry per held hand, in the record's hand order."
+          },
+          "solution_id": {
+            "type": "string",
+            "description": "The solution graded against."
+          },
+          "total_weighted_loss_bb": {
+            "type": "number",
+            "format": "double",
+            "description": "The sum of `weighted_loss_bb`: the painted range's EV loss in bb per hand dealt to\nthe acting seat at this node."
+          }
+        }
+      },
       "GradeRequest": {
         "type": "object",
         "description": "The body of `POST /v1/grade`.",
@@ -1254,7 +1388,8 @@
           "strategy",
           "ev_bb",
           "loss_pct_pot",
-          "ev_best_bb"
+          "ev_best_bb",
+          "mixed"
         ],
         "properties": {
           "ev_bb": {
@@ -1282,6 +1417,10 @@
               "format": "float"
             },
             "description": "The loss of each action in percent of the pot, in record order; 0 for the best."
+          },
+          "mixed": {
+            "type": "boolean",
+            "description": "True when two or more actions are played at 5 percent or more (O-153, O-301), the\nrule behind `/v1/grade`'s `difficulty_features.mixed`; a class row of a 1,326-combo\nnode reads it from the aggregated strategy, so a class whose combos each play one\ndifferent action is mixed; additive."
           },
           "reach": {
             "type": [
@@ -1636,6 +1775,79 @@
             "type": "number",
             "format": "float",
             "description": "The acting seat's share minus the other seat's."
+          }
+        }
+      },
+      "PaintedHand": {
+        "type": "object",
+        "description": "One painted hand: a class and the action it is painted with.",
+        "required": [
+          "hand",
+          "action_index"
+        ],
+        "properties": {
+          "action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The index of the painted action, in the node's record order.",
+            "minimum": 0
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand, a class name such as `AKs`.",
+            "example": "AKs"
+          }
+        }
+      },
+      "PaintedHandGrade": {
+        "type": "object",
+        "description": "One painted hand graded.",
+        "required": [
+          "hand",
+          "action_index",
+          "best_action_index",
+          "loss_bb",
+          "loss_pct_pot",
+          "weight",
+          "weighted_loss_bb"
+        ],
+        "properties": {
+          "action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The painted action.",
+            "minimum": 0
+          },
+          "best_action_index": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The first action with zero loss: the highest EV, the first on ties (O-130).",
+            "minimum": 0
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hand's canonical class name.",
+            "example": "AKs"
+          },
+          "loss_bb": {
+            "type": "number",
+            "format": "float",
+            "description": "The painted action's loss in bb, raw and never clamped; equal to `POST /v1/grade`'s\n`loss_bb` for the same hand and action."
+          },
+          "loss_pct_pot": {
+            "type": "number",
+            "format": "float",
+            "description": "The painted action's loss in percent of the pot, raw and never clamped."
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "description": "The hand's share of the acting seat's range: its reach times its combos over the\nsame sum across every hand the node holds (reach 1 when the record has none), so\nthe weights sum to 1; every weight is 0 when the seat holds no reach-weighted combo."
+          },
+          "weighted_loss_bb": {
+            "type": "number",
+            "format": "double",
+            "description": "`loss_bb` times `weight`, in bb."
           }
         }
       },
@@ -2082,7 +2294,7 @@
     },
     {
       "name": "grade",
-      "description": "Grade one decision with the preflop floor (POST /v1/grade)"
+      "description": "Grade one decision (POST /v1/grade) or a painted preflop range (POST /v1/grade-range) with the floor"
     },
     {
       "name": "insights",

@@ -340,6 +340,28 @@ pub async fn grade(
     post(router, "/v1/grade", &body).await
 }
 
+/// `POST /v1/grade-range` for one paint, given as (hand, action index) pairs.
+pub async fn grade_range(
+    router: Router,
+    solution_id: &str,
+    key: &str,
+    paint: &[(String, usize)],
+) -> (StatusCode, HeaderMap, Value) {
+    let paint: Vec<Value> = paint
+        .iter()
+        .map(|(hand, action)| serde_json::json!({ "hand": hand, "action_index": action }))
+        .collect();
+    let body = serde_json::json!({ "solution_id": solution_id, "node_key": key, "paint": paint });
+    post(router, "/v1/grade-range", &body).await
+}
+
+/// The committed fixture library (O-62, R2.20), the root the dev profile and the api
+/// integration tests mount.
+#[must_use]
+pub fn fixture_library_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../validation/fixtures/library")
+}
+
 /// Percent-encodes the characters of a node key that a query string cannot carry raw.
 #[must_use]
 pub fn encode(text: &str) -> String {

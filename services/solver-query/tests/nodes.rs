@@ -211,3 +211,33 @@ async fn r2_13_nodes_unavailable_solution_answers_503() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(health["library"]["unavailable"], 1, "body was {health}");
 }
+
+/// The synthetic `cfg_6_online_100` BB-BTN solution of the committed fixture library.
+const FIXTURE_LIBRARY_SOLUTION_ID: &str = "f99b054c-6f19-8e69-8003-24060ce3cef7";
+/// The big blind facing the button's open to 2.5 bb there: fold, call, raise to 10 bb.
+const FIXTURE_LIBRARY_NODE_KEY: &str = "cfg_6_online_100/BB-BTN/r250";
+
+#[tokio::test]
+async fn r3_16_hand_rows_flag_mixed_classes_as_v1_grade_does() {
+    // O-301: 55 calls and raises about half each (mixed), 72o folds purely; every row's
+    // flag equals difficulty_features.mixed from /v1/grade for the same hand.
+    let router = common::router_over(&common::fixture_library_root());
+    let (id, key) = (FIXTURE_LIBRARY_SOLUTION_ID, FIXTURE_LIBRARY_NODE_KEY);
+    let (status, _, json) = get_node(router.clone(), id, key, None).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    let rows = json["hands"].as_array().expect("hands");
+    assert_eq!(rows.len(), CLASSES, "{json}");
+    let flag = |name: &str| rows.iter().find(|row| row["hand"] == name).map(|row| &row["mixed"]);
+    assert_eq!(flag("55"), Some(&Value::Bool(true)), "55 calls and raises about half each");
+    assert_eq!(flag("72o"), Some(&Value::Bool(false)), "72o folds purely");
+    for row in rows {
+        let hand = row["hand"].as_str().expect("a hand");
+        let (status, _, graded) = common::grade(router.clone(), id, key, hand, 0).await;
+        assert_eq!(status, StatusCode::OK, "body was {graded}");
+        assert_eq!(row["mixed"], graded["difficulty_features"]["mixed"], "{hand}: {row}");
+    }
+
+    let (status, _, one) = get_node(router, id, key, Some("55")).await;
+    assert_eq!(status, StatusCode::OK, "body was {one}");
+    assert_eq!(one["hands"][0]["mixed"], true, "the one-hand filter carries the flag: {one}");
+}

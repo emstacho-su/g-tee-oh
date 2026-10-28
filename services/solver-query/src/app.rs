@@ -40,7 +40,9 @@ use crate::library::Library;
 use crate::metrics::Metrics;
 use crate::middleware::{latency, request_id};
 use crate::openapi::ApiDoc;
-use crate::routes::{coverage, deal, grade, healthz, insights, metrics, nodes, sample_action};
+use crate::routes::{
+    coverage, deal, grade, grade_range, healthz, insights, metrics, nodes, sample_action,
+};
 
 /// The most bytes a request body may carry, 64 KiB: a grade, deal or sample-action body
 /// is under a kilobyte, so anything near this limit is not a request this service takes.
@@ -199,6 +201,7 @@ pub fn app_with(state: AppState) -> (Router, OpenApi) {
         .routes(routes!(metrics::metrics))
         .routes(routes!(nodes::nodes))
         .routes(routes!(grade::grade))
+        .routes(routes!(grade_range::grade_range))
         .routes(routes!(insights::insights))
         .routes(routes!(deal::deal))
         .routes(routes!(deal::reveal))
