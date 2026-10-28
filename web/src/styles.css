@@ -29,6 +29,19 @@
   --felt: #166534;
   --felt-edge: #14532d;
   --focus: #f59e0b;
+  /*
+   * Mastery heat map (S32, O-320): five ordinal steps of one blue hue, lowest mastery first,
+   * validated with the dataviz palette validator (ordinal mode) against --surface-raised in each
+   * theme. Cell text: steps 1 and 2 take --heat-ink-low, steps 3 to 5 --heat-ink-high, in both
+   * themes, which keeps every label at 4.4:1 or more against its step.
+   */
+  --heat-1: #86b6ef;
+  --heat-2: #5598e7;
+  --heat-3: #2a78d6;
+  --heat-4: #1c5cab;
+  --heat-5: #104281;
+  --heat-ink-low: #0f172a;
+  --heat-ink-high: #ffffff;
   color-scheme: light;
 }
 
@@ -47,6 +60,14 @@
   --felt: #14532d;
   --felt-edge: #052e16;
   --focus: #fbbf24;
+  /* Dark steps run from dark (low mastery) to light (high), validated against #111827. */
+  --heat-1: #184f95;
+  --heat-2: #256abf;
+  --heat-3: #3987e5;
+  --heat-4: #6da7ec;
+  --heat-5: #b7d3f6;
+  --heat-ink-low: #ffffff;
+  --heat-ink-high: #0b1120;
   color-scheme: dark;
 }
 
@@ -65,6 +86,13 @@
   --color-felt: var(--felt);
   --color-felt-edge: var(--felt-edge);
   --color-focus: var(--focus);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
+  --color-heat-ink-low: var(--heat-ink-low);
+  --color-heat-ink-high: var(--heat-ink-high);
 }
 
 html,

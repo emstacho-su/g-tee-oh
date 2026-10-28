@@ -32,6 +32,7 @@ import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
 import { PredictPage } from "./routes/predict/PredictPage.js";
+import { ProgressPage } from "./routes/progress/ProgressPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { validateLibrarySearch } from "./library/search.js";
 import { LibraryPage } from "./routes/library/LibraryPage.js";
@@ -141,7 +142,8 @@ export const paintRoute = createRoute({
     return <PaintPage search={validatePracticeSearch(paintRoute.useSearch())} />;
   },
 });
-export const progressRoute = screenRoute("/progress", "progress");
+// /progress is a real screen (S32, R4.12); it takes no search, so it needs no re-validation.
+export const progressRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/progress", component: ProgressPage });
 // /library and /settings are real screens (S28, R3.4, R3.5); /library re-validates its search in
 // the route component for the same parent-merge reason as /study above.
 export const libraryRoute = createRoute({
