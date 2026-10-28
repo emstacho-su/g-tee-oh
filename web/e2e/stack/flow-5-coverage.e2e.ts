@@ -19,7 +19,7 @@ import { test } from "@playwright/test";
 import { chooseConfig, expectLiveUpdates, openLibrary, pauseThenResume, requestQueuedFlop, requestUncoveredPreflop, settingsRoundTrip } from "../support/flow-5.js";
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { DESKTOP } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 const credentials = ownerCredentials(process.env);
 const SKIP_REASON = "R3.4 flow 5 needs E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD; just e2e creates the admin owner and sets both";
@@ -35,7 +35,7 @@ test("R3.4 R3.5 flow 5: a gap request answers at once with its queue position; p
   test.setTimeout(FLOW_TIMEOUT_MS);
   await page.setViewportSize({ width: DESKTOP.width, height: DESKTOP.height });
 
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   await openLibrary(page);
   await expectLiveUpdates(page);
 

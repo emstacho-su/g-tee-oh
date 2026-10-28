@@ -24,7 +24,7 @@ import { endAndReadRecap, expectRatedCard, expectUnratedCard, FLOW_1_DECISIONS, 
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord } from "../support/shot-manifest.js";
 import { capture, DESKTOP, prepareShotPage } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 const credentials = ownerCredentials(process.env);
 const SKIP_REASON = "Flow 1 needs E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD; just e2e creates the owner and sets both";
@@ -59,7 +59,7 @@ test("R4.10 R4.12 flow 1: five automated decisions on the stack give the fresh o
     records.push(await capture(page, page, OUT_DIR, { screen, theme: THEME, viewport: DESKTOP, criterion, source: SOURCE }));
   };
 
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   await expectUnratedCard(page);
 
   await startTraining(page, shot, CRITERIA.start);

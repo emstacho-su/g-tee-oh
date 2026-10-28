@@ -123,6 +123,16 @@ test('r4_10 the learning seed step gets the owner email and never the password (
   assert.equal(parent[OWNER_PASSWORD_VARIABLE], 'stale');
 });
 
+test('r4_10 the Playwright step still gets the password after the learning step built its environment (O-324)', () => {
+  const parent = { PATH: '/usr/bin' };
+  const owner = { email: DEFAULT_OWNER_EMAIL, password: 'pw-from-this-run-only' };
+  learningStepEnv(parent, owner);
+  const web = e2eWebEnv(parent, owner);
+  assert.equal(web[OWNER_PASSWORD_VARIABLE], owner.password);
+  assert.equal(web[OWNER_EMAIL_VARIABLE], owner.email);
+  assert.deepEqual(parent, { PATH: '/usr/bin' });
+});
+
 test('r3_5 adminDatabaseUrl treats an empty DATABASE_URL as unset and falls back to .env (PR #28 review L7)', () => {
   const url = adminDatabaseUrl({ DATABASE_URL: '' }, 'DATABASE_URL=postgres://owner:pw@localhost:5432/gto\n');
   assert.equal(url, 'postgres://owner:pw@postgres:5432/gto');

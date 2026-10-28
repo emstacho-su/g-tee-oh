@@ -20,7 +20,7 @@ import { expectHeatCells, expectTrendRows, openDrillFromCell, openProgress, togg
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
 import { capture, DESKTOP, prepareShotPage, THEMES, VIEWPORTS, type Viewport } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 const credentials = ownerCredentials(process.env);
 const SKIP_REASON = "R4.12 flow 6 needs E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD; just e2e creates the owner and sets both";
@@ -35,7 +35,7 @@ const records: ShotRecord[] = [];
 
 async function flow6(page: Page, theme: Theme, viewport: Viewport): Promise<void> {
   if (credentials === undefined) return;
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   await openProgress(page);
 
   const trendRows = await expectTrendRows(page);

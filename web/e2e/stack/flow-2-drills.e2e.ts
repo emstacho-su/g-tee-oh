@@ -22,7 +22,7 @@ import { buildRfiDrill, expectImportedTwin, exportCode, importCode, openDrillLib
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord } from "../support/shot-manifest.js";
 import { capture, DESKTOP, prepareShotPage } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 const credentials = ownerCredentials(process.env);
 const SKIP_REASON = "Flow 2 needs E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD; just e2e creates the owner and sets both";
@@ -50,7 +50,7 @@ test("R3.14 flow 2: build RFI boundary hands, save, export, import the export an
     if (!SHOTS) return;
     records.push(await capture(page, page, OUT_DIR, { screen, theme: THEME, viewport: DESKTOP, criterion, source: SOURCE }));
   };
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   await buildRfiDrill(page, shot);
   await openDrillLibrary(page);
   const code = await exportCode(page, shot);

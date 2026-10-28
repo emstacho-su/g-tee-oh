@@ -112,9 +112,8 @@ function runStep(step, owner) {
 
 /** The seed step's environment: the owner's email (not secret) and never the password (O-324). */
 export function learningStepEnv(baseEnv, owner) {
-  const child = { ...baseEnv, [OWNER_EMAIL_VARIABLE]: owner.email };
-  delete child[OWNER_PASSWORD_VARIABLE];
-  return child;
+  const withoutPassword = Object.entries(baseEnv).filter(([name]) => name !== OWNER_PASSWORD_VARIABLE);
+  return { ...Object.fromEntries(withoutPassword), [OWNER_EMAIL_VARIABLE]: owner.email };
 }
 
 /**
