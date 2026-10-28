@@ -6,6 +6,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_CONFIG_ID } from "../../src/fixtures/study.js";
+import { validateStudySearch } from "../../src/study/search.js";
 import { problemOf, renderStudy } from "./render-study.js";
 
 const NODE_SWITCH_LINE = /^g-tee-oh node-switch \d+\.\d ms root$/;
@@ -52,7 +53,15 @@ describe("R3.12 study filters", () => {
     await user.selectOptions(pairSelect, "BB-BTN");
 
     expect(await screen.findByRole("img", { name: /frequency mode/ })).toBeInTheDocument();
+    // The URL holds strings (search-serialization.ts); the validator turns the numeric filters back.
     expect(router.state.location.search).toEqual({
+      format: "online",
+      table_size: "6",
+      stake: FIXTURE_ONLINE_STAKE_ID,
+      depth: "10000",
+      pair: "BB-BTN",
+    });
+    expect(validateStudySearch(router.state.location.search)).toEqual({
       format: "online",
       table_size: 6,
       stake: FIXTURE_ONLINE_STAKE_ID,

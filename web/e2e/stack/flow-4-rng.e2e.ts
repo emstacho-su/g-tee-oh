@@ -168,8 +168,9 @@ async function playToMixedHand(page: Page, prompts: Map<number, TrainerPrompt>, 
     const feedback = (await response.json()) as DecisionFeedback;
     await expect(page.getByTestId("feedback-panel")).toBeVisible();
     if (isMixed(feedback)) {
-      const { state_version: version } = response.request().postDataJSON() as { state_version: number };
-      await expectRollerAgrees(page, feedback, prompts.get(version));
+      // The decided prompt's version: a decision moves the session exactly one version on (S23,
+      // O-246), and the browser sends the decision body as a stream Playwright cannot read back.
+      await expectRollerAgrees(page, feedback, prompts.get(feedback.state_version - 1));
       await shot("flow4-feedback-roller", CRITERIA.feedback);
       return hand;
     }

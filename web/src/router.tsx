@@ -23,6 +23,7 @@ import type { RouterHistory } from "@tanstack/react-router";
 import type { AppApi } from "./api/index.js";
 import { describeFailureForLog } from "./api/http-status.js";
 import { AuthLayout } from "./app/AuthLayout.js";
+import { parseSearchAsStrings, stringifySearchAsStrings } from "./app/search-serialization.js";
 import { RootLayout } from "./app/RootLayout.js";
 import type { RouterContext } from "./app/router-context.js";
 import { SessionError } from "./app/SessionError.js";
@@ -151,6 +152,10 @@ export function createAppRouter({ queryClient, api, history }: AppRouterOptions)
   return createRouter({
     routeTree,
     context: { queryClient, api },
+    // Every query value stays the string in the URL, so ?hand=77 and numeric-looking seeds reach
+    // the string-only validators intact (search-serialization.ts, O-286, O-288).
+    parseSearch: parseSearchAsStrings,
+    stringifySearch: stringifySearchAsStrings,
     ...(history === undefined ? {} : { history }),
   });
 }
