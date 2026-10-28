@@ -13,6 +13,7 @@
  */
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 
+import { fetchAllPages } from "../api/fetch-all-pages.js";
 import { problemFromBody } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
 import type {
@@ -60,17 +61,13 @@ export function ratingQuery(api: AppApi) {
 
 /** Every track, following the api's cursor (seven in v1, O-271). */
 export async function fetchAllTracks(api: AppApi): Promise<TrackProgress[]> {
-  const tracks: TrackProgress[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < MAX_TRACK_PAGES; page += 1) {
+  const fetchPage = async (cursor: string | undefined) => {
     const query = cursor === undefined ? { limit: TRACK_PAGE_LIMIT } : { limit: TRACK_PAGE_LIMIT, cursor };
     const { data, error, response } = await api.client.GET("/api/v1/progress/tracks", { params: { query } });
     if (data === undefined) throw problemFromBody(response.status, error);
-    tracks.push(...data.items);
-    if (data.next_cursor === null) return tracks;
-    cursor = data.next_cursor;
-  }
-  throw new RangeError(`the track list did not end within ${MAX_TRACK_PAGES} pages`);
+    return data;
+  };
+  return fetchAllPages(fetchPage, MAX_TRACK_PAGES, "the track list");
 }
 
 export function tracksQuery(api: AppApi) {

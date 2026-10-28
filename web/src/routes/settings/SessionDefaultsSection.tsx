@@ -13,7 +13,8 @@ import type { Grouping } from "../../contracts.js";
 import { GROUPINGS, useSessionDefaultsStore } from "../../store/index.js";
 import { SESSION_TEXT } from "../drill-run/labels.js";
 import { ConfigScopePicker } from "./ConfigScopePicker.js";
-import { GROUPING_LABELS, SESSION_DEFAULTS_TEXT } from "./settings-text.js";
+import { GROUPING_LABELS } from "../../drills/labels.js";
+import { SESSION_DEFAULTS_TEXT } from "./settings-text.js";
 import { SettingsSection } from "./SettingsSection.js";
 
 const GROUPING_OPTIONS = GROUPINGS.map((value) => ({ value, label: GROUPING_LABELS[value] }));

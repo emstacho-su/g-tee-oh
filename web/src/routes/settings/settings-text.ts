@@ -1,14 +1,7 @@
 /**
- * Fixed text of the S32 /settings sections (R4.12, R4.14, O-323, O-327). The grouping names are
- * kept here rather than read from the drill run's labels, which S26 moves to src/drills/labels.ts.
+ * Fixed text of the S32 /settings sections (R4.12, R4.14, O-323, O-327). The grouping names come
+ * from src/drills/labels.ts (GROUPING_LABELS), shared with the drill builder and the start panels.
  */
-import type { Grouping } from "../../contracts.js";
-
-export const GROUPING_LABELS: Readonly<Record<Grouping, string>> = {
-  standard: "Standard",
-  grouped: "Grouped",
-  simple: "Simple",
-};
 
 export const SESSION_DEFAULTS_TEXT = {
   title: "Session defaults",

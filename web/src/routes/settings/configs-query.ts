@@ -6,6 +6,7 @@
  */
 import { queryOptions } from "@tanstack/react-query";
 
+import { fetchAllPages } from "../../api/fetch-all-pages.js";
 import { problemFromBody } from "../../api/index.js";
 import type { AppApi } from "../../api/index.js";
 import type { GameConfig } from "../../progress/types.js";
@@ -17,17 +18,13 @@ export const MAX_CONFIG_PAGES = 10;
 export const CONFIGS_STALE_MS = 30 * 60 * 1000;
 
 export async function fetchAllConfigs(api: AppApi): Promise<GameConfig[]> {
-  const configs: GameConfig[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < MAX_CONFIG_PAGES; page += 1) {
+  const fetchPage = async (cursor: string | undefined) => {
     const query = cursor === undefined ? { limit: CONFIG_PAGE_LIMIT } : { limit: CONFIG_PAGE_LIMIT, cursor };
     const { data, error, response } = await api.client.GET("/api/v1/configs", { params: { query } });
     if (data === undefined) throw problemFromBody(response.status, error);
-    configs.push(...data.items);
-    if (data.next_cursor === null) return configs;
-    cursor = data.next_cursor;
-  }
-  throw new RangeError(`the configuration list did not end within ${MAX_CONFIG_PAGES} pages`);
+    return data;
+  };
+  return fetchAllPages(fetchPage, MAX_CONFIG_PAGES, "the configuration list");
 }
 
 export function allConfigsQuery(api: AppApi) {
