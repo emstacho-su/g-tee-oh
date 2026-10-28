@@ -7,11 +7,10 @@
  * map cell's family and pair plus format and depth), its current cost in words (bb per 1,000
  * hands), a sparkline on the scale every row shares (leak-model.ts) and a "Drill this spot"
  * button. A row whose class has no heat map cell has no button and says why. The weeks selector
- * (4, 8 or 26) sits in one row above, and "Show table" swaps the rows for a week by week table of
- * the same values. With no items the card says how to get some.
+ * (4, 8 or 26) sits in one row above. A week by week table of the same values sits beside the rows
+ * for screen readers only (S36, O-347: no visible table toggle). With no items the card says how
+ * to get some.
  */
-import { useState } from "react";
-
 import { formatLeak, formatShortDate } from "../../progress/format.js";
 import { joinLeaksToCells, sharedLeakScale, type LeakRow } from "../../progress/leak-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
@@ -20,13 +19,11 @@ import { Button, ToggleGroup } from "../ui/index.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
 import { Sparkline, NO_DATA_TEXT, PARTIAL_WEEK_TEXT } from "./Sparkline.js";
-import { TableToggle } from "./TableToggle.js";
 
 export const NO_LEAKS_TEXT = "No leaks yet: finish an automated session to see where you lose the most";
 export const DRILL_BUTTON_TEXT = "Drill this spot";
 export const OPENING_TEXT = "Opening";
 const UNIT = "bb per 1,000 hands";
-const SUBJECT = "leak cost trend";
 
 const WEEK_OPTIONS = LEAK_WEEK_OPTIONS.map((weeks) => ({ value: String(weeks), label: `${weeks} weeks` }));
 
@@ -115,7 +112,6 @@ function LeakTable({ rows, leaks }: { rows: readonly LeakRow[]; leaks: ProgressL
 }
 
 export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, pendingKey = null, message = null }: LeakTrendChartProps) {
-  const [showTable, setShowTable] = useState(false);
   const rows = joinLeaksToCells(leaks, heatmap);
   const empty = rows.length === 0;
   const selector = (
@@ -127,20 +123,18 @@ export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, 
     />
   );
   return (
-    <ProgressCard
-      title="Leak cost trend"
-      testId="leak-trend"
-      actions={
-        <>
-          {selector}
-          {empty ? null : <TableToggle showTable={showTable} onChange={setShowTable} subject={SUBJECT} />}
-        </>
-      }
-    >
+    <ProgressCard title="Leak cost trend" testId="leak-trend" actions={selector}>
       <DrillAlert text={message} />
-      {empty ? <p className="text-sm text-muted">{NO_LEAKS_TEXT}</p> : null}
-      {!empty && showTable ? <LeakTable rows={rows} leaks={leaks} /> : null}
-      {!empty && !showTable ? <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} /> : null}
+      {empty ? (
+        <p className="text-sm text-muted">{NO_LEAKS_TEXT}</p>
+      ) : (
+        <>
+          <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} />
+          <div className="sr-only">
+            <LeakTable rows={rows} leaks={leaks} />
+          </div>
+        </>
+      )}
     </ProgressCard>
   );
 }

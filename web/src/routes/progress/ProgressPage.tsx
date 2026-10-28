@@ -17,7 +17,7 @@ import { useState, type ReactNode } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { HoldoutCard, LeakTrendChart, MasteryHeatMap, ProgressCard, RatingCard, StreakBadge, TrackBreakdown } from "../../components/progress/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import { describeCosmetic } from "../../cosmetics/catalog.js";
 import { useOpenDrill, type DrillOrigin, type DrillTarget } from "../../progress/open-drill.js";
 import { heatmapQuery, holdoutQuery, leaksQuery, ratingQuery, streakQuery, tracksQuery } from "../../progress/queries.js";
@@ -25,6 +25,7 @@ import { DEFAULT_LEAK_WEEKS, type LeakWeeks, type TrackKey, type TrackProgress }
 import { HoldoutRetestButton } from "../train/HoldoutRetestButton.js";
 
 export const TRY_AGAIN_TEXT = "Try again";
+export const PROGRESS_DESCRIPTION = "Your rating, where you lose the most, what you have mastered and the monthly retest.";
 
 interface CardQueryProps<T> {
   title: string;
@@ -75,8 +76,8 @@ export function ProgressPage() {
   const messageFor = (origin: DrillOrigin) => (drill.message?.origin === origin ? drill.message.text : null);
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Progress</h1>
+    <section className="flex flex-col gap-6">
+      <PageHeader title="Progress" description={PROGRESS_DESCRIPTION} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CardQuery title="Rating" subject="the rating" testId="rating-card" query={rating}>
           {(data) => <RatingCard rating={data} {...(trackNames === undefined ? {} : { trackNames })} />}

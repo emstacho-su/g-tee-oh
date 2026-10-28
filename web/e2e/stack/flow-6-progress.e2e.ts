@@ -6,8 +6,8 @@
  * Mechanism, over the e2e owner that `just fixture-learning` seeds (a schedule card for every
  * catalog class, and leak history for the six Mondays before this week over ten classes): sign
  * in, open /progress, and check structure only, since the seeded numbers are the seed's to change:
- * at least one leak trend row, each with a sparkline; at least one heat map cell; both table
- * fallbacks list one row per trend row and per cell and switch back. Then a heat map cell opens a
+ * at least one leak trend row, each with a sparkline; at least one heat map cell; both screen-reader
+ * tables list one row per trend row and per cell, with no visible toggle (O-347). Then a cell opens a
  * drill: the class's auto drill is found by its tag or created from the catalog configs, and the
  * drill run screen opens (/drills/<id>/run).
  *
@@ -16,7 +16,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectHeatCells, expectTrendRows, openDrillFromCell, openProgress, toggleBothTables } from "../support/flow-6.js";
+import { expectHeatCells, expectTrendRows, openDrillFromCell, openProgress, expectScreenReaderTables } from "../support/flow-6.js";
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
 import { capture, DESKTOP, prepareShotPage, THEMES, VIEWPORTS, type Viewport } from "../support/shots.js";
@@ -46,7 +46,7 @@ async function flow6(page: Page, theme: Theme, viewport: Viewport): Promise<void
     records.push(await capture(page, page, OUT_DIR, { screen: "flow6-progress", theme, viewport, criterion: CRITERION, source: SOURCE }));
   }
 
-  await toggleBothTables(page, trendRows, heatCells);
+  await expectScreenReaderTables(page, trendRows, heatCells);
   await openDrillFromCell(page, page.getByTestId("heat-cell").first());
 }
 
@@ -59,7 +59,7 @@ const RUN_VIEWPORTS: readonly Viewport[] = SHOTS ? VIEWPORTS : [DESKTOP];
 
 for (const theme of RUN_THEMES) {
   for (const viewport of RUN_VIEWPORTS) {
-    test(`R4.12 flow 6: progress trend, heat map, table fallbacks and click to drill on the stack, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
+    test(`R4.12 flow 6: progress trend, heat map, screen-reader tables and click to drill on the stack, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
       test.skip(credentials === undefined, SKIP_REASON);
       test.setTimeout(FLOW_TIMEOUT_MS);
       await prepareShotPage(page, theme, viewport);

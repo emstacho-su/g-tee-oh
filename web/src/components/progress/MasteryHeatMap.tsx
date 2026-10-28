@@ -10,8 +10,8 @@
  * review. One tooltip, shown on hover and on focus, states the class and its p, R, n, mastered and
  * due. A click, Enter or Space opens the class's drill (O-321); mastery gates nothing (ADR 0012).
  * A wide grid scrolls inside the card with the row headers sticky, so the page itself never
- * scrolls sideways at 390 px. A legend explains every mark, and "Show table" lists the same
- * values as a table.
+ * scrolls sideways at 390 px. A legend explains every mark, and a table of the same values sits
+ * beside the grid for screen readers only (S36, O-347: no visible table toggle).
  */
 import { useId, useState, type CSSProperties } from "react";
 
@@ -32,11 +32,9 @@ import { cn } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
-import { TableToggle } from "./TableToggle.js";
 
 export const NO_CLASSES_TEXT = "No spot classes in the library yet.";
 export const OPEN_DRILL_HINT = "Select a cell to drill that spot.";
-const SUBJECT = "mastery heat map";
 const MASTERED_GLYPH = "✓";
 
 /** The never-practiced texture: stripes of the sunken surface token over the raised surface. */
@@ -237,24 +235,22 @@ function HeatTable({ heatmap }: { heatmap: ProgressHeatmap }) {
 }
 
 export function MasteryHeatMap({ heatmap, onDrill, pendingKey = null, message = null }: MasteryHeatMapProps) {
-  const [showTable, setShowTable] = useState(false);
   const empty = heatmap.cells.length === 0;
   return (
-    <ProgressCard
-      title="Mastery heat map"
-      testId="mastery-heatmap"
-      actions={empty ? undefined : <TableToggle showTable={showTable} onChange={setShowTable} subject={SUBJECT} />}
-    >
+    <ProgressCard title="Mastery heat map" testId="mastery-heatmap">
       <DrillAlert text={message} />
-      {empty ? <p className="text-sm text-muted">{NO_CLASSES_TEXT}</p> : null}
-      {!empty && showTable ? <HeatTable heatmap={heatmap} /> : null}
-      {!empty && !showTable ? (
+      {empty ? (
+        <p className="text-sm text-muted">{NO_CLASSES_TEXT}</p>
+      ) : (
         <>
           <p className="text-sm text-muted">{OPEN_DRILL_HINT}</p>
           <Legend />
           <HeatGrid heatmap={heatmap} pendingKey={pendingKey} onDrill={onDrill} />
+          <div className="sr-only">
+            <HeatTable heatmap={heatmap} />
+          </div>
         </>
-      ) : null}
+      )}
     </ProgressCard>
   );
 }
