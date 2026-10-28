@@ -307,6 +307,23 @@ fn r2_7_cache_evicts_least_recently_used() {
 }
 
 #[test]
+fn r3_3_contains_answers_from_the_directory_without_decoding_a_frame() {
+    // O-245, PR #25 M6: solver-query tests each action's child with this, so a node read stays
+    // one record decode.
+    let library = &*LIBRARY;
+    let reader = Reader::new(library.store.clone(), ROOMY);
+    let handle = reader.open(&library.prefix).expect("the solution opens");
+    for key in &library.keys {
+        assert!(reader.contains(handle, key).expect("a directory lookup"), "{key}");
+    }
+    let absent = NodeKey::preflop(config_id(), pair(), vec![ActionToken::Fold]);
+    assert!(!reader.contains(handle, &absent).expect("a directory lookup"));
+    assert_eq!(reader.cache_used_bytes(), 0, "no frame was decoded");
+    let fresh = Reader::new(MemStore::new(), ROOMY);
+    assert!(matches!(fresh.contains(handle, &absent), Err(LibraryError::UnknownHandle(0))));
+}
+
+#[test]
 fn r2_7_reader_refuses_unknown_handles_and_keys() {
     let library = &*LIBRARY;
     let reader = Reader::new(library.store.clone(), ROOMY);

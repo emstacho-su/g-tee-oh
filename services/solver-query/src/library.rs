@@ -191,21 +191,24 @@ impl Library {
     /// # Errors
     ///
     /// As `node`, except that a child the solution does not hold is `None`, not an error.
+    /// Each child is a directory lookup (`Reader::contains`), never a record decode, so a
+    /// node read stays one decode however many actions it offers (PR #25 M6).
     pub fn next_node_keys(
         &self,
         solution_id: &str,
         key: &NodeKey,
         tokens: &[ActionToken],
     ) -> Result<Vec<Option<NodeKey>>, ApiError> {
+        let info = self.resolve(solution_id)?;
+        let reader = self.reader.as_ref().ok_or_else(|| {
+            ApiError::Internal(format!("solution {solution_id} is indexed without a store"))
+        })?;
+        let handle = reader.open(&info.prefix)?;
         tokens
             .iter()
             .map(|token| {
                 let child = key.clone().with_action(*token);
-                match self.node(solution_id, &child) {
-                    Ok(_) => Ok(Some(child)),
-                    Err(ApiError::NotFound(_)) => Ok(None),
-                    Err(err) => Err(err),
-                }
+                Ok(reader.contains(handle, &child)?.then_some(child))
             })
             .collect()
     }
