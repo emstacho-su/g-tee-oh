@@ -119,6 +119,8 @@ export interface FakeOptions {
   deals?: readonly FakeDeal[];
   /** Milliseconds every coverage answer waits, so a test can watch calls overlap. */
   coverageDelayMs?: number;
+  /** The noise flags every /v1/grade answer carries; none by default (S27 R3.18). */
+  gradeNoiseFlags?: readonly Schemas["NoiseFlag"][];
 }
 
 export interface FakeCall {
@@ -175,7 +177,12 @@ function nodeBody(solutionId: string, key: string, node: FakeNode, hand: string 
   };
 }
 
-function gradeBody(solutionId: string, request: Schemas["GradeRequest"], node: FakeNode): Schemas["GradeResponse"] {
+function gradeBody(
+  solutionId: string,
+  request: Schemas["GradeRequest"],
+  node: FakeNode,
+  noiseFlags: readonly Schemas["NoiseFlag"][] = [],
+): Schemas["GradeResponse"] {
   const index = request.action_index;
   const best = Math.max(...node.ev);
   return {
@@ -195,7 +202,7 @@ function gradeBody(solutionId: string, request: Schemas["GradeRequest"], node: F
     floor_pct_pot: 0.5,
     floor_source: "fallback_bb",
     bucket: node.actions[index]?.bucket ?? null,
-    noise_flags: [],
+    noise_flags: [...noiseFlags],
     difficulty_features: { ev_gap_pct_pot: 0, purity: 1, n_actions: node.actions.length, mixed: false, all_within_floor: false },
   };
 }
@@ -299,7 +306,7 @@ function routes(options: FakeOptions, inFlight: InFlight): Record<string, Route>
     "POST /v1/grade": (_url, body) => {
       const request = body as unknown as Schemas["GradeRequest"];
       const node = TREE[request.node_key];
-      return node === undefined ? json(404, notFound("no such node")) : json(200, gradeBody(options.solutionId, request, node));
+      return node === undefined ? json(404, notFound("no such node")) : json(200, gradeBody(options.solutionId, request, node, options.gradeNoiseFlags));
     },
   };
 }

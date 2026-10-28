@@ -155,7 +155,7 @@ export const fixtureFeedback: DecisionFeedback = {
   best_action_indexes: [2],
   freq_by_action: [0.05, 0.1, 0.8, 0.05],
   ev_by_action: [0, 0.52, 0.62, -0.4],
-  rated: true,
+  rated: false,
   rng_roll: 37,
   state_version: 4,
   solution_id: FIXTURE_SOLUTION_ID,

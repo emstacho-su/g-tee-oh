@@ -7,9 +7,11 @@
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
-import { notImplemented } from "../http/not-implemented.js";
+import { requireDatabase } from "../http/database.js";
 import { AUTHENTICATED, READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
+import { driftFor } from "../insights/drift.js";
+import { requireSession } from "../plugins/authenticate.js";
 import { driftQuerySchema, driftSchema } from "../schemas/explain.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
@@ -28,7 +30,10 @@ export const insightRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         response: { 200: driftSchema, ...problemResponses(READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      const { userId } = requireSession(request);
+      return driftFor(requireDatabase(app), userId, request.query.spot_class_key);
+    },
   );
 
   done();

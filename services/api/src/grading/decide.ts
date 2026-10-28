@@ -175,6 +175,8 @@ function attemptValues(session: SessionRow, decision: DecisionRequest, graded: G
     lossPctPotByAction: chosen.loss_pct_pot_by_action,
     bestActionIndexes: bestActionIndexes(chosen.freq_by_action, actions, roll),
     gradedActionIndex: outcome.gradedActionIndex,
+    // gradeActions above validated every kind; Rust names them (ADR 0004, O-304).
+    actionKinds: actions.map((gradeAction) => gradeAction.kind),
   };
 }
 
