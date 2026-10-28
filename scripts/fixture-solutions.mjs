@@ -17,7 +17,7 @@
 //
 // Usage: node scripts/fixture-solutions.mjs [--dev]   (DATABASE_URL from the environment or .env;
 // FIXTURE_LIBRARY_PATH defaults to validation/fixtures/library). Without --dev the database host
-// must be this machine or the compose postgres service, and only manifests with synthetic true
+// must be this machine (loopback), and only manifests with synthetic true
 // are written (PR #25 security review L3).
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
@@ -35,8 +35,12 @@ const URI_SCHEME = 'fixture:';
 const ALLOWED_SOURCES = new Set(['own', 'reference']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const DEV_FLAG = '--dev';
-/** This machine and the compose service name of the database (infra/compose/compose.yaml). */
-const DEV_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', 'postgres']);
+/**
+ * This machine only. The compose service name postgres is not here: the Mac profile uses the same
+ * name for the production database, so a run inside the compose network needs --dev (PR #25
+ * re-review L5). The dev stack and CI reach the database through the published loopback port.
+ */
+const DEV_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 /** Raised for a manifest that cannot become a row; the message names the file. */
 export class FixtureManifestError extends Error {
@@ -75,7 +79,7 @@ export function toSolutionRow(manifest, uriPath) {
 }
 
 /**
- * Refuses a database that is neither on this machine nor the compose postgres service, unless
+ * Refuses a database that is not on this machine (a loopback host), unless
  * --dev says the caller means it (PR #25 security review L3): this script writes published
  * solution rows, which must never land in a real library by accident.
  */

@@ -61,16 +61,21 @@ test('R3.7 the committed fixture library lists every preflop manifest once', () 
   assert.ok(rows.every((row) => row.manifest_uri.startsWith('fixture:preflop/')));
 });
 
-test('R3.7 only a database on this machine or the compose service is seeded without --dev (PR #25 L3)', () => {
+test('R3.7 only a database on this machine is seeded without --dev (PR #25 L3, re-review L5)', () => {
   for (const url of [
     'postgres://u:p@localhost:5432/gto',
     'postgres://u:p@127.0.0.1:65145/postgres?sslmode=disable',
     'postgres://u:p@[::1]:5432/gto',
-    'postgres://u:p@postgres:5432/gto',
   ]) {
     assert.doesNotThrow(() => assertDevDatabase(url, []), url);
   }
-  for (const url of ['postgres://u:p@db.example.com:5432/gto', 'postgres://u:p@10.0.0.5/gto', 'not a url']) {
+  // The bare host postgres is the compose service name on the Mac profile too, so it needs --dev.
+  for (const url of [
+    'postgres://u:p@postgres:5432/gto',
+    'postgres://u:p@db.example.com:5432/gto',
+    'postgres://u:p@10.0.0.5/gto',
+    'not a url',
+  ]) {
     assert.throws(() => assertDevDatabase(url, []), /refuses|not a URL/, url);
   }
   assert.doesNotThrow(() => assertDevDatabase('postgres://u:p@db.example.com:5432/gto', ['--dev']));

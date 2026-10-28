@@ -51,7 +51,8 @@ function migrate(databaseUrl: string): void {
  * stack writes them, so an attempt graded against a fixture solution satisfies its foreign key.
  */
 function seedFixtureSolutions(databaseUrl: string): void {
-  execFileSync(process.execPath, [FIXTURE_SOLUTIONS_SCRIPT], {
+  // --dev: this is the run's own throwaway test container, whatever host name Docker reports.
+  execFileSync(process.execPath, [FIXTURE_SOLUTIONS_SCRIPT, "--dev"], {
     env: { ...process.env, DATABASE_URL: databaseUrl, FIXTURE_LIBRARY_PATH: "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
