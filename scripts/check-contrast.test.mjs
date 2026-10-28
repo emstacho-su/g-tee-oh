@@ -247,6 +247,28 @@ test("R3.13 O-389 every action colour, size shade and felt passes in both themes
   const css = readFileSync(STYLES_PATH, "utf8");
   const source = readFileSync(ACTION_STYLE_PATH, "utf8");
   const themes = parseThemes(css);
-  const result = evaluateSolver(themes, readActionColours(source), readSizeShades(source), readFelts(css, themes));
+  const actions = readActionColours(source);
+  const shades = readSizeShades(source);
+  const felts = readFelts(css, themes);
+  // Review round 1: the gate must have read what it checks. Eight action kinds, four size shades and
+  // five felts (the theme's and four cosmetic) per theme; a parser that silently reads nothing fails here.
+  assert.deepEqual(
+    actions.map((colour) => colour.name),
+    ["Fold", "Check", "Call", "Limp", "Straddle", "Bet", "Raise", "All-in"],
+  );
+  assert.deepEqual([shades.light.length, shades.dark.length], [4, 4]);
+  assert.deepEqual(["light", "dark"].map((theme) => felts.filter((felt) => felt.theme === theme).length), [5, 5]);
+  const result = evaluateSolver(themes, actions, shades, felts);
   assert.deepEqual(result.failures, []);
+});
+
+test("R3.13 O-389 the solver gate fails loudly when it reads no action colours, no size shades or no felt for a theme", () => {
+  const themes = parseThemes(FELT_CSS);
+  const result = evaluateSolver(themes, [], { light: [], dark: ["#f87171"] }, readFelts(FELT_CSS, themes).filter((felt) => felt.theme === "light"));
+  const failures = result.failures.join("\n");
+  assert.match(failures, /no action colours read from web\/src\/theme\/action-style\.ts/);
+  assert.match(failures, /light: no bet and raise size shades read/);
+  assert.doesNotMatch(failures, /dark: no bet and raise size shades read/);
+  assert.match(failures, /dark: no felt read/);
+  assert.doesNotMatch(failures, /light: no felt read/);
 });

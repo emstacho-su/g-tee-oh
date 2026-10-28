@@ -301,10 +301,16 @@ function check(rows, failures, row) {
 export function evaluateSolver(themes, actionColours, sizeShades, felts) {
   const rows = [];
   const failures = [];
+  // A parser that reads nothing would pass everything, so an empty read fails the gate (review round 1).
+  if (actionColours.length === 0) {
+    failures.push("no action colours read from web/src/theme/action-style.ts (ACTION_STYLES); the solver gate would check nothing");
+  }
   for (const theme of ["light", "dark"]) {
     const shades = (sizeShades[theme] ?? []).map((value, rank) => ({ name: `raise and bet size shade ${rank + 1}`, value }));
     const actions = actionColours.map((colour) => ({ name: `${colour.name} (action)`, value: colour[theme] }));
     const themeFelts = felts.filter((felt) => felt.theme === theme);
+    if (shades.length === 0) failures.push(`${theme}: no bet and raise size shades read from web/src/theme/action-style.ts (SIZE_SHADES)`);
+    if (themeFelts.length === 0) failures.push(`${theme}: no felt read from web/src/styles.css (--felt)`);
     for (const colour of [...actions, ...shades, ...themeFelts]) {
       for (const ground of SOLVER_GROUNDS) {
         const bg = themes[theme].get(ground);
