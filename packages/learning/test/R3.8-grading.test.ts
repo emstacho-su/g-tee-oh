@@ -4,26 +4,32 @@
  *
  * Rules (05 section 6, ADR 0008, ADR 0009): score = exp(-max(0, loss - floor) / tau) with tau
  * 4 percent of pot (O-22, O-96); lossPctPot is the raw loss and floorPctPot the floor, both from
- * Rust and never recomputed here (ADR 0004, O-150). Labels: Best when loss is at or below the
- * floor and the action is the hand's highest-frequency action or the RNG-selected one; Correct
- * when loss is at or below the floor otherwise (O-212); Inaccuracy above the floor and under
- * 1 percent; Mistake from 1 to 5 percent inclusive; Blunder above 5 percent. Rated only when
+ * Rust and never recomputed here (ADR 0004, O-150). Labels (ADR 0024, O-343): Best when the
+ * graded loss is at or below the floor and within LOSS_TIE_TOLERANCE_PCT_POT of the node's lowest
+ * loss (the highest EV action; frequencies and the roll never enter the label); Correct when loss
+ * is at or below the floor otherwise; Inaccuracy above the floor and under 1 percent; Mistake from
+ * 1 to 5 percent inclusive; Blunder above 5 percent. In Mixed-frequency mode the roll sets a
+ * separate mark, followedRoll (ADR 0024 rule 2, O-344). Rated only when
  * mode is automated, first attempt, no revealing panel, no noise flag, under the daily cap of
  * 150 per track (A6 section 4, 06 section 3.6, ADR 0011, O-56, O-214).
  *
  * Most vectors use one three-action node in passive-to-aggressive order [fold, call, raise] with
  * hand frequencies [0, 0.4, 0.6]: fold is out of the mix, call is in the mix, raise is the
- * highest-frequency action. One tick is 0.01 percent of pot, the display precision of EV loss.
+ * highest-frequency action. Without an actions list the node's lowest loss is 0 (every loss is
+ * measured against the best action, ADR 0008), so loss 0 is Best whatever the frequency. One tick is 0.01 percent of pot, the display precision of EV loss.
  * The grouping vectors use a five-action node with two raise sizes and an all-in (O-210, O-211).
  */
 import { describe, expect, it } from "vitest";
 
 import {
   DAILY_RATED_CAP,
-  FREQUENCY_TIE_TOLERANCE,
   GRADING_TAU_PCT_POT as POLICY_TAU_PCT_POT,
+  LOSS_TIE_TOLERANCE_PCT_POT,
+  bestActionIndexes,
+  followsRoll,
   grade,
   groupKeys,
+  isCorrectLabel,
   isRated,
   scoreFor,
 } from "../src/index.js";
@@ -93,8 +99,8 @@ export const GRADING_THRESHOLD_ROWS: readonly GradingVector[] = Object.freeze([
     expected: { label: "Correct", score: 1 },
   },
   {
-    name: "loss equal to the floor, highest-frequency action: Best, score 1",
-    input: { ...BASE_GRADE_INPUT, lossPctPot: 0.2, actionIndex: ACTION_INDEX.raise },
+    name: "loss 0, the highest-EV action though not the highest-frequency one: Best, score 1 (ADR 0024)",
+    input: { ...BASE_GRADE_INPUT, lossPctPot: 0, actionIndex: ACTION_INDEX.call },
     expected: { label: "Best", score: 1 },
   },
   {
@@ -137,7 +143,7 @@ export const GRADING_MIXED_HAND_ROWS: readonly GradingVector[] = Object.freeze([
     expected: { label: "Correct", score: 1 },
   },
   {
-    name: "mixed hand, highest-frequency action: raise with loss 0 is Best, score 1",
+    name: "mixed hand, the highest-EV action: raise with loss 0 is Best, score 1 (ADR 0024)",
     input: { ...BASE_GRADE_INPUT, lossPctPot: 0, actionIndex: ACTION_INDEX.raise },
     expected: { label: "Best", score: 1 },
   },
@@ -217,27 +223,52 @@ export const GRADING_DAILY_CAP_ROWS: readonly RatedVector[] = Object.freeze([
   },
 ]);
 
-/** RNG mode (05 section 7, ADR 0009): bands call 1 to 40 and raise 41 to 100; the roll-selected action is Best. */
-export const GRADING_RNG_ROWS: readonly GradingVector[] = Object.freeze([
+/**
+ * The mixed hand with distinct losses (ADR 0024): fold 2.3, call 0.1 (in the mix, within the
+ * floor) and raise 0 (the highest EV), so Best is the raise whatever the roll.
+ */
+export const MIXED_LOSS_NODE_ACTIONS: readonly GradeAction[] = Object.freeze([
+  { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 2.3 },
+  { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0.1 },
+  { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0 },
+]);
+
+/** A Mixed-frequency mode decision on the mixed-loss node; the chosen loss comes from the list. */
+export function mixedLossInput(actionIndex: number, rngRoll: number): GradeInput {
+  const lossPctPot = MIXED_LOSS_NODE_ACTIONS[actionIndex]?.lossPctPot ?? Number.NaN;
+  return { ...BASE_GRADE_INPUT, actions: MIXED_LOSS_NODE_ACTIONS, actionIndex, lossPctPot, rngRoll };
+}
+
+export type RollVector = {
+  name: string;
+  input: GradeInput;
+  expected: { label: GradeLabel; score: number; followedRoll: boolean };
+};
+
+/**
+ * Mixed-frequency mode (05 section 7, ADR 0024 rule 2, O-344): bands call 1 to 40 and raise 41
+ * to 100. The roll never changes the label; it only sets the separate followedRoll mark.
+ */
+export const GRADING_RNG_ROWS: readonly RollVector[] = Object.freeze([
   {
-    name: "roll 37 selects call (band 1 to 40): call with loss 0 is Best",
-    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 37, actionIndex: ACTION_INDEX.call }),
-    expected: { label: "Best", score: 1 },
+    name: "roll 37 selects call (band 1 to 40): call at loss 0.1 followed the roll and is Correct (ADR 0024)",
+    input: mixedLossInput(ACTION_INDEX.call, 37),
+    expected: { label: "Correct", score: 1, followedRoll: true },
   },
   {
-    name: "roll 41 selects raise (band 41 to 100): raise with loss 0 is Best",
-    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.raise }),
-    expected: { label: "Best", score: 1 },
+    name: "roll 41 selects raise (band 41 to 100): raise at loss 0 followed the roll and is Best (ADR 0024)",
+    input: mixedLossInput(ACTION_INDEX.raise, 41),
+    expected: { label: "Best", score: 1, followedRoll: true },
   },
   {
-    name: "roll 41 selects raise: call chosen with loss 0 is Correct, not Best",
-    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 41, actionIndex: ACTION_INDEX.call }),
-    expected: { label: "Correct", score: 1 },
+    name: "roll 41 selects raise: call chosen at loss 0.1 did not follow the roll and is Correct (ADR 0024)",
+    input: mixedLossInput(ACTION_INDEX.call, 41),
+    expected: { label: "Correct", score: 1, followedRoll: false },
   },
   {
-    name: "roll 40 selects call: raise chosen with loss 0 is Correct, not Best",
-    input: withNodeActions({ ...BASE_GRADE_INPUT, rngRoll: 40, actionIndex: ACTION_INDEX.raise }),
-    expected: { label: "Correct", score: 1 },
+    name: "roll 40 selects call: raise chosen at loss 0 did not follow the roll and is still Best (ADR 0024)",
+    input: mixedLossInput(ACTION_INDEX.raise, 40),
+    expected: { label: "Best", score: 1, followedRoll: false },
   },
 ]);
 
@@ -282,7 +313,7 @@ const TWO_SIZE_BUCKET_ACTIONS: readonly GradeAction[] = SIZED_NODE_ACTIONS.map((
 
 const ALL_SCORE_ROWS = [...GRADING_THRESHOLD_ROWS, ...GRADING_MIXED_HAND_ROWS, ...GRADING_RNG_ROWS];
 
-function expectGraded(row: GradingVector): void {
+function expectGraded(row: GradingVector | RollVector): void {
   const output = grade(row.input);
   expect(output.label, row.name).toBe(row.expected.label);
   expect(Math.abs(output.score - row.expected.score), row.name).toBeLessThan(GRADING_SCORE_TOLERANCE);
@@ -306,7 +337,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
+describe("R3.8 grading policy (S22, ADR 0008, ADR 0009, ADR 0024)", () => {
   it("R0.11 grading vector data parses and every expected score follows exp(-max(0, loss - floor) / tau)", () => {
     expect(GRADING_TAU_PCT_POT).toBe(4);
     expect(GRADING_FLOOR_PCT_POT).toBe(0.2);
@@ -360,16 +391,27 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(at(blunderAbove + GRADING_TICK_PCT_POT)).toBe("Blunder");
   });
 
-  it("R3.8 Best requires loss at or below the floor and the highest-frequency action (05 section 6.3)", () => {
-    expectGraded(rowNamed(GRADING_THRESHOLD_ROWS, "loss equal to the floor, highest-frequency"));
+  it("R3.8 Best requires loss at or below the floor and the node's lowest loss, the highest EV (ADR 0024, O-343)", () => {
+    expectGraded(rowNamed(GRADING_THRESHOLD_ROWS, "loss 0, the highest-EV action"));
+    const raiseAtFloor = grade({ ...BASE_GRADE_INPUT, lossPctPot: 0.2, actionIndex: ACTION_INDEX.raise });
+    expect(raiseAtFloor.label, "the top-frequency action at the floor is not the highest EV").toBe("Correct");
     const raiseAboveFloor = grade({ ...BASE_GRADE_INPUT, lossPctPot: 0.21, actionIndex: ACTION_INDEX.raise });
     expect(raiseAboveFloor.label).toBe("Inaccuracy");
   });
 
-  it("R3.8 every action tied for the highest frequency is Best (O-212)", () => {
-    const tied = { ...BASE_GRADE_INPUT, freqByAction: [0, 0.5, 0.5] };
-    expect(grade({ ...tied, actionIndex: ACTION_INDEX.call }).label).toBe("Best");
-    expect(grade({ ...tied, actionIndex: ACTION_INDEX.raise }).label).toBe("Best");
+  it("R3.8 every action tied for the lowest loss within LOSS_TIE_TOLERANCE_PCT_POT is Best, whatever the frequencies (ADR 0024, O-343, O-370)", () => {
+    expect(LOSS_TIE_TOLERANCE_PCT_POT).toBe(0.001);
+    const tiedActions: GradeAction[] = [
+      { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 2 },
+      { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
+      { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0.0005 },
+    ];
+    const rare: GradeInput = { ...BASE_GRADE_INPUT, freqByAction: [0, 0.01, 0.99], actions: tiedActions };
+    expect(grade({ ...rare, actionIndex: ACTION_INDEX.call, lossPctPot: 0 }).label, "a rarely played call at the top EV").toBe("Best");
+    expect(grade({ ...rare, actionIndex: ACTION_INDEX.raise, lossPctPot: 0.0005 }).label).toBe("Best");
+    const oneUnitApart = tiedActions.map((action, index) => (index === ACTION_INDEX.raise ? { ...action, lossPctPot: 0.01 } : action));
+    const apart: GradeInput = { ...rare, actions: oneUnitApart, actionIndex: ACTION_INDEX.raise, lossPctPot: 0.01 };
+    expect(grade(apart).label, "one stored loss unit (0.01 percent of pot) is no tie").toBe("Correct");
   });
 
   it("R3.8 an out-of-mix action within the floor is Correct, because labels follow EV loss (O-212, ADR 0008)", () => {
@@ -380,7 +422,7 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
 
   it("R3.8 mixed hand inside the floor: the in-mix call with loss 0.05 is Correct, score 1", () => {
     expectGraded(rowNamed(GRADING_MIXED_HAND_ROWS, "mixed hand inside the floor"));
-    expectGraded(rowNamed(GRADING_MIXED_HAND_ROWS, "mixed hand, highest-frequency"));
+    expectGraded(rowNamed(GRADING_MIXED_HAND_ROWS, "mixed hand, the highest-EV action"));
   });
 
   it("R3.8 mixed hand outside the floor: the in-mix call with loss 0.35 is Inaccuracy, score 0.96319442, because labels follow EV loss not frequency", () => {
@@ -425,9 +467,14 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(unrated.label).toBe(rated.label);
   });
 
-  it("R3.8 RNG mode: the roll-selected action is Best and the other in-mix action is Correct (ADR 0009)", () => {
+  it("R3.8 Mixed-frequency mode: the roll never changes the label, only the separate followedRoll mark (ADR 0024 rule 2, O-344)", () => {
     for (const row of GRADING_RNG_ROWS) {
       expectGraded(row);
+      expect(grade(row.input).followedRoll, row.name).toBe(row.expected.followedRoll);
+      const withoutRoll: GradeInput = { ...row.input };
+      delete withoutRoll.rngRoll;
+      expect(grade(withoutRoll).label, `${row.name}: the same label with the mode off`).toBe(row.expected.label);
+      expect(grade(withoutRoll).followedRoll, `${row.name}: no mark with the mode off`).toBeNull();
     }
   });
 
@@ -465,33 +512,40 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(grouped.gradedActionIndex).toBe(SIZED_INDEX.raise250);
   });
 
-  it("R3.8 Best ties use FREQUENCY_TIE_TOLERANCE: a call at 0.3 ties a Simple raise type summing 0.1 + 0.2", () => {
-    expect(FREQUENCY_TIE_TOLERANCE).toBe(1e-6);
-    expect(0.1 + 0.2).not.toBe(0.3);
+  it("R3.8 Best ties by loss: a call at loss 0 ties a Simple raise type whose best size is at 0.1 + 0.2 - 0.3, whatever the frequencies (ADR 0024, O-370)", () => {
+    expect(0.1 + 0.2 - 0.3).not.toBe(0);
     const actions: GradeAction[] = [
       { kind: "fold", bucket: null, sizeCbb: 0, lossPctPot: 2 },
       { kind: "call", bucket: null, sizeCbb: 100, lossPctPot: 0 },
       { kind: "raise", bucket: "medium", sizeCbb: 250, lossPctPot: 0.1 },
-      { kind: "raise", bucket: "pot", sizeCbb: 300, lossPctPot: 0 },
+      { kind: "raise", bucket: "pot", sizeCbb: 300, lossPctPot: 0.1 + 0.2 - 0.3 },
     ];
     const input: GradeInput = {
       ...BASE_GRADE_INPUT,
       grouping: "simple",
-      freqByAction: [0, 0.3, 0.1, 0.2],
+      freqByAction: [0, 0.05, 0.9, 0.05],
       actions,
       actionIndex: 1,
       lossPctPot: 0,
     };
     expect(grade(input).label).toBe("Best");
-    expect(grade({ ...input, actionIndex: 3 }).label).toBe("Best");
+    expect(grade({ ...input, actionIndex: 2, lossPctPot: 0.1 }).label, "the raise type grades at its best size").toBe("Best");
+    expect(bestActionIndexes({ actions, grouping: "simple", street: "preflop", floorPctPot: GRADING_FLOOR_PCT_POT })).toEqual([1, 2, 3]);
   });
 
   it("R3.8 Simple grouping grades the action type by its best size: raise 2.5x at loss 0.6 and raise 3x at loss 0 grade a Simple raise at loss 0, Best (05 section 6.4 rule 3)", () => {
     const output = grade(sizedInput(SIZED_INDEX.raise250, { grouping: "simple" }));
-    expect(output).toEqual({ score: 1, label: "Best", rated: true, weight: 1, gradedActionIndex: SIZED_INDEX.raise300 });
+    expect(output).toEqual({
+      score: 1,
+      label: "Best",
+      rated: true,
+      weight: 1,
+      gradedActionIndex: SIZED_INDEX.raise300,
+      followedRoll: null,
+    });
   });
 
-  it("R3.8 Simple grouping: all-in joins the node's raise type, and the call is Correct beside the top raise type (O-211)", () => {
+  it("R3.8 Simple grouping: all-in joins the node's raise type, and the call at loss 0.1 is Correct beside the raise type at loss 0 (O-211, ADR 0024)", () => {
     const allIn = grade(sizedInput(SIZED_INDEX.allIn, { grouping: "simple" }));
     expect(allIn.label).toBe("Best");
     expect(allIn.gradedActionIndex).toBe(SIZED_INDEX.raise300);
@@ -500,11 +554,56 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009)", () => {
     expect(call.gradedActionIndex).toBe(SIZED_INDEX.call);
   });
 
-  it("R3.8 Simple grouping in RNG mode: a roll on either raise size makes the raise type Best (O-211)", () => {
+  it("R3.8 Simple grouping in Mixed-frequency mode: a roll on either raise size is followed by the raise type, and the label stays Best either way (O-211, ADR 0024)", () => {
     const rollOnRaise250 = grade(sizedInput(SIZED_INDEX.raise300, { grouping: "simple", rngRoll: 30 }));
     expect(rollOnRaise250.label).toBe("Best");
+    expect(rollOnRaise250.followedRoll).toBe(true);
     const rollOnCall = grade(sizedInput(SIZED_INDEX.raise300, { grouping: "simple", rngRoll: 15 }));
-    expect(rollOnCall.label).toBe("Correct");
+    expect(rollOnCall.label).toBe("Best");
+    expect(rollOnCall.followedRoll).toBe(false);
+  });
+
+  it("R3.8 bestActionIndexes lists every member of every Best group, the same rule grade() labels by (ADR 0024 rule 4, O-375)", () => {
+    const at = (grouping: GradeInput["grouping"], street: GradeInput["street"]): number[] =>
+      bestActionIndexes({
+        actions: SIZED_NODE_ACTIONS,
+        ...(grouping === undefined ? {} : { grouping }),
+        street,
+        floorPctPot: GRADING_FLOOR_PCT_POT,
+      });
+    expect(at("standard", "preflop")).toEqual([SIZED_INDEX.raise300]);
+    expect(at(undefined, "preflop")).toEqual([SIZED_INDEX.raise300]);
+    expect(at("simple", "preflop")).toEqual([SIZED_INDEX.raise250, SIZED_INDEX.raise300, SIZED_INDEX.allIn]);
+    for (const grouping of ["standard", "grouped", "simple"] as const) {
+      const best = at(grouping, "flop");
+      SIZED_NODE_ACTIONS.forEach((_, index) => {
+        const label = grade(sizedInput(index, { grouping, street: "flop" })).label;
+        expect(best.includes(index), `${grouping} index ${index} labelled ${label}`).toBe(label === "Best");
+      });
+    }
+  });
+
+  it("R3.8 bestActionIndexes and followsRoll reject malformed input with a RangeError", () => {
+    expect(() => bestActionIndexes({ actions: [], street: "preflop", floorPctPot: GRADING_FLOOR_PCT_POT })).toThrow(RangeError);
+    expect(() => bestActionIndexes({ actions: SIZED_NODE_ACTIONS, street: "preflop", floorPctPot: -1 })).toThrow(RangeError);
+    const roll = {
+      freqByAction: [...SIZED_NODE_FREQUENCIES],
+      actions: SIZED_NODE_ACTIONS,
+      street: "preflop" as const,
+      roll: 30,
+      actionIndex: SIZED_INDEX.raise250,
+    };
+    expect(followsRoll(roll)).toBe(true);
+    expect(followsRoll({ ...roll, actionIndex: SIZED_INDEX.call })).toBe(false);
+    expect(() => followsRoll({ ...roll, roll: 0 })).toThrow(RangeError);
+    expect(() => followsRoll({ ...roll, actionIndex: 5 })).toThrow(RangeError);
+    expect(() => followsRoll({ ...roll, freqByAction: [1] })).toThrow(RangeError);
+  });
+
+  it("R3.8 isCorrectLabel is true for Best and Correct only, the reading BKT and leak cost use (moved from the retired R3.11 file, O-345)", () => {
+    const labels: GradeLabel[] = ["Best", "Correct", "Inaccuracy", "Mistake", "Blunder"];
+    expect(labels.filter((label) => isCorrectLabel(label))).toEqual(["Best", "Correct"]);
+    expect(() => isCorrectLabel("Great" as GradeLabel)).toThrow(RangeError);
   });
 
   it("R3.8 group keys: limp joins call, all-in joins bet or raise or stands alone, straddle stands alone; Grouped keys by bucket postflop and by exact action preflop (O-211)", () => {

@@ -99,4 +99,19 @@ describe("R3.8 grading policy properties (fast-check)", () => {
       }),
     );
   });
+
+  it("R3.8 fast-check: the label never depends on the roll or the frequencies, only on the losses and the floor (ADR 0024, O-343)", () => {
+    const frequencies = fc
+      .tuple(fc.nat(100), fc.nat(100), fc.nat(100))
+      .filter((weights) => weights.some((weight) => weight > 0))
+      .map((weights) => weights.map((weight) => weight / weights.reduce((sum, value) => sum + value, 0)));
+    fc.assert(
+      fc.property(loss, floor, actionIndex, roll, roll, frequencies, (lossPctPot, floorPctPot, index, rollA, rollB, freqByAction) => {
+        const plain = grade(inputFor(lossPctPot, floorPctPot, index, rollA));
+        const other = grade({ ...inputFor(lossPctPot, floorPctPot, index, rollB), freqByAction });
+        expect(other.label).toBe(plain.label);
+        expect(other.score).toBe(plain.score);
+      }),
+    );
+  });
 });
