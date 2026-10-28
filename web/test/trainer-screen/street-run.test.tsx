@@ -5,7 +5,7 @@
  * not pause shows the result chip and continues after its delay but never while a dialog is open,
  * and the covered-part notes show on a partly covered or a refused start.
  */
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -23,6 +23,7 @@ import type { Drill } from "../../src/trainer/session-types.js";
 import type { Scheduler } from "../../src/trainer/trainer-deps.js";
 import { jsonResponse, problemResponse } from "../api/fake-fetch.js";
 import { DECIDE_PATH, DRILL_PATH, NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
+import { LIBRARY_MARKER_ID } from "./screen-router.js";
 
 const [HAND] = fixtureStreetHands;
 if (HAND === undefined) throw new Error("the street fixtures have no hand");
@@ -171,9 +172,18 @@ describe("R3.14 covered part on the run screen", () => {
     expect(screen.queryByTestId("hand-counter")).not.toBeInTheDocument();
   });
 
-  it("R3.14 a fully uncovered drill names the queued count from the 422 and links to the library", async () => {
-    const detail = "This drill cannot be dealt: the library covers none of this drill's spots. 4 of its 4 spots were queued for the builder.";
-    renderRun({ script: { [START_PATH]: [problemResponse(422, "no-coverage", detail)] } });
+  it("R3.14 review MEDIUM 4: the run screen's library link is taken by the router, not a page load", async () => {
+    const { router } = renderRun({ script: script(fixtureDrill) });
+    await start(fixtureDrill);
+    const link = within(screen.getByTestId("coverage-note")).getByRole("link", { name: "Open the library" });
+    expect(fireEvent.click(link)).toBe(false);
+    expect(await screen.findByTestId(LIBRARY_MARKER_ID)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/library");
+  });
+
+  it("R3.14 a fully uncovered drill names the queued count from the 422's typed pairs_total and pairs_queued and links to the library", async () => {
+    const detail = "This drill cannot be dealt: the library covers none of this drill's spots.";
+    renderRun({ script: { [START_PATH]: [problemResponse(422, "no-coverage", detail, { pairs_total: 4, pairs_queued: 4 })] } });
     await screen.findByRole("heading", { name: fixtureDrill.name });
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     const note = await screen.findByTestId("no-coverage-note");
@@ -184,9 +194,10 @@ describe("R3.14 covered part on the run screen", () => {
 
 describe("R3.13 start panel pause rule", () => {
   it.each([
-    [fixtureStreetDrill, "Pause after a mistake"],
-    [fixtureFullHandDrill, "Pause on every reveal"],
-    [{ ...fixtureDrill, trainer: { ...fixtureDrill.trainer, pause: "never" as const } }, "Pause on every reveal"],
+    // Worded as the builder's Pause field (src/drills/labels.ts, LOW 10); spot mode always pauses.
+    [fixtureStreetDrill, "After a mistake"],
+    [fixtureFullHandDrill, "After every action"],
+    [{ ...fixtureDrill, trainer: { ...fixtureDrill.trainer, pause: "never" as const } }, "After every action"],
   ] as const)("R3.13 %#: the start panel shows the reveal rule", async (drill, text) => {
     renderRun({ script: script(drill) });
     await screen.findByRole("heading", { name: drill.name });

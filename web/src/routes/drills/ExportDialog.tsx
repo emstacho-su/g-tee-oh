@@ -3,15 +3,20 @@
  * /drills/{id}/export) and shows it in a read-only field with a Copy button. Copy writes the code
  * to the clipboard and says so in a live region; where the clipboard is refused, it says to select
  * the code and copy it by hand (focusing the field selects all of it). A failed read shows its
- * reason with a retry. The code is never cached past the dialog (queries.ts).
+ * reason with a retry. A stored drill that no longer passes the write rules is refused with a 422
+ * (PR #30 review MEDIUM 2): the dialog shows the api's detail and the failing paths, bounded by
+ * ErrorList, and no retry, since the same drill gets the same answer. The code is never cached
+ * past the dialog (queries.ts).
  */
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import type { AppApi } from "../../api/index.js";
 import { Button, Dialog, LoadingNote } from "../../components/ui/index.js";
-import { drillFailureText } from "../../drills/failure-text.js";
+import { exportFailureText, isExportRefused } from "../../drills/failure-text.js";
+import { fieldErrorsOfFailure, omittedErrorsOfFailure } from "../../drills/problem.js";
 import { drillExportQuery } from "../../drills/queries.js";
+import { ErrorList, fieldErrorLine } from "./ErrorList.js";
 
 export const EXPORT_TEXT = {
   title: "Export code",
@@ -74,18 +79,28 @@ function CodeField({ code }: { code: string }) {
   );
 }
 
+/** A failed read: a refused export (422) shows the api's detail and failing paths with no retry. */
+function ExportFailure({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const refused = isExportRefused(error);
+  return (
+    <div role="alert" className="flex flex-col items-start gap-2 text-sm">
+      <p className="text-danger">{exportFailureText(error)}</p>
+      {refused ? (
+        <ErrorList lines={fieldErrorsOfFailure(error).map((entry) => fieldErrorLine(entry))} omitted={omittedErrorsOfFailure(error)} />
+      ) : (
+        <Button size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ExportBody({ api, drillId }: { api: AppApi; drillId: string }) {
   const code = useQuery(drillExportQuery(api, drillId));
   if (code.data !== undefined) return <CodeField code={code.data} />;
   if (!code.isError) return <LoadingNote text={EXPORT_TEXT.loading} />;
-  return (
-    <div role="alert" className="flex flex-col items-start gap-2 text-sm">
-      <p className="text-danger">{drillFailureText(code.error)}</p>
-      <Button size="sm" onClick={() => void code.refetch()}>
-        Try again
-      </Button>
-    </div>
-  );
+  return <ExportFailure error={code.error} onRetry={() => void code.refetch()} />;
 }
 
 export function ExportDialog({ api, drillId, drillName, open, onOpenChange }: ExportDialogProps) {

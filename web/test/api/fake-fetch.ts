@@ -33,10 +33,11 @@ export function jsonResponse(status: number, body: unknown): ResponseFactory {
     new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-export function problemResponse(status: number, slug: string, detail = "server detail text"): ResponseFactory {
+/** A problem+json answer; extensions are extra members (RFC 9457), such as the no-coverage counts. */
+export function problemResponse(status: number, slug: string, detail = "server detail text", extensions: Readonly<Record<string, unknown>> = {}): ResponseFactory {
   return () =>
     new Response(
-      JSON.stringify({ type: `${PROBLEM_TYPE_PREFIX}${slug}`, title: `title of ${slug}`, status, detail }),
+      JSON.stringify({ ...extensions, type: `${PROBLEM_TYPE_PREFIX}${slug}`, title: `title of ${slug}`, status, detail }),
       { status, headers: { "content-type": "application/problem+json" } },
     );
 }

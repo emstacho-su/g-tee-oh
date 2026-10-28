@@ -149,7 +149,7 @@ function boardErrors(filter: SpotFilter): FieldError[] {
   if (flops === undefined) return [];
   if (flops.length > MAX_FLOPS) return [error(`${SF}.board.flops`, `At most ${MAX_FLOPS} flops.`)];
   return flops.flatMap((flop, index) =>
-    FLOP_PATTERN.test(flop) ? [] : [error(`${SF}.board.flops.${index}`, `${flop} is not a flop: write three cards, for example Kh8d3c.`)],
+    FLOP_PATTERN.test(flop) ? [] : [error(`${SF}.board.flops.${index}`, `${flop} is not a flop: write three different cards, for example Kh8d3c.`)],
   );
 }
 

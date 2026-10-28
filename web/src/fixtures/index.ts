@@ -144,6 +144,7 @@ export const fixturePrompt: TrainerPrompt = {
   previous_board: null,
   synthetic: true,
   hand_no: 0,
+  hand_decision_no: 1,
   previous_hand: null,
 };
 

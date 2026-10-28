@@ -229,6 +229,8 @@ const FACING_THREE_BET_ACTIONS: readonly NodeAction[] = [
 const BIG_BLIND_THREE_BET: FixtureHistoryEntry = { position: "BB", token: "r900", label: "Raise to 9bb" };
 const BIG_BLIND_CALL: FixtureHistoryEntry = { position: "BB", token: "c", label: "Call" };
 const FACING_THREE_BET_POT_CBB = 1150;
+/** The second decision's hand_decision_no: the hero's second decision in the hand (O-335). */
+const SECOND_DECISION_NO = 2;
 
 export interface FixtureStreetHand {
   /** The hero's first decision. */
@@ -255,6 +257,7 @@ function secondDecision(first: FixtureHand, answer: readonly FixtureHistoryEntry
     prompt: {
       ...first.prompt,
       history: [...first.prompt.history, heroEntry(first.prompt, open), ...answer],
+      hand_decision_no: SECOND_DECISION_NO,
       pot_cbb: FACING_THREE_BET_POT_CBB,
       buttons: [...FACING_THREE_BET_ACTIONS],
     },

@@ -9,7 +9,8 @@
  * answers 401 when signed out, and the three POSTs answer 403 csrf unless x-csrf-token equals the
  * fixture token, as the api does (O-230). POST /sessions takes mode drill with a known drill (201,
  * with its coverage, O-312), answers 422 no-coverage for the uncovered fixture drill with the
- * queued count in its detail (ADR 0018) and 400 for a bad body or seed. GET /next is pure: the
+ * typed pairs_total and pairs_queued members (ADR 0018, PR #30 review MEDIUM 3) and 400 for a bad
+ * body or seed. GET /next is pure: the
  * current prompt, with the roll only in RNG mode (O-282). A decision for an older state version is
  * a 409 stale-state; a repeat with the same Idempotency-Key replays the first answer (O-232); a
  * correct one advances the hand and the version. Choosing an action in best_action_indexes is
@@ -20,7 +21,8 @@
  * fixture drills stay the fallback. The drill's trainer.stop_rule drives the session:
  * - after_action (spot mode) deals the fixture hands in a cycle exactly as S25 did;
  * - end_of_street and end_of_hand deal the street hands: the hero's first decision, then (unless
- *   the hero folded) the opponents' answer appended to the history and the hero's second decision;
+ *   the hero folded) the opponents' answer appended to the history and the hero's second decision
+ *   (hand_decision_no 1, then 2, from the fixture prompts, O-335);
  *   the hand then ends and the next hand's prompt has a larger hand_no and previous_hand: a fold
  *   ends with end fold, otherwise the street closes (with the opponent's call after a raise), and
  *   in end_of_hand mode the board holds the three flop cards (v1 ends a full hand at the flop).
@@ -55,9 +57,10 @@ const PROBLEMS = {
   ended: { status: 409, slug: "session-ended", title: "Session ended" },
   noCoverage: { status: 422, slug: "no-coverage", title: "No coverage" },
 } as const satisfies Readonly<Record<string, ProblemSpec>>;
-/** The api's 422 wording (services/api/src/sessions/service.ts), with the uncovered drill's one pair queued. */
-const NO_COVERAGE_DETAIL =
-  "This drill cannot be dealt: the library covers none of this drill's spots. 1 of its 1 spots were queued for the builder.";
+/** The api's 422 detail (services/api/src/sessions/service.ts); the web never shows or parses it. */
+const NO_COVERAGE_DETAIL = "This drill cannot be dealt: the library covers none of this drill's spots.";
+/** The 422's typed extension members (review MEDIUM 3, O-318): the uncovered drill's one pair, queued. */
+const UNCOVERED_COUNTS = { pairs_total: 1, pairs_queued: 1 } as const;
 
 const DRILL_PATH = /^\/api\/v1\/drills\/([^/]+)$/;
 const SESSIONS_PATH = "/api/v1/sessions";
@@ -209,7 +212,7 @@ function hasCsrf(request: MockRequest): boolean {
 
 function noCoverage(path: string): MockResponse {
   const refused = problem(PROBLEMS.noCoverage, path);
-  return { ...refused, body: { ...(refused.body as Problem), detail: NO_COVERAGE_DETAIL } };
+  return { ...refused, body: { ...(refused.body as Problem), detail: NO_COVERAGE_DETAIL, ...UNCOVERED_COUNTS } };
 }
 
 /** The problem a POST /sessions body earns, or the drill it starts a session on. */

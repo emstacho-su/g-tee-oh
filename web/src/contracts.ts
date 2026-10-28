@@ -10,6 +10,8 @@ type Schemas = ApiComponents["schemas"];
 
 export type SessionInfo = Schemas["SessionInfo"];
 export type Problem = Schemas["Problem"];
+/** The POST /sessions 422 no-coverage problem with its pairs_total and pairs_queued (O-318). */
+export type NoCoverageProblemBody = Schemas["NoCoverageProblem"];
 export type NodeAction = Schemas["NodeAction"];
 export type NodeHandRow = Schemas["NodeHandRow"];
 export type StudyNode = Schemas["StudyNode"];

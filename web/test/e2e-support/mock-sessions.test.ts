@@ -163,6 +163,7 @@ describe("R3.13 mocked session routes", () => {
 
 interface HandPrompt extends PromptBody {
   hand_no: number;
+  hand_decision_no: number;
   history: { position: string; token: string; label: string }[];
   previous_hand: { hand_no: number; history: { position: string; label: string }[]; board: string[]; end: string } | null;
 }
@@ -188,10 +189,10 @@ describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)"
     expect(startDrill(api, FIXTURE_PART_COVERED_DRILL_ID).body).toMatchObject({ coverage: fixturePartCoverage });
   });
 
-  it("R3.14 the uncovered drill's 422 names the queued count in its detail", () => {
+  it("R3.14 the uncovered drill's 422 carries the typed pairs_total and pairs_queued (review MEDIUM 3)", () => {
     const refused = startDrill(signedInApi(), FIXTURE_UNCOVERED_DRILL_ID);
     expect(refused.status).toBe(422);
-    expect((refused.body as { detail: string }).detail).toMatch(/1 of its 1 spots were queued for the builder/);
+    expect(refused.body).toMatchObject({ type: "urn:g-tee-oh:problem:no-coverage", pairs_total: 1, pairs_queued: 1 });
   });
 
   it("R3.13 drillOf supplies drills from another mocked route; the fixtures stay the fallback", () => {
@@ -210,12 +211,12 @@ describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)"
     const api = signedInApi();
     const id = (startDrill(api, FIXTURE_STREET_DRILL_ID).body as { session_id: string }).session_id;
     const first = next(api, id).body as HandPrompt;
-    expect(first).toMatchObject({ hand_no: 0, previous_hand: null, hero_position: "BTN" });
+    expect(first).toMatchObject({ hand_no: 0, hand_decision_no: 1, previous_hand: null, hero_position: "BTN" });
     const second = play(api, id, RAISE);
-    expect(second).toMatchObject({ hand_no: 0, hero_position: "BTN", previous_hand: null });
+    expect(second).toMatchObject({ hand_no: 0, hand_decision_no: 2, hero_position: "BTN", previous_hand: null });
     expect(second.history.slice(-3).map((entry) => `${entry.position} ${entry.label}`)).toEqual(["BTN Raise to 2.5bb", "SB Fold", "BB Raise to 9bb"]);
     const third = play(api, id, RAISE);
-    expect(third).toMatchObject({ hand_no: 1, hero_position: "CO" });
+    expect(third).toMatchObject({ hand_no: 1, hand_decision_no: 1, hero_position: "CO" });
     expect(third.previous_hand).toMatchObject({ hand_no: 0, board: [], end: "street_closed" });
     expect(third.previous_hand?.history.slice(-2).map((entry) => `${entry.position} ${entry.label}`)).toEqual(["BTN Raise to 22bb", "BB Call"]);
   });

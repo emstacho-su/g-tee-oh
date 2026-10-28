@@ -1,7 +1,9 @@
 /**
  * Plain words for every drill schema value the drill screens show (S26, R3.14, O-317). The stop
  * rule reads "Spot", "Street" and "Full hand", as the plan names them; each other value gets a
- * short label a player recognises. The V1_NOTES say which stored settings v1 does not serve yet
+ * short label a player recognises. This is the one map for these values (PR #30 review LOW 10):
+ * the library, the builder and the drill run's start panel all read it, one wording per value.
+ * The V1_NOTES say which stored settings v1 does not serve yet
  * (O-317): the field stays editable so a drill round-trips, and the note says what v1 does.
  */
 import type {

@@ -1,8 +1,25 @@
 /**
  * The drill schema's limits and value lists, named once for the builder, its client validation
- * and the mocked api (S26, R3.14). Each mirrors services/api/src/schemas/drills.ts,
- * spot-filter-rules.ts, catalog/seats.ts or drills/export-code.ts; the api checks every write again,
- * so a drift here shows as a server field error next to the field, never as a bad stored drill.
+ * and the mocked api (S26, R3.14). The api checks every write again, so a drift here shows as a
+ * server field error next to the field, never as a bad stored drill.
+ *
+ * What stays duplicated (PR #30 review LOW 12). The generated contract types carry no limits, only
+ * the OpenAPI document does, so these are copies; test/drills/contract-limits.test.ts reads
+ * packages/contracts/api.openapi.json and fails when one of them drifts:
+ * - DrillCreate: MAX_DRILL_NAME_LENGTH (name maxLength), MAX_TAGS and TAG_PATTERN (tags);
+ * - SpotFilterWrite: MIN_TABLE_SIZE and MAX_TABLE_SIZE, MAX_DEPTHS, MIN_DEPTH_BB and MAX_DEPTH_BB,
+ *   MAX_STAKE_LABEL_LENGTH, MAX_POSITIONS, LINE_PATTERN, MAX_FLOPS, MAX_HANDS, HAND_CLASS_PATTERN;
+ * - TrainerSettings.tables: MIN_TABLES and MAX_TABLES;
+ * - the export routes: EXPORT_CODE_PREFIX (the export_code pattern) and MAX_EXPORT_CODE_LENGTH
+ *   (the import body's maxLength).
+ * Copies the document cannot check, kept by hand against the api source:
+ * - FLOP_PATTERN: the document's pattern allows a repeated card; the api refuses one in a rule
+ *   outside the pattern, as this pattern does (S26 review LOW 12);
+ * - LIVE_STAKE_LABEL_PATTERN, ONLINE_STAKE_LABEL and the seats by table size (SEATED): the api's
+ *   SpotFilterWrite rules (spot-filter-rules.ts, catalog/seats.ts), not schema keywords;
+ * - OFFERED_TABLE_SIZES, TIMEBANK_CHOICES and COPY_SUFFIX are the builder's own choices.
+ * The value lists (STREETS, PREFLOP_ACTIONS, PANEL_KEYS) are typed by the contract's unions, so a
+ * removed or renamed value fails the typecheck; a value the contract adds is added here by hand.
  */
 import type { PanelKey, Position, PreflopAction, StartStreet, Timebank } from "./types.js";
 
@@ -33,7 +50,11 @@ export const COPY_SUFFIX = " (copy)";
 export const ONLINE_STAKE_LABEL = "online";
 export const LIVE_STAKE_LABEL_PATTERN = /^[0-9]+\/[0-9]+$/;
 export const LINE_PATTERN = /^[a-z][0-9]*(\.[a-z][0-9]*)*$/;
-export const FLOP_PATTERN = /^([2-9TJQKA][cdhs]){3}$/;
+/**
+ * Three cards, rank then suit, no card twice (PR #30 review LOW 12). The first lookahead refuses
+ * card 1 repeated as card 2 or 3, the second card 2 repeated as card 3.
+ */
+export const FLOP_PATTERN = /^(?!(..)(?:..)?\1)(?!..(..)\2)(?:[2-9TJQKA][cdhs]){3}$/;
 export const HAND_CLASS_PATTERN = /^(([2-9TJQKA])\2|[2-9TJQKA]{2}[so])$/;
 
 export const STREETS: readonly StartStreet[] = ["preflop", "flop", "turn", "river"];

@@ -13,9 +13,10 @@ import type { AppApi } from "../../api/index.js";
 import { Button, Dialog } from "../../components/ui/index.js";
 import { importFailureText } from "../../drills/failure-text.js";
 import { EXPORT_CODE_PREFIX, MAX_EXPORT_CODE_LENGTH } from "../../drills/limits.js";
-import { fieldErrorsOfFailure } from "../../drills/problem.js";
+import { fieldErrorsOfFailure, omittedErrorsOfFailure } from "../../drills/problem.js";
 import type { Drill, FieldError } from "../../drills/types.js";
 import { useImportDrill } from "../../drills/use-drill-writes.js";
+import { ErrorList } from "./ErrorList.js";
 import { ErrorText } from "./form-parts.js";
 
 export const IMPORT_TEXT = {
@@ -50,6 +51,7 @@ function codeFieldText({ path, message }: FieldError): string {
   return inner === "" ? message : `${inner}: ${message}`;
 }
 
+/** The refusal's headline and its field errors, at most MAX_LISTED_FIELD_ERRORS plus "and N more" (MEDIUM 1). */
 function Refusal({ error }: { error: unknown }) {
   const details = fieldErrorsOfFailure(error).map(codeFieldText);
   const headline = importFailureText(error);
@@ -57,13 +59,7 @@ function Refusal({ error }: { error: unknown }) {
   return (
     <div role="alert" data-testid="import-failure" className="flex flex-col gap-1 text-sm">
       <p className="font-medium text-danger">{`Error: ${headline}`}</p>
-      {extra.length === 0 ? null : (
-        <ul className="list-disc pl-5">
-          {extra.map((detail) => (
-            <li key={detail}>{detail}</li>
-          ))}
-        </ul>
-      )}
+      <ErrorList lines={extra} omitted={omittedErrorsOfFailure(error)} />
     </div>
   );
 }

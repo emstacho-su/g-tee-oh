@@ -44,12 +44,12 @@ const SESSION = "S26";
 
 const CRITERIA = {
   streetSecond:
-    "R3.13 street mode: second decision in one hand after the opponents' three-bet, counter shows Hand 1, decision 2; the best first action continued by itself (O-314)",
+    "R3.13 street mode: second decision in one hand after the opponents' three-bet, counter shows Hand 1, decision 2 (the prompt's hand_decision_no, O-335); the best first action continued by itself (O-314)",
   streetSummary:
-    "R3.13 street mode: the next hand shows how the last ended (Ended when the street closed, closing actions), counter Hand 2, decision 1 (O-313)",
-  fullHandSummary: "R3.13 full-hand mode: the next hand's summary says Ended at the flop and shows the three flop cards (O-313)",
-  partCovered: "R3.14 covered part: Running on 2 of 3 spots; 1 queued for the builder, with a link to the library (O-312)",
-  uncovered: "R3.14 uncovered drill: the 422 alert plus the queued count and a link to the library (O-312, ADR 0018)",
+    "R3.13 street mode: the next hand shows how the last ended (Ended when the street closed, closing actions), counter Hand 2, decision 1, the hand's ordinal on this page (O-313, review MEDIUM 6)",
+  fullHandSummary: "R3.13 full-hand mode: the next hand's summary says Ended at the flop (end street_closed with a board) and shows the three flop cards (O-313, review MEDIUM 5)",
+  partCovered: "R3.14 covered part: Running on 2 of 3 spots; 1 queued for the builder, with a router link to the library (O-312, review MEDIUM 4)",
+  uncovered: "R3.14 uncovered drill: the 422 alert plus the queued count from its pairs_total and pairs_queued, and a router link to the library (O-312, O-318, ADR 0018)",
 } as const;
 
 const records: ShotRecord[] = [];

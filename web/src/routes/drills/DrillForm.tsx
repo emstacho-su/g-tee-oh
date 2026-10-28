@@ -12,7 +12,7 @@
  * that nothing changed when no field differs.
  */
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
@@ -20,10 +20,11 @@ import { Button } from "../../components/ui/index.js";
 import { draftToCreate, draftToPatch, type DraftResult, type DrillDraft } from "../../drills/draft.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { groupFieldErrors, type GroupedErrors } from "../../drills/field-errors.js";
-import { fieldErrorsOfFailure } from "../../drills/problem.js";
+import { fieldErrorsOfFailure, omittedErrorsOfFailure } from "../../drills/problem.js";
 import type { Drill, FieldError } from "../../drills/types.js";
 import { useSaveDrill, type SaveInput } from "../../drills/use-drill-writes.js";
 import { BoardSection } from "./BoardSection.js";
+import { ErrorList } from "./ErrorList.js";
 import { FormSection, TextField } from "./form-parts.js";
 import { GameSection, type SectionProps } from "./GameSection.js";
 import { HandsSection } from "./HandsSection.js";
@@ -76,20 +77,21 @@ function errorsOf(result: DraftResult<SaveInput>): readonly FieldError[] {
   return result.ok ? [] : result.errors;
 }
 
-function FormAlert({ errors, failure }: { errors: GroupedErrors; failure: string | null }) {
+interface FormAlertProps {
+  errors: GroupedErrors;
+  failure: string | null;
+  /** The api's field errors left out of the bounded list (MEDIUM 1). */
+  omitted: number;
+}
+
+function FormAlert({ errors, failure, omitted }: FormAlertProps) {
   const formMessages = errors.form ?? [];
   const hasFieldErrors = Object.keys(errors).some((key) => key !== "form");
-  if (failure === null && formMessages.length === 0 && !hasFieldErrors) return null;
+  if (failure === null && formMessages.length === 0 && !hasFieldErrors && omitted === 0) return null;
   return (
     <div role="alert" data-testid="form-alert" className="rounded-md border border-danger p-3 text-sm">
       <p className="font-medium text-danger">{`Error: ${failure ?? FORM_TEXT.fix}`}</p>
-      {formMessages.length === 0 ? null : (
-        <ul className="list-disc pl-5">
-          {formMessages.map((message) => (
-            <li key={message}>{message}</li>
-          ))}
-        </ul>
-      )}
+      <ErrorList lines={formMessages} omitted={omitted} />
     </div>
   );
 }
@@ -107,12 +109,28 @@ function useAfterSave(setStatus: (status: string) => void) {
   };
 }
 
+/**
+ * After a create (PR #30 review LOW 11): once this form has mounted with "Drill saved.", the URL
+ * drops ?saved=1 through a replace navigation, so a reload, Back or a copied link does not say it
+ * again. The form keeps its status state across that navigation (same route, same key).
+ */
+function useDropSavedFlag(drillId: string | undefined, justCreated: boolean): void {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!justCreated || drillId === undefined) return;
+    navigate({ to: "/drills/$id", params: { id: drillId }, search: {}, replace: true }).catch((error: unknown) => {
+      console.error(`g-tee-oh: dropping saved=1 from the builder URL failed (${describeFailureForLog(error)})`);
+    });
+  }, [drillId, justCreated, navigate]);
+}
+
 export function DrillForm({ initial, drill, justCreated = false }: DrillFormProps) {
   const api = useAppApi();
   const [draft, setDraft] = useState(initial);
   const [checkedDraft, setCheckedDraft] = useState<DrillDraft | null>(null);
   const [status, setStatus] = useState(justCreated ? FORM_TEXT.saved : "");
   const save = useSaveDrill(api, useAfterSave(setStatus));
+  useDropSavedFlag(drill?.id, justCreated);
 
   // Client errors show once Save was pressed, and then follow every edit.
   const clientErrors = checkedDraft === null ? [] : errorsOf(resultOf(draft, drill));
@@ -141,7 +159,7 @@ export function DrillForm({ initial, drill, justCreated = false }: DrillFormProp
   const sections = { draft, onChange: change, errors };
   return (
     <form aria-label="Drill builder" onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <FormAlert errors={errors} failure={failure} />
+      <FormAlert errors={errors} failure={failure} omitted={sentThisDraft ? omittedErrorsOfFailure(save.error) : 0} />
       <NameSection {...sections} />
       <GameSection {...sections} />
       <SeatsSection {...sections} />

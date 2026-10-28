@@ -1,39 +1,50 @@
 /**
- * Where a prompt sits in its hand, and how the last hand ended (S26, R3.13, O-313). Pure: no
- * input/output, no clock and no randomness.
+ * Where a prompt sits in its hand, and how the last hand ended (S26, R3.13, O-313, O-335, PR #30
+ * review MEDIUM 5 and 6). Pure: no input/output, no clock and no randomness.
  *
  * Mechanism: every prompt carries hand_no, equal on two prompts of one hand (street and full-hand
- * modes), and previous_hand once a hand has ended. advanceHand takes the progress of the prompt
- * shown before (null at the session's first prompt) and the new prompt:
+ * modes), hand_decision_no, the hero's decision index within that hand as the api counts it
+ * (O-335), and previous_hand once a hand has ended. advanceHand takes the progress of the prompt
+ * shown before (null at the first prompt this page shows) and the new prompt:
  * - the same prompt read again (same hand_no and state_version, as after a stale recovery) keeps
- *   the progress object, so the decision number does not grow;
- * - the same hand_no is the next decision of the hand on screen;
- * - any other hand_no starts a new hand at decision 1, and carries the prompt's previous_hand
- *   with the hero of the hand shown before (the closing actions are counted from that hero's last
- *   action), or no hero when that hand was not seen.
- * summarizeHand words the ended hand for the drill's stop rule: its closing actions, the flop when
- * the board has cards (full-hand mode reveals it in v1) and why it ended. Hand numbers are shown
- * from 1; the api counts them from 0.
+ *   the progress object;
+ * - the same hand_no is the hand on screen, now at the prompt's decision;
+ * - any other hand_no starts a new hand, numbered by the hands this page has seen (the ordinal,
+ *   from 1, restarting at 1 after a reload). The api's hand_no is never shown: it skips numbers
+ *   when deals are skipped. The new hand carries the prompt's previous_hand with the hero and
+ *   ordinal of the hand shown before when that is the hand that ended (the closing actions are
+ *   counted from that hero's last action), or neither when that hand was not seen.
+ * The decision number is always the prompt's hand_decision_no and the hero its hero_position, so a
+ * reload mid-hand shows the right decision and hero (MEDIUM 6).
+ *
+ * summarizeHand words the ended hand, one wording per previous_hand.end (MEDIUM 5): the api records
+ * end where the hand ended, so the screen never guesses it. street_closed reads "Ended at the
+ * flop" when the hand reached a board (full-hand mode reveals the flop in v1) and "Ended when the
+ * street closed" when it did not.
  */
 import type { Position, TrainerPrompt } from "../contracts.js";
-import type { PreviousHand, StopRule } from "./session-types.js";
+import type { PreviousHand } from "./session-types.js";
 
-/** The hand that ended just before the one on screen, with the hero it was played by. */
+/** The hand that ended just before the one on screen, with the hero and ordinal it was shown with. */
 export interface EndedHand {
   readonly hand: PreviousHand;
-  /** The hero of the ended hand, or null when its prompts were not shown in this session. */
+  /** The hero of the ended hand, or null when its prompts were not shown on this page. */
   readonly heroPosition: Position | null;
+  /** The ended hand's ordinal on this page, or null when it was not shown. */
+  readonly ordinal: number | null;
 }
 
 export interface HandProgress {
-  /** The api's hand number (from 0). */
+  /** The api's hand number (from 0); compared, never shown. */
   readonly handNo: number;
-  /** The decision within the hand, from 1. */
+  /** The hand's place among the hands this page has seen, from 1. */
+  readonly ordinal: number;
+  /** The hero's decision within the hand, from 1 (the prompt's hand_decision_no). */
   readonly decision: number;
   /** The state version of the prompt this progress was made for. */
   readonly stateVersion: number;
   readonly heroPosition: Position;
-  /** Set at the first decision of a hand that follows an ended hand; null otherwise. */
+  /** Set at the first prompt of a hand that follows an ended hand; null otherwise. */
   readonly endedHand: EndedHand | null;
 }
 
@@ -46,56 +57,50 @@ export interface HandSummaryView {
   readonly flop: readonly string[];
 }
 
-const FIRST_DECISION = 1;
-const SHOWN_NUMBER_OFFSET = 1;
+const FIRST_ORDINAL = 1;
+const UNSEEN_HAND_TITLE = "Previous hand";
 
 function endedHandOf(previous: HandProgress | null, prompt: TrainerPrompt): EndedHand | null {
   const hand = prompt.previous_hand;
   if (hand === null || hand.hand_no >= prompt.hand_no) return null;
-  const heroPosition = previous !== null && previous.handNo === hand.hand_no ? previous.heroPosition : null;
-  return { hand, heroPosition };
+  const seen = previous !== null && previous.handNo === hand.hand_no;
+  return { hand, heroPosition: seen ? previous.heroPosition : null, ordinal: seen ? previous.ordinal : null };
 }
 
 export function advanceHand(previous: HandProgress | null, prompt: TrainerPrompt): HandProgress {
   const sameHand = previous !== null && previous.handNo === prompt.hand_no;
   if (sameHand && previous.stateVersion === prompt.state_version) return previous;
-  if (sameHand) {
-    return { ...previous, decision: previous.decision + 1, stateVersion: prompt.state_version, heroPosition: prompt.hero_position, endedHand: null };
-  }
+  const shown = { decision: prompt.hand_decision_no, stateVersion: prompt.state_version, heroPosition: prompt.hero_position };
+  if (sameHand) return { ...previous, ...shown, endedHand: null };
   return {
     handNo: prompt.hand_no,
-    decision: FIRST_DECISION,
-    stateVersion: prompt.state_version,
-    heroPosition: prompt.hero_position,
+    ordinal: previous === null ? FIRST_ORDINAL : previous.ordinal + 1,
+    ...shown,
     endedHand: endedHandOf(previous, prompt),
   };
 }
 
-export function handTitle(handNo: number): string {
-  return `Hand ${handNo + SHOWN_NUMBER_OFFSET}`;
+/** "Hand 2", or "Previous hand" for a hand this page did not show. */
+export function handTitle(ordinal: number | null): string {
+  return ordinal === null ? UNSEEN_HAND_TITLE : `Hand ${ordinal}`;
 }
 
 /** "Hand 3, decision 2". */
 export function handCounterText(progress: HandProgress): string {
-  return `${handTitle(progress.handNo)}, decision ${progress.decision}`;
+  return `${handTitle(progress.ordinal)}, decision ${progress.decision}`;
 }
 
-const STOP_RULE_END_TEXT: Readonly<Record<StopRule, string>> = {
-  after_action: "Ended after your decision",
-  end_of_street: "Ended at the end of the street",
-  end_of_hand: "Ended at the end of the hand",
-};
-
-function endText(hand: PreviousHand, stopRule: StopRule): string {
+/** One wording per previous_hand.end; street_closed names the flop when the hand reached one. */
+function endText(hand: PreviousHand): string {
   switch (hand.end) {
     case "fold":
       return "Ended with a fold";
     case "off_range":
       return "Ended when the hand left the solution's range";
     case "street_closed":
-      return stopRule === "end_of_hand" && hand.board.length > 0 ? "Ended at the flop" : "Ended when the street closed";
+      return hand.board.length > 0 ? "Ended at the flop" : "Ended when the street closed";
     case "stop_rule":
-      return STOP_RULE_END_TEXT[stopRule];
+      return "Spot over";
   }
 }
 
@@ -105,11 +110,11 @@ function closingEntries(hand: PreviousHand, heroPosition: Position | null): Prev
   return hand.history.slice(from);
 }
 
-export function summarizeHand(ended: EndedHand, stopRule: StopRule): HandSummaryView {
-  const { hand, heroPosition } = ended;
+export function summarizeHand(ended: EndedHand): HandSummaryView {
+  const { hand, heroPosition, ordinal } = ended;
   return {
-    title: handTitle(hand.hand_no),
-    endText: endText(hand, stopRule),
+    title: handTitle(ordinal),
+    endText: endText(hand),
     closing: closingEntries(hand, heroPosition).map((entry) => `${entry.position} ${entry.label}`),
     flop: [...hand.board],
   };

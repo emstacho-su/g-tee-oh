@@ -1,7 +1,8 @@
 /**
  * How the last hand ended, shown at the first decision of the next hand in street and full-hand
- * modes (S26, R3.13, O-313). The strip names the hand, says why it ended in words worded for the
- * drill's stop rule ("Ended at the flop", "Ended with a fold", "Ended when the street closed"),
+ * modes (S26, R3.13, O-313). The strip names the hand by its ordinal on this page, says why it
+ * ended, one wording per previous_hand.end as the api recorded it (PR #30 review MEDIUM 5: "Ended
+ * at the flop", "Ended with a fold", "Ended when the street closed"),
  * lists the closing actions (the hero's last action and what followed it) and, when the hand
  * reached a board (full-hand mode reveals the flop in v1), shows those cards with CardView, whose
  * accessible names carry the suits.
@@ -10,17 +11,15 @@ import { useId } from "react";
 
 import { CardView } from "../../components/table/index.js";
 import { summarizeHand, type EndedHand } from "../../trainer/hand-progress.js";
-import type { StopRule } from "../../trainer/session-types.js";
 import { SESSION_TEXT } from "./labels.js";
 
 export interface HandSummaryProps {
   ended: EndedHand;
-  stopRule: StopRule;
 }
 
-export function HandSummary({ ended, stopRule }: HandSummaryProps) {
+export function HandSummary({ ended }: HandSummaryProps) {
   const closingId = useId();
-  const summary = summarizeHand(ended, stopRule);
+  const summary = summarizeHand(ended);
   return (
     <section
       aria-label={`How ${summary.title.toLowerCase()} ended`}

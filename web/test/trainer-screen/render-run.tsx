@@ -2,7 +2,9 @@
  * Test helper for the drill run screen (S25, R3.13, R3.11). Renders DrillRunPage inside the app's
  * providers (Query, api, an isolated hotkey store, injected trainer dependencies) over the scripted
  * fake fetch, and records every request with its Idempotency-Key header and body. The clock and
- * the key factory are injected (trainer-deps.tsx), so response_ms and the keys are exact.
+ * the key factory are injected (trainer-deps.tsx), so response_ms and the keys are exact. The page
+ * renders inside a small memory router (screen-router.tsx, S26 review MEDIUM 4), since its notes
+ * link to /library through the router Link.
  */
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react";
@@ -15,6 +17,7 @@ import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { DrillRunPage } from "../../src/routes/drill-run/DrillRunPage.js";
 import { TrainerDepsProvider, type Scheduler, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
 import { createFakeFetch, jsonResponse, type FetchScript } from "../api/fake-fetch.js";
+import { createScreenRouter, ScreenRouterView, type ScreenRouter } from "./screen-router.js";
 
 export const ORIGIN = "http://localhost:4173";
 export const SESSION_ID = fixturePracticeSession.session_id;
@@ -42,6 +45,8 @@ export interface RunView extends RenderResult {
   sentTo: (key: string) => SentRequest[];
   queryClient: ReturnType<typeof createQueryClient>;
   api: ReturnType<typeof createAppApi>;
+  /** The test router the page renders in, so a test can follow the library link (MEDIUM 4). */
+  router: ScreenRouter;
 }
 
 export interface RenderRunOptions {
@@ -94,16 +99,19 @@ export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule }
     },
     ...(schedule === undefined ? {} : { schedule }),
   };
+  const router = createScreenRouter();
   const view = render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api}>
         <HotkeyRoot store={createHotkeyStore()}>
           <TrainerDepsProvider deps={deps}>
-            <DrillRunPage drillId={drillId} {...(seed === undefined ? {} : { seed })} />
+            <ScreenRouterView router={router}>
+              <DrillRunPage drillId={drillId} {...(seed === undefined ? {} : { seed })} />
+            </ScreenRouterView>
           </TrainerDepsProvider>
         </HotkeyRoot>
       </ApiProvider>
     </QueryClientProvider>,
   );
-  return { ...view, sent, clock, queryClient, api, sentTo: (key) => sent.filter((request) => request.key === key) };
+  return { ...view, sent, clock, queryClient, api, router, sentTo: (key) => sent.filter((request) => request.key === key) };
 }

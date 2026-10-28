@@ -21,7 +21,7 @@ export function RunProgress({ context }: RunProgressProps) {
     <>
       <CoverageNote coverage={context.session.coverage} />
       {hand === undefined ? null : <HandCounter progress={hand} />}
-      {hand === undefined || hand.endedHand === null ? null : <HandSummary ended={hand.endedHand} stopRule={stopRule} />}
+      {hand === undefined || hand.endedHand === null ? null : <HandSummary ended={hand.endedHand} />}
     </>
   );
 }
