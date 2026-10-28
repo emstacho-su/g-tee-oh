@@ -171,7 +171,7 @@ describe("R4.10 class catalog (O-270)", () => {
         pair: "BB-BTN",
         line: "r250",
         hero_seat: "BB",
-        history: [{ position: "BTN", token: "r250", label: "Raise to 2.5bb" }],
+        history: [{ position: "BTN", token: "r250", label: "Raise to 2.5bb", street: "preflop" }],
       },
     ]);
   });

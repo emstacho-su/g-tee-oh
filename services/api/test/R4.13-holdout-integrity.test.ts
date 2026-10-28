@@ -135,6 +135,20 @@ describe("R4.13 holdout integrity (PR #27 review HIGH 1)", () => {
   const served: string[] = [];
 
   it(
+    "R4.13 drawn items keep their line's history with the preflop street (S40, O-409)",
+    async () => {
+      // The opens track's lines hold no action before the hero; blind defence lines hold the open.
+      const catalog = await loadClassCatalog(fixtureSolverQuery(), iso.database);
+      const defence = catalog.classes.filter((cls) => cls.trackKey === "blind-defense");
+      const drawn = await drawTrackItems(defence, "blind-defense", DRAW_SEED, drawPort(fixtureSolverQuery(), "r4.13-street", LONG_TEST_MS));
+      const entries = drawn.flatMap((item) => item.history);
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries.every((entry) => entry.street === "preflop")).toBe(true);
+    },
+    LONG_TEST_MS,
+  );
+
+  it(
     "R4.13 repeated create, view and end never serves an item twice: each served item is scored skipped",
     async () => {
       for (let repeat = 0; repeat < REPEATS; repeat += 1) {

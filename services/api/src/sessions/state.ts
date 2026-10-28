@@ -59,6 +59,19 @@ export const historyEntrySchema = z.strictObject({
   street: streetSchema.optional(),
 });
 
+/** The street of every class line: a spot class is a preflop line by contract (O-409). */
+export const CLASS_LINE_STREET = "preflop";
+
+/**
+ * A class line's action as a history entry, tagged with the preflop street (S40, O-409): the
+ * automated class catalog and the holdout draw and serving rebuild their spots' history through it,
+ * so an entry never lacks the street the table clears chips by (O-398). Takes only the three
+ * labelled fields (the position checked by the schema), so a stored entry from before S38 is tagged too.
+ */
+export function classLineEntry(entry: { readonly position: string; readonly token: string; readonly label: string }): HistoryEntry {
+  return historyEntrySchema.parse({ position: entry.position, token: entry.token, label: entry.label, street: CLASS_LINE_STREET });
+}
+
 /**
  * A hero decision the drill trains (spot-search.ts): the (configuration, pair), the preflop line
  * to deal at (null for the pair's root), the seat that acts there as the hero, and the actions of

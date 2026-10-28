@@ -21,7 +21,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { heroSpotSchema, type HeroSpot } from "../sessions/state.js";
+import { classLineEntry, heroSpotSchema, type HeroSpot } from "../sessions/state.js";
 import { isDeterministicReplayFailure, type DrawPort } from "./draw-port.js";
 import { replaysItem } from "./draw.js";
 import type { HoldoutItem } from "./repository.js";
@@ -47,7 +47,7 @@ export function itemSpot(item: HoldoutItem): HeroSpot {
     pair: item.pair,
     line: item.line,
     hero_seat: item.heroPosition,
-    history: item.history.map((entry) => ({ position: entry.position, token: entry.token, label: entry.label })),
+    history: item.history.map(classLineEntry),
     deal_seed: item.dealSeed,
   });
 }

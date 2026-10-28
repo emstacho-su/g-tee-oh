@@ -20,7 +20,7 @@ import { createSplitMix64, type SplitMix64 } from "@g-tee-oh/learning";
 import type { CatalogClass } from "../automated/class-catalog.js";
 import type { TrackKey } from "../learning/tracks.js";
 import { fromHex64, pickIndex, toHex64 } from "../sessions/randomness.js";
-import { historyEntrySchema } from "../sessions/state.js";
+import { classLineEntry } from "../sessions/state.js";
 import type { SqClassSpot } from "../solver-query/client.js";
 import type { DrawPort } from "./draw-port.js";
 import type { HoldoutItem, NewHoldoutItem } from "./repository.js";
@@ -105,7 +105,7 @@ async function tryCandidate(candidate: Candidate, trackKey: TrackKey, port: Draw
     nodeKey: deal.start_node_key,
     hand,
     // Stored so serving the item needs no class catalog (PR #27 review HIGH 4).
-    history: spot.history.map((entry) => historyEntrySchema.parse({ position: entry.position, token: entry.token, label: entry.label })),
+    history: spot.history.map(classLineEntry),
   };
 }
 
