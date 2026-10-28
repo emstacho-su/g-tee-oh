@@ -71,6 +71,20 @@ describe("R4.12 /progress", () => {
     expect(cells.every((cell) => cell.getAttribute("data-state") === "new")).toBe(true);
   });
 
+  it("R4.12 the holdout card starts the retest, or resumes it while a round is open (O-328)", async () => {
+    const { router } = renderApp("/progress", FRESH);
+    const start = await screen.findByTestId("holdout-retest");
+    expect(start).toHaveTextContent("Start");
+    fireEvent.click(start);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/train"));
+    expect(router.state.location.search).toEqual({ mode: "holdout" });
+  });
+
+  it("R4.12 an open holdout round offers to resume the retest (O-328)", async () => {
+    renderApp("/progress", PROGRESS);
+    expect(await screen.findByTestId("holdout-retest")).toHaveTextContent("Resume");
+  });
+
   it("R4.12 a failed card shows its own error and Try again reloads only that read", async () => {
     const { fake } = renderApp("/progress", {
       ...PROGRESS,

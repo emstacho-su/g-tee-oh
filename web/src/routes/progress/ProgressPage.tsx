@@ -9,7 +9,8 @@
  * trend's weeks live here, and a weeks change keeps the previous trend until the new one lands.
  * The track names from the tracks read name the tracks on the rating and holdout cards. A click to
  * drill from the trend or the heat map goes through useOpenDrill (O-321), whose pending key
- * disables the clicked button and whose message shows in the card that asked.
+ * disables the clicked button and whose message shows in the card that asked. The holdout card's
+ * action starts or resumes this month's retest on /train (O-328).
  */
 import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -20,6 +21,7 @@ import { Button, LoadingNote } from "../../components/ui/index.js";
 import { useOpenDrill, type DrillOrigin, type DrillTarget } from "../../progress/open-drill.js";
 import { heatmapQuery, holdoutQuery, leaksQuery, ratingQuery, streakQuery, tracksQuery } from "../../progress/queries.js";
 import { DEFAULT_LEAK_WEEKS, type LeakWeeks, type TrackKey, type TrackProgress } from "../../progress/types.js";
+import { HoldoutRetestButton } from "../train/HoldoutRetestButton.js";
 
 export const TRY_AGAIN_TEXT = "Try again";
 
@@ -102,7 +104,13 @@ export function ProgressPage() {
         {(data) => <MasteryHeatMap heatmap={data} onDrill={drillFrom("heatmap")} pendingKey={drill.pendingKey} message={messageFor("heatmap")} />}
       </CardQuery>
       <CardQuery title="Holdout retest" subject="the holdout rounds" testId="holdout-card" query={holdout}>
-        {(data) => <HoldoutCard holdout={data} {...(trackNames === undefined ? {} : { trackNames })} />}
+        {(data) => (
+          <HoldoutCard
+            holdout={data}
+            action={<HoldoutRetestButton resume={data.open !== null} />}
+            {...(trackNames === undefined ? {} : { trackNames })}
+          />
+        )}
       </CardQuery>
     </section>
   );
