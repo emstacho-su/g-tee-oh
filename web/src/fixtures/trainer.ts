@@ -1,13 +1,14 @@
 /**
  * Synthetic drill, session, prompt, feedback and recap fixtures for S25's trainer tests, the
- * mocked api and the shots (R3.13, R3.11, R3.10, O-26, O-264). Typed against the contract, so a
+ * mocked api and the shots (R3.13, R3.10, O-26, O-264). Typed against the contract, so a
  * contract change is a type error here before it is a wrong picture.
  *
  * Shape: one synthetic drill (online 6-max at 100bb, grouping grouped, stop rule after_action, RNG
- * mode off by default) and a cycle of three hands. Each hand is a prompt with its roll left null
- * (the mocked api fills the roll only when the session has RNG mode on), the roll RNG mode would
- * show, and the feedback for that hand. The frequencies are invented; each hand's roll lands in the
- * band of an action listed in its best_action_indexes, so the roller and the grade agree (O-213).
+ * mode, the wire's rng, off by default) and a cycle of three hands. Each hand is a prompt with its
+ * roll left null (the mocked api fills the roll only when the session has Mixed-frequency mode on),
+ * the roll the mode would show, and the feedback for that hand, with followed_roll null; the mocked
+ * api fills it from fixtureFollowedRoll when it serves a roll (O-371). The frequencies are invented;
+ * each hand's best_action_indexes is its highest-EV action (ADR 0024), whatever the roll.
  * fixtureRngPrompt and fixturePlainPrompt are the first hand with and without its roll.
  *
  * S26 (R3.13, R3.14, O-312 to O-314) adds a street-mode drill (end_of_street, pause after_mistake,
@@ -17,12 +18,17 @@
  * second decision (facing a three-bet), the opponent's closing call after a four-bet, and the flop
  * a full hand reveals.
  */
+import { followsRoll } from "@g-tee-oh/learning";
+
 import type {
   DecisionFeedback,
+  Grouping,
   NodeAction,
   TrainerPrompt,
   TrainerSettings,
 } from "../contracts.js";
+import { positionOfIndex } from "../poker/action-index.js";
+import { toGradeActions } from "../poker/grade-actions.js";
 import type { Drill, PracticeSession, SessionCoverage, SessionRecap } from "../trainer/session-types.js";
 import { fixtureActions, fixtureFeedback, fixturePrompt } from "./index.js";
 
@@ -93,9 +99,9 @@ const BB_VERSUS_OPEN_ACTIONS: readonly NodeAction[] = [
 ];
 
 export interface FixtureHand {
-  /** The prompt with rng_roll null; the roll is added when the session has RNG mode on. */
+  /** The prompt with rng_roll null; the roll is added when the session has Mixed-frequency mode on. */
   readonly prompt: TrainerPrompt;
-  /** The roll RNG mode shows before the decision (1 to 100). */
+  /** The roll Mixed-frequency mode shows before the decision (1 to 100). */
   readonly roll: number;
   /** The feedback for this hand; rng_roll is null here and set by whoever serves it with RNG on. */
   readonly feedback: DecisionFeedback;
@@ -104,7 +110,7 @@ export interface FixtureHand {
 const BUTTON_OPEN: FixtureHand = {
   prompt: { ...fixturePrompt, rng_roll: null },
   roll: 37,
-  feedback: { ...fixtureFeedback, rng_roll: null },
+  feedback: { ...fixtureFeedback, rng_roll: null, followed_roll: null },
 };
 
 const CUTOFF_OPEN: FixtureHand = {
@@ -131,6 +137,7 @@ const CUTOFF_OPEN: FixtureHand = {
     pair: "CO-BB",
     hand: "KQs",
     rng_roll: null,
+    followed_roll: null,
   },
 };
 
@@ -163,19 +170,49 @@ const BIG_BLIND_DEFENSE: FixtureHand = {
     node_key: "cfg_6_online_100/BB-BTN/r250",
     hand: "98s",
     rng_roll: null,
+    followed_roll: null,
   },
 };
 
 /** The hands a fixture session deals, in order, then again from the first. */
 export const fixtureTrainerHands: readonly FixtureHand[] = [BUTTON_OPEN, CUTOFF_OPEN, BIG_BLIND_DEFENSE];
 
-/** The first hand as RNG mode serves it: the roll is shown before the decision (O-282). */
+/**
+ * The followed-the-roll mark a mocked api reports for a choice (ADR 0024 rule 2, O-371): learning's
+ * followsRoll over the prompt's buttons, the hand's frequencies and the roll, with the chosen
+ * NodeAction.index taken to its record position (O-198); null without a roll or for an index the
+ * prompt does not offer. The fixture hands are preflop, where Standard and Grouped both key exact
+ * actions, so the mocks pass the session's grouping or Standard.
+ */
+export function fixtureFollowedRoll(
+  prompt: TrainerPrompt,
+  feedback: DecisionFeedback,
+  actionIndex: number,
+  roll: number | null,
+  grouping: Grouping = "standard",
+): boolean | null {
+  const position = positionOfIndex(prompt.buttons, actionIndex);
+  if (roll === null || position === undefined) return null;
+  return followsRoll({
+    freqByAction: feedback.freq_by_action,
+    actions: toGradeActions(prompt.buttons),
+    grouping,
+    street: prompt.street,
+    roll,
+    actionIndex: position,
+  });
+}
+
+/** The first hand as Mixed-frequency mode serves it: the roll is shown before the decision (O-282). */
 export const fixtureRngPrompt: TrainerPrompt = { ...BUTTON_OPEN.prompt, rng_roll: BUTTON_OPEN.roll };
-/** The first hand with RNG mode off. */
+/** The first hand with the mode off. */
 export const fixturePlainPrompt: TrainerPrompt = BUTTON_OPEN.prompt;
-/** The first hand's feedback with RNG mode on. */
-export const fixtureRngFeedback: DecisionFeedback = { ...BUTTON_OPEN.feedback, rng_roll: BUTTON_OPEN.roll };
-/** The first hand's feedback with RNG mode off. */
+/**
+ * The first hand's feedback with the mode on, after the hero raised: roll 37 falls in the raise band,
+ * so the hero followed the roll (O-371).
+ */
+export const fixtureRngFeedback: DecisionFeedback = { ...BUTTON_OPEN.feedback, rng_roll: BUTTON_OPEN.roll, followed_roll: true };
+/** The first hand's feedback with Mixed-frequency mode off. */
 export const fixturePlainFeedback: DecisionFeedback = BUTTON_OPEN.feedback;
 
 export const fixtureRecap: SessionRecap = {

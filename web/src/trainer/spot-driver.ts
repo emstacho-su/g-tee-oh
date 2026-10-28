@@ -13,8 +13,8 @@
  * it started in; an answer that arrives after the state moved on (the session was ended while a
  * prompt loaded, say) is dropped instead of being read as the answer to a later request. dispose
  * (the screen unmounted) bumps the generation once more and stops the driver, so nothing answers
- * into a screen that is gone. The decision is sent only from submitting, which only the confidence
- * tap enters (R3.11). A 409 session-ended inside a running session sends End with a new key at
+ * into a screen that is gone. The decision is sent only from submitting, which only choosing an
+ * action enters (O-345). A 409 session-ended inside a running session sends End with a new key at
  * once: the api answers POST end for an ended session with its recap, so the recap is not lost.
  */
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";

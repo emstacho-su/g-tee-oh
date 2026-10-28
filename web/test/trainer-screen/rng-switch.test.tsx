@@ -1,5 +1,5 @@
 /**
- * The start panel's RNG switch asks the explainer to open on first use (S25, R3.10, O-283), and a
+ * The start panel's Mixed-frequency mode switch (the wire's rng) asks the explainer to open on first use (S25, R3.10, O-283), and a
  * session with RNG on asks again at its first prompt. Lane C's useRngExplainer is replaced by a
  * spy here, so this proves only the screen's side of the seam.
  */
@@ -24,8 +24,8 @@ vi.mock("../../src/components/trainer/index.js", async (importOriginal) => {
   };
 });
 
-describe("R3.10 RNG switch and the explainer's first use", () => {
-  it("R3.10 switching RNG on asks for the first-use explainer; switching it off does not", async () => {
+describe("R3.10 Mixed-frequency mode switch and the explainer's first use", () => {
+  it("R3.10 switching the mode on asks for the first-use explainer; switching it off does not", async () => {
     renderRun({ script: {} });
     await screen.findByRole("heading", { name: fixtureDrill.name });
     const rngSwitch = screen.getByRole("switch", { name: "Mixed-frequency mode" });
@@ -36,13 +36,13 @@ describe("R3.10 RNG switch and the explainer's first use", () => {
     expect(control.hotkey.at(-1)).toBe(false);
   });
 
-  it("R3.10 the first prompt with a roll asks again and the I hotkey is on while RNG is on", async () => {
+  it("R3.10 the first prompt with a roll asks again and the I hotkey is on while the mode is on", async () => {
     control.showIfFirstUse.mockClear();
     renderRun({ script: { [NEXT_PATH]: [jsonResponse(200, fixtureRngPrompt)] } });
     await screen.findByRole("heading", { name: fixtureDrill.name });
     await userEvent.click(screen.getByRole("switch", { name: "Mixed-frequency mode" }));
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
-    await screen.findByTestId("roll-badge");
+    expect(await screen.findByTestId("rng-roller")).toHaveAttribute("data-revealed", "false");
     expect(control.showIfFirstUse).toHaveBeenCalledTimes(2);
     expect(control.hotkey.at(-1)).toBe(true);
   });

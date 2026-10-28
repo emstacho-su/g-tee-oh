@@ -26,7 +26,7 @@ import {
   fixtureHoldoutProgress,
   fixtureHoldoutPrompt,
 } from "../../src/fixtures/automated.js";
-import { fixtureTrainerHands, type FixtureHand } from "../../src/fixtures/trainer.js";
+import { fixtureFollowedRoll, fixtureTrainerHands, type FixtureHand } from "../../src/fixtures/trainer.js";
 import type { TrackKey } from "../../src/progress/types.js";
 import type { AutomatedBlock, PracticeSession, RatingChange, SessionRecap } from "../../src/trainer/session-types.js";
 import { json, problem, type MockRequest, type MockResponse, type ProblemSpec } from "./mock-api.js";
@@ -133,6 +133,7 @@ function feedbackOf(session: TrainingSession, actionIndex: number): DecisionFeed
   const graded = best ? { label: "best" as const, score: BEST_SCORE, ev_loss_bb: 0, ev_loss_pct_pot: 0 } : {};
   const worked = session.mode === "automated" && blockAt(decision).worked_example;
   const classKey = session.mode === "automated" ? blockAt(decision).spot_class_key : hand.feedback.spot_class_key;
+  const roll = session.rng ? hand.roll : null;
   return {
     ...hand.feedback,
     ...graded,
@@ -141,7 +142,9 @@ function feedbackOf(session: TrainingSession, actionIndex: number): DecisionFeed
     review_block: reviewBlockOf(session),
     spot_class_key: classKey,
     state_version: session.version + 1,
-    rng_roll: session.rng ? hand.roll : null,
+    rng_roll: roll,
+    // The followed-the-roll mark, as the api stores it (O-371).
+    followed_roll: fixtureFollowedRoll(promptOf(session), hand.feedback, actionIndex, roll),
   };
 }
 

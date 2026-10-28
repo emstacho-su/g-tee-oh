@@ -3,7 +3,7 @@
  * O-325, O-326, O-328, A7 section 2).
  *
  * Mechanism: the page runs useSpotSession with a start spec (trainer/session-api.ts). In automated
- * mode the spec takes the grouping, RNG mode and configuration scope from the session defaults
+ * mode the spec takes the grouping, Mixed-frequency mode and configuration scope from the session defaults
  * (lane C's store, O-323) and never a seed; in holdout mode (/train?mode=holdout, the holdout
  * card's button) the spec is the mode alone and RNG is off. The screen follows the machine's
  * state: the start panel (AutomatedStart or HoldoutStart) before a session and after a failed
@@ -15,7 +15,7 @@
  *
  * Ending a session invalidates every progress read (in useSpotSession, O-326), so the home and
  * /progress cards refetch. A 401 from any request signs out (the hook sets me to null and the
- * authenticated layout goes to /login). As on the drill run, the RNG explainer opens at the first
+ * authenticated layout goes to /login). As on the drill run, the Mixed-frequency mode explainer opens at the first
  * rolled prompt on first use, E opens the end confirm, and the screen's buttons, hotkeys and
  * response timer pause while a dialog is open (O-284, O-285).
  */

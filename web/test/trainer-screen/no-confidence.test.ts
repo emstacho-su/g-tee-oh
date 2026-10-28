@@ -7,14 +7,15 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const SOURCE_ROOT = fileURLToPath(new URL("../../src/", import.meta.url));
+/** The web package is the test run's working directory, as in test/cosmetics/catalog.test.ts. */
+const SOURCE_ROOT = join(process.cwd(), "src");
 /** Every directory whose code plays a decision; drift's statistical "confidence" lives elsewhere. */
 const TRAINER_DIRECTORIES = ["trainer", "routes/drill-run", "routes/train", "components/trainer", "routes/settings"];
-const RETIRED = /\bconfidence\b|ConfidenceTap|await_confidence|SURE_KEY|UNSURE_KEY/i;
+/** The field as a property or key, and every name the tap had; a comment may still say it was retired. */
+const RETIRED = /\bconfidence\??\s*:|["']confidence["']|ConfidenceTap|ConfidenceChoice|CONFIDENCE_SCOPE|await_confidence|tapConfidence|SURE_KEY|UNSURE_KEY/;
 
 function sourcesUnder(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {

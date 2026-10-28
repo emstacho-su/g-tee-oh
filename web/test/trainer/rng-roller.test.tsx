@@ -140,7 +140,7 @@ describe("R3.13 RngRoller", () => {
     expect(roller).toHaveAttribute("data-revealed", "true");
     const bands = screen.getByRole("list", { name: "Mixed-frequency bands" });
     expect(bands).toHaveClass("motion-safe:transition-[clip-path]", "motion-reduce:transition-none");
-    await waitFor(() => expect(bands.style.clipPath).toBe("inset(0px 0% 0px 0px)"));
+    await waitFor(() => expect(bands).toHaveAttribute("data-reveal", "done"));
   });
 
   it("R3.13 invalid input renders an error state instead of guessing bands", () => {

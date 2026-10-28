@@ -1,6 +1,6 @@
 /**
  * The builder's trainer and panels sections (S26, R3.14, O-314, O-317): how the trainer runs the
- * drill (stop rule in plain words "Spot", "Street", "Full hand"; input; grouping; RNG mode; pause
+ * drill (stop rule in plain words "Spot", "Street", "Full hand"; input; grouping; Mixed-frequency mode; pause
  * rule; speed; quick result; tables; timebank off, 7, 15 or 25 seconds) and which panels show
  * (trainer.panels, one checkbox per PANEL_KEYS entry with a plain label). Frequency input and more
  * than one table stay selectable and carry the v1 note: v1 takes action input on one table.
@@ -75,7 +75,12 @@ export function TrainerSection({ draft, onChange, errors }: SectionProps) {
       </div>
       {trainer.tables > MIN_TABLES ? <V1Note text={V1_NOTES.tables} /> : null}
       <div className="flex flex-wrap gap-6">
-        <CheckboxField label="RNG mode" hint="A roll picks the action of a mixed strategy." checked={trainer.rng} onChange={(rng) => set({ rng })} />
+        <CheckboxField
+          label="Mixed-frequency mode"
+          hint="A roll from 1 to 100 before each decision, to practise mixing; it never changes the grade."
+          checked={trainer.rng}
+          onChange={(rng) => set({ rng })}
+        />
         <CheckboxField label="Quick result" hint="A shorter result between decisions." checked={trainer.quick_result} onChange={(quick_result) => set({ quick_result })} />
       </div>
     </FormSection>

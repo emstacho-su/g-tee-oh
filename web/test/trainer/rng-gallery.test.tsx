@@ -47,7 +47,7 @@ describe("R3.10 Mixed-frequency mode gallery sections", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     renderSections();
     const section = screen.getByTestId("gallery-feedback-wired");
-    expect(within(section).getByTestId("rng-follow")).toHaveTextContent("You followed the roll: roll 37 fell on Raise to 2.5bb");
+    expect(within(section).getByTestId("rng-follow")).toHaveTextContent("You did not follow the roll: roll 37 fell on Raise to 2.5bb, you chose Call");
     expect(within(section).queryByTestId("rng-best")).not.toBeInTheDocument();
     expect(within(section).getByTestId("feedback-range-view")).toHaveAttribute("data-selected-hand", "AJo");
     expect(within(section).getByTestId("threshold-card")).toHaveTextContent("Your hand: AJo");

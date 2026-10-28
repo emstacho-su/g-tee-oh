@@ -3,8 +3,9 @@
  * labels, the screen's sentences and the session hotkeys. The start panel names a drill's grouping,
  * stop rule and pause rule from src/drills/labels.ts, the one map the library and the builder use
  * too (PR #30 review LOW 10), so this file holds no second wording for them. Keys go through
- * useHotkey, so the ? overlay lists them under SESSION_SCOPE; 1 to 9 (ActionBar), S and U
- * (ConfidenceTap) and I (the RNG explainer hook) are registered by their own components.
+ * useHotkey, so the ? overlay lists them under SESSION_SCOPE; 1 to 9 (ActionBar) and I (the
+ * Mixed-frequency mode explainer hook) are registered by their own components. The S and U keys
+ * left with the confidence tap (O-345).
  */
 import type { FeedbackLabel } from "../../contracts.js";
 
@@ -27,9 +28,9 @@ export const SESSION_TEXT = {
   heading: "Drill session",
   start: "Start session",
   starting: "Starting the session",
-  rngSwitch: "RNG mode",
+  rngSwitch: "Mixed-frequency mode",
   rngHint:
-    "Each decision shows a roll from 1 to 100 first. After the reveal, the roll picks one action of the hand's mixed strategy.",
+    "Each decision shows a roll from 1 to 100 first, to practise mixing your actions. After the decision the bands show where it fell; Best is still the highest-EV action.",
   nextHand: "Next hand",
   endSession: "End session",
   confirmTitle: "End this session?",
