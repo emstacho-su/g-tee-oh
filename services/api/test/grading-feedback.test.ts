@@ -59,6 +59,8 @@ const ROW: FeedbackRow = {
   solution_id: "0190f000-0000-7000-8000-0000000000aa",
   node_key: "cfg_6_online_100/BB-BTN/",
   hand: "AhKd",
+  noise_flags: ["close_ev_mix"],
+  spot_class_key: "srp-btn-open",
   game_config_id: "cfg_6_online_100",
   position_pair: "BB-BTN",
 };
@@ -104,6 +106,7 @@ describe("R3.7 grading inputs and feedback", () => {
       rngRoll: 42,
       settings: { ...SETTINGS, grouping: "grouped", panels: { hero_strategy_matrix: true } },
       ratedTodayInTrack: 3,
+      mode: "drill",
     });
     expect(input).toMatchObject({
       lossPctPot: 37.5,
@@ -119,7 +122,7 @@ describe("R3.7 grading inputs and feedback", () => {
       ratedTodayInTrack: 3,
       street: "preflop",
     });
-    const noRoll = buildGradeInput({ node: NODE, grade: GRADE, actionIndex: 1, rngRoll: null, settings: SETTINGS, ratedTodayInTrack: 0 });
+    const noRoll = buildGradeInput({ node: NODE, grade: GRADE, actionIndex: 1, rngRoll: null, settings: SETTINGS, ratedTodayInTrack: 0, mode: "drill" });
     expect("rngRoll" in noRoll).toBe(false);
     expect(noRoll.panelsRevealed).toBe(false);
   });
@@ -161,6 +164,8 @@ describe("R3.7 grading inputs and feedback", () => {
       config_id: "cfg_6_online_100",
       pair: "BB-BTN",
       hand: "AhKd",
+      noise_flags: ["close_ev_mix"],
+      spot_class_key: "srp-btn-open",
     });
     expect(renderFeedback(ROW)).toEqual(feedback);
   });

@@ -1,6 +1,6 @@
 /**
  * Progress, explanation, events and admin schemas (A5 section 3), declared by S21 for the
- * contract-first commit (O-38). Owners: progress S31 (R4.x), explanations S27 (R3.19, R3.20),
+ * contract-first commit (O-38). Owners: progress S31 (R4.x) (S27 moved explanations to explain.ts),
  * events and admin S23 (R3.4, R3.5). Shapes are drafts the owners may change with a visible
  * contract diff.
  */
@@ -52,24 +52,6 @@ export const streakSchema = z.object({
   current_days: z.number().int(),
   longest_days: z.number().int(),
   freezes_available: z.number().int(),
-});
-
-export const attemptParamsSchema = z.object({ attempt_id: uuidSchema });
-
-export const moreInfoSchema = z.object({
-  template: z.string(),
-  text: z.string().describe("Every number in it exists in the node or insights data (R3.19, ADR 0016)"),
-});
-
-export const askBodySchema = z.strictObject({
-  question: z.string().trim().min(1).max(500),
-});
-
-export const askResultSchema = z.object({
-  text: z.string(),
-  validated: z.boolean(),
-  cached: z.boolean(),
-  cost_cents: z.number().int(),
 });
 
 export const builderStatusSchema = z

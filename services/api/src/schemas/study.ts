@@ -57,6 +57,7 @@ export const nodeHandRowSchema = z
     ev_best_bb: z.number(),
     loss_pct_pot: z.array(z.number()),
     reach: z.array(z.number()).nullable(),
+    mixed: z.boolean().describe("Two or more actions at 0.05 or more, as solver-query flags it (O-301)"),
   })
   .meta({ id: "NodeHandRow" });
 

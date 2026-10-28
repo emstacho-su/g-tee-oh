@@ -631,6 +631,10 @@
                 "type": "null"
               }
             ]
+          },
+          "mixed": {
+            "type": "boolean",
+            "description": "Two or more actions at 0.05 or more, as solver-query flags it (O-301)"
           }
         },
         "required": [
@@ -639,7 +643,8 @@
           "ev_bb",
           "ev_best_bb",
           "loss_pct_pot",
-          "reach"
+          "reach",
+          "mixed"
         ]
       },
       "StudyNodeInput": {
@@ -1972,6 +1977,800 @@
         },
         "additionalProperties": false
       },
+      "MoreInfoInput": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "template": {
+                  "type": "string",
+                  "enum": [
+                    "facts",
+                    "range_advantage",
+                    "hand_role",
+                    "position",
+                    "blockers"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Every number in it exists in the node or insights data (R3.19, ADR 0016)"
+                }
+              },
+              "required": [
+                "template",
+                "title",
+                "text"
+              ]
+            }
+          }
+        },
+        "required": [
+          "attempt_id",
+          "sections"
+        ]
+      },
+      "AskResultInput": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text; never rendered as HTML"
+          },
+          "validated": {
+            "type": "boolean",
+            "description": "False when the validator still found an unsupported number or name after one regeneration"
+          },
+          "warning": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "True when served from the cache, which spends nothing"
+          },
+          "cost_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "attempt_id",
+          "text",
+          "validated",
+          "warning",
+          "cached",
+          "cost_cents"
+        ]
+      },
+      "AskStatusInput": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The feature flag: off until a model key is configured (O-305)"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Enabled and under the monthly cap; the Ask button is disabled otherwise"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "flag_off",
+              "cap_reached"
+            ]
+          },
+          "cap_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "spent_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the UTC month the spend counts toward"
+          }
+        },
+        "required": [
+          "enabled",
+          "available",
+          "reason",
+          "cap_cents",
+          "spent_cents",
+          "month"
+        ]
+      },
+      "RangeDriftInput": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "min_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "shown": {
+            "type": "boolean",
+            "description": "False below min_decisions; every number below is then null or empty"
+          },
+          "distance": {
+            "description": "Total variation distance between the user's and the solver's kind shares",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ci_low": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ci_high": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "by_kind": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fold",
+                    "check",
+                    "call",
+                    "limp",
+                    "straddle",
+                    "bet",
+                    "raise",
+                    "all_in"
+                  ]
+                },
+                "user_share": {
+                  "type": "number"
+                },
+                "solver_share": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kind",
+                "user_share",
+                "solver_share"
+              ]
+            }
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "decisions",
+          "min_decisions",
+          "shown",
+          "distance",
+          "ci_low",
+          "ci_high",
+          "confidence",
+          "by_kind"
+        ]
+      },
+      "PredictionPromptInput": {
+        "type": "object",
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Derived from the session and its counter, so a repeat GET answers the same prompt"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ladder": {
+            "type": "string",
+            "enum": [
+              "range",
+              "hand"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "answer_kind": {
+            "type": "string",
+            "enum": [
+              "yes_no",
+              "percent",
+              "regions",
+              "action",
+              "band",
+              "size"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ]
+            }
+          },
+          "hand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                "description": "A hand class, for example AKs"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The hand class the hand ladder asks about; null on the range ladder"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeActionInput"
+            },
+            "description": "The node's tree actions (ADR 0020), for action and size answers"
+          },
+          "action_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The NodeAction.index the question names (threshold, nearest share, band); null otherwise"
+          },
+          "threshold_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The yes or no question's threshold; null otherwise"
+          },
+          "regions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "pairs",
+                    "suited_aces",
+                    "suited_broadways",
+                    "suited_connectors",
+                    "suited_other",
+                    "offsuit_aces",
+                    "offsuit_broadways",
+                    "offsuit_other"
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The regions to choose from on the mixing level; null otherwise"
+          },
+          "bands": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "0_25",
+                    "25_50",
+                    "50_75",
+                    "75_100"
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bands to choose from on the band level; null otherwise"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data (O-57)"
+          }
+        },
+        "required": [
+          "prompt_id",
+          "session_id",
+          "state_version",
+          "ladder",
+          "level",
+          "answer_kind",
+          "question",
+          "spot_class_key",
+          "node_key",
+          "hero_position",
+          "history",
+          "hand",
+          "actions",
+          "action_index",
+          "threshold_pct",
+          "regions",
+          "bands",
+          "synthetic"
+        ]
+      },
+      "PredictionResultInput": {
+        "type": "object",
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "ladder": {
+            "type": "string",
+            "enum": [
+              "range",
+              "hand"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The level the answer was given at"
+          },
+          "truth": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The solver's answer in words, built from the numbers below"
+              },
+              "share_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "frequency_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "action_indexes": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "regions": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "pairs",
+                        "suited_aces",
+                        "suited_broadways",
+                        "suited_connectors",
+                        "suited_other",
+                        "offsuit_aces",
+                        "offsuit_broadways",
+                        "offsuit_other"
+                      ]
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "band": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "0_25",
+                      "25_50",
+                      "50_75",
+                      "75_100"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "text",
+              "share_pct",
+              "frequency_pct",
+              "action_indexes",
+              "regions",
+              "band"
+            ]
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "answers": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Answers counted at this level, at most the window size"
+              },
+              "correct": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "required_pct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "answers",
+              "correct",
+              "size",
+              "required_pct"
+            ]
+          },
+          "next_level_unlocked": {
+            "type": "boolean"
+          },
+          "new_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The ladder's level for this spot class after the answer"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "prompt_id",
+          "correct",
+          "ladder",
+          "level",
+          "truth",
+          "window",
+          "next_level_unlocked",
+          "new_level",
+          "state_version"
+        ]
+      },
+      "RangePaintPromptInput": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "prompt_no": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeActionInput"
+            },
+            "description": "The brushes: the node's tree actions (ADR 0020)"
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+              "description": "A hand class, for example AKs"
+            },
+            "description": "Every class the acting seat holds at the node; each must be painted"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data (O-57)"
+          }
+        },
+        "required": [
+          "session_id",
+          "state_version",
+          "prompt_no",
+          "solution_id",
+          "node_key",
+          "spot_class_key",
+          "hero_position",
+          "history",
+          "actions",
+          "hands",
+          "synthetic"
+        ]
+      },
+      "RangePaintResultInput": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "floor_pct_pot": {
+            "type": "number"
+          },
+          "total_weighted_loss_bb": {
+            "type": "number",
+            "description": "solver-query's sum of weighted_loss_bb over every class (O-300)"
+          },
+          "per_hand": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hand": {
+                  "type": "string",
+                  "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                  "description": "A hand class, for example AKs"
+                },
+                "action_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "best_action_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "loss_bb": {
+                  "type": "number",
+                  "description": "The class's EV loss in bb for the painted action"
+                },
+                "loss_pct_pot": {
+                  "type": "number"
+                },
+                "weight": {
+                  "type": "number",
+                  "description": "Acting reach times combos over the node's reach-weighted combos"
+                },
+                "weighted_loss_bb": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hand",
+                "action_index",
+                "best_action_index",
+                "loss_bb",
+                "loss_pct_pot",
+                "weight",
+                "weighted_loss_bb"
+              ]
+            }
+          }
+        },
+        "required": [
+          "session_id",
+          "state_version",
+          "node_key",
+          "floor_pct_pot",
+          "total_weighted_loss_bb",
+          "per_hand"
+        ]
+      },
       "PracticeSessionInput": {
         "type": "object",
         "properties": {
@@ -2304,6 +3103,22 @@
           "hand": {
             "type": "string",
             "description": "The hero's hand as graded"
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            },
+            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
+          },
+          "spot_class_key": {
+            "type": "string",
+            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
           }
         },
         "required": [
@@ -2322,7 +3137,9 @@
           "node_key",
           "config_id",
           "pair",
-          "hand"
+          "hand",
+          "noise_flags",
+          "spot_class_key"
         ]
       },
       "SessionRecapInput": {
@@ -2997,6 +3814,10 @@
                 "type": "null"
               }
             ]
+          },
+          "mixed": {
+            "type": "boolean",
+            "description": "Two or more actions at 0.05 or more, as solver-query flags it (O-301)"
           }
         },
         "required": [
@@ -3005,7 +3826,8 @@
           "ev_bb",
           "ev_best_bb",
           "loss_pct_pot",
-          "reach"
+          "reach",
+          "mixed"
         ],
         "additionalProperties": false
       },
@@ -4355,6 +5177,815 @@
         },
         "additionalProperties": false
       },
+      "MoreInfo": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "template": {
+                  "type": "string",
+                  "enum": [
+                    "facts",
+                    "range_advantage",
+                    "hand_role",
+                    "position",
+                    "blockers"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Every number in it exists in the node or insights data (R3.19, ADR 0016)"
+                }
+              },
+              "required": [
+                "template",
+                "title",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "attempt_id",
+          "sections"
+        ],
+        "additionalProperties": false
+      },
+      "AskResult": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text; never rendered as HTML"
+          },
+          "validated": {
+            "type": "boolean",
+            "description": "False when the validator still found an unsupported number or name after one regeneration"
+          },
+          "warning": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "True when served from the cache, which spends nothing"
+          },
+          "cost_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "attempt_id",
+          "text",
+          "validated",
+          "warning",
+          "cached",
+          "cost_cents"
+        ],
+        "additionalProperties": false
+      },
+      "AskStatus": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The feature flag: off until a model key is configured (O-305)"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Enabled and under the monthly cap; the Ask button is disabled otherwise"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "flag_off",
+              "cap_reached"
+            ]
+          },
+          "cap_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "spent_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "month": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The first day of the UTC month the spend counts toward"
+          }
+        },
+        "required": [
+          "enabled",
+          "available",
+          "reason",
+          "cap_cents",
+          "spent_cents",
+          "month"
+        ],
+        "additionalProperties": false
+      },
+      "RangeDrift": {
+        "type": "object",
+        "properties": {
+          "spot_class_key": {
+            "type": "string"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "min_decisions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "shown": {
+            "type": "boolean",
+            "description": "False below min_decisions; every number below is then null or empty"
+          },
+          "distance": {
+            "description": "Total variation distance between the user's and the solver's kind shares",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ci_low": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ci_high": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "by_kind": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fold",
+                    "check",
+                    "call",
+                    "limp",
+                    "straddle",
+                    "bet",
+                    "raise",
+                    "all_in"
+                  ]
+                },
+                "user_share": {
+                  "type": "number"
+                },
+                "solver_share": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kind",
+                "user_share",
+                "solver_share"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "spot_class_key",
+          "decisions",
+          "min_decisions",
+          "shown",
+          "distance",
+          "ci_low",
+          "ci_high",
+          "confidence",
+          "by_kind"
+        ],
+        "additionalProperties": false
+      },
+      "PredictionPrompt": {
+        "type": "object",
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Derived from the session and its counter, so a repeat GET answers the same prompt"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "ladder": {
+            "type": "string",
+            "enum": [
+              "range",
+              "hand"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "answer_kind": {
+            "type": "string",
+            "enum": [
+              "yes_no",
+              "percent",
+              "regions",
+              "action",
+              "band",
+              "size"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                "description": "A hand class, for example AKs"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The hand class the hand ladder asks about; null on the range ladder"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeAction"
+            },
+            "description": "The node's tree actions (ADR 0020), for action and size answers"
+          },
+          "action_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The NodeAction.index the question names (threshold, nearest share, band); null otherwise"
+          },
+          "threshold_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The yes or no question's threshold; null otherwise"
+          },
+          "regions": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "pairs",
+                    "suited_aces",
+                    "suited_broadways",
+                    "suited_connectors",
+                    "suited_other",
+                    "offsuit_aces",
+                    "offsuit_broadways",
+                    "offsuit_other"
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The regions to choose from on the mixing level; null otherwise"
+          },
+          "bands": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "0_25",
+                    "25_50",
+                    "50_75",
+                    "75_100"
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bands to choose from on the band level; null otherwise"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data (O-57)"
+          }
+        },
+        "required": [
+          "prompt_id",
+          "session_id",
+          "state_version",
+          "ladder",
+          "level",
+          "answer_kind",
+          "question",
+          "spot_class_key",
+          "node_key",
+          "hero_position",
+          "history",
+          "hand",
+          "actions",
+          "action_index",
+          "threshold_pct",
+          "regions",
+          "bands",
+          "synthetic"
+        ],
+        "additionalProperties": false
+      },
+      "PredictionResult": {
+        "type": "object",
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "ladder": {
+            "type": "string",
+            "enum": [
+              "range",
+              "hand"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The level the answer was given at"
+          },
+          "truth": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The solver's answer in words, built from the numbers below"
+              },
+              "share_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "frequency_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "action_indexes": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "regions": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "pairs",
+                        "suited_aces",
+                        "suited_broadways",
+                        "suited_connectors",
+                        "suited_other",
+                        "offsuit_aces",
+                        "offsuit_broadways",
+                        "offsuit_other"
+                      ]
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "band": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "0_25",
+                      "25_50",
+                      "50_75",
+                      "75_100"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "text",
+              "share_pct",
+              "frequency_pct",
+              "action_indexes",
+              "regions",
+              "band"
+            ],
+            "additionalProperties": false
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "answers": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Answers counted at this level, at most the window size"
+              },
+              "correct": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "required_pct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "answers",
+              "correct",
+              "size",
+              "required_pct"
+            ],
+            "additionalProperties": false
+          },
+          "next_level_unlocked": {
+            "type": "boolean"
+          },
+          "new_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The ladder's level for this spot class after the answer"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "prompt_id",
+          "correct",
+          "ladder",
+          "level",
+          "truth",
+          "window",
+          "next_level_unlocked",
+          "new_level",
+          "state_version"
+        ],
+        "additionalProperties": false
+      },
+      "RangePaintPrompt": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "prompt_no": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "spot_class_key": {
+            "type": "string"
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeAction"
+            },
+            "description": "The brushes: the node's tree actions (ADR 0020)"
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+              "description": "A hand class, for example AKs"
+            },
+            "description": "Every class the acting seat holds at the node; each must be painted"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data (O-57)"
+          }
+        },
+        "required": [
+          "session_id",
+          "state_version",
+          "prompt_no",
+          "solution_id",
+          "node_key",
+          "spot_class_key",
+          "hero_position",
+          "history",
+          "actions",
+          "hands",
+          "synthetic"
+        ],
+        "additionalProperties": false
+      },
+      "RangePaintResult": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "floor_pct_pot": {
+            "type": "number"
+          },
+          "total_weighted_loss_bb": {
+            "type": "number",
+            "description": "solver-query's sum of weighted_loss_bb over every class (O-300)"
+          },
+          "per_hand": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hand": {
+                  "type": "string",
+                  "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                  "description": "A hand class, for example AKs"
+                },
+                "action_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "best_action_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "loss_bb": {
+                  "type": "number",
+                  "description": "The class's EV loss in bb for the painted action"
+                },
+                "loss_pct_pot": {
+                  "type": "number"
+                },
+                "weight": {
+                  "type": "number",
+                  "description": "Acting reach times combos over the node's reach-weighted combos"
+                },
+                "weighted_loss_bb": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hand",
+                "action_index",
+                "best_action_index",
+                "loss_bb",
+                "loss_pct_pot",
+                "weight",
+                "weighted_loss_bb"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "session_id",
+          "state_version",
+          "node_key",
+          "floor_pct_pot",
+          "total_weighted_loss_bb",
+          "per_hand"
+        ],
+        "additionalProperties": false
+      },
       "PracticeSession": {
         "type": "object",
         "properties": {
@@ -4690,6 +6321,22 @@
           "hand": {
             "type": "string",
             "description": "The hero's hand as graded"
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            },
+            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
+          },
+          "spot_class_key": {
+            "type": "string",
+            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
           }
         },
         "required": [
@@ -4708,7 +6355,9 @@
           "node_key",
           "config_id",
           "pair",
-          "hand"
+          "hand",
+          "noise_flags",
+          "spot_class_key"
         ],
         "additionalProperties": false
       },
@@ -8538,6 +10187,1258 @@
         }
       }
     },
+    "/api/v1/prediction/{session}/next": {
+      "get": {
+        "summary": "The next prediction prompt",
+        "tags": [
+          "prediction"
+        ],
+        "description": "Derived from the session seed and its answered counter; writes nothing (O-302).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "session",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionPrompt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prediction/{session}/answer": {
+      "post": {
+        "summary": "Answer a prediction prompt; unrated, no attempt row (R3.16)",
+        "tags": [
+          "prediction"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "state_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "answer": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "yes_no"
+                            ]
+                          },
+                          "value": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "percent"
+                            ]
+                          },
+                          "value": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "regions"
+                            ]
+                          },
+                          "value": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "pairs",
+                                "suited_aces",
+                                "suited_broadways",
+                                "suited_connectors",
+                                "suited_other",
+                                "offsuit_aces",
+                                "offsuit_broadways",
+                                "offsuit_other"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "action"
+                            ]
+                          },
+                          "action_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "action_index"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "band"
+                            ]
+                          },
+                          "band": {
+                            "type": "string",
+                            "enum": [
+                              "0_25",
+                              "25_50",
+                              "50_75",
+                              "75_100"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "band"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "size"
+                            ]
+                          },
+                          "action_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "action_index"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "prompt_id",
+                  "state_version",
+                  "answer"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "session",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/range-paint/{session}/next": {
+      "get": {
+        "summary": "The next node to paint",
+        "tags": [
+          "prediction"
+        ],
+        "description": "Derived from the session seed and its counter; writes nothing (O-302).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "session",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RangePaintPrompt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/range-paint/submit": {
+      "post": {
+        "summary": "Submit a painted range for grading by reach-weighted EV loss; unrated (R3.17)",
+        "tags": [
+          "prediction"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "state_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "node_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "description": "An opaque node key"
+                  },
+                  "paint": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
+                      "description": "A hand class, for example AKs"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "description": "Hand class to the NodeAction.index painted for it; every class of the prompt"
+                  }
+                },
+                "required": [
+                  "session_id",
+                  "state_version",
+                  "node_key",
+                  "paint"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RangePaintResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/drift": {
+      "get": {
+        "summary": "Range drift for one node family, shown only from 30 decisions and never graded (R3.18, O-304)",
+        "tags": [
+          "insights"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "query",
+            "name": "spot_class_key",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RangeDrift"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/explain/{attempt_id}/more-info": {
+      "get": {
+        "summary": "The templated explanation of an attempt (R3.19)",
+        "tags": [
+          "explain"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "attempt_id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoreInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/explain/status": {
+      "get": {
+        "summary": "Whether Ask is available: the feature flag and this month's spend against the cap (O-305, O-306)",
+        "tags": [
+          "explain"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/explain/{attempt_id}/ask": {
+      "post": {
+        "summary": "Ask the model about an attempt, behind a feature flag and a monthly cap (R3.20, O-54)",
+        "tags": [
+          "explain"
+        ],
+        "description": "503 ask-disabled while the flag is off; 429 ask-cap-reached above the monthly cap; a cache hit spends nothing (O-305 to O-307).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "attempt_id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/study/turn-roots": {
       "get": {
         "summary": "Every turn root at a flop node",
@@ -8659,601 +11560,6 @@
           },
           "404": {
             "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/prediction/{session}/next": {
-      "get": {
-        "summary": "The next prediction prompt",
-        "tags": [
-          "prediction"
-        ],
-        "description": "The next prediction prompt\n\nAnswers 501 until S27 builds it (O-38).",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "in": "path",
-            "name": "session",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "prompt_id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "level": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "node_key": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 512,
-                      "description": "An opaque node key"
-                    },
-                    "question": {
-                      "type": "string"
-                    },
-                    "hand": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
-                          "description": "A hand class, for example AKs"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "prompt_id",
-                    "level",
-                    "node_key",
-                    "question",
-                    "hand"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/prediction/{session}/answer": {
-      "post": {
-        "summary": "Answer a prediction prompt",
-        "tags": [
-          "prediction"
-        ],
-        "description": "Answer a prediction prompt\n\nAnswers 501 until S27 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "prompt_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "answer_pct": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 100
-                  }
-                },
-                "required": [
-                  "prompt_id",
-                  "answer_pct"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "in": "path",
-            "name": "session",
-            "required": true
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "correct_pct": {
-                      "type": "number"
-                    },
-                    "error_pct_points": {
-                      "type": "number"
-                    },
-                    "within_tolerance": {
-                      "type": "boolean"
-                    },
-                    "level": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "next_level_unlocked": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "correct_pct",
-                    "error_pct_points",
-                    "within_tolerance",
-                    "level",
-                    "next_level_unlocked"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/range-paint/submit": {
-      "post": {
-        "summary": "Submit a painted range for grading",
-        "tags": [
-          "prediction"
-        ],
-        "description": "Submit a painted range for grading\n\nAnswers 501 until S27 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "session_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "node_key": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 512,
-                    "description": "An opaque node key"
-                  },
-                  "paint": {
-                    "type": "object",
-                    "propertyNames": {
-                      "type": "string",
-                      "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
-                      "description": "A hand class, for example AKs"
-                    },
-                    "additionalProperties": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "description": "Hand class to the action index painted for it"
-                  }
-                },
-                "required": [
-                  "session_id",
-                  "node_key",
-                  "paint"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "total_ev_loss_bb": {
-                      "type": "number"
-                    },
-                    "per_hand": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "hand": {
-                            "type": "string",
-                            "pattern": "^(([2-9TJQKA])\\2|[2-9TJQKA]{2}[so])$",
-                            "description": "A hand class, for example AKs"
-                          },
-                          "ev_loss_bb": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "hand",
-                          "ev_loss_bb"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "total_ev_loss_bb",
-                    "per_hand"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9999,331 +12305,6 @@
           },
           "404": {
             "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/explain/{attempt_id}/more-info": {
-      "get": {
-        "summary": "The templated explanation of an attempt",
-        "tags": [
-          "explain"
-        ],
-        "description": "The templated explanation of an attempt\n\nAnswers 501 until S27 builds it (O-38).",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "in": "path",
-            "name": "attempt_id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "template": {
-                      "type": "string"
-                    },
-                    "text": {
-                      "type": "string",
-                      "description": "Every number in it exists in the node or insights data (R3.19, ADR 0016)"
-                    }
-                  },
-                  "required": [
-                    "template",
-                    "text"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/explain/{attempt_id}/ask": {
-      "post": {
-        "summary": "Ask the model about an attempt, behind a feature flag (O-54)",
-        "tags": [
-          "explain"
-        ],
-        "description": "Ask the model about an attempt, behind a feature flag (O-54)\n\nAnswers 501 until S27 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "question": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 500
-                  }
-                },
-                "required": [
-                  "question"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "in": "path",
-            "name": "attempt_id",
-            "required": true
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "text": {
-                      "type": "string"
-                    },
-                    "validated": {
-                      "type": "boolean"
-                    },
-                    "cached": {
-                      "type": "boolean"
-                    },
-                    "cost_cents": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "text",
-                    "validated",
-                    "cached",
-                    "cost_cents"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
             "content": {
               "application/problem+json": {
                 "schema": {

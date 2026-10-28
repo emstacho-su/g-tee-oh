@@ -147,7 +147,8 @@ function handRow(label: string, node: FakeNode): Schemas["HandRow"] {
   const pure = label === PURE_FOLD_CLASS;
   const strategy = pure ? node.actions.map((_, index) => (index === 0 ? 1 : 0)) : node.freq;
   const loss = pure ? node.actions.map((_, index) => (index === 0 ? 0 : PURE_FOLD_LOSS)) : node.loss;
-  return { hand: label, strategy, loss_pct_pot: loss, ev_bb: node.ev, ev_best_bb: Math.max(...node.ev) };
+  // mixed mirrors solver-query's rule (two or more actions at 0.05 or more, O-301) for the fake's fixed rows.
+  return { hand: label, strategy, loss_pct_pot: loss, ev_bb: node.ev, ev_best_bb: Math.max(...node.ev), mixed: strategy.filter((f) => f >= 0.05).length >= 2 };
 }
 
 function nodeBody(solutionId: string, key: string, node: FakeNode, hand: string | null): Schemas["NodeResponse"] {

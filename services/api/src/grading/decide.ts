@@ -37,8 +37,8 @@ import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-
 import { requireSolverQuery, type SqAction, type SqGrade } from "../solver-query/client.js";
 import { countRatedToday, insertAttempt, staleStateProblem, type AttemptValues } from "./attempts.js";
 import { renderFeedback, toContractLabel, type Feedback } from "./feedback.js";
-import { bestActionIndexes, buildGradeInput, gradeActions } from "./policy.js";
-import { sessionEndedProblem } from "../sessions/problems.js";
+import { bestActionIndexes, buildGradeInput, gradeActions, gradeModeOf } from "./policy.js";
+import { requireSessionMode, sessionEndedProblem } from "../sessions/problems.js";
 
 export type DecisionBody = z.infer<typeof decisionBodySchema>;
 
@@ -92,6 +92,7 @@ function policyOutput(session: SessionRow, graded: Pick<Graded, "derived" | "cho
       rngRoll: graded.derived.roll?.roll ?? null,
       settings: session.settings,
       ratedTodayInTrack: ratedToday,
+      mode: gradeModeOf(session.mode),
     }),
   );
 }
@@ -185,6 +186,7 @@ async function readForDecision(decision: DecisionRequest): Promise<SessionRow> {
   if (session.state.phase === "ended") {
     throw sessionEndedProblem();
   }
+  requireSessionMode(session, "drill");
   if (session.stateVersion !== decision.body.state_version) {
     throw staleStateProblem();
   }

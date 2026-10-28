@@ -18,6 +18,23 @@ export const FILTER_UNMET_REASONS = {
 
 export type FilterUnmetReason = keyof typeof FILTER_UNMET_REASONS;
 
+/**
+ * A route that serves one session mode refuses the others with 409 wrong-session-mode (S27, O-302):
+ * the drill routes (next, decisions) refuse prediction and range_paint sessions, so a practice
+ * session never reaches the trainer machine or grading, and the practice routes refuse the rest.
+ */
+export function wrongSessionModeProblem(actual: string, expected: string): ProblemError {
+  return new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.wrongSessionMode, {
+    detail: `This is a ${actual} session; this route serves ${expected} sessions.`,
+  });
+}
+
+export function requireSessionMode(session: { mode: string }, expected: string): void {
+  if (session.mode !== expected) {
+    throw wrongSessionModeProblem(session.mode, expected);
+  }
+}
+
 export function upstreamInconsistent(detail: string): ProblemError {
   return new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, { detail });
 }

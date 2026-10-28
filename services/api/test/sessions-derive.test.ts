@@ -35,7 +35,7 @@ function node(key: string, street: string, toAct: string, tokens: string[], next
       label: token,
       next_node_key: next[index] ?? null,
     })),
-    hands: [{ hand: "AKo", strategy: tokens.map(() => 1 / tokens.length), loss_pct_pot: tokens.map(() => 0), ev_bb: tokens.map(() => 0), ev_best_bb: 0 }],
+    hands: [{ hand: "AKo", strategy: tokens.map(() => 1 / tokens.length), loss_pct_pot: tokens.map(() => 0), ev_bb: tokens.map(() => 0), ev_best_bb: 0, mixed: tokens.length > 1 }],
     range_summary: { oop: { combos: 1, reach_weighted_combos: 1 }, ip: { combos: 1, reach_weighted_combos: 1 }, by_action: [] },
     noise_flags: [],
     synthetic: true,
