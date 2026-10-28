@@ -77,6 +77,7 @@ function port(combo: (seed: string) => string): Counting {
     reveal: () => Promise.reject(new Error("not used")),
     grade: () => Promise.reject(new Error("not used")),
     coverage: () => Promise.reject(new Error("not used")),
+    gradeRange: () => Promise.reject(new Error("not used")),
   };
 }
 

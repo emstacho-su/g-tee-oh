@@ -71,6 +71,7 @@ function port(setup: PortSetup): SolverPort & { deals: number } {
     reveal: () => Promise.resolve({ deal_id: "d", street: "flop", cards: [], board: setup.board ?? "3cKh4c" }),
     grade: () => Promise.reject(new Error("not used")),
     coverage: () => Promise.reject(new Error("not used")),
+    gradeRange: () => Promise.reject(new Error("not used")),
   });
 }
 
