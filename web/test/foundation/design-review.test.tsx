@@ -75,9 +75,19 @@ function withLocalConstants(source: string, tag: string): string {
 }
 
 describe("R3.13 one layer scale: dialogs above the sticky header", () => {
-  it("R3.13 styles.css orders header < overlay < dialog", () => {
-    expect(layer("header")).toBeLessThan(layer("overlay"));
+  it("R3.13 styles.css orders sticky < header < tooltip < overlay < dialog", () => {
+    expect(layer("sticky")).toBeLessThan(layer("header"));
+    expect(layer("header")).toBeLessThan(layer("tooltip"));
+    expect(layer("tooltip")).toBeLessThan(layer("overlay"));
     expect(layer("overlay")).toBeLessThan(layer("dialog"));
+  });
+
+  it("R3.13 no component picks its own z-index: every layer comes from the scale (S36 follow-up)", () => {
+    const hardCoded = /(?<![\w-])-?z-(\d+|\[[^\]]+\]|auto)(?![\w-])/;
+    const offenders = sourceFiles(SRC)
+      .filter((file) => hardCoded.test(readFileSync(file, "utf8")))
+      .map((file) => relative(SRC, file));
+    expect(offenders).toEqual([]);
   });
 
   it("R3.13 an open Dialog's overlay and content take the overlay and dialog layers", () => {

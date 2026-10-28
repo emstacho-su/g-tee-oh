@@ -97,7 +97,16 @@ function blockBody(css, selector) {
   return match === null ? "" : match[1];
 }
 
-const VAR_REFERENCE = /^var\(--([a-z0-9-]+)\)$/i;
+/** A plain reference, var(--name), with the spaces CSS allows; no fallback. */
+const VAR_REFERENCE = /^var\(\s*--([a-z0-9-]+)\s*\)$/i;
+
+/** A token the checker cannot resolve: a typo, a cycle or a var() form it does not follow. */
+export class ContrastError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ContrastError";
+  }
+}
 
 function rawTokens(body) {
   const tokens = new Map();
@@ -108,36 +117,62 @@ function rawTokens(body) {
 }
 
 /**
- * One token resolved to a hex colour, or null when it is not a colour. A var() reference is looked
- * up in the same theme and then in the light block (the dark block only overrides, and the --p-*
- * primitives live in the light block). A token that takes a primitive as it is names that
- * primitive as its source unless it carries its own note.
+ * One token resolved to a hex colour in one theme, or null when it is not a colour (a shadow, a
+ * number). A var() reference is looked up in the same theme and then in the light block (the dark
+ * block only overrides, and the --p-* primitives live in the light block), so a light-only alias
+ * such as var(--surface) follows the dark --surface in the dark theme. A token that takes a
+ * primitive as it is names that primitive as its source unless it carries its own note. A var()
+ * the browser would drop, never silently: a reference to an undeclared token, a cycle, or a form
+ * the checker does not follow (a fallback), each throws a ContrastError naming the token.
  */
-function resolveRaw(raws, theme, name, seen = new Set()) {
+function resolveRaw(raws, theme, chain) {
+  const name = chain.at(-1);
   const entry = raws[theme].get(name) ?? raws.light.get(name);
-  if (entry === undefined || seen.has(name)) return null;
+  if (entry === undefined) {
+    throw new ContrastError(`${theme}: --${chain.at(-2)} references --${name}, which is not declared`);
+  }
   if (HEX.test(entry.raw)) return { value: expandHex(entry.raw), source: entry.source };
+  if (!entry.raw.includes("var(")) return null;
   const reference = VAR_REFERENCE.exec(entry.raw);
-  if (reference === null) return null;
-  const target = resolveRaw(raws, theme, reference[1], new Set([...seen, name]));
-  if (target === null) return null;
-  const inherited = reference[1].startsWith(PRIMITIVE_PREFIX) ? `--${reference[1]}, the palette value` : target.source;
-  return { value: target.value, source: entry.source ?? inherited };
+  if (reference === null) {
+    throw new ContrastError(`${theme}: --${name} uses ${entry.raw}, which the checker cannot resolve (write a plain var(--token))`);
+  }
+  const target = reference[1];
+  if (chain.includes(target)) {
+    throw new ContrastError(`${theme}: --${chain[0]} has a var() cycle: ${[...chain, target].map((each) => `--${each}`).join(" -> ")}`);
+  }
+  const resolved = resolveRaw(raws, theme, [...chain, target]);
+  if (resolved === null) return null;
+  const inherited = target.startsWith(PRIMITIVE_PREFIX) ? `--${target}, the palette value` : resolved.source;
+  return { value: resolved.value, source: entry.source ?? inherited };
 }
 
-function resolvedTheme(raws, theme) {
+/** Every token the theme sees (the light block's, overridden by the dark block's), resolved in it. */
+function resolvedTheme(raws, theme, errors) {
   const tokens = new Map();
-  for (const name of raws[theme].keys()) {
-    const token = resolveRaw(raws, theme, name);
-    if (token !== null) tokens.set(name, token);
+  const names = new Set([...raws.light.keys(), ...raws[theme].keys()]);
+  for (const name of names) {
+    try {
+      const token = resolveRaw(raws, theme, [name]);
+      if (token !== null) tokens.set(name, token);
+    } catch (error) {
+      if (!(error instanceof ContrastError)) throw error;
+      errors.push(error.message);
+    }
   }
   return tokens;
 }
 
-/** The light (:root) and dark (.dark) colour tokens, var() resolved, each with its source note or null. */
+/**
+ * The light (:root) and dark (.dark) colour tokens, var() resolved, each with its source note or
+ * null. Throws one ContrastError listing every unresolvable token in both themes.
+ */
 export function parseThemes(css) {
   const raws = { light: rawTokens(blockBody(css, ":root")), dark: rawTokens(blockBody(css, ".dark")) };
-  return { light: resolvedTheme(raws, "light"), dark: resolvedTheme(raws, "dark") };
+  const errors = [];
+  const themes = { light: resolvedTheme(raws, "light", errors), dark: resolvedTheme(raws, "dark", errors) };
+  if (errors.length > 0) throw new ContrastError([...new Set(errors)].join("\n"));
+  return themes;
 }
 
 /** The --p-* primitives as "#hex" strings, in declaration order. */
@@ -146,8 +181,8 @@ export function paletteOf(themes) {
 }
 
 function resolveToken(themes, theme, name) {
-  // The dark block only overrides; a token it does not set keeps its light value.
-  return themes[theme].get(name) ?? themes.light.get(name);
+  // Each theme already holds every token resolved in it (resolvedTheme), light-only ones included.
+  return themes[theme].get(name);
 }
 
 /** Every pair in both themes with its ratio, and a list of failure lines (empty when all pass). */
@@ -243,7 +278,15 @@ export function renderReport(result, solver, palette = []) {
 
 function main(argv) {
   const write = argv.includes("--write");
-  const themes = parseThemes(readFileSync(STYLES_PATH, "utf8"));
+  let themes;
+  try {
+    themes = parseThemes(readFileSync(STYLES_PATH, "utf8"));
+  } catch (error) {
+    if (!(error instanceof ContrastError)) throw error;
+    // A token the browser would drop fails the run before any ratio is computed.
+    for (const line of error.message.split("\n")) console.error(`check-contrast: ${line}`);
+    return 1;
+  }
   const result = evaluate(themes, GATING_PAIRS);
   const report = renderReport(result, solverRows(themes, readActionColours(readFileSync(ACTION_STYLE_PATH, "utf8"))), paletteOf(themes));
   for (const failure of result.failures) console.error(`check-contrast: ${failure}`);

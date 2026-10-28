@@ -30,21 +30,25 @@ export interface SparklineProps {
   label: string;
 }
 
-function weekText(item: LeakItem, index: number): string {
+/** One week in words; withUnit adds "bb per 1,000 hands" after the value (the tooltip does). */
+function weekText(item: LeakItem, index: number, withUnit: boolean): string {
   const point = item.series[index];
   if (point === undefined) return "";
   const week = point.partial ? `${formatShortDate(point.week)}, ${PARTIAL_WEEK_TEXT}` : `Week of ${formatShortDate(point.week)}`;
-  const value = point.leak_cost_bb_per_1k === null ? NO_DATA_TEXT : `${formatLeak(point.leak_cost_bb_per_1k)} ${UNIT}`;
-  return `${week}: ${value}`;
+  if (point.leak_cost_bb_per_1k === null) return `${week}: ${NO_DATA_TEXT}`;
+  const value = formatLeak(point.leak_cost_bb_per_1k);
+  return `${week}: ${withUnit ? `${value} ${UNIT}` : value}`;
 }
 
 /**
  * The image's name: every week in order with its value, the partial week and the gaps named (S36
- * review). With the table gone this is the screen-reader view of the line (O-347), the same words
- * the tooltip shows week by week.
+ * review). With the table gone this is the screen-reader view of the line (O-347). The unit is
+ * said once, before the weeks, so 26 weeks stay short enough to listen to (S36 follow-up). The
+ * name is the only accessible text: the tooltip echoes one week for sighted users and is not
+ * linked as a description, which would read that week twice.
  */
 function summary(item: LeakItem, label: string): string {
-  return `${label}: ${item.series.map((_, index) => weekText(item, index)).join("; ")}`;
+  return `${label}, ${UNIT} by week: ${item.series.map((_, index) => weekText(item, index, false)).join("; ")}`;
 }
 
 function nearestIndex(weekX: readonly number[], x: number): number {
@@ -81,7 +85,6 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
       <svg
         role="img"
         aria-label={summary(item, label)}
-        aria-describedby={active === null ? undefined : tooltipId}
         tabIndex={0}
         width={SPARK_BOX.width}
         height={SPARK_BOX.height}
@@ -128,7 +131,7 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
         )}
       </svg>
       <ChartTooltip id={tooltipId} anchor={active === null ? null : tooltip.anchor}>
-        {active === null ? null : weekText(item, active)}
+        {active === null ? null : weekText(item, active, true)}
       </ChartTooltip>
     </span>
   );

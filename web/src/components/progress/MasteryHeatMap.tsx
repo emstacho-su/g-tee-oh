@@ -28,7 +28,7 @@ import {
 } from "../../progress/heatmap-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
-import { cn } from "../ui/index.js";
+import { cn, STICKY_LAYER_CLASS } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
@@ -81,19 +81,17 @@ function Legend() {
 interface CellButtonProps {
   view: HeatCellView;
   pending: boolean;
-  describedBy: string | undefined;
   onDrill: (target: DrillTarget) => void;
   onShow: (view: HeatCellView, element: Element) => void;
   onHide: () => void;
 }
 
-function CellButton({ view, pending, describedBy, onDrill, onShow, onHide }: CellButtonProps) {
+function CellButton({ view, pending, onDrill, onShow, onHide }: CellButtonProps) {
   const practiced = view.bin !== null;
   return (
     <button
       type="button"
       aria-label={view.label}
-      aria-describedby={describedBy}
       disabled={pending}
       data-testid="heat-cell"
       data-state={practiced ? "practiced" : "new"}
@@ -120,7 +118,8 @@ function CellButton({ view, pending, describedBy, onDrill, onShow, onHide }: Cel
   );
 }
 
-const STICKY = "sticky left-0 z-10 bg-surface-raised";
+// The sticky pair headers stay above the scrolling cells, on the sticky layer below the header.
+const STICKY = cn("sticky left-0 bg-surface-raised", STICKY_LAYER_CLASS);
 
 function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; pendingKey: string | null; onDrill: (target: DrillTarget) => void }) {
   const lookup = cellLookup(heatmap);
@@ -168,7 +167,6 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
                         <CellButton
                           view={view}
                           pending={pendingKey === view.cell.spot_class_key}
-                          describedBy={active?.cell.spot_class_key === view.cell.spot_class_key ? tooltipId : undefined}
                           onDrill={onDrill}
                           onShow={show}
                           onHide={hide}

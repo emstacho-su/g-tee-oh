@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
+  ContrastError,
   GATING_PAIRS,
   PRIMITIVE_PREFIX,
   STYLES_PATH,
@@ -97,6 +98,35 @@ test("R3.13 parseThemes resolves var() through the theme and then the light prim
   assert.deepEqual(themes.light.get("accent"), { value: "#8c1c13", source: "--p-oxblood, the palette value" });
   assert.equal(themes.light.get("ring")?.value, "#8c1c13");
   assert.deepEqual(themes.dark.get("accent"), { value: "#8c1c13", source: "8c1c13 oxblood, kept" });
+});
+
+const PRIMITIVES = ":root {\n  --p-cream: #e7d7c1;\n  --p-umber: #735751;\n";
+
+test("R3.13 a var() to an undeclared token is an error naming the token and the reference", () => {
+  const css = `${PRIMITIVES}  --focus: var(--p-umber);\n}\n\n.dark {\n  --focus: var(--p-creme);\n}\n`;
+  assert.throws(() => parseThemes(css), (error) => error instanceof ContrastError && /dark: --focus references --p-creme, which is not declared/.test(error.message));
+});
+
+test("R3.13 a var() cycle is an error naming the chain", () => {
+  const css = `${PRIMITIVES}  --a: var(--b);\n  --b: var(--a);\n}\n\n.dark {\n}\n`;
+  assert.throws(() => parseThemes(css), /light: --a has a var\(\) cycle: --a -> --b -> --a/);
+});
+
+test("R3.13 a var() the checker cannot follow (a fallback) is an error, never silently dropped", () => {
+  const css = `${PRIMITIVES}  --focus: var(--p-umber, #000000);\n}\n\n.dark {\n}\n`;
+  assert.throws(() => parseThemes(css), /light: --focus uses var\(--p-umber, #000000\), which the checker cannot resolve/);
+});
+
+test("R3.13 spaces inside var() are allowed, as in CSS", () => {
+  const css = `${PRIMITIVES}  --focus: var( --p-umber );\n}\n\n.dark {\n}\n`;
+  assert.equal(parseThemes(css).light.get("focus")?.value, "#735751");
+});
+
+test("R3.13 a light-only alias resolves again in the dark theme instead of keeping its light value", () => {
+  const css = `${PRIMITIVES}  --surface: var(--p-cream);\n  --ring: var(--surface);\n}\n\n.dark {\n  --surface: var(--p-umber);\n}\n`;
+  const themes = parseThemes(css);
+  assert.equal(themes.light.get("ring")?.value, "#e7d7c1");
+  assert.equal(themes.dark.get("ring")?.value, "#735751");
 });
 
 test("R3.13 O-346 the palette lives in one place: no token repeats a primitive's hex", () => {

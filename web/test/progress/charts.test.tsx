@@ -90,7 +90,7 @@ describe("R4.12 LeakTrendChart", () => {
     expect(screen.getAllByTestId("leak-partial-marker")).toHaveLength(10);
     // S36 review: the name lists every week, so the partial week is named there, not in a second note.
     expect(screen.queryByText(/still counting/)).toBeNull();
-    expect(screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb: Week of Sep 7: 58\.8 bb per 1,000 hands; .*Oct 26, this week \(partial\): 42\.0 bb per 1,000 hands$/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb, bb per 1,000 hands by week: Week of Sep 7: 58\.8; .*Oct 26, this week \(partial\): 42\.0$/ })).toBeInTheDocument();
   });
 
   it("R4.12 a drill button opens that row's class; the pending one is disabled", () => {
@@ -124,11 +124,13 @@ describe("R4.12 LeakTrendChart", () => {
     expect(screen.queryByRole("button", { name: /Show (table|chart)/ })).toBeNull();
     expect(screen.queryByTestId("leak-table")).toBeNull();
     expect(screen.getAllByTestId("leak-row")).toHaveLength(10);
-    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb:/ });
+    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb, / });
     const name = line.getAttribute("aria-label") ?? "";
-    expect(name).toContain("Week of Sep 7: 58.8 bb per 1,000 hands");
+    // The unit is said once, before the weeks (S36 follow-up), not after every value.
+    expect(name).toMatch(/^rfi BB-UTG, live 100 bb, bb per 1,000 hands by week: Week of Sep 7: 58\.8; /);
     expect(name).toContain("Week of Sep 21: no data");
-    expect(name).toContain("Oct 26, this week (partial): 42.0 bb per 1,000 hands");
+    expect(name).toMatch(/; Oct 26, this week \(partial\): 42\.0$/);
+    expect(name.match(/bb per 1,000 hands/g)).toHaveLength(1);
     expect(name.split("; ")).toHaveLength(8);
   });
 
@@ -140,10 +142,11 @@ describe("R4.12 LeakTrendChart", () => {
 
   it("R4.12 the sparkline tooltip follows focus, arrow keys and hover", () => {
     renderTrend();
-    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb:/ });
+    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb, / });
     fireEvent.focus(line);
     expect(screen.getByRole("tooltip")).toHaveTextContent("Oct 26, this week (partial): 42.0 bb per 1,000 hands");
-    expect(line).toHaveAttribute("aria-describedby", screen.getByRole("tooltip").id);
+    // The name already lists every week, so the tooltip is a sighted echo, not a description (S36 follow-up).
+    expect(line).not.toHaveAttribute("aria-describedby");
     fireEvent.keyDown(line, { key: "ArrowLeft" });
     expect(screen.getByRole("tooltip")).toHaveTextContent("Week of Oct 19: 44.4 bb per 1,000 hands");
     for (let step = 0; step < 4; step += 1) fireEvent.keyDown(line, { key: "ArrowLeft" });
@@ -190,7 +193,8 @@ describe("R4.12 MasteryHeatMap", () => {
     fireEvent.focus(cell);
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip).toHaveTextContent("rfi BB-UTG, live 100 bbKnown: 12%Recall: 98%Attempts: 6Mastered: noDue for review: no");
-    expect(cell).toHaveAttribute("aria-describedby", tooltip.id);
+    // The name already holds every value; linking the tooltip would read them twice (S36 follow-up).
+    expect(cell).not.toHaveAttribute("aria-describedby");
     fireEvent.blur(cell);
     expect(screen.queryByRole("tooltip")).toBeNull();
     fireEvent.mouseEnter(cell);
