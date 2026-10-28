@@ -33,6 +33,7 @@ import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
+import { useActionReplay, type ActionReplay } from "../../trainer/use-action-replay.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "./CoverageNote.js";
 import { DecisionArea } from "./DecisionArea.js";
@@ -80,13 +81,15 @@ function useFirstRollExplainer(state: SpotState, showIfFirstUse: () => void): vo
 interface InSessionProps {
   drill: Drill;
   session: SpotSession;
+  /** The table's replay of the line before the decision (S38, O-381 to O-383). */
+  replay: ActionReplay;
   interactive: boolean;
   onAskEnd: () => void;
   onExplain: () => void;
   onExplainDialog: (open: boolean) => void;
 }
 
-function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
+function InSession({ drill, session, replay, interactive, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
   const { state } = session;
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
@@ -97,12 +100,13 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
-          <SpotTable prompt={prompt} />
+          <SpotTable prompt={prompt} replay={replay} />
           <DecisionArea
             state={state}
             prompt={prompt}
             grouping={drill.trainer.grouping}
             interactive={interactive}
+            replaying={replay.replaying}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
@@ -134,9 +138,17 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
-  // Time under the explainer or the end confirm is not response time (O-284).
-  const session = useSpotSession({ spec: { mode: "drill", drillId: drill.id, seed }, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
+  // The replay's last known state: the session is created before the replay reads its prompt.
+  const [replaying, setReplaying] = useState(false);
+  // Time under the explainer, the end confirm or the replay is not response time (O-284, O-381).
+  const session = useSpotSession({
+    spec: { mode: "drill", drillId: drill.id, seed },
+    paused: !interactive || replaying,
+    trainer: runSettingsOf(drill.trainer),
+  });
   const { state } = session;
+  const replay = useActionReplay(promptOf(state), { speed: drill.trainer.speed });
+  useEffect(() => setReplaying(replay.replaying), [replay.replaying]);
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(
@@ -164,7 +176,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
         <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
-        <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />
+        <InSession drill={drill} session={session} replay={replay} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />
       ) : null}
       {state.kind === "ending" ? <LoadingNote text={SESSION_TEXT.ending} /> : null}
       <EndSessionDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={confirmEnd} />

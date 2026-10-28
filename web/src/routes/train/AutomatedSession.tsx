@@ -17,6 +17,7 @@ import { SpotTable } from "../drill-run/SpotTable.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import type { TrackKey } from "../../progress/types.js";
+import type { ActionReplay } from "../../trainer/use-action-replay.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
 import type { SpotSession } from "../../trainer/use-spot-session.js";
@@ -66,6 +67,8 @@ export interface AutomatedSessionProps {
   block: BlockView | null;
   holdout: HoldoutView | null;
   trackNames?: Readonly<Partial<Record<TrackKey, string>>>;
+  /** The table's replay of the line before the decision, owned by the page (S38, O-381 to O-383). */
+  replay: ActionReplay;
   interactive: boolean;
   onAskEnd: () => void;
   onExplain: () => void;
@@ -73,7 +76,7 @@ export interface AutomatedSessionProps {
 }
 
 export function AutomatedSession(props: AutomatedSessionProps) {
-  const { session, grouping, block, holdout, trackNames, interactive, onAskEnd, onExplain, onExplainDialog } = props;
+  const { session, grouping, block, holdout, trackNames, replay, interactive, onAskEnd, onExplain, onExplainDialog } = props;
   const { state } = session;
   const prompt = promptOf(state);
   const context = "context" in state ? state.context : null;
@@ -86,12 +89,13 @@ export function AutomatedSession(props: AutomatedSessionProps) {
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
-          <SpotTable prompt={prompt} />
+          <SpotTable prompt={prompt} replay={replay} />
           <DecisionArea
             state={state}
             prompt={prompt}
             grouping={grouping}
             interactive={interactive}
+            replaying={replay.replaying}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}

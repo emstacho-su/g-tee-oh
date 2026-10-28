@@ -39,6 +39,11 @@ export interface DecisionAreaProps {
   grouping: Grouping;
   /** False while a dialog is open over the screen: buttons and their hotkeys pause. */
   interactive: boolean;
+  /**
+   * True while the table replays the line before the decision (S38, O-381): the action bar waits.
+   * A click on the table or an action key finishes the replay at once (useActionReplay).
+   */
+  replaying?: boolean;
   /** Choosing an action submits the decision (O-345). */
   onChoose: (actionIndex: number) => void;
   onNext: () => void;
@@ -95,8 +100,8 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
 }
 
 export function DecisionArea(props: DecisionAreaProps) {
-  const { state, prompt, grouping, interactive, onChoose, onExplain } = props;
-  const choosing = state.kind === "await_action";
+  const { state, prompt, grouping, interactive, replaying = false, onChoose, onExplain } = props;
+  const choosing = state.kind === "await_action" && !replaying;
   const roll = BEFORE_DECISION.has(state.kind) ? prompt.rng_roll : null;
   return (
     <div className="flex flex-col gap-3" data-testid="decision-area">
