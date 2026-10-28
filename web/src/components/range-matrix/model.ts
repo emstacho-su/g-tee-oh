@@ -15,6 +15,7 @@
  */
 import type { NodeAction, NodeHandRow, StudyNode } from "../../contracts.js";
 import { HAND_GRID, cellOf, type HandKind } from "../../poker/hands.js";
+import { EV_SCALE_PERCENTILE, MIN_EV_SCALE_BB, nearestRank } from "./scales.js";
 
 export type MatrixMode = "frequency" | "ev" | "weight";
 
@@ -40,7 +41,7 @@ export interface MatrixCell {
 export interface MatrixModel {
   readonly actions: readonly NodeAction[];
   readonly cells: readonly MatrixCell[];
-  /** The largest absolute best EV over the present cells: the end of the diverging EV scale. */
+  /** The end of the diverging EV scale (evScaleOf, O-384). */
   readonly evScaleBb: number;
   /** How many of the 169 classes the node holds. */
   readonly presentCount: number;
@@ -50,8 +51,6 @@ export interface MatrixModel {
 export type MatrixSource = Pick<StudyNode, "actions" | "hands">;
 
 const EMPTY: readonly number[] = Object.freeze([]);
-/** Keeps the EV scale positive when every EV is zero or no hand is present. */
-const MIN_EV_SCALE_BB = 0.01;
 
 function validateRow(row: NodeHandRow, actionCount: number): void {
   if (cellOf(row.hand) === undefined) {
@@ -77,9 +76,14 @@ function indexRows(hands: readonly NodeHandRow[], actionCount: number): Readonly
   return rows;
 }
 
-/** The end of the diverging EV scale: the largest absolute best EV, never below a small floor. */
+/**
+ * The end of the diverging EV scale (O-384): the 90th percentile (nearest rank) of the absolute
+ * best EV over the present cells, never below MIN_EV_SCALE_BB, so one huge hand does not wash the
+ * rest of the matrix out; beyond it the end step holds.
+ */
 export function evScaleOf(cells: readonly MatrixCell[]): number {
-  return cells.reduce((scale, cell) => Math.max(scale, Math.abs(cell.evBestBb ?? 0)), MIN_EV_SCALE_BB);
+  const sizes = cells.filter((cell) => cell.present).map((cell) => Math.abs(cell.evBestBb ?? 0));
+  return Math.max(MIN_EV_SCALE_BB, nearestRank(sizes, EV_SCALE_PERCENTILE) ?? 0);
 }
 
 export function buildMatrixModel(node: MatrixSource): MatrixModel {

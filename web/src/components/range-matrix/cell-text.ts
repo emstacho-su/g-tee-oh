@@ -66,3 +66,22 @@ export function cellValueText(cell: MatrixCell, actions: readonly NodeAction[], 
 export function cellText(cell: MatrixCell, actions: readonly NodeAction[], mode: MatrixMode): string {
   return `${cell.hand}: ${cellValueText(cell, actions, mode)}`;
 }
+
+/** The range weight in words, as the pop-out prints it. */
+export function weightText(cell: MatrixCell): string {
+  return cell.weight === null ? "Range weight unknown" : `Range weight ${formatShare(cell.weight, SHARE_DECIMALS)}`;
+}
+
+/**
+ * The pop-out's numbers in one sentence for the live region (S38, O-386): every action, played
+ * or not, with its exact frequency and EV, then the range weight. "AKs: Fold 0.0%, EV 0.00bb;
+ * Raise to 2.5bb 80.0%, EV 1.30bb; range weight 64.0%".
+ */
+export function cellDetailText(cell: MatrixCell, actions: readonly NodeAction[]): string {
+  if (!cell.present) return `${cell.hand}: ${MISSING_TEXT}`;
+  const parts = actions.map((action, position) => {
+    const frequency = formatShare(cell.frequencies[position] ?? 0, SHARE_DECIMALS);
+    return `${action.label} ${frequency}, EV ${formatBb(cell.evBb[position] ?? 0, EV_TABLE_DECIMALS)}`;
+  });
+  return `${cell.hand}: ${[...parts, weightText(cell).toLowerCase()].join("; ")}`;
+}

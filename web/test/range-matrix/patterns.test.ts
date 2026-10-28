@@ -122,10 +122,10 @@ describe("R3.12 range matrix hatch patterns", () => {
             ? null
             : {
                 ...context,
-                set strokeStyle(value: unknown) {
+                set strokeStyle(value: TileContext["strokeStyle"]) {
                   inks.push(value);
                 },
-                get strokeStyle() {
+                get strokeStyle(): TileContext["strokeStyle"] {
                   return "";
                 },
               },
