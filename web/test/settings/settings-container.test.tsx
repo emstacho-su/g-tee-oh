@@ -2,8 +2,8 @@
  * /settings as one container with a page per section (S36, R4.12, O-348, O-360, O-361): the URL
  * names the section, a "Settings sections" list moves between them with aria-current on the
  * open one, each URL shows only its own page, /settings and unknown sections land on Session
- * defaults, and the builder schedule is listed for admins only (a member opening its URL reads
- * the admins-only note).
+ * defaults, and the builder schedule and the invites (S42) are listed for admins only (a member
+ * opening the schedule's URL reads the admins-only note).
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -107,14 +107,17 @@ describe("R4.12 /settings container (O-348, O-360)", () => {
     expect(screen.queryByRole("form", { name: "Builder schedule" })).toBeNull();
   });
 
-  it("R3.5 an admin's section list ends with the builder schedule, whose page holds the form", async () => {
+  it("R3.5 an admin's section list ends with the builder schedule and the invites (S42), and the schedule page holds the form", async () => {
     const user = userEvent.setup();
     renderApp("/settings/session-defaults", admin);
 
     const nav = await sectionNav();
     const link = await within(nav).findByRole("link", { name: "Builder schedule" });
     expect(link).toHaveAttribute("href", "/settings/builder-schedule");
-    expect(within(nav).getAllByRole("link").at(-1)).toBe(link);
+    const links = within(nav).getAllByRole("link");
+    expect(links.at(-2)).toBe(link);
+    expect(links.at(-1)).toHaveAttribute("href", "/settings/invites");
+    expect(links.at(-1)).toHaveTextContent("Invites");
     await user.click(link);
     expect(await screen.findByRole("form", { name: "Builder schedule" })).toBeInTheDocument();
   });

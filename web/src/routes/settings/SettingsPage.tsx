@@ -5,7 +5,7 @@
  *
  * Pages: Session defaults and Configuration scope for automated training (S32, R4.12, O-323), the
  * read-only Hotkeys (O-327), Cosmetics (R4.14, O-323) and, for admins only, the Builder schedule
- * (S28, R3.5, O-296, O-290). A member opening the schedule's URL reads that it is for admins
+ * (S28, R3.5, O-296, O-290), and the Invites (S42, O-349). A member opening an admin page's URL reads that it is for admins
  * (O-361). Session defaults and cosmetics are kept on this browser; the server owns which
  * cosmetics are unlocked.
  */
@@ -18,6 +18,7 @@ import { useBuilderStatus, useIsAdmin, useSaveSettings } from "../../library/use
 import { ConfigScopeSection } from "./ConfigScopeSection.js";
 import { CosmeticsSection } from "./CosmeticsSection.js";
 import { HotkeysSection } from "./HotkeysSection.js";
+import { InvitesSection } from "./InvitesSection.js";
 import { visibleSections, type SettingsSectionSlug } from "./sections.js";
 import { SessionDefaultsSection } from "./SessionDefaultsSection.js";
 import { SETTINGS_TEXT } from "./settings-text.js";
@@ -70,6 +71,8 @@ function SectionPage({ section, isAdmin }: { section: SettingsSectionSlug; isAdm
       return <CosmeticsSection />;
     case "builder-schedule":
       return <SchedulePage isAdmin={isAdmin} />;
+    case "invites":
+      return <InvitesSection />;
   }
 }
 
