@@ -15,6 +15,7 @@ describe("R3.13 http status and log-safe failures", () => {
       forbidden: 403,
       notFound: 404,
       conflict: 409,
+      gone: 410,
       unprocessable: 422,
       tooManyRequests: 429,
       badGateway: 502,

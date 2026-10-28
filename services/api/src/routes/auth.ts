@@ -11,7 +11,7 @@
  * DUMMY_PASSWORD_HASH when no account matches, so a missing account costs the same time as a
  * wrong password, and both answer the same 401 problem and count one failure for the email. On success, in one transaction, the session whose cookie came with
  * the request (if any) and the user's expired sessions are deleted and a new one is inserted
- * (sessions.ts); the response sets the session cookie (cookie.ts) and answers SessionInfo, whose
+ * (auth/open-session.ts, shared with join); the response sets the session cookie (cookie.ts) and answers SessionInfo, whose
  * csrf_token the browser echoes in x-csrf-token. The lifetime is config.sessionTtlHours, absolute
  * (O-231). Login's auth policy is "none", so the authentication hook never reads its cookie; the
  * handler reads it itself only to delete that older session.
@@ -27,14 +27,14 @@ import { z } from "zod";
 import { clearSessionCookie, setSessionCookie } from "../auth/cookie.js";
 import { LoginThrottle } from "../auth/login-throttle.js";
 import { DUMMY_PASSWORD_HASH, verifyPassword } from "../auth/password.js";
-import type { SessionContext } from "../auth/session-context.js";
-import { createSession, deleteExpiredSessions, deleteSession, deleteSessionByToken } from "../auth/sessions.js";
+import { openSession, sessionInfo } from "../auth/open-session.js";
+import { deleteSession } from "../auth/sessions.js";
 import { findUserCredentials, type UserCredentials } from "../auth/users.js";
 import type { AppConfig } from "../config.js";
 import type { Database } from "../db.js";
 import { eventHub } from "../events/registry.js";
 import { requireDatabase } from "../http/database.js";
-import { optionalCsrfHeadersSchema } from "../http/headers.js";
+import { optionalCsrfHeadersSchema, RETRY_AFTER_HEADER } from "../http/headers.js";
 import { AUTHENTICATED, OPTIONAL_SESSION, PUBLIC, SESSION_COOKIE_NAME } from "../http/openapi.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError, problemResponses } from "../http/problem.js";
 import {
@@ -44,29 +44,15 @@ import {
   LOGIN_RATE_LIMIT,
 } from "../http/rate-limits.js";
 import { requireSession } from "../plugins/authenticate.js";
-import { type LoginBody, loginBodySchema, type SessionInfo, sessionInfoSchema } from "../schemas/auth.js";
+import { type LoginBody, loginBodySchema, sessionInfoSchema } from "../schemas/auth.js";
 
 const TAG = "auth";
-const RETRY_AFTER_HEADER = "retry-after";
 /** One message for a wrong password and an unknown email, so the answer reveals no account. */
 export const INVALID_CREDENTIALS_DETAIL = "Invalid email or password.";
 
 export interface AuthRouteOptions {
   /** Supplies sessionTtlHours, the absolute session lifetime (O-231). */
   config: AppConfig;
-}
-
-function sessionInfo(session: Omit<SessionContext, "sessionId">): SessionInfo {
-  return {
-    user: {
-      id: session.userId,
-      email: session.email,
-      created_at: session.userCreatedAt.toISOString(),
-      is_admin: session.isAdmin,
-    },
-    csrf_token: session.csrfToken,
-    expires_at: session.expiresAt.toISOString(),
-  };
 }
 
 /** The account the credentials prove, or a 401 problem; the timing does not depend on which. */
@@ -79,17 +65,6 @@ async function authenticateCredentials(database: Database, body: LoginBody): Pro
     });
   }
   return user;
-}
-
-/** Replaces the presented session (if any) and the user's expired ones with a new session, atomically. */
-function openSession(database: Database, user: UserCredentials, ttlHours: number, previousToken: string | undefined) {
-  return database.transaction().execute(async (transaction) => {
-    if (previousToken !== undefined) {
-      await deleteSessionByToken(transaction, previousToken);
-    }
-    await deleteExpiredSessions(transaction, user.id);
-    return createSession(transaction, user.id, ttlHours);
-  });
 }
 
 function checkEmailLimit(throttle: LoginThrottle, email: string): void {
@@ -138,11 +113,12 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteOptions> = (app, opti
       }
       emailThrottle.reset(email);
       const previousToken = request.cookies[SESSION_COOKIE_NAME];
-      const session = await openSession(database, user, sessionTtlHours, previousToken);
+      const session = await openSession(database, user.id, sessionTtlHours, previousToken);
       setSessionCookie(reply, session.token, session.expiresAt);
       return sessionInfo({
         userId: user.id,
         email: user.email,
+        displayName: user.displayName,
         userCreatedAt: user.createdAt,
         isAdmin: user.isAdmin,
         csrfToken: session.csrfToken,

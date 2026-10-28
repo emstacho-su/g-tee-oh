@@ -3,8 +3,9 @@
  * against the real api, the mock project against vite preview with the mocked api. Keeping the
  * steps and selectors in one place means the two projects prove the same thing.
  *
- * The selectors are the app's accessible names (Lane A, S24): the login page's h1 "Sign in",
- * inputs labeled "Email" and "Password" and the "Sign in" button; the home shell's h1 "Home",
+ * The selectors are the app's accessible names (Lane A, S24; two steps since S42): the login
+ * page's h1 "Sign in", step 1's input labeled "Email" and its "Continue" button, step 2's input
+ * labeled "Password", its "Sign in" button and "Use a different email"; the home shell's h1 "Home",
  * the nav named "Main", the signed-in email in the header and the "Sign out" button; all inside
  * <div data-testid="shell">. A signed-out visit to / redirects to /login (with a redirect query
  * back to /), and a sign-in lands on /.
@@ -35,15 +36,21 @@ export async function expectRedirectToLogin(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 }
 
-/** Fills the login form and submits it; the caller asserts where that leads. */
+/**
+ * Walks both sign-in steps and submits; the caller asserts where that leads. When the page is
+ * already on step 2 (after a rejected attempt), it goes back to step 1 first.
+ */
 export async function submitLogin(page: Page, credentials: OwnerCredentials): Promise<void> {
+  const back = page.getByRole("button", { name: "Use a different email" });
+  if (await back.isVisible()) await back.click();
   await page.getByLabel("Email").fill(credentials.email);
+  await page.getByRole("button", { name: "Continue" }).click();
   // A boxed step with a fixed title: the Playwright report and the list reporter show only
   // "fill the password", never the fill call with its value (O-263).
   await test.step(
     PASSWORD_STEP_TITLE,
     async () => {
-      await page.getByLabel("Password").fill(credentials.password);
+      await page.getByLabel("Password", { exact: true }).fill(credentials.password);
     },
     { box: true },
   );

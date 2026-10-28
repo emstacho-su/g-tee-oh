@@ -10,7 +10,8 @@
  * non-empty password; anything else gets the same 401 problem, and a body that is not the
  * contract shape a 400 validation problem. POST /auth/logout requires the x-csrf-token header to
  * equal the fixture csrf_token (O-230): a 403 csrf problem otherwise, else 204 and the session
- * ends. Feature routes passed in options (S25: the study and session routes, composed in
+ * ends. POST /auth/invites/inspect and POST /auth/join (S42, mock-join.ts) accept one synthetic
+ * token until a join uses it, and a join signs in as the new member. Feature routes passed in options (S25: the study and session routes, composed in
  * mock-app.ts) are tried next; every other /api/v1 path answers 501, as unbuilt api routes do. Bodies are typed by the
  * contract (src/contracts.ts and the generated paths) and the session is the shared fixture, so
  * the mock, the unit tests and the gallery agree on every shape. Every request is recorded, in
@@ -23,6 +24,7 @@ import { HTTP_STATUS } from "../../src/api/http-status.js";
 import { API_PATHS, CSRF_HEADER } from "../../src/api/paths.js";
 import type { Problem, SessionInfo } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL, fixtureSession } from "../../src/fixtures/index.js";
+import { handleJoinRequest, type JoinState } from "./mock-join.js";
 
 // The paths and the header come from the app's own module, so the mock and the app can never
 // disagree on a name.
@@ -140,8 +142,9 @@ function acceptsLogin(body: LoginBody): boolean {
 /** A fresh mocked api, signed out, with an empty request log. */
 export function createMockApi(options: MockApiOptions = {}): MockApi {
   const featureRoutes = options.routes ?? [];
-  const sessionBody = options.session ?? fixtureSession;
+  let sessionBody = options.session ?? fixtureSession;
   let signedIn = false;
+  let joinState: JoinState = { used: false };
   let log: readonly MockRequest[] = [];
 
   function route(request: MockRequest): MockResponse {
@@ -157,6 +160,15 @@ export function createMockApi(options: MockApiOptions = {}): MockApi {
       if (request.headers[CSRF_HEADER] !== FIXTURE_CSRF_TOKEN) return problem(CSRF, request.path);
       signedIn = false;
       return { status: STATUS.noContent };
+    }
+    const joined = handleJoinRequest(request, joinState);
+    if (joined !== undefined) {
+      joinState = joined.state;
+      if (joined.session !== undefined) {
+        sessionBody = joined.session;
+        signedIn = true;
+      }
+      return joined.response;
     }
     for (const featureRoute of featureRoutes) {
       const response = featureRoute(request, { signedIn });

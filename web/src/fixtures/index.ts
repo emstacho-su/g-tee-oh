@@ -27,7 +27,13 @@ export const FIXTURE_SPOT_CLASS_KEY = "synthetic-rfi-btn";
 
 /** The owner: an admin, so the builder controls show (O-290, O-242). */
 export const fixtureSession: SessionInfo = {
-  user: { id: FIXTURE_USER_ID, email: FIXTURE_USER_EMAIL, created_at: "2026-10-27T12:00:00Z", is_admin: true },
+  user: {
+    id: FIXTURE_USER_ID,
+    email: FIXTURE_USER_EMAIL,
+    display_name: null,
+    created_at: "2026-10-27T12:00:00Z",
+    is_admin: true,
+  },
   csrf_token: FIXTURE_CSRF_TOKEN,
   expires_at: "2026-11-03T12:00:00Z",
 };

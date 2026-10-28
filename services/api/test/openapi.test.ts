@@ -12,11 +12,14 @@ const HEALTH_ROUTE = "/api/v1/healthz";
 // test runs from any working directory.
 const COMMITTED_DOCUMENT_URL = new URL("../../../packages/contracts/api.openapi.json", import.meta.url);
 
-// Every endpoint of A5 section 3, plus GET /drills/{id}, which the drill builder needs (R3.14).
+// Every endpoint of A5 section 3, plus GET /drills/{id}, which the drill builder needs (R3.14), and
+// the S42 invite and join routes (O-349).
 const A5_ROUTES = [
   "POST /auth/login",
   "POST /auth/logout",
   "GET /me",
+  "POST /auth/invites/inspect",
+  "POST /auth/join",
   "GET /stakes",
   "GET /configs",
   "GET /configs/{id}/pairs",
@@ -53,6 +56,9 @@ const A5_ROUTES = [
   "PATCH /admin/builder/settings",
   "POST /admin/builder/pause",
   "POST /admin/builder/resume",
+  "GET /admin/invites",
+  "POST /admin/invites",
+  "POST /admin/invites/{id}/revoke",
 ] as const;
 
 interface OpenApiDocumentShape {

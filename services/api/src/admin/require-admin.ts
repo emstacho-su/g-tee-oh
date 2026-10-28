@@ -1,5 +1,5 @@
 /**
- * Admin authorization (R3.5, O-242). The builder endpoints are for an admin only: app_user.is_admin,
+ * Admin authorization (R3.5, O-242). The builder and invite endpoints are for an admin only: app_user.is_admin,
  * set by create-user --admin. The flag comes from the session lookup, which joins app_user on
  * every request (plugins/authenticate.ts, O-290), so revoking it takes effect on the next request
  * without a second query here (PR #28 review L6).
@@ -25,7 +25,7 @@ export function requireAdmin(request: FastifyRequest): SessionContext {
   const session = requireSession(request);
   if (!session.isAdmin) {
     throw new ProblemError(HTTP_STATUS.forbidden, PROBLEM_SLUGS.forbidden, {
-      detail: "Only an admin may use the builder endpoints.",
+      detail: "Only an admin may use the admin endpoints.",
     });
   }
   return session;

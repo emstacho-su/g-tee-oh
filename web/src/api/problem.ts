@@ -20,6 +20,8 @@ export const PROBLEM_SLUG = {
   rateLimited: "rate-limited",
   validation: "validation",
   notImplemented: "not-implemented",
+  /** Every bad invite token (S42, O-422). */
+  inviteInvalid: "invite-invalid",
   unknown: UNKNOWN_SLUG,
 } as const;
 

@@ -11,6 +11,8 @@ export const HTTP_STATUS = {
   forbidden: 403,
   notFound: 404,
   conflict: 409,
+  /** An invite link that is not valid (S42, O-422). */
+  gone: 410,
   unprocessable: 422,
   tooManyRequests: 429,
   badGateway: 502,

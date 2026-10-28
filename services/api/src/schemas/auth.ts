@@ -32,6 +32,10 @@ export const loginBodySchema = z.strictObject({
 export const sessionUserSchema = z.object({
   id: uuidSchema,
   email: z.string(),
+  display_name: z
+    .string()
+    .nullable()
+    .describe("The name given when joining by invite (O-426); null for an account made by create-user"),
   created_at: timestampSchema,
   is_admin: z
     .boolean()

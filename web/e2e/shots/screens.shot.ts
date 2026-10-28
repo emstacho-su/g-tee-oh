@@ -23,8 +23,9 @@ const OWNER = { email: "owner@example.com", password: "synthetic-password" };
 const SOURCE = "mock";
 
 const CRITERIA = {
-  login: "Login page renders (DoD 1: login page, home shell and route placeholders render)",
-  loginError: "Login shows a generic error and never echoes server detail (step 4, login form)",
+  login: "S42 two-step sign-in, step 1: a centred column with one email field and Continue; no request is sent yet (O-349, DoD 1)",
+  loginPassword: "S42 sign-in step 2: the email as a read-only chip, the password with show and hide, Sign in and Use a different email (O-349)",
+  loginError: "S42 a rejected sign-in shows one fixed message on step 2, the same for an unknown email and a wrong password, never the server detail",
   home: "Home shell renders after sign in, the smoke flow's landing page (DoD 1, R3.13)",
   placeholder: "Route placeholders render under the shell (DoD 1, A7 section 2)",
   shortcuts: "Keyboard-first: the ? shortcuts overlay (A7 section 4, R3.13 hotkeys)",
@@ -73,7 +74,13 @@ async function appScreens(page: Page, theme: Theme, viewport: Viewport): Promise
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await shot("login", CRITERIA.login);
 
-  await submitLogin(page, { email: "someone-else@example.com", password: "wrong" });
+  await page.getByLabel("Email").fill("someone-else@example.com");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByTestId("email-chip")).toBeVisible();
+  await shot("login-password", CRITERIA.loginPassword);
+
+  await page.getByLabel("Password", { exact: true }).fill("wrong");
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await shot("login-error", CRITERIA.loginError);
 

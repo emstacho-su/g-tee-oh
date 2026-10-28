@@ -27,6 +27,7 @@ import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import { z } from "zod";
 
 import { capErrors, MAX_PROBLEM_ERRORS, safeIssueMessage } from "./field-error-cap.js";
+import { RETRY_AFTER_HEADER } from "./headers.js";
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
 
@@ -41,6 +42,7 @@ export const HTTP_STATUS = {
   forbidden: 403,
   notFound: 404,
   conflict: 409,
+  gone: 410,
   unprocessable: 422,
   tooManyRequests: 429,
   internal: 500,
@@ -99,6 +101,8 @@ export const PROBLEM_SLUGS = {
   askCapReached: "ask-cap-reached",
   // S41: a quiz whose spots cannot ask its difficulty on its chosen kinds (O-411 amended).
   noQuizQuestions: "no-quiz-questions",
+  // S42: invite links (O-422).
+  inviteInvalid: "invite-invalid",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -132,6 +136,7 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "ask-disabled": "Ask is off until a model key is configured",
   "ask-cap-reached": "This month's Ask budget is used",
   "no-quiz-questions": "No questions at this difficulty in these spots",
+  "invite-invalid": "This invite link is not valid",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */
@@ -308,8 +313,8 @@ export function problemErrorHandler(error: FastifyError, request: FastifyRequest
 
 /** Keeps a Retry-After header an upstream hook (the rate limiter) already set on the reply. */
 function retryAfterHeader(reply: FastifyReply): Record<string, string> {
-  const value = reply.getHeader("retry-after");
-  return value === undefined ? {} : { "retry-after": String(value) };
+  const value = reply.getHeader(RETRY_AFTER_HEADER);
+  return value === undefined ? {} : { [RETRY_AFTER_HEADER]: String(value) };
 }
 
 /** Fastify not-found handler: unknown routes answer a 404 problem. */

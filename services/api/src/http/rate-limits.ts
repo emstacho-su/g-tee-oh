@@ -29,5 +29,27 @@ export const LOGIN_EMAIL_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 /** The most emails the email limiter tracks at once; expired windows are dropped first. */
 export const LOGIN_EMAIL_THROTTLE_MAX_KEYS = 10_000;
 
+/** Invite creates per client IP per minute (S42, O-428): an admin makes a handful at a time. */
+export const INVITE_CREATE_RATE_LIMIT_MAX = 10;
+export const INVITE_CREATE_RATE_LIMIT = { max: INVITE_CREATE_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW } as const;
+
+/** Invite previews per client IP per minute (O-428); the join page asks once per visit. */
+export const INVITE_INSPECT_RATE_LIMIT_MAX = 10;
+export const INVITE_INSPECT_RATE_LIMIT = { max: INVITE_INSPECT_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW } as const;
+
+/** Joins per client IP per minute (O-428), as strict as login. */
+export const JOIN_RATE_LIMIT_MAX = 5;
+export const JOIN_RATE_LIMIT = { max: JOIN_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW } as const;
+
+/**
+ * Failed inspect or join attempts per invite id per window, whatever the client address (O-429),
+ * the per-invite counterpart of the per-email login limit: one link cannot be tried from many
+ * addresses. Unknown ids are counted the same way, so the limit reveals nothing about which exist.
+ */
+export const INVITE_ATTEMPT_MAX = 10;
+export const INVITE_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+/** The most invite ids the attempt limiter tracks at once. */
+export const INVITE_ATTEMPT_MAX_KEYS = 10_000;
+
 /** Route config value that exempts a probe route from the global limit. */
 export const RATE_LIMIT_EXEMPT = false as const;
