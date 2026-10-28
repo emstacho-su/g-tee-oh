@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TrainerPrompt } from "../../src/contracts.js";
 import { fixturePrompt } from "../../src/fixtures/index.js";
-import { useActionReplay, type ReplayOptions } from "../../src/trainer/use-action-replay.js";
+import { useActionReplay, type ActionReplay, type ReplayOptions } from "../../src/trainer/use-action-replay.js";
 
 type Entry = TrainerPrompt["history"][number];
 
@@ -25,6 +25,13 @@ function renderReplay(prompt: TrainerPrompt | null, options: ReplayOptions = { r
   return renderHook(({ current, opts }: { current: TrainerPrompt | null; opts: ReplayOptions }) => useActionReplay(current, opts), {
     initialProps: { current: prompt, opts: options },
   });
+}
+
+/** Runs the replay to its end, one step per act: each next timer starts after React renders. */
+function playToEnd(result: { current: ActionReplay }): void {
+  for (let guard = 0; guard < 20 && result.current.replaying; guard += 1) {
+    act(() => void vi.advanceTimersByTime(result.current.stepMs ?? 0));
+  }
 }
 
 beforeEach(() => {
@@ -60,7 +67,9 @@ describe("R3.13 useActionReplay", () => {
     const { result } = renderReplay(FIRST, { speed: "fast", reducedMotion: false });
     act(() => void vi.advanceTimersByTime(100));
     expect(result.current.shown).toBe(2);
-    act(() => void vi.advanceTimersByTime(250 + 100));
+    act(() => void vi.advanceTimersByTime(250));
+    expect(result.current.shown).toBe(3);
+    act(() => void vi.advanceTimersByTime(100));
     expect(result.current.replaying).toBe(false);
   });
 
@@ -91,7 +100,7 @@ describe("R3.13 useActionReplay", () => {
 
   it("R3.13 the same session and state version never replays again", () => {
     const { result, rerender } = renderReplay(FIRST);
-    act(() => void vi.runAllTimers());
+    playToEnd(result);
     expect(result.current.replaying).toBe(false);
     rerender({ current: { ...FIRST }, opts: { reducedMotion: false } });
     expect(result.current.replaying).toBe(false);
@@ -100,7 +109,7 @@ describe("R3.13 useActionReplay", () => {
 
   it("R3.13 a continuing hand replays only the new entries, the earlier ones stay shown", () => {
     const { result, rerender } = renderReplay(FIRST);
-    act(() => void vi.runAllTimers());
+    playToEnd(result);
     const next: TrainerPrompt = {
       ...FIRST,
       state_version: 11,
@@ -110,7 +119,7 @@ describe("R3.13 useActionReplay", () => {
     expect(result.current.replaying).toBe(true);
     expect(result.current.shown).toBe(4);
     expect(result.current.activeIndex).toBe(3);
-    act(() => void vi.runAllTimers());
+    playToEnd(result);
     expect(result.current.shown).toBe(5);
     expect(result.current.log.map((line) => line.text)).toEqual([
       "UTG: Fold",
