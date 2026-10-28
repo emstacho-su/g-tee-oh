@@ -31,7 +31,7 @@ export const LOGIN_MESSAGES = {
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INPUT_CLASSES =
-  "h-10 w-full rounded-md border border-border bg-surface-sunken px-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2";
+  "h-10 w-full rounded-md border border-border-strong bg-surface-sunken px-3 text-text focus-visible:outline-2 focus-visible:outline-offset-2";
 
 /** The first client-side problem with the form, or null when it may be sent. */
 export function checkCredentials(email: string, password: string): string | null {

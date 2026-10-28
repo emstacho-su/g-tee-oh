@@ -91,7 +91,7 @@ function ImportBody({ api, onImported }: Pick<ImportDialogProps, "api" | "onImpo
         aria-invalid={checked !== null}
         aria-describedby={checked === null ? undefined : `${id}-error`}
         onChange={(event) => setCode(event.target.value)}
-        className="rounded-md border border-border bg-surface-raised p-2 font-mono text-xs break-all"
+        className="rounded-md border border-border-strong bg-surface-raised p-2 font-mono text-xs break-all"
       />
       <ErrorText id={`${id}-error`} messages={checked === null ? undefined : [checked]} />
       {write.error === null || write.busy ? null : <Refusal error={write.error} />}

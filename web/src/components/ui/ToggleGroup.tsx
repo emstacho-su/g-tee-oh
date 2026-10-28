@@ -10,7 +10,7 @@
 import * as RadixToggleGroup from "@radix-ui/react-toggle-group";
 
 import { cn } from "./cn.js";
-import { FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
+import { CONTROL_EDGE_CLASS, FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
 
 export interface ToggleOption<T extends string> {
   value: T;
@@ -42,7 +42,7 @@ export function ToggleGroup<T extends string>({ label, value, options, onValueCh
         const chosen = options.find((option) => option.value === next);
         if (chosen !== undefined) onValueChange(chosen.value);
       }}
-      className="inline-flex gap-0.5 rounded-xl border border-border/60 bg-surface-sunken p-1 shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]"
+      className={cn("inline-flex gap-0.5 rounded-xl bg-surface-sunken p-1 shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]", CONTROL_EDGE_CLASS)}
     >
       {options.map((option) => (
         <RadixToggleGroup.Item key={option.value} value={option.value} className={ITEM_CLASSES}>

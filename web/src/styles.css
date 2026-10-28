@@ -36,20 +36,20 @@
   --p-umber: #735751;
   --surface: #f3ebdf; /* from e7d7c1 cream, lifted */
   --surface-raised: #fbf7f1; /* from e7d7c1 cream, lifted further */
-  --surface-sunken: #e7d7c1; /* from e7d7c1 cream, the palette value */
-  --border: #a78a7f; /* from a78a7f taupe, the palette value; decorative edges */
-  --border-strong: #735751; /* from 735751 umber, the palette value; control edges */
+  --surface-sunken: var(--p-cream);
+  --border: var(--p-taupe); /* decorative edges only (cards, panels, rules) */
+  --border-strong: var(--p-umber); /* control edges (CONTROL_EDGE_CLASS), checked at 3:1 */
   --text: #2b1a16; /* from 735751 umber, deepened */
-  --text-muted: #735751; /* from 735751 umber, the palette value */
-  --accent: #8c1c13; /* from 8c1c13 oxblood, the palette value */
-  --accent-soft: #bf4342; /* from bf4342 brick, the palette value; highlights, never text */
+  --text-muted: var(--p-umber);
+  --accent: var(--p-oxblood);
+  --accent-soft: var(--p-brick); /* highlights, never text */
   --accent-text: #fbf7f1; /* from e7d7c1 cream, lifted */
   --danger: #a1271b; /* from 8c1c13 oxblood, lightened toward bf4342 brick */
   --success: #36602f; /* from no palette hue: an olive toned to 735751 umber (O-363) */
   --warning: #7a4f10; /* from no palette hue: an ochre toned to 735751 umber (O-363) */
   --felt: #166534;
   --felt-edge: #14532d;
-  --focus: #bf4342; /* from bf4342 brick, the palette value */
+  --focus: var(--p-brick);
   /*
    * Depth (Tactile Digital): layered soft shadows tinted with the umber hue. raised is a static
    * card; press-rest, press-hover and press-down are the three states of a pressable control
@@ -67,6 +67,16 @@
   --shadow-press-down: inset 0 2px 5px rgb(43 26 22 / 0.32), inset 0 -1px 0 rgb(255 255 255 / 0.2), 0 1px 1px rgb(76 48 42 / 0.16);
   /* The release overshoots slightly and settles: the spring back after the squish. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /*
+   * Stacking layers (S36 review), read through components/ui/layers.ts: the sticky header, chart
+   * tooltips above it, then a dialog's overlay and its content above everything else.
+   */
+  --layer-header: 20;
+  --layer-tooltip: 30;
+  --layer-overlay: 40;
+  --layer-dialog: 50;
+  /* The dimmed ground behind a dialog: the deepened umber, translucent. */
+  --overlay: rgb(28 18 16 / 0.55);
   /*
    * Mastery heat map (S32, O-320; S36, O-362): five ordinal steps of one hue (the umber family at
    * OKLCH hue 35), lowest mastery first, validated with the dataviz palette validator (ordinal
@@ -88,18 +98,18 @@
   --surface-raised: #281a17; /* from 735751 umber, deepened less */
   --surface-sunken: #140c0a; /* from 735751 umber, deepened most */
   --border: #5a423c; /* from 735751 umber, darkened; decorative edges */
-  --border-strong: #a78a7f; /* from a78a7f taupe, the palette value; control edges */
+  --border-strong: var(--p-taupe); /* control edges (CONTROL_EDGE_CLASS), checked at 3:1 */
   --text: #efe4d6; /* from e7d7c1 cream, lifted */
   --text-muted: #b9a196; /* from a78a7f taupe, lifted */
   --accent: #e0766c; /* from bf4342 brick, lifted */
-  --accent-soft: #bf4342; /* from bf4342 brick, the palette value; highlights, never text */
+  --accent-soft: var(--p-brick); /* highlights, never text */
   --accent-text: #1c1210; /* from 735751 umber, deepened */
   --danger: #f08a7e; /* from bf4342 brick, lifted further */
   --success: #9cc48f; /* from no palette hue: the olive, lifted (O-363) */
   --warning: #e4b066; /* from no palette hue: the ochre, lifted (O-363) */
   --felt: #14532d;
   --felt-edge: #052e16;
-  --focus: #e7d7c1; /* from e7d7c1 cream, the palette value */
+  --focus: var(--p-cream);
   --shadow-raised:
     inset 0 1px 0 rgb(231 215 193 / 0.07), 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 14px -4px rgb(0 0 0 / 0.55),
     0 16px 32px -12px rgb(0 0 0 / 0.6);
@@ -110,6 +120,7 @@
     inset 0 1px 0 rgb(231 215 193 / 0.16), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.55),
     0 10px 20px -6px rgb(0 0 0 / 0.65);
   --shadow-press-down: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(231 215 193 / 0.08), 0 1px 1px rgb(0 0 0 / 0.4);
+  --overlay: rgb(0 0 0 / 0.65);
   /* Dark steps run from dark (low mastery) to light (high), validated against #281a17. */
   --heat-1: #7e4739; /* from 735751 umber hue, OKLCH lightness 0.46 */
   --heat-2: #9d5f4f; /* from 735751 umber hue, OKLCH lightness 0.55 */
@@ -125,6 +136,7 @@
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
+  --color-overlay: var(--overlay);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text: var(--text);

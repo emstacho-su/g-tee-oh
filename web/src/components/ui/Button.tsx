@@ -11,7 +11,7 @@ import { Slot } from "@radix-ui/react-slot";
 import type { ButtonHTMLAttributes } from "react";
 
 import { cn } from "./cn.js";
-import { FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
+import { CONTROL_EDGE_CLASS, FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -24,7 +24,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_CLASSES: Readonly<Record<ButtonVariant, string>> = {
   primary: "bg-accent text-accent-text",
-  secondary: "border border-border/70 bg-surface-raised text-text hover:bg-surface",
+  secondary: cn(CONTROL_EDGE_CLASS, "bg-surface-raised text-text hover:bg-surface"),
   ghost: cn("text-text hover:bg-surface-sunken", FLAT_REST_CLASS),
   danger: "bg-danger text-accent-text",
 };

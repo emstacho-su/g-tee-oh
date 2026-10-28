@@ -7,10 +7,14 @@
 //
 // Mechanism: web/src/styles.css declares the light tokens in the plain `:root {` block and the
 // dark ones in the plain `.dark {` block (later blocks such as `:root, [data-card-back]` are
-// cosmetics, not themes, and are skipped). Each colour token used by a pair carries a trailing
-// comment `/* from <hex> <name>, <how> */` naming the palette hue it was derived from (or why it
-// sits outside the palette); a checked colour without one fails, so the report always says where
-// every colour came from. The ratio is the WCAG 2 relative luminance formula. GATING_PAIRS are
+// cosmetics, not themes, and are skipped). The owner's palette is the --p-* primitives of the
+// light block, and a token that uses a palette colour as it is says var(--p-*); the parser
+// resolves var() references (same theme first, then the light block) and names that primitive as
+// the source. A derived colour is a hex value with a trailing comment `/* from <hex> <name>,
+// <how> */` naming the hue it came from (or why it sits outside the palette); a checked colour
+// with neither fails, so the report always says where every colour came from, and the palette
+// itself is written only once, in styles.css. The ratio is the WCAG 2 relative luminance formula.
+// GATING_PAIRS are
 // the pairs the app paints: text at 4.5:1 (1.4.3) and control edges and the focus ring at 3:1
 // (1.4.11). The solver surface colours (web/src/theme/action-style.ts and the felt) are owned by
 // S38; they are listed against the grounds at 3:1 for information only and never fail the run.
@@ -29,14 +33,11 @@ export const STYLES_PATH = join(ROOT, "web", "src", "styles.css");
 export const ACTION_STYLE_PATH = join(ROOT, "web", "src", "theme", "action-style.ts");
 export const REPORT_PATH = join(ROOT, "validation", "reports", "contrast.md");
 
-/** The owner's five colours (O-346), declared as primitives in the light :root block. */
-export const PALETTE = Object.freeze({
-  "p-oxblood": "#8c1c13",
-  "p-brick": "#bf4342",
-  "p-cream": "#e7d7c1",
-  "p-taupe": "#a78a7f",
-  "p-umber": "#735751",
-});
+/**
+ * The owner's palette (O-346) lives only in styles.css, as the --p-* primitives of the light :root
+ * block; semantic tokens reference them with var(), which parseThemes resolves.
+ */
+export const PRIMITIVE_PREFIX = "p-";
 
 const TEXT_AA = 4.5;
 const NON_TEXT_AA = 3;
@@ -96,18 +97,52 @@ function blockBody(css, selector) {
   return match === null ? "" : match[1];
 }
 
-function colourTokens(body) {
+const VAR_REFERENCE = /^var\(--([a-z0-9-]+)\)$/i;
+
+function rawTokens(body) {
   const tokens = new Map();
   for (const [, name, rawValue, source] of body.matchAll(DECLARATION)) {
-    const value = rawValue.trim();
-    if (HEX.test(value)) tokens.set(name, { value: expandHex(value), source: source ?? null });
+    tokens.set(name, { raw: rawValue.trim(), source: source ?? null });
   }
   return tokens;
 }
 
-/** The light (:root) and dark (.dark) colour tokens, each with its source note or null. */
+/**
+ * One token resolved to a hex colour, or null when it is not a colour. A var() reference is looked
+ * up in the same theme and then in the light block (the dark block only overrides, and the --p-*
+ * primitives live in the light block). A token that takes a primitive as it is names that
+ * primitive as its source unless it carries its own note.
+ */
+function resolveRaw(raws, theme, name, seen = new Set()) {
+  const entry = raws[theme].get(name) ?? raws.light.get(name);
+  if (entry === undefined || seen.has(name)) return null;
+  if (HEX.test(entry.raw)) return { value: expandHex(entry.raw), source: entry.source };
+  const reference = VAR_REFERENCE.exec(entry.raw);
+  if (reference === null) return null;
+  const target = resolveRaw(raws, theme, reference[1], new Set([...seen, name]));
+  if (target === null) return null;
+  const inherited = reference[1].startsWith(PRIMITIVE_PREFIX) ? `--${reference[1]}, the palette value` : target.source;
+  return { value: target.value, source: entry.source ?? inherited };
+}
+
+function resolvedTheme(raws, theme) {
+  const tokens = new Map();
+  for (const name of raws[theme].keys()) {
+    const token = resolveRaw(raws, theme, name);
+    if (token !== null) tokens.set(name, token);
+  }
+  return tokens;
+}
+
+/** The light (:root) and dark (.dark) colour tokens, var() resolved, each with its source note or null. */
 export function parseThemes(css) {
-  return { light: colourTokens(blockBody(css, ":root")), dark: colourTokens(blockBody(css, ".dark")) };
+  const raws = { light: rawTokens(blockBody(css, ":root")), dark: rawTokens(blockBody(css, ".dark")) };
+  return { light: resolvedTheme(raws, "light"), dark: resolvedTheme(raws, "dark") };
+}
+
+/** The --p-* primitives as "#hex" strings, in declaration order. */
+export function paletteOf(themes) {
+  return [...themes.light].filter(([name]) => name.startsWith(PRIMITIVE_PREFIX)).map(([, token]) => token.value);
 }
 
 function resolveToken(themes, theme, name) {
@@ -170,13 +205,13 @@ function sourceText(token) {
 }
 
 /** The Markdown report: gating pairs, then the solver surface colours for information. */
-export function renderReport(result, solver) {
+export function renderReport(result, solver, palette = []) {
   const lines = [
     "# Colour contrast report (R3.13, O-346, O-365)",
     "",
     "Written by `node scripts/check-contrast.mjs --write` (`just contrast-write`) from web/src/styles.css; `just contrast` checks that every pair passes and that this file is current. Do not edit by hand.",
     "",
-    "Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and the focus ring (1.4.11). The source column names the palette hue each colour was derived from (owner palette 8c1c13, bf4342, e7d7c1, a78a7f, 735751).",
+    `Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and the focus ring (1.4.11). The source column names the palette hue each colour was derived from (owner palette, the --p-* primitives of styles.css: ${palette.join(", ") || "none declared"}).`,
     "",
     "## Gating pairs",
     "",
@@ -210,7 +245,7 @@ function main(argv) {
   const write = argv.includes("--write");
   const themes = parseThemes(readFileSync(STYLES_PATH, "utf8"));
   const result = evaluate(themes, GATING_PAIRS);
-  const report = renderReport(result, solverRows(themes, readActionColours(readFileSync(ACTION_STYLE_PATH, "utf8"))));
+  const report = renderReport(result, solverRows(themes, readActionColours(readFileSync(ACTION_STYLE_PATH, "utf8"))), paletteOf(themes));
   for (const failure of result.failures) console.error(`check-contrast: ${failure}`);
   if (write) {
     writeFileSync(REPORT_PATH, report);

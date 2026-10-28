@@ -15,7 +15,7 @@ export interface Choice<T extends string> {
   readonly hint?: string;
 }
 
-const INPUT_CLASSES = "h-9 rounded-md border border-border bg-surface-raised px-2 text-sm aria-[invalid=true]:border-danger";
+const INPUT_CLASSES = "h-9 rounded-md border border-border-strong bg-surface-raised px-2 text-sm aria-[invalid=true]:border-danger";
 
 function describedBy(...ids: (string | undefined)[]): string | undefined {
   const present = ids.filter((id): id is string => id !== undefined);

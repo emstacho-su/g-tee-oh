@@ -76,10 +76,10 @@ async function chartShots(page: Page, shot: ReturnType<typeof shooter>): Promise
   await expect(page.getByTestId("goodhart-flag")).toBeVisible();
   await shot("progress-holdout", CRITERIA.holdout, page.getByTestId("holdout-card"));
 
-  // S36, O-347: no visible table toggle; the tables are there for screen readers only, so the
-  // review keeps no picture of them (the old progress-leak-table and progress-heatmap-table shots).
+  // S36, O-347: no visible table toggle and no table to picture (the old progress-leak-table and
+  // progress-heatmap-table shots); the rows and cells carry the values for screen readers.
   await expect(page.getByRole("button", { name: /^Show (table|chart)/ })).toHaveCount(0);
-  await expect(page.getByTestId("leak-table").locator("tbody tr")).toHaveCount(10);
+  await expect(page.getByTestId("leak-table")).toHaveCount(0);
 }
 
 test.beforeAll(() => {

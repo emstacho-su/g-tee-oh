@@ -7,18 +7,19 @@
  * map cell's family and pair plus format and depth), its current cost in words (bb per 1,000
  * hands), a sparkline on the scale every row shares (leak-model.ts) and a "Drill this spot"
  * button. A row whose class has no heat map cell has no button and says why. The weeks selector
- * (4, 8 or 26) sits in one row above. A week by week table of the same values sits beside the rows
- * for screen readers only (S36, O-347: no visible table toggle). With no items the card says how
- * to get some.
+ * (4, 8 or 26) sits in one row above. The rows are the one accessible representation (S36 review,
+ * O-347): each sparkline's name states every week's value, the partial week and the gaps, and its
+ * tooltip shows the same numbers to sighted users; no second table repeats them. With no items
+ * the card says how to get some.
  */
-import { formatLeak, formatShortDate } from "../../progress/format.js";
+import { formatLeak } from "../../progress/format.js";
 import { joinLeaksToCells, sharedLeakScale, type LeakRow } from "../../progress/leak-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import { LEAK_WEEK_OPTIONS, type LeakWeeks, type ProgressHeatmap, type ProgressLeaks } from "../../progress/types.js";
 import { Button, ToggleGroup } from "../ui/index.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
-import { Sparkline, NO_DATA_TEXT, PARTIAL_WEEK_TEXT } from "./Sparkline.js";
+import { Sparkline } from "./Sparkline.js";
 
 export const NO_LEAKS_TEXT = "No leaks yet: finish an automated session to see where you lose the most";
 export const DRILL_BUTTON_TEXT = "Drill this spot";
@@ -74,43 +75,6 @@ function LeakRows({ rows, leaks, pendingKey, onDrill }: { rows: readonly LeakRow
   );
 }
 
-function LeakTable({ rows, leaks }: { rows: readonly LeakRow[]; leaks: ProgressLeaks }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm tabular-nums" data-testid="leak-table">
-        <caption className="sr-only">Leak cost by week, {UNIT}</caption>
-        <thead className="text-muted">
-          <tr>
-            <th scope="col" className="py-1 pr-3">Rank</th>
-            <th scope="col" className="py-1 pr-3">Class</th>
-            <th scope="col" className="py-1 pr-3">Now</th>
-            {leaks.weeks.map((week, index) => (
-              <th key={week} scope="col" className="whitespace-nowrap py-1 pr-3">
-                {formatShortDate(week)}
-                {index === leaks.weeks.length - 1 ? ` (${PARTIAL_WEEK_TEXT})` : ""}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.item.spot_class_key} className="border-t border-border">
-              <td className="py-1 pr-3">{row.rank}</td>
-              <th scope="row" className="whitespace-nowrap py-1 pr-3 font-medium">{row.label}</th>
-              <td className="py-1 pr-3">{formatLeak(row.item.leak_cost_bb_per_1k)}</td>
-              {row.item.series.map((point) => (
-                <td key={point.week} className="py-1 pr-3">
-                  {point.leak_cost_bb_per_1k === null ? NO_DATA_TEXT : formatLeak(point.leak_cost_bb_per_1k)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, pendingKey = null, message = null }: LeakTrendChartProps) {
   const rows = joinLeaksToCells(leaks, heatmap);
   const empty = rows.length === 0;
@@ -128,12 +92,7 @@ export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, 
       {empty ? (
         <p className="text-sm text-muted">{NO_LEAKS_TEXT}</p>
       ) : (
-        <>
-          <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} />
-          <div className="sr-only">
-            <LeakTable rows={rows} leaks={leaks} />
-          </div>
-        </>
+        <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} />
       )}
     </ProgressCard>
   );

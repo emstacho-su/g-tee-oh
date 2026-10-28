@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fixtureMemberSession, fixtureSession } from "../../src/fixtures/index.js";
 import { fixtureBuilderStatus } from "../../src/fixtures/library.js";
 import { defaultHotkeyStore } from "../../src/hotkeys/index.js";
+import { HEADER_LAYER_CLASS } from "../../src/components/ui/index.js";
 import { useThemeStore } from "../../src/store/index.js";
 import { jsonResponse, noContent, problemResponse, sessionResponse } from "../api/fake-fetch.js";
 import { renderApp, SIGNED_IN } from "./render-app.js";
@@ -96,6 +97,24 @@ describe("home shell", () => {
     for (const link of within(nav).getAllByRole("link")) expect(link).toHaveClass("tactile", "whitespace-nowrap");
     // The active link is bold as well as highlighted, so colour is never the only signal.
     expect(within(nav).getByRole("link", { name: "Study" })).toHaveClass("font-semibold");
+  });
+
+  it("R3.13 the sticky header sits on the header layer, below dialogs (S36 review)", async () => {
+    renderApp("/", SIGNED_IN);
+    expect(await screen.findByTestId("app-header")).toHaveClass(HEADER_LAYER_CLASS, "sticky");
+  });
+
+  it("R3.13 from md the sticky nav is capped at the viewport and scrolls, so every link stays reachable (S36 review)", async () => {
+    renderApp("/", SIGNED_IN);
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    expect(nav).toHaveClass("md:sticky", "md:overflow-y-auto");
+    expect(nav.className).toMatch(/md:max-h-\[calc\(100dvh-/);
+  });
+
+  it("R4.12 every home grid item can shrink below its content width (min-w-0), so 390 px never scrolls sideways", async () => {
+    renderApp("/", SIGNED_IN);
+    const grid = await screen.findByTestId("home-grid");
+    for (const item of Array.from(grid.children)) expect(item).toHaveClass("min-w-0");
   });
 
   it("R3.13 the Settings link stays active on every settings page (O-360)", async () => {

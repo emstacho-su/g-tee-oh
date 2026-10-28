@@ -196,15 +196,16 @@ export const settingsRoute = createRoute({
 export const settingsSectionRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/settings/$section",
+  // The one check: a valid segment goes on in the route context as a typed section.
   beforeLoad: ({ params }) => {
     if (!isSettingsSection(params.section)) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
       throw redirect(DEFAULT_SETTINGS_TARGET);
     }
+    return { section: params.section };
   },
   component: function SettingsRouteScreen() {
-    const { section } = settingsSectionRoute.useParams();
-    return <SettingsPage section={isSettingsSection(section) ? section : DEFAULT_SETTINGS_SECTION} />;
+    return <SettingsPage section={settingsSectionRoute.useRouteContext().section} />;
   },
 });
 

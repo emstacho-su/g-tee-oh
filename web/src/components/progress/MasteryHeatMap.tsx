@@ -10,8 +10,8 @@
  * review. One tooltip, shown on hover and on focus, states the class and its p, R, n, mastered and
  * due. A click, Enter or Space opens the class's drill (O-321); mastery gates nothing (ADR 0012).
  * A wide grid scrolls inside the card with the row headers sticky, so the page itself never
- * scrolls sideways at 390 px. A legend explains every mark, and a table of the same values sits
- * beside the grid for screen readers only (S36, O-347: no visible table toggle).
+ * scrolls sideways at 390 px. A legend explains every mark. The cell buttons are the one accessible
+ * representation: each name states the class and every value (S36 review, O-347; no table).
  */
 import { useId, useState, type CSSProperties } from "react";
 
@@ -196,44 +196,6 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
   );
 }
 
-function HeatTable({ heatmap }: { heatmap: ProgressHeatmap }) {
-  const lookup = cellLookup(heatmap);
-  const views = heatmap.rows.flatMap((_, rowIndex) =>
-    heatmap.columns.flatMap((__, columnIndex) => cellViewAt(heatmap, lookup, rowIndex, columnIndex) ?? []),
-  );
-  return (
-    <div className="max-h-[32rem] overflow-auto">
-      <table className="w-full text-left text-sm tabular-nums" data-testid="heat-table">
-        <caption className="sr-only">Mastery by spot class</caption>
-        <thead className="text-muted">
-          <tr>
-            <th scope="col" className="py-1 pr-3">Class</th>
-            <th scope="col" className="py-1 pr-3">Game</th>
-            <th scope="col" className="py-1 pr-3">Known</th>
-            <th scope="col" className="py-1 pr-3">Recall</th>
-            <th scope="col" className="py-1 pr-3">Attempts</th>
-            <th scope="col" className="py-1 pr-3">Mastered</th>
-            <th scope="col" className="py-1">Due</th>
-          </tr>
-        </thead>
-        <tbody>
-          {views.map((view) => (
-            <tr key={view.cell.spot_class_key} className="border-t border-border">
-              <th scope="row" className="whitespace-nowrap py-1 pr-3 font-medium">{`${view.row.family} ${view.row.pair}`}</th>
-              <td className="whitespace-nowrap py-1 pr-3">{columnLabel(view.column)}</td>
-              <td className="py-1 pr-3">{view.text}</td>
-              <td className="py-1 pr-3">{view.recallPercent === null ? "not scheduled" : `${view.recallPercent}%`}</td>
-              <td className="py-1 pr-3">{view.cell.n}</td>
-              <td className="py-1 pr-3">{view.cell.mastered ? "yes" : "no"}</td>
-              <td className="py-1">{view.due ? "yes" : "no"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function MasteryHeatMap({ heatmap, onDrill, pendingKey = null, message = null }: MasteryHeatMapProps) {
   const empty = heatmap.cells.length === 0;
   return (
@@ -246,9 +208,6 @@ export function MasteryHeatMap({ heatmap, onDrill, pendingKey = null, message = 
           <p className="text-sm text-muted">{OPEN_DRILL_HINT}</p>
           <Legend />
           <HeatGrid heatmap={heatmap} pendingKey={pendingKey} onDrill={onDrill} />
-          <div className="sr-only">
-            <HeatTable heatmap={heatmap} />
-          </div>
         </>
       )}
     </ProgressCard>

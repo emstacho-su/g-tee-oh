@@ -7,9 +7,9 @@
  * (packages/learning TIER_FLOORS, the bands the overall rating ranks on) that fall inside the
  * axis. Each row also states its figures in words: rating with deviation, conservative rating,
  * weight and rated decisions. A track with weight 0 has no covered class: its row is dimmed and
- * says "no coverage", never color alone. A table of the same figures sits beside the chart for
- * screen readers only (S36, O-347: no visible table toggle). Built as positioned HTML, so the axis
- * stretches with the card at any width.
+ * says "no coverage", never color alone. A table of the same figures is the screen-reader view
+ * and the visual is aria-hidden, so each value is read once (S36 review, O-347). Built as
+ * positioned HTML, so the axis stretches with the card at any width.
  */
 import { TIER_FLOORS } from "@g-tee-oh/learning";
 
@@ -140,7 +140,8 @@ export function TrackBreakdown({ tracks }: TrackBreakdownProps) {
   const axis = ratingAxis(tracks);
   return (
     <ProgressCard title="Tracks" testId="track-breakdown">
-      <div className="flex flex-col gap-2">
+      {/* The visual is hidden from screen readers: the table below is the one representation. */}
+      <div data-testid="track-visual" aria-hidden="true" className="flex flex-col gap-2">
         <p className="text-xs text-muted">Dot: rating. Line: plus or minus the deviation. Dashed lines: tier floors, named above the axis.</p>
         <AxisRow axis={axis} />
         <ul className="flex flex-col gap-3">

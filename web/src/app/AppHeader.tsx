@@ -6,7 +6,7 @@
  * the wordmark beside a small raised accent chip.
  */
 import { useLogout, useMe } from "../auth/index.js";
-import { Button } from "../components/ui/index.js";
+import { Button, cn, HEADER_LAYER_CLASS } from "../components/ui/index.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 export const APP_NAME = "g-tee-oh";
@@ -18,7 +18,7 @@ export function AppHeader() {
   return (
     <header
       data-testid="app-header"
-      className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/50 bg-surface/90 px-4 py-2.5 backdrop-blur md:px-6"
+      className={cn("sticky top-0 flex items-center gap-3 border-b border-border/50 bg-surface/90 px-4 py-2.5 backdrop-blur md:px-6", HEADER_LAYER_CLASS)}
     >
       <div className="flex items-center gap-2">
         {/* A small raised chip in the accent: the wordmark's mark, decorative only. */}

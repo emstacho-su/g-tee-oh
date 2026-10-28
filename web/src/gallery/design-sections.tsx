@@ -10,13 +10,41 @@ import { useState } from "react";
 import { Button, Card, ToggleGroup, type ButtonSize, type ButtonVariant } from "../components/ui/index.js";
 import { GallerySection } from "./sections.js";
 
-const PALETTE = [
-  ["--p-oxblood", "8c1c13"],
-  ["--p-brick", "bf4342"],
-  ["--p-cream", "e7d7c1"],
-  ["--p-taupe", "a78a7f"],
-  ["--p-umber", "735751"],
-] as const;
+const PRIMITIVE_PREFIX = "--p-";
+
+/** Every rule of a sheet or grouping rule, nested ones included (layers, media). */
+function rulesOf(container: { cssRules: CSSRuleList }): CSSRule[] {
+  return Array.from(container.cssRules).flatMap((rule) => ("cssRules" in rule ? [rule, ...rulesOf(rule as CSSGroupingRule)] : [rule]));
+}
+
+function readableRules(sheet: CSSStyleSheet): CSSRule[] {
+  try {
+    return rulesOf(sheet);
+  } catch (error: unknown) {
+    // A sheet from another origin cannot be read; the palette lives in the app's own styles.css.
+    console.warn(`design gallery: skipped an unreadable stylesheet (${String(error)})`);
+    return [];
+  }
+}
+
+/**
+ * The palette primitives as the loaded styles.css declares them (S36 review): the gallery keeps no
+ * copy of the owner's colours, so it always shows what the app uses.
+ */
+function paletteNames(): string[] {
+  const names = new Set<string>();
+  for (const sheet of Array.from(document.styleSheets)) {
+    for (const rule of readableRules(sheet)) {
+      if (!(rule instanceof CSSStyleRule) || rule.selectorText !== ":root") continue;
+      for (const property of Array.from(rule.style)) if (property.startsWith(PRIMITIVE_PREFIX)) names.add(property);
+    }
+  }
+  return [...names];
+}
+
+function tokenValue(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
 const SEMANTIC = [
   "--surface",
@@ -59,13 +87,13 @@ function TokenSection() {
     <GallerySection name="design-tokens" title="Palette and tokens" note="The owner's five colours as primitives, and the semantic tokens of this theme built from them (O-346).">
       <div className="flex flex-col gap-4">
         <ul aria-label="Palette" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {PALETTE.map(([name, hex]) => (
-            <Swatch key={name} name={name} caption={`#${hex}`} />
+          {paletteNames().map((name) => (
+            <Swatch key={name} name={name} caption={tokenValue(name)} />
           ))}
         </ul>
         <ul aria-label="Semantic tokens" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {SEMANTIC.map((name) => (
-            <Swatch key={name} name={name} caption="this theme" />
+            <Swatch key={name} name={name} caption={tokenValue(name)} />
           ))}
         </ul>
       </div>

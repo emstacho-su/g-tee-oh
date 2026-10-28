@@ -9,7 +9,7 @@ import { test } from "node:test";
 
 import {
   GATING_PAIRS,
-  PALETTE,
+  PRIMITIVE_PREFIX,
   STYLES_PATH,
   contrastRatio,
   evaluate,
@@ -72,11 +72,38 @@ test("R3.13 renderReport names the theme, both tokens, the ratio, the minimum an
   assert.match(report, /735751 umber, deepened/);
 });
 
+/** The owner's palette as O-346 states it: the expectation, not a copy the app or the checker reads. */
+const OWNER_PALETTE = ["#8c1c13", "#bf4342", "#e7d7c1", "#a78a7f", "#735751"];
+
 test("R3.13 O-346 styles.css carries the owner's five palette colours as primitives", () => {
   const themes = parseThemes(readFileSync(STYLES_PATH, "utf8"));
-  for (const [name, hex] of Object.entries(PALETTE)) {
-    assert.equal(themes.light.get(name)?.value, hex, `--${name} should be ${hex}`);
-  }
+  const primitives = [...themes.light].filter(([name]) => name.startsWith(PRIMITIVE_PREFIX)).map(([, token]) => token.value);
+  assert.deepEqual(primitives.sort(), [...OWNER_PALETTE].sort());
+});
+
+test("R3.13 parseThemes resolves var() through the theme and then the light primitives", () => {
+  const css = `
+:root {
+  --p-oxblood: #8c1c13;
+  --accent: var(--p-oxblood);
+  --ring: var(--accent);
+}
+
+.dark {
+  --accent: var(--p-oxblood); /* from 8c1c13 oxblood, kept */
+}
+`;
+  const themes = parseThemes(css);
+  assert.deepEqual(themes.light.get("accent"), { value: "#8c1c13", source: "--p-oxblood, the palette value" });
+  assert.equal(themes.light.get("ring")?.value, "#8c1c13");
+  assert.deepEqual(themes.dark.get("accent"), { value: "#8c1c13", source: "8c1c13 oxblood, kept" });
+});
+
+test("R3.13 O-346 the palette lives in one place: no token repeats a primitive's hex", () => {
+  const css = readFileSync(STYLES_PATH, "utf8");
+  const palette = new Set([...parseThemes(css).light].filter(([name]) => name.startsWith(PRIMITIVE_PREFIX)).map(([, token]) => token.value));
+  const repeats = [...css.matchAll(/--(?!p-)([a-z0-9-]+):\s*(#[0-9a-f]{6})\s*;/gi)].filter(([, , hex]) => palette.has(hex.toLowerCase()));
+  assert.deepEqual(repeats.map(([declaration]) => declaration), []);
 });
 
 test("R3.13 O-365 every gating text and control pair passes WCAG AA in both themes", () => {

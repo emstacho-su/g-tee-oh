@@ -79,6 +79,8 @@ for (const theme of THEMES) {
       test.setTimeout(SHOT_TEST_TIMEOUT_MS);
       await prepareShotPage(page, theme, viewport);
       await page.goto(`/gallery.html?theme=${theme}`);
+      // The gallery reads the palette from the loaded styles.css (S36 review): all five appear.
+      await expect(page.getByRole("list", { name: "Palette" }).getByRole("listitem")).toHaveCount(5);
       for (const [name, criterion] of [
         ["design-tokens", CRITERIA.tokens],
         ["design-buttons", CRITERIA.buttons],

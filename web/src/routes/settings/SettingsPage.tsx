@@ -13,7 +13,7 @@ import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
 import { BuilderScheduleForm } from "../../components/library/BuilderScheduleForm.js";
-import { Button, cn, FLAT_REST_CLASS, LoadingNote, PageHeader, Panel, TACTILE_CLASS } from "../../components/ui/index.js";
+import { Button, LoadingNote, NAV_PILL_LINK_PROPS, PageHeader, Panel, PillNav } from "../../components/ui/index.js";
 import { useBuilderStatus, useIsAdmin, useSaveSettings } from "../../library/use-builder.js";
 import { ConfigScopeSection } from "./ConfigScopeSection.js";
 import { CosmeticsSection } from "./CosmeticsSection.js";
@@ -23,10 +23,6 @@ import { SessionDefaultsSection } from "./SessionDefaultsSection.js";
 import { SETTINGS_TEXT } from "./settings-text.js";
 
 export const SCHEDULE_MEMBER_NOTE = SETTINGS_TEXT.scheduleMemberNote;
-
-const LINK_CLASSES = cn("block whitespace-nowrap rounded-xl px-3 py-2 text-sm", TACTILE_CLASS);
-const ACTIVE_CLASSES = "bg-surface-raised font-semibold text-accent";
-const INACTIVE_CLASSES = cn("text-text hover:bg-surface-sunken", FLAT_REST_CLASS);
 
 function ScheduleForm() {
   const api = useAppApi();
@@ -50,23 +46,15 @@ function SchedulePage({ isAdmin }: { isAdmin: boolean }) {
 
 function SectionNav({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <nav aria-label={SETTINGS_TEXT.sections} className="-mx-4 md:mx-0 md:w-56 md:shrink-0">
-      <ul className="flex flex-nowrap gap-1 overflow-x-auto px-4 py-1 md:flex-col md:overflow-visible md:px-0 md:py-0">
-        {visibleSections(isAdmin).map((section) => (
-          <li key={section.slug} className="shrink-0">
-            <Link
-              to="/settings/$section"
-              params={{ section: section.slug }}
-              className={LINK_CLASSES}
-              activeProps={{ className: ACTIVE_CLASSES }}
-              inactiveProps={{ className: INACTIVE_CLASSES }}
-            >
-              {section.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <PillNav label={SETTINGS_TEXT.sections} className="md:w-56 md:shrink-0">
+      {visibleSections(isAdmin).map((section) => (
+        <li key={section.slug} className="shrink-0">
+          <Link to="/settings/$section" params={{ section: section.slug }} {...NAV_PILL_LINK_PROPS}>
+            {section.label}
+          </Link>
+        </li>
+      ))}
+    </PillNav>
   );
 }
 

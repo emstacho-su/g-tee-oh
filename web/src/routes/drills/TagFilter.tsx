@@ -45,7 +45,7 @@ export function TagFilter({ tag, onFilter }: TagFilterProps) {
             aria-invalid={invalid}
             aria-describedby={invalid ? `${id}-error` : undefined}
             onChange={(event) => setText(event.target.value)}
-            className="h-9 rounded-md border border-border bg-surface-raised px-2"
+            className="h-9 rounded-md border border-border-strong bg-surface-raised px-2"
           />
         </div>
         <Button type="submit">Filter</Button>
