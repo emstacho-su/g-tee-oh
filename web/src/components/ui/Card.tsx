@@ -22,6 +22,18 @@ export interface CardProps {
   children: ReactNode;
 }
 
+const SURFACE_CLASSES = "rounded-2xl border border-border/50 bg-surface-raised p-4 sm:p-5";
+
+export interface PanelProps {
+  className?: string;
+  children: ReactNode;
+}
+
+/** The same raised surface without a heading, for content that brings its own (a form). */
+export function Panel({ className, children }: PanelProps) {
+  return <div className={cn("flex min-w-0 flex-col gap-3", SURFACE_CLASSES, RAISED_CLASS, className)}>{children}</div>;
+}
+
 export function Card({ title, description, actions, headingLevel = 2, className, testId, children }: CardProps) {
   const headingId = useId();
   const Heading = headingLevel === 3 ? "h3" : "h2";
@@ -29,11 +41,7 @@ export function Card({ title, description, actions, headingLevel = 2, className,
     <section
       aria-labelledby={headingId}
       data-testid={testId}
-      className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-2xl border border-border/50 bg-surface-raised p-4 sm:p-5",
-        RAISED_CLASS,
-        className,
-      )}
+      className={cn("flex min-w-0 flex-col gap-3", SURFACE_CLASSES, RAISED_CLASS, className)}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Heading id={headingId} className={headingLevel === 3 ? "text-base font-semibold" : "text-lg font-semibold tracking-tight"}>

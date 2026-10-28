@@ -55,7 +55,7 @@ export function HomeRatingCard() {
         trackNames={trackNames}
         badge={badge === null ? undefined : <BadgePill cosmeticKey={badge} />}
         footer={
-          <Link to="/progress" className="text-sm underline">
+          <Link to="/progress" className="self-start text-sm font-medium text-accent underline underline-offset-4">
             {OPEN_PROGRESS}
           </Link>
         }

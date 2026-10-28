@@ -1,8 +1,10 @@
 /** The app's primitive components over Radix and Tailwind (S24, O-44). */
 export { Button } from "./Button.js";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./Button.js";
-export { Card } from "./Card.js";
-export type { CardHeadingLevel, CardProps } from "./Card.js";
+export { Card, Panel } from "./Card.js";
+export type { CardHeadingLevel, CardProps, PanelProps } from "./Card.js";
+export { PageHeader } from "./PageHeader.js";
+export type { PageHeaderProps } from "./PageHeader.js";
 export { FLAT_REST_CLASS, RAISED_CLASS, TACTILE_CLASS } from "./tactile.js";
 export { Dialog } from "./Dialog.js";
 export type { DialogProps } from "./Dialog.js";

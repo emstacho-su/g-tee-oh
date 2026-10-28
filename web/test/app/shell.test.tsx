@@ -87,6 +87,31 @@ describe("home shell", () => {
     expect(within(nav).getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
+  it("R3.13 the Main navigation is one scrolling row at phone width and a column from md, with tactile links (O-346)", async () => {
+    renderApp("/study", SIGNED_IN);
+
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    const list = within(nav).getByRole("list");
+    expect(list).toHaveClass("flex-nowrap", "overflow-x-auto", "md:flex-col");
+    for (const link of within(nav).getAllByRole("link")) expect(link).toHaveClass("tactile", "whitespace-nowrap");
+    // The active link is bold as well as highlighted, so colour is never the only signal.
+    expect(within(nav).getByRole("link", { name: "Study" })).toHaveClass("font-semibold");
+  });
+
+  it("R3.13 the Settings link stays active on every settings page (O-360)", async () => {
+    renderApp("/settings/hotkeys", SIGNED_IN);
+
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    await waitFor(() => expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page"));
+  });
+
+  it("R3.13 the header's buttons take the shared tactile press", async () => {
+    renderApp("/", SIGNED_IN);
+
+    const header = await screen.findByTestId("app-header");
+    for (const button of within(header).getAllByRole("button")) expect(button).toHaveClass("tactile");
+  });
+
   it("R3.13 clicking a nav link moves aria-current", async () => {
     const user = userEvent.setup();
     const { router } = renderApp("/", SIGNED_IN);
