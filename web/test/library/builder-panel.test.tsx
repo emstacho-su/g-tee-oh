@@ -209,6 +209,19 @@ describe("R3.5 /settings builder schedule", () => {
     expect(sent("PATCH", SETTINGS_PATH)).toEqual([]);
   });
 
+  it("R3.5 a failed settings read shows an alert with a retry", async () => {
+    const user = userEvent.setup();
+    let fail = true;
+    renderLibrary("/settings", {
+      override: (request) => (request.path === BUILDER_PATH && fail ? jsonBody(500, { status: 500 }) : undefined),
+    });
+
+    expect(await screen.findByText("The builder settings could not be loaded.")).toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("form", { name: "Builder schedule" })).toBeInTheDocument();
+  });
+
   it("R3.5 a member sees that the schedule is for admins and no admin read is made (O-290)", async () => {
     const { sent } = renderLibrary("/settings", { admin: false });
 
