@@ -18,6 +18,7 @@ import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import type { TrackKey } from "../../progress/types.js";
 import type { ActionReplay } from "../../trainer/use-action-replay.js";
+import { useFeedbackSections } from "../../components/trainer/index.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
 import type { SpotSession } from "../../trainer/use-spot-session.js";
@@ -81,6 +82,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
   const prompt = promptOf(state);
   const context = "context" in state ? state.context : null;
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
+  // The feedback sections the user opened or closed stay that way for the session (O-387).
+  const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : (
@@ -96,6 +99,7 @@ export function AutomatedSession(props: AutomatedSessionProps) {
             grouping={grouping}
             interactive={interactive}
             replaying={replay.replaying}
+            feedbackSections={feedbackSections}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}

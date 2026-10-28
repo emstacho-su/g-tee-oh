@@ -24,7 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
-import { RngExplainer, useRngExplainer } from "../../components/trainer/index.js";
+import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
@@ -94,6 +94,8 @@ function InSession({ drill, session, replay, interactive, onAskEnd, onExplain, o
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   const context = "context" in state ? state.context : null;
+  // The feedback sections the user opened or closed stay that way for the session (O-387).
+  const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : <RunProgress context={context} />}
@@ -107,6 +109,7 @@ function InSession({ drill, session, replay, interactive, onAskEnd, onExplain, o
             grouping={drill.trainer.grouping}
             interactive={interactive}
             replaying={replay.replaying}
+            feedbackSections={feedbackSections}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
