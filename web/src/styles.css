@@ -114,3 +114,85 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Cosmetics (S32, R4.14, O-323, O-279). CosmeticsRoot sets data-felt and data-card-back on <html>
+ * for the equipped items the server has unlocked; the /settings previews set the same attributes
+ * on a wrapper, so the selectors match any element and the values inherit. "none" restores the
+ * standard look inside a preview while another item is equipped on <html>.
+ *
+ * Felts keep the table's white text readable. White on each felt, by the WCAG relative luminance
+ * formula (a node calculation): standard light #166534 7.13:1, dark #14532d 9.11:1; Tier III blue
+ * light #1e40af 8.72:1, dark #1e3a8a 10.36:1; Tier V burgundy light #9f1239 8.02:1, dark #881337
+ * 9.57:1; Tier VII violet light #5b21b6 8.98:1, dark #4c1d95 10.95:1. All are 4.5:1 or more.
+ *
+ * Card backs are three custom properties CardView's face-down card reads. The defaults reproduce
+ * the earlier fixed classes exactly (Tailwind's blue-800 fill, blue-900 border and the light
+ * 45 degree stripe); the 14-day back is a crimson crosshatch, the 60-day back a gold grid on black.
+ */
+:root,
+[data-card-back="none"] {
+  --card-back-bg: oklch(42.4% 0.199 265.638);
+  --card-back-border: oklch(37.9% 0.146 265.522);
+  --card-back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 3px, transparent 3px 6px);
+}
+
+[data-card-back="card-back-streak-14"] {
+  --card-back-bg: #991b1b;
+  --card-back-border: #7f1d1d;
+  --card-back-pattern:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px);
+}
+
+[data-card-back="card-back-streak-60"] {
+  --card-back-bg: #1c1917;
+  --card-back-border: #a16207;
+  --card-back-pattern:
+    repeating-linear-gradient(90deg, rgba(250, 204, 21, 0.35) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(250, 204, 21, 0.35) 0 1px, transparent 1px 5px);
+}
+
+[data-felt="none"] {
+  --felt: #166534;
+  --felt-edge: #14532d;
+}
+
+[data-felt="felt-tier-III"] {
+  --felt: #1e40af;
+  --felt-edge: #1e3a8a;
+}
+
+[data-felt="felt-tier-V"] {
+  --felt: #9f1239;
+  --felt-edge: #881337;
+}
+
+[data-felt="felt-tier-VII"] {
+  --felt: #5b21b6;
+  --felt-edge: #4c1d95;
+}
+
+.dark[data-felt="none"],
+.dark [data-felt="none"] {
+  --felt: #14532d;
+  --felt-edge: #052e16;
+}
+
+.dark[data-felt="felt-tier-III"],
+.dark [data-felt="felt-tier-III"] {
+  --felt: #1e3a8a;
+  --felt-edge: #172554;
+}
+
+.dark[data-felt="felt-tier-V"],
+.dark [data-felt="felt-tier-V"] {
+  --felt: #881337;
+  --felt-edge: #4c0519;
+}
+
+.dark[data-felt="felt-tier-VII"],
+.dark [data-felt="felt-tier-VII"] {
+  --felt: #4c1d95;
+  --felt-edge: #2e1065;
+}

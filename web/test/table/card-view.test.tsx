@@ -25,6 +25,15 @@ describe("R3.13 CardView", () => {
     expect(card).toHaveAttribute("data-face", "down");
   });
 
+  it("R4.14 a face-down card paints its back from the card back custom properties", () => {
+    render(<CardView faceDown />);
+    const classes = screen.getByRole("img", { name: "Face-down card" }).className;
+    expect(classes).toContain("border-(color:--card-back-border)");
+    expect(classes).toContain("bg-(color:--card-back-bg)");
+    expect(classes).toContain("bg-(image:--card-back-pattern)");
+    expect(classes).not.toContain("bg-blue-800");
+  });
+
   it("R3.13 a missing card renders face down", () => {
     render(<CardView />);
     expect(screen.getByRole("img", { name: "Face-down card" })).toBeInTheDocument();

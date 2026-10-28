@@ -193,7 +193,6 @@ describe("R3.5 /settings builder schedule", () => {
       overnight: { start_hour: 0, end_hour: 6, utc_offset_minutes: -300, cpu_share: 1 },
     });
     expect(within(form).getByText("Now 00:00 to 06:00 at UTC offset -300 minutes, CPU share 1")).toBeInTheDocument();
-    expect(screen.getByText("Session defaults, hotkeys and cosmetics arrive in S32.")).toBeInTheDocument();
   });
 
   it("R3.5 an invalid hour is named and nothing is sent", async () => {
@@ -205,7 +204,9 @@ describe("R3.5 /settings builder schedule", () => {
     await user.type(start, "24");
     await user.click(screen.getByRole("button", { name: "Save the schedule" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Window starts (hour): a whole hour from 0 to 23");
+    // Scoped to the form: /settings has other sections with their own alerts (S32).
+    const form = screen.getByRole("form", { name: "Builder schedule" });
+    expect(await within(form).findByRole("alert")).toHaveTextContent("Window starts (hour): a whole hour from 0 to 23");
     expect(sent("PATCH", SETTINGS_PATH)).toEqual([]);
   });
 
