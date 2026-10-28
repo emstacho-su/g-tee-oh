@@ -192,7 +192,14 @@ describe("R3.16 mocked quiz sessions (S41, O-410, O-411, O-412, O-415)", () => {
     };
     expect(kindsOf("easy", ["range", "hand"])).toEqual(["yes_no", "action", "yes_no"]);
     expect(kindsOf("medium", ["range", "hand"])).toEqual(["percent", "band", "percent"]);
-    expect(kindsOf("hard", ["hand"])).toEqual(["size", "size", "size"]);
+    expect(kindsOf("hard", ["range", "hand"])).toEqual(["regions", "size", "regions"]);
+  });
+
+  it("R3.16 a Hard quiz with only hand questions is a 422 no-quiz-questions, so a shot can show it (O-411 amended)", () => {
+    const refused = startQuiz(signedInApi(), "hard", ["hand"]);
+    expect(refused.status).toBe(422);
+    expect(refused.body).toMatchObject({ type: "urn:g-tee-oh:problem:no-quiz-questions" });
+    expect(startQuiz(signedInApi(), "hard", ["range"]).status).toBe(201);
   });
 
   it("R3.16 refuses a bad catalog spot or quiz with 400, an uncovered seat with 422, and quiz options on a drill start", () => {
@@ -222,6 +229,20 @@ describe("R3.16 mocked quiz sessions (S41, O-410, O-411, O-412, O-415)", () => {
     expect(short.body).toMatchObject({ type: "urn:g-tee-oh:problem:bad-request", detail: "Type a reason of at least 3 characters." });
     expect(next(api, id).state_version).toBe(0);
     expect(answer(api, id, { ...body, rationale: " abc " }).status).toBe(200);
+  });
+
+  it("R3.16 a refused reason follows the shared rule and names body.rationale in the problem's errors (PR #39 review finding 3)", () => {
+    const api = signedInApi();
+    const id = start(api);
+    const prompt = next(api, id);
+    const body = { prompt_id: prompt.prompt_id, state_version: 0, answer: rightAnswer(prompt) };
+    for (const rationale of [undefined, "   ", "ab", "ㅤㅤㅤ", "⠀⠀⠀", "a️️b", "́́́"]) {
+      const refused = answer(api, id, { ...body, rationale });
+      expect(refused.status, JSON.stringify(rationale)).toBe(400);
+      const paths = ((refused.body as { errors?: { path: string }[] }).errors ?? []).map((error) => error.path);
+      expect(paths, JSON.stringify(rationale)).toContain("body.rationale");
+    }
+    expect(next(api, id).state_version).toBe(0);
   });
 
   it("R3.16 a result says whether the window at this level passes", () => {

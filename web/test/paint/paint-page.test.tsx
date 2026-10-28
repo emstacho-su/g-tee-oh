@@ -1,7 +1,7 @@
 /**
  * Tests for the /paint screen (S27 lane B, S41, R3.17, O-302, O-351, O-415, O-416) through the
  * whole app over an injected fake fetch: pick a table, seat, spot and opener, start a catalog-spot
- * range_paint session from the address, paint, submit the painted map, read the graded view, go
+ * range_paint session on Start painting (an address only prefills, PR #39 security LOW 2), paint, submit the painted map, read the graded view, go
  * Next; an old drill link; and the failures it names without echoing a problem's text. One
  * Idempotency-Key per paint submission (PR #29 review M4): Try again after a failed or lost answer
  * resends the same key so the server replays, while a changed paint or the next range gets a new one.
@@ -55,6 +55,13 @@ async function pickAndStart(user: User): Promise<void> {
   await user.click(await within(position).findByRole("radio", { name: "BB" }));
   await user.click(within(screen.getByRole("radiogroup", { name: "Spot" })).getByRole("radio", { name: "Facing an open" }));
   await user.click(screen.getByRole("button", { name: /start painting/i }));
+}
+
+/** Presses Start painting once it is enabled: a link only prefills (PR #39 security LOW 2). */
+async function pressStartPainting(): Promise<void> {
+  const button = await screen.findByRole("button", { name: /start painting/i });
+  await waitFor(() => expect(button).toBeEnabled());
+  await userEvent.click(button);
 }
 
 async function startPainting(path = "/paint", overrides: Record<string, readonly ResponseFactory[]> = {}) {
@@ -152,8 +159,9 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     expect(bodyOf(app, SESSIONS)).toMatchObject({ catalog_spot: { villain_positions: ["BTN"] } });
   });
 
-  it("R3.17 an address with a full valid choice starts directly, with its seed", async () => {
+  it("R3.17 an address with a full valid choice fills the picker and starts on Start painting, with its seed", async () => {
     const app = renderApp("/paint?config=cfg_6_online_100&position=BB&spot=vs_open&vs=BTN&seed=00000000deadbeef", script());
+    await pressStartPainting();
     expect(await screen.findByTestId("range-painter")).toBeInTheDocument();
     expect(bodyOf(app, SESSIONS)).toEqual({
       mode: "range_paint",
@@ -164,7 +172,17 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
 
   it("R3.17 while the start runs a status says so, and a failed start's Try again is a new attempt with a new Idempotency-Key", async () => {
     const keys: (string | null)[] = [];
-    const fake = createFakeFetch(script({ [SESSIONS]: [problemResponse(503, "unavailable"), jsonResponse(201, fixturePaintSession)] }));
+    // The first start is held until the status has been seen: since the start waits for a click
+    // (PR #39 security LOW 2), an instant answer could replace the status before it is read.
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const heldFailure = async (): Promise<Response> => {
+      await gate;
+      return problemResponse(503, "unavailable")();
+    };
+    const fake = createFakeFetch(script({ [SESSIONS]: [heldFailure, jsonResponse(201, fixturePaintSession)] }));
     const fetch = (request: Request): Promise<Response> => {
       if (`${request.method} ${new URL(request.url).pathname}` === SESSIONS) keys.push(request.headers.get("idempotency-key"));
       return fake.fetch(request);
@@ -173,7 +191,9 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     const queryClient = createQueryClient();
     const router = createAppRouter({ queryClient, api, history: createMemoryHistory({ initialEntries: ["/paint?config=cfg_6_online_100&position=BB&spot=vs_open"] }) });
     render(<App router={router} queryClient={queryClient} api={api} />);
+    await pressStartPainting();
     expect(await screen.findByRole("status")).toHaveTextContent(/starting/i);
+    release();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/solver service/i);
     await userEvent.click(within(alert).getByRole("button", { name: /try again/i }));
@@ -183,8 +203,9 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     expect(keys[1]).not.toBe(keys[0]);
   });
 
-  it("R3.17 an old drill link still starts a drill-backed session", async () => {
+  it("R3.17 an old drill link still starts a drill-backed session, from its start card", async () => {
     const app = renderApp(`/paint?drill=${FIXTURE_PAINT_DRILL_ID}`, script());
+    await pressStartPainting();
     expect(await screen.findByTestId("range-painter")).toBeInTheDocument();
     expect(bodyOf(app, SESSIONS)).toEqual({ mode: "range_paint", drill_id: FIXTURE_PAINT_DRILL_ID });
   });

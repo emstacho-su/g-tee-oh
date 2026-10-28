@@ -15,7 +15,7 @@ import type { PredictionResult } from "../../src/contracts.js";
 import { fixtureSession } from "../../src/fixtures/index.js";
 import { fixturePredictionPrompt, fixturePredictionResult, fixturePredictions } from "../../src/fixtures/prediction.js";
 import { jsonResponse, noContent } from "../api/fake-fetch.js";
-import { ANSWER_PATH, END_PATH, NEXT_PATH, START_PATH, renderQuiz, typeReason } from "./render-quiz.js";
+import { ANSWER_PATH, END_PATH, NEXT_PATH, START_PATH, pressStart, renderStartedQuiz, typeReason } from "./render-quiz.js";
 import { APP_SUITE } from "./app-suite-timeout.js";
 
 const QUIZ = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&kinds=range,hand&difficulty=easy";
@@ -74,7 +74,7 @@ async function answerAction(reason: string): Promise<void> {
 
 describe("R3.16 the required reason (O-412)", APP_SUITE, () => {
   it("R3.16 a labelled textarea with the field class, a 1,000 limit and a live count", async () => {
-    renderQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)] });
+    await renderStartedQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)] });
     await screen.findByRole("heading", { name: YES_NO.prompt.question });
     const field = screen.getByRole("textbox", { name: REASON_LABEL });
     expect(field.tagName).toBe("TEXTAREA");
@@ -85,8 +85,8 @@ describe("R3.16 the required reason (O-412)", APP_SUITE, () => {
     expect(screen.getByText("4 / 1000")).toBeInTheDocument();
   });
 
-  it("R3.16 Submit and the Enter hotkey wait for 3 characters after trimming", async () => {
-    const view = renderQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)], [ANSWER_PATH]: [jsonResponse(200, passedResult())] });
+  it("R3.16 Submit and the Enter hotkey wait for 3 visible characters (the shared rule)", async () => {
+    const view = await renderStartedQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)], [ANSWER_PATH]: [jsonResponse(200, passedResult())] });
     await screen.findByRole("heading", { name: YES_NO.prompt.question });
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     await typeReason("  ab   ");
@@ -99,7 +99,7 @@ describe("R3.16 the required reason (O-412)", APP_SUITE, () => {
   });
 
   it("R3.16 Enter inside the reason types a newline and never submits", async () => {
-    const view = renderQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)], [ANSWER_PATH]: [jsonResponse(200, passedResult())] });
+    const view = await renderStartedQuiz(QUIZ, { [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)], [ANSWER_PATH]: [jsonResponse(200, passedResult())] });
     await screen.findByRole("heading", { name: YES_NO.prompt.question });
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     await typeReason("first line{Enter}second line");
@@ -111,7 +111,7 @@ describe("R3.16 the required reason (O-412)", APP_SUITE, () => {
 
 describe("R3.16 a quiz result (O-410)", APP_SUITE, () => {
   it("R3.16 shows the passed mark and the window counts, and no unlock wording", async () => {
-    renderQuiz(QUIZ, twoAnswers());
+    await renderStartedQuiz(QUIZ, twoAnswers());
     await answerYesNo("Calls are cheap here.");
     const panel = screen.getByTestId("prediction-result");
     expect(within(panel).getByText("Passed Easy at this spot")).toBeInTheDocument();
@@ -123,13 +123,13 @@ describe("R3.16 a quiz result (O-410)", APP_SUITE, () => {
 
 describe("R3.16 Previous (O-414)", APP_SUITE, () => {
   it("R3.16 shows no Previous before the first answer", async () => {
-    renderQuiz(QUIZ, twoAnswers());
+    await renderStartedQuiz(QUIZ, twoAnswers());
     await screen.findByRole("heading", { name: YES_NO.prompt.question });
     expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
   });
 
   it("R3.16 reviews earlier answers read-only, steps back and forward, and returns to the draft intact", async () => {
-    const view = renderQuiz(QUIZ, twoAnswers());
+    const view = await renderStartedQuiz(QUIZ, twoAnswers());
     await answerYesNo("Calls are cheap here.");
     await answerAction("Suited wheel ace raises.");
     await userEvent.click(screen.getByRole("button", { name: "Next question" }));
@@ -166,7 +166,7 @@ describe("R3.16 Previous (O-414)", APP_SUITE, () => {
   });
 
   it("R3.16 Previous also shows on a result once an answer exists, and the hotkeys stay off in review", async () => {
-    const view = renderQuiz(QUIZ, twoAnswers());
+    const view = await renderStartedQuiz(QUIZ, twoAnswers());
     await answerYesNo("Calls are cheap here.");
     await userEvent.click(screen.getByRole("button", { name: "Previous" }));
     await screen.findByTestId("answer-review");
@@ -178,7 +178,7 @@ describe("R3.16 Previous (O-414)", APP_SUITE, () => {
 
 describe("R3.16 End quiz and sign-out clear the run (O-414)", APP_SUITE, () => {
   it("R3.16 End quiz posts the end with the csrf token and returns to the start screen without the answered list", async () => {
-    const view = renderQuiz(QUIZ, twoAnswers());
+    const view = await renderStartedQuiz(QUIZ, twoAnswers());
     await answerYesNo("Calls are cheap here.");
     await userEvent.click(screen.getByRole("button", { name: "End quiz" }));
     expect(await screen.findByRole("combobox", { name: "Table" })).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("R3.16 End quiz and sign-out clear the run (O-414)", APP_SUITE, () => {
   });
 
   it("R3.16 after a sign-out the answered list is gone: the next session starts fresh with no Previous", async () => {
-    const view = renderQuiz(QUIZ, { ...twoAnswers(), "POST /api/v1/auth/logout": [noContent()] });
+    const view = await renderStartedQuiz(QUIZ, { ...twoAnswers(), "POST /api/v1/auth/logout": [noContent()] });
     await answerYesNo("Calls are cheap here.");
     expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -202,6 +202,8 @@ describe("R3.16 End quiz and sign-out clear the run (O-414)", APP_SUITE, () => {
       await Promise.resolve();
     });
     await act(() => view.router.navigate({ href: QUIZ }));
+    expect(view.sentTo(START_PATH)).toHaveLength(1);
+    await pressStart();
     await waitFor(() => expect(view.sentTo(START_PATH)).toHaveLength(2));
     await screen.findByRole("heading", { level: 1, name: "Quizzes" });
     expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();

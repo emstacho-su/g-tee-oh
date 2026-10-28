@@ -2,7 +2,8 @@
  * The /quiz start screen (S41, R3.16, O-350, O-410, O-411, O-415, O-416): the table select over the
  * catalog, the session defaults' preselection, positions with uncovered seats disabled and named,
  * the spot types, question kinds and difficulty, the Start rule, the address it writes, the
- * catalog-spot start request and the fixed no-coverage sentence.
+ * catalog-spot start request (sent on Start only, PR #39 security LOW 2) and the fixed no-coverage
+ * sentence.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -11,7 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { fixturePredictionPrompt } from "../../src/fixtures/prediction.js";
 import { DEFAULT_SESSION_DEFAULTS, useSessionDefaultsStore } from "../../src/store/session-defaults.js";
 import { jsonResponse, problemResponse } from "../api/fake-fetch.js";
-import { NEXT_PATH, START_PATH, renderQuiz } from "./render-quiz.js";
+import { NEXT_PATH, START_PATH, pressStart, renderQuiz } from "./render-quiz.js";
 import { APP_SUITE } from "./app-suite-timeout.js";
 
 const FULL = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&kinds=range,hand&difficulty=medium";
@@ -96,8 +97,9 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
     await screen.findByRole("heading", { name: fixturePredictionPrompt("percent").question });
   });
 
-  it("R3.16 an address with a full valid choice starts a catalog-spot prediction session with the quiz options", async () => {
+  it("R3.16 an address with a full valid choice fills the start screen; Start quiz posts a catalog-spot prediction session with the quiz options", async () => {
     const view = renderQuiz(`${FULL}&seed=00000000deadbeef`, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("percent"))] });
+    await pressStart();
     await screen.findByRole("heading", { name: fixturePredictionPrompt("percent").question });
     const [start] = view.sentTo(START_PATH);
     expect(start?.body).toEqual({
@@ -113,6 +115,7 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
 
   it("R3.16 a no-coverage answer shows the fixed sentence, never the server's detail", async () => {
     renderQuiz(FULL, { [START_PATH]: [problemResponse(422, "no-coverage")] });
+    await pressStart();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The library has no solved spot for these choices yet. They were queued for the builder.");
     expect(alert).not.toHaveTextContent("server detail text");

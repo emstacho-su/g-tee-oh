@@ -1,7 +1,7 @@
 /**
  * Your frequencies against the solver's (S41, R4.12, O-347, O-353, O-367, O-417, O-418): the pure
  * model (spot names from the response fields and the configuration list, action family words,
- * percent text, the largest gap, the sample line) and the /progress card over a fake fetch (the
+ * the spot key of solution and node, the sample line) and the /progress card over a fake fetch (the
  * spot select, paired bars with numbers in words, hand rows in the api's order, the screen-reader
  * table, the below-minimum line, the empty state and a failed read with Try again).
  */
@@ -20,7 +20,8 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
-import { familyWords, largestGap, percentText, sampleText, spotOptions } from "../../src/progress/frequency-model.js";
+import { familyWords, sampleText, spotKey, spotOptions } from "../../src/progress/frequency-model.js";
+import * as frequencyModel from "../../src/progress/frequency-model.js";
 import { frequencyQuery } from "../../src/progress/frequency-query.js";
 import { createAppApi } from "../../src/api/index.js";
 import { jsonResponse, problemResponse, type FetchScript } from "../api/fake-fetch.js";
@@ -28,6 +29,7 @@ import { SIGNED_IN, TEST_ORIGIN, renderApp } from "../app/render-app.js";
 import { APP_SUITE } from "../quiz/app-suite-timeout.js";
 
 const FREQUENCIES = "GET /api/v1/progress/frequencies";
+const REBUILT_SOLUTION_ID = "00000000-0000-4000-8000-0000000f0f0f";
 const [ABOVE, BELOW] = fixtureFrequencies.spots;
 if (ABOVE === undefined || BELOW === undefined) throw new Error("fixture spots missing");
 
@@ -78,7 +80,7 @@ describe("R4.12 the frequency model", () => {
       "BTN open (BB-BTN), cfg_6_online_100",
     ]);
     expect(spotOptions(fixtureFrequencies.spots, fixtureConfigs)[0]?.label).toBe("BB facing an open (BB-BTN), Online, 6 players, 100 bb deep, stakes online");
-    expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.value)).toEqual([ABOVE.node_key, BELOW.node_key]);
+    expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.value)).toEqual([spotKey(ABOVE), spotKey(BELOW)]);
   });
 
   it("R4.12 numbers two spots that would share a name", () => {
@@ -89,11 +91,24 @@ describe("R4.12 the frequency model", () => {
     ]);
   });
 
-  it("R4.12 percent text, the largest gap and the sample line", () => {
-    expect(percentText(0.384)).toBe("38%");
-    expect(percentText(1)).toBe("100%");
-    expect(largestGap({ your_freq: [0.5, 0.25, 0.25], solver_freq: [0.05, 0.2, 0.75] })).toBeCloseTo(0.5);
+  it("R4.12 a spot is keyed by its solution and node: a rebuilt node with the same node_key is its own option (PR #39 review finding 6)", () => {
+    const rebuilt = { ...ABOVE, solution_id: REBUILT_SOLUTION_ID };
+    expect(spotKey(rebuilt)).not.toBe(spotKey(ABOVE));
+    expect(spotKey(rebuilt)).toContain(REBUILT_SOLUTION_ID);
+    expect(spotKey(rebuilt)).toContain(ABOVE.node_key);
+    const values = spotOptions([ABOVE, rebuilt], undefined).map((option) => option.value);
+    expect(new Set(values).size).toBe(2);
+  });
+
+  it("R4.12 the fixture spots carry distinct solution ids", () => {
+    expect(fixtureFrequencies.spots.map((spot) => spot.solution_id)).toEqual([ABOVE.solution_id, BELOW.solution_id]);
+    expect(ABOVE.solution_id).not.toBe(BELOW.solution_id);
+  });
+
+  it("R4.12 the sample line; the unused gap and pass-through percent helpers are gone (PR #39 review finding 10)", () => {
     expect(sampleText(12, 30)).toBe("12 of 30 decisions at this spot");
+    expect(Object.keys(frequencyModel)).not.toContain("largestGap");
+    expect(Object.keys(frequencyModel)).not.toContain("percentText");
   });
 
   it("R4.12 the query reads GET /progress/frequencies under the progress root", async () => {
@@ -149,11 +164,26 @@ describe("R4.12 the frequency card on /progress", APP_SUITE, () => {
     const user = userEvent.setup();
     renderApp("/progress", progress([jsonResponse(200, fixtureFrequencies)]));
     const card = await loadedCard();
-    await user.selectOptions(await within(card).findByRole("combobox", { name: "Spot" }), BELOW.node_key);
+    await user.selectOptions(await within(card).findByRole("combobox", { name: "Spot" }), spotKey(BELOW));
     expect(within(card).getByText(`${BELOW.decisions} of 30 decisions at this spot`)).toBeInTheDocument();
     expect(within(card).queryByTestId("frequency-bars")).not.toBeInTheDocument();
     expect(within(card).queryByRole("table")).not.toBeInTheDocument();
     expect(within(card).queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it("R4.12 two spots with the same node_key and different solutions are told apart by the select (PR #39 review finding 6)", async () => {
+    const user = userEvent.setup();
+    const rebuilt = { ...BELOW, node_key: ABOVE.node_key, solution_id: REBUILT_SOLUTION_ID };
+    renderApp("/progress", progress([jsonResponse(200, { ...fixtureFrequencies, spots: [ABOVE, rebuilt] })]));
+    const card = await loadedCard();
+    const select = await within(card).findByRole("combobox", { name: "Spot" });
+    expect(within(select).getAllByRole("option")).toHaveLength(2);
+    expect(within(card).getByTestId("frequency-bars")).toBeInTheDocument();
+    await user.selectOptions(select, spotKey(rebuilt));
+    expect(within(card).getByText(`${rebuilt.decisions} of 30 decisions at this spot`)).toBeInTheDocument();
+    expect(within(card).queryByTestId("frequency-bars")).not.toBeInTheDocument();
+    await user.selectOptions(select, spotKey(ABOVE));
+    expect(within(card).getByTestId("frequency-bars")).toBeInTheDocument();
   });
 
   it("R4.12 with no spots the card says how to fill it", async () => {

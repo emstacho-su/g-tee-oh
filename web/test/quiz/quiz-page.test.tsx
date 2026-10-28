@@ -1,6 +1,7 @@
 /**
  * The /quiz screen's question loop (S27 lane A, S41, R3.16, O-301, O-302, O-412): an old
- * drill-backed address still starts a prediction session directly, one render per answer kind,
+ * drill-backed address still starts a prediction session once Start quiz is pressed on its start
+ * card (PR #39 security LOW 2: a link never starts one on mount), one render per answer kind,
  * the request each answer sends (now with the required reason), the result view, the synthetic
  * banner, the hotkeys, a 409 stale-state that reads the current prompt again, and fixed problem
  * text that never shows the server's detail. No rating, score or grade label appears anywhere.
@@ -19,7 +20,7 @@ import {
   fixturePredictions,
 } from "../../src/fixtures/prediction.js";
 import { jsonResponse, problemResponse } from "../api/fake-fetch.js";
-import { ANSWER_PATH, NEXT_PATH, REASON, START_PATH, renderQuiz, typeReason } from "./render-quiz.js";
+import { ANSWER_PATH, NEXT_PATH, REASON, START_PATH, renderStartedQuiz, typeReason } from "./render-quiz.js";
 import { APP_SUITE } from "./app-suite-timeout.js";
 
 const RUN_PATH = `/quiz?drill=${FIXTURE_PREDICTION_DRILL_ID}`;
@@ -39,8 +40,8 @@ async function question(kind: PredictionPrompt["answer_kind"]): Promise<HTMLElem
 }
 
 describe("R3.16 /quiz drill-backed start (old links)", APP_SUITE, () => {
-  it("R3.16 /quiz?drill starts a prediction session with the drill, the seed, the csrf token and an Idempotency-Key, without quiz options", async () => {
-    const view = renderQuiz(`${RUN_PATH}&seed=00000000deadbeef`, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
+  it("R3.16 /quiz?drill and Start quiz start a prediction session with the drill, the seed, the csrf token and an Idempotency-Key, without quiz options", async () => {
+    const view = await renderStartedQuiz(`${RUN_PATH}&seed=00000000deadbeef`, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
     await question("yes_no");
     const [start] = view.sentTo(START_PATH);
     expect(start?.body).toEqual({ mode: "prediction", drill_id: FIXTURE_PREDICTION_DRILL_ID, seed: "00000000deadbeef" });
@@ -50,7 +51,7 @@ describe("R3.16 /quiz drill-backed start (old links)", APP_SUITE, () => {
   });
 
   it("R3.16 a start refused by the api shows the fixed text of its problem kind", async () => {
-    renderQuiz(RUN_PATH, { [START_PATH]: [problemResponse(422, "no-coverage")] });
+    await renderStartedQuiz(RUN_PATH, { [START_PATH]: [problemResponse(422, "no-coverage")] });
     expect(await screen.findByRole("alert")).toHaveTextContent("The library has no solved spot for these choices yet. They were queued for the builder.");
     expect(screen.queryByText(SERVER_DETAIL)).not.toBeInTheDocument();
   });
@@ -58,7 +59,7 @@ describe("R3.16 /quiz drill-backed start (old links)", APP_SUITE, () => {
 
 describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   it("R3.16 yes or no: a level badge, the spot and Yes and No buttons", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
     await question("yes_no");
     expect(screen.getByTestId("level-badge")).toHaveTextContent("Range level 1 of 3");
     expect(screen.getByText("BTN Raise to 2.5bb")).toBeInTheDocument();
@@ -68,7 +69,7 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   });
 
   it("R3.16 percent: a number field from 0 to 100 in steps of 5", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("percent"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("percent"))] });
     await question("percent");
     const field = screen.getByRole("spinbutton", { name: "Share of the range, in percent" });
     expect(field).toHaveAttribute("min", "0");
@@ -77,7 +78,7 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   });
 
   it("R3.16 regions: one checkbox per region; a regions answer is complete, so the reason alone gates Submit", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("regions"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("regions"))] });
     await question("regions");
     expect(screen.getAllByRole("checkbox")).toHaveLength(8);
     expect(screen.getByRole("checkbox", { name: "Suited connectors" })).not.toBeChecked();
@@ -87,7 +88,7 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   });
 
   it("R3.16 action: the node's actions as buttons with a swatch, and the hand", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("action"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("action"))] });
     await question("action");
     const group = screen.getByRole("group", { name: "Most frequent action" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["FFold", "CCall", "RRaise to 10bb", "RRaise to 25bb"]);
@@ -96,7 +97,7 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   });
 
   it("R3.16 band: the four frequency bands", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("band"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("band"))] });
     await question("band");
     const group = screen.getByRole("group", { name: "Frequency band" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual([
@@ -108,7 +109,7 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   });
 
   it("R3.16 size: only the aggressive actions", async () => {
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("size"))] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("size"))] });
     await question("size");
     const group = screen.getByRole("group", { name: "Most frequent size" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["RRaise to 10bb", "RRaise to 25bb"]);
@@ -119,7 +120,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   it("R3.16 submit sends the prompt id, state version, the yes or no answer and the reason, then shows the result", async () => {
     const entry = entryOf("yes_no");
     const result = fixturePredictionResult(entry, { kind: "yes_no", value: true }, 0);
-    const view = renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
+    const view = await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
     await question("yes_no");
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     expect(screen.getByRole("button", { name: /Yes/ })).toHaveAttribute("aria-pressed", "true");
@@ -140,7 +141,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   it("R3.16 a drill-backed session may keep its unlock message", async () => {
     const entry = entryOf("yes_no");
     const result = fixturePredictionResult(entry, { kind: "yes_no", value: true }, 0);
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
     await question("yes_no");
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     await typeReason();
@@ -152,7 +153,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   it("R3.16 a wrong answer says so with a symbol and no unlock banner", async () => {
     const entry = entryOf("band");
     const result = fixturePredictionResult(entry, { kind: "band", band: "0_25" }, 3);
-    const view = renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, { ...entry.prompt, state_version: 3 })], [ANSWER_PATH]: [jsonResponse(200, result)] });
+    const view = await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, { ...entry.prompt, state_version: 3 })], [ANSWER_PATH]: [jsonResponse(200, result)] });
     await question("band");
     await userEvent.click(screen.getByRole("button", { name: "0 to 25 percent" }));
     await typeReason();
@@ -182,7 +183,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
     for (const { kind, act, answer } of cases) {
       const entry = entryOf(kind);
       const result = fixturePredictionResult(entry, answer as never, 0);
-      const view = renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
+      const view = await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [jsonResponse(200, result)] });
       await question(kind);
       await act();
       await typeReason();
@@ -196,7 +197,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   it("R3.16 Next reads the next prompt; Enter submits and N moves on", async () => {
     const first = entryOf("yes_no");
     const second = { ...fixturePredictionPrompt("action"), state_version: 1 };
-    const view = renderQuiz(RUN_PATH, {
+    const view = await renderStartedQuiz(RUN_PATH, {
       [NEXT_PATH]: [jsonResponse(200, first.prompt), jsonResponse(200, second)],
       [ANSWER_PATH]: [jsonResponse(200, fixturePredictionResult(first, { kind: "yes_no", value: false }, 0))],
     });
@@ -215,7 +216,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   it("R3.16 a 409 stale-state reads the current prompt again and says so", async () => {
     const stale = entryOf("yes_no").prompt;
     const current = { ...fixturePredictionPrompt("action"), state_version: 4 };
-    const view = renderQuiz(RUN_PATH, {
+    const view = await renderStartedQuiz(RUN_PATH, {
       [NEXT_PATH]: [jsonResponse(200, stale), jsonResponse(200, current)],
       [ANSWER_PATH]: [problemResponse(409, "stale-state")],
     });
@@ -231,7 +232,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
 
   it("R3.16 another failed answer shows fixed text and keeps the prompt", async () => {
     const entry = entryOf("yes_no");
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [problemResponse(409, "session-ended")] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, entry.prompt)], [ANSWER_PATH]: [problemResponse(409, "session-ended")] });
     await question("yes_no");
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     await typeReason();
@@ -242,11 +243,11 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
   });
 
   it("R3.16 the synthetic banner shows only for a synthetic solution", async () => {
-    const { unmount } = renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
+    const { unmount } = await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("yes_no"))] });
     await question("yes_no");
     expect(screen.getByText(SYNTHETIC_TEXT)).toBeInTheDocument();
     unmount();
-    renderQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, { ...fixturePredictionPrompt("yes_no"), synthetic: false })] });
+    await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, { ...fixturePredictionPrompt("yes_no"), synthetic: false })] });
     await question("yes_no");
     await waitFor(() => expect(screen.queryByText(SYNTHETIC_TEXT)).not.toBeInTheDocument());
   });

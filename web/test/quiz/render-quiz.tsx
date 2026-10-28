@@ -5,8 +5,9 @@
  * every request with its Idempotency-Key and csrf headers and its parsed body.
  */
 import { createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, type RenderResult } from "@testing-library/react";
+import { render, screen, waitFor, type RenderResult } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
+import { expect } from "vitest";
 
 import { createAppApi } from "../../src/api/index.js";
 import { App } from "../../src/app/index.js";
@@ -24,6 +25,7 @@ export const ANSWER_PATH = `POST /api/v1/prediction/${SESSION_ID}/answer`;
 export const END_PATH = `POST /api/v1/sessions/${SESSION_ID}/end`;
 export const CONFIGS_PATH = "GET /api/v1/configs";
 export const REASON = "Facing a small open, the price is good.";
+export const START_QUIZ = "Start quiz";
 
 export interface SentRequest {
   key: string;
@@ -82,6 +84,23 @@ export function renderQuiz(path: string, script: FetchScript): QuizView {
   const router = createAppRouter({ queryClient, api, history });
   const view = render(<App router={router} queryClient={queryClient} api={api} />);
   return { ...view, sent, history, router, queryClient, sentTo: (key) => sent.filter((request) => request.key === key) };
+}
+
+/**
+ * Presses the start button a link only prefills (PR #39 security LOW 2: no link starts a session on
+ * mount), once it is enabled: Start quiz on the start screen or on a drill link's start card.
+ */
+export async function pressStart(name: string = START_QUIZ): Promise<void> {
+  const button = await screen.findByRole("button", { name });
+  await waitFor(() => expect(button).toBeEnabled());
+  await userEvent.click(button);
+}
+
+/** Renders the quiz at a path and presses its start button, as a player opening a link does. */
+export async function renderStartedQuiz(path: string, script: FetchScript): Promise<QuizView> {
+  const view = renderQuiz(path, script);
+  await pressStart();
+  return view;
 }
 
 /** Types the required reason into the reason field. */

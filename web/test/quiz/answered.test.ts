@@ -1,14 +1,17 @@
 /**
  * The quiz run's pure parts (S41, R3.16, O-410, O-412, O-414): the answered list for Previous
- * (newest last, capped at 50, never mutated), the review steps, the reason rule (3 to 1,000
- * characters after trimming) and the passed text by difficulty. Nothing names a rating or score.
+ * (newest last, capped at 50, never mutated), the review steps, the reason rule (the shared
+ * rationaleReady from @g-tee-oh/contracts) and its raw count, the passed text by difficulty and the
+ * no-quiz-questions sentence. Nothing names a rating or score.
  */
+import { RATIONALE_MAX_CHARS, RATIONALE_MIN_CHARS, rationaleReady } from "@g-tee-oh/contracts";
 import { describe, expect, it } from "vitest";
 
 import { fixturePredictionResult, fixturePredictions } from "../../src/fixtures/prediction.js";
 import { MAX_ANSWERED, appendAnswered, reviewStep, type AnsweredItem } from "../../src/prediction/answered.js";
-import { REASON_MAX_CHARS, REASON_MIN_CHARS, reasonCount, reasonReady } from "../../src/prediction/draft.js";
+import { reasonCount } from "../../src/prediction/draft.js";
 import { passedText, problemText, windowText } from "../../src/prediction/labels.js";
+import { noQuestionsText, quizDifficultyName } from "../../src/prediction/quiz-text.js";
 import { ApiProblem } from "../../src/api/index.js";
 
 function item(order: number): AnsweredItem {
@@ -46,14 +49,29 @@ describe("R3.16 the answered list behind Previous (O-414)", () => {
   });
 });
 
-describe("R3.16 the reason rule (O-412)", () => {
-  it("R3.16 a reason is ready from 3 characters after trimming, up to 1,000", () => {
-    expect(REASON_MIN_CHARS).toBe(3);
-    expect(REASON_MAX_CHARS).toBe(1000);
-    expect(reasonReady("  ab  ")).toBe(false);
-    expect(reasonReady(" abc ")).toBe(true);
-    expect(reasonReady("x".repeat(1001))).toBe(false);
+describe("R3.16 the reason rule (O-412, PR #39 review finding 3)", () => {
+  it("R3.16 the web reads the shared rule: 3 visible characters, up to 1,000; the count is the raw length", () => {
+    expect(RATIONALE_MIN_CHARS).toBe(3);
+    expect(RATIONALE_MAX_CHARS).toBe(1000);
+    expect(rationaleReady("  ab  ")).toBe(false);
+    expect(rationaleReady(" abc ")).toBe(true);
+    expect(rationaleReady("x".repeat(1001))).toBe(false);
     expect(reasonCount("abc")).toBe("3 / 1000");
+    expect(reasonCount("ㅤㅤㅤ")).toBe("3 / 1000");
+  });
+});
+
+describe("R3.16 no-quiz-questions text (O-411 amended)", () => {
+  it("R3.16 names the difficulty, and the kind only when exactly one was chosen", () => {
+    expect(noQuestionsText("hard", ["hand"])).toBe("No more Hard hand questions in these spots; try more spot types or another difficulty.");
+    expect(noQuestionsText("medium", ["range"])).toBe("No more Medium range questions in these spots; try more spot types or another difficulty.");
+    expect(noQuestionsText("easy", ["range", "hand"])).toBe("No more Easy questions in these spots; try more spot types or another difficulty.");
+    expect(quizDifficultyName("hard")).toBe("Hard");
+  });
+
+  it("R3.16 problemText has a fixed sentence for the slug too, never the server's detail", () => {
+    const problem = new ApiProblem({ status: 422, slug: "no-quiz-questions", title: "t", detail: "server detail text" });
+    expect(problemText(problem)).toBe("No more questions in these spots; try more spot types or another difficulty.");
   });
 });
 

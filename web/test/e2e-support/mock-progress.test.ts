@@ -71,6 +71,9 @@ describe("R4.12 mocked progress routes", () => {
     const spots = fixtureFrequencies.spots;
     expect(spots.some((spot) => spot.pooled !== null && spot.hands.length > 0)).toBe(true);
     expect(spots.some((spot) => spot.pooled === null && spot.decisions < fixtureFrequencies.min_spot_decisions)).toBe(true);
+    // PR #39 review finding 6: every served spot names the solution it was graded on.
+    const served = (seasoned.body as typeof fixtureFrequencies).spots;
+    expect(served.every((spot) => /^[0-9a-f-]{36}$/.test(spot.solution_id))).toBe(true);
     progress.setLearner("fresh");
     expect(get(api, "frequencies").body).toEqual(fixtureFreshFrequencies);
     expect(get(createMockApi({ routes: [createMockProgressRoute().route] }), "frequencies").status).toBe(401);
