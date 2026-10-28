@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
+  ContrastError,
   GATING_PAIRS,
   PRIMITIVE_PREFIX,
   STYLES_PATH,
@@ -97,6 +98,64 @@ test("R3.13 parseThemes resolves var() through the theme and then the light prim
   assert.deepEqual(themes.light.get("accent"), { value: "#8c1c13", source: "--p-oxblood, the palette value" });
   assert.equal(themes.light.get("ring")?.value, "#8c1c13");
   assert.deepEqual(themes.dark.get("accent"), { value: "#8c1c13", source: "8c1c13 oxblood, kept" });
+});
+
+const PRIMITIVES = ":root {\n  --p-cream: #e7d7c1;\n  --p-umber: #735751;\n";
+
+test("R3.13 a var() to an undeclared token is an error naming the token and the reference", () => {
+  const css = `${PRIMITIVES}  --focus: var(--p-umber);\n}\n\n.dark {\n  --focus: var(--p-creme);\n}\n`;
+  assert.throws(() => parseThemes(css), (error) => error instanceof ContrastError && /dark: --focus references --p-creme, which is not declared/.test(error.message));
+});
+
+/** The fault lines of the ContrastError parseThemes throws for this stylesheet. */
+function faultsOf(css) {
+  try {
+    parseThemes(css);
+  } catch (error) {
+    if (error instanceof ContrastError) return error.message.split("\n");
+    throw error;
+  }
+  return [];
+}
+
+test("R3.13 a var() cycle is reported once, naming only the tokens in it", () => {
+  // --entry only points into the cycle; it is not part of it and is not named.
+  const css = `${PRIMITIVES}  --entry: var(--a);\n  --a: var(--b);\n  --b: var(--a);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), ["light: var() cycle: --a -> --b -> --a"]);
+});
+
+test("R3.13 a fault in a light-only token is reported once, not again for the dark theme", () => {
+  const css = `${PRIMITIVES}  --ring: var(--p-creme);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), ["light: --ring references --p-creme, which is not declared"]);
+});
+
+test("R3.13 a var() inside a larger value (calc, a shadow list) is not a colour token and never fails the run", () => {
+  const css = `${PRIMITIVES}  --layer-tooltip: 30;\n  --layer-popover: calc(var(--layer-tooltip) + 1);\n  --shadow-raised: 0 1px 2px var(--p-umber);\n  --mix: color-mix(in srgb, var(--p-umber) 50%, white);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), []);
+  const themes = parseThemes(css);
+  for (const name of ["layer-popover", "shadow-raised", "mix"]) assert.equal(themes.light.has(name), false, `--${name} is not a colour token`);
+});
+
+test("R3.13 a fallback on a token that is not a colour is left alone", () => {
+  const css = `${PRIMITIVES}  --layer-tooltip: 30;\n  --layer-popover: var(--layer-tooltip, 31);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), []);
+});
+
+test("R3.13 a var() the checker cannot follow (a fallback) is an error, never silently dropped", () => {
+  const css = `${PRIMITIVES}  --focus: var(--p-umber, #000000);\n}\n\n.dark {\n}\n`;
+  assert.throws(() => parseThemes(css), /light: --focus uses var\(--p-umber, #000000\), which the checker cannot resolve/);
+});
+
+test("R3.13 spaces inside var() are allowed, as in CSS", () => {
+  const css = `${PRIMITIVES}  --focus: var( --p-umber );\n}\n\n.dark {\n}\n`;
+  assert.equal(parseThemes(css).light.get("focus")?.value, "#735751");
+});
+
+test("R3.13 a light-only alias resolves again in the dark theme instead of keeping its light value", () => {
+  const css = `${PRIMITIVES}  --surface: var(--p-cream);\n  --ring: var(--surface);\n}\n\n.dark {\n  --surface: var(--p-umber);\n}\n`;
+  const themes = parseThemes(css);
+  assert.equal(themes.light.get("ring")?.value, "#e7d7c1");
+  assert.equal(themes.dark.get("ring")?.value, "#735751");
 });
 
 test("R3.13 O-346 the palette lives in one place: no token repeats a primitive's hex", () => {

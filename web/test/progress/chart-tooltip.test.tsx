@@ -22,39 +22,45 @@ afterEach(() => setViewportWidth(ORIGINAL_WIDTH));
 
 describe("R4.12 ChartTooltip placement (O-320)", () => {
   it("R4.12 renders nothing without an anchor", () => {
-    render(<ChartTooltip id="tip" anchor={null}>text</ChartTooltip>);
+    render(<ChartTooltip anchor={null}>text</ChartTooltip>);
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("R4.12 opens above a trigger lower on the page, centred on it", () => {
     setViewportWidth(1440);
     const anchor: TooltipAnchor = { left: 400, top: 500, bottom: 520, width: 40 };
-    render(<ChartTooltip id="tip" anchor={anchor}>above</ChartTooltip>);
+    render(<ChartTooltip anchor={anchor}>above</ChartTooltip>);
     expect(tooltip()).toHaveTextContent("above");
     expect(tooltip().style.left).toBe("420px");
     expect(tooltip().style.top).toBe("494px");
     expect(tooltip().style.transform).toBe("translate(-50%, -100%)");
   });
 
+  it("R4.12 is a sighted echo only: no id for a describedby link (S36 follow-up)", () => {
+    setViewportWidth(1440);
+    render(<ChartTooltip anchor={{ left: 400, top: 500, bottom: 520, width: 40 }}>echo</ChartTooltip>);
+    expect(tooltip()).not.toHaveAttribute("id");
+  });
+
   it("R4.12 opens below a trigger near the viewport top", () => {
     setViewportWidth(1440);
     const anchor: TooltipAnchor = { left: 400, top: 40, bottom: 60, width: 40 };
-    render(<ChartTooltip id="tip" anchor={anchor}>below</ChartTooltip>);
+    render(<ChartTooltip anchor={anchor}>below</ChartTooltip>);
     expect(tooltip().style.top).toBe("66px");
     expect(tooltip().style.transform).toBe("translateX(-50%)");
   });
 
   it("R4.12 clamps the centre away from both edges at phone width", () => {
     setViewportWidth(390);
-    const { rerender } = render(<ChartTooltip id="tip" anchor={{ left: 0, top: 500, bottom: 520, width: 20 }}>edge</ChartTooltip>);
+    const { rerender } = render(<ChartTooltip anchor={{ left: 0, top: 500, bottom: 520, width: 20 }}>edge</ChartTooltip>);
     expect(tooltip().style.left).toBe("112px");
-    rerender(<ChartTooltip id="tip" anchor={{ left: 380, top: 500, bottom: 520, width: 10 }}>edge</ChartTooltip>);
+    rerender(<ChartTooltip anchor={{ left: 380, top: 500, bottom: 520, width: 10 }}>edge</ChartTooltip>);
     expect(tooltip().style.left).toBe("278px");
   });
 
   it("R4.12 leaves the centre unclamped on a viewport narrower than two margins", () => {
     setViewportWidth(200);
-    render(<ChartTooltip id="tip" anchor={{ left: 10, top: 500, bottom: 520, width: 20 }}>narrow</ChartTooltip>);
+    render(<ChartTooltip anchor={{ left: 10, top: 500, bottom: 520, width: 20 }}>narrow</ChartTooltip>);
     expect(tooltip().style.left).toBe("20px");
   });
 
