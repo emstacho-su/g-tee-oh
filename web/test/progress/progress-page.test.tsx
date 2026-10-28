@@ -4,6 +4,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { drillListKey } from "../../src/drills/queries.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
 import {
@@ -126,17 +127,20 @@ describe("R4.12 /progress", () => {
     expect(fake.keys()).not.toContain("POST /api/v1/drills");
   });
 
-  it("R4.12 a leak row creates the class's drill when none exists, then opens it", async () => {
-    const { router, fake } = renderApp("/progress", {
+  it("R4.12 a leak row creates the class's drill when none exists, then opens it and drops the cached drill lists", async () => {
+    const { router, fake, queryClient } = renderApp("/progress", {
       ...PROGRESS,
       "GET /api/v1/drills": [NO_DRILLS],
       "GET /api/v1/configs": [CONFIGS],
       "POST /api/v1/drills": [jsonResponse(201, { ...fixtureDrill, id: CREATED_ID })],
+      [`GET /api/v1/drills/${CREATED_ID}`]: [jsonResponse(200, { ...fixtureDrill, id: CREATED_ID })],
     });
+    queryClient.setQueryData(drillListKey(undefined), { pages: [], pageParams: [] });
     fireEvent.click(await screen.findByRole("button", { name: "Drill this spot: rfi BB-UTG, live 100 bb" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${CREATED_ID}/run`));
     const post = fake.calls.find((call) => call.method === "POST" && call.path === "/api/v1/drills");
     expect(JSON.parse(post?.body ?? "{}")).toMatchObject({ name: "Leak drill: rfi BB-UTG live 100" });
+    expect(queryClient.getQueryState(drillListKey(undefined))?.isInvalidated).toBe(true);
   });
 
   it("R4.12 a class no configuration covers says so in its card and creates nothing", async () => {

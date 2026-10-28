@@ -19,6 +19,7 @@ import {
 } from "../../src/progress/drill-family.js";
 import {
   AUTO_TAG_HASH_CHARS,
+  canonicalJson,
   autoDrillIdempotencyKey,
   autoDrillTag,
   drillTargetOf,
@@ -120,7 +121,12 @@ describe("R4.12 the reserved tag and key (PM note 2)", () => {
     const tag = autoDrillTag(SHA256_OF_ABC);
     expect(tag).toBe(`auto-${SHA256_OF_ABC.slice(0, AUTO_TAG_HASH_CHARS)}`);
     expect(tag).toMatch(TAG_PATTERN);
-    expect(autoDrillIdempotencyKey(SHA256_OF_ABC)).toBe(`auto-drill-${SHA256_OF_ABC}`);
+    expect(autoDrillIdempotencyKey(SHA256_OF_ABC, "b0d7")).toBe(`auto-drill-${SHA256_OF_ABC}-b0d7`);
+  });
+
+  it("R4.12 the canonical body text sorts object keys at every depth and keeps array order", () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, { f: 1, e: 0 }], c: null } })).toBe('{"a":{"c":null,"d":[2,{"e":0,"f":1}]},"b":1}');
+    expect(canonicalJson({ a: 1, b: 2 })).toBe(canonicalJson({ b: 2, a: 1 }));
   });
 
   it("R4.12 a cell's target carries its key and its row and column coordinates", () => {
@@ -146,37 +152,111 @@ function harness(script: FetchScript, configs: readonly GameConfig[] = fixtureCo
     return fake.fetch(input);
   };
   const loadConfigs = vi.fn(() => Promise.resolve(configs));
-  return { fake, recorded, loadConfigs, deps: { api: createAppApi({ baseUrl: TEST_ORIGIN, fetch }), loadConfigs } };
+  const freshKeySuffix = vi.fn(() => FRESH_SUFFIX);
+  return { fake, recorded, loadConfigs, deps: { api: createAppApi({ baseUrl: TEST_ORIGIN, fetch }), loadConfigs, freshKeySuffix } };
 }
 
 const TARGET: DrillTarget = { spotClassKey: "abc", spot: LIVE_100 };
 const TAG = autoDrillTag(SHA256_OF_ABC);
 const CREATED_ID = "00000000-0000-4000-8000-0000000000aa";
+const RETRIED_ID = "00000000-0000-4000-8000-0000000000bb";
+const FRESH_SUFFIX = "fresh-1";
+const NO_DRILLS = jsonResponse(200, { items: [], next_cursor: null });
+
+function postKeys(recorded: readonly Recorded[]): (string | null)[] {
+  return recorded.filter((call) => new URL(call.url).pathname === "/api/v1/drills" && call.idempotencyKey !== null).map((call) => call.idempotencyKey);
+}
+
+async function bodyHashOf(postBody: string | undefined): Promise<string> {
+  return sha256Hex(canonicalJson(JSON.parse(postBody ?? "{}") as unknown));
+}
 
 describe("R4.12 openClassDrill", () => {
   it("R4.12 reuses the drill the tag finds and creates nothing", async () => {
     const { fake, recorded, loadConfigs, deps } = harness({ "GET /api/v1/drills": [jsonResponse(200, { items: [fixtureDrill], next_cursor: null })] });
-    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: fixtureDrill.id });
+    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: fixtureDrill.id, created: false });
     expect(new URL(recorded[0]?.url ?? "").searchParams.get("tag")).toBe(TAG);
     expect(fake.keys()).toEqual(["GET /api/v1/drills"]);
     expect(loadConfigs).not.toHaveBeenCalled();
   });
 
-  it("R4.12 creates the drill with the tag, the csrf header and the deterministic idempotency key when none exists", async () => {
+  it("R4.12 creates the drill under a key of the class hash and the body hash, then reads it back", async () => {
     const { fake, recorded, loadConfigs, deps } = harness({
-      "GET /api/v1/drills": [jsonResponse(200, { items: [], next_cursor: null })],
+      "GET /api/v1/drills": [NO_DRILLS],
       "POST /api/v1/drills": [jsonResponse(201, { ...fixtureDrill, id: CREATED_ID })],
+      [`GET /api/v1/drills/${CREATED_ID}`]: [jsonResponse(200, { ...fixtureDrill, id: CREATED_ID })],
     });
-    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: CREATED_ID });
+    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: CREATED_ID, created: true });
     expect(loadConfigs).toHaveBeenCalledWith("live");
     const post = fake.calls.find((call) => call.method === "POST");
     expect(post?.csrf).toBe(fixtureSession.csrf_token);
-    expect(recorded.find((call) => call.url.endsWith("/api/v1/drills") && call.idempotencyKey !== null)?.idempotencyKey).toBe(`auto-drill-${SHA256_OF_ABC}`);
+    expect(postKeys(recorded)).toEqual([`auto-drill-${SHA256_OF_ABC}-${await bodyHashOf(post?.body)}`]);
+    expect(fake.keys()).toContain(`GET /api/v1/drills/${CREATED_ID}`);
+    expect(deps.freshKeySuffix).not.toHaveBeenCalled();
     const body = JSON.parse(post?.body ?? "{}") as { name: string; tags: string[]; spot_filter: { stake: string }; trainer: unknown };
     expect(body.name).toBe("Leak drill: rfi BB-UTG live 100");
     expect(body.tags).toEqual([TAG]);
     expect(body.spot_filter.stake).toBe("1/3");
     expect(body.trainer).toEqual(DEFAULT_TRAINER);
+  });
+
+  it("R4.12 another body for the same class (the catalog changed) sends another key", async () => {
+    const script = {
+      "GET /api/v1/drills": [NO_DRILLS],
+      "POST /api/v1/drills": [jsonResponse(201, { ...fixtureDrill, id: CREATED_ID })],
+      [`GET /api/v1/drills/${CREATED_ID}`]: [jsonResponse(200, { ...fixtureDrill, id: CREATED_ID })],
+    };
+    const first = harness(script);
+    await openClassDrill(first.deps, TARGET);
+    const live = fixtureConfigs.find((entry) => entry.format === "live") as GameConfig;
+    const second = harness(script, [...fixtureConfigs, { ...live, config_id: "cfg_live_110", depth_cbb: 11_000 }]);
+    await openClassDrill(second.deps, TARGET);
+    expect(postKeys(first.recorded)).toHaveLength(1);
+    expect(postKeys(second.recorded)).toHaveLength(1);
+    expect(postKeys(first.recorded)[0]).not.toBe(postKeys(second.recorded)[0]);
+  });
+
+  it("R4.12 a replayed create whose drill was deleted (404 on the read back) retries once under a fresh key", async () => {
+    const { fake, recorded, deps } = harness({
+      "GET /api/v1/drills": [NO_DRILLS],
+      "POST /api/v1/drills": [jsonResponse(201, { ...fixtureDrill, id: CREATED_ID }), jsonResponse(201, { ...fixtureDrill, id: RETRIED_ID })],
+      [`GET /api/v1/drills/${CREATED_ID}`]: [problemResponse(404, "not-found")],
+    });
+    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: RETRIED_ID, created: true });
+    const post = fake.calls.find((call) => call.method === "POST");
+    expect(postKeys(recorded)).toEqual([`auto-drill-${SHA256_OF_ABC}-${await bodyHashOf(post?.body)}`, `auto-drill-${SHA256_OF_ABC}-${FRESH_SUFFIX}`]);
+  });
+
+  it("R4.12 a key-reuse refusal (422 idempotency-mismatch) retries once under a fresh key", async () => {
+    const { recorded, deps } = harness({
+      "GET /api/v1/drills": [NO_DRILLS],
+      "POST /api/v1/drills": [problemResponse(422, "idempotency-mismatch"), jsonResponse(201, { ...fixtureDrill, id: RETRIED_ID })],
+    });
+    await expect(openClassDrill(deps, TARGET)).resolves.toEqual({ kind: "opened", drillId: RETRIED_ID, created: true });
+    expect(postKeys(recorded)).toHaveLength(2);
+    expect(postKeys(recorded)[1]).toBe(`auto-drill-${SHA256_OF_ABC}-${FRESH_SUFFIX}`);
+  });
+
+  it("R4.12 retries only once, and never on a request still in flight (409)", async () => {
+    const twice = harness({
+      "GET /api/v1/drills": [NO_DRILLS],
+      "POST /api/v1/drills": [problemResponse(422, "idempotency-mismatch"), problemResponse(422, "idempotency-mismatch")],
+    });
+    expect(((await openClassDrill(twice.deps, TARGET).catch((error: unknown) => error)) as ApiProblem).slug).toBe("idempotency-mismatch");
+    expect(postKeys(twice.recorded)).toHaveLength(2);
+    const inFlight = harness({ "GET /api/v1/drills": [NO_DRILLS], "POST /api/v1/drills": [problemResponse(409, "idempotency-in-flight")] });
+    expect(((await openClassDrill(inFlight.deps, TARGET).catch((error: unknown) => error)) as ApiProblem).status).toBe(409);
+    expect(postKeys(inFlight.recorded)).toHaveLength(1);
+  });
+
+  it("R4.12 a failed read back other than 404 rejects without a retry", async () => {
+    const { recorded, deps } = harness({
+      "GET /api/v1/drills": [NO_DRILLS],
+      "POST /api/v1/drills": [jsonResponse(201, { ...fixtureDrill, id: CREATED_ID })],
+      [`GET /api/v1/drills/${CREATED_ID}`]: [problemResponse(500, "internal")],
+    });
+    expect(((await openClassDrill(deps, TARGET).catch((error: unknown) => error)) as ApiProblem).status).toBe(500);
+    expect(postKeys(recorded)).toHaveLength(1);
   });
 
   it("R4.12 a body the write rules refuse is never sent", async () => {

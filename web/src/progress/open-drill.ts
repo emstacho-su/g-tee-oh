@@ -9,9 +9,14 @@
  * through S26's fetchDrillPage, and reuses the first it finds. Otherwise it reads the format's
  * configs (the study catalog read, so a cached list is reused), builds the body
  * (drill-family.ts), checks it with S26's checkDrillBody (the api's write rules) and creates it
- * with S26's createDrill, which sends AUTO_CSRF_HEADER, under the Idempotency-Key "auto-drill-"
- * plus the full hash. Two clicks, two tabs or a retry for the same class therefore send the same
- * key and the api replays the first answer, so there is never more than one auto drill per class.
+ * with S26's createDrill, which sends AUTO_CSRF_HEADER, under the Idempotency-Key "auto-drill-",
+ * the full class hash, "-" and the sha256 of the body's canonical JSON (keys sorted). Two clicks,
+ * two tabs or a retry of the same body therefore send the same key and the api replays the first
+ * answer, so there is never more than one auto drill per class; a changed catalog makes a new
+ * body and so a new key. The api keeps a key's answer for a day, so a replay can name a drill the
+ * user has since deleted: the created drill is read back, and on a 404, or on the api's
+ * key-reuse refusal (422 idempotency-mismatch), the create is sent once more under a fresh key
+ * (the class hash and a random suffix). A request still in flight (409) is never retried.
  * When no config matches, nothing is created and the result says so; a body the write rules
  * refuse is never sent and its first rule message is reported.
  *
@@ -24,11 +29,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 
-import { isApiProblem } from "../api/index.js";
+import { HTTP_STATUS, isApiProblem } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
+import type { DrillCreate } from "../drills/types.js";
 import { useAppApi } from "../auth/index.js";
 import { checkDrillBody } from "../drills/body-rules.js";
-import { createDrill, fetchDrillPage } from "../drills/queries.js";
+import { createDrill, fetchDrill, fetchDrillPage, invalidateDrills } from "../drills/queries.js";
 import { formatConfigsQuery } from "../study/queries.js";
 import { isDrillFormat, leakDrillBody, type DrillSpot } from "./drill-family.js";
 import type { GameConfig, HeatmapCell, HeatmapColumn, HeatmapRow } from "./types.js";
@@ -53,8 +59,30 @@ export function autoDrillTag(hash: string): string {
   return `${AUTO_TAG_PREFIX}${hash.slice(0, AUTO_TAG_HASH_CHARS)}`;
 }
 
-export function autoDrillIdempotencyKey(hash: string): string {
-  return `${AUTO_IDEMPOTENCY_PREFIX}${hash}`;
+/** The create's Idempotency-Key: the class hash, then the body hash or a fresh suffix. */
+export function autoDrillIdempotencyKey(classHash: string, suffix: string): string {
+  return `${AUTO_IDEMPOTENCY_PREFIX}${classHash}-${suffix}`;
+}
+
+/** JSON with object keys sorted at every depth, so equal bodies give equal text. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** The api's problem slug when an Idempotency-Key is reused with a different body. */
+export const IDEMPOTENCY_MISMATCH_SLUG = "idempotency-mismatch";
+
+function isKeyReuseRefusal(error: unknown): boolean {
+  return isApiProblem(error) && error.status === HTTP_STATUS.unprocessable && error.slug === IDEMPOTENCY_MISMATCH_SLUG;
+}
+
+function isNotFound(error: unknown): boolean {
+  return isApiProblem(error) && error.status === HTTP_STATUS.notFound;
 }
 
 /** What to open: the class key (hashed for the tag) and its coordinates (for the filter). */
@@ -72,7 +100,7 @@ export function drillTargetOf(cell: HeatmapCell, row: HeatmapRow, column: Heatma
 }
 
 export type OpenDrillResult =
-  | { readonly kind: "opened"; readonly drillId: string }
+  | { readonly kind: "opened"; readonly drillId: string; readonly created: boolean }
   | { readonly kind: "no-config" }
   | { readonly kind: "refused"; readonly reason: string };
 
@@ -80,6 +108,30 @@ export interface OpenDrillDeps {
   readonly api: AppApi;
   /** Every catalog config of a format, in /configs order. */
   readonly loadConfigs: (format: GameConfig["format"]) => Promise<readonly GameConfig[]>;
+  /** The suffix of a retry's fresh key; crypto.randomUUID by default. */
+  readonly freshKeySuffix?: () => string;
+}
+
+/** Creates under the body's key and reads the drill back; one retry under a fresh key (see above). */
+async function createAutoDrill(deps: OpenDrillDeps, body: DrillCreate, classHash: string): Promise<string> {
+  const retry = async (): Promise<string> => {
+    const freshSuffix = (deps.freshKeySuffix ?? (() => crypto.randomUUID()))();
+    return (await createDrill(deps.api, body, autoDrillIdempotencyKey(classHash, freshSuffix))).id;
+  };
+  const bodyHash = await sha256Hex(canonicalJson(body));
+  const created = await createDrill(deps.api, body, autoDrillIdempotencyKey(classHash, bodyHash)).catch((error: unknown) => {
+    if (isKeyReuseRefusal(error)) return null;
+    throw error;
+  });
+  if (created === null) return retry();
+  const stillThere = await fetchDrill(deps.api, created.id).then(
+    () => true,
+    (error: unknown) => {
+      if (isNotFound(error)) return false;
+      throw error;
+    },
+  );
+  return stillThere ? created.id : retry();
 }
 
 /** Finds the class's auto drill by tag, or creates it; no-config when no catalog config fits. */
@@ -87,14 +139,13 @@ export async function openClassDrill(deps: OpenDrillDeps, target: DrillTarget): 
   const hash = await sha256Hex(target.spotClassKey);
   const tag = autoDrillTag(hash);
   const existing = (await fetchDrillPage(deps.api, tag, undefined)).items[0];
-  if (existing !== undefined) return { kind: "opened", drillId: existing.id };
+  if (existing !== undefined) return { kind: "opened", drillId: existing.id, created: false };
   if (!isDrillFormat(target.spot.format)) return { kind: "no-config" };
   const body = leakDrillBody(target.spot, tag, await deps.loadConfigs(target.spot.format));
   if (body === null) return { kind: "no-config" };
   const [refusal] = checkDrillBody(body);
   if (refusal !== undefined) return { kind: "refused", reason: refusal.message };
-  const created = await createDrill(deps.api, body, autoDrillIdempotencyKey(hash));
-  return { kind: "opened", drillId: created.id };
+  return { kind: "opened", drillId: await createAutoDrill(deps, body, hash), created: true };
 }
 
 /** The inline text for a failed open. */
@@ -142,6 +193,7 @@ export function useOpenDrill(): OpenDrillControl {
             setMessage({ origin, text: unopenedText(result) });
             return;
           }
+          if (result.created) await invalidateDrills(queryClient);
           await navigate({ to: "/drills/$id/run", params: { id: result.drillId } });
         })
         .catch((error: unknown) => setMessage({ origin, text: openFailureText(error) }))
