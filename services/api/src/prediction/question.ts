@@ -95,6 +95,15 @@ export function heldRows(node: SqNode): SqHandRow[] {
   });
 }
 
+/** One row's loss for an action in percent of the pot, as solver-query gave it (0 for the best). */
+export function lossOf(row: SqHandRow, index: number): number {
+  const loss = row.loss_pct_pot[index];
+  if (loss === undefined) {
+    throw upstreamInconsistent("solver-query answered a hand row without a loss for every action.");
+  }
+  return loss;
+}
+
 /** One row's frequency of an action, as solver-query gave it. */
 export function frequencyOf(row: SqHandRow, index: number): number {
   const frequency = row.strategy[index];

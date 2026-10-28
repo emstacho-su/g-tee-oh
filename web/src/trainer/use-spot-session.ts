@@ -1,5 +1,5 @@
 /**
- * The trainer session hook in spot mode (S25, R3.13, R3.11, O-197, O-232, O-284, A7 section 4).
+ * The trainer session hook in spot mode (S25, S37, R3.13, O-197, O-232, O-284, O-345, A7 section 4).
  *
  * Mechanism: one SpotDriver per mounted screen (spot-driver.ts) runs the pure machine
  * (spot-machine.ts) and its requests; the hook binds the driver's input and output to the app: the
@@ -33,7 +33,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ME_QUERY_KEY, useAppApi } from "../auth/index.js";
-import type { ConfidenceChoice } from "../components/trainer/index.js";
 import type { TrainerPrompt } from "../contracts.js";
 import { invalidateProgress } from "../progress/queries.js";
 import { useTrainerTableStore } from "../store/index.js";
@@ -68,9 +67,8 @@ function useAutoContinue(state: SpotState, paused: boolean, schedule: Scheduler,
 export interface SpotSession {
   state: SpotState;
   start: (rng: boolean) => void;
-  /** Takes NodeAction.index (O-198). */
+  /** Takes NodeAction.index (O-198); choosing submits the decision (O-345). */
   chooseAction: (actionIndex: number) => void;
-  tapConfidence: (confidence: ConfidenceChoice) => void;
   next: () => void;
   end: () => void;
   retry: () => void;
@@ -137,8 +135,7 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   return {
     state,
     start: (rng) => send(trainer === undefined ? { type: "start", key: newKey(), rng } : { type: "start", key: newKey(), rng, trainer }),
-    chooseAction: (actionIndex) => send({ type: "choose_action", actionIndex, at: now() }),
-    tapConfidence: (confidence) => send({ type: "confidence", confidence, key: newKey() }),
+    chooseAction: (actionIndex) => send({ type: "choose_action", actionIndex, at: now(), key: newKey() }),
     next: () => send({ type: "next" }),
     end: () => send({ type: "end", key: newKey() }),
     retry: () => send({ type: "retry" }),

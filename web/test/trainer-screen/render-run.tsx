@@ -1,5 +1,5 @@
 /**
- * Test helper for the drill run screen (S25, R3.13, R3.11). Renders DrillRunPage inside the app's
+ * Test helper for the drill run screen (S25, R3.13). Renders DrillRunPage inside the app's
  * providers (Query, api, an isolated hotkey store, injected trainer dependencies) over the scripted
  * fake fetch, and records every request with its Idempotency-Key header and body. The clock and
  * the key factory are injected (trainer-deps.tsx), so response_ms and the keys are exact. The page

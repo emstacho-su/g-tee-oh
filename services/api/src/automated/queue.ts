@@ -11,8 +11,8 @@
  *   mastered) (O-253, O-254); a class with no card is a first exposure with factor 1;
  * - priority: queuePriority(leak cost, overdue factor).
  * pickBlock runs learning's pickNext over those candidates with the pick stream's draw
- * (pick-stream.ts): the interleave rule, then a pending confident miss, then the priority draw
- * (O-256). The picked class becomes a block of REVIEW_BLOCK_INSTANCES hands over its spots
+ * (pick-stream.ts): the interleave rule, then the priority draw (O-256; the confident-miss step
+ * was retired with R3.11, O-345). The picked class becomes a block of REVIEW_BLOCK_INSTANCES hands over its spots
  * (O-272), a worked example when it is a first exposure.
  */
 import {
@@ -80,17 +80,17 @@ export function queueCandidates(classes: readonly CatalogClass[], inputs: QueueI
   }));
 }
 
-/** A new session's queue state: no last family, no pending miss. */
+/** A new session's queue state: no last family. */
 export function emptyLearningQueue(): AutomatedLearning["queue"] {
   return fromQueueState(emptyQueueState());
 }
 
 export function toQueueState(queue: AutomatedLearning["queue"]): QueueState {
-  return { lastFamily: queue.last_family, hypercorrection: [...queue.hypercorrection] };
+  return { lastFamily: queue.last_family };
 }
 
 export function fromQueueState(state: QueueState): AutomatedLearning["queue"] {
-  return { last_family: state.lastFamily, hypercorrection: [...state.hypercorrection] };
+  return { last_family: state.lastFamily };
 }
 
 export interface BlockPickInput {

@@ -1,5 +1,5 @@
 /**
- * Screenshot pass of the trainer in spot mode for the owner's review (S25, R3.13, R3.11, R3.10,
+ * Screenshot pass of the trainer in spot mode for the owner's review (S25, S37, R3.13, R3.10,
  * O-282, O-283, O-289). The shots project serves the harness build with the mocked app api
  * (support/mock-app.ts: the auth, study and session routes, O-264), so the pictures show the
  * synthetic fixtures only (O-26).
@@ -7,7 +7,7 @@
  * Mechanism: one test per theme and width, each in a fresh browser context, so the RNG explainer
  * is unseen (O-283). The test signs in, opens /drills/<fixture drill>/run and captures the start
  * panel with RNG mode switched on, the prompt with the roll shown and no bands, the explainer from
- * the I key, the confidence tap after choosing an action, the feedback (label, frequencies, roller,
+ * the I key, the feedback after choosing an action, which submits it (label, frequencies, the revealed scale and its followed mark,
  * range view, threshold card) and the recap after ending. The explainer that opens by itself on
  * first use is closed before a shot that is not about it. afterAll merges the records into the
  * shared manifest with session S25 and source mock.
@@ -27,15 +27,14 @@ const OWNER = { email: "owner@example.com", password: "synthetic-password" };
 const SOURCE = "mock";
 const SESSION = "S25";
 const RUN_PATH = `/drills/${FIXTURE_DRILL_ID}/run`;
-const EXPLAINER_NAME = "How RNG mode works";
+const EXPLAINER_NAME = "How Mixed-frequency mode works";
 const CHOSEN_ACTION = "Raise to 2.5bb";
 
 const CRITERIA = {
-  start: "R3.13 start panel: drill name, grouping, stop rule, RNG mode switch and Start (O-283, O-288)",
-  prompt: "R3.10 roll shown before the decision, bands hidden (O-282); R3.13 table, cards, action so far, synthetic banner (O-57)",
-  explainer: "R3.10 RNG explainer opened with the I key: why randomize, how the roll works, why it is optional (05 section 7)",
-  confidence: "R3.11 confidence tap before any reveal (05 section 5): the choice is shown, nothing is revealed (O-284)",
-  feedback: "R3.13 feedback after the tap: label, EV loss, frequencies, roller with the roll-selected action Best, range view and threshold card (O-281, O-282)",
+  start: "R3.13 start panel: drill name, grouping, stop rule, Mixed-frequency mode switch and Start (O-283, O-288, O-344)",
+  prompt: "R3.10 the roll on the hidden 1 to 100 scale before the decision, no bands (ADR 0024, O-344); R3.13 table, cards, action so far, synthetic banner (O-57)",
+  explainer: "R3.10 Mixed-frequency mode explainer opened with the I key: what earns Best, how the roll works, why practise mixing (ADR 0024)",
+  feedback: "R3.13 feedback after the choice: label, EV loss, frequencies, the same scale with the bands revealed and the followed-the-roll mark (never Best), range view and threshold card (O-281, O-371)",
   recap: "R3.13 session recap after End session and its confirm (O-285)",
 } as const;
 
@@ -61,13 +60,13 @@ async function trainerScreens(page: Page, theme: Theme, viewport: Viewport): Pro
 
   await page.goto(RUN_PATH);
   await expect(page.getByRole("heading", { name: fixtureDrill.name })).toBeVisible();
-  await page.getByRole("switch", { name: "RNG mode" }).click();
+  await page.getByRole("switch", { name: "Mixed-frequency mode" }).click();
   await closeExplainerIfOpen(page);
-  await expect(page.getByRole("switch", { name: "RNG mode" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "true");
   await shot("trainer-start", CRITERIA.start);
 
   await page.getByRole("button", { name: "Start session" }).click();
-  await expect(page.getByTestId("roll-badge")).toBeVisible();
+  await expect(page.getByTestId("rng-roller")).toHaveAttribute("data-revealed", "false");
   await closeExplainerIfOpen(page);
   await shot("trainer-prompt-roll", CRITERIA.prompt);
 
@@ -77,13 +76,12 @@ async function trainerScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: EXPLAINER_NAME })).toBeHidden();
 
-  await page.getByRole("button", { name: CHOSEN_ACTION }).click();
-  await expect(page.getByTestId("confidence-tap")).toBeVisible();
   await expect(page.getByTestId("feedback-panel")).toHaveCount(0);
-  await shot("trainer-confidence", CRITERIA.confidence);
-
-  await page.getByRole("button", { name: "Sure", exact: true }).click();
+  // Choosing an action submits it: the confidence tap and its screen are retired (O-345, O-378).
+  await page.getByRole("button", { name: CHOSEN_ACTION }).click();
   await expect(page.getByTestId("feedback-panel")).toBeVisible();
+  await expect(page.getByTestId("feedback-panel").getByTestId("rng-roller")).toHaveAttribute("data-revealed", "true");
+  await expect(page.getByTestId("feedback-panel").getByRole("list", { name: "Mixed-frequency bands" })).toHaveAttribute("data-reveal", "done");
   await page.waitForLoadState("networkidle");
   await shot("trainer-feedback", CRITERIA.feedback);
 
@@ -104,7 +102,7 @@ test.afterAll(() => {
 
 for (const theme of THEMES) {
   for (const viewport of VIEWPORTS) {
-    test(`R3.10 R3.11 R3.13 trainer screenshots, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
+    test(`R3.10 R3.13 trainer screenshots, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
       test.setTimeout(SHOT_TEST_TIMEOUT_MS);
       await prepareShotPage(page, theme, viewport);
       await trainerScreens(page, theme, viewport);

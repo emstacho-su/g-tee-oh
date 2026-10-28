@@ -124,8 +124,14 @@ export const automatedLearningSchema = z.strictObject({
   config_ids: z.array(configIdSchema),
   /** How many class picks the session made; the pick stream's counter. */
   pick_no: z.number().int().min(0),
-  /** learning's QueueState, as stored: the last family served and the confident misses to revisit (O-215). */
-  queue: z.strictObject({ last_family: z.string().nullable(), hypercorrection: z.array(z.string()) }),
+  /**
+   * learning's QueueState, as stored: the last family served. Rows written before S37 also hold
+   * hypercorrection, the confident misses of the retired rule (O-215, O-345); it is read, dropped
+   * and never written again (O-372).
+   */
+  queue: z
+    .strictObject({ last_family: z.string().nullable(), hypercorrection: z.array(z.string()).optional() })
+    .transform(({ last_family }) => ({ last_family })),
   block: automatedBlockStateSchema,
 });
 

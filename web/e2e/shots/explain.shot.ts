@@ -5,7 +5,7 @@
  * synthetic fixtures only (O-26).
  *
  * Mechanism: one test per theme and width, each in a fresh browser context. The test signs in,
- * starts the fixture drill (RNG mode off) and decides a hand (its first action, then Sure) the
+ * starts the fixture drill (Mixed-frequency mode off) and decides a hand (its first action, which submits it) the
  * way trainer.shot.ts reaches the feedback. The mocked Ask status is switched per request by the MOCK_ASK_STATUS_HEADER header,
  * set with page.setExtraHTTPHeaders before each hand, and the status is read again whenever a new
  * feedback panel mounts. Hand one shows flag_off: the panel with its insight cards, the disabled
@@ -32,7 +32,7 @@ const OWNER = { email: "owner@example.com", password: "synthetic-password" };
 const SOURCE = "mock";
 const SESSION = "S27";
 const RUN_PATH = `/drills/${FIXTURE_DRILL_ID}/run`;
-const EXPLAINER_NAME = "How RNG mode works";
+const EXPLAINER_NAME = "How Mixed-frequency mode works";
 const NEXT_HAND = "Next hand";
 const QUESTION = "Why is raising better than calling here?";
 const WARNING_QUESTION = `Give me an ${MOCK_ASK_WARNING_TRIGGER} estimate of the raise's edge.`;
@@ -63,7 +63,7 @@ async function useAskStatus(page: Page, reason: AskStatus["reason"]): Promise<vo
 }
 
 /**
- * Decides the current hand with its first action and Sure, then waits for the settled feedback.
+ * Decides the current hand with its first action (choosing submits, O-345), then waits for the settled feedback.
  * The first action button must be enabled first, so a hand still loading is never clicked.
  */
 async function decideHand(page: Page): Promise<void> {
@@ -71,7 +71,6 @@ async function decideHand(page: Page): Promise<void> {
   const firstAction = page.getByTestId("action-bar").getByRole("button").first();
   await expect(firstAction).toBeEnabled();
   await firstAction.click();
-  await page.getByRole("button", { name: "Sure", exact: true }).click();
   await expect(page.getByTestId("feedback-panel")).toBeVisible();
   await page.waitForLoadState("networkidle");
 }

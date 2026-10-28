@@ -1,5 +1,5 @@
 /**
- * Open state and first-use memory for the RNG (random number generator) mode explainer (S25,
+ * Open state and first-use memory for the Mixed-frequency mode explainer (S25, S37,
  * R3.10, O-283, O-285).
  *
  * Mechanism: open is plain React state. showIfFirstUse() opens the explainer when this browser
@@ -8,8 +8,8 @@
  * remembered across page loads, so the explainer shows on every first use (O-283); a ref still
  * remembers it for this mount, so a screen that calls showIfFirstUse on every RNG prompt shows it
  * once per mount rather than on every hand. The I key opens it at any time, registered through
- * useHotkey under the "RNG mode" scope so the ? overlay lists it (O-285), unless options.hotkey
- * is false (RNG mode off).
+ * useHotkey under the "Mixed-frequency mode" scope so the ? overlay lists it (O-285), unless options.hotkey
+ * is false (the mode is off).
  */
 import { useCallback, useRef, useState } from "react";
 
@@ -22,8 +22,8 @@ import {
 } from "./rng-explainer-memory.js";
 
 export const RNG_EXPLAINER_KEY = "i";
-export const RNG_EXPLAINER_SCOPE = "RNG mode";
-export const RNG_EXPLAINER_TITLE = "How RNG mode works";
+export const RNG_EXPLAINER_SCOPE = "Mixed-frequency mode";
+export const RNG_EXPLAINER_TITLE = "How Mixed-frequency mode works";
 
 export interface RngExplainerControl {
   open: boolean;
@@ -33,7 +33,7 @@ export interface RngExplainerControl {
 }
 
 export interface UseRngExplainerOptions {
-  /** Whether the I hotkey is registered; off when RNG mode is off. */
+  /** Whether the I hotkey is registered; off when Mixed-frequency mode is off. */
   hotkey?: boolean;
   /** Where the seen flag lives; window.localStorage, read lazily, by default. For tests. */
   storage?: ExplainerStorageSource;

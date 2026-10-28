@@ -65,6 +65,7 @@ export function fixtureAutomatedSession(block: AutomatedBlock = fixtureRatedBloc
     state_version: 1,
     started_at: STARTED_AT,
     rated_eligible: true,
+    grouping: "standard",
     automated: block,
     holdout: null,
   };
@@ -80,6 +81,8 @@ export const fixtureHoldoutSession: PracticeSession = {
   state_version: 1,
   started_at: STARTED_AT,
   rated_eligible: false,
+  // A holdout retest is graded with standard grouping (TrainPage HOLDOUT_GROUPING).
+  grouping: "standard",
   automated: null,
   holdout: fixtureHoldoutProgress,
 };

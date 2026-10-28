@@ -67,7 +67,7 @@ function automatedLearning(cls: CatalogClass): LearningState {
     seeded: false,
     config_ids: [CONFIG],
     pick_no: 1,
-    queue: { last_family: null, hypercorrection: [] },
+    queue: { last_family: null },
     block: { spot_class_key: cls.spotClassKey, family: cls.family, track_key: cls.trackKey, worked_example: false, served: 0, size: 3 },
   };
 }

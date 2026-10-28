@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { ActionFrequencyTable, ThresholdCard } from "../components/panels/index.js";
 import { BoardReveal, CardView, PokerTable } from "../components/table/index.js";
 import type { TableSeat } from "../components/table/index.js";
-import { ActionBar, ConfidenceTap, FeedbackPanel, RngRoller } from "../components/trainer/index.js";
+import { ActionBar, FeedbackPanel, RngRoller } from "../components/trainer/index.js";
 import type { NodeAction } from "../contracts.js";
 import { fixtureActions, fixtureFeedback, fixtureInsights, fixturePrompt } from "../fixtures/index.js";
 
@@ -110,10 +110,11 @@ export function TrainerSections() {
           <ActionBar actions={POSTFLOP_ACTIONS} grouping="grouped" street="flop" onAction={noop} />
         </div>
       </GallerySection>
-      <GallerySection name="confidence-tap" title="ConfidenceTap" note="Sure or unsure, before any reveal; keys S and U.">
-        <ConfidenceTap onChoose={noop} />
-      </GallerySection>
-      <GallerySection name="rng-roller" title="RngRoller" note="Bands and the selection come from packages/learning (O-213).">
+      <GallerySection
+        name="rng-roller"
+        title="RngRoller, revealed"
+        note="After the decision: the bands grow in from the left (none under reduced motion) and the caption says where the roll fell; bands come from packages/learning (O-213, O-376)."
+      >
         <RngRoller
           actions={fixtureActions}
           freqByAction={fixtureFeedback.freq_by_action}

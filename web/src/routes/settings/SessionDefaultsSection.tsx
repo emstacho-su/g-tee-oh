@@ -1,10 +1,11 @@
 /**
- * The Session defaults section of /settings (S32, R4.12, O-323, O-325): grouping, RNG mode and
- * the configuration scope the /train start screen offers first. Each change is saved to the
- * session defaults store at once and a status line says so; a seed is never offered.
+ * The Session defaults section of /settings (S32, S36, S37, R4.12, O-323, O-325, O-344, O-360):
+ * grouping and Mixed-frequency mode (off by default; the stored field keeps the wire name rng) for
+ * the /train start screen. Each change is saved to the session defaults store at once and a status
+ * line says so; a seed is never offered.
  *
- * Mechanism: grouping is a ToggleGroup and RNG a checkbox, both written straight to the store. The
- * configuration scope has its own page since S36 (ConfigScopeSection, O-360).
+ * Mechanism: grouping is a ToggleGroup and the mode a checkbox, both written straight to the store.
+ * The configuration scope has its own page since S36 (ConfigScopeSection, O-360).
  */
 import { useState } from "react";
 

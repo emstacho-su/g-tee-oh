@@ -44,7 +44,12 @@ export interface AttemptValues {
   score: number;
   label: string;
   rngRoll: number | null;
-  confidence: "sure" | "unsure" | null;
+  /**
+   * In Mixed-frequency mode whether the roll-selected action is in the chosen group, else null
+   * (learning's grade() followedRoll, ADR 0024 rule 2, O-371). The confidence column is no longer
+   * written: the tap was retired (O-345, O-373).
+   */
+  followedRoll: boolean | null;
   responseMs: number;
   rated: boolean;
   weight: number;
@@ -95,7 +100,7 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         label: values.label,
         reference_strategy: REFERENCE_STRATEGY,
         rng_roll: values.rngRoll,
-        confidence: values.confidence,
+        followed_roll: values.followedRoll,
         response_ms: values.responseMs,
         rated: values.rated,
         weight: values.weight,

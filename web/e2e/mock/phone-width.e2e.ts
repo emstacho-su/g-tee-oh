@@ -1,5 +1,5 @@
 /**
- * Nothing on the trainer feedback screens is wider than a phone (R3.11, R3.13, R3.19, R3.20,
+ * Nothing on the trainer feedback screens is wider than a phone (R3.13, R3.19, R3.20,
  * R4.10): at a 390 px viewport the page never scrolls sideways (document scrollWidth at most
  * innerWidth) on the drill run's feedback, its More info dialog, an Ask answer and /train's
  * feedback. The range matrix used to keep its 520 px desktop size and pushed the page to 423 px.
@@ -17,7 +17,7 @@ import { signIn } from "../support/sign-in-flow.js";
 const PHONE = { width: 390, height: 844 } as const;
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "any-non-empty-password" };
 const RUN_PATH = `/drills/${FIXTURE_DRILL_ID}/run`;
-const EXPLAINER_NAME = "How RNG mode works";
+const EXPLAINER_NAME = "How Mixed-frequency mode works";
 const QUESTION = "Why is raising better than calling here?";
 
 async function expectNoSidewaysScroll(page: Page, screen: string): Promise<void> {
@@ -37,7 +37,6 @@ async function decide(page: Page): Promise<void> {
   const firstAction = page.getByTestId("action-bar").getByRole("button").first();
   await expect(firstAction).toBeEnabled();
   await firstAction.click();
-  await page.getByRole("button", { name: "Sure", exact: true }).click();
   await expect(page.getByTestId("feedback-panel")).toBeVisible();
   await page.waitForLoadState("networkidle");
 }
@@ -46,7 +45,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize(PHONE);
 });
 
-test("R3.11 R3.19 R3.20 the drill run's feedback, More info and an Ask answer fit a 390 px phone", async ({ page }) => {
+test("R3.13 R3.19 R3.20 the drill run's feedback, More info and an Ask answer fit a 390 px phone", async ({ page }) => {
   await page.setExtraHTTPHeaders({ [MOCK_ASK_STATUS_HEADER]: "ok" });
   await installAppMockApi(page);
   await signIn(page, OWNER);

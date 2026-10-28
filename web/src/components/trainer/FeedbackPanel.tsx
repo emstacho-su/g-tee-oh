@@ -31,7 +31,7 @@ export interface FeedbackPanelProps {
   chosenIndex: number;
   rangeView?: ReactNode;
   thresholdCard?: ReactNode;
-  /** The RNG roller after the reveal, when the session has RNG mode on (S25, O-282). */
+  /** The RNG roller after the reveal, when the session has Mixed-frequency mode on (S25, O-282). */
   roller?: ReactNode;
   /** The insight cards: noise flags and range drift (S27, R3.18, O-304). */
   insights?: ReactNode;

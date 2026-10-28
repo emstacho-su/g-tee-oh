@@ -1,9 +1,9 @@
 /**
- * The running session of /train (S32, R4.10, R3.11, O-272, O-284, O-285, O-325, O-328): the S25
+ * The running session of /train (S32, S37, R4.10, R3.13, O-272, O-284, O-285, O-325, O-328, O-345): the S25
  * and S26 trainer screen in spot mode, reused part for part. Above the table the BlockBanner says
  * which block the hand belongs to (or the holdout round's progress); then SpotTable, and
- * DecisionArea with the action bar, the confidence tap that must come before any reveal (O-284),
- * the FeedbackPanel and Next; then End session, which opens the confirm dialog the page owns.
+ * DecisionArea with the action bar, whose choice submits the decision (the confidence tap was
+ * retired, O-345), the FeedbackPanel and Next; then End session, which opens the confirm dialog the page owns.
  * Automated and holdout sessions stop after every action, so no run settings go to the machine
  * and every reveal waits for Next.
  *
@@ -28,7 +28,6 @@ import { trainProblemMessage, TRAIN_TEXT, type TrainMode } from "./train-text.js
 export function promptOf(state: SpotState): TrainerPrompt | null {
   switch (state.kind) {
     case "await_action":
-    case "await_confidence":
     case "submitting":
     case "feedback":
     case "error":
@@ -94,7 +93,6 @@ export function AutomatedSession(props: AutomatedSessionProps) {
             grouping={grouping}
             interactive={interactive}
             onChoose={session.chooseAction}
-            onConfidence={session.tapConfidence}
             onNext={session.next}
             onExplain={onExplain}
             onExplainDialog={onExplainDialog}

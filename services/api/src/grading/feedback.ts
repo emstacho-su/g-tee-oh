@@ -48,6 +48,7 @@ export type FeedbackRow = Pick<
   | "ev_by_action"
   | "rated"
   | "rng_roll"
+  | "followed_roll"
   | "state_version"
   | "solution_id"
   | "node_key"
@@ -70,6 +71,7 @@ export const FEEDBACK_COLUMNS = [
   "ev_by_action",
   "rated",
   "rng_roll",
+  "followed_roll",
   "state_version",
   "solution_id",
   "node_key",
@@ -105,6 +107,7 @@ export function renderFeedback(row: FeedbackRow): Feedback {
     ev_by_action: [...required(row.ev_by_action, "ev_by_action")],
     rated: row.rated,
     rng_roll: row.rng_roll,
+    followed_roll: row.followed_roll,
     state_version: required(row.state_version, "state_version") + 1,
     solution_id: row.solution_id,
     node_key: row.node_key,

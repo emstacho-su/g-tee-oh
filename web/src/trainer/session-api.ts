@@ -114,7 +114,6 @@ export async function submitDecision(api: AppApi, sessionId: string, decision: P
     body: {
       state_version: decision.stateVersion,
       action_index: decision.actionIndex,
-      confidence: decision.confidence,
       response_ms: decision.responseMs,
     },
   });

@@ -1,5 +1,5 @@
 /**
- * The learning policy's input for one decision (R3.7, A6 section 4, ADR 0004, O-210, O-212, O-213).
+ * The learning policy's input for one decision (R3.7, A6 section 4, ADR 0004, ADR 0024, O-210, O-213).
  *
  * Mechanism: every number comes from solver-query: the hand's frequencies, the per-action loss in
  * percent of the pot (loss_pct_pot_by_action, O-210), the floor and the noise flags from
@@ -12,20 +12,21 @@
  * threshold card each show which action the hand takes before the hero acts; the range matrices,
  * charts, hand class, breakdowns, roller and streak counter do not.
  *
- * best_action_indexes is the actions tied for the hand's highest frequency within learning's
- * FREQUENCY_TIE_TOLERANCE (O-212), or in RNG mode the one action the roll selects
- * (rollSelectedAction, O-213), the same rule grade() uses for Best.
+ * best_action_indexes is learning's bestActionIndexes: every member of every lowest-loss (highest
+ * EV) group under the session's grouping, within LOSS_TIE_TOLERANCE_PCT_POT and at or below the
+ * floor, the same rule grade() labels Best by (ADR 0024 rules 1 and 4, O-343, O-375). The roll and
+ * the frequencies never enter it; the roll only sets grade()'s followedRoll mark (rule 2, O-344).
  */
 import {
   ACTION_KINDS,
   BUCKETS,
-  FREQUENCY_TIE_TOLERANCE,
-  rollSelectedAction,
+  bestActionIndexes as learningBestActionIndexes,
   type ActionKind,
   type Bucket,
   type GradeAction,
   type GradeInput,
   type GradeMode,
+  type Grouping,
   type Street,
 } from "@g-tee-oh/learning";
 
@@ -98,12 +99,19 @@ export function gradeActions(node: SqNode, grade: SqGrade): GradeAction[] {
   }));
 }
 
-export function bestActionIndexes(freqByAction: readonly number[], actions: readonly GradeAction[], rngRoll: number | null): number[] {
-  if (rngRoll !== null) {
-    return [rollSelectedAction(freqByAction, actions, rngRoll)];
-  }
-  const top = Math.max(...freqByAction);
-  return freqByAction.flatMap((frequency, index) => (top - frequency <= FREQUENCY_TIE_TOLERANCE ? [index] : []));
+/** The node's street, as the policy spells it; an unknown street is a 502 (the upstream answered it). */
+export function streetOf(node: SqNode): Street {
+  return oneOf<Street>(node.street, STREETS, "street");
+}
+
+/** The best actions of the hand at the node under the grouping (ADR 0024 rule 4, O-375). */
+export function bestActionIndexes(node: SqNode, grade: SqGrade, grouping: Grouping): number[] {
+  return learningBestActionIndexes({
+    actions: gradeActions(node, grade),
+    grouping,
+    street: streetOf(node),
+    floorPctPot: grade.floor_pct_pot,
+  });
 }
 
 /** The GradeInput of one decision; the chosen loss is the per-action list's entry (O-210). */
@@ -123,6 +131,6 @@ export function buildGradeInput(facts: GradeInputFacts): GradeInput {
     grouping: settings.grouping,
     actions,
     ratedTodayInTrack: facts.ratedTodayInTrack,
-    street: oneOf<Street>(node.street, STREETS, "street"),
+    street: streetOf(node),
   };
 }

@@ -1,36 +1,19 @@
 /**
- * The review block's progress (R4.10, O-272, O-215): pure steps over an automated session's
- * learning state, applied by the automated hook part after each decision.
+ * The review block's progress (R4.10, O-272): pure steps over an automated session's learning
+ * state, applied by the automated hook part after each decision.
  *
- * - recordDecision: the block's served count goes up by one; a confident miss (sure, and a label
- *   other than Best or Correct) enters the queue state's hypercorrection list through learning's
- *   recordAttempt, so the class returns at the first pick the interleave rule allows. A seeded
- *   session records no hypercorrection (PM seed condition).
+ * - recordDecision: the block's served count goes up by one. The label never changes the queue:
+ *   the confident-miss rule (O-215) was retired with the confidence tap and R3.11 (O-345).
  * - isBlockComplete: the block has served its size.
  * - isPickPending, pendingPickOf: a stored block that is complete waits for its next pick (HIGH 3).
  * - withBlock: the learning state with the next block, its queue state and the pick counter.
  */
-import { recordAttempt, type Confidence, type GradeLabel } from "@g-tee-oh/learning";
-
 import { learningOf, type AutomatedLearning, type PersistedState } from "../sessions/state.js";
-import { fromQueueState, toQueueState, type BlockPick } from "./queue.js";
+import type { BlockPick } from "./queue.js";
 
-export interface DecisionFacts {
-  label: GradeLabel;
-  /** The player's stated confidence; null when none was given. */
-  confidence: Confidence | null;
-}
-
-export function recordDecision(learning: AutomatedLearning, decision: DecisionFacts): AutomatedLearning {
-  const block = { ...learning.block, served: learning.block.served + 1 };
-  if (learning.seeded || decision.confidence === null) {
-    return { ...learning, block };
-  }
-  const queue = recordAttempt(toQueueState(learning.queue), learning.block.spot_class_key, {
-    confidence: decision.confidence,
-    label: decision.label,
-  });
-  return { ...learning, block, queue: fromQueueState(queue) };
+/** The block after one more decision: its served count up by one, nothing else changed. */
+export function recordDecision(learning: AutomatedLearning): AutomatedLearning {
+  return { ...learning, block: { ...learning.block, served: learning.block.served + 1 } };
 }
 
 export function isBlockComplete(learning: AutomatedLearning): boolean {

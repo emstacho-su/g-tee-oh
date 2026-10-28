@@ -11,7 +11,7 @@
  * solver-query number passed in, never computed here (ADR 0004). Personal frequency from hand
  * capture replaces the prior in v2, so freqPersonalPer1k is always null for now.
  *
- * A miss is a decision above the noise floor, any label other than Best or Correct (O-215, reusing
+ * A miss is a decision above the noise floor, any label other than Best or Correct (src/labels.ts
  * isCorrectLabel). Miss rate and EV per miss are shrunk toward the track average while a class has
  * under 30 decisions (06 section 6) with weight min(1, n / 30) on the class; a class with no misses
  * takes the track EV per miss (O-257). A never-practiced class starts at prior x track miss rate x
@@ -20,7 +20,7 @@
  * The rows match the A4 leak_stat and leak_history columns in camelCase. services/api owns the
  * week boundary and the write (R4.11); this module only shapes the rows and never reads a clock.
  */
-import { isCorrectLabel } from "./calibration.js";
+import { isCorrectLabel } from "./labels.js";
 import type { GradeLabel } from "./types.js";
 import {
   elementAt,
