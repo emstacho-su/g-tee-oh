@@ -11,7 +11,9 @@
  * - fetchNextPrompt: the same read outside the cache, for a stale-state recovery, where the
  *   version the server moved to is unknown.
  * - createSession, submitDecision, endSession: the three POSTs, each with AUTO_CSRF_HEADER (the
- *   csrf fetch fills the token, O-197) and the caller's Idempotency-Key (O-232).
+ *   csrf fetch fills the token, O-197) and the caller's Idempotency-Key (O-232). endSession also
+ *   serves the quiz and painting runs (practice/use-practice-session.ts), and takes keepalive for
+ *   an end sent as the tab closes.
  *
  * S32 (R4.10, O-325, O-328): a session starts from a SessionStartSpec, one of three modes.
  * sessionCreateBody turns it and the RNG choice into the POST /sessions body: a drill session sends
@@ -121,10 +123,16 @@ export async function submitDecision(api: AppApi, sessionId: string, decision: P
   return data;
 }
 
-export async function endSession(api: AppApi, sessionId: string, key: string): Promise<SessionRecap> {
+/** Request options an end may carry: keepalive lets a tab-close end outlive the page (pagehide). */
+export interface EndSessionOptions {
+  keepalive?: boolean;
+}
+
+export async function endSession(api: AppApi, sessionId: string, key: string, { keepalive = false }: EndSessionOptions = {}): Promise<SessionRecap> {
   const { data, error, response } = await api.client.POST("/api/v1/sessions/{id}/end", {
     params: { path: { id: sessionId }, header: { ...AUTO_CSRF_HEADER, [IDEMPOTENCY_HEADER]: key } },
     body: {},
+    keepalive,
   });
   if (data === undefined) throw problemFromBody(response.status, error);
   return data;

@@ -7,7 +7,7 @@
  * (O-412); whether it is ready is the shared rule's call (rationaleReady from @g-tee-oh/contracts,
  * PR #39 review finding 3), which the api applies too, so this module counts nothing of its own.
  */
-import { RATIONALE_MAX_CHARS } from "@g-tee-oh/contracts";
+import { RATIONALE_MAX_CHARS, checkRationale } from "@g-tee-oh/contracts";
 
 import type { NodeAction, PredictionPrompt } from "../contracts.js";
 import type { FrequencyBand, HandRegion, PredictionAnswer, PredictionKind } from "./types.js";
@@ -73,12 +73,13 @@ export function toAnswer(draft: AnswerDraft): PredictionAnswer | null {
 }
 
 /**
- * The live count under the reason field: the raw length out of the bound, "42 / 1000". It counts
- * what the textarea's maxLength and the body schema count (UTF-16 units of the raw text); whether
- * the reason is ready is rationaleReady's call, never this count's.
+ * The live count under the reason field, "42 / 1000": the cleaned reason's length in code points out
+ * of the bound, the same count the shared rule (checkRationale) and the database check use, so a
+ * reason NFC lengthens past the bound shows a count over it (PR #41 review round 1, finding 8).
+ * Whether the reason is ready is checkRationale's call, never this count's.
  */
 export function reasonCount(reason: string): string {
-  return `${reason.length} / ${RATIONALE_MAX_CHARS}`;
+  return `${checkRationale(reason).length} / ${RATIONALE_MAX_CHARS}`;
 }
 
 /** The actions a size answer chooses among: the node's bets, raises and all-ins. */

@@ -10,8 +10,9 @@
  * prompt is replaced by the current one with a notice. A 422 no-quiz-questions, at the start or
  * mid-quiz (O-411 amended), shows the quiz's own sentence (its difficulty, and its kind when it has
  * one) with a way back to the start screen, which ends the session first when there is one.
+ * Leaving the run any other way ends its session too (practice/use-practice-session.ts).
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button, LoadingNote, Panel } from "../../components/ui/index.js";
 import { useHotkey } from "../../hotkeys/index.js";
@@ -28,10 +29,8 @@ import { ReviewCard } from "./ReviewCard.js";
 export interface QuizRunProps {
   source: PredictionSource;
   seed: string | undefined;
-  /** Called once the session has ended; the page goes back to the start screen. */
+  /** Called once the session has ended, while the run is still mounted; the page goes back to the start screen. */
   onEnded: () => void;
-  /** Told the session id once the start has one, so the page can end it when the address leaves (PR #39 re-review LOW). */
-  onSession?: (sessionId: string | undefined) => void;
 }
 
 function Alert({ text }: { text: string }) {
@@ -64,11 +63,9 @@ function NoQuestions({ source, error, ending, onBack }: NoQuestionsProps) {
   );
 }
 
-export function QuizRun({ source, seed, onEnded, onSession }: QuizRunProps) {
+export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
   const run = usePredictionRun({ source, seed });
-  const quit = useEndQuiz(run.sessionId, onEnded);
-  const { sessionId } = run;
-  useEffect(() => onSession?.(sessionId), [onSession, sessionId]);
+  const quit = useEndQuiz(run.life, onEnded);
   const [reviewing, setReviewing] = useState<number | null>(null);
   const { prompt, draft, result, answered } = run;
   const flavor = source.kind === "quiz" ? "quiz" : "drill";

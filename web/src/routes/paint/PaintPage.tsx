@@ -7,22 +7,23 @@
  * drill-backed painting session; anything else shows the spot picker, filled from the address's
  * valid parts (a full valid choice: config, position, spot, the optional opener vs and seed,
  * paint-search.ts). Start painting writes the choice to the address and arms the start for exactly
- * that address, so another address goes back to the picker instead of starting; leaving it by
- * address ends its session and drops the arm, so browser Back never starts it again
- * (practice/use-armed-run.ts, PR #39 re-review LOW). The start posts
- * POST /sessions under one Idempotency-Key per start attempt (O-232): a failed start shows a fixed
- * sentence and Try again, which is a new attempt with a new key. Once the session exists,
- * PaintRun.tsx paints its prompts. Keying the start by the address starts afresh when it changes.
+ * that address once the navigation lands there, so another address goes back to the picker instead
+ * of starting, and leaving the address drops the arm, so browser Back or Forward never starts it
+ * again (practice/use-start-arm.ts, PR #41 review round 1). The start posts POST /sessions under
+ * one Idempotency-Key per start attempt (O-232): a failed start shows a fixed sentence and Try
+ * again, which is a new attempt with a new key. Once the session exists, PaintRun.tsx paints its
+ * prompts. Leaving the start (another address or route, a sign-out, a tab close) ends its session,
+ * even one that arrives after the player left (practice/use-practice-session.ts). Keying the start
+ * by the address starts afresh when it changes.
  */
 import { useNavigate } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { DrillStartCard } from "../../components/practice/DrillStartCard.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import { paintChoiceOf, paintSearchOf, partialPaintChoice, validatePaintSearch, type PaintChoice, type PaintSearch } from "../../practice/paint-search.js";
-import { useArmedRun } from "../../practice/use-armed-run.js";
+import { usePracticeSession } from "../../practice/use-practice-session.js";
+import { useStartArm } from "../../practice/use-start-arm.js";
 import { useTrainerDeps } from "../../trainer/trainer-deps.js";
 import { createPaintSession, paintFailureText, type PaintSource } from "./paint-api.js";
 import { PaintRun } from "./PaintRun.js";
@@ -36,6 +37,8 @@ export const PAINT_PAGE_TEXT = {
   drillBody: "This link opens range painting over a saved drill. Nothing starts until you press Start painting.",
 } as const;
 
+const PAINT_PATH = "/paint";
+
 export interface PaintPageProps {
   search: PaintSearch;
 }
@@ -43,8 +46,6 @@ export interface PaintPageProps {
 interface PaintStartProps {
   source: PaintSource;
   seed: string | undefined;
-  /** Told the session id once the start has one, so the page can end it when the address leaves (PR #39 re-review LOW). */
-  onSession: (sessionId: string | undefined) => void;
 }
 
 function sourceOf(search: PaintSearch): PaintSource | null {
@@ -55,22 +56,14 @@ function sourceOf(search: PaintSearch): PaintSource | null {
 
 /**
  * Starts the session once on mount, which the page allows only after the player's Start; Try again
- * is a new attempt under a new Idempotency-Key.
+ * is a new attempt under a new Idempotency-Key. Unmounting ends the session.
  */
-function PaintStart({ source, seed, onSession }: PaintStartProps) {
+function PaintStart({ source, seed }: PaintStartProps) {
   const api = useAppApi();
   const { newKey } = useTrainerDeps();
-  const start = useMutation({ mutationFn: () => createPaintSession(api, { source, seed, key: newKey() }) });
-  const requested = useRef(false);
+  const { start } = usePracticeSession(() => createPaintSession(api, { source, seed, key: newKey() }));
   const { mutate } = start;
-  useEffect(() => {
-    if (requested.current) return;
-    requested.current = true;
-    mutate();
-  }, [mutate]);
   const session = start.data;
-  const sessionId = session?.session_id;
-  useEffect(() => onSession(sessionId), [onSession, sessionId]);
   if (session !== undefined) return <PaintRun sessionId={session.session_id} initialVersion={session.state_version} />;
   if (start.isError) {
     return (
@@ -86,7 +79,7 @@ function PaintStart({ source, seed, onSession }: PaintStartProps) {
 }
 
 /** The start key of an address as the route will validate it, so a Start and its address agree. */
-function addressKey(search: PaintSearch): string | null {
+function addressKey(search: Record<string, unknown>): string | null {
   const checked = validatePaintSearch({ ...search });
   const source = sourceOf(checked);
   return source === null ? null : `${JSON.stringify(source)}:${checked.seed ?? ""}`;
@@ -97,20 +90,19 @@ export function PaintPage({ search }: PaintPageProps) {
   // The router merges the parent's unvalidated search into the child's, so check it again here.
   const checked = validatePaintSearch({ ...search });
   const source = sourceOf(checked);
-  const currentKey = addressKey(checked);
-  const armed = useArmedRun(currentKey);
+  const currentKey = addressKey({ ...checked });
+  const armed = useStartArm({ pathname: PAINT_PATH, currentKey, keyOf: addressKey });
   const start = (choice: PaintChoice) => {
     const next = paintSearchOf(choice, checked.seed);
-    armed.arm(addressKey(next));
-    void navigate({ to: "/paint", search: next });
+    armed.startAfter(navigate({ to: PAINT_PATH, search: next }), addressKey({ ...next }));
   };
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={PAINT_PAGE_TEXT.heading} description={PICKER_TEXT.goal} />
       {armed.running && source !== null && currentKey !== null ? (
-        <PaintStart key={currentKey} source={source} seed={checked.seed} onSession={armed.reportSession} />
+        <PaintStart key={currentKey} source={source} seed={checked.seed} />
       ) : source?.kind === "drill" ? (
-        <DrillStartCard title={PAINT_PAGE_TEXT.drillTitle} body={PAINT_PAGE_TEXT.drillBody} startLabel={PICKER_TEXT.start} onStart={() => armed.arm(currentKey)} />
+        <DrillStartCard title={PAINT_PAGE_TEXT.drillTitle} body={PAINT_PAGE_TEXT.drillBody} startLabel={PICKER_TEXT.start} onStart={armed.startHere} />
       ) : (
         <SpotPicker key={JSON.stringify(checked)} initial={partialPaintChoice(checked)} onStart={start} />
       )}

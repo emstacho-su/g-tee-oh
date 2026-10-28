@@ -10,7 +10,8 @@
  *   no quiz options) or over a catalog spot with the quiz's difficulty and question kinds (O-415).
  * - answerPrediction: the answer with its reason (O-412); its problem keeps the body's field
  *   errors (drills/problem.ts, bounded and narrowed), so a refused reason is recognisable.
- * - endPredictionSession: POST /sessions/{id}/end, when the player ends the quiz.
+ * Ending the session is trainer/session-api.ts endSession, through the run's lifecycle
+ * (practice/use-practice-session.ts).
  * Every POST carries AUTO_CSRF_HEADER (the csrf fetch fills the token, O-197) and the caller's
  * Idempotency-Key (O-232).
  */
@@ -20,9 +21,7 @@ import { AUTO_CSRF_HEADER, problemFromBody, type AppApi } from "../api/index.js"
 import type { PracticeSession, PredictionPrompt, PredictionResult } from "../contracts.js";
 import { drillProblemFromBody } from "../drills/problem.js";
 import type { QuizChoice } from "../practice/quiz-search.js";
-import type { SessionRecap } from "../progress/types.js";
 import { IDEMPOTENCY_HEADER } from "../trainer/idempotency.js";
-import { endPracticeSession } from "../practice/end-session.js";
 import type { PredictionAnswerBody } from "./types.js";
 
 export const PREDICTION_QUERY_ROOT = "prediction";
@@ -76,8 +75,4 @@ export async function answerPrediction(api: AppApi, sessionId: string, body: Pre
   // The problem keeps its field errors, so a refused reason (body.rationale) can be told apart.
   if (data === undefined) throw drillProblemFromBody(response.status, error);
   return data;
-}
-
-export function endPredictionSession(api: AppApi, sessionId: string, key: string): Promise<SessionRecap> {
-  return endPracticeSession(api, sessionId, key);
 }
