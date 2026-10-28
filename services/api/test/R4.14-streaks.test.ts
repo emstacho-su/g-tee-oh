@@ -90,8 +90,19 @@ describe("R4.14 streak writes", () => {
     await recordMany(player.userId, 0, 5);
     await recordMany(player.userId, 4, 3);
     const view = await streakView(database, player.userId, at(4), TIME_ZONE);
-    expect(view.repairable).toEqual({ day: addDays(MON, 3), deadline: `${addDays(MON, 6)}T00:00:00.000Z`, progress: 3, needed: 10 });
+    expect(view.repairable).toEqual({ day: addDays(MON, 3), deadline: `${addDays(MON, 6)}T00:00:00.000Z`, last_day: addDays(MON, 5), progress: 3, needed: 10 });
     expect(view.current_days).toBe(1);
+  });
+
+  it.each([
+    ["Europe/Berlin", "2026-10-10T22:00:00.000Z"],
+    ["America/Los_Angeles", "2026-10-11T07:00:00.000Z"],
+  ])("R4.14 in %s the deadline is local midnight and last_day the local day before it", async (timeZone, deadline) => {
+    const player = await newPlayer(database);
+    await recordMany(player.userId, 0, 5);
+    await recordMany(player.userId, 4, 3);
+    const view = await streakView(database, player.userId, at(4), timeZone);
+    expect(view.repairable).toMatchObject({ day: addDays(MON, 3), deadline, last_day: addDays(MON, 5) });
   });
 });
 

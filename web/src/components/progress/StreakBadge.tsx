@@ -5,7 +5,9 @@
  *
  * Not a chart (dataviz form pass): a stat tile. The day meter is a native <meter> with its numbers
  * in text beside it, so the count never rests on the bar alone. The wording is neutral: no guilt
- * and no urgency (06 section 8); a repairable day states what repairs it and by when. Cosmetic
+ * and no urgency (06 section 8); a repairable day states what repairs it and by when: the api's
+ * last_day, the last day in its time zone (APP_TIME_ZONE) on which the repair counts, so the date
+ * never depends on the UTC date of the deadline's instant or on the browser's zone. Cosmetic
  * names come from the caller's describeCosmetic (the catalog, O-279); the key is shown otherwise.
  */
 import type { ReactNode } from "react";
@@ -47,7 +49,7 @@ export function StreakBadge({ streak, describeCosmetic = (key) => key, footer }:
       {streak.repairable === null ? null : (
         <p className="text-sm" data-testid="streak-repair">
           The day {formatShortDate(streak.repairable.day)} can still count: {streak.repairable.progress} of {streak.repairable.needed} rated
-          decisions by {formatShortDate(streak.repairable.deadline)}.
+          decisions by the end of {formatShortDate(streak.repairable.last_day)}.
         </p>
       )}
       {streak.next_milestone === null ? null : (

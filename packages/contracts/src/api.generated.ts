@@ -5676,6 +5676,11 @@ export interface components {
                  * @description RFC 3339 timestamp
                  */
                 deadline: string;
+                /**
+                 * Format: date
+                 * @description The last local day (APP_TIME_ZONE) on which rated decisions still repair the day: the day before the deadline's midnight
+                 */
+                last_day: string;
                 needed: number;
                 progress: number;
             } | null;
@@ -5708,6 +5713,11 @@ export interface components {
                  * @description RFC 3339 timestamp
                  */
                 deadline: string;
+                /**
+                 * Format: date
+                 * @description The last local day (APP_TIME_ZONE) on which rated decisions still repair the day: the day before the deadline's midnight
+                 */
+                last_day: string;
                 needed: number;
                 progress: number;
             } | null;

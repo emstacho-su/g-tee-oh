@@ -144,6 +144,9 @@ export const streakSchema = z
       .object({
         day: z.iso.date(),
         deadline: timestampSchema,
+        last_day: z.iso
+          .date()
+          .describe("The last local day (APP_TIME_ZONE) on which rated decisions still repair the day: the day before the deadline's midnight"),
         progress: z.number().int().min(0),
         needed: z.number().int().min(0),
       })

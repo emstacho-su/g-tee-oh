@@ -224,13 +224,17 @@ export const fixtureStreak: ProgressStreak = {
   next_milestone: { days: NEXT_MILESTONE_DAYS, cosmetic_key: `badge-streak-${NEXT_MILESTONE_DAYS}` },
 };
 
-/** A streak with a missed day still inside its 48-hour repair window (O-278). */
+/**
+ * A streak with a missed day still inside its 48-hour repair window (O-278), as an api in
+ * Europe/Berlin sends it: the deadline is local midnight starting Oct 29 (23:00 UTC), and last_day
+ * is the last local day on which the repair counts.
+ */
 export const fixtureRepairableStreak: ProgressStreak = {
   ...fixtureStreak,
   current_days: 0,
   today_rated: 4,
   freezes_left_this_week: 0,
-  repairable: { day: "2026-10-26", deadline: "2026-10-28T23:00:00Z", progress: 4, needed: 10 },
+  repairable: { day: "2026-10-26", deadline: "2026-10-28T23:00:00Z", last_day: "2026-10-28", progress: 4, needed: 10 },
 };
 
 export const fixtureFreshStreak: ProgressStreak = {

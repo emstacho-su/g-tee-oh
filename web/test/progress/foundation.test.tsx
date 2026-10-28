@@ -163,9 +163,16 @@ describe("R4.14 StreakBadge", () => {
     expect(screen.queryByTestId("streak-repair")).not.toBeInTheDocument();
   });
 
-  it("R4.14 states a repairable day neutrally with its deadline", () => {
+  it("R4.14 states a repairable day neutrally with the last local day of its window (api in Europe/Berlin)", () => {
     render(<StreakBadge streak={fixtureRepairableStreak} />);
-    expect(screen.getByTestId("streak-repair")).toHaveTextContent("The day Oct 26 can still count: 4 of 10 rated decisions by Oct 28.");
+    expect(screen.getByTestId("streak-repair")).toHaveTextContent("The day Oct 26 can still count: 4 of 10 rated decisions by the end of Oct 28.");
+  });
+
+  it("R4.14 a zone west of UTC names the same last day, never the UTC date of the deadline (api in America/Los_Angeles)", () => {
+    const losAngeles = { day: "2026-10-26", deadline: "2026-10-29T07:00:00.000Z", last_day: "2026-10-28", progress: 4, needed: 10 };
+    render(<StreakBadge streak={{ ...fixtureRepairableStreak, repairable: losAngeles }} />);
+    expect(screen.getByTestId("streak-repair")).toHaveTextContent("by the end of Oct 28.");
+    expect(screen.getByTestId("streak-repair")).not.toHaveTextContent("Oct 29");
   });
 
   it("R4.14 marks a counted day and reads singular days", () => {
