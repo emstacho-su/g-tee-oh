@@ -1,9 +1,13 @@
 /**
  * The seven v1 tracks and the one track of each spot class (R4.11, O-271, 06 section 2): every
  * Rust action family at every seat maps to exactly the track the table names, squeeze and
- * facing-open split by the blinds, and an unknown family maps to none.
+ * facing-open split by the blinds, an unknown family maps to none, and the table equals the track
+ * rows the migration seeds (20261029000100_api_learning.sql).
  */
 import { describe, expect, it } from "vitest";
+
+import { TRACK_ENABLED_WEIGHT, TRACK_FAMILY, TRACK_FORMAT } from "../src/learning/tracks.js";
+import { appDatabase } from "./support/database.js";
 
 import { POSITIONS } from "../src/schemas/common.js";
 import { RUST_ACTION_FAMILIES } from "../src/sessions/action-family.js";
@@ -54,5 +58,22 @@ describe("R4.11 tracks", () => {
     const live = trackDefinition("live-limped-straddled");
     expect(live.scope.formats).toEqual(["live"]);
     expect(() => trackDefinition("nope" as TrackKey)).toThrow(RangeError);
+  });
+
+  it("R4.11 the migration seeds exactly this table: key, scope, family, format and weight", async () => {
+    const database = appDatabase();
+    try {
+      const rows = await database.selectFrom("track").select(["key", "family", "format", "scope", "weight"]).orderBy("key").execute();
+      const expected = TRACKS.map((track) => ({
+        key: track.key,
+        family: TRACK_FAMILY,
+        format: TRACK_FORMAT,
+        scope: { families: [...track.scope.families], hero: track.scope.hero, formats: [...track.scope.formats] },
+        weight: TRACK_ENABLED_WEIGHT,
+      })).sort((a, b) => a.key.localeCompare(b.key));
+      expect(rows).toEqual(expected);
+    } finally {
+      await database.destroy();
+    }
   });
 });

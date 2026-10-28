@@ -38,6 +38,20 @@ export type SolutionSource = "own" | "reference";
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AppJob {
+  attempts: Generated<number>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  last_error: string | null;
+  locked_at: Timestamp | null;
+  locked_by: string | null;
+  period_key: string;
+  run_at: Timestamp;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppUser {
   created_at: Generated<Timestamp>;
   email: string;
@@ -68,12 +82,20 @@ export interface Attempt {
    */
   graded_action_index: number | null;
   hand: string;
+  /**
+   * the hero's row label at the node as solver-query names it (O-274)
+   */
+  hand_class: string | null;
   id: Generated<string>;
   item_difficulty: number | null;
   label: string;
   loss_pct_pot_by_action: number[] | null;
   node_key: string;
   noise_flags: Generated<string[]>;
+  /**
+   * an answer-revealing panel was on when the decision was made (O-274)
+   */
+  panels_revealed: Generated<boolean>;
   rated: boolean;
   reference_strategy: Generated<string>;
   response_ms: number | null;
@@ -191,19 +213,56 @@ export interface GameConfig {
   table_size: number;
 }
 
+export interface HoldoutDraw {
+  drawn_at: Generated<Timestamp>;
+  items: number;
+  seed: string;
+  track_id: string;
+}
+
 export interface HoldoutItem {
+  config_id: string;
+  /**
+   * the stored deal seed that replays the item (O-276)
+   */
+  deal_seed: string;
+  drawn_at: Generated<Timestamp>;
   hand: string;
+  hero_position: string;
   id: Generated<string>;
+  line: string | null;
   node_key: string;
+  pair: string;
   solution_id: string;
+  spot_class_key: string;
   track_id: string;
 }
 
 export interface HoldoutResult {
   attempt_id: string | null;
   holdout_item_id: string | null;
+  round_id: string | null;
   taken_at: Timestamp;
   user_id: string;
+}
+
+export interface HoldoutRound {
+  closed_at: Timestamp | null;
+  id: Generated<string>;
+  month: Timestamp;
+  opened_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface HoldoutSummary {
+  answered: number;
+  goodhart_flag: Generated<boolean>;
+  mean_score: number | null;
+  mu: number | null;
+  rd: number | null;
+  round_id: string;
+  total: number;
+  track_id: string;
 }
 
 export interface IdempotencyKey {
@@ -397,6 +456,7 @@ export interface Track {
 }
 
 export interface DB {
+  app_job: AppJob;
   app_user: AppUser;
   attempt: Attempt;
   auth_session: AuthSession;
@@ -407,8 +467,11 @@ export interface DB {
   drill: Drill;
   explanation: Explanation;
   game_config: GameConfig;
+  holdout_draw: HoldoutDraw;
   holdout_item: HoldoutItem;
   holdout_result: HoldoutResult;
+  holdout_round: HoldoutRound;
+  holdout_summary: HoldoutSummary;
   idempotency_key: IdempotencyKey;
   leak_history: LeakHistory;
   leak_stat: LeakStat;
