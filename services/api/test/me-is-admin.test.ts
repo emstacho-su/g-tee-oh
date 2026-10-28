@@ -74,6 +74,24 @@ describe("O-290 is_admin on GET /me", () => {
     expect(sessionInfoSchema.parse(response.json()).user.is_admin).toBe(true);
   });
 
+  it("R3.5 O-242 revoking is_admin takes effect on the next admin request of a live session", async () => {
+    const ownerDatabase = createDatabaseFromUrl(inject("adminDatabaseUrl"));
+    try {
+      const revoked = await createUser(ownerDatabase, { email: uniqueEmail("revoked"), password: TEST_PASSWORD, isAdmin: true });
+      const session = await createTestSession(database, revoked.id);
+      const before = await app.inject({ method: "GET", url: ADMIN_URL, headers: readHeaders(session) });
+      expect(before.statusCode, before.body).toBe(STATUS.ok);
+
+      await ownerDatabase.updateTable("app_user").set({ is_admin: false }).where("id", "=", revoked.id).execute();
+
+      const after = await app.inject({ method: "GET", url: ADMIN_URL, headers: readHeaders(session) });
+      expect(after.statusCode).toBe(STATUS.forbidden);
+      expect((await readMe(session.token)).user.is_admin).toBe(false);
+    } finally {
+      await ownerDatabase.destroy();
+    }
+  });
+
   it("R3.5 O-290 is_admin cannot be claimed: a login body naming it is refused and a member still gets 403 from the admin routes", async () => {
     const member = await createTestUser(database);
     const claimed = await app.inject({

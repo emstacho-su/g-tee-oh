@@ -51,8 +51,13 @@ function pauseSchema(summary: string) {
 }
 
 export const adminRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, _options, done) => {
-  app.addHook("onRequest", async (request) => {
-    await requireAdmin(app, request);
+  app.addHook("onRequest", (request, _reply, done) => {
+    try {
+      requireAdmin(request);
+      done();
+    } catch (error: unknown) {
+      done(error instanceof Error ? error : new Error(String(error)));
+    }
   });
 
   app.get(
