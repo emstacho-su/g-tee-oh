@@ -1,14 +1,28 @@
 /**
- * One seat at the poker table (S24, R3.13). Shows the position, the stack in big blinds, the
- * current bet, a "D" dealer button marker, an "STR" straddle marker and, for the hero, the word
- * Hero and the hole cards. Markers carry a visually hidden spoken name ("Dealer button",
- * "Straddle"). A folded seat is dimmed and also says "Folded", so dimming is never the only signal.
+ * One seat card at the game-style table (S24, S38, R3.13, O-380, O-381). A raised card with the
+ * position, the stack in big blinds, a "D" dealer button marker, an "STR" straddle marker, the
+ * seat's last action as a badge, the current bet when given and, for the hero, the word You, an
+ * accent ring and the hole cards. Markers carry a visually hidden spoken name ("Dealer button",
+ * "Straddle"). A folded seat is dimmed and also says "Folded", so dimming is never the only
+ * signal; the seat whose action is playing is marked active (a ring and a small lift, no lift
+ * under reduced motion). The card carries both layouts' spots as custom properties and the
+ * container query in styles.css picks one (seat-layout.ts).
  */
-import { VisuallyHidden, cn } from "../ui/index.js";
+import type { CSSProperties } from "react";
+
+import { RAISED_CLASS, VisuallyHidden, cn } from "../ui/index.js";
 import type { Position } from "../../contracts.js";
 import { formatCbb } from "../../poker/format.js";
 import { CardView } from "./CardView.js";
-import type { SeatSpot } from "./seat-layout.js";
+import type { SeatSlot } from "./seat-layout.js";
+
+/** An action chip at the seat's bet spot; moving while its step plays. */
+export interface SeatChip {
+  /** The api's history label, never a computed amount (ADR 0004). */
+  label: string;
+  moving: boolean;
+  durationMs: number;
+}
 
 export interface TableSeat {
   position: Position;
@@ -20,12 +34,36 @@ export interface TableSeat {
   isStraddle: boolean;
   /** The hero's two hole cards; other seats show none. */
   cards?: readonly [string, string];
+  /** The seat's last action label, shown as a badge. */
+  lastAction?: string;
+  /** True while this seat's action plays. */
+  active?: boolean;
+  chip?: SeatChip;
+}
+
+export interface SeatSlots {
+  readonly landscape: SeatSlot;
+  readonly portrait: SeatSlot;
 }
 
 interface SeatProps {
   seat: TableSeat;
-  spot: SeatSpot;
+  slots: SeatSlots;
   fourColor: boolean;
+}
+
+const percent = (value: number): string => `${value}%`;
+
+/** The seat's spots in both layouts, as the custom properties styles.css reads. */
+export function seatSpotStyle({ landscape, portrait }: SeatSlots): CSSProperties {
+  return {
+    "--land-x": percent(landscape.seat.leftPercent),
+    "--land-y": percent(landscape.seat.topPercent),
+    "--port-x": percent(portrait.seat.leftPercent),
+    "--port-y": percent(portrait.seat.topPercent),
+    "--land-w": percent(landscape.box.widthPercent),
+    "--port-w": percent(portrait.box.widthPercent),
+  } as CSSProperties;
 }
 
 function Marker({ short, name, className }: { short: string; name: string; className: string }) {
@@ -37,15 +75,36 @@ function Marker({ short, name, className }: { short: string; name: string; class
   );
 }
 
-export function Seat({ seat, spot, fourColor }: SeatProps) {
+function Badge({ seat }: { seat: TableSeat }) {
+  if (seat.hasFolded) {
+    return (
+      <span data-testid="seat-action" className="table-seat-badge text-xs text-muted">
+        Folded
+      </span>
+    );
+  }
+  if (seat.lastAction === undefined) return null;
+  return (
+    <span data-testid="seat-action" className="table-seat-badge rounded-full bg-surface-sunken px-2 text-xs font-semibold">
+      {seat.lastAction}
+    </span>
+  );
+}
+
+export function Seat({ seat, slots, fourColor }: SeatProps) {
+  const active = seat.active === true;
   return (
     <li
       data-testid={`seat-${seat.position}`}
       data-folded={seat.hasFolded ? "true" : "false"}
-      style={{ left: `${spot.leftPercent}%`, top: `${spot.topPercent}%` }}
+      data-active={active ? "true" : "false"}
+      data-hero={seat.isHero ? "true" : "false"}
+      style={seatSpotStyle(slots)}
       className={cn(
-        "pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-lg border bg-surface-raised px-2 py-1 text-center text-sm shadow",
+        "table-seat flex flex-col items-center gap-0.5 rounded-xl border bg-surface-raised px-2 py-1.5 text-center text-sm",
+        RAISED_CLASS,
         seat.isHero ? "border-accent ring-2 ring-accent" : "border-border",
+        active && "table-seat-active ring-2 ring-focus",
         seat.hasFolded && "opacity-50",
       )}
     >
@@ -53,16 +112,16 @@ export function Seat({ seat, spot, fourColor }: SeatProps) {
         <span className="font-semibold">{seat.position}</span>
         {seat.isButton ? <Marker short="D" name="Dealer button" className="bg-white text-slate-900 ring-1 ring-slate-400" /> : null}
         {seat.isStraddle ? <Marker short="STR" name="Straddle" className="bg-warning text-white" /> : null}
+        {seat.isHero ? <span className="text-xs font-semibold text-accent">You</span> : null}
       </div>
       <span className="tabular-nums">{formatCbb(seat.stackCbb)}</span>
-      {seat.isHero ? <span className="text-xs font-semibold text-accent">Hero</span> : null}
       {seat.cards === undefined ? null : (
         <div className="flex gap-0.5">
           <CardView card={seat.cards[0]} size="sm" fourColor={fourColor} />
           <CardView card={seat.cards[1]} size="sm" fourColor={fourColor} />
         </div>
       )}
-      {seat.hasFolded ? <span className="text-xs text-muted">Folded</span> : null}
+      <Badge seat={seat} />
       {seat.betCbb === undefined ? null : <span className="text-xs tabular-nums">Bet {formatCbb(seat.betCbb)}</span>}
     </li>
   );

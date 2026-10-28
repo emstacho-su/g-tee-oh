@@ -350,3 +350,123 @@ meter::-moz-meter-bar {
   --felt: #4c1d95;
   --felt-edge: #2e1065;
 }
+
+/*
+ * The game-style table (S38, R3.13, O-380, O-381; components/table). Every seat card, the felt and
+ * each action chip carry their landscape and portrait spots as custom properties (seat-layout.ts);
+ * these rules place them. The table root is the "poker-table" inline-size container, and below
+ * 600 px of its own width (PORTRAIT_BELOW_PX) the portrait spots, the 4 by 5 box and the compact
+ * card apply, so a phone or a narrow column turns the table without any script. A moving chip
+ * slides from its seat to its bet spot over its step's duration (--chip-ms); the active seat lifts
+ * slightly. Reduced motion: no slide and no lift (the replay also shows its end state at once).
+ * Stacking is by document order only: no z-index.
+ */
+.poker-table {
+  container: poker-table / inline-size;
+}
+
+.table-box {
+  aspect-ratio: 16 / 9;
+}
+
+.table-felt {
+  left: var(--land-felt-l);
+  right: var(--land-felt-r);
+  top: var(--land-felt-t);
+  bottom: var(--land-felt-b);
+}
+
+.table-seat {
+  position: absolute;
+  left: var(--land-x);
+  top: var(--land-y);
+  width: var(--land-w);
+  transform: translate(-50%, -50%);
+  transition: transform 150ms ease-out;
+}
+
+.table-seat-active {
+  transform: translate(-50%, calc(-50% - 3px)) scale(1.04);
+}
+
+.table-chip {
+  position: absolute;
+  left: var(--land-bet-x);
+  top: var(--land-bet-y);
+  transform: translate(-50%, -50%);
+}
+
+.table-chip[data-moving="true"] {
+  animation: table-chip-slide var(--chip-ms) ease-out both;
+}
+
+@keyframes table-chip-slide {
+  from {
+    left: var(--land-x);
+    top: var(--land-y);
+    opacity: 0.3;
+  }
+  to {
+    left: var(--land-bet-x);
+    top: var(--land-bet-y);
+    opacity: 1;
+  }
+}
+
+@keyframes table-chip-slide-portrait {
+  from {
+    left: var(--port-x);
+    top: var(--port-y);
+    opacity: 0.3;
+  }
+  to {
+    left: var(--port-bet-x);
+    top: var(--port-bet-y);
+    opacity: 1;
+  }
+}
+
+@container poker-table (max-width: 599.98px) {
+  .table-box {
+    aspect-ratio: 4 / 5;
+  }
+
+  .table-felt {
+    left: var(--port-felt-l);
+    right: var(--port-felt-r);
+    top: var(--port-felt-t);
+    bottom: var(--port-felt-b);
+  }
+
+  .table-seat {
+    left: var(--port-x);
+    top: var(--port-y);
+    width: var(--port-w);
+    gap: 0;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .table-chip {
+    left: var(--port-bet-x);
+    top: var(--port-bet-y);
+    font-size: 0.6875rem;
+  }
+
+  .table-chip[data-moving="true"] {
+    animation-name: table-chip-slide-portrait;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-chip[data-moving="true"] {
+    animation: none;
+  }
+
+  .table-seat,
+  .table-seat-active {
+    transition: none;
+    transform: translate(-50%, -50%);
+  }
+}
