@@ -20,6 +20,10 @@ export type TrainerPrompt = Schemas["TrainerPrompt"];
 export type TrainerSettings = Schemas["TrainerSettings"];
 export type DecisionFeedback = Schemas["DecisionFeedback"];
 export type BuilderStatus = Schemas["BuilderStatus"];
+// S42 (O-349): invites and joining.
+export type InviteSummary = Schemas["InviteSummary"];
+export type CreatedInvite = Schemas["CreatedInvite"];
+export type InvitePreview = Schemas["InvitePreview"];
 
 export type ActionKind = NodeAction["kind"];
 export type Position = TrainerPrompt["hero_position"];

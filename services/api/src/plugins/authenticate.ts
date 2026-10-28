@@ -40,6 +40,7 @@ export async function findLiveSession(
       "auth_session.csrf_token",
       "auth_session.expires_at",
       "app_user.email",
+      "app_user.display_name",
       "app_user.created_at as user_created_at",
       "app_user.is_admin",
     ])
@@ -56,6 +57,7 @@ export async function findLiveSession(
     sessionId: row.session_id,
     userId: row.user_id,
     email: row.email,
+    displayName: row.display_name,
     userCreatedAt: row.user_created_at,
     isAdmin: row.is_admin,
     csrfToken: row.csrf_token,

@@ -35,6 +35,14 @@ export function isWellFormedToken(value: string): boolean {
   return TOKEN_PATTERN.test(value);
 }
 
+/**
+ * Constant-time equality of two digests (S42, invite secrets): crypto.timingSafeEqual over the
+ * bytes; unequal lengths are unequal without comparing, which leaks only the length.
+ */
+export function digestsEqual(expected: Buffer, given: Buffer): boolean {
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
 /** Constant-time string equality for tokens; unequal lengths are unequal without comparing. */
 export function tokensEqual(expected: string, given: string): boolean {
   const left = Buffer.from(expected, "utf8");

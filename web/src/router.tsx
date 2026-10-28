@@ -2,7 +2,8 @@
  * Route tree for the web app (R0.7, R3.13, A7 sections 1 and 2). Routes are code based: no
  * file-route plugin and no generated route tree to diff-check.
  *
- * Shape: the root route (RootLayout, <div data-testid="shell">) holds /login and a pathless
+ * Shape: the root route (RootLayout, <div data-testid="shell">) holds /login, the public /join
+ * (S42: an invite link, /join#<token>, read by the page itself) and a pathless
  * authenticated layout route ("app") that holds every other A7 section 2 route. The layout's
  * beforeLoad ensures the me query through the router context's QueryClient; signed out (null), it
  * redirects to /login?redirect=<current path>. /login's beforeLoad does the reverse: a signed-in
@@ -29,6 +30,7 @@ import type { RouterContext } from "./app/router-context.js";
 import { SessionError } from "./app/SessionError.js";
 import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
+import { JoinPage } from "./routes/join.js";
 import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
 import { PredictPage } from "./routes/predict/PredictPage.js";
@@ -80,6 +82,13 @@ export const loginRoute = createRoute({
     return { sessionUnavailable: false };
   },
   component: LoginPage,
+});
+
+/** Joining by invite (S42, O-349): public, with or without a session; the page reads the fragment. */
+export const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/join",
+  component: JoinPage,
 });
 
 export const appLayoutRoute = createRoute({
@@ -211,6 +220,7 @@ export const settingsSectionRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
+  joinRoute,
   appLayoutRoute.addChildren([
     homeRoute,
     trainRoute,

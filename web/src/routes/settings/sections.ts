@@ -1,7 +1,8 @@
 /**
  * The pages of the /settings container (S36, R4.12, O-348, O-360, O-361). Each page lives at
  * /settings/<slug>; /settings itself and any slug not listed here go to DEFAULT_SETTINGS_SECTION.
- * The builder schedule is listed for admins only; a member opening its URL reads a note instead.
+ * The builder schedule and the invites (S42, O-349) are listed for admins only; a member opening
+ * either URL reads a note instead.
  */
 export const SETTINGS_SECTIONS = [
   { slug: "session-defaults", label: "Session defaults", adminOnly: false },
@@ -9,6 +10,7 @@ export const SETTINGS_SECTIONS = [
   { slug: "hotkeys", label: "Hotkeys", adminOnly: false },
   { slug: "cosmetics", label: "Cosmetics", adminOnly: false },
   { slug: "builder-schedule", label: "Builder schedule", adminOnly: true },
+  { slug: "invites", label: "Invites", adminOnly: true },
 ] as const;
 
 export type SettingsSectionSlug = (typeof SETTINGS_SECTIONS)[number]["slug"];

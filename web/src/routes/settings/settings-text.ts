@@ -31,6 +31,56 @@ export const SETTINGS_TEXT = {
   scheduleMemberNote: "The builder schedule is for admins.",
 } as const;
 
+/** The admin Invites page (S42, R3.5, O-349, O-420, O-423, O-427). */
+export const INVITES_TEXT = {
+  title: "Invites",
+  memberNote: "Invites are for admins.",
+  emailLabel: "Email to invite",
+  create: "Create invite",
+  emailMissing: "Enter the email address to invite.",
+  emailShape: "Enter an email address like name@example.com.",
+  accountExists: "An account already exists for this email.",
+  rateLimited: "Too many invites in a minute. Wait and try again.",
+  createFailed: "The invite could not be created. Try again.",
+  linkTitle: "Invite link",
+  linkDescription: "Copy it now: it is shown only once. Send it to the person yourself.",
+  linkLabel: "Join link",
+  copy: "Copy link",
+  copied: "Copied.",
+  copyFailed: "Copy did not work. Select the link and copy it by hand.",
+  listTitle: "Recent invites",
+  empty: "No invites yet.",
+  loading: "Loading the invites.",
+  loadFailed: "The invites could not be loaded.",
+  tryAgain: "Try again",
+  revoke: "Revoke",
+  revokeTitle: "Revoke this invite?",
+  revokeConfirm: "Revoke invite",
+  cancel: "Cancel",
+  revokeFailed: "The invite could not be revoked. Try again.",
+  status: { pending: "Pending", used: "Used", expired: "Expired", revoked: "Revoked" },
+} as const;
+
+export function invitesDescription(ttlDays: number): string {
+  return `Invite someone by email. Each link works once and expires after ${ttlDays} days.`;
+}
+
+export function moreInvitesText(limit: number): string {
+  return `Showing the ${limit} most recent invites.`;
+}
+
+export function revokeDescription(email: string): string {
+  return `The link sent to ${email} will stop working. This cannot be undone.`;
+}
+
+export function expiresText(date: string): string {
+  return `Expires ${date}`;
+}
+
+export function linkExpiryText(date: string): string {
+  return `It works once, until ${date}.`;
+}
+
 export function staleConfigsText(ids: readonly string[]): string {
   return `Saved configurations no longer offered: ${ids.join(", ")}.`;
 }

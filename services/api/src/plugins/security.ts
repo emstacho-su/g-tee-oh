@@ -34,7 +34,13 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import fastifyPlugin from "fastify-plugin";
 
 import type { AppConfig } from "../config.js";
-import { CSRF_HEADER, IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER, REQUEST_ID_HEADER } from "../http/headers.js";
+import {
+  CSRF_HEADER,
+  IDEMPOTENCY_HEADER,
+  IDEMPOTENCY_REPLAYED_HEADER,
+  REQUEST_ID_HEADER,
+  RETRY_AFTER_HEADER,
+} from "../http/headers.js";
 import { PROBLEM_SLUGS, ProblemError, HTTP_STATUS } from "../http/problem.js";
 import { GLOBAL_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../http/rate-limits.js";
 
@@ -43,7 +49,6 @@ export interface SecurityOptions {
 }
 
 const MS_PER_SECOND = 1000;
-const RETRY_AFTER_HEADER = "retry-after";
 const TEXT_PLAIN = "text/plain";
 const CACHE_CONTROL_HEADER = "cache-control";
 const NO_STORE = "no-store";
