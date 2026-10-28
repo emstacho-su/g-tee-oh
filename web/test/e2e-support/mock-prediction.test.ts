@@ -34,8 +34,25 @@ function next(api: MockApi, id: string): PredictionPrompt {
   return response.body as PredictionPrompt;
 }
 
+const REASON = "The price is good.";
+
+/** Posts an answer; a body without a rationale gets the default reason (S41: the reason is required). */
 function answer(api: MockApi, id: string, body: unknown, headers: Record<string, string> = SIGNED) {
-  return api.handle(request("POST", `/api/v1/prediction/${id}/answer`, { headers, body }));
+  const withReason = typeof body === "object" && body !== null && !("rationale" in body) ? { ...body, rationale: REASON } : body;
+  return api.handle(request("POST", `/api/v1/prediction/${id}/answer`, { headers, body: withReason }));
+}
+
+function startQuiz(api: MockApi, difficulty: string, kinds: readonly string[], heroes: readonly string[] = ["BB"]) {
+  return api.handle(
+    request("POST", "/api/v1/sessions", {
+      headers: SIGNED,
+      body: {
+        mode: "prediction",
+        catalog_spot: { config_id: "cfg_6_online_100", hero_positions: heroes, spot_types: ["vs_open"] },
+        quiz: { difficulty, question_kinds: kinds },
+      },
+    }),
+  );
 }
 
 function rightAnswer(prompt: PredictionPrompt): unknown {
@@ -153,5 +170,78 @@ describe("R3.16 mocked prediction routes", () => {
     const again = answer(api, id, body, headers);
     expect(again).toEqual(first);
     expect(next(api, id).state_version).toBe(1);
+  });
+});
+
+describe("R3.16 mocked quiz sessions (S41, O-410, O-411, O-412, O-415)", () => {
+  it("R3.16 a catalog-spot start with quiz options opens a session without a drill", () => {
+    const started = startQuiz(signedInApi(), "easy", ["range", "hand"]);
+    expect(started.status).toBe(201);
+    expect(started.body).toMatchObject({ mode: "prediction", drill_id: null });
+  });
+
+  it("R3.16 every prompt asks the chosen difficulty, alternating the chosen kinds", () => {
+    const api = signedInApi();
+    const kindsOf = (difficulty: string, kinds: readonly string[]) => {
+      const id = (startQuiz(api, difficulty, kinds).body as { session_id: string }).session_id;
+      return [0, 1, 2].map(() => {
+        const prompt = next(api, id);
+        expect(answer(api, id, { prompt_id: prompt.prompt_id, state_version: prompt.state_version, answer: rightAnswer(prompt) }).status).toBe(200);
+        return prompt.answer_kind;
+      });
+    };
+    expect(kindsOf("easy", ["range", "hand"])).toEqual(["yes_no", "action", "yes_no"]);
+    expect(kindsOf("medium", ["range", "hand"])).toEqual(["percent", "band", "percent"]);
+    expect(kindsOf("hard", ["hand"])).toEqual(["size", "size", "size"]);
+  });
+
+  it("R3.16 refuses a bad catalog spot or quiz with 400, an uncovered seat with 422, and quiz options on a drill start", () => {
+    const api = signedInApi();
+    expect(startQuiz(api, "insane", ["range"]).status).toBe(400);
+    expect(startQuiz(api, "easy", []).status).toBe(400);
+    expect(startQuiz(api, "easy", ["range", "range"]).status).toBe(400);
+    expect(startQuiz(api, "easy", ["range"], ["UTG"]).status).toBe(422);
+    const drillQuiz = { mode: "prediction", drill_id: FIXTURE_PREDICTION_DRILL_ID, quiz: { difficulty: "easy", question_kinds: ["range"] } };
+    expect(api.handle(request("POST", "/api/v1/sessions", { headers: SIGNED, body: drillQuiz })).status).toBe(400);
+  });
+
+  it("R3.16 an answer needs a reason of 3 to 1,000 characters after trimming; a refused one records nothing", () => {
+    const api = signedInApi();
+    const id = start(api);
+    const prompt = next(api, id);
+    const body = { prompt_id: prompt.prompt_id, state_version: 0, answer: rightAnswer(prompt) };
+    // As the api: the schema refuses a missing, non-string, blank or too long reason (validation);
+    // a reason under 3 characters once cleaned is a bad-request with a fixed detail.
+    for (const rationale of [undefined, "   ", "x".repeat(1001), 7]) {
+      const refused = answer(api, id, { ...body, rationale });
+      expect(refused.status, String(rationale)).toBe(400);
+      expect(refused.body).toMatchObject({ type: "urn:g-tee-oh:problem:validation" });
+    }
+    const short = answer(api, id, { ...body, rationale: "  ab  " });
+    expect(short.status).toBe(400);
+    expect(short.body).toMatchObject({ type: "urn:g-tee-oh:problem:bad-request", detail: "Type a reason of at least 3 characters." });
+    expect(next(api, id).state_version).toBe(0);
+    expect(answer(api, id, { ...body, rationale: " abc " }).status).toBe(200);
+  });
+
+  it("R3.16 a result says whether the window at this level passes", () => {
+    const api = signedInApi();
+    const id = start(api);
+    const first = next(api, id);
+    expect(answer(api, id, { prompt_id: first.prompt_id, state_version: 0, answer: rightAnswer(first) }).body).toMatchObject({ level_passed: true });
+    const second = next(api, id);
+    expect(answer(api, id, { prompt_id: second.prompt_id, state_version: 1, answer: rightAnswer(second) }).body).toMatchObject({ level_passed: false });
+  });
+
+  it("R3.16 POST /sessions/{id}/end ends a prediction session with a recap, after which the session refuses more", () => {
+    const api = signedInApi();
+    const id = start(api);
+    expect(api.handle(request("POST", `/api/v1/sessions/${id}/end`, { body: {} })).status).toBe(403);
+    const ended = api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED, body: {} }));
+    expect(ended.status).toBe(200);
+    expect(ended.body).toMatchObject({ session_id: id, decisions: 0, rated_decisions: 0 });
+    const prompt = api.handle(request("GET", `/api/v1/prediction/${id}/next`));
+    expect(prompt.status).toBe(409);
+    expect(prompt.body).toMatchObject({ type: "urn:g-tee-oh:problem:session-ended" });
   });
 });

@@ -65,6 +65,28 @@ describe("R3.17 mocked range-painting routes", () => {
     expect(start(api, { mode: "range_paint", drill_id: FIXTURE_PAINT_DRILL_ID, seed: "XYZ" }).status).toBe(400);
   });
 
+  it("R3.17 starts a catalog-spot range_paint session on a covered seat (O-415)", () => {
+    const api = signedInApi();
+    const spot = { config_id: "cfg_6_online_100", hero_positions: ["BB"], villain_positions: ["BTN"], spot_types: ["vs_open"] };
+    const started = start(api, { mode: "range_paint", catalog_spot: spot, seed: "00000000deadbeef" });
+    expect(started.status).toBe(201);
+    expect(started.body).toMatchObject({ mode: "range_paint", drill_id: null });
+    const id = (started.body as { session_id: string }).session_id;
+    expect(api.handle(request("GET", `/api/v1/range-paint/${id}/next`)).status).toBe(200);
+  });
+
+  it("R3.17 refuses a catalog spot the api would refuse: unknown table, bad shape, both drill and spot, an uncovered seat", () => {
+    const api = signedInApi();
+    const spot = { config_id: "cfg_6_online_100", hero_positions: ["BB"], spot_types: ["vs_open"] };
+    expect(start(api, { mode: "range_paint", catalog_spot: { ...spot, config_id: "cfg_6_online_999" } }).status).toBe(400);
+    expect(start(api, { mode: "range_paint", catalog_spot: { ...spot, spot_types: ["sideways"] } }).status).toBe(400);
+    expect(start(api, { mode: "range_paint", catalog_spot: { ...spot, hero_positions: [] } }).status).toBe(400);
+    expect(start(api, { mode: "range_paint", catalog_spot: spot, drill_id: FIXTURE_PAINT_DRILL_ID }).status).toBe(400);
+    const uncovered = start(api, { mode: "range_paint", catalog_spot: { ...spot, hero_positions: ["UTG"] } });
+    expect(uncovered.status).toBe(422);
+    expect(uncovered.body).toMatchObject({ type: "urn:g-tee-oh:problem:no-coverage" });
+  });
+
   it("R3.17 next is pure and an unknown session is 404", () => {
     const api = signedInApi();
     start(api);

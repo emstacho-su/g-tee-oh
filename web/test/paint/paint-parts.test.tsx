@@ -1,6 +1,7 @@
 /**
  * Tests for the painter's smaller parts (S27 lane B, R3.17, ADR 0020): brushes past the ninth have
- * no number key, the picker needs a choice before Start, and the failure texts never echo a problem.
+ * no number key and the failure texts never echo a problem (S41: the drill picker went with drills
+ * on /paint; the spot picker is tested through the page, test/paint/paint-page.test.tsx).
  */
 import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -9,9 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiProblem } from "../../src/api/index.js";
 import { BrushPicker } from "../../src/components/painter/BrushPicker.js";
 import type { NodeAction } from "../../src/contracts.js";
-import { fixturePaintDrills } from "../../src/fixtures/paint.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
-import { DrillPicker } from "../../src/routes/paint/DrillPicker.js";
 import { PAINT_FAILURES, isStalePaint, paintFailureText } from "../../src/routes/paint/paint-api.js";
 import { PAINTER_SUITE } from "./painter-timeout.js";
 
@@ -48,23 +47,6 @@ describe("R3.17 BrushPicker", PAINTER_SUITE, () => {
   });
 });
 
-describe("R3.17 DrillPicker", () => {
-  it("R3.17 Start waits for a chosen drill", async () => {
-    const onStart = vi.fn();
-    const onSelect = vi.fn();
-    const user = userEvent.setup();
-    render(<DrillPicker drills={fixturePaintDrills} selected={null} starting={false} onSelect={onSelect} onStart={onStart} />);
-    expect(screen.getByRole("button", { name: "Start painting" })).toBeDisabled();
-    await user.click(screen.getByRole("radio", { name: fixturePaintDrills[1]?.name ?? "" }));
-    expect(onSelect).toHaveBeenCalledWith(fixturePaintDrills[1]?.id);
-  });
-
-  it("R3.17 while starting, Start is disabled and a status says so", () => {
-    render(<DrillPicker drills={fixturePaintDrills} selected={fixturePaintDrills[0]?.id ?? null} starting onSelect={vi.fn()} onStart={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Start painting" })).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent(/starting/i);
-  });
-});
 
 describe("R3.17 paintFailureText", () => {
   it.each([
