@@ -304,12 +304,17 @@ Fields beyond the envelope:
 
 `--out-dir DIR` sends the file elsewhere (development runs); `--base-url URL` measures another origin, which must equal the api's `APP_ORIGIN` because it is also the `Origin` header. Hosted CI never reruns `just perf`; the ts job checks the committed file with `just report-check`, and the in-process latency test (`services/api/test/latency.test.ts`, R3.3) times the same three paths against the fixture solver-query as the CI stand-in.
 
+## Colour contrast: `contrast.md` (R3.13, O-346, O-365)
+
+Written by `just contrast-write` (`scripts/check-contrast.mjs --write`) from the light (`:root`) and dark (`.dark`) token blocks of `web/src/styles.css`. One table row per gating pair and theme: the two tokens, the WCAG 2 ratio, the minimum (4.5:1 for text, 3:1 for control edges and the focus ring), the result, what the pair is used for, and each colour's value with the palette hue it was derived from (the "from" note beside the token). A second table lists the solver surface colours (`web/src/theme/action-style.ts` and the felt) against the grounds for information; they never fail the run. The report is Markdown rather than JSON because it is derived from source, not measured on a machine, so it carries no machine or commit. `just contrast` (the ts job and `just ci`) fails when a gating pair is under its minimum, when a checked colour has no source note, or when the committed file differs from what the script writes.
+
 ## Report files (O-87)
 
 09 section 7 names where each gate report lands and O-87 fixes the file names 09 left open; `v1-gate.md` and the Phase 0 names come from 09 section 7 and the phase doc. The table lists every public report, who writes it and what it proves, so a session knows the name before it writes. Markdown files are gate summaries; JSON files follow `report.schema.json`. The two O-87 names that are fixtures rather than reports, `PROVENANCE-g6a.md` and `g4-spots.json`, live under `validation/fixtures/` and are described in that directory's README. Private reports (the Phase 1 exit, the G4 report, the coverage and quality assurance reports) stay in the capture repo and are only linked from here.
 
 | File | Written by | Form | Proves |
 |---|---|---|---|
+| `contrast.md` | S36, `just contrast-write` | Markdown, tool written | R3.13 (O-346, O-365): every text and control token pair at WCAG AA in both themes, with each colour's source hue. |
 | `phase-0-gate.md` | S06, started by S01 | Markdown | Phase 0 gate, repo part: R0.1 to R0.8 and R0.10 to R0.12, with the throwaway AGPL (GNU Affero General Public License) and guard runs linked and the private continuous integration (CI) result for R0.8 noted. |
 | `mac-bootstrap.md` | S04 | Markdown | Phase 0 gate, Mac part: R0.9 against O-50 (peak resident set size (RSS) under 5 GB and under 30 minutes to 0.3 percent pot per preflop line), the Docker memory per O-20, nothing left running per O-47. |
 | `bench-zenbook.json` | S02, `just bench`; S16 adds the grade id | JSON baseline | R0.10 and R2.13 (the `grade/warm_cache` id under its 30 ms budget). The p95 guard baseline that O-40's thresholds are later measured against; the benchmark section above has the fields. |

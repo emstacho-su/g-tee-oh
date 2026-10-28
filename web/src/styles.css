@@ -14,60 +14,110 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Visual system (S36, O-346): Tactile Digital on the owner's palette. The five palette colours are
+ * primitives (--p-*); the semantic tokens below keep the names every component already uses and
+ * take their values from those hues. Light is a cream ground with brown text and red accents; dark
+ * is a deep brown ground built from the same hues, with lifted text and accent. Every colour a
+ * text or control pair uses carries a "from" note naming its source hue, which
+ * scripts/check-contrast.mjs reads: `just contrast` holds every pair at WCAG AA in both themes and
+ * keeps validation/reports/contrast.md current (O-365). Success and warning have no hue in the
+ * five, so they are an olive and an ochre tuned to sit beside them (O-363). Danger shares the red
+ * family with the accent and is always carried by words (O-366).
+ *
+ * The solver surfaces keep their own colours (O-346, owned by S38): the felt below, the card
+ * backs further down and the action colours in src/theme/action-style.ts.
+ */
 :root {
-  --surface: #f8fafc;
-  --surface-raised: #ffffff;
-  --surface-sunken: #e2e8f0;
-  --border: #cbd5e1;
-  --text: #0f172a;
-  --text-muted: #475569;
-  --accent: #2563eb;
-  --accent-text: #ffffff;
-  --danger: #b91c1c;
-  --success: #15803d;
-  --warning: #b45309;
+  --p-oxblood: #8c1c13;
+  --p-brick: #bf4342;
+  --p-cream: #e7d7c1;
+  --p-taupe: #a78a7f;
+  --p-umber: #735751;
+  --surface: #f3ebdf; /* from e7d7c1 cream, lifted */
+  --surface-raised: #fbf7f1; /* from e7d7c1 cream, lifted further */
+  --surface-sunken: #e7d7c1; /* from e7d7c1 cream, the palette value */
+  --border: #a78a7f; /* from a78a7f taupe, the palette value; decorative edges */
+  --border-strong: #735751; /* from 735751 umber, the palette value; control edges */
+  --text: #2b1a16; /* from 735751 umber, deepened */
+  --text-muted: #735751; /* from 735751 umber, the palette value */
+  --accent: #8c1c13; /* from 8c1c13 oxblood, the palette value */
+  --accent-soft: #bf4342; /* from bf4342 brick, the palette value; highlights, never text */
+  --accent-text: #fbf7f1; /* from e7d7c1 cream, lifted */
+  --danger: #a1271b; /* from 8c1c13 oxblood, lightened toward bf4342 brick */
+  --success: #36602f; /* from no palette hue: an olive toned to 735751 umber (O-363) */
+  --warning: #7a4f10; /* from no palette hue: an ochre toned to 735751 umber (O-363) */
   --felt: #166534;
   --felt-edge: #14532d;
-  --focus: #f59e0b;
+  --focus: #bf4342; /* from bf4342 brick, the palette value */
   /*
-   * Mastery heat map (S32, O-320): five ordinal steps of one blue hue, lowest mastery first,
-   * validated with the dataviz palette validator (ordinal mode) against --surface-raised in each
-   * theme. Cell text: steps 1 and 2 take --heat-ink-low, steps 3 to 5 --heat-ink-high, in both
-   * themes, which keeps every label at 4.4:1 or more against its step.
+   * Depth (Tactile Digital): layered soft shadows tinted with the umber hue. raised is a static
+   * card; press-rest, press-hover and press-down are the three states of a pressable control
+   * (the tactile utility below). The top inset highlight reads as light falling on a raised edge.
    */
-  --heat-1: #86b6ef;
-  --heat-2: #5598e7;
-  --heat-3: #2a78d6;
-  --heat-4: #1c5cab;
-  --heat-5: #104281;
-  --heat-ink-low: #0f172a;
-  --heat-ink-high: #ffffff;
+  --shadow-raised:
+    inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 2px rgb(115 87 81 / 0.16), 0 4px 10px -2px rgb(115 87 81 / 0.18),
+    0 14px 28px -10px rgb(115 87 81 / 0.22);
+  --shadow-press-rest:
+    inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -2px 0 rgb(43 26 22 / 0.16), 0 1px 2px rgb(76 48 42 / 0.22),
+    0 5px 12px -4px rgb(76 48 42 / 0.28);
+  --shadow-press-hover:
+    inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -2px 0 rgb(43 26 22 / 0.16), 0 2px 4px rgb(76 48 42 / 0.22),
+    0 9px 18px -6px rgb(76 48 42 / 0.32);
+  --shadow-press-down: inset 0 2px 5px rgb(43 26 22 / 0.32), inset 0 -1px 0 rgb(255 255 255 / 0.2), 0 1px 1px rgb(76 48 42 / 0.16);
+  /* The release overshoots slightly and settles: the spring back after the squish. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /*
+   * Mastery heat map (S32, O-320; S36, O-362): five ordinal steps of one hue (the umber family at
+   * OKLCH hue 35), lowest mastery first, validated with the dataviz palette validator (ordinal
+   * mode) against --surface-raised in each theme. Cell text: steps 1 and 2 take --heat-ink-low,
+   * steps 3 to 5 --heat-ink-high, checked at 4.5:1 by the contrast script.
+   */
+  --heat-1: #d1a195; /* from 735751 umber hue, OKLCH lightness 0.75 */
+  --heat-2: #b87f70; /* from 735751 umber hue, OKLCH lightness 0.65 */
+  --heat-3: #9d5f4f; /* from 735751 umber hue, OKLCH lightness 0.55 */
+  --heat-4: #7d4234; /* from 735751 umber hue, OKLCH lightness 0.45 */
+  --heat-5: #5b2a1e; /* from 735751 umber hue, OKLCH lightness 0.35 */
+  --heat-ink-low: #2b1a16; /* from 735751 umber, deepened */
+  --heat-ink-high: #fbf7f1; /* from e7d7c1 cream, lifted */
   color-scheme: light;
 }
 
 .dark {
-  --surface: #0b1120;
-  --surface-raised: #111827;
-  --surface-sunken: #1f2937;
-  --border: #334155;
-  --text: #e5e7eb;
-  --text-muted: #94a3b8;
-  --accent: #60a5fa;
-  --accent-text: #0b1120;
-  --danger: #f87171;
-  --success: #4ade80;
-  --warning: #fbbf24;
+  --surface: #1c1210; /* from 735751 umber, deepened */
+  --surface-raised: #281a17; /* from 735751 umber, deepened less */
+  --surface-sunken: #140c0a; /* from 735751 umber, deepened most */
+  --border: #5a423c; /* from 735751 umber, darkened; decorative edges */
+  --border-strong: #a78a7f; /* from a78a7f taupe, the palette value; control edges */
+  --text: #efe4d6; /* from e7d7c1 cream, lifted */
+  --text-muted: #b9a196; /* from a78a7f taupe, lifted */
+  --accent: #e0766c; /* from bf4342 brick, lifted */
+  --accent-soft: #bf4342; /* from bf4342 brick, the palette value; highlights, never text */
+  --accent-text: #1c1210; /* from 735751 umber, deepened */
+  --danger: #f08a7e; /* from bf4342 brick, lifted further */
+  --success: #9cc48f; /* from no palette hue: the olive, lifted (O-363) */
+  --warning: #e4b066; /* from no palette hue: the ochre, lifted (O-363) */
   --felt: #14532d;
   --felt-edge: #052e16;
-  --focus: #fbbf24;
-  /* Dark steps run from dark (low mastery) to light (high), validated against #111827. */
-  --heat-1: #184f95;
-  --heat-2: #256abf;
-  --heat-3: #3987e5;
-  --heat-4: #6da7ec;
-  --heat-5: #b7d3f6;
-  --heat-ink-low: #ffffff;
-  --heat-ink-high: #0b1120;
+  --focus: #e7d7c1; /* from e7d7c1 cream, the palette value */
+  --shadow-raised:
+    inset 0 1px 0 rgb(231 215 193 / 0.07), 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 14px -4px rgb(0 0 0 / 0.55),
+    0 16px 32px -12px rgb(0 0 0 / 0.6);
+  --shadow-press-rest:
+    inset 0 1px 0 rgb(231 215 193 / 0.14), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.55),
+    0 6px 14px -4px rgb(0 0 0 / 0.6);
+  --shadow-press-hover:
+    inset 0 1px 0 rgb(231 215 193 / 0.16), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.55),
+    0 10px 20px -6px rgb(0 0 0 / 0.65);
+  --shadow-press-down: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(231 215 193 / 0.08), 0 1px 1px rgb(0 0 0 / 0.4);
+  /* Dark steps run from dark (low mastery) to light (high), validated against #281a17. */
+  --heat-1: #7e4739; /* from 735751 umber hue, OKLCH lightness 0.46 */
+  --heat-2: #9d5f4f; /* from 735751 umber hue, OKLCH lightness 0.55 */
+  --heat-3: #c48777; /* from 735751 umber hue, OKLCH lightness 0.68 */
+  --heat-4: #e1ac9f; /* from 735751 umber hue, OKLCH lightness 0.79 */
+  --heat-5: #f7d5cc; /* from 735751 umber hue, OKLCH lightness 0.90 */
+  --heat-ink-low: #fbf7f1; /* from e7d7c1 cream, lifted */
+  --heat-ink-high: #1c1210; /* from 735751 umber, deepened */
   color-scheme: dark;
 }
 
@@ -76,9 +126,11 @@
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-text: var(--accent-text);
   --color-danger: var(--danger);
   --color-success: var(--success);
@@ -101,6 +153,12 @@ body {
   color: var(--text);
 }
 
+/* Checkboxes, radios and range inputs take the accent, so native controls match the palette. */
+:root {
+  accent-color: var(--accent);
+}
+
+/* The ring sits 2 px outside the control, on the ground, so it is checked against the grounds. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -112,6 +170,58 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Tactile Digital (S36, O-346, O-364): the one implementation of depth and the press-squish. The
+ * components/ui primitives apply these classes; no screen restyles a press on its own.
+ *
+ * raised: a static surface (cards, panels, dialogs) with layered soft shadows.
+ *
+ * tactile: a pressable control. At rest it sits on soft layered shadows; hover lifts it 1 px.
+ * While pressed (:active, which Chromium also applies while Space is held) it squishes, wider and
+ * shorter, sinks 1 px and swaps to an inset shadow; on release the spring curve carries it back
+ * with a small overshoot. The squish is transform only, so the box keeps its layout size and
+ * nothing beside it moves. A disabled control neither lifts nor squishes. --tactile-rest lets a
+ * flat variant (ghost) drop the resting shadow while keeping the press.
+ *
+ * Reduced motion: transform is none in every state, so nothing moves; the press still shows
+ * through the shadow swap, which the global rule above makes instant.
+ */
+@utility raised {
+  box-shadow: var(--shadow-raised);
+}
+
+@utility tactile {
+  box-shadow: var(--tactile-rest, var(--shadow-press-rest));
+  transform-origin: 50% 100%;
+  transition:
+    transform 220ms var(--ease-spring),
+    box-shadow 160ms ease-out,
+    background-color 160ms ease-out;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-press-hover);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(1.03, 0.92);
+    box-shadow: var(--shadow-press-down);
+    transition-duration: 70ms;
+  }
+
+  &:disabled {
+    box-shadow: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      transform: none;
+    }
   }
 }
 
