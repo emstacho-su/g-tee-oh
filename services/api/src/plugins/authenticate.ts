@@ -41,6 +41,7 @@ export async function findLiveSession(
       "auth_session.expires_at",
       "app_user.email",
       "app_user.created_at as user_created_at",
+      "app_user.is_admin",
     ])
     .where("auth_session.token_hash", "=", hashSessionToken(token))
     .executeTakeFirst();
@@ -56,6 +57,7 @@ export async function findLiveSession(
     userId: row.user_id,
     email: row.email,
     userCreatedAt: row.user_created_at,
+    isAdmin: row.is_admin,
     csrfToken: row.csrf_token,
     expiresAt: row.expires_at,
   };

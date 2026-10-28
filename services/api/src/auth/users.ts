@@ -61,6 +61,8 @@ export interface UserCredentials {
   email: string;
   passwordHash: string;
   createdAt: Date;
+  /** app_user.is_admin, returned by login as user.is_admin (O-290). */
+  isAdmin: boolean;
 }
 
 export function normalizeEmail(raw: string): string {
@@ -116,10 +118,10 @@ export async function createUser(database: Database, input: NewUserInput): Promi
 export async function findUserCredentials(database: Database, rawEmail: string): Promise<UserCredentials | undefined> {
   const row = await database
     .selectFrom("app_user")
-    .select(["id", "email", "password_hash", "created_at"])
+    .select(["id", "email", "password_hash", "created_at", "is_admin"])
     .where("email", "=", normalizeEmail(rawEmail))
     .executeTakeFirst();
   return row === undefined
     ? undefined
-    : { id: row.id, email: row.email, passwordHash: row.password_hash, createdAt: row.created_at };
+    : { id: row.id, email: row.email, passwordHash: row.password_hash, createdAt: row.created_at, isAdmin: row.is_admin };
 }
