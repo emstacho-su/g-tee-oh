@@ -67,7 +67,15 @@ function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps)
       {selected === undefined ? (
         <p className="text-muted">Choose a pair to see its flops and queue, or to request it.</p>
       ) : (
-        <CoveragePanel api={api} configId={configId} pair={selected.pair} preflopAvailable={selected.preflop_available} />
+        // Keyed by the spot, so a new selection starts with an empty flop field, no earlier
+        // answer in the live region and no held Idempotency-Key (PR #28 review M2).
+        <CoveragePanel
+          key={`${configId}|${selected.pair}`}
+          api={api}
+          configId={configId}
+          pair={selected.pair}
+          preflopAvailable={selected.preflop_available}
+        />
       )}
     </>
   );

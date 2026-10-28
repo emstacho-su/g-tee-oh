@@ -7,8 +7,9 @@
  * handler (kept in a ref, so a re-render never reopens the stream). The status follows the
  * stream: "open" after its open event; "connecting" while the browser retries after an error (it
  * does so on its own, at the api's retry interval); "closed" once the browser gives up, which it
- * does when the api answers with an error status, for example a 401 after the session ended.
- * reconnect() opens a fresh stream after that.
+ * does when the api answers with an error status, for example a 401 after the session ended, or
+ * once MAX_CONSECUTIVE_STREAM_ERRORS errors arrive with no open between them, when the hook
+ * closes the stream itself. reconnect() opens a fresh stream after that.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -28,6 +29,12 @@ export type StreamStatus = "connecting" | "open" | "closed";
 
 /** EventSource.CLOSED, written out so the module never touches the global in a test. */
 export const EVENT_SOURCE_CLOSED = 2;
+/**
+ * Errors in a row, with no open between them, after which the screen stops the browser's own
+ * retries and offers Reconnect instead (PR #28 security review): a stream the api keeps refusing
+ * is not retried every few seconds for as long as the page stays open.
+ */
+export const MAX_CONSECUTIVE_STREAM_ERRORS = 3;
 
 export interface ServerEventHandlers {
   onCoverageAdded?: (event: CoverageAddedEvent) => void;
@@ -49,9 +56,21 @@ export function useServerEvents(handlers: ServerEventHandlers): ServerEvents {
 
   useEffect(() => {
     const source = openEvents(EVENTS_PATH);
+    let consecutiveErrors = 0;
     setStatus(source.readyState === EVENT_SOURCE_CLOSED ? "closed" : "connecting");
-    source.addEventListener("open", () => setStatus("open"));
-    source.addEventListener("error", () => setStatus(source.readyState === EVENT_SOURCE_CLOSED ? "closed" : "connecting"));
+    source.addEventListener("open", () => {
+      consecutiveErrors = 0;
+      setStatus("open");
+    });
+    source.addEventListener("error", () => {
+      consecutiveErrors += 1;
+      if (source.readyState === EVENT_SOURCE_CLOSED || consecutiveErrors >= MAX_CONSECUTIVE_STREAM_ERRORS) {
+        source.close();
+        setStatus("closed");
+        return;
+      }
+      setStatus("connecting");
+    });
     source.addEventListener(EVENT_NAMES.coverageAdded, (event) => {
       const parsed = parseCoverageAdded(event.data);
       if (parsed !== null) latest.current.onCoverageAdded?.(parsed);

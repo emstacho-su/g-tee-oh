@@ -7,6 +7,7 @@ import { useId, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../auth/index.js";
+import { BUILDER_STATE_TEXT } from "../library/format.js";
 import { useBuilderStatus, useIsAdmin } from "../library/use-builder.js";
 
 interface HomeCard {
@@ -47,7 +48,7 @@ function BuilderStatusCard() {
   const status = useBuilderStatus(useAppApi(), isAdmin);
   let summary = "Background library builder health is on the Library screen.";
   if (isAdmin && status.data !== undefined) {
-    summary = `Builder ${status.data.state}, ${status.data.queue.queued} builds queued.`;
+    summary = `Builder state: ${BUILDER_STATE_TEXT[status.data.state]}. ${status.data.queue.queued} builds queued.`;
   } else if (isAdmin && status.isError) {
     summary = "The builder status could not be loaded.";
   }

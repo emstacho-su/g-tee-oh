@@ -11,16 +11,8 @@ import type { ReactNode } from "react";
 import type { BuilderStatus } from "../../contracts.js";
 import { numericSetting } from "../../library/builder-settings.js";
 import type { BuildProgressEvent } from "../../library/events.js";
-import { flopsPerDay, formatBytes, formatPercent } from "../../library/format.js";
+import { BUILDER_STATE_TEXT, flopsPerDay, formatBytes, formatPercent } from "../../library/format.js";
 import { Button } from "../ui/index.js";
-
-const STATE_TEXT: Readonly<Record<BuilderStatus["state"], string>> = {
-  running: "Running",
-  paused: "Paused",
-  throttled: "Throttled",
-  idle: "Idle",
-  unknown: "Unknown: the builder has not reported since the api started",
-};
 
 export interface BuilderHealthProps {
   status: BuilderStatus;
@@ -73,7 +65,7 @@ export function BuilderHealth({ status, progress, onSetPaused, pending, failure 
       )}
       <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <Item term="Builder state">
-          <span data-testid="builder-state">{STATE_TEXT[status.state]}</span>
+          <span data-testid="builder-state">{BUILDER_STATE_TEXT[status.state]}</span>
           {status.reason === null || status.reason === "" ? null : <span className="block text-xs text-muted">{status.reason}</span>}
         </Item>
         <Item term="Queue depth">{`${queue.queued} queued, ${queue.running} running, ${queue.failed} failed, ${queue.blocked_budget} waiting on budget`}</Item>

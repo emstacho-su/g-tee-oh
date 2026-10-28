@@ -8,6 +8,17 @@ const UNITS: readonly { readonly size: number; readonly name: string }[] = [
   { size: 1e6, name: "MB" },
   { size: 1e3, name: "kB" },
 ];
+import type { BuilderStatus } from "../contracts.js";
+
+/** The words for each builder state, shared by BuilderHealth and the home card. */
+export const BUILDER_STATE_TEXT: Readonly<Record<BuilderStatus["state"], string>> = {
+  running: "Running",
+  paused: "Paused",
+  throttled: "Throttled",
+  idle: "Idle",
+  unknown: "Unknown: the builder has not reported since the api started",
+};
+
 const HOURS_PER_DAY = 24;
 const PERCENT = 100;
 

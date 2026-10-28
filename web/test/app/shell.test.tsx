@@ -119,7 +119,7 @@ describe("home shell", () => {
     });
 
     const card = await screen.findByRole("region", { name: "Builder status" });
-    await waitFor(() => expect(card).toHaveTextContent("Builder running, 3 builds queued."));
+    await waitFor(() => expect(card).toHaveTextContent("Builder state: Running. 3 builds queued."));
     expect(within(card).getByRole("link", { name: "Open the library" })).toHaveAttribute("href", "/library");
   });
 

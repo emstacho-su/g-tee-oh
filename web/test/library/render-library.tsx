@@ -84,6 +84,8 @@ export interface RenderedLibrary extends RenderResult {
 
 export interface RenderLibraryOptions {
   admin?: boolean;
+  /** Whether /me answers the admin fixture now; lets a test revoke the flag mid-test. */
+  isAdminNow?: () => boolean;
   override?: LibraryOverride;
 }
 
@@ -117,7 +119,8 @@ export function renderLibrary(path: string, options: RenderLibraryOptions = {}):
     requests.push(request);
     const custom = options.override?.(request);
     if (custom !== undefined) return custom;
-    if (request.path === "/api/v1/me") return jsonBody(200, admin ? fixtureSession : fixtureMemberSession);
+    const adminNow = options.isAdminNow?.() ?? admin;
+    if (request.path === "/api/v1/me") return jsonBody(200, adminNow ? fixtureSession : fixtureMemberSession);
     const routed = mockStudyRoute(request, { signedIn: true }) ?? libraryRoute(request, { signedIn: true });
     if (routed === undefined) return new Response("unrouted", { status: UNROUTED_STATUS });
     return jsonBody(routed.status, routed.body, routed.contentType);
