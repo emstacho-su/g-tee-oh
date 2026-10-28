@@ -107,9 +107,38 @@ test("R3.13 a var() to an undeclared token is an error naming the token and the 
   assert.throws(() => parseThemes(css), (error) => error instanceof ContrastError && /dark: --focus references --p-creme, which is not declared/.test(error.message));
 });
 
-test("R3.13 a var() cycle is an error naming the chain", () => {
-  const css = `${PRIMITIVES}  --a: var(--b);\n  --b: var(--a);\n}\n\n.dark {\n}\n`;
-  assert.throws(() => parseThemes(css), /light: --a has a var\(\) cycle: --a -> --b -> --a/);
+/** The fault lines of the ContrastError parseThemes throws for this stylesheet. */
+function faultsOf(css) {
+  try {
+    parseThemes(css);
+  } catch (error) {
+    if (error instanceof ContrastError) return error.message.split("\n");
+    throw error;
+  }
+  return [];
+}
+
+test("R3.13 a var() cycle is reported once, naming only the tokens in it", () => {
+  // --entry only points into the cycle; it is not part of it and is not named.
+  const css = `${PRIMITIVES}  --entry: var(--a);\n  --a: var(--b);\n  --b: var(--a);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), ["light: var() cycle: --a -> --b -> --a"]);
+});
+
+test("R3.13 a fault in a light-only token is reported once, not again for the dark theme", () => {
+  const css = `${PRIMITIVES}  --ring: var(--p-creme);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), ["light: --ring references --p-creme, which is not declared"]);
+});
+
+test("R3.13 a var() inside a larger value (calc, a shadow list) is not a colour token and never fails the run", () => {
+  const css = `${PRIMITIVES}  --layer-tooltip: 30;\n  --layer-popover: calc(var(--layer-tooltip) + 1);\n  --shadow-raised: 0 1px 2px var(--p-umber);\n  --mix: color-mix(in srgb, var(--p-umber) 50%, white);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), []);
+  const themes = parseThemes(css);
+  for (const name of ["layer-popover", "shadow-raised", "mix"]) assert.equal(themes.light.has(name), false, `--${name} is not a colour token`);
+});
+
+test("R3.13 a fallback on a token that is not a colour is left alone", () => {
+  const css = `${PRIMITIVES}  --layer-tooltip: 30;\n  --layer-popover: var(--layer-tooltip, 31);\n}\n\n.dark {\n}\n`;
+  assert.deepEqual(faultsOf(css), []);
 });
 
 test("R3.13 a var() the checker cannot follow (a fallback) is an error, never silently dropped", () => {

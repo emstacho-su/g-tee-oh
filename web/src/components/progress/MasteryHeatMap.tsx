@@ -13,7 +13,7 @@
  * scrolls sideways at 390 px. A legend explains every mark. The cell buttons are the one accessible
  * representation: each name states the class and every value (S36 review, O-347; no table).
  */
-import { useId, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 import {
   cellLookup,
@@ -118,12 +118,12 @@ function CellButton({ view, pending, onDrill, onShow, onHide }: CellButtonProps)
   );
 }
 
-// The sticky pair headers stay above the scrolling cells, on the sticky layer below the header.
+// Everything that sticks while the grid scrolls sideways (the pair column, the family labels) sits
+// on the sticky layer below the header, on the card's ground so cells never show through.
 const STICKY = cn("sticky left-0 bg-surface-raised", STICKY_LAYER_CLASS);
 
 function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; pendingKey: string | null; onDrill: (target: DrillTarget) => void }) {
   const lookup = cellLookup(heatmap);
-  const tooltipId = useId();
   const tooltip = useTooltipAnchor();
   const [active, setActive] = useState<HeatCellView | null>(null);
   const show = (view: HeatCellView, element: Element) => {
@@ -153,7 +153,7 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
           <tbody key={group.family}>
             <tr>
               <th scope="colgroup" colSpan={columnCount} className="pt-2 text-xs font-semibold text-muted">
-                <span className="sticky left-0">{group.family}</span>
+                <span className={cn(STICKY, "inline-block pr-2")}>{group.family}</span>
               </th>
             </tr>
             {group.rows.map((entry) => (
@@ -180,7 +180,7 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
           </tbody>
         ))}
       </table>
-      <ChartTooltip id={tooltipId} anchor={active === null ? null : tooltip.anchor}>
+      <ChartTooltip anchor={active === null ? null : tooltip.anchor}>
         {active === null ? null : (
           <>
             <p className="font-semibold">{active.classText}</p>

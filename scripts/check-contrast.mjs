@@ -8,13 +8,15 @@
 // Mechanism: web/src/styles.css declares the light tokens in the plain `:root {` block and the
 // dark ones in the plain `.dark {` block (later blocks such as `:root, [data-card-back]` are
 // cosmetics, not themes, and are skipped). The owner's palette is the --p-* primitives of the
-// light block, and a token that uses a palette colour as it is says var(--p-*); the parser
-// resolves var() references (same theme first, then the light block) and names that primitive as
-// the source. A derived colour is a hex value with a trailing comment `/* from <hex> <name>,
-// <how> */` naming the hue it came from (or why it sits outside the palette); a checked colour
-// with neither fails, so the report always says where every colour came from, and the palette
-// itself is written only once, in styles.css. The ratio is the WCAG 2 relative luminance formula.
-// GATING_PAIRS are
+// light block, and a token that uses a palette colour as it is says var(--p-*). The parser
+// resolves aliases, tokens whose whole value is one var() (same theme first, then the light
+// block), and names the primitive as the source; a var() inside a larger value (calc(), a shadow)
+// is not a colour token and is left alone. An alias the browser would drop (an undeclared target,
+// a cycle, a fallback on a colour) is a fault, reported once, and fails the run before any ratio.
+// A derived colour is a hex value with a trailing comment `/* from <hex> <name>, <how> */` naming
+// the hue it came from (or why it sits outside the palette); a checked colour with neither fails,
+// so the report always says where every colour came from, and the palette itself is written only
+// once, in styles.css. The ratio is the WCAG 2 relative luminance formula. GATING_PAIRS are
 // the pairs the app paints: text at 4.5:1 (1.4.3) and control edges and the focus ring at 3:1
 // (1.4.11). The solver surface colours (web/src/theme/action-style.ts and the felt) are owned by
 // S38; they are listed against the grounds at 3:1 for information only and never fail the run.
@@ -97,8 +99,13 @@ function blockBody(css, selector) {
   return match === null ? "" : match[1];
 }
 
-/** A plain reference, var(--name), with the spaces CSS allows; no fallback. */
-const VAR_REFERENCE = /^var\(\s*--([a-z0-9-]+)\s*\)$/i;
+/**
+ * A token whose whole value is one var(), with the spaces CSS allows and an optional fallback. A
+ * var() inside a larger value (calc(), color-mix(), a shadow list) is not an alias and is left out.
+ */
+const WHOLE_VAR = /^var\(\s*--([a-z0-9-]+)\s*(,[\s\S]*)?\)$/i;
+/** A token whose resolution failed; the fault is recorded once where it happened. */
+const FAILED = Symbol("failed");
 
 /** A token the checker cannot resolve: a typo, a cycle or a var() form it does not follow. */
 export class ContrastError extends Error {
@@ -117,61 +124,83 @@ function rawTokens(body) {
 }
 
 /**
- * One token resolved to a hex colour in one theme, or null when it is not a colour (a shadow, a
- * number). A var() reference is looked up in the same theme and then in the light block (the dark
- * block only overrides, and the --p-* primitives live in the light block), so a light-only alias
- * such as var(--surface) follows the dark --surface in the dark theme. A token that takes a
- * primitive as it is names that primitive as its source unless it carries its own note. A var()
- * the browser would drop, never silently: a reference to an undeclared token, a cycle, or a form
- * the checker does not follow (a fallback), each throws a ContrastError naming the token.
+ * A memoised resolver for one theme. A token resolves to { value, source } when it is a hex colour
+ * or an alias (a whole-value var()) that ends in one, to null when it is not a colour (a number, a
+ * shadow, a calc() or any var() inside a larger value), or to FAILED. A reference is looked up in
+ * the same theme and then in the light block (the dark block only overrides, and the --p-*
+ * primitives live in the light block), so a light-only alias such as var(--surface) follows the
+ * dark --surface in the dark theme. An alias that takes a primitive as it is names that primitive
+ * as its source unless it carries its own note.
+ *
+ * Faults, each added once to `faults` and named by the block that declares the faulty token (so a
+ * light-only fault seen again from the dark theme is the same line): an alias to an undeclared
+ * token; a cycle, naming only the tokens in it (a token that merely points into a cycle fails
+ * quietly); and an alias with a fallback that would otherwise be a colour, which the checker
+ * cannot follow. A fallback on a token that is not a colour is left alone.
  */
-function resolveRaw(raws, theme, chain) {
-  const name = chain.at(-1);
-  const entry = raws[theme].get(name) ?? raws.light.get(name);
-  if (entry === undefined) {
-    throw new ContrastError(`${theme}: --${chain.at(-2)} references --${name}, which is not declared`);
-  }
-  if (HEX.test(entry.raw)) return { value: expandHex(entry.raw), source: entry.source };
-  if (!entry.raw.includes("var(")) return null;
-  const reference = VAR_REFERENCE.exec(entry.raw);
-  if (reference === null) {
-    throw new ContrastError(`${theme}: --${name} uses ${entry.raw}, which the checker cannot resolve (write a plain var(--token))`);
-  }
-  const target = reference[1];
-  if (chain.includes(target)) {
-    throw new ContrastError(`${theme}: --${chain[0]} has a var() cycle: ${[...chain, target].map((each) => `--${each}`).join(" -> ")}`);
-  }
-  const resolved = resolveRaw(raws, theme, [...chain, target]);
-  if (resolved === null) return null;
-  const inherited = target.startsWith(PRIMITIVE_PREFIX) ? `--${target}, the palette value` : resolved.source;
-  return { value: resolved.value, source: entry.source ?? inherited };
+function themeResolver(raws, theme, faults) {
+  const memo = new Map();
+  const stack = [];
+  const homeOf = (name) => (raws[theme].has(name) ? theme : "light");
+
+  const evaluateToken = (name) => {
+    const entry = raws[theme].get(name) ?? raws.light.get(name);
+    if (HEX.test(entry.raw)) return { value: expandHex(entry.raw), source: entry.source };
+    const alias = WHOLE_VAR.exec(entry.raw);
+    if (alias === null) return null;
+    const [, target, fallback] = alias;
+    if (!raws[theme].has(target) && !raws.light.has(target)) {
+      faults.add(`${homeOf(name)}: --${name} references --${target}, which is not declared`);
+      return FAILED;
+    }
+    const resolved = resolve(target);
+    if (resolved === FAILED || resolved === null) return resolved;
+    if (fallback !== undefined) {
+      faults.add(`${homeOf(name)}: --${name} uses ${entry.raw}, which the checker cannot resolve (write a plain var(--token) for a colour)`);
+      return FAILED;
+    }
+    const inherited = target.startsWith(PRIMITIVE_PREFIX) ? `--${target}, the palette value` : resolved.source;
+    return { value: resolved.value, source: entry.source ?? inherited };
+  };
+
+  const resolve = (name) => {
+    if (memo.has(name)) return memo.get(name);
+    const at = stack.indexOf(name);
+    if (at >= 0) {
+      const members = stack.slice(at);
+      const home = members.every((member) => homeOf(member) === "light") ? "light" : theme;
+      faults.add(`${home}: var() cycle: ${[...members, name].map((member) => `--${member}`).join(" -> ")}`);
+      return FAILED;
+    }
+    stack.push(name);
+    const result = evaluateToken(name);
+    stack.pop();
+    memo.set(name, result);
+    return result;
+  };
+  return resolve;
 }
 
-/** Every token the theme sees (the light block's, overridden by the dark block's), resolved in it. */
-function resolvedTheme(raws, theme, errors) {
+/** Every colour token the theme sees (the light block's, overridden by the dark block's), resolved in it. */
+function resolvedTheme(raws, theme, faults) {
+  const resolve = themeResolver(raws, theme, faults);
   const tokens = new Map();
-  const names = new Set([...raws.light.keys(), ...raws[theme].keys()]);
-  for (const name of names) {
-    try {
-      const token = resolveRaw(raws, theme, [name]);
-      if (token !== null) tokens.set(name, token);
-    } catch (error) {
-      if (!(error instanceof ContrastError)) throw error;
-      errors.push(error.message);
-    }
+  for (const name of new Set([...raws.light.keys(), ...raws[theme].keys()])) {
+    const token = resolve(name);
+    if (token !== null && token !== FAILED) tokens.set(name, token);
   }
   return tokens;
 }
 
 /**
  * The light (:root) and dark (.dark) colour tokens, var() resolved, each with its source note or
- * null. Throws one ContrastError listing every unresolvable token in both themes.
+ * null. Throws one ContrastError listing every fault once, in the order found.
  */
 export function parseThemes(css) {
   const raws = { light: rawTokens(blockBody(css, ":root")), dark: rawTokens(blockBody(css, ".dark")) };
-  const errors = [];
-  const themes = { light: resolvedTheme(raws, "light", errors), dark: resolvedTheme(raws, "dark", errors) };
-  if (errors.length > 0) throw new ContrastError([...new Set(errors)].join("\n"));
+  const faults = new Set();
+  const themes = { light: resolvedTheme(raws, "light", faults), dark: resolvedTheme(raws, "dark", faults) };
+  if (faults.size > 0) throw new ContrastError([...faults].join("\n"));
   return themes;
 }
 
@@ -180,19 +209,14 @@ export function paletteOf(themes) {
   return [...themes.light].filter(([name]) => name.startsWith(PRIMITIVE_PREFIX)).map(([, token]) => token.value);
 }
 
-function resolveToken(themes, theme, name) {
-  // Each theme already holds every token resolved in it (resolvedTheme), light-only ones included.
-  return themes[theme].get(name);
-}
-
 /** Every pair in both themes with its ratio, and a list of failure lines (empty when all pass). */
 export function evaluate(themes, pairs) {
   const rows = [];
   const failures = [];
   for (const theme of ["light", "dark"]) {
     for (const pair of pairs) {
-      const fg = resolveToken(themes, theme, pair.fg);
-      const bg = resolveToken(themes, theme, pair.bg);
+      const fg = themes[theme].get(pair.fg);
+      const bg = themes[theme].get(pair.bg);
       if (fg === undefined || bg === undefined) {
         failures.push(`${theme}: --${fg === undefined ? pair.fg : pair.bg} is not a hex colour token`);
         continue;
@@ -220,12 +244,12 @@ export function readActionColours(source) {
 function solverRows(themes, actionColours) {
   const rows = [];
   for (const theme of ["light", "dark"]) {
-    const felt = resolveToken(themes, theme, "felt");
+    const felt = themes[theme].get("felt");
     const surfaces = [...actionColours.map((colour) => ({ name: `${colour.name} (action)`, value: colour[theme] }))];
     if (felt !== undefined) surfaces.push({ name: "felt", value: felt.value });
     for (const surface of surfaces) {
       for (const ground of ["surface", "surface-raised"]) {
-        const bg = resolveToken(themes, theme, ground);
+        const bg = themes[theme].get(ground);
         if (bg === undefined) continue;
         const ratio = contrastRatio(surface.value, bg.value);
         rows.push({ theme, name: surface.name, value: surface.value, ground, ratio, meets: ratio >= NON_TEXT_AA });

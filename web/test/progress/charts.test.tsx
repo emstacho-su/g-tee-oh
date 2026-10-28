@@ -25,6 +25,7 @@ import {
   fixtureLeaks,
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
+import { STICKY_LAYER_CLASS } from "../../src/components/ui/index.js";
 import { NOT_ON_HEATMAP_REASON } from "../../src/progress/leak-model.js";
 import type { LeakItem, LeakWeeks } from "../../src/progress/types.js";
 
@@ -140,6 +141,27 @@ describe("R4.12 LeakTrendChart", () => {
     expect(screen.queryByTestId("leak-table")).toBeNull();
   });
 
+  it("R4.12 arrow-key stepping is announced politely in one live region per chart, focus and hover are not (S36 follow-up)", () => {
+    renderTrend();
+    const card = screen.getByTestId("leak-trend");
+    const regions = within(card).getAllByRole("status");
+    expect(regions).toHaveLength(1);
+    const [region] = regions as [HTMLElement];
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toHaveClass("sr-only");
+    const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb, / });
+    fireEvent.focus(line);
+    expect(region).toBeEmptyDOMElement();
+    fireEvent.keyDown(line, { key: "ArrowLeft" });
+    expect(region).toHaveTextContent("rfi BB-UTG, live 100 bb: Week of Oct 19: 44.4 bb per 1,000 hands");
+    // A key that does not step and a hover leave the announcement as it was.
+    fireEvent.keyDown(line, { key: "Enter" });
+    fireEvent.mouseMove(line, { clientX: 0 });
+    expect(region).toHaveTextContent("Week of Oct 19");
+    fireEvent.blur(line);
+    expect(region).toBeEmptyDOMElement();
+  });
+
   it("R4.12 the sparkline tooltip follows focus, arrow keys and hover", () => {
     renderTrend();
     const line = screen.getByRole("img", { name: /^rfi BB-UTG, live 100 bb, / });
@@ -184,6 +206,14 @@ describe("R4.12 MasteryHeatMap", () => {
     const grid = screen.getByTestId("heat-grid");
     expect(within(grid).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Pair", "live 100 bb", "online 100 bb", "online 150 bb", "online 200 bb", "rfi", "facing-open", "facing-3bet", "blind-vs-blind"]);
     expect(within(grid).getAllByRole("rowheader")).toHaveLength(10);
+  });
+
+  it("R4.12 every sticky header in the grid (pair column and family labels) is on the sticky layer with a ground (S36 follow-up)", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const stuck = Array.from(screen.getByTestId("heat-grid").querySelectorAll(".sticky"));
+    expect(stuck.length).toBeGreaterThan(10);
+    for (const element of stuck) expect(element).toHaveClass(STICKY_LAYER_CLASS, "bg-surface-raised");
+    expect(within(screen.getByTestId("heat-grid")).getByText("facing-3bet")).toHaveClass(STICKY_LAYER_CLASS);
   });
 
   it("R4.12 the tooltip shows on focus and hover; a click opens the cell's drill", () => {
