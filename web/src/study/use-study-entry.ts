@@ -10,8 +10,8 @@
  *
  * Review round 1: the catalog reads (stakes, configurations, the URL's pairs) and the draft's read
  * are reported apart (combineReads), so a draft still loading never hides the panel behind the
- * page's loading note, and a draft read that failed shows inside the panel, never over a confirmed
- * solution. The merged configurations and the catalog object are memoised on the data they hold,
+ * page's loading note, and a draft read that failed shows inside the panel, with its Retry, never
+ * over a confirmed solution (also when the draft and the URL name one configuration, PR 37). The merged configurations and the catalog object are memoised on the data they hold,
  * so the panel's choices (memoised on catalog and draft) are not recomputed on unrelated renders.
  */
 import { useQuery } from "@tanstack/react-query";
@@ -32,12 +32,16 @@ export interface StudyEntry {
   readonly configId: string | undefined;
   /** The URL's pair when the library covers it at the URL's configuration. */
   readonly studyPair: PositionPairEntry | undefined;
-  /** True once the catalog has said whether the URL names a covered spot. */
+  /** True once the catalog has said (or failed to say) whether the URL names a covered spot. */
   readonly urlSettled: boolean;
-  /** The stakes, configurations and the URL's pairs. */
+  /**
+   * The stakes, the configurations and the URL's pairs. The URL's pairs count here only when the
+   * draft names another configuration; when both name one, that read is the draft's seats read,
+   * reported once, in the panel (PR 37 review round 1).
+   */
   readonly catalogReads: CombinedReads;
-  /** The draft configuration's pairs, for the panel. */
-  readonly draftReads: CombinedReads;
+  /** The read of the draft configuration's seats: whether it failed, and its retry for the panel. */
+  readonly draftSeats: { readonly failed: boolean; readonly retry: () => void };
 }
 
 function useConfigs(api: AppApi) {
@@ -73,8 +77,12 @@ export function useStudyEntry(api: AppApi, search: StudySearch, draft: SettingsD
     stakes: stakes.data,
     configId,
     studyPair: entry?.preflop_available === true ? entry : undefined,
-    urlSettled: catalog !== undefined && (configId === undefined || urlPairs.data !== undefined),
-    catalogReads: combineReads([stakes, ...configReads, urlPairs]),
-    draftReads: combineReads(draftConfigId === configId ? [] : [draftPairs]),
+    urlSettled: catalog !== undefined && (configId === undefined || urlPairs.data !== undefined || urlPairs.isError),
+    catalogReads: combineReads([stakes, ...configReads, ...(draftConfigId === configId ? [] : [urlPairs])]),
+    // One query: when both name one configuration, draftPairs and urlPairs share a query key.
+    draftSeats: {
+      failed: draftConfigId !== undefined && draftPairs.isError,
+      retry: () => void draftPairs.refetch(),
+    },
   };
 }
