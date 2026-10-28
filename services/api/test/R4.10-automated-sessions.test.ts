@@ -162,13 +162,16 @@ describe("R4.10 coverage (O-270, O-240, ADR 0018)", () => {
       [player.userId, session.rows[0]?.id, solutionId, goneKey],
     );
     await seedCards(database, player.userId, [goneKey]);
-    const solutionsBefore = await pool.query<{ n: number }>("select count(*)::int as n from solution");
     const created = await requireAutomated(app, player);
     expect(created.automated?.spot_class_key).not.toBe(goneKey);
     const requests = await pool.query<{ game_config_id: string; position_pair: string; line: string | null }>("select game_config_id, position_pair, line from coverage_request where user_id = $1", [player.userId]);
     expect(requests.rows).toEqual([{ game_config_id: ONLINE_100, position_pair: "BB-BTN", line: null }]);
-    const solutionsAfter = await pool.query<{ n: number }>("select count(*)::int as n from solution");
-    expect(solutionsAfter.rows[0]?.n).toBe(solutionsBefore.rows[0]?.n);
+    // No solution row can come from this request: the api connects as app, which holds no insert or update on
+    // solution (ADR 0018). A global row count would race the other suites that insert fixture solutions.
+    const privileges = await pool.query<{ can_insert: boolean; can_update: boolean }>(
+      "select has_table_privilege('app', 'solution', 'INSERT') as can_insert, has_table_privilege('app', 'solution', 'UPDATE') as can_update",
+    );
+    expect(privileges.rows[0]).toEqual({ can_insert: false, can_update: false });
   });
 
   it("R4.10 a scope with no covered class is a 422 no-coverage that still records every gap once", async () => {
