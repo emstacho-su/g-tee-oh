@@ -116,6 +116,25 @@ describe("R3.13 seatActions and logLines (O-383)", () => {
     expect(flop.get("UTG")).toEqual({ label: "Fold", folded: true, chip: null });
   });
 
+  it("R3.13 the hero acting first on a new street: once the replay ends, the last street's chips clear (S40, item a)", () => {
+    const pre = (entry: Entry): Entry => ({ ...entry, street: "preflop" });
+    // Every entry is preflop; the prompt is the flop, where the hero (BB) acts first.
+    const handHistory: Entry[] = [pre(fold("UTG")), pre(raise("BTN", 250)), pre(call("BB"))];
+    const done = seatActions(handHistory, 3, "flop");
+    expect(done.get("BTN")).toBeUndefined();
+    expect(done.get("BB")).toBeUndefined();
+    expect(done.get("UTG")).toEqual({ label: "Fold", folded: true, chip: null });
+    // The same street, or no street passed (the replay still running), keeps the chips.
+    expect(seatActions(handHistory, 3, "preflop").get("BTN")?.chip).toBe("Raise 2.5bb");
+    expect(seatActions(handHistory, 3).get("BB")?.chip).toBe("Call");
+    // Entries without a street never clear on the prompt's street: the web infers nothing.
+    expect(seatActions([raise("BTN", 250)], 1, "flop").get("BTN")?.chip).toBe("Raise 2.5bb");
+  });
+
+  it("R3.13 planReplay carries the prompt's street", () => {
+    expect(planReplay(null, promptWith({ street: "flop" }), "normal").street).toBe("flop");
+  });
+
   it("R3.13 entries without a street (stored before review round 1) stay one street", () => {
     expect(seatActions(history, 4).get("HJ")).toEqual({ label: "Raise 2.5bb", folded: false, chip: "Raise 2.5bb" });
   });

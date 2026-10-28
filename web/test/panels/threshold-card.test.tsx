@@ -40,6 +40,22 @@ describe("R3.12 ThresholdCard", () => {
     expect(screen.getByRole("group", { name: "Hand position" })).toHaveTextContent("At or above every hand in this range by strength");
   });
 
+  it.each([
+    [0.996, "At or above every hand in this range by strength"],
+    [0.994, "At or above 99% of this range by strength"],
+    [0.5, "At or above 50% of this range by strength"],
+    [0.006, "At or above 1% of this range by strength"],
+    [0.004, "At or above less than 1% of this range by strength"],
+    [0.001, "At or above less than 1% of this range by strength"],
+  ])("R3.12 a rank of %s is rounded to a whole percent before the wording is chosen (S40 item d, O-408)", (rank, text) => {
+    const card: Card = { ...CARD, hand_position: { ...CARD.hand_position, rank_in_range: rank } };
+    render(<ThresholdCard card={card} heroHand="AJo" />);
+    const position = screen.getByRole("group", { name: "Hand position" });
+    expect(position).toHaveTextContent(text);
+    expect(position).not.toHaveTextContent("At or above 100%");
+    expect(position).not.toHaveTextContent("At or above 0%");
+  });
+
   it("R3.12 a hand with no strength rank (outside the range here) gets its own text and no placeholder equity (review round 1, 4)", () => {
     const outside: Card = { ...CARD, hand_position: { ...CARD.hand_position, rank_in_range: 0, equity_vs_villain: 0.5 } };
     render(<ThresholdCard card={outside} heroHand="AJo" />);

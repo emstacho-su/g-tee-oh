@@ -180,3 +180,19 @@ describe("R3.13 useActionReplay", () => {
     expect(result.current.shown).toBe(3);
   });
 });
+
+describe("R3.13 useActionReplay and the prompt's street (S40, item a)", () => {
+  it("R3.13 the hero acting first on the flop: the preflop chips show during the replay and clear once it ends", () => {
+    const preflop: Entry[] = [
+      { position: "HJ", token: "r250", label: "Raise 2.5bb", street: "preflop" },
+      { position: "BB", token: "c", label: "Call", street: "preflop" },
+    ];
+    const flopPrompt: TrainerPrompt = { ...fixturePrompt, hand_no: 4, state_version: 20, street: "flop", history: preflop };
+    const { result } = renderReplay(flopPrompt);
+    expect(result.current.seats.get("HJ")?.chip).toBe("Raise 2.5bb");
+    playToEnd(result);
+    expect(result.current.replaying).toBe(false);
+    expect(result.current.seats.get("HJ")).toBeUndefined();
+    expect(result.current.seats.get("BB")).toBeUndefined();
+  });
+});
