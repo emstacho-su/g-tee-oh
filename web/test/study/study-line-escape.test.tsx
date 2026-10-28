@@ -14,6 +14,7 @@ import {
   FIXTURE_STUDY_PAIR,
   fixtureChildNode,
 } from "../../src/fixtures/study.js";
+import { studyNodeKey } from "../../src/study/queries.js";
 import { nodeJson, problemOf, renderStudy, type StudyOverride } from "./render-study.js";
 
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
@@ -100,11 +101,13 @@ describe("R3.12 the carousel stays preflop", () => {
   });
 
   it("R3.12 a child read that failed leaves its action enabled", async () => {
-    const { nodeRequests } = renderStudy(BASE, (request) =>
+    const { queryClient } = renderStudy(BASE, (request) =>
       request.path === "/api/v1/study/node" && request.query["line"] === FIXTURE_CHILD_LINE ? problemOf(503, "unavailable") : undefined,
     );
     const actions = await screen.findByRole("region", { name: "BTN's actions" });
-    await waitFor(() => expect(nodeRequests().map((request) => request.query["line"])).toContain(FIXTURE_CHILD_LINE));
+    // Wait for the failure itself, an error-only signal, before checking the action.
+    const childKey = studyNodeKey({ configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: FIXTURE_CHILD_LINE });
+    await waitFor(() => expect(queryClient.getQueryState(childKey)?.status).toBe("error"));
     const raise = within(actions).getByRole("button", { name: /^Raise 2\.5bb/ });
     expect(raise).not.toHaveAttribute("aria-disabled");
     expect(raise).not.toHaveAccessibleName(POSTFLOP_REASON);

@@ -19,7 +19,7 @@ import {
   confirmBlocker,
   draftConfigId,
   draftUncoveredPair,
-  fieldWaitText,
+  fieldStates,
   draftFromSearch,
   draftPair,
   searchFromDraft,
@@ -29,6 +29,7 @@ import {
   withSetting,
   type SettingChoice,
   type SettingsCatalog,
+  type SettingKey,
   type SettingsDraft,
 } from "../../src/study/settings.js";
 
@@ -91,10 +92,20 @@ describe("R3.12 study settings choices", () => {
     expect(depths?.map((choice) => choice.label)).toEqual(["100bb", "200bb"]);
     expect(depths?.every((choice) => !choice.disabled)).toBe(true);
 
-    const live: SettingsDraft = { format: "live", table_size: 6, stake: FIXTURE_LIVE_STAKE_ID };
-    expect(summary(settingChoices(CATALOG, live).depth)).toEqual([
-      { value: "10000", disabled: true, reason: "Not at this stake and size" },
+    // A 150 bb game exists only at 9 players, so at 6 players that depth is listed but disabled.
+    const nine = { ...fixtureConfigs[0]!, config_id: "cfg_9_online_150", table_size: 9, depth_cbb: 15000 };
+    const wider: SettingsCatalog = { ...CATALOG, configs: [...fixtureConfigs, nine] };
+    expect(summary(settingChoices(wider, draft).depth)).toEqual([
+      { value: "10000", disabled: false, reason: undefined },
+      { value: "15000", disabled: true, reason: "Not at this stake and size" },
+      { value: "20000", disabled: false, reason: undefined },
     ]);
+  });
+
+  it("R3.12 a field below an unavailable choice waits and names that field", () => {
+    const live: SettingsDraft = { format: "live", table_size: 6, stake: FIXTURE_LIVE_STAKE_ID };
+    expect(settingChoices(CATALOG, live).depth).toBeUndefined();
+    expect(fieldStates(CATALOG, live).depth).toEqual({ kind: "waiting", cause: "upper", reason: "Choose an available table size first." });
   });
 
   it("R3.12 first to act lists the seats in action order but the last; a seat with no covered pair is disabled", () => {
@@ -194,20 +205,42 @@ describe("R3.12 why Confirm is unavailable", () => {
   it("R3.12 seats whose read failed say they could not be loaded, not that they are loading", () => {
     const failed: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
     const draft: SettingsDraft = { ...ONLINE_100, first: "BTN", against: "BB" };
-    expect(confirmBlocker(failed, draft, undefined, { seatsFailed: true })).toBe("The seats for these settings could not be loaded.");
-    expect(confirmBlocker(failed, draft, undefined, { seatsFailed: false })).toBe("Loading the seats for these settings.");
+    expect(confirmBlocker(failed, draft, { seatsFailed: true })).toBe("The seats for these settings could not be loaded.");
+    expect(confirmBlocker(failed, draft, { seatsFailed: false })).toBe("Loading the seats for these settings.");
+    expect(canConfirm(failed, draft, { seatsFailed: true })).toBe(false);
   });
 
-  it("R3.12 a field waiting on its upper fields prompts for them; seats waiting on a chosen depth say why", () => {
+  it("R3.12 a waiting field names the first upper field missing or unavailable, or says loading or failed", () => {
     const loading: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
-    expect(fieldWaitText(CATALOG, {}, "table_size", false)).toBe("Choose a format first.");
-    expect(fieldWaitText(CATALOG, { format: "online", table_size: 6, stake: FIXTURE_ONLINE_STAKE_ID }, "first", false)).toBe(
-      "Choose a depth first.",
-    );
-    expect(fieldWaitText(loading, ONLINE_100, "first", false)).toBe("Loading the seats for these settings.");
-    expect(fieldWaitText(loading, ONLINE_100, "first", true)).toBe("The seats for these settings could not be loaded.");
-    expect(fieldWaitText(CATALOG, { ...ONLINE_100, depth: 30000 }, "first", false)).toBe("Choose an available depth first.");
-    expect(fieldWaitText(undefined, {}, "format", false)).toBe("Loading the catalog.");
+    const reason = (catalog: SettingsCatalog | undefined, draft: SettingsDraft, key: SettingKey, seatsFailed = false) => {
+      const state = fieldStates(catalog, draft, { seatsFailed })[key];
+      return state.kind === "waiting" ? state.reason : "choices";
+    };
+    expect(reason(CATALOG, {}, "table_size")).toBe("Choose a format first.");
+    expect(reason(CATALOG, { format: "online", table_size: 6, stake: FIXTURE_ONLINE_STAKE_ID }, "first")).toBe("Choose a depth first.");
+    expect(reason(loading, ONLINE_100, "first")).toBe("Loading the seats for these settings.");
+    expect(reason(loading, ONLINE_100, "first", true)).toBe("The seats for these settings could not be loaded.");
+    expect(reason(CATALOG, { ...ONLINE_100, depth: 30000 }, "first")).toBe("Choose an available depth first.");
+    expect(reason(undefined, {}, "format")).toBe("Loading the catalog.");
+    expect(reason(undefined, {}, "table_size")).toBe("Choose a format first.");
+    expect(reason(CATALOG, { ...ONLINE_100, first: "CO" }, "against")).toBe("Choose an available seat to act first.");
+  });
+
+  it("R3.12 seats below a missing stake ask for the stake, and Confirm names it too", () => {
+    const noStake: SettingsDraft = { format: "online", table_size: 6, depth: 10000, first: "BTN", against: "BB" };
+    const states = fieldStates(CATALOG, noStake);
+    expect(states.depth).toMatchObject({ kind: "waiting", reason: "Choose a stake first." });
+    expect(states.first).toMatchObject({ kind: "waiting", reason: "Choose a stake first." });
+    expect(states.against).toMatchObject({ kind: "waiting", reason: "Choose a stake first." });
+    expect(confirmBlocker(CATALOG, noStake)).toBe("Choose the stake.");
+  });
+
+  it("R3.12 seats below a stake of the other format name the stake, not the depth", () => {
+    const otherFormat: SettingsDraft = { ...ONLINE_100, stake: FIXTURE_LIVE_STAKE_ID, first: "BTN", against: "BB" };
+    const states = fieldStates(CATALOG, otherFormat);
+    expect(states.first).toMatchObject({ kind: "waiting", reason: "Choose an available stake first." });
+    expect(states.against).toMatchObject({ kind: "waiting", reason: "Choose an available stake first." });
+    expect(confirmBlocker(CATALOG, otherFormat)).toBe("Choose the stake.");
   });
 
   it("R3.12 the uncovered pair the draft names, if any", () => {

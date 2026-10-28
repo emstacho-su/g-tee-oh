@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   FIXTURE_DEEP_CONFIG_ID,
+  FIXTURE_LIVE_STAKE_ID,
   FIXTURE_ONLINE_STAKE_ID,
   FIXTURE_STUDY_CONFIG_ID,
   fixturePairsByConfig,
@@ -127,9 +128,11 @@ describe("R3.12 study settings panel", () => {
     const { nodeRequests } = renderStudy(`/study?${ONLINE_100}&pair=CO-BTN`);
     const panel = await screen.findByRole("region", { name: "Spot settings" });
     expect(await within(panel).findByText("CO-BTN is not in the library at this configuration.")).toBeInTheDocument();
-    const btn = await waitFor(() => choice("Against", /^BTN/));
-    expect(btn).toHaveAttribute("aria-checked", "true");
-    expect(btn).toHaveAccessibleName(/Not in the library/);
+    // The uncovered seat is shown chosen with its reason; the field below it names that seat.
+    const co = await waitFor(() => choice("First to act", /^CO/));
+    expect(co).toHaveAttribute("aria-checked", "true");
+    expect(co).toHaveAccessibleName(/Not in the library/);
+    expect(within(panel).getByText("Choose an available seat to act first.")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Confirm" })).toBeDisabled();
     expect(nodeRequests()).toEqual([]);
     expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
@@ -243,14 +246,39 @@ describe("R3.12 study settings panel", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("R3.12 a failed read of the URL configuration's seats says so in the panel too", async () => {
-    renderStudy(`/study?${ONLINE_100}`, (request) =>
-      request.path === `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs` ? problemOf(500, "internal") : undefined,
-    );
+  it("R3.12 a failed read of the URL configuration's seats says so in the panel, with the panel's Retry", async () => {
+    const user = userEvent.setup();
+    let failures = 1;
+    renderStudy(`/study?${ONLINE_100}`, (request) => {
+      if (request.path !== `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs` || failures === 0) return undefined;
+      failures -= 1;
+      return problemOf(500, "internal");
+    });
     const panel = await screen.findByRole("region", { name: "Spot settings" });
-    expect(await screen.findByRole("alert")).toHaveTextContent("The game catalog could not be loaded.");
+    const alert = await within(panel).findByRole("alert");
+    expect(screen.getAllByRole("alert")).toEqual([alert]);
     expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
     expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(await waitFor(() => choice("First to act", /^BTN/))).not.toHaveAttribute("aria-disabled");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a link with depth and pair but no stake: the seat fields ask for the stake", async () => {
+    renderStudy(`/study?format=online&table_size=6&depth=10000&pair=BB-BTN`);
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    await waitFor(() => expect(within(panel).getAllByText("Choose a stake first.")).toHaveLength(3));
+    expect(within(panel).getByText("Choose the stake.")).toBeInTheDocument();
+    expect(within(panel).queryByText(/depth first/)).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a link whose stake belongs to the other format: the seats and Confirm name the stake, not the depth", async () => {
+    renderStudy(`/study?format=online&table_size=6&stake=${FIXTURE_LIVE_STAKE_ID}&depth=10000&pair=BB-BTN`);
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    await waitFor(() => expect(within(panel).getAllByText("Choose an available stake first.")).toHaveLength(3));
+    expect(within(panel).getByText("Choose the stake.")).toBeInTheDocument();
+    expect(within(panel).queryByText(/depth first/i)).not.toBeInTheDocument();
   });
 
   it("R3.12 a failed catalog read shows an error with a retry and no server detail", async () => {
