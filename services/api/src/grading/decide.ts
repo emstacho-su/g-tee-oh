@@ -20,8 +20,14 @@
  *    render the feedback
  *    from the inserted row (O-92). Any failure rolls back the attempt with the state, and under an
  *    Idempotency-Key the stored response commits with them, so a retry replays it, graded once.
+ * 4. S31 (O-27, O-272 to O-279): the learning hooks (learning/effects.ts) run inside that same
+ *    transaction: beforeGrade after the lock (its overrides change the GradeInput, ratedTodayInTrack
+ *    and the attempt's track_ids and item_difficulty), afterInsert after the attempt insert (its
+ *    state patch is written with the next state, its extras join the feedback). The attempt also
+ *    stores hand_class, the hero's row label at the node, and panels_revealed. The derivation loads
+ *    the session's holdout guard first (sessions/derive-settings.ts).
  */
-import { grade as gradeDecision, type GradeOutput } from "@g-tee-oh/learning";
+import { grade as gradeDecision, type GradeInput, type GradeOutput } from "@g-tee-oh/learning";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
@@ -31,13 +37,15 @@ import { idempotentWrite } from "../http/idempotent-write.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { SQ_GRADE_METRIC, timed } from "../http/server-timing.js";
 import type { decisionBodySchema } from "../schemas/training.js";
+import type { DecisionContext, GradeOverrides } from "../learning/effects.js";
 import { actionAt, afterHeroDecision, deriveAwaitHero, type DerivedPrompt } from "../sessions/derive.js";
+import { deriveSettingsFor } from "../sessions/derive-settings.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
 import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-port.js";
 import { requireSolverQuery, type SqAction, type SqGrade } from "../solver-query/client.js";
 import { countRatedToday, insertAttempt, staleStateProblem, type AttemptValues } from "./attempts.js";
 import { renderFeedback, toContractLabel, type Feedback } from "./feedback.js";
-import { bestActionIndexes, buildGradeInput, gradeActions } from "./policy.js";
+import { bestActionIndexes, buildGradeInput, gradeActions, panelsRevealAnswer } from "./policy.js";
 import { sessionEndedProblem } from "../sessions/problems.js";
 
 export type DecisionBody = z.infer<typeof decisionBodySchema>;
@@ -83,17 +91,30 @@ function referenceOf(sessionId: string, stateVersion: number): string {
   return `${sessionId}:${stateVersion}`.slice(0, MAX_REFERENCE_LENGTH);
 }
 
-function policyOutput(session: SessionRow, graded: Pick<Graded, "derived" | "chosen" | "action">, ratedToday: number): GradeOutput {
-  return gradeDecision(
-    buildGradeInput({
-      node: graded.derived.node,
-      grade: graded.chosen,
-      actionIndex: graded.action.index,
-      rngRoll: graded.derived.roll?.roll ?? null,
-      settings: session.settings,
-      ratedTodayInTrack: ratedToday,
-    }),
-  );
+/** The GradeInput fields the learning hooks may override (learning/effects.ts). */
+function gradeInputOverrides(overrides: GradeOverrides): Partial<Pick<GradeInput, "mode" | "firstAttempt" | "panelsRevealed">> {
+  return {
+    ...(overrides.mode === undefined ? {} : { mode: overrides.mode }),
+    ...(overrides.firstAttempt === undefined ? {} : { firstAttempt: overrides.firstAttempt }),
+    ...(overrides.panelsRevealed === undefined ? {} : { panelsRevealed: overrides.panelsRevealed }),
+  };
+}
+
+function policyOutput(
+  session: SessionRow,
+  graded: Pick<Graded, "derived" | "chosen" | "action">,
+  ratedToday: number,
+  overrides: GradeOverrides = {},
+): GradeOutput {
+  const input = buildGradeInput({
+    node: graded.derived.node,
+    grade: graded.chosen,
+    actionIndex: graded.action.index,
+    rngRoll: graded.derived.roll?.roll ?? null,
+    settings: session.settings,
+    ratedTodayInTrack: ratedToday,
+  });
+  return gradeDecision({ ...input, ...gradeInputOverrides(overrides) });
 }
 
 /**
@@ -117,8 +138,8 @@ function gradeAtFor(decision: DecisionRequest, port: SolverPort, call: Omit<Grad
 }
 
 async function gradeWithSolverQuery(session: SessionRow, decision: DecisionRequest, port: SolverPort): Promise<{ graded: Graded; gradeAt: GradeAt }> {
-  const { settings } = session;
-  const derived = await deriveAwaitHero(session.state, { stopRule: settings.stop_rule, rng: settings.rng }, port);
+  const settings = await deriveSettingsFor(decision.app, decision.userId, session);
+  const derived = await deriveAwaitHero(session.state, settings, port);
   const action = actionAt(derived.node, decision.body.action_index);
   if (action === undefined) {
     throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, {
@@ -138,7 +159,13 @@ async function gradeWithSolverQuery(session: SessionRow, decision: DecisionReque
   return { graded: await settleMember(partial, previewIndex, gradeAt), gradeAt };
 }
 
-function attemptValues(session: SessionRow, decision: DecisionRequest, graded: Graded, outcome: GradeOutput): AttemptValues {
+function attemptValues(
+  session: SessionRow,
+  decision: DecisionRequest,
+  graded: Graded,
+  outcome: GradeOutput,
+  overrides: GradeOverrides,
+): AttemptValues {
   const { chosen, derived, action, member } = graded;
   if (member.index !== outcome.gradedActionIndex) {
     throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, { detail: "The graded member and its loss disagree." });
@@ -174,6 +201,10 @@ function attemptValues(session: SessionRow, decision: DecisionRequest, graded: G
     lossPctPotByAction: chosen.loss_pct_pot_by_action,
     bestActionIndexes: bestActionIndexes(chosen.freq_by_action, actions, roll),
     gradedActionIndex: outcome.gradedActionIndex,
+    handClass: derived.node.hands[0]?.hand ?? null,
+    panelsRevealed: overrides.panelsRevealed ?? panelsRevealAnswer(session.settings),
+    trackIds: overrides.trackIds ?? [],
+    itemDifficulty: overrides.itemDifficulty ?? null,
   };
 }
 
@@ -204,21 +235,35 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
     if (locked.stateVersion !== session.stateVersion) {
       throw staleStateProblem();
     }
-    const ratedToday = await countRatedToday(transaction, decision.userId, decision.now, decision.config.timeZone);
-    const outcome = policyOutput(session, preview.graded, ratedToday);
+    const hooks = decision.app.learningHooks;
+    const context: DecisionContext = {
+      transaction,
+      now: decision.now,
+      timeZone: decision.config.timeZone,
+      userId: decision.userId,
+      session,
+      derived: preview.graded.derived,
+      solverQuery: requireSolverQuery(decision.app),
+      request: decision.request,
+    };
+    const overrides = await hooks.beforeGrade(context);
+    const ratedToday =
+      overrides.ratedTodayInTrack ?? (await countRatedToday(transaction, decision.userId, decision.now, decision.config.timeZone));
+    const outcome = policyOutput(session, preview.graded, ratedToday, overrides);
     // The real ratedTodayInTrack may grade another member than the preview did: grade that one (MEDIUM 7).
     const graded = await settleMember(preview.graded, outcome.gradedActionIndex, preview.gradeAt);
-    const row = await insertAttempt(transaction, attemptValues(session, decision, graded, outcome));
+    const row = await insertAttempt(transaction, attemptValues(session, decision, graded, outcome, overrides));
     const next = afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
+    const effects = await hooks.afterInsert({ ...context, attempt: row, outcome, overrides, next });
     const written = await writeState(transaction, {
       userId: decision.userId,
       sessionId: session.id,
       expectedVersion: session.stateVersion,
-      state: next,
+      state: { ...next, ...effects.statePatch },
     });
     if (written === undefined) {
       throw staleStateProblem();
     }
-    return renderFeedback(row);
+    return { ...renderFeedback(row), ...effects.feedbackExtras };
   });
 }

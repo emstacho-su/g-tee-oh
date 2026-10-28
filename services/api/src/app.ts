@@ -37,6 +37,8 @@ import { csrfGuard } from "./plugins/csrf.js";
 import { idempotency } from "./plugins/idempotency.js";
 import { security } from "./plugins/security.js";
 import type { NotificationSource } from "./events/source.js";
+import type { LearningHooks } from "./learning/effects.js";
+import { DEFAULT_LEARNING_HOOKS } from "./learning/hooks.js";
 import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { catalogRoutes } from "./routes/catalog.js";
@@ -85,6 +87,11 @@ export interface BuildAppOptions {
    * and tests that do not open the stream; the stream then carries heartbeats only.
    */
   notifications?: NotificationSource;
+  /**
+   * The S31 learning hooks run inside the decision and session-end transactions (learning/effects.ts).
+   * DEFAULT_LEARNING_HOOKS when absent; a test may inject its own.
+   */
+  learningHooks?: LearningHooks;
 }
 
 export function buildApp(options: BuildAppOptions = {}): ApiApp {
@@ -98,6 +105,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   app.decorate("database", options.database ?? null);
   app.decorate("solverQuery", options.solverQuery ?? null);
   app.decorate("notifications", options.notifications ?? null);
+  app.decorate("learningHooks", options.learningHooks ?? DEFAULT_LEARNING_HOOKS);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
   void app.register(security, { config });

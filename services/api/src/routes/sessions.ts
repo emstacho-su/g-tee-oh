@@ -124,7 +124,7 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
     },
     async (request) => {
       const { userId } = requireSession(request);
-      return endSession({ app, request, userId }, request.params.id);
+      return endSession({ app, request, userId, now: new Date(), timeZone: options.config.timeZone }, request.params.id);
     },
   );
 

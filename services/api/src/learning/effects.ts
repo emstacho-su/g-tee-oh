@@ -1,0 +1,199 @@
+/**
+ * The learning hooks (R4.10, R4.11, R4.13, R4.14, O-27, O-272 to O-279): where the S31 lanes plug
+ * their writes into S23's decision and session-end transactions, so every learning write commits
+ * or rolls back with the attempt or the end it belongs to.
+ *
+ * Mechanism: each lane exports one LearningHookPart (learning/hooks.ts lists them, in the order
+ * shared effects, automated, holdout); composeLearningHooks turns the list into one LearningHooks,
+ * which buildApp decorates the app with (tests may inject their own through BuildAppOptions).
+ * - beforeGrade runs in the decision transaction after the session row is locked, before grading.
+ *   Each part returns overrides of learning's GradeInput (mode, firstAttempt, panelsRevealed,
+ *   ratedTodayInTrack) and of the attempt row (trackIds, itemDifficulty); later parts win per key.
+ *   Absent keys keep S23's drill defaults (grading/policy.ts buildGradeInput; ratedTodayInTrack
+ *   from countRatedToday; track_ids empty; item_difficulty null).
+ * - afterInsert runs after the attempt row is inserted, before the session state is written. Each
+ *   part sees `next`, the state about to be written with the earlier parts' patches applied, and
+ *   returns a state patch (learning, spots) and feedback extras (review_block); later parts win
+ *   per key. Parts run in list order, so a later part reads what an earlier one wrote in the same
+ *   transaction (the automated next pick sees the block close's cards).
+ * - onSessionEnd runs in the end transaction after ended_at is written, and again, with firstEnd
+ *   false, when an ended session is ended again: then it must write nothing and return the same
+ *   extras (read back by session id), so a repeat end answers the same recap. Rating changes and
+ *   unlocks concatenate across parts; the last tier wins.
+ * - loadHoldoutGuard runs before a derivation (GET /next, POST decisions), read only; the guards of
+ *   every part combine (any part holding a hand back holds it back).
+ * Every part checks the session's mode itself (learningOf(session.state)); a drill session runs the
+ * shared effects too.
+ */
+import type { GradeMode, GradeOutput } from "@g-tee-oh/learning";
+import type { FastifyRequest } from "fastify";
+import type { z } from "zod";
+
+import type { Database } from "../db.js";
+import type { FeedbackRow } from "../grading/feedback.js";
+import type { feedbackSchema, recapSchema } from "../schemas/training.js";
+import type { DerivedPrompt } from "../sessions/derive.js";
+import { EMPTY_HOLDOUT_GUARD, type HoldoutGuard } from "../sessions/holdout-guard.js";
+import type { SessionRow } from "../sessions/repository.js";
+import type { PersistedState } from "../sessions/state.js";
+import type { SolverQuery } from "../solver-query/client.js";
+
+type Feedback = z.infer<typeof feedbackSchema>;
+type Recap = z.infer<typeof recapSchema>;
+
+/** One decision, inside its transaction, as every hook sees it. */
+export interface DecisionContext {
+  transaction: Database;
+  now: Date;
+  /** APP_TIME_ZONE, for day boundaries (O-247). */
+  timeZone: string;
+  userId: string;
+  /** The session row as read before the transaction locked it (same version). */
+  session: SessionRow;
+  /** The await_hero derivation the decision answers: hand, node (with the hero's row) and roll. */
+  derived: DerivedPrompt;
+  solverQuery: SolverQuery;
+  /** The api request, for upstream headers (solver-port.ts). */
+  request: FastifyRequest;
+}
+
+/** What beforeGrade may change; an absent key keeps S23's default. */
+export interface GradeOverrides {
+  mode?: GradeMode;
+  firstAttempt?: boolean;
+  panelsRevealed?: boolean;
+  ratedTodayInTrack?: number;
+  /** attempt.track_ids (O-274). */
+  trackIds?: readonly string[];
+  /** attempt.item_difficulty (O-274). */
+  itemDifficulty?: number | null;
+}
+
+export interface AfterInsertContext extends DecisionContext {
+  /** The inserted attempt, as the feedback renders it. */
+  attempt: FeedbackRow;
+  outcome: GradeOutput;
+  /** The merged overrides the decision was graded and stored with. */
+  overrides: GradeOverrides;
+  /** The state about to be written, with earlier parts' patches applied. */
+  next: PersistedState;
+}
+
+/** State fields a hook may replace: the learning state and, for a new block, the hero spots. */
+export type StatePatch = Partial<Pick<PersistedState, "learning" | "spots">>;
+export type FeedbackExtras = Partial<Pick<Feedback, "review_block">>;
+
+export interface AfterInsertResult {
+  statePatch: StatePatch;
+  feedbackExtras: FeedbackExtras;
+}
+
+export interface SessionEndContext {
+  transaction: Database;
+  now: Date;
+  timeZone: string;
+  userId: string;
+  /** The row as locked before the end. */
+  session: SessionRow;
+  /** The row after ended_at was written. */
+  ended: SessionRow;
+  /** False when an ended session is ended again: write nothing, return the same extras. */
+  firstEnd: boolean;
+}
+
+export type RecapExtras = Partial<Pick<Recap, "rating_changes" | "tier" | "unlocks">>;
+
+export interface HoldoutGuardContext {
+  database: Database;
+  userId: string;
+  session: SessionRow;
+}
+
+/** One lane's hooks; every member is optional. */
+export interface LearningHookPart {
+  /** Names the part in logs and errors, for example "shared-effects". */
+  name: string;
+  beforeGrade?(context: DecisionContext): Promise<GradeOverrides>;
+  afterInsert?(context: AfterInsertContext): Promise<Partial<AfterInsertResult>>;
+  onSessionEnd?(context: SessionEndContext): Promise<RecapExtras>;
+  loadHoldoutGuard?(context: HoldoutGuardContext): Promise<HoldoutGuard>;
+}
+
+/** The composed hooks decide.ts and sessions/service.ts call. */
+export interface LearningHooks {
+  beforeGrade(context: DecisionContext): Promise<GradeOverrides>;
+  afterInsert(context: AfterInsertContext): Promise<AfterInsertResult>;
+  onSessionEnd(context: SessionEndContext): Promise<RecapExtras>;
+  loadHoldoutGuard(context: HoldoutGuardContext): Promise<HoldoutGuard>;
+}
+
+export type DecisionEffects = Pick<LearningHooks, "beforeGrade" | "afterInsert">;
+export type SessionEndEffects = Pick<LearningHooks, "onSessionEnd">;
+
+function mergeRecapExtras(left: RecapExtras, right: RecapExtras): RecapExtras {
+  const hasRatingChanges = left.rating_changes !== undefined || right.rating_changes !== undefined;
+  const hasUnlocks = left.unlocks !== undefined || right.unlocks !== undefined;
+  const tier = right.tier !== undefined ? right.tier : left.tier;
+  return {
+    ...(hasRatingChanges ? { rating_changes: [...(left.rating_changes ?? []), ...(right.rating_changes ?? [])] } : {}),
+    ...(hasUnlocks ? { unlocks: [...(left.unlocks ?? []), ...(right.unlocks ?? [])] } : {}),
+    ...(tier === undefined ? {} : { tier }),
+  };
+}
+
+function anyGuard(guards: readonly HoldoutGuard[]): HoldoutGuard {
+  if (guards.length === 0) {
+    return EMPTY_HOLDOUT_GUARD;
+  }
+  return { isHeldOut: (solutionId, nodeKey, hand) => guards.some((guard) => guard.isHeldOut(solutionId, nodeKey, hand)) };
+}
+
+/** One LearningHooks over the parts, in order (see the module doc for the merge rules). */
+export function composeLearningHooks(parts: readonly LearningHookPart[]): LearningHooks {
+  return {
+    async beforeGrade(context) {
+      let overrides: GradeOverrides = {};
+      for (const part of parts) {
+        if (part.beforeGrade !== undefined) {
+          overrides = { ...overrides, ...(await part.beforeGrade(context)) };
+        }
+      }
+      return overrides;
+    },
+    async afterInsert(context) {
+      let result: AfterInsertResult = { statePatch: {}, feedbackExtras: {} };
+      for (const part of parts) {
+        if (part.afterInsert !== undefined) {
+          const next = { ...context.next, ...result.statePatch };
+          const partial = await part.afterInsert({ ...context, next });
+          result = {
+            statePatch: { ...result.statePatch, ...partial.statePatch },
+            feedbackExtras: { ...result.feedbackExtras, ...partial.feedbackExtras },
+          };
+        }
+      }
+      return result;
+    },
+    async onSessionEnd(context) {
+      let extras: RecapExtras = {};
+      for (const part of parts) {
+        if (part.onSessionEnd !== undefined) {
+          extras = mergeRecapExtras(extras, await part.onSessionEnd(context));
+        }
+      }
+      return extras;
+    },
+    async loadHoldoutGuard(context) {
+      const guards: HoldoutGuard[] = [];
+      for (const part of parts) {
+        if (part.loadHoldoutGuard !== undefined) {
+          guards.push(await part.loadHoldoutGuard(context));
+        }
+      }
+      return anyGuard(guards);
+    },
+  };
+}
+
+/** Hooks that change nothing: S23's behaviour exactly. */
+export const NO_LEARNING_HOOKS: LearningHooks = composeLearningHooks([]);

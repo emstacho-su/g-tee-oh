@@ -4,11 +4,15 @@
  * /events (O-243; closed after the app on shutdown), builds the app with the logger on, listens
  * on API_PORT and closes cleanly on SIGTERM (what compose sends) and SIGINT (what a terminal
  * sends). esbuild bundles this file to dist/index.js (build.mjs, O-114).
+ *
+ * S31 (O-275, PM condition): the app_job worker starts here, once the server listens, and nowhere
+ * else (never from buildApp or a request); shutdown stops it before the app closes.
  */
 import { buildApp } from "./app.js";
 import { LISTEN_HOST, loadProcessConfig } from "./config.js";
 import { createDatabase } from "./db.js";
 import { createPgNotificationSource, LISTEN_APPLICATION_NAME } from "./events/pg-source.js";
+import { startJobWorker, type JobWorker } from "./jobs/worker.js";
 import { createSolverQuery } from "./solver-query/client.js";
 
 const SHUTDOWN_SIGNALS = ["SIGTERM", "SIGINT"] as const;
@@ -39,11 +43,13 @@ const notifications = createPgNotificationSource({
 });
 const app = buildApp({ logger: true, config: processConfig.app, database, solverQuery, notifications });
 notifications.start(app.log);
+let jobWorker: JobWorker | undefined;
 
 function shutdown(signal: NodeJS.Signals): void {
   app.log.info({ signal }, "api shutting down");
-  app
-    .close()
+  const stopped = jobWorker === undefined ? Promise.resolve() : jobWorker.stop();
+  stopped
+    .then(() => app.close())
     .then(() => notifications.close())
     .then(() => database.destroy())
     .then(
@@ -63,6 +69,7 @@ for (const signal of SHUTDOWN_SIGNALS) {
 
 try {
   await app.listen({ host: LISTEN_HOST, port: processConfig.port });
+  jobWorker = startJobWorker(app, { timeZone: processConfig.app.timeZone });
 } catch (error: unknown) {
   app.log.error(error, "api failed to start");
   process.exit(1);

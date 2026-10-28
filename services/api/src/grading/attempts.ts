@@ -9,7 +9,10 @@
  * countRatedToday is ratedTodayInTrack (O-214): the user's rated attempts since midnight in the
  * configured time zone (O-247), counted at an injected instant so a test fixes the clock. Postgres
  * computes the midnight (`date_trunc('day', now at time zone tz) at time zone tz`), which handles
- * daylight saving changes. Tracks arrive with S31, so until then every attempt counts in one track.
+ * daylight saving changes. S31's learning hooks may replace it with a per-track count (O-274).
+ *
+ * S31 (O-274) adds hand_class (the hero's row label at the node, from solver-query), panels_revealed,
+ * track_ids and item_difficulty; the hooks supply the last two (learning/effects.ts).
  */
 import { sql } from "kysely";
 
@@ -51,6 +54,12 @@ export interface AttemptValues {
   lossPctPotByAction: readonly number[];
   bestActionIndexes: readonly number[];
   gradedActionIndex: number;
+  /** The hero's row label at the node as solver-query answers it (O-274). */
+  handClass: string | null;
+  /** An answer-revealing panel was on (grading/policy.ts panelsRevealAnswer, or the block's panels). */
+  panelsRevealed: boolean;
+  trackIds: readonly string[];
+  itemDifficulty: number | null;
 }
 
 export function staleStateProblem(): ProblemError {
@@ -69,7 +78,7 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         solution_id: values.solutionId,
         node_key: values.nodeKey,
         spot_class_key: values.spotClassKey,
-        track_ids: [],
+        track_ids: [...values.trackIds],
         hand: values.hand,
         action_index: values.actionIndex,
         action_token: values.actionToken,
@@ -94,6 +103,9 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         loss_pct_pot_by_action: [...values.lossPctPotByAction],
         best_action_indexes: [...values.bestActionIndexes],
         graded_action_index: values.gradedActionIndex,
+        hand_class: values.handClass,
+        panels_revealed: values.panelsRevealed,
+        item_difficulty: values.itemDifficulty,
       })
       .returning("id")
       .executeTakeFirstOrThrow()

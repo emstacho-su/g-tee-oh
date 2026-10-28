@@ -11,6 +11,7 @@ import { actionKindSchema } from "../schemas/study.js";
 import type { SqAction } from "../solver-query/client.js";
 import { trackFor } from "../learning/tracks.js";
 import { cardsOf, type DerivedPrompt } from "./derive.js";
+import { learningOf } from "./state.js";
 import type { z } from "zod";
 
 export type Prompt = z.infer<typeof promptSchema>;
@@ -34,6 +35,12 @@ export function visiblePanels(settings: TrainerSettings): string[] {
   return PANEL_KEYS.filter((key) => settings.panels[key] === true);
 }
 
+/** True on a worked-example block of an automated session (O-272). */
+function workedExample(derived: DerivedPrompt): boolean {
+  const learning = learningOf(derived.state);
+  return learning?.kind === "automated" && learning.block.worked_example;
+}
+
 export function toPrompt(sessionId: string, stateVersion: number, derived: DerivedPrompt, settings: TrainerSettings): Prompt {
   const { hand, node, roll, state } = derived;
   return {
@@ -55,6 +62,6 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     // S31 (O-270, O-271): the class and its track come from solver-query's names for the node.
     spot_class_key: node.spot_class_key ?? null,
     track_key: trackFor(node.action_family ?? null, hand.hero_position),
-    worked_example: false,
+    worked_example: workedExample(derived),
   };
 }
