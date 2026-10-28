@@ -4,7 +4,10 @@
  * - first attempt: an earlier attempt at the same (solution, node, hand class), in any mode, makes
  *   the decision a non-first attempt;
  * - per-track cap: ratedTodayInTrack counts only today's rated attempts in the block's track, and at
- *   learning's DAILY_RATED_CAP the decision is unrated;
+ *   learning's DAILY_RATED_CAP the decision is unrated, while a twin dealt the same hand under the
+ *   cap is rated. The twins share a pinned server seed (an unseeded session draws 64 random bits, and
+ *   about one hand in 27 carries a noise flag, which learning never rates), and Date is frozen, so no
+ *   midnight falls between the seeded rows and the decision;
  * - a client-seeded session's decisions are all unrated and leave every learning table unchanged,
  *   while an unseeded twin over the same cards writes them;
  * - replay: the same seed gives the same blocks and the same prompts.
@@ -12,7 +15,7 @@
 import { DAILY_RATED_CAP } from "@g-tee-oh/learning";
 import type { FastifyRequest } from "fastify";
 import type pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ApiApp } from "../src/app.js";
 import { AUTOMATED_HOOK_PART } from "../src/automated/effects.js";
@@ -25,6 +28,7 @@ import {
   decideOnce,
   derivedNow,
   endSession,
+  type FeedbackBody,
   learningSnapshot,
   ONLINE_100,
   requireAutomated,
@@ -34,6 +38,19 @@ import { newPlayer, type Player } from "./sessions-test-kit.js";
 import { TEST_CONFIG } from "./support/app.js";
 import { adminPool, appDatabase } from "./support/database.js";
 import { buildTrainerApp, fixtureSolverQuery } from "./support/solver-query.js";
+
+/**
+ * The server seed an unseeded session draws, pinned by the cap test: the session stays unseeded
+ * (rated eligible), yet its block and first hand are fixed. RATEABLE_SERVER_SEED deals a first hand
+ * of the fixture library with no noise flag that is not all within the floor, so only the cap can
+ * unrate it.
+ */
+const serverSeed = vi.hoisted(() => ({ pinned: undefined as string | undefined }));
+vi.mock("../src/sessions/randomness.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/sessions/randomness.js")>();
+  return { ...actual, newSessionSeed: () => serverSeed.pinned ?? actual.newSessionSeed() };
+});
+const RATEABLE_SERVER_SEED = "5eed00000000cafe";
 
 const SEED = "00000000c0ffee00";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -98,6 +115,10 @@ async function insertRatedAttempts(userId: string, track: string, count: number,
   );
 }
 
+function itemOf(feedback: FeedbackBody): { solution: string; node: string; hand: string } {
+  return { solution: feedback.solution_id, node: feedback.node_key, hand: feedback.hand };
+}
+
 async function reviewSession(seed?: string): Promise<{ player: Player; sessionId: string; trackKey: string }> {
   const player = await newPlayer(database);
   await seedCards(database, player.userId, classKeys);
@@ -127,18 +148,31 @@ describe("R4.10 per-track daily cap (O-274, O-214, O-247)", () => {
     const { player, sessionId, trackKey } = await reviewSession();
     const context = await contextFor(player, sessionId);
     const other = trackKey === "opens" ? "facing-3bet" : "opens";
-    await insertRatedAttempts(player.userId, await trackId(trackKey), 3, new Date(context.now.getTime() - 60_000));
-    await insertRatedAttempts(player.userId, await trackId(other), 5, new Date(context.now.getTime() - 60_000));
+    // At now itself (the count is inclusive), so a run in the first minute after midnight still counts them.
+    await insertRatedAttempts(player.userId, await trackId(trackKey), 3, context.now);
+    await insertRatedAttempts(player.userId, await trackId(other), 5, context.now);
     await insertRatedAttempts(player.userId, await trackId(trackKey), 7, new Date(context.now.getTime() - 2 * DAY_MS));
     expect((await AUTOMATED_HOOK_PART.beforeGrade?.(context))?.ratedTodayInTrack).toBe(3);
   });
 
   it("R4.10 at the cap the decision is unrated, while a twin under it is rated", async () => {
-    const capped = await reviewSession();
-    await insertRatedAttempts(capped.player.userId, await trackId(capped.trackKey), DAILY_RATED_CAP, new Date(Date.now() - 60_000));
-    expect((await decideOnce(app, capped.player, capped.sessionId)).feedback.rated).toBe(false);
-    const twin = await reviewSession();
-    expect((await decideOnce(app, twin.player, twin.sessionId)).feedback.rated).toBe(true);
+    const now = new Date();
+    vi.useFakeTimers({ toFake: ["Date"], now });
+    serverSeed.pinned = RATEABLE_SERVER_SEED;
+    try {
+      const capped = await reviewSession();
+      await insertRatedAttempts(capped.player.userId, await trackId(capped.trackKey), DAILY_RATED_CAP, now);
+      const atCap = await decideOnce(app, capped.player, capped.sessionId);
+      const twin = await reviewSession();
+      const underCap = await decideOnce(app, twin.player, twin.sessionId);
+      // The same item in the same block: the per-track count is the only difference between them.
+      expect(itemOf(underCap.feedback)).toEqual(itemOf(atCap.feedback));
+      expect(atCap.feedback.rated).toBe(false);
+      expect(underCap.feedback.rated).toBe(true);
+    } finally {
+      serverSeed.pinned = undefined;
+      vi.useRealTimers();
+    }
   });
 });
 
