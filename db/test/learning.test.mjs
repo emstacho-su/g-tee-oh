@@ -1,9 +1,12 @@
 // The api learning migration (R4.11, R4.13, S31, O-271 to O-277): the seven tracks are seeded with their
 // scope, the attempt item columns and indexes exist, holdout items, draws, rounds and summaries carry their
-// keys, and the app job queue has its partial index. Grants: app selects, inserts and updates the four new
-// tables and deletes only app_job rows (the done-job prune, PR #27 review MEDIUM 9); builder, capture and
-// query see none of them (A4 section 3, ADR 0005). Every probe
-// runs inside a transaction that rolls back.
+// keys, and the app job queue has its partial index. Grants: app selects, inserts and updates app_job and
+// holdout_round, only selects and inserts holdout_draw and holdout_summary (PR #27 review LOW 13), and
+// deletes only app_job rows (the done-job prune, PR #27 review MEDIUM 9); builder, capture and query see
+// none of them (A4 section 3, ADR 0005). Holdout integrity (PR #27 review HIGH 1, HIGH 4): a round keeps
+// its order seed, a result its outcome (answered with an attempt, skipped or unservable without one), an
+// item its line history, and a user has at most one open holdout session. Every probe runs inside a
+// transaction that rolls back.
 
 import { test, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,13 +15,15 @@ import { asRole, createPool, expectDenied, withRollback } from './helpers.mjs';
 const pool = createPool();
 after(() => pool.end());
 
-/** Each new table with a column an update probe may set to itself. */
+/** Each new table with a column an update probe may set to itself, and whether app may update it (LOW 13). */
 const UPDATE_PROBES = Object.freeze({
-  app_job: 'attempts',
-  holdout_draw: 'items',
-  holdout_round: 'closed_at',
-  holdout_summary: 'answered',
+  app_job: { column: 'attempts', appUpdates: true },
+  holdout_draw: { column: 'items', appUpdates: false },
+  holdout_round: { column: 'closed_at', appUpdates: true },
+  holdout_summary: { column: 'answered', appUpdates: false },
 });
+const ORDER_SEED = '00000000deadbeef';
+const HISTORY = '[{"position": "BTN", "token": "r250", "label": "Raise 2.5"}]';
 const OTHER_ROLES = Object.freeze(['builder', 'capture', 'query']);
 const BOTH_FORMATS = ['online', 'live'];
 
@@ -106,11 +111,16 @@ describe('R4.11 api learning migration (S31)', () => {
     });
   });
 
-  test('R4.11 app selects, inserts and updates the new tables and deletes only app_job rows; other roles see none', async () => {
+  test('R4.11 app updates only app_job and holdout_round, deletes only app_job rows; other roles see none (LOW 13)', async () => {
     await withRollback(pool, async (client) => {
-      for (const [table, column] of Object.entries(UPDATE_PROBES)) {
+      for (const [table, { column, appUpdates }] of Object.entries(UPDATE_PROBES)) {
         await asRole(client, 'app', `select * from "${table}" limit 1`);
-        await asRole(client, 'app', `update "${table}" set ${column} = ${column} where false`);
+        const update = `update "${table}" set ${column} = ${column} where false`;
+        if (appUpdates) {
+          await asRole(client, 'app', update);
+        } else {
+          await expectDenied(client, 'app', update);
+        }
         if (table === 'app_job') {
           await asRole(client, 'app', `delete from "${table}" where false`);
         } else {
@@ -129,12 +139,13 @@ describe('R4.13 holdout rows (S31, O-276, O-277)', () => {
     await withRollback(pool, async (client) => {
       const { solutionId, trackId } = await holdoutFixture(client);
       const insert = `insert into holdout_item
-        (track_id, solution_id, node_key, hand, spot_class_key, config_id, pair, line, hero_position, deal_seed)
+        (track_id, solution_id, node_key, hand, spot_class_key, config_id, pair, line, hero_position, deal_seed, history)
         values ($1, $2, 'cfg_6_online_100/BB-BTN/r250', 'AKs', 'preflop/online/100/facing-open/BB-BTN',
-          'cfg_6_online_100', 'BB-BTN', 'r250', 'BB', '00000000deadbeef') returning id, drawn_at`;
-      const item = await asRole(client, 'app', insert, [trackId, solutionId]);
+          'cfg_6_online_100', 'BB-BTN', 'r250', 'BB', '00000000deadbeef', $3) returning id, drawn_at, history`;
+      const item = await asRole(client, 'app', insert, [trackId, solutionId, HISTORY]);
+      assert.deepEqual(item.rows[0].history, JSON.parse(HISTORY));
       assert.ok(item.rows[0].drawn_at instanceof Date);
-      await assert.rejects(asRole(client, 'app', insert, [trackId, solutionId]), (error) => error.code === '23505');
+      await assert.rejects(asRole(client, 'app', insert, [trackId, solutionId, HISTORY]), (error) => error.code === '23505');
       await asRole(client, 'app', `insert into holdout_draw (track_id, seed, items) values ($1, 'abc', 30)`, [trackId]);
     });
   });
@@ -145,21 +156,22 @@ describe('R4.13 holdout rows (S31, O-276, O-277)', () => {
       const round = await asRole(
         client,
         'app',
-        `insert into holdout_round (user_id, month) values ($1, '2026-11-01') returning id`,
-        [userId],
+        `insert into holdout_round (user_id, month, order_seed) values ($1, '2026-11-01', $2) returning id`,
+        [userId, ORDER_SEED],
       );
       const roundId = round.rows[0].id;
       await assert.rejects(
-        asRole(client, 'app', `insert into holdout_round (user_id, month) values ($1, '2026-11-01')`, [userId]),
+        asRole(client, 'app', `insert into holdout_round (user_id, month, order_seed) values ($1, '2026-11-01', $2)`, [userId, ORDER_SEED]),
         (error) => error.code === '23505',
       );
       const item = await client.query(
         `insert into holdout_item
-          (track_id, solution_id, node_key, hand, spot_class_key, config_id, pair, hero_position, deal_seed)
-          values ($1, $2, 'k', 'AA', 'c', 'cfg_6_online_100', 'BB-BTN', 'BTN', 's') returning id`,
+          (track_id, solution_id, node_key, hand, spot_class_key, config_id, pair, hero_position, deal_seed, history)
+          values ($1, $2, 'k', 'AA', 'c', 'cfg_6_online_100', 'BB-BTN', 'BTN', 's', '[]') returning id`,
         [trackId, solutionId],
       );
-      const result = `insert into holdout_result (user_id, holdout_item_id, round_id, taken_at) values ($1, $2, $3, now())`;
+      const result = `insert into holdout_result (user_id, holdout_item_id, round_id, taken_at, outcome)
+        values ($1, $2, $3, now(), 'skipped')`;
       await asRole(client, 'app', result, [userId, item.rows[0].id, roundId]);
       await assert.rejects(
         asRole(client, 'app', result, [userId, item.rows[0].id, roundId]),
@@ -172,6 +184,66 @@ describe('R4.13 holdout rows (S31, O-276, O-277)', () => {
          values ($1, $2, 20, 30, 0.81, 1500, 80, false)`,
         [roundId, trackId],
       );
+    });
+  });
+});
+
+describe('R4.13 holdout integrity rows (S31, PR #27 review HIGH 1, HIGH 4)', () => {
+  test('R4.13 a round needs a 64-bit hex order seed', async () => {
+    await withRollback(pool, async (client) => {
+      const { userId } = await holdoutFixture(client);
+      await assert.rejects(
+        asRole(client, 'app', `insert into holdout_round (user_id, month) values ($1, '2026-12-01')`, [userId]),
+        (error) => error.code === '23502',
+      );
+      await assert.rejects(
+        asRole(client, 'app', `insert into holdout_round (user_id, month, order_seed) values ($1, '2026-12-01', 'xyz')`, [userId]),
+        (error) => error.code === '23514',
+      );
+    });
+  });
+
+  test('R4.13 a result is answered with an attempt, or skipped or unservable without one', async () => {
+    await withRollback(pool, async (client) => {
+      const { userId, solutionId, trackId } = await holdoutFixture(client);
+      const round = await client.query(
+        `insert into holdout_round (user_id, month, order_seed) values ($1, '2026-12-01', $2) returning id`,
+        [userId, ORDER_SEED],
+      );
+      const item = await client.query(
+        `insert into holdout_item
+          (track_id, solution_id, node_key, hand, spot_class_key, config_id, pair, hero_position, deal_seed, history)
+          values ($1, $2, 'k', 'KK', 'c', 'cfg_6_online_100', 'BB-BTN', 'BTN', 's', '[]') returning id`,
+        [trackId, solutionId],
+      );
+      const insert = (outcome) =>
+        asRole(
+          client,
+          'app',
+          `insert into holdout_result (user_id, holdout_item_id, round_id, taken_at, outcome) values ($1, $2, $3, now(), $4)`,
+          [userId, item.rows[0].id, round.rows[0].id, outcome],
+        );
+      await assert.rejects(insert('answered'), (error) => error.code === '23514');
+      await assert.rejects(insert('lost'), (error) => error.code === '23514');
+      await insert('unservable');
+    });
+  });
+
+  test('R4.13 a user has at most one open holdout session; ended ones and other modes do not count', async () => {
+    await withRollback(pool, async (client) => {
+      const { userId } = await holdoutFixture(client);
+      const insert = (mode, endedAt) =>
+        asRole(
+          client,
+          'app',
+          `insert into practice_session (user_id, mode, settings, state, ended_at) values ($1, $2, '{}', '{}', $3)`,
+          [userId, mode, endedAt],
+        );
+      await insert('holdout', new Date());
+      await insert('holdout', null);
+      await insert('automated', null);
+      await insert('automated', null);
+      await assert.rejects(insert('holdout', null), (error) => error.code === '23505');
     });
   });
 });

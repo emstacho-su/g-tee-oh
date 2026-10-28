@@ -229,6 +229,10 @@ export interface HoldoutItem {
   drawn_at: Generated<Timestamp>;
   hand: string;
   hero_position: string;
+  /**
+   * the line's actions (position, token, label) as solver-query labelled them at the draw (PR #27 review HIGH 4)
+   */
+  history: Json;
   id: Generated<string>;
   line: string | null;
   node_key: string;
@@ -241,6 +245,10 @@ export interface HoldoutItem {
 export interface HoldoutResult {
   attempt_id: string | null;
   holdout_item_id: string | null;
+  /**
+   * answered (with its attempt), skipped (served, then its session ended unanswered: score 0) or unservable (PR #27 review HIGH 1, HIGH 4)
+   */
+  outcome: Generated<string>;
   round_id: string | null;
   taken_at: Timestamp;
   user_id: string;
@@ -251,6 +259,10 @@ export interface HoldoutRound {
   id: Generated<string>;
   month: Timestamp;
   opened_at: Generated<Timestamp>;
+  /**
+   * fixes the round's serving order for its user (PR #27 review HIGH 1)
+   */
+  order_seed: string;
   user_id: string;
 }
 
