@@ -1,11 +1,15 @@
-// Tests for e2e/support/mock-sessions.ts (S25, R3.13, O-264): the mocked drill and session routes
+// Tests for e2e/support/mock-sessions.ts and mock-automated.ts (S25, S32, R3.13, R4.10, O-264): the mocked drill and session routes
 // the shots project uses. The routes are pure functions over their own state, so these call them
 // directly through createMockApi with no browser.
 import { describe, expect, it } from "vitest";
 
 import { CSRF_HEADER, createMockApi, type MockApi, type MockRequest } from "../../e2e/support/mock-api.js";
+import { createAppMockApi } from "../../e2e/support/mock-app.js";
+import type { MockProgress } from "../../e2e/support/mock-progress.js";
 import { createMockSessionRoute, mockSessionRoute } from "../../e2e/support/mock-sessions.js";
+import { FIXTURE_BLOCK_SIZE, fixtureHoldoutProgress, fixtureRatedBlock, fixtureWorkedBlock } from "../../src/fixtures/automated.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
+import type { SessionRecap } from "../../src/trainer/session-types.js";
 import {
   FIXTURE_DRILL_ID,
   FIXTURE_FULL_HAND_DRILL_ID,
@@ -98,7 +102,8 @@ describe("R3.13 mocked session routes", () => {
   it("R3.13 POST /sessions validates its body: mode, drill, seed", () => {
     const api = signedInApi();
     const post = (body: unknown) => api.handle(request("POST", "/api/v1/sessions", { headers: SIGNED, body }));
-    expect(post({ mode: "automated" }).status).toBe(400);
+    // S32: automated and holdout start sessions now (mock-automated.ts); another mode is still refused.
+    expect(post({ mode: "prediction" }).status).toBe(400);
     expect(post(startBody(false, { seed: "XYZ" })).status).toBe(400);
     expect(post(startBody(false, { seed: FIXTURE_SEED })).status).toBe(201);
     expect(post({ mode: "drill", drill_id: "unknown" }).status).toBe(404);
@@ -243,5 +248,108 @@ describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)"
     const second = play(api, id, RAISE);
     const graded = decide(api, id, { state_version: second.state_version, action_index: CALL, response_ms: 1 });
     expect(graded.body).toMatchObject({ label: "best", state_version: second.state_version + 1 });
+  });
+});
+
+interface TrainingFeedback {
+  rated: boolean;
+  state_version: number;
+  review_block: { closed: boolean; fsrs_grade: string | null } | null;
+}
+
+function startTraining(api: MockApi, body: unknown) {
+  return api.handle(request("POST", "/api/v1/sessions", { headers: SIGNED, body }));
+}
+
+function trainingApi(onEnd?: (recap: SessionRecap) => void): MockApi {
+  const api = createMockApi({ routes: [createMockSessionRoute(onEnd === undefined ? {} : { onEnd })] });
+  api.handle(request("POST", "/api/v1/auth/login", { body: { email: FIXTURE_USER_EMAIL, password: "x" } }));
+  return api;
+}
+
+/** Plays `count` decisions with the first button and returns each feedback. */
+function playTraining(api: MockApi, id: string, count: number): TrainingFeedback[] {
+  return Array.from({ length: count }, (_, step) => {
+    const prompt = next(api, id).body as PromptBody & { buttons: { index: number }[] };
+    const answer = decide(api, id, { state_version: prompt.state_version, action_index: prompt.buttons[0]?.index ?? 0, response_ms: 1, confidence: "sure" }, { ...SIGNED, "idempotency-key": `k-${step}` });
+    expect(answer.status).toBe(200);
+    return answer.body as TrainingFeedback;
+  });
+}
+
+function end(api: MockApi, id: string) {
+  return api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED }));
+}
+
+describe("R4.10 mocked automated and holdout sessions", () => {
+  it("R4.10 an automated start answers its first block; prompts carry the block's class, rated block first, then a worked example", () => {
+    const api = trainingApi();
+    const started = startTraining(api, { mode: "automated", settings: { grouping: "standard", rng: false } });
+    expect(started.status).toBe(201);
+    expect(started.body).toMatchObject({ mode: "automated", rated_eligible: true, automated: fixtureRatedBlock, holdout: null });
+    const id = (started.body as { session_id: string }).session_id;
+    expect(next(api, id).body).toMatchObject({ spot_class_key: fixtureRatedBlock.spot_class_key, track_key: "opens", worked_example: false });
+    const feedback = playTraining(api, id, FIXTURE_BLOCK_SIZE + 1);
+    expect(feedback.map((entry) => entry.rated)).toEqual([true, true, true, false]);
+    expect(feedback.map((entry) => entry.review_block?.fsrs_grade ?? null)).toEqual([null, null, "Good", null]);
+    expect(next(api, id).body).toMatchObject({ spot_class_key: fixtureWorkedBlock.spot_class_key, worked_example: true });
+  });
+
+  it("R4.10 end answers a recap with rating changes and an unlock, calls onEnd once, then refuses more", () => {
+    const recaps: SessionRecap[] = [];
+    const api = trainingApi((recap) => recaps.push(recap));
+    const id = (startTraining(api, { mode: "automated" }).body as { session_id: string }).session_id;
+    playTraining(api, id, 5);
+    const recap = end(api, id).body as SessionRecap;
+    expect(recap).toMatchObject({ decisions: 5, rated_decisions: 3, unlocks: ["badge-tier-II"], tier: { tier: "II", blocked_by: ["opens"] } });
+    expect(recap.rating_changes).toHaveLength(1);
+    const [change] = recap.rating_changes;
+    expect(change).toMatchObject({ track_key: "opens", before: null });
+    expect(change?.after.mu).toBeGreaterThan(change?.after.rd ?? Infinity);
+    expect(end(api, id).body).toEqual(recap);
+    expect(recaps).toHaveLength(1);
+    expect(next(api, id).status).toBe(409);
+  });
+
+  it("R4.10 a seeded automated session is never rated; a bad config_ids is a 400", () => {
+    const api = trainingApi();
+    const seeded = startTraining(api, { mode: "automated", seed: FIXTURE_SEED });
+    expect(seeded.body).toMatchObject({ rated_eligible: false });
+    const id = (seeded.body as { session_id: string }).session_id;
+    expect(playTraining(api, id, 1)[0]?.rated).toBe(false);
+    expect(end(api, id).body).toMatchObject({ rated_decisions: 0, tier: null, rating_changes: [] });
+    expect(startTraining(api, { mode: "automated", config_ids: [] }).status).toBe(400);
+  });
+
+  it("R4.10 a training decision checks the version and replays a repeated key", () => {
+    const api = trainingApi();
+    const id = (startTraining(api, { mode: "automated" }).body as { session_id: string }).session_id;
+    const body = { state_version: 1, action_index: 0, response_ms: 1 };
+    const headers = { ...SIGNED, "idempotency-key": "same" };
+    const first = decide(api, id, body, headers);
+    expect(decide(api, id, body, headers)).toEqual(first);
+    expect(decide(api, id, body, { ...SIGNED, "idempotency-key": "other" }).status).toBe(409);
+    expect(decide(api, id, { state_version: 2, action_index: 99, response_ms: 1 }).status).toBe(400);
+  });
+
+  it("R4.10 holdout refuses a seed, starts at the round's progress and is never rated (O-328)", () => {
+    const api = trainingApi();
+    expect(startTraining(api, { mode: "holdout", seed: FIXTURE_SEED }).status).toBe(400);
+    const started = startTraining(api, { mode: "holdout" });
+    expect(started.body).toMatchObject({ mode: "holdout", rated_eligible: false, automated: null, holdout: fixtureHoldoutProgress });
+    const id = (started.body as { session_id: string }).session_id;
+    expect(playTraining(api, id, 2).map((entry) => entry.rated)).toEqual([false, false]);
+    expect(end(api, id).body).toMatchObject({ decisions: 2, rated_decisions: 0, tier: null, unlocks: [] });
+  });
+
+  it("R4.12 in the app mock, ending a session with rated decisions moves the learner from fresh to seasoned", () => {
+    let progress: MockProgress | undefined;
+    const api = createAppMockApi({ learner: "fresh", onProgress: (control) => (progress = control) });
+    api.handle(request("POST", "/api/v1/auth/login", { body: { email: FIXTURE_USER_EMAIL, password: "x" } }));
+    const id = (startTraining(api, { mode: "automated" }).body as { session_id: string }).session_id;
+    playTraining(api, id, 1);
+    expect(progress?.learner()).toBe("fresh");
+    end(api, id);
+    expect(progress?.learner()).toBe("seasoned");
   });
 });

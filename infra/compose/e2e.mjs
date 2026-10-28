@@ -6,6 +6,8 @@
 //   3b. fixture-solutions  solution rows for the fixture library, so graded attempts can be stored (S23)
 //   3c. fixture-queue  queued build jobs for one fixture spot, so flow 5 sees a queue position (S28, O-293)
 //   4. create-owner  a fresh admin owner account with a random per-run password (O-263, O-294)
+//   4b. fixture-learning  the owner's schedule cards and leak history, so flow 1's decisions are
+//                    rated and flow 6 draws a trend (S32, O-324); it gets the owner's email only
 //   5. smoke         health of every service through Caddy
 //   6. e2e-web       the Playwright stack project, with the owner in its environment only
 //   and always dev-down.
@@ -30,12 +32,17 @@ import {
   createOwnerInput,
   e2eWebEnv,
   generateOwnerPassword,
+  OWNER_EMAIL_VARIABLE,
+  OWNER_PASSWORD_VARIABLE,
   ownerEmail,
 } from './e2e-owner.mjs';
 
 export const OWNER_STEP = 'create-owner';
+export const LEARNING_STEP = 'fixture-learning';
 const E2E_WEB_STEP = 'e2e-web';
-export const STEPS = ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, 'smoke', E2E_WEB_STEP];
+export const STEPS = [
+  'dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, LEARNING_STEP, 'smoke', E2E_WEB_STEP,
+];
 // The repo .env, read only for DATABASE_URL when the environment lacks it (create-owner --admin).
 const ENV_FILE = '.env';
 
@@ -99,7 +106,14 @@ function runStep(step, owner) {
     return createOwner(owner);
   }
   console.log(`e2e: just ${step}`);
+  if (step === LEARNING_STEP) return just(step, learningStepEnv(process.env, owner));
   return step === E2E_WEB_STEP ? just(step, e2eWebEnv(process.env, owner)) : just(step);
+}
+
+/** The seed step's environment: the owner's email (not secret) and never the password (O-324). */
+export function learningStepEnv(baseEnv, owner) {
+  const withoutPassword = Object.entries(baseEnv).filter(([name]) => name !== OWNER_PASSWORD_VARIABLE);
+  return { ...Object.fromEntries(withoutPassword), [OWNER_EMAIL_VARIABLE]: owner.email };
 }
 
 /**

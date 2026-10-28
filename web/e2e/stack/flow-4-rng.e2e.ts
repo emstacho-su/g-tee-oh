@@ -37,7 +37,7 @@ import { toGradeActions } from "../../src/poker/grade-actions.js";
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
 import { capture, DESKTOP, prepareShotPage, THEMES } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 type DrillCreateBody = ApiPaths["/api/v1/drills"]["post"]["requestBody"]["content"]["application/json"];
 
@@ -214,7 +214,7 @@ async function flow4(page: Page, theme: Theme): Promise<void> {
     records.push(await capture(page, page, OUT_DIR, { screen, theme, viewport: DESKTOP, criterion, source: SOURCE }));
   };
   if (credentials === undefined) return;
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   const drillId = await createDrill(page);
   const prompts = trackPrompts(page);
   await openRunWithRng(page, drillId, shot);

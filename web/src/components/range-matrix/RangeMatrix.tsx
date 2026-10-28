@@ -4,7 +4,9 @@
  *
  * Mechanism: the node becomes a MatrixModel once per node (model.ts); useMatrixCanvas draws it
  * through one animation frame per input change at the device pixel ratio, so the backing store
- * is sharp and the CSS box stays sizePx. useDevicePixelRatio follows ratio changes (another
+ * is sharp and the CSS box is sizePx wide, or the container's width when that is narrower (a
+ * phone): max-width 100% with a square aspect ratio, so the matrix never pushes the page sideways
+ * and a click maps through the box it is drawn in. useDevicePixelRatio follows ratio changes (another
  * screen, page zoom), which resizes the backing store and redraws. The table and the legend are
  * memoized on the per-node model, so a focus move or a selection change repaints the canvas
  * without re-rendering the 169 table cells. The canvas is an image (role img) labeled with the mode
@@ -149,7 +151,7 @@ export function RangeMatrix({
   const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands`;
 
   return (
-    <div className="inline-block">
+    <div className="inline-block max-w-full">
       <div
         role="group"
         aria-label="Range matrix cells: arrow keys move, Enter or Space selects"
@@ -158,7 +160,7 @@ export function RangeMatrix({
         onKeyDown={onKeyDown}
         onFocus={() => setHasFocus(true)}
         onBlur={() => setHasFocus(false)}
-        className="inline-block rounded-sm"
+        className="inline-block max-w-full rounded-sm"
       >
         <canvas
           ref={canvasRef}
@@ -167,7 +169,7 @@ export function RangeMatrix({
           aria-describedby={tableId}
           width={backing}
           height={backing}
-          style={{ width: `${sizePx}px`, height: `${sizePx}px` }}
+          style={{ width: `${sizePx}px`, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1" }}
           onClick={onClick}
           className="block cursor-pointer"
         />

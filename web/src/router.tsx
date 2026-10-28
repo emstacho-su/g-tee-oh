@@ -32,6 +32,7 @@ import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
 import { PredictPage } from "./routes/predict/PredictPage.js";
+import { ProgressPage } from "./routes/progress/ProgressPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { validateDrillBuilderSearch, validateDrillsSearch } from "./drills/search.js";
 import { DrillBuilderPage } from "./routes/drills/DrillBuilderPage.js";
@@ -39,9 +40,9 @@ import { DrillsPage } from "./routes/drills/DrillsPage.js";
 import { validateLibrarySearch } from "./library/search.js";
 import { LibraryPage } from "./routes/library/LibraryPage.js";
 import { SettingsPage } from "./routes/settings/SettingsPage.js";
-import { placeholderRoute } from "./routes/placeholders.js";
-import type { PlaceholderKey } from "./routes/placeholders.js";
 import { StudyPage } from "./routes/study/StudyPage.js";
+import { TrainPage } from "./routes/train/TrainPage.js";
+import { trainModeOf, validateTrainSearch } from "./routes/train/train-search.js";
 import { validatePracticeSearch } from "./practice/search.js";
 import { validateStudySearch } from "./study/search.js";
 import { validateDrillRunSearch } from "./trainer/run-search.js";
@@ -96,11 +97,16 @@ export const appLayoutRoute = createRoute({
 
 export const homeRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/", component: HomePage });
 
-function screenRoute<TPath extends string>(path: TPath, key: PlaceholderKey) {
-  return createRoute({ getParentRoute: () => appLayoutRoute, path, component: placeholderRoute(key) });
-}
-
-export const trainRoute = screenRoute("/train", "train");
+// /train is a real screen (S32, R4.10, O-328): ?mode=holdout opens the holdout retest. It
+// re-validates its search in the route component for the parent-merge reason given below for /study.
+export const trainRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/train",
+  validateSearch: validateTrainSearch,
+  component: function TrainRouteScreen() {
+    return <TrainPage mode={trainModeOf(validateTrainSearch(trainRoute.useSearch()))} />;
+  },
+});
 // The drill library and builder (S26, R3.14) re-validate their search in the route component for
 // the parent-merge reason given below for /study.
 export const drillsRoute = createRoute({
@@ -162,7 +168,8 @@ export const paintRoute = createRoute({
     return <PaintPage search={validatePracticeSearch(paintRoute.useSearch())} />;
   },
 });
-export const progressRoute = screenRoute("/progress", "progress");
+// /progress is a real screen (S32, R4.12); it takes no search, so it needs no re-validation.
+export const progressRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/progress", component: ProgressPage });
 // /library and /settings are real screens (S28, R3.4, R3.5); /library re-validates its search in
 // the route component for the same parent-merge reason as /study above.
 export const libraryRoute = createRoute({

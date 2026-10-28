@@ -1,7 +1,8 @@
 /**
- * Home page (R3.13, A7 section 2). Four cards: today's queue, streak, rating and builder status.
- * The builder status card (S28, R3.5, O-290) shows an admin the builder's state and queue depth
- * and links everyone to /library; the other cards say which session fills them.
+ * Home page (R3.13, R4.12, A7 section 2). Four cards: today's queue (S32, O-322), streak and
+ * rating (S32, the foundation's tiles with the equipped badge, O-323) and builder status. The
+ * queue, streak and rating cards live in routes/home-cards/. The builder status card (S28, R3.5,
+ * O-290) shows an admin the builder's state and queue depth and links everyone to /library.
  */
 import { useId, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
@@ -9,18 +10,8 @@ import { Link } from "@tanstack/react-router";
 import { useAppApi } from "../auth/index.js";
 import { BUILDER_STATE_TEXT } from "../library/format.js";
 import { useBuilderStatus, useIsAdmin } from "../library/use-builder.js";
-
-interface HomeCard {
-  title: string;
-  summary: string;
-  session: string;
-}
-
-const HOME_CARDS: readonly HomeCard[] = [
-  { title: "Today's queue", summary: "Spots due for review today.", session: "Phase 4 (S32)" },
-  { title: "Streak", summary: "Days in a row with training.", session: "S32" },
-  { title: "Rating", summary: "Your overall rating and trend.", session: "S32" },
-];
+import { QueueCard } from "./home-cards/QueueCard.js";
+import { HomeRatingCard, HomeStreakCard } from "./home-cards/StatCards.js";
 
 function CardFrame({ title, children }: { title: string; children: ReactNode }) {
   const headingId = useId();
@@ -31,15 +22,6 @@ function CardFrame({ title, children }: { title: string; children: ReactNode }) 
       </h2>
       {children}
     </section>
-  );
-}
-
-function Card({ card }: { card: HomeCard }) {
-  return (
-    <CardFrame title={card.title}>
-      <p className="text-muted">{card.summary}</p>
-      <p className="text-sm text-muted">Filled in {card.session}.</p>
-    </CardFrame>
   );
 }
 
@@ -67,9 +49,9 @@ export function HomePage() {
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Home</h1>
       <div className="grid gap-4 sm:grid-cols-2">
-        {HOME_CARDS.map((card) => (
-          <Card key={card.title} card={card} />
-        ))}
+        <QueueCard />
+        <HomeStreakCard />
+        <HomeRatingCard />
         <BuilderStatusCard />
       </div>
     </section>

@@ -8,8 +8,14 @@
  * the nav named "Main", the signed-in email in the header and the "Sign out" button; all inside
  * <div data-testid="shell">. A signed-out visit to / redirects to /login (with a redirect query
  * back to /), and a sign-in lands on /.
+ *
+ * signInOnce is for the stack flows: the api allows five logins per address per minute (its
+ * LOGIN_RATE_LIMIT_MAX) and the stack project runs every flow from one address in under a minute,
+ * so the flows share one session. The first call in a worker signs in through the form and keeps
+ * the context's cookies; later calls add those cookies to the new context and open /. Should the
+ * kept session no longer be accepted (the login page shows), it signs in through the form again.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Cookie, type Page } from "@playwright/test";
 
 import type { OwnerCredentials } from "./owner-credentials.js";
 
@@ -58,6 +64,25 @@ export async function signOut(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(onPath(LOGIN_PATH));
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+}
+
+/** The cookies of this worker's shared stack session, once signInOnce has signed in. */
+let sharedSession: readonly Cookie[] | null = null;
+
+/** Signs in through the form at most once per worker and reuses that session afterwards. */
+export async function signInOnce(page: Page, credentials: OwnerCredentials): Promise<void> {
+  if (sharedSession === null) {
+    await signIn(page, credentials);
+  } else {
+    await page.context().addCookies([...sharedSession]);
+    await page.goto(HOME_PATH);
+    const signInHeading = page.getByRole("heading", { level: 1, name: "Sign in" });
+    const homeHeading = page.getByRole("heading", { level: 1, name: "Home" });
+    await expect(signInHeading.or(homeHeading)).toBeVisible();
+    if (await signInHeading.isVisible()) await submitLogin(page, credentials);
+    await expectHomeShell(page, credentials.email);
+  }
+  sharedSession = await page.context().cookies();
 }
 
 /** The whole flow: redirect to /login, sign in, land on the home shell. */

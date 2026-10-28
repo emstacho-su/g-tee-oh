@@ -8,6 +8,7 @@
 import { Navigate, Outlet, useLocation } from "@tanstack/react-router";
 
 import { useMe } from "../auth/index.js";
+import { CosmeticsRoot } from "../cosmetics/CosmeticsRoot.js";
 import { HotkeyRoot } from "../hotkeys/index.js";
 import { AppHeader } from "./AppHeader.js";
 import { MainNav } from "./MainNav.js";
@@ -28,6 +29,7 @@ export function AuthLayout() {
     <div className="flex min-h-screen flex-col">
       {/* One window keydown listener and the ? shortcuts overlay for every signed-in screen (A7 section 4) */}
       <HotkeyRoot />
+      <CosmeticsRoot />
       <AppHeader />
       <div className="flex flex-1 flex-col gap-4 p-4 md:flex-row">
         <MainNav />

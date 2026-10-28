@@ -41,6 +41,8 @@ export interface SpotProblem {
   readonly status: number | null;
   /** The 422 no-coverage's typed pairs_queued and pairs_total, when it carried valid ones. */
   readonly queued?: QueuedCount;
+  /** The slug of an api problem of kind "other" (none of the trainer's kinds), so a screen can name it (S32 /train). */
+  readonly slug?: string;
 }
 
 /** The api's problem slugs the trainer branches on (services/api/src/http/problem.ts). */
@@ -72,6 +74,7 @@ export function problemOf(error: unknown): SpotProblem {
   if (isApiProblem(error)) {
     const kind = kindOfApiProblem(error.status, error.slug);
     const queued = kind === "no_coverage" && error instanceof NoCoverageProblem ? error.counts : null;
+    if (kind === "other") return { kind, status: error.status, slug: error.slug };
     return queued === null ? { kind, status: error.status } : { kind, status: error.status, queued };
   }
   if (error instanceof TypeError) return { kind: "network", status: null };

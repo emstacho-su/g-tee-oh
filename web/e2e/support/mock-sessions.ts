@@ -26,6 +26,11 @@
  *   the hand then ends and the next hand's prompt has a larger hand_no and previous_hand: a fold
  *   ends with end fold, otherwise the street closes (with the opponent's call after a raise), and
  *   in end_of_hand mode the board holds the three flop cards (v1 ends a full hand at the flop).
+ *
+ * Automated and holdout sessions (S32, R4.10, O-328): POST /sessions with mode automated or
+ * holdout, and those sessions' next, decisions and end, go to mock-automated.ts (blocks of three
+ * hands with their class, rated outside worked examples, a SessionRecap with rating changes);
+ * options.onEnd sees each such session's recap the first time it ends.
  */
 import type { DecisionFeedback, NodeAction, Problem, TrainerPrompt } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
@@ -47,6 +52,7 @@ import {
 } from "../../src/fixtures/trainer.js";
 import type { Drill, PracticeSession, PreviousHand, SessionRecap, StopRule } from "../../src/trainer/session-types.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
+import { createAutomatedSessions, type AutomatedSessionOptions } from "./mock-automated.js";
 
 const STATUS = { ok: 200, created: 201 } as const;
 const PROBLEMS = {
@@ -74,9 +80,15 @@ const STARTED_AT = "2026-10-27T12:00:00Z";
 const ENDED_AT = "2026-10-27T12:20:00Z";
 const BEST_SCORE = 1;
 
-export interface MockSessionOptions {
+export interface MockSessionOptions extends AutomatedSessionOptions {
   /** Drills another mocked route holds; the fixture drills answer when it has none by that id. */
   readonly drillOf?: (id: string) => Drill | undefined;
+}
+
+const TRAINING_MODES: ReadonlySet<unknown> = new Set(["automated", "holdout"]);
+
+function isTrainingStart(body: unknown): boolean {
+  return isRecord(body) && TRAINING_MODES.has(body["mode"]);
 }
 
 const FIXTURE_DRILLS: readonly Drill[] = [
@@ -238,12 +250,14 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
   let sessions: ReadonlyMap<string, MockSession> = new Map();
   let started = 0;
   const drillOf = (id: string): Drill | undefined => options.drillOf?.(id) ?? fixtureDrillOf(id);
+  const training = createAutomatedSessions(options.onEnd === undefined ? {} : { onEnd: options.onEnd });
 
   function save(session: MockSession): void {
     sessions = new Map([...sessions, [session.id, session]]);
   }
 
   function startSession(request: MockRequest): MockResponse {
+    if (isTrainingStart(request.body)) return training.start(request);
     const target = startTarget(request.body, drillOf);
     if (target === PROBLEMS.noCoverage) return noCoverage(request.path);
     if (!("trainer" in target)) return problem(target, request.path);
@@ -300,6 +314,7 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
     const reading = method === "GET" && action === "next";
     if (!reading && method !== "POST") return undefined;
     if (!reading && !hasCsrf(request)) return problem(PROBLEMS.csrf, request.path);
+    if (training.owns(id)) return training.route(request, id, action);
     const session = sessions.get(id);
     if (session === undefined) return problem(PROBLEMS.notFound, request.path);
     if (action === "end") return end(session);

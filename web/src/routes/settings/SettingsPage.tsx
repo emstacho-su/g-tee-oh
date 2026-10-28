@@ -1,14 +1,17 @@
 /**
- * /settings (A7 section 2). A7's settings screen is split between sessions: S28 builds the
- * builder schedule (R3.5, O-296), shown to an admin only (O-290); S32 adds session defaults,
- * hotkeys and cosmetics, which this page names as coming.
+ * /settings (A7 section 2). S28 built the builder schedule (R3.5, O-296), shown to an admin only
+ * (O-290). S32 adds, for everyone, the session defaults of automated training (R4.12, O-323), the
+ * cosmetics (R4.14, O-323) and the read-only hotkey list (O-327). Session defaults and cosmetics
+ * are kept on this browser; the server owns which cosmetics are unlocked.
  */
 import { useAppApi } from "../../auth/index.js";
 import { BuilderScheduleForm } from "../../components/library/BuilderScheduleForm.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import { useBuilderStatus, useIsAdmin, useSaveSettings } from "../../library/use-builder.js";
+import { CosmeticsSection } from "./CosmeticsSection.js";
+import { HotkeysSection } from "./HotkeysSection.js";
+import { SessionDefaultsSection } from "./SessionDefaultsSection.js";
 
-export const LATER_SETTINGS_NOTE = "Session defaults, hotkeys and cosmetics arrive in S32.";
 export const SCHEDULE_MEMBER_NOTE = "The builder schedule is for admins.";
 
 function ScheduleSection() {
@@ -33,7 +36,9 @@ export function SettingsPage() {
     <section className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
       {isAdmin ? <ScheduleSection /> : <p className="text-sm text-muted">{SCHEDULE_MEMBER_NOTE}</p>}
-      <p className="text-sm text-muted">{LATER_SETTINGS_NOTE}</p>
+      <SessionDefaultsSection />
+      <CosmeticsSection />
+      <HotkeysSection />
     </section>
   );
 }

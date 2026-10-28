@@ -1,7 +1,7 @@
 /**
  * Home shell tests (R3.13, A7 section 2, O-266). The authenticated layout shows the header (app
  * name, signed-in email, theme toggle, sign out), the "Main" navigation with aria-current on the
- * active link, and the shortcuts hint; the home page shows its four placeholder cards. Sign out
+ * active link, and the shortcuts hint; the home page shows its four cards. Sign out
  * sends the CSRF (cross-site request forgery) token, forgets it and lands on /login.
  */
 import { screen, waitFor, within } from "@testing-library/react";
@@ -64,6 +64,18 @@ describe("home shell", () => {
     expect(screen.getByText(/Press \? for shortcuts/)).toBeInTheDocument();
   });
 
+  it("R3.13 at phone width the header keeps the app name and buttons on one line and shortens the email", async () => {
+    renderApp("/", SIGNED_IN);
+
+    const header = await screen.findByTestId("app-header");
+    expect(within(header).getByText("g-tee-oh")).toHaveClass("whitespace-nowrap");
+    const email = await within(header).findByText(fixtureSession.user.email);
+    expect(email).toHaveClass("truncate");
+    expect(email).toHaveAttribute("title", fixtureSession.user.email);
+    expect(within(header).getByRole("button", { name: "Sign out" })).toHaveClass("whitespace-nowrap");
+    for (const button of within(header).getAllByRole("button")) expect(button).toHaveClass("whitespace-nowrap");
+  });
+
   it("R3.13 the Main navigation links every app route and marks the active one", async () => {
     renderApp("/study", SIGNED_IN);
 
@@ -97,18 +109,17 @@ describe("home shell", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("R3.13 the home page shows four cards, three naming the session that fills each", async () => {
+  it("R3.13 R4.12 the home page shows four cards: today's queue, streak, rating and builder status", async () => {
     renderApp("/", SIGNED_IN);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
-    const cards: readonly (readonly [string, string])[] = [
-      ["Today's queue", "Phase 4 (S32)"],
-      ["Streak", "S32"],
-      ["Rating", "S32"],
-    ];
-    for (const [title, session] of cards) {
+    for (const title of ["Today's queue", "Streak", "Rating", "Builder status"]) {
+      expect(screen.getByRole("region", { name: title })).toBeInTheDocument();
+    }
+    // This script answers no progress read, so each progress card ends in its error state.
+    for (const title of ["Today's queue", "Streak", "Rating"]) {
       const card = screen.getByRole("region", { name: title });
-      expect(card).toHaveTextContent(`Filled in ${session}`);
+      expect(await within(card).findByRole("button", { name: /^Try again/ })).toBeInTheDocument();
     }
   });
 

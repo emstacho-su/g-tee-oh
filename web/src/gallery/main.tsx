@@ -13,6 +13,7 @@ import { createRoot } from "react-dom/client";
 import { HotkeyRoot } from "../hotkeys/index.js";
 import { useThemeStore } from "../store/index.js";
 import { MatrixSections } from "./matrix-sections.js";
+import { ProgressSections } from "./progress-sections.js";
 import { RngSections } from "./rng-sections.js";
 import { TableSections, TrainerSections } from "./sections.js";
 import "../styles.css";
@@ -42,6 +43,7 @@ createRoot(container).render(
         <TrainerSections />
         <RngSections />
         <MatrixSections theme={theme} />
+        <ProgressSections />
       </main>
     </HotkeyRoot>
   </StrictMode>,

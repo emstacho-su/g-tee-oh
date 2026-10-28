@@ -39,6 +39,11 @@ const COLOR_CLASSES: Readonly<Record<SuitColor, string>> = {
 
 const BASE_CLASSES = "inline-flex shrink-0 select-none items-center justify-center rounded-md border font-semibold shadow-sm";
 const FACE_DOWN_NAME = "Face-down card";
+/**
+ * The back reads three custom properties (S32, R4.14, O-323): styles.css defaults them to the
+ * standard blue stripe and an equipped card back (data-card-back on <html>) overrides them.
+ */
+export const FACE_DOWN_CLASSES = "border-(color:--card-back-border) bg-(color:--card-back-bg) bg-(image:--card-back-pattern)";
 
 function tryParse(text: string): Card | null {
   try {
@@ -58,7 +63,7 @@ export function CardView({ card, faceDown = false, size = "md", fourColor = fals
         aria-label={FACE_DOWN_NAME}
         data-testid="card-view"
         data-face="down"
-        className={cn(BASE_CLASSES, sizeClass, "border-blue-900 bg-blue-800 bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.15)_0_3px,transparent_3px_6px)]", className)}
+        className={cn(BASE_CLASSES, sizeClass, FACE_DOWN_CLASSES, className)}
       />
     );
   }

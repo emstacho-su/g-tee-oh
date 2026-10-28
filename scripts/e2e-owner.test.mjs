@@ -19,7 +19,7 @@ import {
   generateOwnerPassword,
   ownerEmail,
 } from '../infra/compose/e2e-owner.mjs';
-import { COMPOSE_ARGS, OWNER_STEP, STEPS, resolveOwner } from '../infra/compose/e2e.mjs';
+import { COMPOSE_ARGS, LEARNING_STEP, OWNER_STEP, STEPS, learningStepEnv, resolveOwner } from '../infra/compose/e2e.mjs';
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const PASSWORD_BYTES = 24;
@@ -110,8 +110,27 @@ test('r3_13 e2eWebEnv adds the owner to a new object and leaves the parent envir
   assert.equal(OWNER_PASSWORD_VARIABLE in parent, false);
 });
 
-test('r3_13 the e2e chain creates the owner after the database steps and before smoke', () => {
-  assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, 'smoke', 'e2e-web']);
+test('r3_13 the e2e chain creates the owner after the database steps, seeds its learning state, then smoke', () => {
+  assert.deepEqual(STEPS, [
+    'dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, LEARNING_STEP, 'smoke', 'e2e-web',
+  ]);
+});
+
+test('r4_10 the learning seed step gets the owner email and never the password (O-324)', () => {
+  const parent = Object.freeze({ PATH: '/usr/bin', [OWNER_PASSWORD_VARIABLE]: 'stale' });
+  const child = learningStepEnv(parent, { email: DEFAULT_OWNER_EMAIL, password: 'pw-from-this-run-only' });
+  assert.deepEqual(child, { PATH: '/usr/bin', [OWNER_EMAIL_VARIABLE]: DEFAULT_OWNER_EMAIL });
+  assert.equal(parent[OWNER_PASSWORD_VARIABLE], 'stale');
+});
+
+test('r4_10 the Playwright step still gets the password after the learning step built its environment (O-324)', () => {
+  const parent = { PATH: '/usr/bin' };
+  const owner = { email: DEFAULT_OWNER_EMAIL, password: 'pw-from-this-run-only' };
+  learningStepEnv(parent, owner);
+  const web = e2eWebEnv(parent, owner);
+  assert.equal(web[OWNER_PASSWORD_VARIABLE], owner.password);
+  assert.equal(web[OWNER_EMAIL_VARIABLE], owner.email);
+  assert.deepEqual(parent, { PATH: '/usr/bin' });
 });
 
 test('r3_5 adminDatabaseUrl treats an empty DATABASE_URL as unset and falls back to .env (PR #28 review L7)', () => {

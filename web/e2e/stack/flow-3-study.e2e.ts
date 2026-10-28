@@ -26,7 +26,7 @@ import { THEME_STORAGE_KEY } from "../../src/store/theme-key.js";
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord } from "../support/shot-manifest.js";
 import { capture, DESKTOP, THEMES } from "../support/shots.js";
-import { signIn } from "../support/sign-in-flow.js";
+import { signInOnce } from "../support/sign-in-flow.js";
 
 const credentials = ownerCredentials(process.env);
 const SKIP_REASON = "R3.12 flow 3 needs E2E_OWNER_EMAIL and E2E_OWNER_PASSWORD; just e2e creates the owner and sets both";
@@ -152,7 +152,7 @@ test("R3.12 flow 3: study browser over the fixture library, node switch times lo
   });
   await page.setViewportSize({ width: DESKTOP.width, height: DESKTOP.height });
 
-  await signIn(page, credentials);
+  await signInOnce(page, credentials);
   await chooseFilters(page);
   await expect(page.getByTestId("synthetic-banner")).toBeVisible();
   await switchModes(page);

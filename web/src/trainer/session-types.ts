@@ -11,6 +11,10 @@ type Schemas = ApiComponents["schemas"];
 export type Drill = Schemas["Drill"];
 export type PracticeSession = Schemas["PracticeSession"];
 export type SessionRecap = Schemas["SessionRecap"];
+/** An automated session's current review block and a holdout session's round progress (S32, O-272, O-276). */
+export type AutomatedBlock = Schemas["AutomatedBlock"];
+export type HoldoutProgress = Schemas["HoldoutProgress"];
+export type RatingChange = SessionRecap["rating_changes"][number];
 export type StopRule = Schemas["TrainerSettings"]["stop_rule"];
 export type PauseRule = Schemas["TrainerSettings"]["pause"];
 export type RevealSpeed = Schemas["TrainerSettings"]["speed"];

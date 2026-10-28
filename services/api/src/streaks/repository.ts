@@ -28,7 +28,7 @@ import { overallRatingOf } from "../progress/rating.js";
 import { effectiveTrackWeights } from "../progress/weights.js";
 import { STREAK_DAY_MINIMUM, type streakSchema } from "../schemas/insights.js";
 import type { recapSchema } from "../schemas/training.js";
-import { isoDateOf, localDay, startOfDay } from "./calendar.js";
+import { addDays, isoDateOf, localDay, startOfDay } from "./calendar.js";
 import { nextStreakMilestone, streakCosmetics, tierCosmetics } from "./cosmetics.js";
 import { computeStreak, type DayCounts, type StreakComputation } from "./rules.js";
 
@@ -139,6 +139,7 @@ export async function streakView(database: Database, userId: string, now: Date, 
         : {
             day: repairable.day,
             deadline: startOfDay(repairable.deadlineDay, timeZone).toISOString(),
+            last_day: addDays(repairable.deadlineDay, -1),
             progress: repairable.progress,
             needed: repairable.needed,
           },

@@ -86,7 +86,7 @@ describe("R3.14 review MEDIUM 3: the no-coverage counts are typed members of the
   it("R3.14 counts on another problem, or a body that is not a problem, are ignored", () => {
     const stale = sessionProblemFromBody(409, { type: "urn:g-tee-oh:problem:stale-state", title: "t", status: 409, pairs_total: 3, pairs_queued: 3 });
     expect(problemOf(stale)).toEqual({ kind: "stale", status: 409 });
-    expect(problemOf(sessionProblemFromBody(422, null))).toEqual({ kind: "other", status: 422 });
+    expect(problemOf(sessionProblemFromBody(422, null))).toEqual({ kind: "other", status: 422, slug: "unknown" });
   });
 
   it("R3.14 a 422 without counts still links to the library, and other problems show nothing", async () => {

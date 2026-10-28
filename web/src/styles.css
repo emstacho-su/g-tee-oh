@@ -29,6 +29,19 @@
   --felt: #166534;
   --felt-edge: #14532d;
   --focus: #f59e0b;
+  /*
+   * Mastery heat map (S32, O-320): five ordinal steps of one blue hue, lowest mastery first,
+   * validated with the dataviz palette validator (ordinal mode) against --surface-raised in each
+   * theme. Cell text: steps 1 and 2 take --heat-ink-low, steps 3 to 5 --heat-ink-high, in both
+   * themes, which keeps every label at 4.4:1 or more against its step.
+   */
+  --heat-1: #86b6ef;
+  --heat-2: #5598e7;
+  --heat-3: #2a78d6;
+  --heat-4: #1c5cab;
+  --heat-5: #104281;
+  --heat-ink-low: #0f172a;
+  --heat-ink-high: #ffffff;
   color-scheme: light;
 }
 
@@ -47,6 +60,14 @@
   --felt: #14532d;
   --felt-edge: #052e16;
   --focus: #fbbf24;
+  /* Dark steps run from dark (low mastery) to light (high), validated against #111827. */
+  --heat-1: #184f95;
+  --heat-2: #256abf;
+  --heat-3: #3987e5;
+  --heat-4: #6da7ec;
+  --heat-5: #b7d3f6;
+  --heat-ink-low: #ffffff;
+  --heat-ink-high: #0b1120;
   color-scheme: dark;
 }
 
@@ -65,6 +86,13 @@
   --color-felt: var(--felt);
   --color-felt-edge: var(--felt-edge);
   --color-focus: var(--focus);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
+  --color-heat-ink-low: var(--heat-ink-low);
+  --color-heat-ink-high: var(--heat-ink-high);
 }
 
 html,
@@ -85,4 +113,86 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * Cosmetics (S32, R4.14, O-323, O-279). CosmeticsRoot sets data-felt and data-card-back on <html>
+ * for the equipped items the server has unlocked; the /settings previews set the same attributes
+ * on a wrapper, so the selectors match any element and the values inherit. "none" restores the
+ * standard look inside a preview while another item is equipped on <html>.
+ *
+ * Felts keep the table's white text readable. White on each felt, by the WCAG relative luminance
+ * formula (a node calculation): standard light #166534 7.13:1, dark #14532d 9.11:1; Tier III blue
+ * light #1e40af 8.72:1, dark #1e3a8a 10.36:1; Tier V burgundy light #9f1239 8.02:1, dark #881337
+ * 9.57:1; Tier VII violet light #5b21b6 8.98:1, dark #4c1d95 10.95:1. All are 4.5:1 or more.
+ *
+ * Card backs are three custom properties CardView's face-down card reads. The defaults reproduce
+ * the earlier fixed classes exactly (Tailwind's blue-800 fill, blue-900 border and the light
+ * 45 degree stripe); the 14-day back is a crimson crosshatch, the 60-day back a gold grid on black.
+ */
+:root,
+[data-card-back="none"] {
+  --card-back-bg: oklch(42.4% 0.199 265.638);
+  --card-back-border: oklch(37.9% 0.146 265.522);
+  --card-back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 3px, transparent 3px 6px);
+}
+
+[data-card-back="card-back-streak-14"] {
+  --card-back-bg: #991b1b;
+  --card-back-border: #7f1d1d;
+  --card-back-pattern:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 6px);
+}
+
+[data-card-back="card-back-streak-60"] {
+  --card-back-bg: #1c1917;
+  --card-back-border: #a16207;
+  --card-back-pattern:
+    repeating-linear-gradient(90deg, rgba(250, 204, 21, 0.35) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(250, 204, 21, 0.35) 0 1px, transparent 1px 5px);
+}
+
+[data-felt="none"] {
+  --felt: #166534;
+  --felt-edge: #14532d;
+}
+
+[data-felt="felt-tier-III"] {
+  --felt: #1e40af;
+  --felt-edge: #1e3a8a;
+}
+
+[data-felt="felt-tier-V"] {
+  --felt: #9f1239;
+  --felt-edge: #881337;
+}
+
+[data-felt="felt-tier-VII"] {
+  --felt: #5b21b6;
+  --felt-edge: #4c1d95;
+}
+
+.dark[data-felt="none"],
+.dark [data-felt="none"] {
+  --felt: #14532d;
+  --felt-edge: #052e16;
+}
+
+.dark[data-felt="felt-tier-III"],
+.dark [data-felt="felt-tier-III"] {
+  --felt: #1e3a8a;
+  --felt-edge: #172554;
+}
+
+.dark[data-felt="felt-tier-V"],
+.dark [data-felt="felt-tier-V"] {
+  --felt: #881337;
+  --felt-edge: #4c0519;
+}
+
+.dark[data-felt="felt-tier-VII"],
+.dark [data-felt="felt-tier-VII"] {
+  --felt: #4c1d95;
+  --felt-edge: #2e1065;
 }
