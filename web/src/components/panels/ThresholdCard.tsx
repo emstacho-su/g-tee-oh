@@ -3,8 +3,9 @@
  * hands take each aggressive action at the node and where one hand sits, in plain words.
  *
  * Mechanism: the card is StudyInsights.threshold_card as the contract pins it (S23). Three tiles:
- * Hand position (the hand, "Stronger than 18% of this range" from rank_in_range, a percentile with 1
- * the strongest, and its equity against the opponent's range), Actions (one row per entry: the
+ * Hand position ("At or above 18% of this range by strength" from rank_in_range, which counts the
+ * hand and its ties, its own text when the hand has no rank, the hand itself only when Your hand
+ * does not already name it, and its equity against the opponent's range), Actions (one row per entry: the
  * action's name, the share of the range that plays it, the weakest hand that plays it at least half
  * the time, and whether the hand is above, at or below that line) and Strongest folding hand. Each
  * tile's heading carries an InfoTip that explains it. Actions are named from the node's actions by
@@ -90,16 +91,35 @@ function Tile({ title, tipSubject, tip, headingId, className, children }: TilePr
   );
 }
 
+/**
+ * rank_in_range in words (review round 1, 4). It is the reach-weighted share of the range at or
+ * below the hand's strength, the hand and its ties included, so the strongest hand reads 100% and
+ * the weakest still counts itself; 0 means the api had no strength for the hand (it is outside the
+ * range at this node), and its equity is then only a placeholder.
+ */
+export const RANK_TEXT = {
+  top: "At or above every hand in this range by strength",
+  share: (percent: string) => `At or above ${percent} of this range by strength`,
+  none: "No strength rank here: the hand is outside this range at this node",
+} as const;
+
 function HandPosition({ card, heroHand }: { card: ThresholdCardData; heroHand: string | undefined }) {
   const position = card.hand_position;
   const headingId = useId();
+  const rank = position.rank_in_range;
+  const ranked = rank > 0;
   return (
     <Tile title="Hand position" tipSubject="hand position" tip={THRESHOLD_TIPS.handPosition} headingId={headingId}>
-      <p className="text-base">
-        <HandText hand={position.hand} heroHand={heroHand} />
-      </p>
-      <p>{`Stronger than ${formatShare(position.rank_in_range, WHOLE_PERCENT)} of this range`}</p>
-      <p className="text-muted">{`Equity against the opponent's range: ${formatShare(position.equity_vs_villain, WHOLE_PERCENT)}`}</p>
+      {/* The hand is named once: here only when it is not the hand Your hand already names. */}
+      {position.hand === heroHand ? null : (
+        <p className="text-base">
+          <HandText hand={position.hand} heroHand={heroHand} />
+        </p>
+      )}
+      <p>{!ranked ? RANK_TEXT.none : rank >= 1 ? RANK_TEXT.top : RANK_TEXT.share(formatShare(rank, WHOLE_PERCENT))}</p>
+      {ranked ? (
+        <p className="text-muted">{`Equity against the opponent's range: ${formatShare(position.equity_vs_villain, WHOLE_PERCENT)}`}</p>
+      ) : null}
     </Tile>
   );
 }

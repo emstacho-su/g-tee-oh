@@ -26,11 +26,32 @@ describe("R3.12 ThresholdCard", () => {
     expect(card).toHaveTextContent("Your hand: AJo");
   });
 
-  it("R3.12 says where the hand sits in plain words", () => {
+  it("R3.12 says where the hand sits in words that match rank_in_range, which counts the hand and its ties (review round 1, 4)", () => {
     render(<ThresholdCard card={CARD} heroHand="AJo" />);
     const position = screen.getByRole("group", { name: "Hand position" });
-    expect(position).toHaveTextContent("Stronger than 18% of this range");
+    expect(position).toHaveTextContent("At or above 18% of this range by strength");
+    expect(position).not.toHaveTextContent("Stronger than");
     expect(position).toHaveTextContent("Equity against the opponent's range: 61%");
+  });
+
+  it("R3.12 the strongest hand reads as at or above every hand, not as stronger than all of them (review round 1, 4)", () => {
+    const top: Card = { ...CARD, hand_position: { ...CARD.hand_position, rank_in_range: 1 } };
+    render(<ThresholdCard card={top} heroHand="AJo" />);
+    expect(screen.getByRole("group", { name: "Hand position" })).toHaveTextContent("At or above every hand in this range by strength");
+  });
+
+  it("R3.12 a hand with no strength rank (outside the range here) gets its own text and no placeholder equity (review round 1, 4)", () => {
+    const outside: Card = { ...CARD, hand_position: { ...CARD.hand_position, rank_in_range: 0, equity_vs_villain: 0.5 } };
+    render(<ThresholdCard card={outside} heroHand="AJo" />);
+    const position = screen.getByRole("group", { name: "Hand position" });
+    expect(position).toHaveTextContent("No strength rank here: the hand is outside this range at this node");
+    expect(position).not.toHaveTextContent("At or above");
+    expect(position).not.toHaveTextContent("Equity against");
+  });
+
+  it("R3.12 the hand position tile does not repeat the hand already named in Your hand (review round 1, 4)", () => {
+    render(<ThresholdCard card={CARD} heroHand="AJo" />);
+    expect(within(screen.getByRole("group", { name: "Hand position" })).queryByText("AJo")).not.toBeInTheDocument();
   });
 
   it("R3.12 names each action from the node's actions by NodeAction.index, with its share and line (O-198)", () => {
@@ -79,9 +100,15 @@ describe("R3.12 ThresholdCard", () => {
 
   it("R3.12 marks the hero's hand wherever it appears", () => {
     render(<ThresholdCard card={{ ...CARD, strongest_folding_hand: "AJo" }} heroHand="AJo" />);
-    const marks = screen.getAllByText("AJo", { selector: "mark" });
-    expect(marks.length).toBeGreaterThanOrEqual(2);
-    for (const mark of marks) expect(mark).toHaveAttribute("data-hero", "true");
+    // Once in Your hand and once as the strongest folding hand; the hand position tile no longer repeats it.
+    const card = screen.getByTestId("threshold-card");
+    const yourHand = within(card).getByText("Your hand:", { exact: false });
+    const folding = screen.getByRole("group", { name: "Strongest folding hand" });
+    for (const place of [yourHand, folding]) {
+      const mark = within(place).getByText("AJo", { selector: "mark" });
+      expect(mark).toHaveAttribute("data-hero", "true");
+    }
+    expect(within(card).getAllByText("AJo", { selector: "mark" })).toHaveLength(2);
   });
 
   it("R3.12 a node without a threshold card says so, under a custom title", () => {
