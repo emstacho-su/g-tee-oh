@@ -23,7 +23,6 @@ import { storedSpotFilterSchema, trainerSettingsSchema, type TrainerSettings } f
 import { requireSolverQuery } from "../../solver-query/client.js";
 import { candidatesFor, configIdsFor, pairsFor, splitByCoverage } from "../candidates.js";
 import { filterUnmetProblem } from "../problems.js";
-import { newSessionSeed } from "../randomness.js";
 import { insertCoverageRequests, insertSession } from "../repository.js";
 import type { SessionCall, SessionCreateBody } from "../session-call.js";
 import { toSession, type Session } from "../session-view.js";
@@ -71,7 +70,7 @@ export async function createDrillSession(call: SessionCall, body: SessionCreateB
     });
   }
   // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
-  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, {
+  const state = initialState(body.seed ?? call.app.newSessionSeed(), heroSpots, spot, {
     seeded: body.seed !== undefined,
     ...(mode === "drill" ? {} : { practice: mode }),
   });

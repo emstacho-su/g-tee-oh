@@ -8,6 +8,13 @@ import type { z } from "zod";
 
 import type { sessionCreateBodySchema } from "../schemas/training.js";
 
+declare module "fastify" {
+  interface FastifyInstance {
+    /** The seed of a session created without a client seed (BuildAppOptions.newSessionSeed). */
+    newSessionSeed: () => string;
+  }
+}
+
 export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
 
 export interface SessionCall {
