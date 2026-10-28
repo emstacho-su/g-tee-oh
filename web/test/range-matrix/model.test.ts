@@ -76,10 +76,18 @@ describe("R3.12 range matrix model", () => {
     expect(() => buildMatrixModel(repeated)).toThrow(/AA/);
   });
 
-  it("R3.12 evScaleOf is the largest absolute best EV of the present cells, never zero", () => {
+  it("R3.12 evScaleOf is the 90th percentile of the present cells' absolute best EV, at least 0.5bb (O-384)", () => {
     const model = buildMatrixModel(fixtureStudyNode);
-    const expected = Math.max(...fixtureStudyNode.hands.map((row) => Math.abs(row.ev_best_bb)));
-    expect(model.evScaleBb).toBe(expected);
-    expect(evScaleOf([])).toBeGreaterThan(0);
+    const sorted = fixtureStudyNode.hands.map((row) => Math.abs(row.ev_best_bb)).sort((a, b) => a - b);
+    const nearestRank = sorted[Math.ceil(0.9 * sorted.length) - 1] ?? 0;
+    expect(model.evScaleBb).toBe(Math.max(0.5, nearestRank));
+    expect(evScaleOf([])).toBe(0.5);
+  });
+
+  it("R3.12 one huge EV does not stretch the scale end, and missing cells do not count", () => {
+    const base = buildMatrixModel(fixtureStudyNode).cells;
+    const cells = base.map((cell, index) => ({ ...cell, evBestBb: index === 0 ? 40 : index <= 100 ? 2 : -1, present: index < 150 }));
+    expect(evScaleOf(cells)).toBe(2);
+    expect(evScaleOf(cells.map((cell) => ({ ...cell, evBestBb: 0.1 })))).toBe(0.5);
   });
 });

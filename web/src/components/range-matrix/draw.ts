@@ -6,19 +6,23 @@
  * in device pixels: the backing store is sizePx times the pixel ratio, cut into 13 integer cell
  * edges, so every rectangle lands on whole pixels and nothing blurs. One frame paints in passes
  * to keep context state changes few: the background, every cell's fill (stacked frequency bars
- * with their hatch overlay, the diverging expected value (EV) fill, or the weight bar; missing
- * hands gray with a gray hatch), the grid lines, the label chips, the texts, then the selection
- * and focus outlines. Color is never the only signal: every bar carries its action's pattern
- * (fold is the one plain fill), every cell prints its hand, EV and weight print their numbers,
- * missing hands print a dash. Speed (the 16 ms frame budget, O-260): patterns come from a cache
- * built once per theme and ratio (patterns.ts), EV colors from a quantized palette, label chips
- * have a fixed width from a monospace font so no text is measured, and a frame allocates only a
- * handful of small objects per action, none per cell.
+ * with their hatch overlay, the diverging expected value (EV) step, or the weight step filling
+ * the whole cell; missing hands and unknown weights take the missing fill and hatch), the grid
+ * lines, the label chips (frequency bars and missing cells only: EV and weight print straight on
+ * their step in its own ink, S38), the texts, then the selection and focus outlines. Color is
+ * never the only signal: every bar carries its action's pattern (fold is the one plain fill),
+ * with light hatch lines over a dark fill and dark ones over a light fill, every cell prints its
+ * hand, EV and weight print their numbers, missing hands print a dash. Speed (the 16 ms frame
+ * budget, O-260): patterns come from a cache built once per theme and ratio (patterns.ts), EV
+ * and weight colours and their inks from quantized, pre-resolved palettes (matrix-theme.ts),
+ * label chips have a fixed width from a monospace font so no text is measured, and a frame
+ * allocates only a handful of small objects per action, none per cell.
  */
 import type { NodeAction } from "../../contracts.js";
 import { actionColor, actionStyle, sizeRank, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
 import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatWeightShort } from "./cell-text.js";
-import { MATRIX_PALETTES, evFill, type MatrixPalette } from "./matrix-theme.js";
+import { isDarkFill } from "./color.js";
+import { MATRIX_PALETTES, evFill, evInk, weightFill, weightInk, type ResolvedPalette } from "./matrix-theme.js";
 import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
 import type { MatrixCell, MatrixMode, MatrixModel } from "./model.js";
 import { MISSING_PATTERN_KEY, patternKey, type PatternSource } from "./patterns.js";
@@ -84,6 +88,7 @@ const PAD_CSS_PX = 2;
 const GRID_LINE_CSS_PX = 1;
 const FOCUS_LINE_CSS_PX = 2;
 const SELECTED_LINE_CSS_PX = 4;
+const HALO_LINE_CSS_PX = 1;
 /** What lastPlayedPosition returns when no action has a positive frequency. */
 const NONE_PLAYED = -1;
 
@@ -97,15 +102,16 @@ function edgeAt(index: number, sizeDevicePx: number): number {
   return Math.round((index * sizeDevicePx) / GRID_SIZE);
 }
 
-function patternOf(style: ActionStyle, variant: number, patterns: PatternSource): CanvasPattern | null {
-  return style.pattern === "none" ? null : patterns.get(patternKey(style.pattern, variant));
+function patternOf(style: ActionStyle, variant: number, color: string, patterns: PatternSource): CanvasPattern | null {
+  if (style.pattern === "none") return null;
+  return patterns.get(patternKey(style.pattern, variant, isDarkFill(color) ? "light" : "dark"));
 }
 
 function actionPaints(actions: readonly NodeAction[], theme: ThemeName, patterns: PatternSource): ActionPaint[] {
-  return actions.map((action) => ({
-    color: actionColor(action, actions, theme),
-    pattern: patternOf(actionStyle(action.kind), sizeRank(action, actions), patterns),
-  }));
+  return actions.map((action) => {
+    const color = actionColor(action, actions, theme);
+    return { color, pattern: patternOf(actionStyle(action.kind), sizeRank(action, actions), color, patterns) };
+  });
 }
 
 function textLayout(cellPx: number, pixelRatio: number): TextLayout {
@@ -178,32 +184,42 @@ function drawFrequencyCell(ctx: MatrixCanvasContext, cell: MatrixCell, rect: Rec
   });
 }
 
-function drawWeightCell(ctx: MatrixCanvasContext, cell: MatrixCell, rect: Rect, palette: MatrixPalette): void {
-  fillWith(ctx, palette.weightTrack, rect.x, rect.y, rect.w, rect.h);
-  if (cell.weight === null) return;
-  const height = Math.round(Math.min(1, Math.max(0, cell.weight)) * rect.h);
-  fillWith(ctx, palette.weightFill, rect.x, rect.y + rect.h - height, rect.w, height);
-}
-
 interface FrameContext {
   readonly ctx: MatrixCanvasContext;
   readonly model: MatrixModel;
   readonly mode: MatrixMode;
-  readonly palette: MatrixPalette;
+  readonly palette: ResolvedPalette;
   readonly paints: readonly ActionPaint[];
   readonly missingPattern: CanvasPattern | null;
 }
 
+/** True when the cell is drawn as missing: no row, or (weight mode) an unknown weight. */
+function drawnMissing(cell: MatrixCell, mode: MatrixMode): boolean {
+  return !cell.present || (mode === "weight" && cell.weight === null);
+}
+
+/** Frequency bars and missing cells keep the label chip; EV and weight print on their own fill. */
+function usesChip(cell: MatrixCell, mode: MatrixMode): boolean {
+  return mode === "frequency" || drawnMissing(cell, mode);
+}
+
 function drawCellFill(frame: FrameContext, cell: MatrixCell, rect: Rect): void {
   const { ctx, palette } = frame;
-  if (!cell.present) {
+  if (drawnMissing(cell, frame.mode)) {
     fillWith(ctx, palette.missingFill, rect.x, rect.y, rect.w, rect.h);
     if (frame.missingPattern !== null) fillWith(ctx, frame.missingPattern, rect.x, rect.y, rect.w, rect.h);
     return;
   }
   if (frame.mode === "frequency") drawFrequencyCell(ctx, cell, rect, frame.paints);
   else if (frame.mode === "ev") fillWith(ctx, evFill(palette, cell.evBestBb ?? 0, frame.model.evScaleBb), rect.x, rect.y, rect.w, rect.h);
-  else drawWeightCell(ctx, cell, rect, palette);
+  else fillWith(ctx, weightFill(palette, cell.weight) ?? palette.missingFill, rect.x, rect.y, rect.w, rect.h);
+}
+
+/** The ink of a cell's texts: the label colour on a chip, else the step's own ink. */
+function cellInk(frame: FrameContext, cell: MatrixCell): string {
+  if (usesChip(cell, frame.mode)) return frame.palette.labelText;
+  if (frame.mode === "ev") return evInk(frame.palette, cell.evBestBb ?? 0, frame.model.evScaleBb);
+  return weightInk(frame.palette, cell.weight);
 }
 
 function drawGridLines(ctx: MatrixCanvasContext, size: number, pixelRatio: number, color: string): void {
@@ -228,6 +244,7 @@ function drawChips(frame: FrameContext, rects: readonly Rect[], layout: TextLayo
   const { ctx } = frame;
   ctx.fillStyle = frame.palette.labelChip;
   frame.model.cells.forEach((cell, index) => {
+    if (!usesChip(cell, frame.mode)) return;
     const rect = rectAt(rects, index);
     ctx.fillRect(rect.x, rect.y, Math.min(rect.w, layout.labelChipW), Math.min(rect.h, layout.labelChipH));
     if (valueText(cell, frame.mode) === null) return;
@@ -236,14 +253,18 @@ function drawChips(frame: FrameContext, rects: readonly Rect[], layout: TextLayo
   });
 }
 
+/**
+ * Prints every hand label, then every value. The ink changes per cell only in EV and weight
+ * modes, and it is a string from the resolved palette, so no colour is allocated per cell.
+ */
 function drawTexts(frame: FrameContext, rects: readonly Rect[], layout: TextLayout): void {
   const { ctx } = frame;
-  ctx.fillStyle = frame.palette.labelText;
   ctx.font = layout.labelFont;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   frame.model.cells.forEach((cell, index) => {
     const rect = rectAt(rects, index);
+    ctx.fillStyle = cellInk(frame, cell);
     ctx.fillText(cell.hand, rect.x + layout.pad, rect.y + layout.pad);
   });
   ctx.font = layout.valueFont;
@@ -253,6 +274,7 @@ function drawTexts(frame: FrameContext, rects: readonly Rect[], layout: TextLayo
     const text = valueText(cell, frame.mode);
     if (text === null) return;
     const rect = rectAt(rects, index);
+    ctx.fillStyle = cellInk(frame, cell);
     ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h - layout.pad);
   });
 }
@@ -272,7 +294,12 @@ function drawOutlines(frame: FrameContext, rects: readonly Rect[], options: Draw
     outline(frame.ctx, rects[index], frame.palette.selected, Math.round(SELECTED_LINE_CSS_PX * ratio));
   }
   if (options.focusedIndex !== null) {
-    outline(frame.ctx, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio));
+    const rect = rects[options.focusedIndex];
+    const width = Math.round(FOCUS_LINE_CSS_PX * ratio);
+    outline(frame.ctx, rect, frame.palette.focus, width);
+    // A thin line of the ground inside the ring, so the ring shows on a fill of its own hue.
+    const halo = rect === undefined ? undefined : { x: rect.x + width, y: rect.y + width, w: rect.w - 2 * width, h: rect.h - 2 * width };
+    outline(frame.ctx, halo, frame.palette.focusHalo, Math.max(1, Math.round(HALO_LINE_CSS_PX * ratio)));
   }
 }
 
