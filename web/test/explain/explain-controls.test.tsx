@@ -1,6 +1,7 @@
 /**
- * Tests for the More info and Ask controls in the feedback panel (S27 lane D, R3.19, R3.20, O-305
- * to O-308). The controls read GET /explain/status, GET /explain/{attempt_id}/more-info and POST
+ * Tests for More info and Ask in the feedback panel (S27 lane D, S38, R3.19, R3.20, O-305 to
+ * O-308, O-388). More info is the panel's inline Explanation section, read on its first open; Ask
+ * keeps its dialog in the controls row. The controls read GET /explain/status, GET /explain/{attempt_id}/more-info and POST
  * /explain/{attempt_id}/ask from an injected fake fetch; the Idempotency-Key factory is injected
  * through the trainer deps, so the keys are exact.
  */
@@ -12,9 +13,11 @@ import { describe, expect, it, vi } from "vitest";
 import { createAppApi } from "../../src/api/index.js";
 import { ApiProvider } from "../../src/auth/index.js";
 import { ExplainControls } from "../../src/components/explain/ExplainControls.js";
+import { MoreInfoSection } from "../../src/components/explain/MoreInfoSection.js";
+import { FeedbackPanel } from "../../src/components/trainer/index.js";
 import type { AskResult } from "../../src/contracts.js";
 import { EXPLAIN_TEXT } from "../../src/explain/texts.js";
-import { fixtureFeedback } from "../../src/fixtures/index.js";
+import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
 import {
   ASK_UNVALIDATED_WARNING,
   fixtureAskAnswer,
@@ -36,7 +39,9 @@ const ASK_PATH = `POST /api/v1/explain/${ATTEMPT}/ask`;
 const ME_PATH = "GET /api/v1/me";
 const QUESTION = "Why is raising better than calling?";
 
-function setup(script: FetchScript, onDialogOpenChange?: (open: boolean) => void) {
+type Mount = "controls" | "panel";
+
+function setup(script: FetchScript, onDialogOpenChange?: (open: boolean) => void, mount: Mount = "controls") {
   const fake = createFakeFetch(script);
   const idempotencyKeys: (string | null)[] = [];
   const api = createAppApi({
@@ -59,7 +64,17 @@ function setup(script: FetchScript, onDialogOpenChange?: (open: boolean) => void
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api}>
         <TrainerDepsProvider deps={deps}>
-          <ExplainControls feedback={fixtureFeedback} {...(onDialogOpenChange === undefined ? {} : { onDialogOpenChange })} />
+          {mount === "panel" ? (
+            <FeedbackPanel
+              feedback={fixtureFeedback}
+              actions={fixtureActions}
+              chosenIndex={1}
+              explain={<ExplainControls feedback={fixtureFeedback} />}
+              explanation={<MoreInfoSection attemptId={ATTEMPT} />}
+            />
+          ) : (
+            <ExplainControls feedback={fixtureFeedback} {...(onDialogOpenChange === undefined ? {} : { onDialogOpenChange })} />
+          )}
         </TrainerDepsProvider>
       </ApiProvider>
     </QueryClientProvider>,
@@ -76,6 +91,14 @@ function askScript(answers: readonly AskResult[], extra: FetchScript = {}): Fetc
   };
 }
 
+function explanationButton(): HTMLElement {
+  return screen.getByRole("button", { name: EXPLAIN_TEXT.explanation });
+}
+
+async function openExplanation(): Promise<void> {
+  await userEvent.click(explanationButton());
+}
+
 async function openAsk() {
   const button = await screen.findByRole("button", { name: EXPLAIN_TEXT.ask });
   await screen.findByTestId("ask-available");
@@ -90,39 +113,55 @@ async function send(dialog: HTMLElement, question: string) {
   await userEvent.click(within(dialog).getByRole("button", { name: EXPLAIN_TEXT.send }));
 }
 
-describe("R3.19 More info dialog", () => {
-  it("R3.19 opens a dialog listing every template section with its title and plain text", async () => {
+describe("R3.19 More info as the inline Explanation section (O-388)", () => {
+  it("R3.19 reads nothing until the section is opened, then lists every template section with its title and plain text", async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
     const held = () => gate.then(() => jsonResponse(200, fixtureMoreInfo)());
-    const { fake } = setup({ [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)], [MORE_INFO_PATH]: [held] });
+    const { fake } = setup({ [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)], [MORE_INFO_PATH]: [held] }, undefined, "panel");
+    await screen.findByTestId("ask-available");
     expect(fake.keys()).not.toContain(MORE_INFO_PATH);
-    await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }));
-    const dialog = await screen.findByRole("dialog", { name: EXPLAIN_TEXT.moreInfoTitle });
-    expect(within(dialog).getByRole("status")).toHaveTextContent(EXPLAIN_TEXT.moreInfoLoading);
+    await openExplanation();
+    const section = screen.getByRole("region", { name: EXPLAIN_TEXT.explanation });
+    expect(within(section).getByRole("status")).toHaveTextContent(EXPLAIN_TEXT.moreInfoLoading);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     release();
-    for (const section of fixtureMoreInfo.sections) {
-      const region = await within(dialog).findByRole("region", { name: section.title });
-      const text = within(region).getByTestId(`more-info-${section.template}`);
-      expect(text.textContent).toBe(section.text);
+    for (const part of fixtureMoreInfo.sections) {
+      const region = await within(section).findByRole("region", { name: part.title });
+      const text = within(region).getByTestId(`more-info-${part.template}`);
+      expect(text.textContent).toBe(part.text);
       expect(text).toHaveClass("whitespace-pre-line");
     }
   });
 
+  it("R3.19 closing and reopening the section reads More info once", async () => {
+    const { fake } = setup({ [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)], [MORE_INFO_PATH]: [jsonResponse(200, fixtureMoreInfo)] }, undefined, "panel");
+    await openExplanation();
+    await screen.findByTestId("more-info-sections");
+    await userEvent.click(explanationButton());
+    await userEvent.click(explanationButton());
+    expect(screen.getByTestId("more-info-sections")).toBeVisible();
+    expect(fake.keys().filter((key) => key === MORE_INFO_PATH)).toHaveLength(1);
+  });
+
   it("R3.19 says so when there is no section", async () => {
-    setup({ [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)], [MORE_INFO_PATH]: [jsonResponse(200, { ...fixtureMoreInfo, sections: [] })] });
-    await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }));
+    setup({ [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)], [MORE_INFO_PATH]: [jsonResponse(200, { ...fixtureMoreInfo, sections: [] })] }, undefined, "panel");
+    await openExplanation();
     expect(await screen.findByText(EXPLAIN_TEXT.moreInfoEmpty)).toBeInTheDocument();
   });
 
   it("R3.19 a failure is an explicit alert with the status, and Retry reads again", async () => {
-    const { fake } = setup({
-      [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)],
-      [MORE_INFO_PATH]: [problemResponse(502, "upstream"), jsonResponse(200, fixtureMoreInfo)],
-    });
-    await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }));
+    const { fake } = setup(
+      {
+        [STATUS_PATH]: [jsonResponse(200, fixtureAskStatus)],
+        [MORE_INFO_PATH]: [problemResponse(502, "upstream"), jsonResponse(200, fixtureMoreInfo)],
+      },
+      undefined,
+      "panel",
+    );
+    await openExplanation();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("could not load (status 502)");
     expect(alert).not.toHaveTextContent("server detail text");
@@ -133,15 +172,13 @@ describe("R3.19 More info dialog", () => {
 });
 
 describe("R3.19 R3.20 dialog open state", () => {
-  it("R3.19 R3.20 tells the screen when More info or Ask opens and closes, so it can pause its hotkeys", async () => {
+  it("R3.19 R3.20 the controls hold Ask only, and tell the screen when its dialog opens and closes so it can pause its hotkeys", async () => {
     const onDialogOpenChange = vi.fn();
-    setup(askScript([fixtureAskAnswer], { [MORE_INFO_PATH]: [jsonResponse(200, fixtureMoreInfo)] }), onDialogOpenChange);
-    await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }));
-    await screen.findByRole("dialog", { name: EXPLAIN_TEXT.moreInfoTitle });
-    await userEvent.keyboard("{Escape}");
+    setup(askScript([fixtureAskAnswer]), onDialogOpenChange);
+    expect(screen.queryByRole("button", { name: EXPLAIN_TEXT.moreInfo })).not.toBeInTheDocument();
     await openAsk();
     await userEvent.keyboard("{Escape}");
-    expect(onDialogOpenChange.mock.calls).toEqual([[true], [false], [true], [false]]);
+    expect(onDialogOpenChange.mock.calls).toEqual([[true], [false]]);
   });
 });
 

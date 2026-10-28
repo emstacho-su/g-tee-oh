@@ -15,6 +15,7 @@ import { useThemeStore } from "../store/index.js";
 import { DesignSystemSections } from "./design-sections.js";
 import { MatrixSections } from "./matrix-sections.js";
 import { ProgressSections } from "./progress-sections.js";
+import { FeedbackGallerySections } from "./feedback-sections.js";
 import { RngSections } from "./rng-sections.js";
 import { TableSections, TrainerSections } from "./sections.js";
 import "../styles.css";
@@ -43,6 +44,7 @@ createRoot(container).render(
         <DesignSystemSections />
         <TableSections />
         <TrainerSections />
+        <FeedbackGallerySections />
         <RngSections />
         <MatrixSections theme={theme} />
         <ProgressSections />

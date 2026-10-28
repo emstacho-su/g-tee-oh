@@ -102,6 +102,8 @@ function WiredFeedbackSection() {
             }
             rangeView={<FeedbackRangeView feedback={fixtureFeedback} />}
             thresholdCard={<FeedbackThreshold feedback={fixtureFeedback} />}
+            // The wired view shows the seeded range and threshold reads, so both sections start open (S38, O-387).
+            defaultOpen={{ range: true, threshold: true }}
           />
         </ApiProvider>
       </QueryClientProvider>

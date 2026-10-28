@@ -9,7 +9,7 @@
  * way trainer.shot.ts reaches the feedback. The mocked Ask status is switched per request by the MOCK_ASK_STATUS_HEADER header,
  * set with page.setExtraHTTPHeaders before each hand, and the status is read again whenever a new
  * feedback panel mounts. Hand one shows flag_off: the panel with its insight cards, the disabled
- * Ask with its reason and the More info dialog. Hand two shows cap_reached. Hand three shows ok:
+ * Ask with its reason and More info opened inline (S38, O-388). Hand two shows cap_reached. Hand three shows ok:
  * a validated answer, then a question naming MOCK_ASK_WARNING_TRIGGER, whose answer carries the
  * validator warning. afterAll merges the records into the shared manifest with session S27 and
  * source mock.
@@ -18,6 +18,7 @@ import { mkdirSync } from "node:fs";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { FEEDBACK_SECTION_TITLES } from "../../src/components/trainer/feedback-sections.js";
 import type { AskStatus } from "../../src/contracts.js";
 import { EXPLAIN_TEXT } from "../../src/explain/texts.js";
 import { FIXTURE_DRILL_ID, fixtureDrill } from "../../src/fixtures/trainer.js";
@@ -34,12 +35,14 @@ const SESSION = "S27";
 const RUN_PATH = `/drills/${FIXTURE_DRILL_ID}/run`;
 const EXPLAINER_NAME = "How Mixed-frequency mode works";
 const NEXT_HAND = "Next hand";
+const THRESHOLD_SECTION = FEEDBACK_SECTION_TITLES.threshold;
+const INSIGHTS_SECTION = FEEDBACK_SECTION_TITLES.insights;
 const QUESTION = "Why is raising better than calling here?";
 const WARNING_QUESTION = `Give me an ${MOCK_ASK_WARNING_TRIGGER} estimate of the raise's edge.`;
 
 const CRITERIA = {
   cards: "R3.18 feedback panel with the noise flags, threshold card and drift card (O-304)",
-  moreInfo: "R3.19 More info dialog: the five template sections as plain text, every number from the solver data (O-309)",
+  moreInfo: "R3.19 More info as the inline Explanation section: the five template sections as plain text, every number from the solver data (O-309, O-388)",
   flagOff: "R3.20 O-305 Ask disabled with the visible reason: Ask is off until a model key is configured",
   cap: "R3.20 O-307 Ask disabled above the monthly cap with the visible reason: This month's Ask budget is used",
   answer: "R3.20 Ask answer as plain text, validated (O-308)",
@@ -103,14 +106,20 @@ async function explainScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   await useAskStatus(page, "flag_off");
   await startSession(page);
   await decideHand(page);
+  // The cards live in collapsed sections since S38 (O-387): open them for the shot, close them after.
+  for (const title of [THRESHOLD_SECTION, INSIGHTS_SECTION]) await panel.getByRole("button", { name: title }).click();
+  await expect(panel.getByTestId("threshold-card")).toBeVisible();
   await shot(panel, "feedback-cards", CRITERIA.cards);
+  for (const title of [THRESHOLD_SECTION, INSIGHTS_SECTION]) await panel.getByRole("button", { name: title }).click();
   await expect(reason).toHaveText(EXPLAIN_TEXT.flagOff);
   await shot(panel, "ask-disabled-flag-off", CRITERIA.flagOff);
-  await page.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }).click();
-  const moreInfo = page.getByRole("dialog", { name: EXPLAIN_TEXT.moreInfoTitle });
+  // More info is the inline Explanation section (O-388): it expands in place, nothing to exit.
+  const explanation = panel.getByRole("button", { name: EXPLAIN_TEXT.explanation });
+  await explanation.click();
+  const moreInfo = panel.getByRole("region", { name: EXPLAIN_TEXT.explanation });
   await expect(moreInfo.getByTestId("more-info-sections")).toBeVisible();
-  await shot(page, "feedback-more-info", CRITERIA.moreInfo);
-  await page.keyboard.press("Escape");
+  await shot(panel, "feedback-more-info", CRITERIA.moreInfo);
+  await explanation.click();
   await expect(moreInfo).toBeHidden();
 
   await useAskStatus(page, "cap_reached");

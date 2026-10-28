@@ -1,7 +1,7 @@
 /**
  * Nothing on the trainer feedback screens is wider than a phone (R3.13, R3.19, R3.20,
  * R4.10): at a 390 px viewport the page never scrolls sideways (document scrollWidth at most
- * innerWidth) on the drill run's feedback, its More info dialog, an Ask answer and /train's
+ * innerWidth) on the drill run's feedback, its inline More info section, an Ask answer and /train's
  * feedback. The range matrix used to keep its 520 px desktop size and pushed the page to 423 px.
  * Runs in the mock project against the harness build, so CI's e2e job checks it every run.
  */
@@ -56,11 +56,13 @@ test("R3.13 R3.19 R3.20 the drill run's feedback, More info and an Ask answer fi
   await decide(page);
   await expectNoSidewaysScroll(page, "drill run feedback");
 
-  await page.getByRole("button", { name: EXPLAIN_TEXT.moreInfo }).click();
-  const moreInfo = page.getByRole("dialog", { name: EXPLAIN_TEXT.moreInfoTitle });
+  // More info is the panel's inline Explanation section since S38 (O-388): it expands and collapses.
+  const explanation = page.getByRole("button", { name: EXPLAIN_TEXT.explanation });
+  await explanation.click();
+  const moreInfo = page.getByRole("region", { name: EXPLAIN_TEXT.explanation });
   await expect(moreInfo.getByTestId("more-info-sections")).toBeVisible();
   await expectNoSidewaysScroll(page, "More info");
-  await page.keyboard.press("Escape");
+  await explanation.click();
   await expect(moreInfo).toBeHidden();
 
   await page.getByTestId("ask-available").click();
