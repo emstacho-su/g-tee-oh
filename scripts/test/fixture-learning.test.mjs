@@ -9,6 +9,7 @@ import {
   LEAK_CLASSES,
   PAST_WEEKS,
   SEEDED_CARD,
+  assertFreshOwner,
   coveredPairs,
   fetchClassKeys,
   leakSeed,
@@ -18,6 +19,7 @@ import {
   parseClassKeys,
   seedLearning,
   seededCard,
+  targetLine,
 } from '../fixture-learning.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -109,6 +111,25 @@ test('R4.10 the owner must exist, and the pairs come from fixture solutions with
   const client = fakeClient(() => ({ rows: [{ game_config_id: 'cfg_6_online_100', position_pair: 'BB-BTN' }] }));
   assert.deepEqual(await coveredPairs(client), [['cfg_6_online_100', 'BB-BTN']]);
   assert.match(client.calls[0].text, /manifest_uri like 'fixture:%' and g.ante_cbb = 0/);
+});
+
+test('R4.10 the seed refuses an owner who already has practice sessions or attempts (the e2e owner is fresh)', async () => {
+  const counts = (sessions, attempts) => fakeClient(() => ({ rows: [{ sessions, attempts }] }));
+  await assertFreshOwner(counts(0, 0), 'u1');
+  await assert.rejects(assertFreshOwner(counts(1, 0), 'u1'), /already has 1 practice sessions and 0 attempts/);
+  await assert.rejects(assertFreshOwner(counts(0, 4), 'u1'), /refuses to seed/);
+  const client = counts(0, 0);
+  await assertFreshOwner(client, 'u1');
+  assert.match(client.calls[0].text, /from practice_session/);
+  assert.match(client.calls[0].text, /from attempt/);
+  assert.deepEqual(client.calls[0].values, ['u1']);
+});
+
+test('R4.10 the target line names the host, port, database and email, never the password', () => {
+  const line = targetLine('postgres://owner:not-printed@127.0.0.1:5432/gto?sslmode=disable', 'e2e-owner@example.com');
+  assert.equal(line, 'fixture-learning: seeding e2e-owner@example.com on 127.0.0.1:5432/gto');
+  assert.doesNotMatch(line, /not-printed|owner:/);
+  assert.equal(targetLine('postgres://u:p@localhost/gto', 'a@b'), 'fixture-learning: seeding a@b on localhost/gto');
 });
 
 test('R4.10 main refuses a database that is not on this machine before connecting', async () => {

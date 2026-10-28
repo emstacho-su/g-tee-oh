@@ -22,7 +22,10 @@
 // conflict do nothing), run as the superuser of DATABASE_URL (the app role writes these tables
 // only through the api), and, like fixture-solutions, refuse a database that is not on this
 // machine unless --dev is given. No credential is read or printed: only the owner's email
-// (E2E_OWNER_EMAIL, not secret) and DATABASE_URL.
+// (E2E_OWNER_EMAIL, not secret) and DATABASE_URL. Before writing it prints the target (email, host,
+// port and database; never the URL's user or password) and refuses an owner who already has
+// practice sessions or attempts: the e2e owner is created fresh for each run, so an account with
+// history is someone else's and is never seeded.
 //
 // Usage: node scripts/fixture-learning.mjs [--dev]   (DATABASE_URL and E2E_OWNER_EMAIL from the
 // environment or .env; the e2e chain runs it after create-owner)
@@ -148,6 +151,26 @@ export async function ownerId(client, email) {
   return result.rows[0].id;
 }
 
+/** Refuses an owner with any practice session or attempt: only the fresh e2e owner is seeded. */
+export async function assertFreshOwner(client, userId) {
+  const result = await client.query(
+    `select (select count(*) from practice_session where user_id = $1)::int as sessions,
+            (select count(*) from attempt where user_id = $1)::int as attempts`,
+    [userId],
+  );
+  const { sessions, attempts } = result.rows[0];
+  if (sessions > 0 || attempts > 0) {
+    throw new Error(`refuses to seed: the owner already has ${sessions} practice sessions and ${attempts} attempts; only a fresh e2e owner is seeded`);
+  }
+}
+
+/** The line printed before any write: the email and the database's host, port and name only. */
+export function targetLine(url, email) {
+  const parsed = new URL(url);
+  const port = parsed.port === '' ? '' : `:${parsed.port}`;
+  return `fixture-learning: seeding ${email} on ${parsed.hostname}${port}${parsed.pathname}`;
+}
+
 /** Inserts the owner's learning state; returns how many rows were inserted and already present. */
 export async function seedLearning(client, { userId, classKeys, now, timeZone }) {
   const counts = { inserted: 0, present: 0 };
@@ -198,6 +221,8 @@ export async function main(env = process.env, args = process.argv.slice(2), spaw
   await client.connect();
   try {
     const userId = await ownerId(client, email);
+    await assertFreshOwner(client, userId);
+    console.log(targetLine(url, email));
     const pairs = await coveredPairs(client);
     if (pairs.length === 0) throw new Error('no fixture solution rows; run fixture-solutions first');
     const classKeys = fetchClassKeys(pairs, spawn);
