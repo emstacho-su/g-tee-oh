@@ -11,11 +11,20 @@
  * never merge. Simple keys by action type: fold, check, call (a limp is a call of the big blind),
  * bet, raise; an all-in joins the node's bet or raise type, or stands alone when the node has
  * neither; a straddle stands alone. A group grades at its lowest-loss member (the best size of the
- * type), its frequency is the sum of its members', and the per-action losses arrive from Rust
+ * type), and the per-action losses arrive from Rust
  * (O-210, ADR 0004).
  */
 import type { ActionKind, GradeAction, Grouping, Street } from "./types.js";
 import { elementAt } from "./validate.js";
+
+/** The grouping mode when none is named (05 section 4: standard grades exact tree sizes). */
+export const DEFAULT_GROUPING: Grouping = "standard";
+
+/** Every grouping mode, for validation. */
+export const GROUPINGS: readonly Grouping[] = Object.freeze(["standard", "grouped", "simple"]);
+
+/** Every street, for validation. */
+export const STREETS: readonly Street[] = Object.freeze(["preflop", "flop", "turn", "river"]);
 
 /** The Simple type of each kind before the all-in is placed (O-211). */
 const SIMPLE_TYPE: Readonly<Record<ActionKind, string>> = Object.freeze({
@@ -64,15 +73,6 @@ export function groupKeys(actions: readonly GradeAction[], grouping: Grouping, s
     case "simple":
       return simpleKeys(actions);
   }
-}
-
-/** Summed frequency per group key. */
-export function groupFrequencies(keys: readonly string[], freqByAction: readonly number[]): ReadonlyMap<string, number> {
-  const totals = new Map<string, number>();
-  keys.forEach((key, index) => {
-    totals.set(key, (totals.get(key) ?? 0) + elementAt(freqByAction, index, "freqByAction"));
-  });
-  return totals;
 }
 
 /**

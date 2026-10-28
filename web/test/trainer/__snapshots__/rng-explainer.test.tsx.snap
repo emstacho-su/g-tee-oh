@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot: why randomize, how the roll works, why it is optional 1`] = `
+exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot: what earns Best, how the roll works, why practise mixing (ADR 0024) 1`] = `
 <div
   class="flex flex-col gap-4 text-sm"
   data-testid="rng-explainer-content"
@@ -11,13 +11,10 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
     <h3
       class="font-semibold"
     >
-      Why randomize at all
+      What earns Best
     </h3>
     <p>
-      Some hands play more than one action, for example calling some of the time and raising the rest. A hand that mixes is indifferent between those actions: each one earns the same EV (expected value) by itself.
-    </p>
-    <p>
-      The mix matters for your range as a whole. If you always played this hand the same way, an observant opponent could learn which hands take which line and play against that.
+      Best is always the action with the highest EV (expected value). Any other action whose EV loss is within the noise floor is graded Correct. The roll never changes your grade.
     </p>
   </section>
   <section
@@ -29,13 +26,96 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
       How the roll works
     </h3>
     <p>
-      Before you act, the app rolls a number from 1 to 100. Your hand's actions are lined up from passive to aggressive: fold, then check or call, then bets and raises from small to large. Each action gets a band as wide as its frequency, and the roll picks the action whose band contains it. That action is labeled Best.
-    </p>
-    <p>
-      Example: 40 percent call and 60 percent raise means rolls 1 to 40 call and 41 to 100 raise. Here the roll is 37, so it lands in the call band.
+      Before you act, the app rolls a number from 1 to 100 and shows it on a scale, with nothing else. Weigh how often the strategy takes each of your options, then choose the one the roll points to.
     </p>
     <div
-      class="flex flex-col gap-2"
+      class="flex flex-col gap-1"
+      data-revealed="false"
+      data-testid="rng-roller"
+    >
+      <div
+        class="flex items-center justify-between gap-2"
+      >
+        <p
+          aria-live="polite"
+          class="text-sm font-medium"
+        >
+          Mixed-frequency mode
+        </p>
+      </div>
+      <div
+        class="relative h-5"
+      >
+        <span
+          class="absolute top-0 -translate-x-1/2 whitespace-nowrap text-xs font-semibold tabular-nums"
+          data-testid="rng-roll-label"
+          style="left: 36.5%;"
+        >
+          Roll 37
+        </span>
+      </div>
+      <div
+        aria-label="Roll 37 on a scale from 1 to 100"
+        class="relative"
+        role="img"
+      >
+        <div
+          class="h-12 w-full rounded border border-border bg-surface-sunken"
+        />
+        <span
+          aria-hidden="true"
+          class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 bg-text"
+          data-testid="rng-marker"
+          style="left: 36.5%;"
+        />
+      </div>
+      <div
+        aria-hidden="true"
+        class="relative h-4 text-xs text-muted"
+      >
+        <span
+          class="absolute top-0 -translate-x-1/2 tabular-nums"
+          data-testid="rng-tick"
+          style="left: 0.5%;"
+        >
+          1
+        </span>
+        <span
+          class="absolute top-0 -translate-x-1/2 tabular-nums"
+          data-testid="rng-tick"
+          style="left: 24.5%;"
+        >
+          25
+        </span>
+        <span
+          class="absolute top-0 -translate-x-1/2 tabular-nums"
+          data-testid="rng-tick"
+          style="left: 49.5%;"
+        >
+          50
+        </span>
+        <span
+          class="absolute top-0 -translate-x-1/2 tabular-nums"
+          data-testid="rng-tick"
+          style="left: 74.5%;"
+        >
+          75
+        </span>
+        <span
+          class="absolute top-0 -translate-x-1/2 tabular-nums"
+          data-testid="rng-tick"
+          style="left: 99.5%;"
+        >
+          100
+        </span>
+      </div>
+    </div>
+    <p>
+      After your decision the same scale shows the bands. Your hand's actions are lined up from passive to aggressive: fold, then check or call, then bets and raises from small to large, each as wide as its frequency. Example: 40 percent call and 60 percent raise means rolls 1 to 40 call and 41 to 100 raise, so roll 37 lands in the call band.
+    </p>
+    <div
+      class="flex flex-col gap-1"
+      data-revealed="true"
       data-selected-index="0"
       data-testid="rng-roller"
     >
@@ -46,15 +126,28 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
           aria-live="polite"
           class="text-sm font-medium"
         >
-          Roll 37 selects Call
+          Roll 37 fell on Call
         </p>
+      </div>
+      <div
+        class="relative h-5"
+      >
+        <span
+          class="absolute top-0 -translate-x-1/2 whitespace-nowrap text-xs font-semibold tabular-nums"
+          data-testid="rng-roll-label"
+          style="left: 36.5%;"
+        >
+          Roll 37
+        </span>
       </div>
       <div
         class="relative"
       >
         <ol
-          aria-label="RNG bands"
-          class="flex h-12 w-full overflow-hidden rounded border border-border"
+          aria-label="Mixed-frequency bands"
+          class="flex h-12 w-full overflow-hidden rounded border border-border motion-safe:transition-[clip-path] motion-safe:duration-500 motion-safe:ease-out motion-reduce:transition-none"
+          data-reveal="pending"
+          style="clip-path: inset(0px 100% 0px 0px);"
         >
           <li
             aria-current="true"
@@ -134,7 +227,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
         />
       </div>
       <ul
-        aria-label="RNG band legend"
+        aria-label="Mixed-frequency band legend"
         class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"
       >
         <li
@@ -190,7 +283,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
     <p
       class="text-muted"
     >
-      You see only the roll before you act. The bands appear after your decision, because they are the hand's strategy.
+      A separate mark then says whether you followed the roll. It shows how well you mix; it is not part of the grade.
     </p>
   </section>
   <section
@@ -199,13 +292,10 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
     <h3
       class="font-semibold"
     >
-      Why it is optional
+      Why practise mixing
     </h3>
     <p>
-      Against opponents who do not track your frequencies, getting the action category right (fold, call or raise) matters more than hitting the exact mix.
-    </p>
-    <p>
-      Grading stays fair either way: any action in your hand's mix whose EV loss is within the noise floor is graded correct, with or without RNG mode.
+      Some hands play more than one action, calling some of the time and raising the rest. Such a hand is close to indifferent between those actions, and the mix protects your range: if you always played it the same way, an observant opponent could learn which hands take which line. Mixed-frequency mode trains you to take each action about as often as the strategy does.
     </p>
   </section>
 </div>

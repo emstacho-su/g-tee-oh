@@ -17,10 +17,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ConfidenceAttempt } from "../src/calibration.js";
 import { overdueFactor } from "../src/fsrs.js";
 import { classStat, leakStat, startingLeakCost, trackAverage } from "../src/leak-cost.js";
-import { LEAK_COST_FLOOR_BB_PER_1000, emptyQueueState, pickNext, queuePriority, recordAttempt } from "../src/queue.js";
+import { LEAK_COST_FLOOR_BB_PER_1000, emptyQueueState, pickNext, queuePriority } from "../src/queue.js";
 import type { QueueCandidate, QueuePick, QueueState } from "../src/queue.js";
 import { splitMix64Source } from "../src/random.js";
 import type { RandomSource } from "../src/types.js";
@@ -126,13 +125,8 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
   }
 
   const seededRandom = (): RandomSource => splitMix64Source(BigInt(INTERLEAVE_SEED));
-  const CONFIDENT_MISS: ConfidenceAttempt = { confidence: "sure", label: "Blunder" };
-  const UNSURE_MISS: ConfidenceAttempt = { confidence: "unsure", label: "Mistake" };
-  const HYPERCORRECTION_RUN_PICKS = 300;
-  const MISS_ON_PICKED_EVERY = 5;
-  const MISS_ON_LOW_EVERY = 7;
 
-  /** A fourth family at a very low priority: only hypercorrection serves it often. */
+  /** A fourth family at a very low priority. */
   const LOW_PRIORITY_CLASS: QueueCandidate = {
     spotClassKey: "facing-4bet/BTN-vs-CO/100bb/online",
     family: "facing-4bet",
@@ -279,52 +273,6 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
     expect(seen.pick.firstExposure).toBe(false);
   });
 
-  it("R4.9 hypercorrection: a confident miss is the next pick regardless of priority, and the interleave rule still holds across it (05 section 5)", () => {
-    const candidates = [...candidatesOf(INTERLEAVE_THREE_FAMILY_FIXTURE.classes), LOW_PRIORITY_CLASS];
-    const random = seededRandom();
-    const rfiKey = INTERLEAVE_THREE_FAMILY_FIXTURE.classes[0]?.spotClass ?? "";
-
-    // A miss outside the family just played is the very next pick, whatever its priority.
-    const afterRfi: QueueState = { lastFamily: "rfi", hypercorrection: [] };
-    const lowMissed = recordAttempt(afterRfi, LOW_PRIORITY_CLASS.spotClassKey, CONFIDENT_MISS);
-    expect(lowMissed.hypercorrection).toEqual([LOW_PRIORITY_CLASS.spotClassKey]);
-    const served = pickNext(lowMissed, candidates, random);
-    expect(served.pick.spotClassKey).toBe(LOW_PRIORITY_CLASS.spotClassKey);
-    expect(served.pick.reason).toBe("hypercorrection");
-    expect(served.state.hypercorrection).toEqual([]);
-
-    // A miss in the family just played waits exactly one pick.
-    const rfiMissed = recordAttempt(afterRfi, rfiKey, CONFIDENT_MISS);
-    const between = pickNext(rfiMissed, candidates, random);
-    expect(between.pick.family).not.toBe("rfi");
-    expect(between.pick.reason).toBe("priority");
-    const later = pickNext(between.state, candidates, random);
-    expect(later.pick.spotClassKey).toBe(rfiKey);
-    expect(later.pick.reason).toBe("hypercorrection");
-
-    // A long seeded run: every miss is served at the first pick the interleave rule allows.
-    const familyOf = new Map(candidates.map((candidate) => [candidate.spotClassKey, candidate.family]));
-    let state = emptyQueueState();
-    const picks: QueuePick[] = [];
-    for (let step = 0; step < HYPERCORRECTION_RUN_PICKS; step += 1) {
-      const allowed = state.hypercorrection.find((key) => familyOf.get(key) !== state.lastFamily);
-      const next = pickNext(state, candidates, random);
-      expect(next.pick.spotClassKey).toBe(allowed ?? next.pick.spotClassKey);
-      expect(next.pick.reason).toBe(allowed === undefined ? "priority" : "hypercorrection");
-      picks.push(next.pick);
-      const pickedMissed = step % MISS_ON_PICKED_EVERY === 0;
-      state = recordAttempt(next.state, next.pick.spotClassKey, pickedMissed ? CONFIDENT_MISS : UNSURE_MISS);
-      if (step % MISS_ON_LOW_EVERY === 0) {
-        state = recordAttempt(state, LOW_PRIORITY_CLASS.spotClassKey, CONFIDENT_MISS);
-      }
-      // Never more than one pending miss per family can wait, so the list stays short.
-      expect(state.hypercorrection.length).toBeLessThanOrEqual(2);
-    }
-    expectNoConsecutiveFamily(picks);
-    const lowServed = picks.filter((pick) => pick.spotClassKey === LOW_PRIORITY_CLASS.spotClassKey);
-    expect(lowServed.length).toBeGreaterThanOrEqual(Math.floor(HYPERCORRECTION_RUN_PICKS / MISS_ON_LOW_EVERY));
-  });
-
   it("R4.9 the picker's only randomness is the injected RandomSource: the same seed replays the same 1,000 picks (A1 section 2)", () => {
     const candidates = candidatesOf(INTERLEAVE_THREE_FAMILY_FIXTURE.classes);
     const first = runPicks(candidates, INTERLEAVE_PICK_COUNT, seededRandom());
@@ -333,17 +281,17 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
     const other = runPicks(candidates, INTERLEAVE_PICK_COUNT, splitMix64Source(BigInt(INTERLEAVE_SEED + 1)));
     expect(other.picks).not.toEqual(first.picks);
 
-    // Exactly one draw per priority pick and none for a hypercorrection pick.
+    // Exactly one draw per pick: every pick is a priority draw since hypercorrection was retired (O-345).
     let draws = 0;
     const counting: RandomSource = () => {
       draws += 1;
       return 0.5;
     };
-    const priorityPick = pickNext(emptyQueueState(), candidates, counting);
+    const firstPick = pickNext(emptyQueueState(), candidates, counting);
     expect(draws).toBe(1);
-    const missed = recordAttempt(priorityPick.state, LOW_PRIORITY_CLASS.spotClassKey, CONFIDENT_MISS);
-    pickNext(missed, [...candidates, LOW_PRIORITY_CLASS], counting);
-    expect(draws).toBe(1);
+    expect(firstPick.pick.reason).toBe("priority");
+    pickNext(firstPick.state, [...candidates, LOW_PRIORITY_CLASS], counting);
+    expect(draws).toBe(2);
   });
 
   it("R4.9 the picker returns a new queue state and never mutates the cards or leak stats it reads", () => {
@@ -351,39 +299,15 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
       candidatesOf(INTERLEAVE_THREE_FAMILY_FIXTURE.classes).map((candidate) => Object.freeze(candidate)),
     );
     const snapshot = JSON.parse(JSON.stringify(candidates)) as unknown;
-    const state: QueueState = Object.freeze({
-      lastFamily: "rfi",
-      hypercorrection: Object.freeze([LOW_PRIORITY_CLASS.spotClassKey]),
-    });
+    const state: QueueState = Object.freeze({ lastFamily: "rfi" });
     const next = pickNext(state, candidates, seededRandom());
     expect(next.state).not.toBe(state);
-    expect(state).toEqual({ lastFamily: "rfi", hypercorrection: [LOW_PRIORITY_CLASS.spotClassKey] });
+    expect(state).toEqual({ lastFamily: "rfi" });
     expect(candidates).toEqual(snapshot);
     expect(Object.isFrozen(next.state)).toBe(true);
-    expect(Object.isFrozen(next.state.hypercorrection)).toBe(true);
     expect(Object.isFrozen(next.pick)).toBe(true);
-    const recorded = recordAttempt(state, "rfi/CO/100bb/online", CONFIDENT_MISS);
-    expect(recorded).not.toBe(state);
-    expect(Object.isFrozen(recorded)).toBe(true);
-    expect(state.hypercorrection).toEqual([LOW_PRIORITY_CLASS.spotClassKey]);
-    expect(recorded.hypercorrection).toEqual(["rfi/CO/100bb/online", LOW_PRIORITY_CLASS.spotClassKey]);
-  });
-
-  it("R4.9 recordAttempt keeps one entry per class, most recent first, and ignores attempts that are not confident misses (O-215)", () => {
-    const once = recordAttempt(emptyQueueState(), "a", CONFIDENT_MISS);
-    const twice = recordAttempt(recordAttempt(once, "b", CONFIDENT_MISS), "a", CONFIDENT_MISS);
-    expect(twice.hypercorrection).toEqual(["a", "b"]);
-    expect(recordAttempt(twice, "c", UNSURE_MISS).hypercorrection).toEqual(["a", "b"]);
-    expect(recordAttempt(twice, "b", { confidence: "sure", label: "Best" }).hypercorrection).toEqual(["a", "b"]);
-    expect(emptyQueueState()).toEqual({ lastFamily: null, hypercorrection: [] });
-  });
-
-  it("R4.9 a pending miss whose class is not on offer stays pending and the draw goes on by priority", () => {
-    const candidates = candidatesOf(INTERLEAVE_TWO_FAMILY_FIXTURE.classes);
-    const state: QueueState = { lastFamily: null, hypercorrection: ["gone/class"] };
-    const next = pickNext(state, candidates, () => 0);
-    expect(next.pick.reason).toBe("priority");
-    expect(next.state.hypercorrection).toEqual(["gone/class"]);
+    expect(next.state).toEqual({ lastFamily: next.pick.family });
+    expect(emptyQueueState()).toEqual({ lastFamily: null });
   });
 
   it("R4.9 the weighted draw walks cumulative priority, skips zero priorities, and is uniform when every priority is 0", () => {
@@ -422,16 +346,6 @@ describe("R4.9 queue selection and the interleave rule (S30, ADR 0012, ADR 0013)
     expect(() => pick([good], () => 1)).toThrow(/random/);
     expect(() => pick([good], () => -0.1)).toThrow(/random/);
     expect(() => pick([good], () => Number.NaN)).toThrow(/random/);
-    expect(() => pickNext({ lastFamily: 3 as unknown as string, hypercorrection: [] }, [good], () => 0)).toThrow(
-      /state\.lastFamily/,
-    );
-    expect(() =>
-      pickNext({ lastFamily: null, hypercorrection: "a" as unknown as string[] }, [good], () => 0),
-    ).toThrow(/state\.hypercorrection/);
-    expect(() => recordAttempt(state, "", CONFIDENT_MISS)).toThrow(/spotClassKey/);
-    expect(() => recordAttempt(state, "a", { confidence: "maybe" as "sure", label: "Best" })).toThrow(RangeError);
-    expect(() =>
-      recordAttempt({ lastFamily: null, hypercorrection: [1 as unknown as string] }, "a", CONFIDENT_MISS),
-    ).toThrow(/state\.hypercorrection/);
+    expect(() => pickNext({ lastFamily: 3 as unknown as string }, [good], () => 0)).toThrow(/state\.lastFamily/);
   });
 });

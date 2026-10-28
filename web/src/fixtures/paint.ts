@@ -49,6 +49,7 @@ export const fixturePaintSession: PracticeSession = {
   started_at: FIXTURE_PAINT_TIME,
   // S31: a practice session is never rated and carries no automated block or holdout progress.
   rated_eligible: false,
+  grouping: "standard",
   automated: null,
   holdout: null,
 };

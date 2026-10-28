@@ -176,6 +176,8 @@ export const fixtureFeedback: DecisionFeedback = {
   ev_by_action: [0, 0.52, 0.62, -0.4],
   rated: false,
   rng_roll: 37,
+  // The hero called (the gallery's chosen action); roll 37 fell on the raise, so the roll was not followed (O-371).
+  followed_roll: false,
   state_version: 4,
   solution_id: FIXTURE_SOLUTION_ID,
   node_key: "cfg_6_online_100/BB-BTN/",

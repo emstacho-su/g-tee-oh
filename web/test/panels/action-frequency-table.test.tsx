@@ -37,7 +37,7 @@ describe("R3.12 ActionFrequencyTable", () => {
     expect(within(raise).getByTestId("frequency-bar")).toHaveStyle({ width: "80%" });
   });
 
-  it("R3.12 shows EV in bb when given and marks highlighted rows in text", () => {
+  it("R3.12 shows EV in bb when given and marks highlighted rows in text: the highest-EV row is the Best one (ADR 0024)", () => {
     render(
       <ActionFrequencyTable
         actions={fixtureActions}

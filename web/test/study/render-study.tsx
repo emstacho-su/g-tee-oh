@@ -18,7 +18,8 @@ import { fixtureSession } from "../../src/fixtures/index.js";
 import { createAppRouter } from "../../src/router.js";
 import { TEST_ORIGIN } from "../app/render-app.js";
 
-export type StudyOverride = (request: MockRequest) => Response | undefined;
+/** Answers a request first; a promise holds the answer back until the test resolves it (S39). */
+export type StudyOverride = (request: MockRequest) => Response | Promise<Response> | undefined;
 
 const UNROUTED_STATUS = 599;
 

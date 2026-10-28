@@ -29,6 +29,7 @@ import {
   RNG_ROLL_MIN as POLICY_ROLL_MIN,
   actionForRoll,
   chiSquareStatistic,
+  followsRoll,
   grade,
   passiveToAggressiveOrder,
   rngBands,
@@ -319,7 +320,7 @@ describe("R3.10 RNG mode band mapping and the chi-square test (S22, ADR 0009, O-
     }
   });
 
-  it("R3.10 rollSelectedAction is the one entry the web roller (S25) and grade() share: for every roll it picks the action grade() labels Best", () => {
+  it("R3.10 rollSelectedAction is the one entry the web roller (S25) and grade() share: for every roll it picks the action grade() marks as following the roll (ADR 0024 rule 2, O-344)", () => {
     const records = actionsNamed(["all-in", "raise 3x", "fold", "raise 2.5x", "call"]);
     const frequencies = [0.05, 0.2, 0.1, 0.35, 0.3];
     for (let roll = RNG_ROLL_MIN; roll <= RNG_ROLL_MAX; roll += 1) {
@@ -339,7 +340,12 @@ describe("R3.10 RNG mode band mapping and the chi-square test (S22, ADR 0009, O-
         ratedTodayInTrack: 0,
         street: "flop",
       });
-      expect(output.label, `roll ${roll}`).toBe("Best");
+      expect(output.followedRoll, `roll ${roll}`).toBe(true);
+      expect(output.label, `roll ${roll}: every loss is 0, so the label is Best whatever the roll`).toBe("Best");
+      const otherIndex = (selected + 1) % records.length;
+      expect(followsRoll({ freqByAction: frequencies, actions: records, street: "flop", roll, actionIndex: otherIndex }), `roll ${roll}`).toBe(
+        false,
+      );
     }
   });
 

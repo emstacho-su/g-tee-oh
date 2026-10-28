@@ -66,7 +66,6 @@ async function startRun(page: Page, drillId: string, name: string): Promise<void
 
 async function decide(page: Page, action: string): Promise<void> {
   await page.getByRole("button", { name: action, exact: true }).click();
-  await page.getByRole("button", { name: "Sure", exact: true }).click();
 }
 
 async function nextHand(page: Page): Promise<void> {

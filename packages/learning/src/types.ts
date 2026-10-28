@@ -52,7 +52,7 @@ export type GradeAction = {
  * Input of the grading policy (A6 section 4). lossPctPot and floorPctPot arrive from solver-query
  * in percent of the pot at the node and are never recomputed here (R3.8, ADR 0004, O-150).
  * freqByAction lists the hand's equilibrium frequency per tree action in record order; actionIndex
- * is the chosen action in that order; rngRoll is the 1 to 100 roll when RNG mode is on (05
+ * is the chosen action in that order; rngRoll is the 1 to 100 roll when Mixed-frequency mode (RNG mode) is on (05
  * section 7, ADR 0009); noiseFlags carries the flags of 05 section 9 (any flag unrates).
  *
  * S22 extensions: grouping (default standard, O-211); actions, the node's actions in record order,
@@ -83,6 +83,8 @@ export type GradeInput = {
  * adds gradedActionIndex: the action whose loss was graded, which is the chosen action in
  * Standard and the lowest-loss member of the chosen group in Grouped and Simple (O-211), so
  * services/api stores that action's loss and the criterion 3 recompute can follow it (O-60).
+ * S37 adds followedRoll: in Mixed-frequency mode (rngRoll set) whether the roll-selected action is
+ * in the chosen action's group, else null; it never changes the label (ADR 0024 rule 2, O-344).
  */
 export type GradeOutput = {
   score: number;
@@ -90,6 +92,7 @@ export type GradeOutput = {
   rated: boolean;
   weight: number;
   gradedActionIndex: number;
+  followedRoll: boolean | null;
 };
 
 /**

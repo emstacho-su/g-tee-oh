@@ -9,9 +9,12 @@
  * button. A row whose class has no heat map cell has no button and says why. The weeks selector
  * (4, 8 or 26) sits in one row above. The rows are the one accessible representation (S36 review,
  * O-347): each sparkline's name states every week's value, the partial week and the gaps, and its
- * tooltip shows the same numbers to sighted users; no second table repeats them. With no items
- * the card says how to get some.
+ * tooltip shows the same numbers to sighted users; no second table repeats them. One polite live
+ * region per chart says where arrow-key stepping on a sparkline landed (S36 follow-up). With no
+ * items the card says how to get some.
  */
+import { useState } from "react";
+
 import { formatLeak } from "../../progress/format.js";
 import { joinLeaksToCells, sharedLeakScale, type LeakRow } from "../../progress/leak-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
@@ -54,7 +57,15 @@ function DrillButton({ row, pendingKey, onDrill }: { row: LeakRow; pendingKey: s
   );
 }
 
-function LeakRows({ rows, leaks, pendingKey, onDrill }: { rows: readonly LeakRow[]; leaks: ProgressLeaks; pendingKey: string | null; onDrill: (target: DrillTarget) => void }) {
+interface LeakRowsProps {
+  rows: readonly LeakRow[];
+  leaks: ProgressLeaks;
+  pendingKey: string | null;
+  onDrill: (target: DrillTarget) => void;
+  onAnnounce: (text: string) => void;
+}
+
+function LeakRows({ rows, leaks, pendingKey, onDrill, onAnnounce }: LeakRowsProps) {
   const scale = sharedLeakScale(leaks.items);
   return (
     <ol className="flex flex-col divide-y divide-border" aria-label="Top leaks by current cost">
@@ -67,7 +78,7 @@ function LeakRows({ rows, leaks, pendingKey, onDrill }: { rows: readonly LeakRow
               {formatLeak(row.item.leak_cost_bb_per_1k)} {UNIT}
             </span>
           </span>
-          <Sparkline item={row.item} scale={scale} label={row.label} />
+          <Sparkline item={row.item} scale={scale} label={row.label} onAnnounce={onAnnounce} />
           <DrillButton row={row} pendingKey={pendingKey} onDrill={onDrill} />
         </li>
       ))}
@@ -77,6 +88,8 @@ function LeakRows({ rows, leaks, pendingKey, onDrill }: { rows: readonly LeakRow
 
 export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, pendingKey = null, message = null }: LeakTrendChartProps) {
   const rows = joinLeaksToCells(leaks, heatmap);
+  // One polite live region for the whole chart: where keyboard stepping on a sparkline landed.
+  const [announcement, setAnnouncement] = useState("");
   const empty = rows.length === 0;
   const selector = (
     <ToggleGroup
@@ -92,7 +105,12 @@ export function LeakTrendChart({ leaks, heatmap, weeks, onWeeksChange, onDrill, 
       {empty ? (
         <p className="text-sm text-muted">{NO_LEAKS_TEXT}</p>
       ) : (
-        <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} />
+        <>
+          <LeakRows rows={rows} leaks={leaks} pendingKey={pendingKey} onDrill={onDrill} onAnnounce={setAnnouncement} />
+          <p role="status" aria-live="polite" className="sr-only">
+            {announcement}
+          </p>
+        </>
       )}
     </ProgressCard>
   );

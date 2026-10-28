@@ -1,6 +1,8 @@
 /**
  * The progress charts' tooltip (S32, R4.12, O-320, A7 section 4): shown on hover and on focus,
- * read by screen readers through aria-describedby on its trigger.
+ * a visual echo for sighted users only. Its trigger's accessible name already carries the same
+ * values, so it is not linked by aria-describedby (that read them twice, S36 follow-up); keyboard
+ * stepping on a sparkline is announced through the leak chart's one live region instead.
  *
  * Mechanism: useTooltipAnchor keeps the trigger's bounding box while it is hovered or focused.
  * ChartTooltip renders at a fixed position from that box, centred above the trigger (below it when
@@ -43,7 +45,6 @@ export function useTooltipAnchor(): TooltipAnchorControl {
 }
 
 export interface ChartTooltipProps {
-  id: string;
   anchor: TooltipAnchor | null;
   children: ReactNode;
 }
@@ -55,7 +56,7 @@ function centreX(anchor: TooltipAnchor): number {
   return Math.min(Math.max(centre, EDGE_MARGIN_PX), viewport - EDGE_MARGIN_PX);
 }
 
-export function ChartTooltip({ id, anchor, children }: ChartTooltipProps) {
+export function ChartTooltip({ anchor, children }: ChartTooltipProps) {
   if (anchor === null) return null;
   const below = anchor.top < FLIP_BELOW_PX;
   const style = below
@@ -63,7 +64,6 @@ export function ChartTooltip({ id, anchor, children }: ChartTooltipProps) {
     : { left: centreX(anchor), top: anchor.top - GAP_PX, transform: "translate(-50%, -100%)" };
   return (
     <div
-      id={id}
       role="tooltip"
       style={style}
       className={cn("pointer-events-none fixed max-w-52 rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-text shadow-md", TOOLTIP_LAYER_CLASS)}

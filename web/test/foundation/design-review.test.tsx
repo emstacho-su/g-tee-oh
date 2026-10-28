@@ -43,12 +43,31 @@ function layer(name: string): number {
   return match === null ? Number.NaN : Number(match[1]);
 }
 
-function sourceFiles(directory: string): string[] {
+function sourceFiles(directory: string, extensions: readonly string[] = [".tsx"]): string[] {
   return readdirSync(directory).flatMap((entry) => {
     const path = join(directory, entry);
-    if (statSync(path).isDirectory()) return sourceFiles(path);
-    return path.endsWith(".tsx") ? [path] : [];
+    if (statSync(path).isDirectory()) return sourceFiles(path, extensions);
+    return extensions.some((extension) => path.endsWith(extension)) ? [path] : [];
   });
+}
+
+/** The two homes of the layer scale: the tokens in styles.css and the classes in layers.ts. */
+const LAYER_TOKENS_HOME = "styles.css";
+const LAYER_CLASSES_HOME = "layers.ts";
+const LAYER_RULES: readonly { pattern: RegExp; what: string; allowedIn?: string; only?: RegExp }[] = [
+  { pattern: /(?<![\w-])-?z-(\d+|\[[^\]]+\]|auto)(?![\w-])/, what: "a Tailwind z-index class off the scale" },
+  { pattern: /\bzIndex\s*[:=]/, what: "an inline zIndex style", only: /\.tsx?$/ },
+  { pattern: /(?<![\w-])z-index\s*:/, what: "a raw z-index declaration", only: /\.css$/ },
+  { pattern: /z-\(--layer-/, what: "a layer class outside layers.ts", allowedIn: LAYER_CLASSES_HOME },
+  { pattern: /--layer-[a-z]+\s*:/, what: "a layer token outside styles.css", allowedIn: LAYER_TOKENS_HOME },
+];
+
+/** Every way a file under web/src picks a z-index off the one scale (S36 follow-up). */
+function layerFaults(path: string, text: string): string[] {
+  const name = path.split(/[\\/]/).at(-1) ?? path;
+  return LAYER_RULES.filter((rule) => (rule.only === undefined || rule.only.test(path)) && rule.allowedIn !== name && rule.pattern.test(text)).map(
+    (rule) => `${path}: ${rule.what}`,
+  );
 }
 
 /** The opening tag starting at `start`, ending at the first > outside braces and quotes. */
@@ -75,9 +94,28 @@ function withLocalConstants(source: string, tag: string): string {
 }
 
 describe("R3.13 one layer scale: dialogs above the sticky header", () => {
-  it("R3.13 styles.css orders header < overlay < dialog", () => {
-    expect(layer("header")).toBeLessThan(layer("overlay"));
+  it("R3.13 styles.css orders sticky < header < tooltip < overlay < dialog", () => {
+    expect(layer("sticky")).toBeLessThan(layer("header"));
+    expect(layer("header")).toBeLessThan(layer("tooltip"));
+    expect(layer("tooltip")).toBeLessThan(layer("overlay"));
     expect(layer("overlay")).toBeLessThan(layer("dialog"));
+  });
+
+  it("R3.13 the layer scan catches every way to pick a z-index off the scale", () => {
+    expect(layerFaults("a/Card.tsx", 'className="sticky z-10"')).toEqual(["a/Card.tsx: a Tailwind z-index class off the scale"]);
+    expect(layerFaults("a/Pop.tsx", "style={{ zIndex: 5 }}")).toEqual(["a/Pop.tsx: an inline zIndex style"]);
+    expect(layerFaults("a/pop.ts", "el.style.zIndex = '5';")).toEqual(["a/pop.ts: an inline zIndex style"]);
+    expect(layerFaults("a/extra.css", ".pop { z-index: 5; }")).toEqual(["a/extra.css: a raw z-index declaration"]);
+    expect(layerFaults("a/Pop.tsx", 'className="z-(--layer-dialog)"')).toEqual(["a/Pop.tsx: a layer class outside layers.ts"]);
+    expect(layerFaults("a/extra.css", ":root { --layer-popover: 45; }")).toEqual(["a/extra.css: a layer token outside styles.css"]);
+    // The two homes are allowed their own part of the scale.
+    expect(layerFaults("components/ui/layers.ts", 'export const X = "z-(--layer-dialog)";')).toEqual([]);
+    expect(layerFaults("styles.css", ":root { --layer-dialog: 50; }")).toEqual([]);
+  });
+
+  it("R3.13 nothing under web/src (.ts, .tsx, .css) picks its own z-index: every layer comes from the scale (S36 follow-up)", () => {
+    const offenders = sourceFiles(SRC, [".ts", ".tsx", ".css"]).flatMap((file) => layerFaults(relative(SRC, file), readFileSync(file, "utf8")));
+    expect(offenders).toEqual([]);
   });
 
   it("R3.13 an open Dialog's overlay and content take the overlay and dialog layers", () => {

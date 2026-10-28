@@ -167,7 +167,9 @@ describe("R4.10 seeded sessions (PM seed condition)", () => {
     expect(twinAfter.leak_stat.length).toBeGreaterThan(0);
     expect(twinAfter.rating_history.length).toBeGreaterThan(0);
     const seededSession = await findSession(database, seeded.player.userId, seeded.sessionId);
-    expect(seededSession?.state.learning).toMatchObject({ seeded: true, queue: { hypercorrection: [] } });
+    // The confident-miss rule is retired (O-345): no session, seeded or not, stores a hypercorrection list (O-372).
+    expect(seededSession?.state.learning).toMatchObject({ seeded: true });
+    expect(seededSession?.state.learning?.kind === "automated" ? seededSession.state.learning.queue : null).not.toHaveProperty("hypercorrection");
   });
 
   it("R4.10 the same seed replays the same blocks and prompts", async () => {

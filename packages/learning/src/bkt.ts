@@ -7,14 +7,14 @@
  * guess and slip rates (a correct answer is p (1 - slip) / (p (1 - slip) + (1 - p) guess), a wrong
  * one p slip / (p slip + (1 - p) (1 - guess))), then the learn transition adds (1 - posterior)
  * learn. Both numbers are returned so the heat map and the tests can see each step. A decision is
- * evidence of knowing when its label is Best or Correct (isCorrectLabel, O-215). Mastered means
+ * evidence of knowing when its label is Best or Correct (isCorrectLabel, src/labels.ts). Mastered means
  * pKnown of 0.95 or more.
  *
  * Mastery gates nothing and locks no content (ADR 0012): Mastery carries pKnown only, and queue
  * selection (src/queue.ts) takes no mastery input. Its one scheduling effect is that FSRS spaces a
  * mastered class at the lower retention of retentionFor in src/fsrs.ts (O-253).
  */
-import { isCorrectLabel } from "./calibration.js";
+import { isCorrectLabel } from "./labels.js";
 import type { GradeLabel } from "./types.js";
 import { requireBoolean, requireUnitInterval } from "./validate.js";
 

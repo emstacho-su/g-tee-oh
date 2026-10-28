@@ -2,7 +2,7 @@
  * The start panel of automated training (S32, R4.10, O-323, O-325): one line on what a session
  * does, then what the session will use, all from the session defaults (lane C's
  * store/session-defaults.ts): the configuration scope (all covered configurations, or the ones
- * chosen in /settings, named from GET /configs), the grouping and RNG mode, with a link to
+ * chosen in /settings, named from GET /configs), the grouping and Mixed-frequency mode, with a link to
  * /settings to change them, and Start. No seed is ever offered (a client seed makes the session
  * unrated). The names read has its own loading and error states with Try again; a failed read
  * still lets the session start, since the scope's ids are known. An id /configs does not list is

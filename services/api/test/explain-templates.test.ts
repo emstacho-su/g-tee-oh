@@ -143,6 +143,13 @@ describe("R3.19 grounding", () => {
     expect(buildGrounding(SOURCES_55_BARE).grounding.best_actions).toEqual(["Call"]);
   });
 
+  it("R3.19 without stored best actions the fallback ties by learning's loss tolerance, not by an exact zero (ADR 0024, O-370)", () => {
+    const row = SOURCES_55_BARE.node.hands[0];
+    if (row === undefined) throw new Error("the fixture has a hand row");
+    const nearTie = { ...row, loss_pct_pot: [16.26, 0.0005, 0] };
+    const bare = { ...SOURCES_55_BARE, node: { ...SOURCES_55_BARE.node, hands: [nearTie] } };
+    expect(buildGrounding(bare).grounding.best_actions).toEqual(["Call", "Raise to 10bb"]);
+  });
   it("R3.19 a node without the attempt's hand row is refused", () => {
     expect(() => buildGrounding({ ...SOURCES_55, node: { ...SOURCES_55.node, hands: [] } })).toThrow(/no row/);
   });

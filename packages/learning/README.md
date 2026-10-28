@@ -1,6 +1,6 @@
 # @g-tee-oh/learning
 
-The pure TypeScript learning model of g-tee-oh: the grading policy, the Glicko-2 rating, item difficulty, FSRS (Free Spaced Repetition Scheduler) scheduling, BKT (Bayesian Knowledge Tracing) mastery, leak cost and queue selection (A6 sections 1 and 4 of the architecture set in the vault). S05 landed the skeleton and the red test vectors (R0.11). S22 landed the grading policy (R3.8, the mapping part of R3.10 and the stat part of R3.11) and S30 landed the rest (R4.1 to R4.9). Every requirement identifier (R ID) below is from the 09 sprint roadmap, section 6.
+The pure TypeScript learning model of g-tee-oh: the grading policy, the Glicko-2 rating, item difficulty, FSRS (Free Spaced Repetition Scheduler) scheduling, BKT (Bayesian Knowledge Tracing) mastery, leak cost and queue selection (A6 sections 1 and 4 of the architecture set in the vault). S05 landed the skeleton and the red test vectors (R0.11). S22 landed the grading policy (R3.8, the mapping part of R3.10 and the stat part of R3.11, retired by S37 with O-345) and S30 landed the rest (R4.1 to R4.9). Every requirement identifier (R ID) below is from the 09 sprint roadmap, section 6.
 
 ## The package is pure
 
@@ -20,7 +20,8 @@ One module per A6 section 1 row located in packages/learning. S05 seeded each ro
 | src/actions.ts | Action kind and bucket spellings of the solver-query contract; the passive-to-aggressive order | S22 | R3.8, R3.10 |
 | src/rng-bands.ts | RNG mode bands, rollSelectedAction (the one entry grade() and the web roller share), the roll from the injected RandomSource, the chi-square statistic | S22 | R3.10 |
 | src/random.ts | SplitMix64 RandomSource, bit for bit the generator of solver-query (O-151) | S22 | R3.10 |
-| src/calibration.ts | Calibration stat (accuracy when sure versus unsure) and the confident-miss queue rule S30 reuses (O-89) | S22 | R3.11 |
+| src/best.ts | What earns Best (the lowest-loss group within LOSS_TIE_TOLERANCE_PCT_POT, ADR 0024), bestActionIndexes for the api, and followsRoll, the Mixed-frequency mode mark | S37 | R3.8, R3.10 |
+| src/labels.ts | isCorrectLabel (Best or Correct), the reading BKT and leak cost use; it outlived the retired calibration module (O-345) | S37 | R3.8 |
 | src/validate.ts | Shared input checks that throw a RangeError naming the field | S22 | R3.8 |
 | src/glicko2.ts | Glicko-2 per track with fractional outcomes and weights, one period per session over rated decisions only, inactivity, the conservative rating | S30 | R4.1, R4.2, R4.3 |
 | src/difficulty.ts | Item difficulty from solver features and the rated-play exclusion of all-within-floor items (withItemExclusion) | S30 | R4.4 |
@@ -28,7 +29,7 @@ One module per A6 section 1 row located in packages/learning. S05 seeded each ro
 | src/fsrs.ts | FSRS scheduling per spot class wrapping ts-fsrs, the grade mapping, retrievability and the overdue factor | S30 | R4.6 |
 | src/bkt.ts | BKT mastery, gating nothing | S30 | R4.7 |
 | src/leak-cost.ts | Leak cost from the equilibrium reach prior, shrinkage, the leak_stat and leak_history rows | S30 | R4.8 |
-| src/queue.ts | Queue selection: leak priority, interleave rule, first exposure, hypercorrection | S30 | R4.9 |
+| src/queue.ts | Queue selection: leak priority, interleave rule, first exposure (hypercorrection retired, O-345) | S30 | R4.9 |
 
 ## Vector files
 
@@ -36,11 +37,10 @@ Test-driven by design (R0.11): every vector started as an it.todo whose title st
 
 | File | Vectors | Source of the numbers | Green session |
 |---|---|---|---|
-| test/R3.8-grading.test.ts | Floor boundary, every label threshold, the mixed hand inside and outside the floor, the rated flag rows and the daily cap, the RNG rows, the three grouping modes with the preflop exact-size rule, the frequency tie tolerance, input validation, immutability (the contract spelling pin lives in services/api/test/learning-contract-spellings.test.ts, since this package reads no files) | 05 section 6.3 (tau 4 percent of pot, floor 0.2), 06 section 3.6, ADR 0008, ADR 0009, ADR 0020, O-210 to O-214 | S22 |
+| test/R3.8-grading.test.ts | Floor boundary, every label threshold, the mixed hand inside and outside the floor, the rated flag rows and the daily cap, the Mixed-frequency mode rows (label unchanged by the roll, followedRoll set), the three grouping modes with the preflop exact-size rule, the loss tie tolerance, bestActionIndexes by group, input validation, immutability (the contract spelling pin lives in services/api/test/learning-contract-spellings.test.ts, since this package reads no files) | 05 section 6.3 (tau 4 percent of pot, floor 0.2), 06 section 3.6, ADR 0008, ADR 0009, ADR 0020, ADR 0024, O-210 to O-214, O-343, O-370, O-375 | S22, S37 |
 | test/R3.8-grading.property.test.ts | fast-check: score monotone non-increasing in loss and 1 at or below the floor, label severity monotone in loss | A9 section 1 | S22 |
 | test/R3.10-rng-bands.test.ts | Cumulative bands passive to aggressive, the rounding rule, the chi-square over 10,000 seeded rolls with seed 20261020, pass when p is above 0.01 | 05 section 7, A6 section 6, O-90, O-213 | S22 |
 | test/R3.10-splitmix64.test.ts | SplitMix64 outputs, unit draws and rolls printed by the Rust generator in services/solver-query/src/rng.rs | O-151 | S22 |
-| test/R3.11-calibration.test.ts | Calibration aggregation on fixture attempts; a confident miss is next in the queue | 05 section 5, O-89, O-215 | S22 |
 | test/R3.20-explanation-validator.test.ts | A planted unsupported number is rejected, supported and rounded numbers pass, unsupported hand and card names are rejected | A6 section 5, 05 section 10.2, ADR 0016 | S27 |
 | test/R4.1-glicko2.test.ts | Glickman's worked example (1500, RD 200, volatility 0.06, three opponents, about 1464.06, 151.52 and 0.05999), inactivity and its cap at RD 350, defaults, the conservative rating | A6 section 6, 06 section 3.3, ADR 0011 (parameters accepted per O-56), O-259 | S30 |
 | test/R4.1-glicko2.property.test.ts | fast-check: update symmetry for s and 1 - s, rating monotone in score, RD bounds after a period and under inactivity; results too far away to inform leave the player unchanged | A9 section 1, O-259 | S30 |
@@ -51,7 +51,7 @@ Test-driven by design (R0.11): every vector started as an it.todo whose title st
 | test/R4.6-fsrs.test.ts | The ts-fsrs published vectors: the 13-review interval history, the six-review memory state, the first repeat, the default-parameter retrievability; the grade mapping table; the overdue factor near 1 at the due time for mastered and unmastered classes, and at least 1 for a due learning or relearning step | ts-fsrs packages/fsrs/__tests__/FSRS-6.test.ts at tag v5.4.2, commit bb71e35a2f5af5a5ac6cce9ef7c41ad24855721d (O-35); 06 section 4; O-253, O-254, O-195 | S30 |
 | test/R4.7-bkt.test.ts | Three hand-computed sequences with prior 0.2, learn 0.15, guess 0.2, slip 0.1; mastered at 0.95 | 06 section 5, ADR 0012 | S30 |
 | test/R4.8-leak-cost.test.ts | The worked row 12 x 0.25 x 1.5 = 4.5 bb per 1,000 hands, the equilibrium reach prior rows, shrinkage under 30 decisions, ranking | 06 section 6, ADR 0013 | S30 |
-| test/R4.9-queue.test.ts | The interleave rule over 1,000 seeded picks (two equal families alternate 500 each; priorities 3, 2, 1 give about 409, 364, 227), priority = leak cost x overdue factor with the 0.1 bb floor (a clean track's new class and a perfectly played overdue class are still drawn), the never-practiced prior, first exposure, hypercorrection | A6 sections 3 and 6, 06 section 4, ADR 0013, O-255 | S30 |
+| test/R4.9-queue.test.ts | The interleave rule over 1,000 seeded picks (two equal families alternate 500 each; priorities 3, 2, 1 give about 409, 364, 227), priority = leak cost x overdue factor with the 0.1 bb floor (a clean track's new class and a perfectly played overdue class are still drawn), the never-practiced prior, first exposure | A6 sections 3 and 6, 06 section 4, ADR 0013, O-255 | S30 |
 
 The two gto-model vectors, the bucket-edge table and the node-key round trip, are not here: S12 writes them red first inside its own session (R0.11, 09 section 3).
 
@@ -61,7 +61,7 @@ S05 wrote these into the vector files as "proposed" rows; S30 settled each one w
 
 - Queue selection is a priority-weighted draw with the injected RNG among the classes outside the last pick's family, relaxed when one family remains (confirmed, O-256). A deterministic highest-priority pick would never serve the third family of the 3, 2, 1 fixture.
 - The shrinkage weight under 30 decisions is the linear weight min(1, n / 30) (confirmed, O-257).
-- BKT counts a decision as correct when its label is Best or Correct, through isCorrectLabel (O-215).
+- BKT counts a decision as correct when its label is Best or Correct, through isCorrectLabel (src/labels.ts).
 - The FSRS grade thresholds 0.4, 0.7 and 0.95 are inclusive at the lower edge (confirmed, O-253).
 - The R3.20 validator lives in services/api per A6 section 1; its vectors sit here until S27 moves them.
 
@@ -79,7 +79,7 @@ Mechanism, by module; every value an answer sets cites its O-ID in the code.
 
 ## The grading policy (S22)
 
-Mechanism: grade takes one GradeInput, validates it once at the boundary (a RangeError names any malformed field), and returns a new GradeOutput. The chosen action's group is found under the grouping mode and the node's street, the group grades at its lowest-loss member, and the score is exp(-max(0, loss - floor) / tau) with tau 4 percent of the pot (O-22, O-96). The label tests the raw loss against the floor first: at or below it the decision is Best when its group's summed frequency is the hand's highest within FREQUENCY_TIE_TOLERANCE (1e-6, above the rounding of summed f32 frequencies), or holds the roll-selected action in RNG mode, and Correct otherwise; above it the loss decides Inaccuracy (under 1), Mistake (1 to 5 inclusive) or Blunder (above 5). The decision is rated only in automated mode, on a first attempt, with no revealing panel, no noise flag and fewer than 150 rated decisions today in its track; a rated decision weighs 1. Every loss, the floor and every bucket come from solver-query and are never recomputed here (ADR 0004).
+Mechanism: grade takes one GradeInput, validates it once at the boundary (a RangeError names any malformed field), and returns a new GradeOutput. The chosen action's group is found under the grouping mode and the node's street, the group grades at its lowest-loss member, and the score is exp(-max(0, loss - floor) / tau) with tau 4 percent of the pot (O-22, O-96). The label tests the raw loss against the floor first: at or below it the decision is Best when its group is the lowest-loss (highest EV) group at the node within LOSS_TIE_TOLERANCE_PCT_POT (0.001 percent of the pot, a tenth of Rust's stored loss unit), and Correct otherwise, whatever the frequencies or the roll (ADR 0024, O-343, O-370); in Mixed-frequency mode the output adds followedRoll, whether the roll-selected action is in the chosen group (O-344); above it the loss decides Inaccuracy (under 1), Mistake (1 to 5 inclusive) or Blunder (above 5). The decision is rated only in automated mode, on a first attempt, with no revealing panel, no noise flag and fewer than 150 rated decisions today in its track; a rated decision weighs 1. Every loss, the floor and every bucket come from solver-query and are never recomputed here (ADR 0004).
 
 S22 extended the A6 section 4 types only where A6 is silent:
 
@@ -91,7 +91,7 @@ S22 extended the A6 section 4 types only where A6 is silent:
 | GradeInput.street, required | Grouped shows and grades exact sizes at a preflop node, so Grouped equals Standard there | R3.9, O-22, O-211 |
 | GradeOutput.gradedActionIndex | The action whose loss was graded, so services/api stores it and the criterion 3 recompute can follow it | O-211, O-60 |
 
-Rules decided where the specification is silent, each a proposed O-ID with its default implemented: Grouped keys by kind and bucket postflop and by exact action preflop, and Simple types are fold, check, call (a limp joins call), bet and raise, an all-in joins the node's bet or raise type or stands alone, and a straddle stands alone (O-211); an out-of-mix action within the floor is Correct and every action tied for the top frequency, within FREQUENCY_TIE_TOLERANCE, is Best (O-212); bands always need the actions list, order by kind then size with all-in last, normalize the frequencies, round each cumulative edge half up and end at 100, and rollSelectedAction is the one entry both grade() and the web roller (S25) call, so they never disagree on a roll (O-213); a confident miss is "sure" with Inaccuracy, Mistake or Blunder, and it moves the missed item to the front of the queue (O-215).
+Rules decided where the specification is silent, each a proposed O-ID with its default implemented: Grouped keys by kind and bucket postflop and by exact action preflop, and Simple types are fold, check, call (a limp joins call), bet and raise, an all-in joins the node's bet or raise type or stands alone, and a straddle stands alone (O-211); an out-of-mix action within the floor is Correct (O-212; its frequency rule for Best is replaced by ADR 0024); bands always need the actions list, order by kind then size with all-in last, normalize the frequencies, round each cumulative edge half up and end at 100, and rollSelectedAction is the one entry both grade() and the web roller (S25) call, so they never disagree on a roll (O-213). The confident-miss rule (O-215) is retired with R3.11 (O-345).
 
 The solver-query grade response carries the loss of the chosen action only, so until it gains loss_pct_pot_by_action the caller grades each member of a Grouped or Simple group with one /v1/grade call and fills actions from the answers (O-210, an S23 dependency).
 

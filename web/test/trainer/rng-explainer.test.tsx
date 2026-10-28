@@ -1,7 +1,8 @@
 /**
- * Tests for the RNG (random number generator) mode explainer and its open state (S25, R3.10,
- * 05 section 7, ADR 0009, O-283, O-285). The dialog content is pinned by a snapshot; the hook's
- * first-use memory runs against an injected storage, including one that throws.
+ * Tests for the Mixed-frequency mode explainer and its open state (S25, S37, R3.10, 05 section 7,
+ * ADR 0024, O-283, O-285, O-344). The dialog content is pinned by a snapshot, rewritten for the
+ * new methodology (screen review row 20); the hook's first-use memory runs against an injected
+ * storage, including one that throws.
  */
 import { act, render, renderHook, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -47,30 +48,36 @@ function hotkeyWrapper(store: HotkeyStore = createHotkeyStore()) {
 }
 
 describe("R3.10 RngExplainer", () => {
-  it("R3.10 the explainer's content matches its snapshot: why randomize, how the roll works, why it is optional", () => {
+  it("R3.10 the explainer's content matches its snapshot: what earns Best, how the roll works, why practise mixing (ADR 0024)", () => {
     render(<RngExplainer open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId("rng-explainer-content")).toMatchSnapshot();
   });
 
-  it("R3.10 is a dialog named How RNG mode works with the three parts as headings", () => {
+  it("R3.10 is a dialog named How Mixed-frequency mode works with the three parts as headings", () => {
     render(<RngExplainer open onOpenChange={vi.fn()} />);
-    const dialog = screen.getByRole("dialog", { name: "How RNG mode works" });
+    const dialog = screen.getByRole("dialog", { name: "How Mixed-frequency mode works" });
     expect(within(dialog).getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
-      "Why randomize at all",
+      "What earns Best",
       "How the roll works",
-      "Why it is optional",
+      "Why practise mixing",
     ]);
     expect(dialog).toHaveTextContent("rolls 1 to 40 call and 41 to 100 raise");
-    expect(dialog).toHaveTextContent("graded correct");
+    expect(dialog).toHaveTextContent("Best is always the action with the highest EV");
+    expect(dialog).toHaveTextContent("never changes your grade");
+    expect(dialog).not.toHaveTextContent("That action is labeled Best");
   });
 
-  it("R3.10 draws the band example with the roller strip and no dead info button inside the dialog", () => {
+  it("R3.10 draws the example on the same scale, first hidden then revealed, with no dead info button inside the dialog (ADR 0024 rule 3)", () => {
     render(<RngExplainer open onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
-    const bands = within(dialog).getAllByRole("listitem").filter((item) => item.hasAttribute("data-range"));
+    const [before, after] = within(dialog).getAllByTestId("rng-roller");
+    expect(before).toHaveAttribute("data-revealed", "false");
+    expect(before).toHaveTextContent("Roll 37");
+    expect(after).toHaveAttribute("data-revealed", "true");
+    const bands = within(after as HTMLElement).getAllByRole("listitem").filter((item) => item.hasAttribute("data-range"));
     expect(bands.map((band) => band.getAttribute("data-range"))).toEqual(["1-40", "41-100"]);
-    expect(within(dialog).getByTestId("rng-roller")).toHaveTextContent("Roll 37 selects Call");
-    expect(within(dialog).queryByRole("button", { name: "How RNG mode works" })).not.toBeInTheDocument();
+    expect(after).toHaveTextContent("Roll 37 fell on Call");
+    expect(within(dialog).queryByRole("button", { name: "How Mixed-frequency mode works" })).not.toBeInTheDocument();
   });
 
   it("R3.10 renders nothing while closed and reports a close through onOpenChange", async () => {
@@ -170,7 +177,7 @@ describe("R3.10 useRngExplainer", () => {
     const store = createHotkeyStore();
     const { result } = renderHook(() => useRngExplainer({ storage: () => memoryStorage() }), { wrapper: hotkeyWrapper(store) });
     expect(store.getState().bindings.map(({ key, scope, description }) => ({ key, scope, description }))).toEqual([
-      { key: "i", scope: "RNG mode", description: "How RNG mode works" },
+      { key: "i", scope: "Mixed-frequency mode", description: "How Mixed-frequency mode works" },
     ]);
     await userEvent.keyboard("i");
     expect(result.current.open).toBe(true);

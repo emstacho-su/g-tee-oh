@@ -25,13 +25,13 @@ const ACTIONS: SqNode["actions"] = [
   { index: 3, token: "r2500", kind: "raise", label: "Raise to 25bb", size_cbb: 2500, bucket: null, next_node_key: null },
 ];
 
-function row(hand: string, strategy: number[], options: { mixed?: boolean; reach?: number[] | null } = {}): Row {
+function row(hand: string, strategy: number[], options: { mixed?: boolean; reach?: number[] | null; loss?: number[] } = {}): Row {
   return {
     hand,
     strategy,
     ev_bb: strategy.map(() => 0),
     ev_best_bb: 0,
-    loss_pct_pot: strategy.map(() => 0),
+    loss_pct_pot: options.loss ?? strategy.map(() => 0),
     mixed: options.mixed ?? false,
     reach: options.reach === undefined ? [1, 1] : options.reach,
   };
@@ -208,16 +208,25 @@ describe("R3.16 range ladder", () => {
 describe("R3.16 hand ladder", () => {
   const facts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true })]);
 
-  it("R3.16 level 1 asks the most frequent action; ties within the tolerance all count", () => {
-    const question = handQuestion({ node: facts, level: 1, draws: DRAWS });
+  it("R3.16 level 1 accepts every action at or below the floor, as grading labels Best or Correct, and the reveal names the lowest-loss action with the frequencies (ADR 0024, O-374, O-379)", () => {
+    // Floor 0.5 (the node's floor_pct_pot): raise to 10bb (0) and raise to 25bb (0.1) are within it, call (0.8) and fold (5) are not.
+    const evFacts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true, loss: [5, 0.8, 0, 0.1] })]);
+    const question = handQuestion({ node: evFacts, level: 1, draws: DRAWS });
     if (question === undefined) throw new Error("no question");
-    expect(question).toMatchObject({ answer_kind: "action", hand: "AKs", ladder: "hand" });
-    expect(judgeAnswer(question, facts, { kind: "action", action_index: 3 })).toBe(true);
-    expect(judgeAnswer(question, facts, { kind: "action", action_index: 1 })).toBe(false);
-    const tied = node([row("55", [0, 0.5, 0.5, 0])]);
+    expect(question).toMatchObject({ answer_kind: "action", hand: "AKs", ladder: "hand", question: "What is BB's highest-EV action with AKs?" });
+    expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 2 })).toBe(true);
+    expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 3 }), "a mixing action one step worse, within the floor, is correct").toBe(true);
+    expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 1 }), "an action above the floor is wrong").toBe(false);
+    expect(question.truth).toMatchObject({ action_indexes: [2, 3], frequency_pct: 30 });
+    expect(question.truth.text).toBe(
+      "BB's highest-EV action with AKs is Raise to 10bb. Within the noise floor, so also correct: Raise to 10bb 30.0 percent, Raise to 25bb 50.0 percent.",
+    );
+    const tied = node([row("55", [0, 0.9, 0.1, 0], { loss: [1, 0, 0.0005, 2] })]);
     const tie = handQuestion({ node: tied, level: 1, draws: DRAWS });
     expect(tie?.truth.action_indexes).toEqual([1, 2]);
-    expect(tie?.truth.text).toBe("BB plays 55 most often as Call or Raise to 10bb (50.0 percent).");
+    expect(tie?.truth.text).toBe(
+      "BB's highest-EV action with 55 is Call or Raise to 10bb. Within the noise floor, so also correct: Call 90.0 percent, Raise to 10bb 10.0 percent.",
+    );
   });
 
   it("R3.16 level 2 asks the band of the most frequent action, lower edge inclusive", () => {

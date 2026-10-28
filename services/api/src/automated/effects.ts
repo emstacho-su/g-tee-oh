@@ -1,13 +1,12 @@
 /**
- * The automated loop's learning hook part (R4.10, O-272, O-274, O-215, the PM seed condition),
+ * The automated loop's learning hook part (R4.10, O-272, O-274, the PM seed condition),
  * registered in learning/hooks.ts after the shared effects. It acts only on automated sessions.
  *
  * - needsCatalog: the next pick reads context.prepared.catalog, loaded before the transaction
  *   (learning/prepare.ts); no catalog is ever loaded under the lock (PR #27 review HIGH 3, MEDIUM 12).
  * - beforeGrade: mode automated, first attempt by item, the per-track daily count, panels by block,
  *   and forceUnrated for a client-seeded session (learning/rated-rules.ts).
- * - afterInsert: the block serves one more hand and a confident miss joins the queue state's
- *   hypercorrection list (automated/block.ts). When the block has served its size, it is closed with
+ * - afterInsert: the block serves one more hand (automated/block.ts). When the block has served its size, it is closed with
  *   the learning-state lane's closeReviewBlock (FSRS card and BKT mastery, O-272) BEFORE the next
  *   block is picked in the same transaction, so the reviewed class's new due date counts; the next
  *   block replaces the session's hero spots, and the feedback carries review_block. A seeded session
@@ -94,14 +93,17 @@ function afterInsertWith(writers: LearningStateWriters) {
       return {};
     }
     const { transaction, userId } = context;
-    const attempts = await blockAttempts(transaction, context.session.id, learning.block.served + 1);
-    const recorded = recordDecision(learning, { label: context.outcome.label, confidence: attempts.at(-1)?.confidence ?? null });
+    const recorded = recordDecision(learning);
     if (!isBlockComplete(recorded)) {
       return { statePatch: { learning: recorded } };
     }
+    // The block's attempts are read only to close it, and a seeded session closes nothing (PR #33 review round 1).
     const reviewBlock = recorded.seeded
       ? unwrittenClose(recorded.block.spot_class_key)
-      : await writers.closeReviewBlock(transaction, closeInput(context, recorded, attempts));
+      : await writers.closeReviewBlock(
+          transaction,
+          closeInput(context, recorded, await blockAttempts(transaction, context.session.id, recorded.block.served)),
+        );
     const closed = { statePatch: { learning: recorded }, feedbackExtras: { review_block: reviewBlock } };
     const catalog = context.prepared.catalog;
     if (catalog === null) {

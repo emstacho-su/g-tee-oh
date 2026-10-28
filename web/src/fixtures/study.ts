@@ -3,11 +3,13 @@
  * (R3.12, O-26, O-57, O-264). Typed against the contract; no number comes from a real solution.
  *
  * Mechanism: three stakes, three configurations (the online 6-max set at 100 bb and 200 bb, and a
- * live 9-handed one), pairs per configuration with some not preflop_available, and a two-node line
- * in cfg_6_online_100 BB-BTN: the root (the shared fixtureStudyNode with its actions given child
- * keys) and the child one step down the next likely line (r250). The child's hand rows reuse
- * fixtureHandRow shifted three grid steps towards weaker hands, so the two matrices look
- * different. FIXTURE_STUDY_LINES maps (config, pair, line) to a node, which is how the mocked
+ * live 9-handed one), pairs per configuration with some not preflop_available, and a three-node
+ * line in cfg_6_online_100 BB-BTN: the root (the shared fixtureStudyNode with its actions given
+ * child keys), the child one step down the next likely line (r250) and the grandchild after the
+ * big blind's reraise (r250.r1100, BTN to act again, S39), which gives the position carousel a
+ * decision past the first orbit. The child's hand rows reuse fixtureHandRow shifted three grid
+ * steps towards weaker hands and the grandchild's six, so the matrices look different.
+ * FIXTURE_STUDY_LINES maps (config, pair, line) to a node, which is how the mocked
  * api answers GET /study/node; fixtureInsightsFor builds a hand's insights from the shared
  * fixtureInsights. Every node is synthetic: true, so the O-57 banner always shows.
  */
@@ -27,6 +29,8 @@ export const FIXTURE_LIVE_CONFIG_ID = "cfg_9_live_13_100";
 export const FIXTURE_STUDY_PAIR = "BB-BTN";
 /** The root's next likely line: one step down the tree. */
 export const FIXTURE_CHILD_LINE = "r250";
+/** The child's reraise, one step further: BTN acts again (a second-orbit decision, S39). */
+export const FIXTURE_GRANDCHILD_LINE = "r250.r1100";
 /** A hand the mocked insights route answers with hand-not-in-range (S23 problem type). */
 export const FIXTURE_OUT_OF_RANGE_HAND = "72o";
 
@@ -119,10 +123,16 @@ function childKey(configId: string, pair: string, line: string): string {
   return `${rootKey(configId, pair)}${line}`;
 }
 
-/** The root's actions: fold ends the line, the others lead on (O-280). */
-function rootActions(configId: string, pair: string): NodeAction[] {
+/**
+ * The root's actions (O-280): only the tokens in `continuing` lead on, to nodes the fixtures hold;
+ * every other action ends the line, so the carousel's child reads (S39) never ask for a node the
+ * fixtures lack.
+ */
+function rootActions(configId: string, pair: string, continuing: readonly string[]): NodeAction[] {
   return fixtureActions.map((action) =>
-    action.kind === "fold" ? { ...action } : { ...action, next_node_key: childKey(configId, pair, action.token) },
+    continuing.includes(action.token)
+      ? { ...action, next_node_key: childKey(configId, pair, action.token) }
+      : { ...action, next_node_key: null },
   );
 }
 
@@ -137,7 +147,7 @@ const childActions: readonly NodeAction[] = [
     size_cbb: 1100,
     bucket: "pot",
     label: "Raise to 11bb",
-    next_node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, `${FIXTURE_CHILD_LINE}.r1100`),
+    next_node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, FIXTURE_GRANDCHILD_LINE),
   },
   { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
 ];
@@ -149,7 +159,7 @@ function shifted(value: number): number {
 export const fixtureRootNode: StudyNode = {
   ...fixtureStudyNode,
   node_key: rootKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR),
-  actions: rootActions(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR),
+  actions: rootActions(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, [FIXTURE_CHILD_LINE]),
   next_likely_line: FIXTURE_CHILD_LINE,
   next_likely_node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, FIXTURE_CHILD_LINE),
 };
@@ -174,13 +184,49 @@ export const fixtureChildNode: StudyNode = {
   ],
 };
 
+/** BTN facing the reraise. The fixture tree stops here, so every answer ends the line. */
+const grandchildActions: readonly NodeAction[] = [
+  { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
+  { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
+  { index: 2, token: "r2500", kind: "raise", size_cbb: 2500, bucket: "pot", label: "Raise to 25bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+];
+
+/** The grandchild's rows sit twice the child's shift towards weaker hands. */
+function shiftedTwice(value: number): number {
+  return shifted(shifted(value));
+}
+
+/**
+ * The grandchild after the big blind's reraise (S39). It spreads the shared synthetic node, so it
+ * stays synthetic: true and the O-57 banner shows on it like on every other fixture node.
+ */
+export const fixtureGrandchildNode: StudyNode = {
+  ...fixtureStudyNode,
+  node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, FIXTURE_GRANDCHILD_LINE),
+  to_act: "BTN",
+  pot_cbb: 1400,
+  stacks_cbb: [10000, 10000, 10000, 9750, 9950, 8900],
+  actions: [...grandchildActions],
+  hands: HAND_GRID.map((cell) => fixtureHandRow(cell.hand, shiftedTwice(cell.row), shiftedTwice(cell.col))),
+  noise_flags: [],
+  next_likely_line: null,
+  next_likely_node_key: null,
+  range_by_action: [
+    { index: 0, share: 0.46 },
+    { index: 1, share: 0.38 },
+    { index: 2, share: 0.12 },
+    { index: 3, share: 0.04 },
+  ],
+};
+
 /** The deeper configuration's root: the same synthetic shape under its own ids. */
 export const fixtureDeepRootNode: StudyNode = {
   ...fixtureRootNode,
   solution_id: FIXTURE_DEEP_SOLUTION_ID,
   config_id: FIXTURE_DEEP_CONFIG_ID,
   node_key: rootKey(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR),
-  actions: rootActions(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR),
+  actions: rootActions(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR, []),
   next_likely_line: null,
   next_likely_node_key: null,
 };
@@ -196,6 +242,7 @@ export interface FixtureStudyLine {
 export const FIXTURE_STUDY_LINES: readonly FixtureStudyLine[] = [
   { configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: "", node: fixtureRootNode },
   { configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: FIXTURE_CHILD_LINE, node: fixtureChildNode },
+  { configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: FIXTURE_GRANDCHILD_LINE, node: fixtureGrandchildNode },
   { configId: FIXTURE_DEEP_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: "", node: fixtureDeepRootNode },
 ];
 

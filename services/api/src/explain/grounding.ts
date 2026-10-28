@@ -17,6 +17,7 @@
  * loadGrounding does the reads: the attempt by id and the session user's id (another user's
  * attempt is a 404, ADR 0001), then the two solver-query reads through the request's port.
  */
+import { lowestLossIndexes } from "@g-tee-oh/learning";
 import type { FastifyRequest } from "fastify";
 
 import type { Database } from "../db.js";
@@ -113,7 +114,8 @@ function handRowOf(node: SqNode): SqNode["hands"][number] {
 
 function bestActions(sources: GroundingSources, row: SqNode["hands"][number]): string[] {
   const stored = sources.attempt.best_action_indexes;
-  const indexes = stored ?? row.loss_pct_pot.flatMap((loss, index) => (loss === 0 ? [index] : []));
+  // Without a stored list, the node row's lowest losses by learning's one tie rule (O-370).
+  const indexes = stored ?? lowestLossIndexes(row.loss_pct_pot);
   return indexes.map((index) => labelOf(sources.node, index));
 }
 

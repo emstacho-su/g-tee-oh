@@ -9,9 +9,10 @@
  * `just fixture-learning` writes in infra/compose/e2e.mjs (O-324: a schedule card with two Good
  * reviews for every catalog class, so the first block is rated, not a worked example): sign in and
  * see the home rating card read Unrated; open /train from the main navigation and start with the
- * defaults (every covered configuration, standard grouping, RNG off; no seed, so the session is
- * rated); play five decisions, each an action and a confidence tap (S or U) with nothing revealed
- * before the tap; end the session through E and the confirm; the recap lists at least one rated
+ * defaults (every covered configuration, standard grouping, Mixed-frequency mode off; no seed, so
+ * the session is rated); play five decisions, each an action that submits at once (a click or the
+ * 1 key) with nothing revealed before it and no confidence field sent (O-345, O-373); end the
+ * session through E and the confirm; the recap lists at least one rated
  * decision; back home the rating card shows a whole-number rating with plus or minus RD.
  *
  * When SCREENSHOT_DIR is set the flow captures the start panel, the first prompt, the recap and the
