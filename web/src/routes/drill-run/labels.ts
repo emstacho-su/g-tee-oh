@@ -37,8 +37,6 @@ export const SESSION_TEXT = {
   confirmDescription: "The recap shows how the session went. A decision you have not tapped is not graded.",
   keepPlaying: "Keep playing",
   grading: "Grading your decision",
-  /** The right column before the decision, from 1024 px (S38 layout). */
-  feedbackPlaceholder: "Your feedback shows here after you act.",
   loadingPrompt: "Dealing the next hand",
   loadingDrill: "Loading the drill",
   ending: "Ending the session",

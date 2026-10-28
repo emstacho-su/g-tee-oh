@@ -28,7 +28,8 @@ test("R4.10 R4.12 mock flow 1: an automated session of five decisions turns an u
 
   const rated = await endAndReadRecap(page);
   expect(rated, "the rated block's three decisions were rated").toBe(3);
-  await expect(page.getByRole("table", { name: "Rating by track" })).toBeVisible();
+  // The recap lists each rated track as a card in the "Rating by track" list (S38 restyle).
+  await expect(page.getByRole("list", { name: "Rating by track" })).toBeVisible();
 
   await expectRatedCard(page);
 });

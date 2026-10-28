@@ -58,8 +58,12 @@ export async function startTraining(page: Page, shot: Flow1Shooter = noShot, cri
 /** Plays one decision: choosing the first action submits it; returns once the reveal shows. */
 async function playOne(page: Page, step: number): Promise<void> {
   await expect(page.getByTestId("feedback-panel"), "nothing is revealed before the choice").toHaveCount(0);
+  // The bar is live once the table's replay of the line has finished (S38, O-381); an action key
+  // pressed during the replay only finishes it and never submits, so wait for the live bar first.
+  const firstAction = page.getByRole("group", { name: "Actions" }).getByRole("button").first();
+  await expect(firstAction, "the action bar goes live after the replay").toBeEnabled({ timeout: FEEDBACK_TIMEOUT_MS });
   const sent = page.waitForRequest((request) => request.method() === "POST" && DECISION_PATH.test(new URL(request.url()).pathname));
-  if (step % 2 === 0) await page.getByRole("group", { name: "Actions" }).getByRole("button").first().click();
+  if (step % 2 === 0) await firstAction.click();
   else await page.keyboard.press(FIRST_ACTION_KEY);
   // The browser may send the body as a stream Playwright cannot read back (null); the screen tests cover that case.
   const body: unknown = (await sent).postDataJSON();
