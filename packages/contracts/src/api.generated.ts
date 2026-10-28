@@ -925,7 +925,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018) */
+        /** Raise a build's priority for an uncovered spot or record the request; never starts a solve (ADR 0018) */
         post: {
             parameters: {
                 query?: never;
@@ -960,10 +960,17 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            /** @description The raised build job; null when the spot is already covered */
+                            /** @description The spot's build job when status is queued or blocked_budget; null when recorded or covered */
                             job_id: string | null;
+                            /** @description The job's priority after the request; null when job_id is null */
                             priority: number | null;
+                            /** @description 1 plus the queued jobs the builder claims first; null unless status is queued */
                             queue_position: number | null;
+                            /**
+                             * @description queued: the build job was raised to the queue head; blocked_budget: the job waits on the storage budget, has no queue position and keeps its priority, and the request is recorded; recorded: no job to raise, the request is recorded for the planner; covered: the library already holds the spot, nothing was written
+                             * @enum {string}
+                             */
+                            status: "queued" | "blocked_budget" | "recorded" | "covered";
                         };
                     };
                 };
@@ -3894,6 +3901,15 @@ export interface paths {
                 };
                 /** @description Problem (409) */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (422) */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
