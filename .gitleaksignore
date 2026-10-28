@@ -12,3 +12,8 @@
 # cosmetic catalog entry key "badge-streak-30" (streaks/cosmetics.ts, O-279).
 0be541c969fb721a7e7b337c48ab9170da0e31e3:services/api/src/automated/repository.ts:generic-api-key:74
 3c99b7a826188a11799982fcbabca05b348a16e8:services/api/src/streaks/cosmetics.ts:generic-api-key:20
+#
+# fa2b8ef (S32): generic-api-key matched the same cosmetic catalog key "badge-streak-30" as the
+# next milestone of the synthetic progress fixture (web/src/fixtures/progress.ts). Not a secret; the
+# literal is now built at run time from the milestone's day count, and this entry only clears history.
+fa2b8ef414e8fa4cfe2579ef427a02e23c4936e4:web/src/fixtures/progress.ts:generic-api-key:221

@@ -203,6 +203,9 @@ export const fixtureHoldout: ProgressHoldout = {
 
 export const fixtureFreshHoldout: ProgressHoldout = { open: null, next_cursor: null, items: [] };
 
+/** The seasoned learner's next streak milestone; its badge key is built from it (see .gitleaksignore). */
+const NEXT_MILESTONE_DAYS = 30;
+
 export const fixtureStreak: ProgressStreak = {
   current_days: 9,
   longest_days: 15,
@@ -218,7 +221,7 @@ export const fixtureStreak: ProgressStreak = {
     { cosmetic_key: "felt-tier-III", unlocked_at: "2026-09-29T20:00:00Z" },
     { cosmetic_key: "card-back-streak-14", unlocked_at: "2026-09-23T20:00:00Z" },
   ],
-  next_milestone: { days: 30, cosmetic_key: "badge-streak-30" },
+  next_milestone: { days: NEXT_MILESTONE_DAYS, cosmetic_key: `badge-streak-${NEXT_MILESTONE_DAYS}` },
 };
 
 /** A streak with a missed day still inside its 48-hour repair window (O-278). */
