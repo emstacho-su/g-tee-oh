@@ -10,7 +10,10 @@
  * countRatedToday is ratedTodayInTrack (O-214): the user's rated attempts since midnight in the
  * configured time zone (O-247), counted at an injected instant so a test fixes the clock. Postgres
  * computes the midnight (`date_trunc('day', now at time zone tz) at time zone tz`), which handles
- * daylight saving changes. Tracks arrive with S31, so until then every attempt counts in one track.
+ * daylight saving changes. S31's learning hooks may replace it with a per-track count (O-274).
+ *
+ * S31 (O-274) adds hand_class (the hero's row label at the node, from solver-query), panels_revealed,
+ * track_ids and item_difficulty; the hooks supply the last two (learning/effects.ts).
  */
 import { sql } from "kysely";
 
@@ -52,6 +55,12 @@ export interface AttemptValues {
   lossPctPotByAction: readonly number[];
   bestActionIndexes: readonly number[];
   gradedActionIndex: number;
+  /** The hero's row label at the node as solver-query answers it (O-274). */
+  handClass: string | null;
+  /** An answer-revealing panel was on (grading/policy.ts panelsRevealAnswer, or the block's panels). */
+  panelsRevealed: boolean;
+  trackIds: readonly string[];
+  itemDifficulty: number | null;
   /** The node's action kinds in record order, as solver-query names them: range drift's input (O-304). */
   actionKinds: readonly string[];
 }
@@ -72,7 +81,7 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         solution_id: values.solutionId,
         node_key: values.nodeKey,
         spot_class_key: values.spotClassKey,
-        track_ids: [],
+        track_ids: [...values.trackIds],
         hand: values.hand,
         action_index: values.actionIndex,
         action_token: values.actionToken,
@@ -97,6 +106,9 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         loss_pct_pot_by_action: [...values.lossPctPotByAction],
         best_action_indexes: [...values.bestActionIndexes],
         graded_action_index: values.gradedActionIndex,
+        hand_class: values.handClass,
+        panels_revealed: values.panelsRevealed,
+        item_difficulty: values.itemDifficulty,
         action_kinds: [...values.actionKinds],
       })
       .returning("id")
@@ -124,9 +136,24 @@ export async function selectFeedbackRow(database: Database, attemptId: string): 
   return feedbackRows(database).where("attempt.id", "=", attemptId).executeTakeFirstOrThrow();
 }
 
-/** The user's rated attempts since midnight in `timeZone`, as of `now` (O-214, O-247). */
-export async function countRatedToday(database: Database, userId: string, now: Date, timeZone: string): Promise<number> {
-  const row = await database
+/** Narrows countRatedToday: trackId counts only attempts carrying that track (O-274). */
+export interface RatedTodayFilter {
+  trackId?: string;
+}
+
+/**
+ * The user's rated attempts since midnight in `timeZone`, as of `now` (O-214, O-247); with a
+ * trackId, only those carrying the track (O-274's per-track cap). The one count the drill default
+ * and the automated per-track cap share (PR #27 review LOW 15).
+ */
+export async function countRatedToday(
+  database: Database,
+  userId: string,
+  now: Date,
+  timeZone: string,
+  filter: RatedTodayFilter = {},
+): Promise<number> {
+  let query = database
     .selectFrom("attempt")
     .select((eb) => eb.fn.countAll<string>().as("rated"))
     .where("user_id", "=", userId)
@@ -136,7 +163,10 @@ export async function countRatedToday(database: Database, userId: string, now: D
       "created_at",
       ">=",
       sql<Date>`(date_trunc('day', cast(${now.toISOString()} as timestamptz) at time zone ${timeZone}) at time zone ${timeZone})`,
-    )
-    .executeTakeFirstOrThrow();
+    );
+  if (filter.trackId !== undefined) {
+    query = query.where(sql<boolean>`track_ids @> array[${filter.trackId}]::uuid[]`);
+  }
+  const row = await query.executeTakeFirstOrThrow();
   return Number(row.rated);
 }

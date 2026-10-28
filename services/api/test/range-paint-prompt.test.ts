@@ -23,7 +23,7 @@ const SPOT: HeroSpot = {
 const SESSION_SPOT = { preflop_action: ["vs_open" as const], hands: { mode: "all" as const }, alternate_seats: false };
 
 function session(counter = 0): PaintSession {
-  const state = initialState("00000000deadbeef", [SPOT], SESSION_SPOT, "range_paint");
+  const state = initialState("00000000deadbeef", [SPOT], SESSION_SPOT, { practice: "range_paint" });
   return { id: "01a180ad-7838-7c4b-80c3-8700e77e58da", stateVersion: 3, state: { ...state, practice: { kind: "range_paint", counter, data: {} } } };
 }
 

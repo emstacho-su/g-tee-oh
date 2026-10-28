@@ -12,7 +12,11 @@
  *    decision, and the deal's hero_position (the seat to act there) must be the spot's hero seat;
  * 3. a manual hands list that lacks the hero's class deals again at once, with no node read;
  * 4. the hero's node is read with the hero's hand; a hand outside the hero's range there, or a
- *    row the hands filter refuses (close decisions), deals again.
+ *    row the hands filter refuses (close decisions), deals again;
+ * 5. a hand the holdout guard holds back (S31, O-276: the hero's row at that node is a holdout item)
+ *    deals again, so drills and automated sessions never serve a holdout item (holdout-guard.ts).
+ * A spot pinned to a stored deal (S31, O-276: a holdout session's item, HeroSpot.deal_seed) is dealt
+ * with that seed instead of the attempt's, and takes a single attempt when every spot is pinned.
  * The history before the hero is the spot's line, as the spot recorded it; nothing is sampled.
  *
  * Bounds: a hand takes at most MAX_DEAL_ATTEMPTS attempts, one deal call each when a manual list
@@ -30,6 +34,7 @@
 import type { SqNode } from "../solver-query/client.js";
 import { filterUnmetProblem, upstreamInconsistent } from "./problems.js";
 import { dealAttempts, handDraws, type HandDraws } from "./randomness.js";
+import { EMPTY_HOLDOUT_GUARD, type HoldoutGuard } from "./holdout-guard.js";
 import type { DealFilter, SolverPort } from "./solver-port.js";
 import { comboMayPass, pickSpot, rowPasses, type HandsFilter } from "./spot.js";
 import { handStateSchema, type HandState, type HeroSpot, type PersistedState } from "./state.js";
@@ -53,9 +58,16 @@ export function dealFilterOf(spot: Pick<HeroSpot, "config_id" | "pair" | "line">
   return { config_id: spot.config_id, pair: spot.pair, ...(spot.line === null ? {} : { line: spot.line }) };
 }
 
-async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter, draws: HandDraws, port: SolverPort): Promise<DealtHand | undefined> {
+interface DealContext {
+  port: SolverPort;
+  guard: HoldoutGuard;
+}
+
+async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter, draws: HandDraws, context: DealContext): Promise<DealtHand | undefined> {
+  const { port, guard } = context;
   const spot = pickSpot(state.spots, state.spot, handNo, draws.pick);
-  const deal = await port.deal(dealFilterOf(spot), draws.dealSeed);
+  const dealSeed = spot.deal_seed ?? draws.dealSeed;
+  const deal = await port.deal(dealFilterOf(spot), dealSeed);
   const solutionId = deal.solution_ids[0];
   if (solutionId === undefined) {
     throw upstreamInconsistent("solver-query dealt a spot with no solution.");
@@ -74,6 +86,9 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
   if (node.to_act !== spot.hero_seat || row === undefined) {
     throw upstreamInconsistent("solver-query answered the hero's node without the hero to act or the hero's row.");
   }
+  if (guard.isHeldOut(solutionId, deal.start_node_key, row.hand)) {
+    return undefined;
+  }
   if (!rowPasses(hands, row)) {
     return undefined;
   }
@@ -81,7 +96,7 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
     config_id: spot.config_id,
     pair: spot.pair,
     line: spot.line,
-    deal_seed: draws.dealSeed,
+    deal_seed: dealSeed,
     deal_id: deal.deal_id,
     solution_id: solutionId,
     hero_position: deal.hero_position,
@@ -101,14 +116,22 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
   return { hand, node, handNo };
 }
 
-async function dealOneHand(state: PersistedState, handNo: number, hands: HandsFilter, port: SolverPort): Promise<DealtHand | undefined> {
+/** A pinned spot deals one stored deal, so a second attempt would only repeat it (S31, O-276). */
+const PINNED_DEAL_ATTEMPTS = 1;
+
+function attemptLimit(state: PersistedState): number {
+  return state.spots.every((spot) => spot.deal_seed !== undefined) ? PINNED_DEAL_ATTEMPTS : MAX_DEAL_ATTEMPTS;
+}
+
+async function dealOneHand(state: PersistedState, handNo: number, hands: HandsFilter, context: DealContext): Promise<DealtHand | undefined> {
   let attempts = 0;
+  const limit = attemptLimit(state);
   for (const draws of dealAttempts(handDraws(state.seed, handNo))) {
-    if (attempts === MAX_DEAL_ATTEMPTS) {
+    if (attempts === limit) {
       return undefined;
     }
     attempts += 1;
-    const dealt = await tryDeal(state, handNo, hands, draws, port);
+    const dealt = await tryDeal(state, handNo, hands, draws, context);
     if (dealt !== undefined) {
       return dealt;
     }
@@ -117,10 +140,11 @@ async function dealOneHand(state: PersistedState, handNo: number, hands: HandsFi
 }
 
 /** Deals the state's hand, or a later one, at a hero spot (see the module doc). */
-export async function dealHand(state: PersistedState, port: SolverPort): Promise<DealtHand> {
+export async function dealHand(state: PersistedState, port: SolverPort, guard: HoldoutGuard = EMPTY_HOLDOUT_GUARD): Promise<DealtHand> {
+  const context: DealContext = { port, guard };
   for (let offset = 0; offset < MAX_HANDS_PER_DEAL; offset += 1) {
     const relaxed = offset === MAX_HANDS_PER_DEAL - 1;
-    const dealt = await dealOneHand(state, state.hand_no + offset, relaxed ? ALL_HANDS : state.spot.hands, port);
+    const dealt = await dealOneHand(state, state.hand_no + offset, relaxed ? ALL_HANDS : state.spot.hands, context);
     if (dealt !== undefined) {
       return dealt;
     }

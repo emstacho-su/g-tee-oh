@@ -13,3 +13,4 @@ pub mod insights;
 pub mod metrics;
 pub mod nodes;
 pub mod sample_action;
+pub mod spot_classes;

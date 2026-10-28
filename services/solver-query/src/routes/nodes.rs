@@ -166,14 +166,14 @@ fn node_response(
 }
 
 /// The preflop action family of a preflop node (`ActionFamily::classify`); `None` postflop.
-fn action_family(key: &NodeKey) -> Option<String> {
+pub(crate) fn action_family(key: &NodeKey) -> Option<String> {
     (key.street() == Street::Preflop)
         .then(|| ActionFamily::classify(key.pair, &key.preflop).as_str().to_owned())
 }
 
 /// The spot-class key of a preflop node under a catalog configuration; `None` for a
 /// configuration outside the catalog or a postflop node (`SpotClass::classify`).
-fn spot_class_key(key: &NodeKey) -> Option<String> {
+pub(crate) fn spot_class_key(key: &NodeKey) -> Option<String> {
     let config = gto_model::v1_configs().into_iter().find(|c| c.config_id() == key.config_id)?;
     let class = SpotClass::classify(&config, key).ok()?;
     class.key().ok().map(|class_key| class_key.as_str().to_owned())
@@ -213,7 +213,7 @@ const fn action_kind(token: ActionToken) -> ActionKind {
 
 /// The button label: the exact size at a preflop node (O-22), the bucket's Grouped label
 /// (`Bucket::label`) postflop, and the token's name for an action without a bucket.
-fn action_label(action: &RecordAction, street: Street) -> String {
+pub(crate) fn action_label(action: &RecordAction, street: Street) -> String {
     match (street, action.bucket) {
         (Street::Preflop, _) | (_, None) => exact_label(action.token),
         (_, Some(bucket)) => Bucket::label(bucket).to_owned(),

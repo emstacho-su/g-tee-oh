@@ -45,6 +45,10 @@ export const fixturePredictionSession: PracticeSession = {
   state: "await_hero",
   state_version: 0,
   started_at: STARTED_AT,
+  // S31: a practice session is never rated and carries no automated block or holdout progress.
+  rated_eligible: false,
+  automated: null,
+  holdout: null,
 };
 
 /** The drill list the picker reads (GET /drills). */

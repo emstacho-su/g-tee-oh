@@ -47,6 +47,10 @@ export const fixturePaintSession: PracticeSession = {
   state: "await_hero",
   state_version: 0,
   started_at: FIXTURE_PAINT_TIME,
+  // S31: a practice session is never rated and carries no automated block or holdout progress.
+  rated_eligible: false,
+  automated: null,
+  holdout: null,
 };
 
 export const fixturePaintActions: readonly NodeAction[] = [

@@ -92,7 +92,7 @@ function fakePort(dealt: SqDeal, read: SqNode): SolverPort {
 }
 
 function session(counter = 0, withPractice = true): SessionRow {
-  const state = initialState("00000000deadbeef", [SPOT], { preflop_action: ["vs_open"], hands: { mode: "all" }, alternate_seats: false }, "prediction");
+  const state = initialState("00000000deadbeef", [SPOT], { preflop_action: ["vs_open"], hands: { mode: "all" }, alternate_seats: false }, { practice: "prediction" });
   return {
     id: "0192f0a0-0000-7000-8000-000000000001",
     userId: "0192f0a0-0000-7000-8000-000000000002",

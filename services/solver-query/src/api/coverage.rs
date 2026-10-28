@@ -3,6 +3,10 @@
 //! `QUERY_DB_PASSWORD` is set, from the `solution` table under the read-only query role;
 //! flops, textures and queue positions come from the database only, so without one they
 //! are empty and `database` says `unconfigured`.
+//!
+//! S31 (O-270, R4.10) adds the spot-class catalog, additively: with `classes=true` the
+//! response lists the spot classes the pair's first indexed preflop solution holds, each
+//! with its line reach and its most frequent start nodes (`routes::spot_classes`).
 
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -17,6 +21,10 @@ pub struct CoverageQuery {
     /// The position pair, out of position first.
     #[param(example = "BB-BTN")]
     pub pair: String,
+    /// True to list the pair's spot classes in `spot_classes` (O-270); absent or false
+    /// leaves it empty, so a plain coverage call walks no tree.
+    #[param(example = false)]
+    pub classes: Option<bool>,
 }
 
 /// Where a preflop solution was found.
@@ -99,7 +107,7 @@ pub struct QueueEntry {
 }
 
 /// The body of `GET /v1/coverage`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct CoverageResponse {
     /// The configuration identifier as given.
     pub config_id: String,
@@ -115,4 +123,72 @@ pub struct CoverageResponse {
     pub queue: Vec<QueueEntry>,
     /// Whether the database answered.
     pub database: DatabaseState,
+    /// The spot classes of the pair's first indexed preflop solution, by key (O-270).
+    /// Always present; empty unless `classes=true`, and empty when the pair holds no
+    /// preflop solution or the configuration is outside the v1 catalog.
+    pub spot_classes: Vec<SpotClassEntry>,
+}
+
+/// One action on the way from the pair's root to a class spot, labelled as `/v1/nodes`
+/// labels its buttons.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ClassHistoryEntry {
+    /// The seat that took the action.
+    #[schema(example = "BTN")]
+    pub position: String,
+    /// The action token text.
+    #[schema(example = "r250")]
+    pub token: String,
+    /// The button label of the action.
+    #[schema(example = "Raise to 2.5bb")]
+    pub label: String,
+}
+
+/// One decision node of a spot class: where a hand of the class is dealt.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ClassSpot {
+    /// The dotted preflop line from the pair's root; null for the root itself.
+    #[schema(example = "r250")]
+    pub line: Option<String>,
+    /// The node key of the decision.
+    #[schema(example = "cfg_6_online_100/BB-BTN/r250")]
+    pub start_node_key: String,
+    /// The seat to act at the node, the hero of a hand dealt there.
+    #[schema(example = "BB")]
+    pub hero_position: String,
+    /// The pot at the node in centi-big-blinds (cbb).
+    pub pot_cbb: u32,
+    /// The probability that play reaches the node from the root: the product, over the
+    /// line, of the acting seat's reach-weighted share of each action taken (O-270).
+    pub line_reach: f32,
+    /// The actions of the line, in order.
+    pub history: Vec<ClassHistoryEntry>,
+}
+
+/// One spot class of a (configuration, pair), with its most frequent spots (O-270).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SpotClassEntry {
+    /// The spot-class key, as `/v1/nodes` names it.
+    #[schema(example = "preflop/online/100/facing-open/BB-BTN")]
+    pub spot_class_key: String,
+    /// The action family, as `/v1/nodes` names it in `action_family`.
+    #[schema(example = "facing-open")]
+    pub family: String,
+    /// The configuration's format.
+    #[schema(example = "online")]
+    pub format: String,
+    /// The configuration's depth band.
+    #[schema(example = "100")]
+    pub depth_band: String,
+    /// The configuration's seats.
+    pub table_size: u8,
+    /// The solution the class was read from.
+    pub solution_id: String,
+    /// The probability that any decision of the class arises in the pair's tree: the sum
+    /// of the line reach of the class's first nodes along each line (a node under another
+    /// node of the same class is not counted again), in (0, 1].
+    pub line_reach: f32,
+    /// The class's spots, by line reach descending then line, at most
+    /// `MAX_SPOTS_PER_CLASS` (8).
+    pub spots: Vec<ClassSpot>,
 }

@@ -59,6 +59,7 @@ const ROW: FeedbackRow = {
   solution_id: "0190f000-0000-7000-8000-0000000000aa",
   node_key: "cfg_6_online_100/BB-BTN/",
   hand: "AhKd",
+  item_difficulty: null,
   noise_flags: ["close_ev_mix"],
   spot_class_key: "srp-btn-open",
   game_config_id: "cfg_6_online_100",
@@ -164,6 +165,8 @@ describe("R3.7 grading inputs and feedback", () => {
       config_id: "cfg_6_online_100",
       pair: "BB-BTN",
       hand: "AhKd",
+      item_difficulty: null,
+      review_block: null,
       noise_flags: ["close_ev_mix"],
       spot_class_key: "srp-btn-open",
     });

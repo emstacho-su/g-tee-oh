@@ -2,57 +2,157 @@
  * Progress, explanation, events and admin schemas (A5 section 3), declared by S21 for the
  * contract-first commit (O-38). Owners: progress S31 (R4.x) (S27 moved explanations to explain.ts),
  * events and admin S23 (R3.4, R3.5). Shapes are drafts the owners may change with a visible
- * contract diff.
+ * contract diff; S31 replaced the progress drafts (R4.12).
  */
 import { z } from "zod";
 
 import { builderSettingValueSchemas } from "../admin/settings-keys.js";
-import { timestampSchema, uuidSchema } from "./common.js";
+import { pageQuerySchema, pageSchema } from "../http/pagination.js";
+import { timestampSchema } from "./common.js";
+import { tierSchema, trackKeySchema } from "./training.js";
 
-export const ratingSchema = z.object({
-  overall: z.object({ mu: z.number(), rd: z.number(), tier: z.string() }),
-  updated_at: timestampSchema.nullable(),
-});
+// S31 (R4.12, O-271 to O-279): the six progress shapes replace S21's drafts. Track keys come from
+// learning/tracks.ts; every list that can grow is a cursor page (pagination.ts, the S21 collection rule).
 
-export const trackRatingSchema = z.object({
-  track_id: uuidSchema,
-  key: z.string(),
-  family: z.enum(["equilibrium", "exploit"]),
-  mu: z.number(),
-  rd: z.number(),
-});
+/** The most weeks /progress/leaks looks back (O-275). */
+export const MAX_LEAK_WEEKS = 52;
+/** The weeks /progress/leaks shows by default (O-275). */
+export const DEFAULT_LEAK_WEEKS = 8;
+/** /progress/leaks lists the top this many classes by current leak cost (O-275). */
+export const TOP_LEAKS = 10;
+/** Rated decisions that make a streak day count (O-278). */
+export const STREAK_DAY_MINIMUM = 5;
 
-export const tracksSchema = z.object({ items: z.array(trackRatingSchema) });
+
+export const ratingSchema = z
+  .object({
+    overall: z
+      .object({
+        mu: z.number().describe("Weighted mean of the track ratings (O-271)"),
+        rd: z.number().describe("Weighted rating deviation, the band around mu"),
+        conservative: z.number().describe("The figure the tier ranks on"),
+        tier: tierSchema,
+        band_tier: tierSchema.describe("The tier the conservative figure alone would give"),
+        blocked_by: z.array(trackKeySchema).describe("Tracks whose deviation holds the tier below band_tier"),
+      })
+      .nullable()
+      .describe("Null before any rated session"),
+    updated_at: timestampSchema.nullable(),
+  })
+  .meta({ id: "ProgressRating" });
+
+export const trackProgressSchema = z
+  .object({
+    track_key: trackKeySchema,
+    name: z.string(),
+    family: z.enum(["equilibrium", "exploit"]),
+    format: z.enum(["cash", "mtt"]),
+    weight: z.number().min(0).max(1).describe("Effective weight, normalized over tracks with a covered class (O-271)"),
+    mu: z.number(),
+    rd: z.number(),
+    conservative: z.number(),
+    rated_decisions: z.number().int().min(0),
+    last_rated_at: timestampSchema.nullable(),
+  })
+  .meta({ id: "TrackProgress" });
+
+export const tracksQuerySchema = pageQuerySchema;
+export const tracksSchema = pageSchema(trackProgressSchema).meta({ id: "ProgressTracks" });
 
 export const leaksQuerySchema = z.object({
-  weeks: z.coerce.number().int().min(1).max(52).default(8),
+  weeks: z.coerce.number().int().min(1).max(MAX_LEAK_WEEKS).default(DEFAULT_LEAK_WEEKS),
 });
 
-export const leaksSchema = z.object({
-  items: z.array(
-    z.object({
-      spot_class_key: z.string(),
-      leak_cost_bb_per_1k: z.number(),
-      trend: z.array(z.object({ week: z.iso.date(), leak_cost_bb_per_1k: z.number() })),
-    }),
-  ),
-});
+export const leaksSchema = z
+  .object({
+    weeks: z.array(z.iso.date()).describe("Mondays, oldest first; the last is the current partial week"),
+    items: z
+      .array(
+        z.object({
+          spot_class_key: z.string(),
+          family: z.string(),
+          track_key: trackKeySchema.nullable(),
+          leak_cost_bb_per_1k: z.number(),
+          series: z.array(
+            z.object({
+              week: z.iso.date(),
+              leak_cost_bb_per_1k: z.number().nullable(),
+              partial: z.boolean().describe("True for the current week, computed live"),
+            }),
+          ),
+        }),
+      )
+      .max(TOP_LEAKS)
+      .describe(`The top ${TOP_LEAKS} classes by current leak cost`),
+  })
+  .meta({ id: "ProgressLeaks" });
 
-export const heatmapSchema = z.object({
-  cells: z.array(z.object({ spot_class_key: z.string(), p_known: z.number(), n: z.number().int() })),
-});
+export const heatmapSchema = z
+  .object({
+    rows: z.array(z.object({ family: z.string(), pair: z.string() })),
+    columns: z.array(z.object({ depth_band: z.string(), format: z.string() })),
+    cells: z.array(
+      z.object({
+        spot_class_key: z.string(),
+        row: z.number().int().min(0).describe("Index into rows"),
+        column: z.number().int().min(0).describe("Index into columns"),
+        p_known: z.number().nullable().describe("Null when never practiced"),
+        mastered: z.boolean(),
+        retrievability: z.number().nullable(),
+        n: z.number().int().min(0),
+      }),
+    ),
+  })
+  .meta({ id: "ProgressHeatmap" });
 
-export const holdoutSchema = z.object({
-  taken: z.number().int(),
-  mean_score: z.number().nullable(),
-  last_taken_at: timestampSchema.nullable(),
-});
+export const holdoutRoundSchema = z
+  .object({
+    round_month: z.iso.date().describe("The first day of the round's month"),
+    opened_at: timestampSchema,
+    closed_at: timestampSchema.nullable(),
+    tracks: z.array(
+      z.object({
+        track_key: trackKeySchema,
+        answered: z.number().int().min(0),
+        total: z.number().int().min(0),
+        mean_score: z.number().nullable(),
+        mu: z.number().nullable().describe("The track rating at the round's close"),
+        goodhart_flag: z.boolean().describe("Rating rose while holdout scores did not (O-277)"),
+      }),
+    ),
+  })
+  .meta({ id: "HoldoutRound" });
 
-export const streakSchema = z.object({
-  current_days: z.number().int(),
-  longest_days: z.number().int(),
-  freezes_available: z.number().int(),
-});
+export const holdoutQuerySchema = pageQuerySchema;
+export const holdoutSchema = pageSchema(holdoutRoundSchema)
+  .extend({
+    open: z
+      .object({ round_month: z.iso.date(), answered: z.number().int().min(0), total: z.number().int().min(0) })
+      .nullable()
+      .describe("The open round's progress; null when no round is open"),
+  })
+  .meta({ id: "ProgressHoldout" });
+
+export const streakSchema = z
+  .object({
+    current_days: z.number().int().min(0),
+    longest_days: z.number().int().min(0),
+    today_rated: z.number().int().min(0),
+    day_minimum: z.literal(STREAK_DAY_MINIMUM),
+    freezes_left_this_week: z.number().int().min(0),
+    repairable: z
+      .object({
+        day: z.iso.date(),
+        deadline: timestampSchema,
+        progress: z.number().int().min(0),
+        needed: z.number().int().min(0),
+      })
+      .nullable()
+      .describe("A missed day that can still be repaired (O-278)"),
+    unlocks: z.array(z.object({ cosmetic_key: z.string(), unlocked_at: timestampSchema })),
+    next_milestone: z.object({ days: z.number().int().min(1), cosmetic_key: z.string() }).nullable(),
+  })
+  .meta({ id: "ProgressStreak" });
 
 export const builderStatusSchema = z
   .object({

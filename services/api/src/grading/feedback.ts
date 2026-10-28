@@ -52,6 +52,7 @@ export type FeedbackRow = Pick<
   | "solution_id"
   | "node_key"
   | "hand"
+  | "item_difficulty"
   | "noise_flags"
   | "spot_class_key"
 > &
@@ -73,6 +74,7 @@ export const FEEDBACK_COLUMNS = [
   "solution_id",
   "node_key",
   "hand",
+  "item_difficulty",
   "noise_flags",
   "spot_class_key",
 ] as const;
@@ -109,6 +111,9 @@ export function renderFeedback(row: FeedbackRow): Feedback {
     config_id: row.game_config_id,
     pair: required(row.position_pair, "position_pair"),
     hand: row.hand,
+    item_difficulty: row.item_difficulty,
+    // S31: set by the learning hooks when the decision closes an automated review block (O-272).
+    review_block: null,
     noise_flags: row.noise_flags.map((flag) => noiseFlagSchema.parse(flag)),
     spot_class_key: row.spot_class_key,
   };

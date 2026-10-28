@@ -15,6 +15,7 @@
  */
 import { z } from "zod";
 
+import type { GradedSessionMode } from "../grading/policy.js";
 import { HTTP_STATUS, PROBLEM_CONTENT_TYPE, PROBLEM_SLUGS, ProblemError, problemSchema } from "../http/problem.js";
 
 export const noCoverageProblemSchema = problemSchema
@@ -73,6 +74,19 @@ export function wrongSessionModeProblem(actual: string, expected: string): Probl
 export function requireSessionMode(session: { mode: string }, expected: string): void {
   if (session.mode !== expected) {
     throw wrongSessionModeProblem(session.mode, expected);
+  }
+}
+
+/**
+ * The trainer routes (next, decisions) serve every graded mode (grading/policy.ts GradedSessionMode):
+ * drill (S23) and the S31 automated and holdout sessions. A prediction or range_paint session is a
+ * 409 wrong-session-mode (O-302).
+ */
+export const GRADED_SESSION_MODES: readonly GradedSessionMode[] = Object.freeze(["drill", "automated", "holdout"]);
+
+export function requireGradedSessionMode(session: { mode: string }): void {
+  if (!GRADED_SESSION_MODES.some((mode) => mode === session.mode)) {
+    throw wrongSessionModeProblem(session.mode, GRADED_SESSION_MODES.join(", "));
   }
 }
 

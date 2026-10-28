@@ -203,6 +203,9 @@ function recapOf(session: MockSession): SessionRecap {
     rated_decisions: session.graded.length,
     mean_score: session.graded.length === 0 ? null : total / session.graded.length,
     ev_loss_bb_total: session.graded.reduce((sum, entry) => sum + entry.evLossBb, 0),
+    rating_changes: [],
+    tier: null,
+    unlocks: [],
   };
 }
 
@@ -260,7 +263,7 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
     };
     save(session);
     const coverage = target.id === FIXTURE_PART_COVERED_DRILL_ID ? fixturePartCoverage : fixtureFullCoverage;
-    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, coverage };
+    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, automated: null, holdout: null, coverage };
     return json(STATUS.created, body);
   }
 

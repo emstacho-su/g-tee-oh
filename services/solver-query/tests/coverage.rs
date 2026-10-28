@@ -138,3 +138,41 @@ async fn assert_coverage_and_healthz_connected(router: Router, fixture: &Fixture
     assert_eq!(json["database"]["connected"], true, "{json}");
     assert_eq!(json["database"]["role"], QUERY_ROLE, "{json}");
 }
+
+/// The committed fixture library (`validation/fixtures/library`, O-225).
+fn committed_library() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../validation/fixtures/library")
+}
+
+#[tokio::test]
+async fn r4_10_coverage_lists_spot_classes_only_when_asked() {
+    let router = common::router_over(&committed_library());
+    let plain = "/v1/coverage?config_id=cfg_6_online_100&pair=BB-BTN";
+    let (status, _, json) = get(router.clone(), plain).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["spot_classes"], json!([]), "classes absent lists nothing: {json}");
+
+    let off = format!("{plain}&classes=false");
+    let (status, _, json) = get(router.clone(), &off).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["spot_classes"], json!([]), "classes=false lists nothing: {json}");
+
+    let on = format!("{plain}&classes=true");
+    let (status, _, json) = get(router.clone(), &on).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    let classes = json["spot_classes"].as_array().expect("an array");
+    assert!(!classes.is_empty(), "{json}");
+    for class in classes {
+        assert!(class["spot_class_key"].as_str().is_some_and(|k| k.ends_with("/BB-BTN")));
+        assert!(class["spots"].as_array().is_some_and(|spots| !spots.is_empty()), "{class}");
+    }
+
+    let off_catalog = "/v1/coverage?config_id=cfg_2_online_norake_10&pair=BB-BTN&classes=true";
+    let (status, _, json) = get(router.clone(), off_catalog).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["spot_classes"], json!([]), "outside the v1 catalog: {json}");
+
+    let bad_flag = format!("{plain}&classes=maybe");
+    let (status, headers, json) = get(router, &bad_flag).await;
+    assert_problem(status, &headers, &json, StatusCode::BAD_REQUEST, "bad-request");
+}

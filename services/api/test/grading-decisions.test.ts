@@ -71,12 +71,14 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     const grade = sq.calls.find((call) => call.path === "/v1/grade");
     expect(grade?.body).toEqual({ solution_id: solutionId, node_key: ROOT_KEY, hand: "AhKd", action_index: 1, reference: `${sessionId}:0` });
     const row = await pool.query("select * from attempt where session_id = $1", [sessionId]);
+    // S31 (O-274): every attempt carries its class's track, and an RFI decision is in the opens track.
+    const opens = await pool.query<{ id: string }>("select id from track where key = 'opens'");
     expect(row.rows[0]).toMatchObject({
       user_id: player.userId,
       solution_id: solutionId,
       node_key: ROOT_KEY,
       spot_class_key: "preflop/online/100/rfi/BB-BTN",
-      track_ids: [],
+      track_ids: [opens.rows[0]?.id],
       hand: "AhKd",
       action_index: 1,
       action_token: "r250",

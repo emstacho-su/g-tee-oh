@@ -27,6 +27,7 @@ import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { cardSchema } from "../schemas/common.js";
 import type { SqAction, SqNode } from "../solver-query/client.js";
 import { dealFilterOf, dealHand } from "./deal-hand.js";
+import { EMPTY_HOLDOUT_GUARD, type HoldoutGuard } from "./holdout-guard.js";
 import { actionAt, withAction } from "./hand-actions.js";
 import { handEndAt, type PreviousHandEnd } from "./hand-end.js";
 import { transition, type AfterFeedback, type MachineEvent, type MachineState, type Phase, type StopRule } from "./machine.js";
@@ -48,6 +49,8 @@ const NEXT_STREET: Readonly<Partial<Record<Street, Street>>> = { preflop: "flop"
 export interface DeriveSettings {
   stopRule: StopRule;
   rng: boolean;
+  /** S31 (O-276): holdout items a deal must not serve; the empty guard when absent. */
+  holdoutGuard?: HoldoutGuard;
 }
 
 export interface DerivedPrompt {
@@ -71,7 +74,7 @@ interface Step {
 }
 
 /** One phase step; the steps that read nothing from solver-query answer synchronously. */
-type StepFn = (context: Context, port: SolverPort) => Promise<Step> | Step;
+type StepFn = (context: Context, port: SolverPort, settings: DeriveSettings) => Promise<Step> | Step;
 
 /** Board or hand text ("AhKd", "3cKh4c") as cards. */
 export function cardsOf(text: string): string[] {
@@ -97,8 +100,8 @@ function requireNodeKey(hand: HandState): string {
 }
 
 /** The hand dealt at one of the session's hero spots; a later hand number when earlier ones found no hand (deal-hand.ts). */
-const dealing: StepFn = async ({ state }, port) => {
-  const { hand, node, handNo } = await dealHand(state, port);
+const dealing: StepFn = async ({ state }, port, settings) => {
+  const { hand, node, handNo } = await dealHand(state, port, settings.holdoutGuard ?? EMPTY_HOLDOUT_GUARD);
   return { event: { type: "dealt", heroToAct: true }, context: { state: { ...state, hand_no: handNo, hand }, node } };
 };
 
@@ -240,7 +243,7 @@ export async function deriveAwaitHero(state: PersistedState, settings: DeriveSet
     if (machine.phase === "ended") {
       throw sessionEndedProblem();
     }
-    const result = await STEPS[machine.phase](context, port);
+    const result = await STEPS[machine.phase](context, port, settings);
     const next = transition(machine, result.event);
     // MEDIUM 5: how the hand ended is named on the edge into hand_end, from the phase it leaves (hand-end.ts).
     const ended = next.phase === "hand_end" ? handEndAt(machine.phase, settings.stopRule, requireHand(result.context.state)) : undefined;
