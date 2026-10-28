@@ -31,7 +31,7 @@
  * shared effects too.
  */
 import type { GradeMode, GradeOutput } from "@g-tee-oh/learning";
-import type { FastifyRequest } from "fastify";
+import type { FastifyBaseLogger, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
 import type { ClassCatalog } from "../automated/class-catalog.js";
@@ -58,6 +58,13 @@ export interface PreparedLearning {
 /** Nothing prepared: no catalog, no part results. */
 export const EMPTY_PREPARED_LEARNING: PreparedLearning = Object.freeze({ catalog: null, parts: Object.freeze({}) });
 
+/**
+ * What the prepared context is for: a decision (beforeGrade, afterInsert) or an end (onSessionEnd),
+ * so a part prepares only what its hooks will read (the holdout part replays the next item only for
+ * a decision, PR #27 review HIGH 4).
+ */
+export type PreparePurpose = "decision" | "end";
+
 /** What a part's prepare sees: no transaction, no lock; the catalog is already loaded (or null). */
 export interface PrepareContext {
   /** The app's handle, outside any transaction. */
@@ -68,6 +75,9 @@ export interface PrepareContext {
   session: SessionRow;
   now: Date;
   catalog: ClassCatalog | null;
+  purpose: PreparePurpose;
+  /** Where a part logs what it handled without throwing (an upstream failure it turned into a value). */
+  log: Pick<FastifyBaseLogger, "warn">;
 }
 
 /** One decision, inside its transaction, as every hook sees it. */

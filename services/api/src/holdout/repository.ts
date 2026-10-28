@@ -1,27 +1,32 @@
 /**
- * Holdout rows (R4.13, O-100, O-276, O-277, ADR 0001): the global item set and its draws, each
- * user's monthly rounds, their results and their closing summaries.
+ * Holdout rows (R4.13, O-100, O-276, ADR 0001): the global item set and its draws, each user's
+ * monthly rounds, and the user's open holdout session. Results live in holdout/results.ts and the
+ * round summaries in holdout/summaries.ts.
  *
  * Mechanism:
  * - holdout_item and holdout_draw are global (A4 section 2): one recorded draw per track, never
- *   redrawn; the guard reads the item keys (solution, node, hand class) once per request.
+ *   redrawn; the guard reads the item keys (solution, node, hand class) once per request. An item
+ *   keeps its line's history as solver-query labelled it at the draw, so serving it needs no class
+ *   catalog (PR #27 review HIGH 4).
  * - holdout_round is one row per user and month (unique), opened with `on conflict do nothing`, so
- *   the monthly job and a month's first holdout session open it once between them.
- * - holdout_result carries its round; unique (user, item, round) makes a replayed decision write
- *   it once. An item counts as answered in a round once it has a result there.
- * - closeRound writes one holdout_summary per track with items (answered, total, the mean attempt
- *   score, the track's rating at the close with inactivity on read, and the Goodhart flag against
- *   the user's previous closed round, O-277), then sets closed_at; a round already closed is left
- *   alone, so the monthly job may run twice.
+ *   the monthly job and a month's first holdout session open it once between them. Its order seed,
+ *   64 random bits chosen when it opens, fixes the order the round serves its items in (PR #27
+ *   review HIGH 1, holdout/session-items.ts roundOrder). lockRound serializes a user's holdout
+ *   creates within the round.
+ * - A user has at most one open holdout session (the partial unique index
+ *   practice_session_open_holdout_key); openHoldoutSessions reads it with the item it serves.
  */
 import { sql } from "kysely";
+import { z } from "zod";
 
 import type { Database } from "../db.js";
-import { ratingOnRead } from "../learning-state/rating-period.js";
 import { TRACK_KEYS, type TrackKey } from "../learning/tracks.js";
+import { newSessionSeed } from "../sessions/randomness.js";
+import { historyEntrySchema, learningOf, persistedStateSchema, type HistoryEntry } from "../sessions/state.js";
 import { isoDateOf } from "../streaks/calendar.js";
 import { sqlDate } from "../streaks/sql-date.js";
-import { goodhartFlag, type RoundFigures } from "./goodhart.js";
+
+const historySchema = z.array(historyEntrySchema);
 
 export interface HoldoutItem {
   id: string;
@@ -36,6 +41,8 @@ export interface HoldoutItem {
   nodeKey: string;
   /** The hand class: the hero's row label at the node, as solver-query names it. */
   hand: string;
+  /** The line's actions as solver-query labelled them at the draw (the prompt's history). */
+  history: HistoryEntry[];
 }
 
 /** A drawn item before it is stored. */
@@ -45,19 +52,19 @@ export interface HoldoutRound {
   id: string;
   /** The first day of the round's month. */
   month: string;
+  /** Fixes the round's serving order (PR #27 review HIGH 1). */
+  orderSeed: string;
   openedAt: Date;
   closedAt: Date | null;
 }
 
-export interface NewResult {
-  userId: string;
-  itemId: string;
-  attemptId: string;
-  roundId: string;
-  takenAt: Date;
+/** A user's open holdout session and the item it serves (null once its round is done). */
+export interface OpenHoldoutSession {
+  id: string;
+  currentItem: string | null;
 }
 
-function asTrackKey(key: string): TrackKey {
+export function asTrackKey(key: string): TrackKey {
   const found = TRACK_KEYS.find((candidate) => candidate === key);
   if (found === undefined) {
     throw new Error(`holdout item of an unknown track ${key}`);
@@ -81,6 +88,7 @@ function itemQuery(database: Database) {
       "holdout_item.solution_id",
       "holdout_item.node_key",
       "holdout_item.hand",
+      "holdout_item.history",
     ]);
 }
 
@@ -99,6 +107,7 @@ function toItem(row: ItemRow): HoldoutItem {
     solutionId: row.solution_id,
     nodeKey: row.node_key,
     hand: row.hand,
+    history: historySchema.parse(row.history),
   };
 }
 
@@ -113,6 +122,17 @@ export async function holdoutItems(database: Database, trackKey: TrackKey | null
 export async function heldOutKeys(database: Database): Promise<{ solutionId: string; nodeKey: string; hand: string }[]> {
   const rows = await database.selectFrom("holdout_item").select(["solution_id", "node_key", "hand"]).execute();
   return rows.map((row) => ({ solutionId: row.solution_id, nodeKey: row.node_key, hand: row.hand }));
+}
+
+/** Holdout items per track. */
+export async function itemTotals(database: Database): Promise<Map<TrackKey, { trackId: string; total: number }>> {
+  const rows = await database
+    .selectFrom("holdout_item")
+    .innerJoin("track", "track.id", "holdout_item.track_id")
+    .select((eb) => ["track.key", "track.id", eb.fn.countAll<string>().as("total")])
+    .groupBy(["track.key", "track.id"])
+    .execute();
+  return new Map(rows.map((row) => [asTrackKey(row.key), { trackId: row.id, total: Number(row.total) }]));
 }
 
 /** The track ids that already have a recorded draw. */
@@ -138,37 +158,56 @@ export async function recordDraw(transaction: Database, trackId: string, seed: s
         solution_id: item.solutionId,
         node_key: item.nodeKey,
         hand: item.hand,
+        history: sql`cast(${JSON.stringify(item.history)} as jsonb)`,
       })),
     )
     .execute();
 }
 
-function toRound(row: { id: string; month: Date | string; opened_at: Date; closed_at: Date | null }): HoldoutRound {
-  return { id: row.id, month: isoDateOf(row.month), openedAt: row.opened_at, closedAt: row.closed_at };
+const ROUND_COLUMNS = ["id", "month", "order_seed", "opened_at", "closed_at"] as const;
+
+function toRound(row: { id: string; month: Date | string; order_seed: string; opened_at: Date; closed_at: Date | null }): HoldoutRound {
+  return { id: row.id, month: isoDateOf(row.month), orderSeed: row.order_seed, openedAt: row.opened_at, closedAt: row.closed_at };
 }
 
-/** The user's round of `month` (its first day), opened now if it does not exist yet. */
-export async function openRound(transaction: Database, userId: string, month: string, now: Date): Promise<HoldoutRound> {
+/**
+ * The user's round of `month` (its first day), opened now if it does not exist yet; a new round's
+ * order seed is 64 random bits unless the caller (a test) fixes it.
+ */
+export async function openRound(transaction: Database, userId: string, month: string, now: Date, orderSeed: string = newSessionSeed()): Promise<HoldoutRound> {
   await transaction
     .insertInto("holdout_round")
-    .values({ user_id: userId, month, opened_at: now })
+    .values({ user_id: userId, month, order_seed: orderSeed, opened_at: now })
     .onConflict((conflict) => conflict.columns(["user_id", "month"]).doNothing())
     .execute();
   const row = await transaction
     .selectFrom("holdout_round")
-    .select(["id", "month", "opened_at", "closed_at"])
+    .select(ROUND_COLUMNS)
     .where("user_id", "=", userId)
     .where("month", "=", sqlDate(month))
     .executeTakeFirstOrThrow();
   return toRound(row);
 }
 
+/** The user's round by id. */
+export async function roundById(database: Database, userId: string, roundId: string): Promise<HoldoutRound> {
+  const row = await database
+    .selectFrom("holdout_round")
+    .select(ROUND_COLUMNS)
+    .where("id", "=", roundId)
+    .where("user_id", "=", userId)
+    .executeTakeFirstOrThrow();
+  return toRound(row);
+}
+
+/** Locks the round row for the transaction, so a user's holdout creates in it run one at a time. */
+export async function lockRound(transaction: Database, roundId: string): Promise<void> {
+  await transaction.selectFrom("holdout_round").select("id").where("id", "=", roundId).forUpdate().executeTakeFirstOrThrow();
+}
+
 /** The user's rounds, newest month first, after `beforeMonth` when paging. */
 export async function roundsPage(database: Database, userId: string, limit: number, beforeMonth: string | null): Promise<HoldoutRound[]> {
-  let query = database
-    .selectFrom("holdout_round")
-    .select(["id", "month", "opened_at", "closed_at"])
-    .where("user_id", "=", userId);
+  let query = database.selectFrom("holdout_round").select(ROUND_COLUMNS).where("user_id", "=", userId);
   if (beforeMonth !== null) {
     query = query.where("month", "<", sqlDate(beforeMonth));
   }
@@ -176,170 +215,31 @@ export async function roundsPage(database: Database, userId: string, limit: numb
   return rows.map(toRound);
 }
 
-/** The ids of the items the user answered in a round. */
-export async function answeredItemIds(database: Database, userId: string, roundId: string): Promise<ReadonlySet<string>> {
-  const rows = await database
-    .selectFrom("holdout_result")
-    .select("holdout_item_id")
-    .where("user_id", "=", userId)
-    .where("round_id", "=", roundId)
-    .execute();
-  return new Set(rows.flatMap((row) => (row.holdout_item_id === null ? [] : [row.holdout_item_id])));
-}
-
-/** Records one answered item (once per user, item and round). */
-export async function insertResult(transaction: Database, result: NewResult): Promise<void> {
-  await transaction
-    .insertInto("holdout_result")
-    .values({
-      user_id: result.userId,
-      holdout_item_id: result.itemId,
-      attempt_id: result.attemptId,
-      round_id: result.roundId,
-      taken_at: result.takenAt,
-    })
-    .onConflict((conflict) => conflict.columns(["user_id", "holdout_item_id", "round_id"]).doNothing())
-    .execute();
-}
-
-/** Per track of a round: answered items and their mean attempt score. */
-export async function roundScores(database: Database, roundId: string): Promise<Map<TrackKey, { answered: number; meanScore: number | null }>> {
-  const rows = await database
-    .selectFrom("holdout_result")
-    .innerJoin("holdout_item", "holdout_item.id", "holdout_result.holdout_item_id")
-    .innerJoin("track", "track.id", "holdout_item.track_id")
-    .innerJoin("attempt", "attempt.id", "holdout_result.attempt_id")
-    .select((eb) => [
-      "track.key",
-      eb.fn.countAll<string>().as("answered"),
-      sql<number | null>`avg(attempt.score)::float8`.as("mean_score"),
-    ])
-    .where("holdout_result.round_id", "=", roundId)
-    .groupBy("track.key")
-    .execute();
-  return new Map(rows.map((row) => [asTrackKey(row.key), { answered: Number(row.answered), meanScore: row.mean_score }]));
-}
-
-/** Holdout items per track. */
-export async function itemTotals(database: Database): Promise<Map<TrackKey, { trackId: string; total: number }>> {
-  const rows = await database
-    .selectFrom("holdout_item")
-    .innerJoin("track", "track.id", "holdout_item.track_id")
-    .select((eb) => ["track.key", "track.id", eb.fn.countAll<string>().as("total")])
-    .groupBy(["track.key", "track.id"])
-    .execute();
-  return new Map(rows.map((row) => [asTrackKey(row.key), { trackId: row.id, total: Number(row.total) }]));
-}
-
-export interface SummaryRow {
-  trackKey: TrackKey;
-  answered: number;
-  total: number;
-  meanScore: number | null;
-  mu: number | null;
-  goodhartFlag: boolean;
-}
-
-/** The summaries of a set of rounds, by round id. */
-export async function summariesOf(database: Database, roundIds: readonly string[]): Promise<Map<string, SummaryRow[]>> {
-  if (roundIds.length === 0) {
-    return new Map();
-  }
-  const rows = await database
-    .selectFrom("holdout_summary")
-    .innerJoin("track", "track.id", "holdout_summary.track_id")
-    .select(["holdout_summary.round_id", "track.key", "answered", "total", "mean_score", "mu", "goodhart_flag"])
-    .where("holdout_summary.round_id", "in", [...roundIds])
-    .execute();
-  const byRound = new Map<string, SummaryRow[]>();
-  for (const row of rows) {
-    const summary: SummaryRow = {
-      trackKey: asTrackKey(row.key),
-      answered: row.answered,
-      total: row.total,
-      meanScore: row.mean_score,
-      mu: row.mu,
-      goodhartFlag: row.goodhart_flag,
-    };
-    byRound.set(row.round_id, [...(byRound.get(row.round_id) ?? []), summary]);
-  }
-  return byRound;
-}
-
-async function ratingsAt(database: Database, userId: string, now: Date): Promise<Map<TrackKey, { mu: number; rd: number }>> {
-  const rows = await database
-    .selectFrom("rating")
-    .innerJoin("track", "track.id", "rating.track_id")
-    .select(["track.key", "mu", "rd", "volatility", "updated_at"])
-    .where("user_id", "=", userId)
-    .execute();
-  return new Map(
-    rows.map((row) => {
-      const rating = ratingOnRead({ mu: row.mu, rd: row.rd, volatility: row.volatility, updatedAt: row.updated_at }, now);
-      return [asTrackKey(row.key), { mu: rating.rating, rd: rating.rd }] as const;
-    }),
-  );
-}
-
-async function previousClosedRound(database: Database, userId: string, month: string): Promise<string | undefined> {
-  const row = await database
-    .selectFrom("holdout_round")
-    .select("id")
-    .where("user_id", "=", userId)
-    .where("month", "<", sqlDate(month))
-    .where("closed_at", "is not", null)
-    .orderBy("month", "desc")
-    .executeTakeFirst();
-  return row?.id;
-}
-
-/** Closes an open round with its per-track summaries (see the module doc). */
-export async function closeRound(transaction: Database, userId: string, round: HoldoutRound, now: Date): Promise<void> {
-  const totals = await itemTotals(transaction);
-  const scores = await roundScores(transaction, round.id);
-  const ratings = await ratingsAt(transaction, userId, now);
-  const previousId = await previousClosedRound(transaction, userId, round.month);
-  const previous = previousId === undefined ? [] : ((await summariesOf(transaction, [previousId])).get(previousId) ?? []);
-  const rows = [...totals].map(([key, { trackId, total }]) => {
-    const score = scores.get(key) ?? { answered: 0, meanScore: null };
-    const rating = ratings.get(key) ?? null;
-    const current: RoundFigures = { answered: score.answered, meanScore: score.meanScore, mu: rating?.mu ?? null };
-    const before = previous.find((summary) => summary.trackKey === key) ?? null;
-    return {
-      round_id: round.id,
-      track_id: trackId,
-      answered: score.answered,
-      total,
-      mean_score: score.meanScore,
-      mu: rating?.mu ?? null,
-      rd: rating?.rd ?? null,
-      goodhart_flag: goodhartFlag(before, current),
-    };
-  });
-  if (rows.length > 0) {
-    await transaction
-      .insertInto("holdout_summary")
-      .values(rows)
-      .onConflict((conflict) => conflict.columns(["round_id", "track_id"]).doNothing())
-      .execute();
-  }
-  await transaction
-    .updateTable("holdout_round")
-    .set({ closed_at: now })
-    .where("id", "=", round.id)
-    .where("closed_at", "is", null)
-    .execute();
-}
-
 /** Every user's open round of a month before `month`, oldest first. */
 export async function openRoundsBefore(database: Database, month: string): Promise<{ userId: string; round: HoldoutRound }[]> {
   const rows = await database
     .selectFrom("holdout_round")
-    .select(["id", "user_id", "month", "opened_at", "closed_at"])
+    .select([...ROUND_COLUMNS, "user_id"])
     .where("closed_at", "is", null)
     .where("month", "<", sqlDate(month))
     .orderBy("month")
     .orderBy("user_id")
     .execute();
   return rows.map((row) => ({ userId: row.user_id, round: toRound(row) }));
+}
+
+/** The user's open holdout sessions (at most one) with the item each serves. */
+export async function openHoldoutSessions(database: Database, userId: string): Promise<OpenHoldoutSession[]> {
+  const rows = await database
+    .selectFrom("practice_session")
+    .select(["id", "state"])
+    .where("user_id", "=", userId)
+    .where("mode", "=", "holdout")
+    .where("ended_at", "is", null)
+    .orderBy("started_at")
+    .execute();
+  return rows.map((row) => {
+    const learning = learningOf(persistedStateSchema.parse(row.state));
+    return { id: row.id, currentItem: learning?.kind === "holdout" ? learning.current_item : null };
+  });
 }

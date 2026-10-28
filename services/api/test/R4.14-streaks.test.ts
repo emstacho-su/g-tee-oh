@@ -14,10 +14,10 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ApiApp } from "../src/app.js";
-import type { ClassCatalog, CatalogClass } from "../src/automated/class-catalog.js";
+import { loadClassCatalog, type ClassCatalog, type CatalogClass } from "../src/automated/class-catalog.js";
 import type { Database } from "../src/db.js";
 import { HOLDOUT_HOOK_PART } from "../src/holdout/effects.js";
-import type { AfterInsertContext, SessionEndContext } from "../src/learning/effects.js";
+import { EMPTY_PREPARED_LEARNING, type AfterInsertContext, type SessionEndContext } from "../src/learning/effects.js";
 import { insertSession, type SessionRow } from "../src/sessions/repository.js";
 import { initialState, type LearningState } from "../src/sessions/state.js";
 import { addDays, isoDateOf } from "../src/streaks/calendar.js";
@@ -191,11 +191,13 @@ describe("R4.14 tier unlocks at session end", () => {
     expect(await tierUnlocks(database, { userId: player.userId, sessionId: session.id, catalog: TWO_TRACKS, write: true })).toEqual({ tier: null, unlocks: [] });
   });
 
-  it("R4.14 the end hook computes the tier over the fixture catalog, repeats it, and is a 503 without solver-query", async () => {
+  it("R4.14 the end hook computes the tier over the prepared fixture catalog, repeats it, and is a 503 with none prepared", async () => {
     const player = await newPlayer(database);
     const session = await automatedSession(player, false);
     await rateTrack(player.userId, session.id, "opens", 1800, 60, new Date());
     const ended = { ...session, endedAt: new Date(Date.now() + NOON_MS) };
+    // PR #27 review HIGH 3: the tier reads the catalog the end's prepare phase loaded (learning/prepare.ts).
+    const prepared = { catalog: await loadClassCatalog(fixtureSolverQuery(), database), parts: {} };
     const context = (firstEnd: boolean, withSolver: boolean) =>
       ({
         transaction: database,
@@ -206,6 +208,7 @@ describe("R4.14 tier unlocks at session end", () => {
         ended,
         firstEnd,
         solverQuery: withSolver ? fixtureSolverQuery() : null,
+        prepared: withSolver ? prepared : EMPTY_PREPARED_LEARNING,
       }) as SessionEndContext;
     const first = await HOLDOUT_HOOK_PART.onSessionEnd?.(context(true, true));
     expect(first?.tier).not.toBeNull();

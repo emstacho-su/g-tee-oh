@@ -3,7 +3,8 @@
  * GET /sessions/{id}/next and POST /sessions/{id}/end. The route file stays thin and calls these.
  *
  * - create: dispatches by mode (the S31 mode split): drill to sessions/modes/drill.ts (S23's code),
- *   automated to modes/automated.ts, holdout to modes/holdout.ts; prediction and range_paint answer
+ *   automated to modes/automated.ts, holdout to modes/holdout.ts (which ends the user's open holdout
+ *   session through endLockedSession first, PR #27 review HIGH 1); prediction and range_paint answer
  *   501 naming S27 (O-249).
  * - next: pure (the S23 binding rule). It derives the prompt from the persisted state with the
  *   session's holdout guard (derive-settings.ts, read only) and writes nothing; two calls in a row
@@ -25,7 +26,7 @@ import { requireDatabase } from "../http/database.js";
 import { idempotentWrite } from "../http/idempotent-write.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { resumePendingBlock } from "../automated/resume-block.js";
-import type { LearningHooks, PreparedLearning } from "../learning/effects.js";
+import { EMPTY_PREPARED_LEARNING, type LearningHooks, type PreparedLearning } from "../learning/effects.js";
 import { prepareLearning } from "../learning/prepare.js";
 import type { Database } from "../db.js";
 import type { recapSchema } from "../schemas/training.js";
@@ -35,7 +36,7 @@ import { deriveSettingsFor } from "./derive-settings.js";
 import { transition } from "./machine.js";
 import { createAutomatedSession } from "./modes/automated.js";
 import { createDrillSession } from "./modes/drill.js";
-import { createHoldoutSession } from "./modes/holdout.js";
+import { createHoldoutSession, type ReplaceOpenSession } from "./modes/holdout.js";
 import { sessionEndedProblem } from "./problems.js";
 import { toPrompt, type Prompt } from "./prompt.js";
 import { findSession, lockSession, recapStats, writeState, type SessionRow } from "./repository.js";
@@ -81,12 +82,31 @@ export async function createSession(call: SessionCall, body: SessionCreateBody, 
     case "automated":
       return createAutomatedSession(call, body, clock.now);
     case "holdout":
-      return createHoldoutSession(call, body, clock);
+      return createHoldoutSession(call, body, clock, replaceOpenHoldout(call, clock));
     default:
       throw new ProblemError(HTTP_STATUS.notImplemented, PROBLEM_SLUGS.notImplemented, {
         detail: `${body.mode} sessions are built by ${S27}; S23 serves drill sessions (O-249).`,
       });
   }
+}
+
+/**
+ * PR #27 review HIGH 1: a holdout create ends the user's open holdout session through the shared end
+ * path, so its served item is skipped exactly as a POST end skips it. Nothing is prepared: a holdout
+ * session's end hooks read no prepared context (only the holdout part acts on it, writing the skip).
+ */
+function replaceOpenHoldout(call: SessionCall, clock: CreateClock): ReplaceOpenSession {
+  return async (transaction, sessionId) => {
+    await endLockedSession(transaction, {
+      hooks: call.app.learningHooks,
+      userId: call.userId,
+      sessionId,
+      now: clock.now,
+      timeZone: clock.timeZone,
+      solverQuery: call.app.solverQuery,
+      prepared: EMPTY_PREPARED_LEARNING,
+    });
+  };
 }
 
 async function requireSession(call: SessionCall, sessionId: string): Promise<SessionRow> {
@@ -175,6 +195,7 @@ export async function endSession(call: EndCall, sessionId: string): Promise<Reca
     session,
     now: call.now,
     log: call.request.log,
+    purpose: "end",
   });
   const end: SessionEnd = {
     hooks: call.app.learningHooks,

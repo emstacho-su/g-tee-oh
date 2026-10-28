@@ -261,6 +261,7 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
     session,
     now: decision.now,
     log: decision.request.log,
+    purpose: "decision",
   });
   return idempotentWrite(decision.app, decision.request, HTTP_STATUS.ok, async (transaction) => {
     const locked = await lockSession(transaction, decision.userId, session.id);

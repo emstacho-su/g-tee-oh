@@ -1,59 +1,53 @@
 /**
- * Serving holdout items in a session (R4.13, O-276): the seeded serving order, the hero spot that
- * replays an item, and the next item that still replays.
+ * Serving holdout items (R4.13, O-276, PR #27 review HIGH 1 and HIGH 4): the round's fixed serving
+ * order, the hero spot that replays an item, and the search for the next item that still replays.
  *
  * Mechanism:
- * - Order: a Fisher-Yates shuffle of the round's unanswered items driven by a SplitMix64 stream from
- *   the session seed XOR ORDER_STREAM_SALT (so the order and the hands' own draws never share a
- *   stream). The seed is always 64 random bits (the PM seed condition), so no client can preview it.
+ * - Order (HIGH 1): an item's place in a round is the sha256 of the round's order seed and the item
+ *   id, so the order is fixed per (user, round), the same for every session of the round, and an
+ *   item keeps its place when a later draw adds another track's items. The seed is 64 random bits
+ *   chosen when the round opens and never leaves the server, so no client can preview the order.
  * - Spot: an item replays at its stored line with its stored deal seed (HeroSpot.deal_seed, which
- *   deal-hand.ts deals in a single attempt). The line's history, as the prompt shows it, is the
- *   catalog's ClassSpot.history for that line (solver-query labels it; ADR 0004); an item whose class
- *   or line the catalog no longer lists has no spot.
- * - Servable: an item with a spot whose stored deal still yields its solution, node, seat and hand
- *   class (draw.ts replaysItem). An item that is not servable is skipped for the session; it stays
- *   unanswered in the round.
+ *   deal-hand.ts deals in a single attempt), with the line's history as solver-query labelled it at
+ *   the draw (holdout_item.history; ADR 0004). No class catalog is read.
+ * - Servable (HIGH 4): an item whose stored deal still yields its solution, node, seat and hand class
+ *   (draw.ts replaysItem). findServable walks the ordered items until one is servable. Only a
+ *   deterministic failure makes an item unservable for the round (O-334): a replay that mismatches
+ *   (another solution, node or seat, or the hand outside the node's range) or a 4xx from solver-query
+ *   (draw-port.ts isDeterministicReplayFailure). A transient failure (its per-call deadline, a network
+ *   error, a 5xx or 503) stops the search: that item and the ones after it stay untried (unresolved),
+ *   as they do when the caller's budget runs out, so a later search tries them again. It runs before
+ *   any transaction opens.
  */
-import { createSplitMix64 } from "@g-tee-oh/learning";
+import { createHash } from "node:crypto";
 
-import type { ClassCatalog } from "../automated/class-catalog.js";
-import { fromHex64, pickIndex } from "../sessions/randomness.js";
 import { heroSpotSchema, type HeroSpot } from "../sessions/state.js";
-import type { DrawPort } from "./draw-port.js";
+import { isDeterministicReplayFailure, type DrawPort } from "./draw-port.js";
 import { replaysItem } from "./draw.js";
 import type { HoldoutItem } from "./repository.js";
 
-/** Separates the serving-order stream from the session's hand draws (any fixed 64-bit value). */
-export const ORDER_STREAM_SALT = 0x686f_6c64_6f75_7431n;
+const ORDER_KEY_SEPARATOR = ":";
 
-/** The items in the session's serving order. */
-export function servingOrder<T>(items: readonly T[], seed: string): T[] {
-  const stream = createSplitMix64(fromHex64(seed) ^ ORDER_STREAM_SALT);
-  const order = [...items];
-  for (let last = order.length - 1; last > 0; last -= 1) {
-    const swap = pickIndex(stream.nextU64(), last + 1);
-    const held = order[last] as T;
-    order[last] = order[swap] as T;
-    order[swap] = held;
-  }
-  return order;
+function orderKey(orderSeed: string, itemId: string): string {
+  return createHash("sha256").update(`${orderSeed}${ORDER_KEY_SEPARATOR}${itemId}`).digest("hex");
 }
 
-/** The hero spot that replays the item, or undefined when the catalog no longer lists its line. */
-export function itemSpot(item: HoldoutItem, catalog: ClassCatalog): HeroSpot | undefined {
-  const option = catalog.byKey
-    .get(item.spotClassKey)
-    ?.options.find((candidate) => candidate.configId === item.configId && candidate.pair === item.pair);
-  const spot = option?.spots.find((candidate) => (candidate.line ?? null) === item.line && candidate.hero_position === item.heroPosition);
-  if (spot === undefined) {
-    return undefined;
-  }
+/** The items in the round's serving order (see the module doc); a new array. */
+export function roundOrder<T extends { id: string }>(items: readonly T[], orderSeed: string): T[] {
+  return items
+    .map((item) => ({ item, key: orderKey(orderSeed, item.id) }))
+    .sort((left, right) => left.key.localeCompare(right.key) || left.item.id.localeCompare(right.item.id))
+    .map((entry) => entry.item);
+}
+
+/** The hero spot that replays the item exactly. */
+export function itemSpot(item: HoldoutItem): HeroSpot {
   return heroSpotSchema.parse({
     config_id: item.configId,
     pair: item.pair,
     line: item.line,
     hero_seat: item.heroPosition,
-    history: spot.history.map((entry) => ({ position: entry.position, token: entry.token, label: entry.label })),
+    history: item.history.map((entry) => ({ position: entry.position, token: entry.token, label: entry.label })),
     deal_seed: item.dealSeed,
   });
 }
@@ -65,13 +59,58 @@ export interface ServableItem {
   rest: HoldoutItem[];
 }
 
-/** The first item of `ordered` that still replays, with the ones after it; undefined when none does. */
-export async function firstServable(ordered: readonly HoldoutItem[], catalog: ClassCatalog, port: DrawPort): Promise<ServableItem | undefined> {
-  for (const [index, item] of ordered.entries()) {
-    const spot = itemSpot(item, catalog);
-    if (spot !== undefined && (await replaysItem(item, port))) {
-      return { item, spot, rest: ordered.slice(index + 1) };
-    }
+/** What findServable found, in serving order. */
+export interface ServingSearch {
+  /** The first item that replays; undefined when none did (or the budget ran out first). */
+  next: ServableItem | undefined;
+  /** Items whose replay mismatched or failed deterministically: unservable for the round (O-334). */
+  unservable: HoldoutItem[];
+  /** Items a transient failure or the spent budget left untried: still unresolved (O-334). */
+  untried: HoldoutItem[];
+}
+
+export interface SearchOptions {
+  /** Fires when the search's whole budget is spent (the port's calls stop with it). */
+  budget: AbortSignal;
+  /** Called with each deterministic replay failure before the item is marked unservable. */
+  onReplayError: (item: HoldoutItem, error: unknown) => void;
+  /** Called with the transient replay failure that stops the search; the item stays unresolved (O-334). */
+  onTransientError: (item: HoldoutItem, error: unknown) => void;
+}
+
+type Replay = "servable" | "unservable" | "untried";
+
+async function tryReplay(item: HoldoutItem, port: DrawPort, options: SearchOptions): Promise<Replay> {
+  if (options.budget.aborted) {
+    return "untried";
   }
-  return undefined;
+  try {
+    return (await replaysItem(item, port)) ? "servable" : "unservable";
+  } catch (error: unknown) {
+    if (options.budget.aborted) {
+      return "untried";
+    }
+    if (!isDeterministicReplayFailure(error)) {
+      options.onTransientError(item, error);
+      return "untried";
+    }
+    options.onReplayError(item, error);
+    return "unservable";
+  }
+}
+
+/** The first item of `ordered` that still replays, with the ones it found unservable (see the module doc). */
+export async function findServable(ordered: readonly HoldoutItem[], port: DrawPort, options: SearchOptions): Promise<ServingSearch> {
+  const unservable: HoldoutItem[] = [];
+  for (const [index, item] of ordered.entries()) {
+    const replay = await tryReplay(item, port, options);
+    if (replay === "servable") {
+      return { next: { item, spot: itemSpot(item), rest: ordered.slice(index + 1) }, unservable, untried: [] };
+    }
+    if (replay === "untried") {
+      return { next: undefined, unservable, untried: ordered.slice(index) };
+    }
+    unservable.push(item);
+  }
+  return { next: undefined, unservable, untried: [] };
 }

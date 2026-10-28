@@ -20,7 +20,10 @@ import { loadClassCatalog, type ClassCatalog } from "../automated/class-catalog.
 import type { Database } from "../db.js";
 import type { SessionRow } from "../sessions/repository.js";
 import type { SolverQuery } from "../solver-query/client.js";
-import type { LearningHooks, PreparedLearning } from "./effects.js";
+import type { LearningHooks, PreparedLearning, PreparePurpose } from "./effects.js";
+
+/** The purpose a caller that names none prepares for (grading/decide.ts). */
+const DEFAULT_PREPARE_PURPOSE: PreparePurpose = "decision";
 
 export interface PrepareRequest {
   /** A handle outside the transaction the hooks will run in (the catalog reads game_config). */
@@ -31,8 +34,10 @@ export interface PrepareRequest {
   /** The session row as read before the transaction. */
   session: SessionRow;
   now: Date;
-  /** Where a catalog failure is logged. */
+  /** Where a catalog failure (and any part's handled failure) is logged. */
   log: Pick<FastifyBaseLogger, "warn">;
+  /** A decision or an end (learning/effects.ts PreparePurpose); a decision unless the caller says end. */
+  purpose?: PreparePurpose;
 }
 
 async function catalogOrNull(request: PrepareRequest): Promise<ClassCatalog | null> {
@@ -50,7 +55,8 @@ async function catalogOrNull(request: PrepareRequest): Promise<ClassCatalog | nu
 /** The prepared learning context of one decision or end (see the module doc). */
 export async function prepareLearning(hooks: LearningHooks, request: PrepareRequest): Promise<PreparedLearning> {
   const catalog = hooks.needsCatalog ? await catalogOrNull(request) : null;
-  const { database, solverQuery, userId, session, now } = request;
-  const parts = await hooks.prepareParts({ database, solverQuery, userId, session, now, catalog });
+  const { database, solverQuery, userId, session, now, log } = request;
+  const purpose = request.purpose ?? DEFAULT_PREPARE_PURPOSE;
+  const parts = await hooks.prepareParts({ database, solverQuery, userId, session, now, catalog, purpose, log });
   return Object.freeze({ catalog, parts });
 }

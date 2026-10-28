@@ -185,6 +185,7 @@ async function endInSavepoint(context: JobContext, planned: PlannedEnd, solverQu
       session,
       now: planned.endAt,
       log: context.services.log,
+      purpose: "end",
     });
     await endLockedSession(transaction, {
       hooks,

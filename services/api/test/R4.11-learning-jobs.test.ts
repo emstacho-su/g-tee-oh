@@ -310,7 +310,8 @@ describe("R4.11 the idle session closer (O-275)", () => {
     const user = await createTestUser(database);
     const sessions: string[] = [];
     for (let index = 0; index < 3; index += 1) {
-      sessions.push(await insertSessionRow(pool, { userId: user.id, mode: "holdout", learning: holdoutLearning(), startedAt: window.idleStart }));
+      // Automated: a user has at most one open holdout session (PR #27 review HIGH 1); the hooks are NO_LEARNING_HOOKS.
+      sessions.push(await insertSessionRow(pool, { userId: user.id, mode: "automated", learning: automatedLearning(CLASS), startedAt: window.idleStart }));
     }
     const services: JobServices = { solverQuery: fixtureSolverQuery(), learningHooks: NO_LEARNING_HOOKS, log };
     const kind = `test_${randomUUID()}`;
