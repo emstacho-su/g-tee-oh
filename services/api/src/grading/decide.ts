@@ -31,6 +31,11 @@
  *    loaded outside the lock (null when it cannot load) and reaches every hook as context.prepared.
  *    An automated session whose closed block waits for its next pick is 409 stale-state: the
  *    client fetches GET /next, which picks the block (automated/resume-block.ts).
+ * 6. S40 (R3.13, O-400): after the preview grade and before the transaction, the machine runs
+ *    forward from the decided state to the hand's end (deriveFinishedHand: the steps GET /next will
+ *    take, never dealing the next hand, writing nothing). When the decision ends the hand, its
+ *    hand_record is inserted right after the attempt, so it commits or rolls back with it; a replay
+ *    under the same Idempotency-Key returns the stored response and inserts nothing.
  */
 import {
   DIFFICULTY_BASE,
@@ -52,7 +57,17 @@ import type { decisionBodySchema } from "../schemas/training.js";
 import { pendingPickOf } from "../automated/block.js";
 import type { DecisionContext, GradeOverrides } from "../learning/effects.js";
 import { prepareLearning } from "../learning/prepare.js";
-import { actionAt, afterHeroDecision, deriveAwaitHero, type DerivedPrompt } from "../sessions/derive.js";
+import { insertHandRecord } from "../hands/repository.js";
+import {
+  actionAt,
+  afterHeroDecision,
+  deriveAwaitHero,
+  deriveFinishedHand,
+  stateAfterHeroAction,
+  type DerivedPrompt,
+  type DeriveSettings,
+  type FinishedHand,
+} from "../sessions/derive.js";
 import { deriveSettingsFor } from "../sessions/derive-settings.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
 import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-port.js";
@@ -166,7 +181,13 @@ function gradeAtFor(decision: DecisionRequest, port: SolverPort, call: Omit<Grad
   return (actionIndex) => timed(decision.reply, SQ_GRADE_METRIC, () => port.grade({ ...call, action_index: actionIndex }));
 }
 
-async function gradeWithSolverQuery(session: SessionRow, decision: DecisionRequest, port: SolverPort): Promise<{ graded: Graded; gradeAt: GradeAt }> {
+interface Preview {
+  graded: Graded;
+  gradeAt: GradeAt;
+  settings: DeriveSettings;
+}
+
+async function gradeWithSolverQuery(session: SessionRow, decision: DecisionRequest, port: SolverPort): Promise<Preview> {
   const settings = await deriveSettingsFor(decision.app, decision.userId, session);
   const derived = await deriveAwaitHero(session.state, settings, port);
   const action = actionAt(derived.node, decision.body.action_index);
@@ -185,7 +206,18 @@ async function gradeWithSolverQuery(session: SessionRow, decision: DecisionReque
   const chosen = await gradeAt(action.index);
   const partial: Graded = { derived, action, chosen, member: { index: action.index, lossBb: chosen.loss_bb } };
   const previewIndex = policyOutput(session, partial, PREVIEW_RATED_TODAY).gradedActionIndex;
-  return { graded: await settleMember(partial, previewIndex, gradeAt), gradeAt };
+  return { graded: await settleMember(partial, previewIndex, gradeAt), gradeAt, settings };
+}
+
+/**
+ * S40 (O-400): the hand this decision ends, if it does, found before the transaction opens by
+ * running the machine forward from the decided state (sessions/derive.ts deriveFinishedHand). The
+ * hero's action and the derived prompt are the ones the transaction persists (settleMember only
+ * changes the graded member), and the run writes nothing, so the persisted state is unchanged.
+ */
+function finishedHandOf(session: SessionRow, preview: Preview, port: SolverPort): Promise<FinishedHand | null> {
+  const decided = stateAfterHeroAction(preview.graded.derived, preview.graded.action, session.settings.stop_rule);
+  return deriveFinishedHand(decided, preview.settings, port);
 }
 
 function attemptValues(
@@ -259,6 +291,7 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
   const session = await readForDecision(decision);
   const port = solverPort(requireSolverQuery(decision.app), decision.request);
   const preview = await gradeWithSolverQuery(session, decision, port);
+  const finished = await finishedHandOf(session, preview, port);
   const prepared = await prepareLearning(decision.app.learningHooks, {
     database: requireDatabase(decision.app),
     solverQuery: decision.app.solverQuery,
@@ -296,7 +329,11 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
     // The real ratedTodayInTrack may grade another member than the preview did: grade that one (MEDIUM 7).
     const graded = await settleMember(preview.graded, outcome.gradedActionIndex, preview.gradeAt);
     const row = await insertAttempt(transaction, attemptValues(session, decision, graded, outcome, overrides));
-    const next = afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
+    if (finished !== null) {
+      // S40 (O-400): the hand this decision ended is logged with it, all or nothing.
+      await insertHandRecord(transaction, { userId: decision.userId, sessionId: session.id, attemptId: row.id, hand: finished });
+    }
+    const next =afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
     const effects = await hooks.afterInsert({ ...context, attempt: row, outcome, overrides, next });
     const written = await writeState(transaction, {
       userId: decision.userId,
