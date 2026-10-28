@@ -19,7 +19,7 @@ import { coverageRequestResultSchema } from "../src/schemas/study.js";
 import { mutatingHeaders } from "./support/app.js";
 import {
   countCoverageRequests,
-  countRows,
+  countSpotRows,
   deleteBuildJobs,
   insertBuildJob,
   readBuildJob,
@@ -74,8 +74,11 @@ describe("R3.4 coverage request path (ADR 0018)", () => {
       const raisedId = await insertBuildJob(pool, { configId: CONFIG, pair: PAIR, flop: RAISED_FLOP, priority: 1.0 });
       const otherId = await insertBuildJob(pool, { configId: CONFIG, pair: PAIR, flop: OTHER_FLOP, priority: 5 });
       jobIds.push(raisedId, otherId);
-      const solutionsBefore = await countRows(pool, "solution");
-      const scenariosBefore = await countRows(pool, "scenario");
+      // Only this spot's rows are counted: other test files insert solution rows while vitest runs
+      // them in parallel, so a table-wide count was flaky ("expected 123 to be 120").
+      const spot = { configId: CONFIG, pair: PAIR, flop: RAISED_FLOP };
+      expect(await countSpotRows(pool, "solution", spot)).toBe(0);
+      expect(await countSpotRows(pool, "scenario", spot)).toBe(0);
 
       const response = await app.inject({
         method: "POST",
@@ -94,8 +97,8 @@ describe("R3.4 coverage request path (ADR 0018)", () => {
       expect(raised.priority).toBeGreaterThan(await maxOtherQueuedPriority(pool, raisedId));
       expect(raised.status).toBe("queued");
       expect(raised.locked_by).toBeNull();
-      expect(await countRows(pool, "solution")).toBe(solutionsBefore);
-      expect(await countRows(pool, "scenario")).toBe(scenariosBefore);
+      expect(await countSpotRows(pool, "solution", spot)).toBe(0);
+      expect(await countSpotRows(pool, "scenario", spot)).toBe(0);
 
       // The api source holds no child_process, execa or library-builder (exit 0, else this throws).
       const output = execFileSync("node", ["scripts/check-api-boundary.mjs"], {
