@@ -6,14 +6,16 @@
  * - next: pure. The session must be the caller's (404 otherwise, ADR 0001), of mode range_paint
  *   (409 wrong-session-mode) and not ended (409 session-ended); the prompt is derived from the
  *   session state (prompt.ts) and nothing is written, so two calls answer the same prompt.
- * - submit: one idempotent write (http/idempotent-write.ts, O-232). The session row is locked; the
- *   body's state_version must be the row's and its node_key the derived prompt's node (409
- *   stale-state otherwise, so a paint of an old prompt is never graded against a new one); the
- *   paint must cover the prompt's classes exactly with node actions (paint.ts, 400). solver-query's
- *   POST /v1/grade-range grades it, and every number of its answer is relayed unchanged (ADR 0004:
- *   the per-class losses, weights and their sum are Rust's). The practice counter advances by one
- *   in the same transaction through the optimistic state write. Painting is unrated: no attempt
- *   row is written and no rating state is touched (O-300).
+ * - submit: first, with no lock held, the session is read, the body's state_version must be the
+ *   row's and its node_key the derived prompt's node (409 stale-state otherwise, so a paint of an
+ *   old prompt is never graded against a new one), the paint must cover the prompt's classes
+ *   exactly with node actions (paint.ts, 400), and solver-query's POST /v1/grade-range grades it;
+ *   every number of its answer is relayed unchanged (ADR 0004: the per-class losses, weights and
+ *   their sum are Rust's). Then one idempotent write (http/idempotent-write.ts, O-232) locks the
+ *   row, re-checks its version (409 stale-state when another submit won meanwhile) and advances
+ *   the practice counter by one through the optimistic state write, so no row lock is held across
+ *   a solver-query call (PR #29 review M5). Painting is unrated: no attempt row is written and no
+ *   rating state is touched (O-300).
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
@@ -86,24 +88,44 @@ function toResult(sessionId: string, stateVersion: number, grade: SqGradeRange):
   };
 }
 
-/** Grades the painted range and advances the session in one idempotent write; unrated (O-300). */
+/** The session as the body names it, unlocked: the caller's, paintable and at the body's version. */
+async function readForPaint(call: PaintCall, body: RangePaintBody): Promise<SessionRow> {
+  const session = requirePaintable(await findSession(requireDatabase(call.app), call.userId, body.session_id));
+  if (session.stateVersion !== body.state_version) {
+    throw staleStateProblem();
+  }
+  return session;
+}
+
+/** The prompt derived and the paint graded, every solver-query call made before any lock is taken. */
+async function gradeOutsideLock(call: PaintCall, session: SessionRow, body: RangePaintBody): Promise<SqGradeRange> {
+  const port = solverPort(requireSolverQuery(call.app), call.request);
+  const prompt = await derivePaintPrompt(session, port);
+  if (prompt.node_key !== body.node_key) {
+    throw staleStateProblem();
+  }
+  return port.gradeRange(prompt.solution_id, prompt.node_key, paintedHands(prompt, body.paint));
+}
+
+/**
+ * Grades the painted range and advances the session; unrated (O-300). The upstream reads run
+ * first, outside the transaction, then the row is locked and its version re-checked, so no row
+ * lock is held across a solver-query call and a submit that won in between makes this one 409
+ * stale-state (PR #29 review M5, the pattern of grading/decide.ts).
+ */
 export async function submitPaint(call: PaintCall, body: RangePaintBody): Promise<RangePaintResult> {
+  const session = await readForPaint(call, body);
+  const grade = await gradeOutsideLock(call, session, body);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, async (transaction) => {
-    const session = requirePaintable(await lockSession(transaction, call.userId, body.session_id));
-    if (session.stateVersion !== body.state_version) {
+    const locked = requirePaintable(await lockSession(transaction, call.userId, session.id));
+    if (locked.stateVersion !== session.stateVersion) {
       throw staleStateProblem();
     }
-    const port = solverPort(requireSolverQuery(call.app), call.request);
-    const prompt = await derivePaintPrompt(session, port);
-    if (prompt.node_key !== body.node_key) {
-      throw staleStateProblem();
-    }
-    const grade = await port.gradeRange(prompt.solution_id, prompt.node_key, paintedHands(prompt, body.paint));
     const written = await writeState(transaction, {
       userId: call.userId,
       sessionId: session.id,
       expectedVersion: session.stateVersion,
-      state: advanced(session.state),
+      state: advanced(locked.state),
     });
     if (written === undefined) {
       throw staleStateProblem();

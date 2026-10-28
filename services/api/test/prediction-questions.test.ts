@@ -107,13 +107,16 @@ describe("R3.16 hand regions", () => {
 });
 
 describe("R3.16 prompt identity and draws", () => {
-  it("R3.16 the prompt id is a deterministic version 8 UUID per session and counter", () => {
+  it("R3.16 the prompt id is a deterministic version 8 UUID per session, counter, ladder and level (PR #29 review M6)", () => {
     const session = "0192f0a0-0000-7000-8000-000000000001";
-    const first = promptIdOf(session, 0);
+    const shown = { ladder: "range", level: 1 } as const;
+    const first = promptIdOf(session, 0, shown);
     expect(uuidSchema.safeParse(first).success).toBe(true);
     expect(first[14]).toBe("8");
-    expect(promptIdOf(session, 0)).toBe(first);
-    expect(promptIdOf(session, 1)).not.toBe(first);
+    expect(promptIdOf(session, 0, shown)).toBe(first);
+    expect(promptIdOf(session, 1, shown)).not.toBe(first);
+    expect(promptIdOf(session, 0, { ladder: "range", level: 2 })).not.toBe(first);
+    expect(promptIdOf(session, 0, { ladder: "hand", level: 1 })).not.toBe(first);
   });
 
   it("R3.16 draws replay from the seed and differ by counter", () => {

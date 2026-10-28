@@ -281,6 +281,36 @@ describe("R3.16 prediction routes", () => {
     expect(prompt).toMatchObject({ ladder: "range", level: 2, answer_kind: "percent" });
   });
 
+  it("R3.16 an open level 1 prompt stays answerable as shown after another session of the user unlocks level 2 (PR #29 review M6)", async () => {
+    const player = await newPlayer(database);
+    const drillId = await createDrill(app, player, predictionDrill());
+    const sessionA = await startPrediction(player, drillId);
+    const sessionB = await startPrediction(player, drillId);
+    const shown = await next(player, sessionA);
+    expect(shown).toMatchObject({ ladder: "range", level: 1, answer_kind: "yes_no" });
+    // Session B holds all but one answer of a full correct range level 1 window; its next range answer unlocks level 2.
+    await pool.query(
+      `insert into prediction_answer (user_id, session_id, spot_class_key, ladder, level, correct, created_at)
+       select $1, $2, $3, 'range', 1, true, now() - make_interval(secs => g) from generate_series($4::int, 1, -1) g`,
+      [player.userId, sessionB, shown.spot_class_key, WINDOW - 1],
+    );
+    const unlock = await answerOne(player, sessionB, true);
+    expect(unlock.prompt).toMatchObject({ ladder: "range", level: 1 });
+    expect(unlock.result).toMatchObject({ next_level_unlocked: true, new_level: 2 });
+    const response = await post(player, sessionA, {
+      prompt_id: shown.prompt_id,
+      state_version: shown.state_version,
+      answer: answerFor(shown, await nodeOf(shown), true),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const result = predictionResultSchema.parse(response.json());
+    expect(result).toMatchObject({ prompt_id: shown.prompt_id, correct: true, ladder: "range", level: 1, new_level: 2 });
+    expect(result.truth.share_pct).not.toBeNull();
+    const stored = await pool.query("select ladder, level, correct from prediction_answer where session_id = $1", [sessionA]);
+    expect(stored.rows).toEqual([{ ladder: "range", level: 1, correct: true }]);
+    expect(await next(player, sessionA)).toMatchObject({ state_version: shown.state_version + 1 });
+  });
+
   it("R3.16 a prediction session writes no attempt and touches no rating, schedule, mastery, leak or streak row", async () => {
     const player = await newPlayer(database);
     const sessionId = await startPrediction(player);

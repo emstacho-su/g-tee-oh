@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import type { PredictionAnswerRecord } from "@g-tee-oh/learning";
 
 import { HTTP_STATUS, ProblemError } from "../src/http/problem.js";
-import { derivePrediction, type HistoryReader } from "../src/prediction/derive.js";
+import { derivePrediction, deriveShownPrediction, promptIdOf, type HistoryReader } from "../src/prediction/derive.js";
 import type { TrainerSettings } from "../src/schemas/drills.js";
 import type { SqDeal, SqNode } from "../src/solver-query/client.js";
 import type { SessionRow } from "../src/sessions/repository.js";
@@ -156,5 +156,22 @@ describe("R3.16 prediction derivation over a fake solver-query", () => {
     expect(derived.spotClassKey).toBe("unclassified");
     expect(asked).toEqual(["unclassified"]);
     expect(derived.counter).toBe(1);
+  });
+
+  it("R3.16 a prompt id rebuilds the question at the level it was shown, whatever the history reads now (PR #29 review M6)", async () => {
+    const shown = await derivePrediction(session(0), fakePort(deal(), node()), NO_HISTORY);
+    expect(shown.question).toMatchObject({ ladder: "range", level: 1, answer_kind: "yes_no" });
+    const rebuilt = await deriveShownPrediction(session(0), fakePort(deal(), node()), shown.promptId);
+    expect(rebuilt).toEqual(shown);
+    const levelTwoId = promptIdOf(session(0).id, 0, { ladder: "range", level: 2 });
+    const levelTwo = await deriveShownPrediction(session(0), fakePort(deal(), node()), levelTwoId);
+    expect(levelTwo?.question).toMatchObject({ ladder: "range", level: 2, answer_kind: "percent" });
+  });
+
+  it("R3.16 a prompt id of another counter or session matches no question of this counter (PR #29 review M6)", async () => {
+    const older = promptIdOf(session(0).id, 0, { ladder: "range", level: 1 });
+    expect(await deriveShownPrediction(session(1), fakePort(deal(), node()), older)).toBeUndefined();
+    const elsewhere = promptIdOf("0192f0a0-0000-7000-8000-00000000ffff", 0, { ladder: "range", level: 1 });
+    expect(await deriveShownPrediction(session(0), fakePort(deal(), node()), elsewhere)).toBeUndefined();
   });
 });

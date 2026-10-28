@@ -4,9 +4,11 @@
  * - next: the user's session (404 otherwise), of mode prediction (409 wrong-session-mode), not
  *   ended (409 session-ended); the prompt is derived (derive.ts) and nothing is written, so two
  *   calls answer the same prompt. The truth never leaves the server here (predict before peek).
- * - answer: the same checks, then the body's state_version and prompt_id must be the session's
- *   current ones (409 stale-state otherwise). The prompt is derived again, the answer judged
- *   (judge.ts), and in one idempotentWrite transaction the session row is locked and its version
+ * - answer: the same checks, then the body's state_version must be the session's and its prompt_id
+ *   one of the current counter's (409 stale-state otherwise). The prompt is rebuilt at the ladder
+ *   and level its id was shown at, not the level the history reads now, so an unlock from another
+ *   session of the user never makes an open prompt unanswerable (derive.ts, PR #29 review M6).
+ *   The answer is judged (judge.ts), and in one idempotentWrite transaction the session row is locked and its version
  *   checked again, one prediction_answer row is inserted and the state is written with the counter
  *   advanced (state_version moves). The level after the answer is learning's levelFor over the
  *   stored answers, so next_level_unlocked is true exactly for the answer that crossed. The
@@ -27,7 +29,7 @@ import { requireSolverQuery } from "../solver-query/client.js";
 import { requireSessionMode, sessionEndedProblem } from "../sessions/problems.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
 import { solverPort } from "../sessions/solver-port.js";
-import { derivePrediction, type DerivedPrediction } from "./derive.js";
+import { derivePrediction, deriveShownPrediction, type DerivedPrediction } from "./derive.js";
 import { judgeAnswer } from "./judge.js";
 import { answerHistory, insertAnswer } from "./repository.js";
 
@@ -99,17 +101,27 @@ export async function nextPrediction(call: PredictionCall, sessionId: string): P
   return toPrompt(session, await derive(call, session));
 }
 
-function requireCurrent(session: SessionRow, derived: DerivedPrediction, body: PredictionAnswerBody): void {
-  if (session.stateVersion !== body.state_version || derived.promptId !== body.prompt_id) {
+/**
+ * The prompt the body answers, as it was shown: the session's current version and a prompt id of
+ * its current counter, rebuilt at the ladder and level the GET showed it at, never the level the
+ * history reads now (PR #29 review M6). Anything else is 409 stale-state, so the client moves on.
+ */
+async function shownPrompt(call: PredictionCall, session: SessionRow, body: PredictionAnswerBody): Promise<DerivedPrediction> {
+  if (session.stateVersion !== body.state_version) {
     throw staleStateProblem();
   }
+  const port = solverPort(requireSolverQuery(call.app), call.request);
+  const derived = await deriveShownPrediction(session, port, body.prompt_id);
+  if (derived === undefined) {
+    throw staleStateProblem();
+  }
+  return derived;
 }
 
 /** POST /prediction/{session}/answer: judged, recorded unrated, the counter advanced. */
 export async function answerPrediction(call: PredictionCall, sessionId: string, body: PredictionAnswerBody): Promise<PredictionResult> {
   const session = await readPredictionSession(call, sessionId);
-  const derived = await derive(call, session);
-  requireCurrent(session, derived, body);
+  const derived = await shownPrompt(call, session, body);
   const correct = judgeAnswer(derived.question, derived.node, body.answer);
   const { question, spotClassKey } = derived;
   return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, async (transaction) => {
