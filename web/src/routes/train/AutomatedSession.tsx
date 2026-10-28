@@ -92,8 +92,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
-          <SpotTable prompt={prompt} replay={replay} />
           <DecisionArea
+            table={<SpotTable prompt={prompt} replay={replay} />}
             state={state}
             prompt={prompt}
             grouping={grouping}

@@ -17,6 +17,8 @@
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
  * available (S26).
  */
+import type { ReactNode } from "react";
+
 import {
   ActionBar,
   FeedbackPanel,
@@ -48,6 +50,8 @@ export interface DecisionAreaProps {
    * A click on the table or an action key finishes the replay at once (useActionReplay).
    */
   replaying?: boolean;
+  /** The table (SpotTable), drawn at the top of the left column (S38 layout). */
+  table?: ReactNode;
   /** Choosing an action submits the decision (O-345). */
   onChoose: (actionIndex: number) => void;
   onNext: () => void;
@@ -111,17 +115,35 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
   );
 }
 
+/**
+ * Layout (S38, rows 6 and 31): from 1024 px the screen is two columns, the table, the roll scale and
+ * the action bar on the left and the feedback in a right column of at most 28rem, which a quiet
+ * placeholder holds before the decision so the table never jumps when the feedback arrives; below
+ * that everything stacks and the placeholder is not shown.
+ */
+const COLUMNS_CLASS = "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]";
+
 export function DecisionArea(props: DecisionAreaProps) {
-  const { state, prompt, grouping, interactive, replaying = false, onChoose, onExplain } = props;
+  const { state, prompt, grouping, interactive, replaying = false, table, onChoose, onExplain } = props;
   const choosing = state.kind === "await_action" && !replaying;
   const roll = BEFORE_DECISION.has(state.kind) ? prompt.rng_roll : null;
   return (
-    <div className="flex flex-col gap-3" data-testid="decision-area">
-      {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
-      {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
-      <ActionBar actions={prompt.buttons} grouping={grouping} street={prompt.street} disabled={!choosing || !interactive} onAction={onChoose} />
-      {state.kind === "submitting" ? <LoadingNote text={SESSION_TEXT.grading} /> : null}
-      <Feedback {...props} />
+    <div className={COLUMNS_CLASS} data-testid="decision-area">
+      <div className="flex min-w-0 flex-col gap-3">
+        {table}
+        {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
+        {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
+        <ActionBar actions={prompt.buttons} grouping={grouping} street={prompt.street} disabled={!choosing || !interactive} onAction={onChoose} />
+        {state.kind === "submitting" ? <LoadingNote text={SESSION_TEXT.grading} /> : null}
+      </div>
+      <div className="flex min-w-0 flex-col gap-3">
+        {state.kind === "feedback" ? null : (
+          <p data-testid="feedback-placeholder" className="hidden rounded-2xl border border-dashed border-border p-4 text-sm text-muted lg:block">
+            {SESSION_TEXT.feedbackPlaceholder}
+          </p>
+        )}
+        <Feedback {...props} />
+      </div>
     </div>
   );
 }

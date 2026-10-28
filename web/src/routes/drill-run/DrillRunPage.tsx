@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
@@ -102,8 +102,8 @@ function InSession({ drill, session, replay, interactive, onAskEnd, onExplain, o
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
-          <SpotTable prompt={prompt} replay={replay} />
           <DecisionArea
+            table={<SpotTable prompt={prompt} replay={replay} />}
             state={state}
             prompt={prompt}
             grouping={drill.trainer.grouping}
@@ -196,7 +196,7 @@ export function DrillRunPage({ drillId, seed: rawSeed }: DrillRunPageProps) {
   const { seed } = validateDrillRunSearch(rawSeed === undefined ? {} : { seed: rawSeed });
   return (
     <section className="flex flex-col gap-4" data-drill-id={drillId}>
-      <h1 className="text-2xl font-semibold">{SESSION_TEXT.heading}</h1>
+      <PageHeader title={SESSION_TEXT.heading} />
       {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
       {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
       {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}
