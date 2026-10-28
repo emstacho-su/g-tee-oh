@@ -1,0 +1,2615 @@
+[
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 0,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Qc",
+        "4d"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 80,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.00083618,
+      "ev_loss_bb": 0.4452,
+      "ev_loss_pct_pot": 29.68,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.4452
+      ],
+      "rated": false,
+      "rng_roll": 80,
+      "state_version": 1
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 1,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "6d",
+        "2c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 39,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 7.273731e-11,
+      "ev_loss_bb": 1.42065,
+      "ev_loss_pct_pot": 94.71,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.42065
+      ],
+      "rated": false,
+      "rng_roll": 39,
+      "state_version": 2
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 2,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "7c",
+        "3s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 29,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 3.73103e-10,
+      "ev_loss_bb": 1.32255,
+      "ev_loss_pct_pot": 88.17,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.32255
+      ],
+      "rated": false,
+      "rng_roll": 29,
+      "state_version": 3
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 3,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "8s",
+        "7c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 30,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.000047648155,
+      "ev_loss_bb": 0.6171,
+      "ev_loss_pct_pot": 41.14,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.6171
+      ],
+      "rated": false,
+      "rng_roll": 30,
+      "state_version": 4
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 4,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "9d",
+        "4h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 92,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 5.1376676e-9,
+      "ev_loss_bb": 1.1652,
+      "ev_loss_pct_pot": 77.68,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.1652
+      ],
+      "rated": false,
+      "rng_roll": 92,
+      "state_version": 5
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 5,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "8d",
+        "7h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 43,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.000047648155,
+      "ev_loss_bb": 0.6171,
+      "ev_loss_pct_pot": 41.14,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.6171
+      ],
+      "rated": false,
+      "rng_roll": 43,
+      "state_version": 6
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 6,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ah",
+        "9s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 88,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        0.000026267624,
+        0.51392627
+      ],
+      "rated": false,
+      "rng_roll": 88,
+      "state_version": 7
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 7,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ad",
+        "4h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 13,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.00006919405,
+        0.2195308
+      ],
+      "rated": false,
+      "rng_roll": 13,
+      "state_version": 8
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 8,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Kc",
+        "5c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 8,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.00004409461,
+        0.1952559
+      ],
+      "rated": false,
+      "rng_roll": 8,
+      "state_version": 9
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 9,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Td",
+        "2d"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 8,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0000022565653,
+      "ev_loss_bb": 0.8001,
+      "ev_loss_pct_pot": 53.34,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.8001
+      ],
+      "rated": false,
+      "rng_roll": 8,
+      "state_version": 10
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 10,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Qc",
+        "5s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 99,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.013888882,
+      "ev_loss_bb": 0.2766,
+      "ev_loss_pct_pot": 18.44,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.2766
+      ],
+      "rated": false,
+      "rng_roll": 99,
+      "state_version": 11
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 11,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "7c",
+        "2s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 2,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 6.6983047e-12,
+      "ev_loss_bb": 1.56375,
+      "ev_loss_pct_pot": 104.25,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.56375
+      ],
+      "rated": false,
+      "rng_roll": 2,
+      "state_version": 12
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 12,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Kh",
+        "9d"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 30,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        0.00006609335,
+        0.3261661
+      ],
+      "rated": false,
+      "rng_roll": 30,
+      "state_version": 13
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 13,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "As",
+        "6h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 75,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.000005974245,
+        0.32444403
+      ],
+      "rated": false,
+      "rng_roll": 75,
+      "state_version": 14
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 14,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "As",
+        "6h"
+      ],
+      "board": [],
+      "pot_cbb": 1300,
+      "stacks_cbb": [
+        9000,
+        9750
+      ],
+      "history": [
+        {
+          "position": "BTN",
+          "token": "r250",
+          "label": "Raise to 2.5bb"
+        },
+        {
+          "position": "BB",
+          "token": "r1000",
+          "label": "Raise to 10bb"
+        }
+      ],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "c",
+          "kind": "call",
+          "size_cbb": 1000,
+          "bucket": null,
+          "label": "Call"
+        },
+        {
+          "index": 2,
+          "token": "r2200",
+          "kind": "raise",
+          "size_cbb": 2200,
+          "bucket": "overbet-large",
+          "label": "Raise to 22bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 58,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.056134764,
+      "ev_loss_bb": 1.5236,
+      "ev_loss_pct_pot": 11.72,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.5236,
+        -3.8207
+      ],
+      "rated": false,
+      "rng_roll": 58,
+      "state_version": 15
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 15,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Jd",
+        "7c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 6,
+      "previous_board": [
+        "Js",
+        "5c",
+        "6s"
+      ]
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0047759297,
+      "ev_loss_bb": 0.34065,
+      "ev_loss_pct_pot": 22.71,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.34065
+      ],
+      "rated": false,
+      "rng_roll": 6,
+      "state_version": 16
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 16,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "7d",
+        "5c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 5,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 6.1663012e-9,
+      "ev_loss_bb": 1.15425,
+      "ev_loss_pct_pot": 76.95,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.15425
+      ],
+      "rated": false,
+      "rng_roll": 5,
+      "state_version": 17
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 17,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Qc",
+        "Jc"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 17,
+      "previous_board": [
+        "3d",
+        "4d",
+        "Th"
+      ]
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.000048975708,
+        0.46720102
+      ],
+      "rated": false,
+      "rng_roll": 17,
+      "state_version": 18
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 18,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "9d",
+        "8s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 32,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0023073244,
+      "ev_loss_bb": 0.3843,
+      "ev_loss_pct_pot": 25.62,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.3843
+      ],
+      "rated": false,
+      "rng_roll": 32,
+      "state_version": 19
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 19,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ac",
+        "9s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 27,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        0.000026267624,
+        0.51392627
+      ],
+      "rated": false,
+      "rng_roll": 27,
+      "state_version": 20
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 20,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Jh",
+        "5c"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 74,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.000024936782,
+      "ev_loss_bb": 0.65595,
+      "ev_loss_pct_pot": 43.73,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.65595
+      ],
+      "rated": false,
+      "rng_roll": 74,
+      "state_version": 21
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 21,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "8s",
+        "6d"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 93,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 6.7458603e-7,
+      "ev_loss_bb": 0.87255,
+      "ev_loss_pct_pot": 58.17,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.87255
+      ],
+      "rated": false,
+      "rng_roll": 93,
+      "state_version": 22
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 22,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Kc",
+        "7s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 65,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0.05882353,
+        0.9411765
+      ],
+      "ev_by_action": [
+        0.000040686595,
+        0.06424069
+      ],
+      "rated": false,
+      "rng_roll": 65,
+      "state_version": 23
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 23,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Kc",
+        "7s"
+      ],
+      "board": [],
+      "pot_cbb": 1300,
+      "stacks_cbb": [
+        9000,
+        9750
+      ],
+      "history": [
+        {
+          "position": "BTN",
+          "token": "r250",
+          "label": "Raise to 2.5bb"
+        },
+        {
+          "position": "BB",
+          "token": "r1000",
+          "label": "Raise to 10bb"
+        }
+      ],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "c",
+          "kind": "call",
+          "size_cbb": 1000,
+          "bucket": null,
+          "label": "Call"
+        },
+        {
+          "index": 2,
+          "token": "r2200",
+          "kind": "raise",
+          "size_cbb": 2200,
+          "bucket": "overbet-large",
+          "label": "Raise to 22bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 5,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0007770546,
+      "ev_loss_bb": 3.7492,
+      "ev_loss_pct_pot": 28.84,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -3.7492,
+        -6.3466
+      ],
+      "rated": false,
+      "rng_roll": 5,
+      "state_version": 24
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 24,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Qs",
+        "3s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 92,
+      "previous_board": [
+        "2h",
+        "Ts",
+        "Tc"
+      ]
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.005317954,
+      "ev_loss_bb": 0.3342,
+      "ev_loss_pct_pot": 22.28,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.3342
+      ],
+      "rated": false,
+      "rng_roll": 92,
+      "state_version": 25
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 25,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ad",
+        "7d"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 24,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        0.000007957458,
+        0.54975796
+      ],
+      "rated": false,
+      "rng_roll": 24,
+      "state_version": 26
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 26,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ad",
+        "7d"
+      ],
+      "board": [],
+      "pot_cbb": 1300,
+      "stacks_cbb": [
+        9000,
+        9750
+      ],
+      "history": [
+        {
+          "position": "BTN",
+          "token": "r250",
+          "label": "Raise to 2.5bb"
+        },
+        {
+          "position": "BB",
+          "token": "r1000",
+          "label": "Raise to 10bb"
+        }
+      ],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "c",
+          "kind": "call",
+          "size_cbb": 1000,
+          "bucket": null,
+          "label": "Call"
+        },
+        {
+          "index": 2,
+          "token": "r2200",
+          "kind": "raise",
+          "size_cbb": 2200,
+          "bucket": "overbet-large",
+          "label": "Raise to 22bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 36,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1,
+        0
+      ],
+      "ev_by_action": [
+        -0.00023491221,
+        0.9630651,
+        -1.045435
+      ],
+      "rated": false,
+      "rng_roll": 36,
+      "state_version": 27
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 27,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Jc",
+        "6s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 59,
+      "previous_board": [
+        "2c",
+        "4d",
+        "Th"
+      ]
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.00094515027,
+      "ev_loss_bb": 0.43785,
+      "ev_loss_pct_pot": 29.19,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.43785
+      ],
+      "rated": false,
+      "rng_roll": 59,
+      "state_version": 28
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 28,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ts",
+        "4h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 19,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0000051363563,
+      "ev_loss_bb": 0.75075,
+      "ev_loss_pct_pot": 50.05,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.75075
+      ],
+      "rated": false,
+      "rng_roll": 19,
+      "state_version": 29
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 29,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Tc",
+        "4s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 31,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0000051363563,
+      "ev_loss_bb": 0.75075,
+      "ev_loss_pct_pot": 50.05,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.75075
+      ],
+      "rated": false,
+      "rng_roll": 31,
+      "state_version": 30
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 30,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "7h",
+        "3s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 60,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 3.73103e-10,
+      "ev_loss_bb": 1.32255,
+      "ev_loss_pct_pot": 88.17,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.32255
+      ],
+      "rated": false,
+      "rng_roll": 60,
+      "state_version": 31
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 31,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ad",
+        "Tc"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 39,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        0.000010410309,
+        0.6277604
+      ],
+      "rated": false,
+      "rng_roll": 39,
+      "state_version": 32
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 32,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ad",
+        "Tc"
+      ],
+      "board": [],
+      "pot_cbb": 1300,
+      "stacks_cbb": [
+        9000,
+        9750
+      ],
+      "history": [
+        {
+          "position": "BTN",
+          "token": "r250",
+          "label": "Raise to 2.5bb"
+        },
+        {
+          "position": "BB",
+          "token": "r1000",
+          "label": "Raise to 10bb"
+        }
+      ],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "c",
+          "kind": "call",
+          "size_cbb": 1000,
+          "bucket": null,
+          "label": "Call"
+        },
+        {
+          "index": 2,
+          "token": "r2200",
+          "kind": "raise",
+          "size_cbb": 2200,
+          "bucket": "overbet-large",
+          "label": "Raise to 22bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 10,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1,
+        0
+      ],
+      "ev_by_action": [
+        -0.00010662498,
+        1.5117934,
+        -0.001406625
+      ],
+      "rated": false,
+      "rng_roll": 10,
+      "state_version": 33
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 33,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Td",
+        "3h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 83,
+      "previous_board": [
+        "6c",
+        "9h",
+        "4s"
+      ]
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 0.0000024384044,
+      "ev_loss_bb": 0.79545,
+      "ev_loss_pct_pot": 53.03,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -0.79545
+      ],
+      "rated": false,
+      "rng_roll": 83,
+      "state_version": 34
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 34,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Qs",
+        "8h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 45,
+      "previous_board": [
+        "6c",
+        "7h",
+        "5c"
+      ]
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0.26666668,
+        0.73333335
+      ],
+      "ev_by_action": [
+        -0.00001808909,
+        0.01753191
+      ],
+      "rated": false,
+      "rng_roll": 45,
+      "state_version": 35
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 35,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ah",
+        "2h"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 19,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.00006454983,
+        0.28658545
+      ],
+      "rated": false,
+      "rng_roll": 19,
+      "state_version": 36
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 36,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Ac",
+        "8s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 6,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.000023824357,
+        0.48912618
+      ],
+      "rated": false,
+      "rng_roll": 6,
+      "state_version": 37
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 37,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Jh",
+        "Js"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 68,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "best",
+      "score": 1,
+      "ev_loss_bb": 0,
+      "ev_loss_pct_pot": 0,
+      "best_action_indexes": [
+        1
+      ],
+      "freq_by_action": [
+        0,
+        1
+      ],
+      "ev_by_action": [
+        -0.00000710516,
+        0.7840429
+      ],
+      "rated": false,
+      "rng_roll": 68,
+      "state_version": 38
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 38,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "Jh",
+        "Js"
+      ],
+      "board": [],
+      "pot_cbb": 1300,
+      "stacks_cbb": [
+        9000,
+        9750
+      ],
+      "history": [
+        {
+          "position": "BTN",
+          "token": "r250",
+          "label": "Raise to 2.5bb"
+        },
+        {
+          "position": "BB",
+          "token": "r1000",
+          "label": "Raise to 10bb"
+        }
+      ],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "c",
+          "kind": "call",
+          "size_cbb": 1000,
+          "bucket": null,
+          "label": "Call"
+        },
+        {
+          "index": 2,
+          "token": "r2200",
+          "kind": "raise",
+          "size_cbb": 2200,
+          "bucket": "overbet-large",
+          "label": "Raise to 22bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 92,
+      "previous_board": null
+    },
+    "feedback": {
+      "label": "inaccuracy",
+      "score": 0.85641515,
+      "ev_loss_bb": 0.1066,
+      "ev_loss_pct_pot": 0.82,
+      "best_action_indexes": [
+        2
+      ],
+      "freq_by_action": [
+        0,
+        0.2627451,
+        0.7372549
+      ],
+      "ev_by_action": [
+        -0.00024740372,
+        2.4697526,
+        2.5763526
+      ],
+      "rated": false,
+      "rng_roll": 92,
+      "state_version": 39
+    }
+  },
+  {
+    "prompt": {
+      "state": "await_hero",
+      "state_version": 39,
+      "hero_position": "BTN",
+      "hero_hand": [
+        "6c",
+        "4s"
+      ],
+      "board": [],
+      "pot_cbb": 150,
+      "stacks_cbb": [
+        9900,
+        10000
+      ],
+      "history": [],
+      "buttons": [
+        {
+          "index": 0,
+          "token": "f",
+          "kind": "fold",
+          "size_cbb": 0,
+          "bucket": null,
+          "label": "Fold"
+        },
+        {
+          "index": 1,
+          "token": "r250",
+          "kind": "raise",
+          "size_cbb": 250,
+          "bucket": "overbet-large",
+          "label": "Raise to 2.5bb"
+        }
+      ],
+      "visible_panels": [
+        "hero_range_matrix"
+      ],
+      "street": "preflop",
+      "rng_roll": 92,
+      "previous_board": [
+        "3d",
+        "6c",
+        "7s"
+      ]
+    },
+    "feedback": {
+      "label": "blunder",
+      "score": 2.993712e-8,
+      "ev_loss_bb": 1.05945,
+      "ev_loss_pct_pot": 70.63,
+      "best_action_indexes": [
+        0
+      ],
+      "freq_by_action": [
+        1,
+        0
+      ],
+      "ev_by_action": [
+        0,
+        -1.05945
+      ],
+      "rated": false,
+      "rng_roll": 92,
+      "state_version": 40
+    }
+  }
+]
