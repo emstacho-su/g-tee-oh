@@ -4,7 +4,6 @@
  * does (O-272: blocks of a class, worked examples unrated; O-276: holdout never rated) in plain
  * words. A problem sentence is fixed per kind (S24 precedent), so no server detail is shown.
  */
-import { HTTP_STATUS } from "../../api/http-status.js";
 import { problemMessage, type SpotProblem } from "../../trainer/spot-problem.js";
 
 export type TrainMode = "automated" | "holdout";
@@ -66,16 +65,21 @@ const NO_CLASS_IN_SCOPE =
 const HOLDOUT_COMPLETE = "This month's retest is complete. The next round opens on the first of next month.";
 const NO_HOLDOUT_ITEMS = "No retest spots are drawn for this round yet. Try again later.";
 
+/** The api's holdout start problems (services/api/src/http/problem.ts, S31) and their sentences. */
+export const HOLDOUT_START_MESSAGES: Readonly<Record<string, string>> = {
+  "holdout-complete": HOLDOUT_COMPLETE,
+  "no-holdout-items": NO_HOLDOUT_ITEMS,
+};
+
 /**
  * The sentence for a problem on /train. An automated start refused with 422 no-coverage names the
- * scope, not a drill. A holdout start answers 409 holdout-complete or 422 no-holdout-items, which
- * spot-problem.ts classifies as "other" with their status; any other problem keeps its sentence.
+ * scope, not a drill. A holdout start (onStart: the start panel is showing) refused with the
+ * holdout-complete or no-holdout-items slug gets its own sentence, chosen by slug, never by the
+ * bare status, so a 422 validation or a 409 idempotency conflict, and any problem of a running
+ * retest, keeps the trainer's generic sentence.
  */
-export function trainProblemMessage(mode: TrainMode, problem: SpotProblem): string {
+export function trainProblemMessage(mode: TrainMode, problem: SpotProblem, onStart: boolean): string {
   if (problem.kind === "no_coverage") return NO_CLASS_IN_SCOPE;
-  if (mode === "holdout" && problem.kind === "other") {
-    if (problem.status === HTTP_STATUS.conflict) return HOLDOUT_COMPLETE;
-    if (problem.status === HTTP_STATUS.unprocessable) return NO_HOLDOUT_ITEMS;
-  }
-  return problemMessage(problem);
+  const holdoutStart = mode === "holdout" && onStart && problem.slug !== undefined ? HOLDOUT_START_MESSAGES[problem.slug] : undefined;
+  return holdoutStart ?? problemMessage(problem);
 }

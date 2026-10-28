@@ -30,7 +30,8 @@ describe("R3.13 spot problem classification", () => {
     [new Error("boom"), "other", null],
     ["not an error", "other", null],
   ] as const)("R3.13 %s is %s", (error, kind, status) => {
-    expect(problemOf(error)).toEqual({ kind, status });
+    const expected = error instanceof ApiProblem && kind === "other" ? { kind, status, slug: error.slug } : { kind, status };
+    expect(problemOf(error)).toEqual(expected);
   });
 
   it("R3.13 only transient problems are retryable: network, timeouts, 502, 503, 409 in flight, a stale end", () => {

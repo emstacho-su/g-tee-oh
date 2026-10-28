@@ -46,14 +46,16 @@ export function onStartPanel(state: SpotState): boolean {
 export interface TrainAlertProps {
   mode: TrainMode;
   problem: SpotProblem;
+  /** True while the start panel shows, so a start problem gets its own sentence. */
+  onStart: boolean;
   canRetry: boolean;
   onRetry: () => void;
 }
 
-export function TrainAlert({ mode, problem, canRetry, onRetry }: TrainAlertProps) {
+export function TrainAlert({ mode, problem, onStart, canRetry, onRetry }: TrainAlertProps) {
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-danger px-3 py-2">
-      <p className="text-danger">{trainProblemMessage(mode, problem)}</p>
+      <p className="text-danger">{trainProblemMessage(mode, problem, onStart)}</p>
       {canRetry ? <Button onClick={onRetry}>{TRAIN_TEXT.retry}</Button> : null}
     </div>
   );

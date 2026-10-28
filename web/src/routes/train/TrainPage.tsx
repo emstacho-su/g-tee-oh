@@ -112,7 +112,7 @@ function TrainRun({ mode }: TrainPageProps) {
   const starting = state.kind === "starting";
   return (
     <>
-      {state.kind === "error" ? <TrainAlert mode={mode} problem={state.problem} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} /> : null}
+      {state.kind === "error" ? <TrainAlert mode={mode} problem={state.problem} onStart={startPanel} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} /> : null}
       {state.kind === "error" && startPanel && mode === "automated" ? <NoCoverageNote problem={state.problem} /> : null}
       {state.kind === "ended" ? <TrainingRecap recap={state.recap} onTrainAgain={trainAgain} {...(trackNames === undefined ? {} : { trackNames })} /> : null}
       {startPanel && mode === "automated" ? <AutomatedStart defaults={defaults} starting={starting} onStart={() => session.start(rng)} /> : null}

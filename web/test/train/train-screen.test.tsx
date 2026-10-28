@@ -196,4 +196,20 @@ describe("R4.10 holdout retest (O-328)", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("No retest spots are drawn for this round yet."));
     expect(screen.queryByRole("link", { name: "Open the library" })).not.toBeInTheDocument();
   });
+
+  it("R4.10 a 409 or 422 that is not a holdout problem gets the generic sentence, on start and in a running retest", async () => {
+    await renderTrain("holdout", {
+      [START_PATH]: [problemResponse(409, "idempotency-in-flight"), jsonResponse(201, fixtureHoldoutSession)],
+      [HOLDOUT_PATHS.next]: [jsonResponse(200, fixtureHoldoutPrompt(0, 1))],
+      [HOLDOUT_PATHS.decide]: [problemResponse(422, "validation")],
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Start the retest" }));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("retest is complete");
+    await userEvent.click(screen.getByRole("button", { name: "Start the retest" }));
+    await chooseFirstAction();
+    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The request failed (status 422).");
+    expect(alert).not.toHaveTextContent("No retest spots");
+  });
 });
