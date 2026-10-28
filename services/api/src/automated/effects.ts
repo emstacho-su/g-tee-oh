@@ -93,14 +93,17 @@ function afterInsertWith(writers: LearningStateWriters) {
       return {};
     }
     const { transaction, userId } = context;
-    const attempts = await blockAttempts(transaction, context.session.id, learning.block.served + 1);
     const recorded = recordDecision(learning);
     if (!isBlockComplete(recorded)) {
       return { statePatch: { learning: recorded } };
     }
+    // The block's attempts are read only to close it, and a seeded session closes nothing (PR #33 review round 1).
     const reviewBlock = recorded.seeded
       ? unwrittenClose(recorded.block.spot_class_key)
-      : await writers.closeReviewBlock(transaction, closeInput(context, recorded, attempts));
+      : await writers.closeReviewBlock(
+          transaction,
+          closeInput(context, recorded, await blockAttempts(transaction, context.session.id, recorded.block.served)),
+        );
     const closed = { statePatch: { learning: recorded }, feedbackExtras: { review_block: reviewBlock } };
     const catalog = context.prepared.catalog;
     if (catalog === null) {

@@ -86,6 +86,8 @@ export const fixturePracticeSession: PracticeSession = {
   state_version: fixturePrompt.state_version,
   started_at: FIXTURE_TIME,
   rated_eligible: false,
+  // The fixture drill grades with grouped grouping (fixtureDrill.trainer.grouping).
+  grouping: "grouped",
   automated: null,
   holdout: null,
 };

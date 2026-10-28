@@ -3,10 +3,11 @@
  *
  * The hand is a class the acting seat holds at the node (reach above 0, or none recorded), drawn
  * with the session's seeded generator. Then:
- * - level 1 (action): the hand's highest-EV action, the lowest loss_pct_pot of its row; every action
- *   within learning's LOSS_TIE_TOLERANCE_PCT_POT of that loss is correct, whatever the frequencies
- *   (ADR 0024 consequence 2, O-374). Levels 2 and 3 ask about frequency by their wording and keep
- *   the frequency rule.
+ * - level 1 (action): the hand's highest-EV action. An answer is correct when its loss is at or
+ *   below the node's floor, what grading labels Best or Correct (O-379); the reveal names the
+ *   lowest-loss action or actions (learning's lowestLossIndexes, the one tie rule, O-370) and lists
+ *   every correct action with its frequency (ADR 0024 consequence 2, O-374). Levels 2 and 3 ask
+ *   about frequency by their wording and keep the frequency rule.
  * - level 2 (band): the band (0 to 25, 25 to 50, 50 to 75, 75 to 100 percent; lower edge
  *   inclusive, 100 in the top band) of the hand's most frequent action (lowest index on a tie).
  * - level 3 (size): asked only when the node has two or more aggressive actions (bet, raise, all
@@ -14,7 +15,7 @@
  *   is correct (ties within the tolerance too). Otherwise the prompt falls back to level 2.
  * Every frequency and loss is solver-query's; only comparisons happen here (ADR 0004).
  */
-import { FREQUENCY_TIE_TOLERANCE, LOSS_TIE_TOLERANCE_PCT_POT } from "@g-tee-oh/learning";
+import { FREQUENCY_TIE_TOLERANCE, lowestLossIndexes } from "@g-tee-oh/learning";
 
 import { pickIndex } from "../sessions/randomness.js";
 import type { SqNode } from "../solver-query/client.js";
@@ -65,10 +66,15 @@ export function topIndexes(row: SqHandRow, indexes: readonly number[]): number[]
   return indexes.filter((index) => top - frequencyOf(row, index) <= FREQUENCY_TIE_TOLERANCE);
 }
 
-/** The indexes whose loss is the row's lowest within the loss tie tolerance: the highest EV (O-374). */
+/** The indexes whose loss is the row's lowest within learning's tie tolerance: the highest EV (O-374, O-370). */
 export function highestEvIndexes(row: SqHandRow, indexes: readonly number[]): number[] {
-  const lowest = Math.min(...indexes.map((index) => lossOf(row, index)));
-  return indexes.filter((index) => lossOf(row, index) - lowest <= LOSS_TIE_TOLERANCE_PCT_POT);
+  const positions = lowestLossIndexes(indexes.map((index) => lossOf(row, index)));
+  return indexes.filter((_, position) => positions.includes(position));
+}
+
+/** The indexes a level 1 answer may name: the highest EV and every action at or below the floor (O-379). */
+export function correctActionIndexes(row: SqHandRow, indexes: readonly number[], floorPctPot: number, best: readonly number[]): number[] {
+  return indexes.filter((index) => best.includes(index) || lossOf(row, index) <= floorPctPot);
 }
 
 function base(level: number, row: SqHandRow) {
@@ -80,17 +86,20 @@ function labels(node: SqNode, indexes: readonly number[]): string {
 }
 
 function actionQuestion(node: SqNode, row: SqHandRow): PredictionQuestion {
-  const best = highestEvIndexes(row, node.actions.map((action) => action.index));
+  const indexes = node.actions.map((action) => action.index);
+  const best = highestEvIndexes(row, indexes);
+  const correct = correctActionIndexes(row, indexes, node.floor_pct_pot, best);
   const frequencyPct = best.reduce((sum, index) => sum + frequencyOf(row, index), 0) * PERCENT;
+  const within = correct.map((index) => `${actionLabel(node, index)} ${formatPct(frequencyOf(row, index) * PERCENT)}`).join(", ");
   return {
     ...base(LEVEL_ACTION, row),
     answer_kind: "action",
     question: `What is ${node.to_act}'s highest-EV action with ${row.hand}?`,
     truth: {
-      text: `${node.to_act}'s highest-EV action with ${row.hand} is ${labels(node, best)} (played ${formatPct(frequencyPct)} of the time).`,
+      text: `${node.to_act}'s highest-EV action with ${row.hand} is ${labels(node, best)}. Within the noise floor, so also correct: ${within}.`,
       share_pct: null,
       frequency_pct: frequencyPct,
-      action_indexes: best,
+      action_indexes: correct,
       regions: null,
       band: null,
     },

@@ -38,7 +38,7 @@ export {
   isRated,
   scoreFor,
 } from "./grading.js";
-export { LOSS_TIE_TOLERANCE_PCT_POT, bestActionIndexes, followsRoll } from "./best.js";
+export { LOSS_TIE_TOLERANCE_PCT_POT, bestActionIndexes, followsRoll, lowestLossIndexes } from "./best.js";
 export type { BestActionsInput, RollFollowInput } from "./best.js";
 export { GRADE_LABELS, isCorrectLabel } from "./labels.js";
 export { ACTION_KINDS, BUCKETS, passiveToAggressiveOrder } from "./actions.js";

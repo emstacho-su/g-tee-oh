@@ -5261,6 +5261,11 @@ export interface components {
             /** @description The covered part of the drill; set by POST /sessions (O-312) */
             coverage?: components["schemas"]["SessionCoverage"];
             drill_id: string | null;
+            /**
+             * @description The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it
+             * @enum {string}
+             */
+            grouping: "standard" | "grouped" | "simple";
             /** @description The round progress of a holdout session; null otherwise */
             holdout: components["schemas"]["HoldoutProgress"] | null;
             /** @enum {string} */
@@ -5284,6 +5289,11 @@ export interface components {
             /** @description The covered part of the drill; set by POST /sessions (O-312) */
             coverage?: components["schemas"]["SessionCoverageInput"];
             drill_id: string | null;
+            /**
+             * @description The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it
+             * @enum {string}
+             */
+            grouping: "standard" | "grouped" | "simple";
             /** @description The round progress of a holdout session; null otherwise */
             holdout: components["schemas"]["HoldoutProgressInput"] | null;
             /** @enum {string} */

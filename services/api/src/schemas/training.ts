@@ -109,6 +109,9 @@ export const sessionSchema = z
     state: sessionStateSchema,
     state_version: z.number().int().min(0),
     started_at: timestampSchema,
+    grouping: z
+      .enum(["standard", "grouped", "simple"])
+      .describe("The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it"),
     coverage: sessionCoverageSchema.optional().describe("The covered part of the drill; set by POST /sessions (O-312)"),
     rated_eligible: z
       .boolean()

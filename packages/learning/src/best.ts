@@ -7,16 +7,19 @@
  * A group's loss is its lowest member loss (05 section 6.4 rule 3, O-211). A group is Best when
  * its loss is at or below the floor and within LOSS_TIE_TOLERANCE_PCT_POT of the lowest loss at
  * the node, the highest-EV action; frequencies and the roll never enter it (ADR 0024 rule 1).
- * bestActionIndexes lists every member of every Best group in record order, so each listed action,
- * chosen alone, grades Best (rule 4). In Mixed-frequency mode the roll selects one action through
+ * bestActionIndexes lists, in record order, the lowest-loss member or members (within the tolerance)
+ * of each Best group, so it names only the sizes that are actually best (rule 4, O-375 as amended
+ * in PR #33 review round 1); a worse size of a Best type is not listed, though choosing it still
+ * grades Best because the label follows the group. lowestLossIndexes is the one tie rule over a
+ * plain loss list, which the api's prediction questions and explanations reuse. In Mixed-frequency mode the roll selects one action through
  * rollSelectedAction (O-213); the decision followed the roll when that action is in the chosen
  * action's group (rule 2). Every loss arrives from Rust and is only compared here (ADR 0004).
  */
 import { requireActions } from "./actions.js";
-import { groupKeys } from "./grouping.js";
+import { DEFAULT_GROUPING, GROUPINGS, STREETS, groupKeys } from "./grouping.js";
 import { rollSelectedAction } from "./rng-bands.js";
 import type { GradeAction, Grouping, Street } from "./types.js";
-import { elementAt, requireIntegerInRange, requireNonNegative, requireOneOf } from "./validate.js";
+import { elementAt, isList, requireIntegerInRange, requireNonNegative, requireOneOf } from "./validate.js";
 
 /**
  * Losses this close, in percent of the pot, tie for Best (O-370): a tenth of Rust's stored loss
@@ -24,12 +27,6 @@ import { elementAt, requireIntegerInRange, requireNonNegative, requireOneOf } fr
  * and a one-unit gap never does.
  */
 export const LOSS_TIE_TOLERANCE_PCT_POT = 0.001;
-
-/** The grouping mode when none is named (05 section 4: standard grades exact tree sizes). */
-export const DEFAULT_GROUPING: Grouping = "standard";
-
-export const GROUPINGS: readonly Grouping[] = Object.freeze(["standard", "grouped", "simple"]);
-export const STREETS: readonly Street[] = Object.freeze(["preflop", "flop", "turn", "river"]);
 
 /** The node's actions with their losses, the grouping and street that group them, and the floor. */
 export type BestActionsInput = {
@@ -59,6 +56,11 @@ function groupLosses(keys: readonly string[], losses: readonly number[]): Readon
   return lowest;
 }
 
+/** Whether a group loss is Best against the node's lowest loss and the floor. */
+function isBestLoss(groupLoss: number, lowest: number, floorPctPot: number): boolean {
+  return groupLoss <= floorPctPot && groupLoss - lowest <= LOSS_TIE_TOLERANCE_PCT_POT;
+}
+
 /**
  * Whether the group of `key` is Best: its loss at or below the floor and within the tie tolerance
  * of the lowest loss. keys and losses are parallel and already validated.
@@ -66,9 +68,21 @@ function groupLosses(keys: readonly string[], losses: readonly number[]): Readon
 export function isBestKey(keys: readonly string[], losses: readonly number[], key: string, floorPctPot: number): boolean {
   const byGroup = groupLosses(keys, losses);
   // A key no action holds has no loss, so it is never Best.
-  const groupLoss = byGroup.get(key) ?? Number.POSITIVE_INFINITY;
-  const lowest = Math.min(...byGroup.values());
-  return groupLoss <= floorPctPot && groupLoss - lowest <= LOSS_TIE_TOLERANCE_PCT_POT;
+  return isBestLoss(byGroup.get(key) ?? Number.POSITIVE_INFINITY, Math.min(...byGroup.values()), floorPctPot);
+}
+
+/**
+ * The indices of every loss within LOSS_TIE_TOLERANCE_PCT_POT of the lowest, ascending: the one tie
+ * rule over a plain list of losses in percent of the pot (O-370). A RangeError on an empty list or
+ * a negative or non-finite loss.
+ */
+export function lowestLossIndexes(losses: readonly number[]): number[] {
+  if (!isList(losses) || losses.length === 0) {
+    throw new RangeError("losses must list at least one loss");
+  }
+  losses.forEach((loss, index) => requireNonNegative(loss, `losses[${index}]`));
+  const lowest = Math.min(...losses);
+  return losses.flatMap((loss, index) => (loss - lowest <= LOSS_TIE_TOLERANCE_PCT_POT ? [index] : []));
 }
 
 function requireNodeActions(actions: readonly GradeAction[]): readonly GradeAction[] {
@@ -85,7 +99,9 @@ function keysFor(actions: readonly GradeAction[], grouping: Grouping | undefined
 }
 
 /**
- * The record indices of every member of every Best group, ascending (ADR 0024 rule 4, O-375).
+ * The record indices of the lowest-loss member or members of each Best group, ascending (ADR 0024
+ * rule 4, O-375 amended): a member is listed when its group is Best and its own loss is within the
+ * tie tolerance of its group's loss. The group losses and the node's lowest loss are computed once.
  * Throws a RangeError on an empty or malformed actions list or a negative floor.
  */
 export function bestActionIndexes(input: BestActionsInput): number[] {
@@ -93,7 +109,13 @@ export function bestActionIndexes(input: BestActionsInput): number[] {
   const floorPctPot = requireNonNegative(input.floorPctPot, "floorPctPot");
   const keys = keysFor(actions, input.grouping, input.street);
   const losses = actions.map((action) => action.lossPctPot);
-  return keys.flatMap((key, index) => (isBestKey(keys, losses, key, floorPctPot) ? [index] : []));
+  const byGroup = groupLosses(keys, losses);
+  const lowest = Math.min(...byGroup.values());
+  return keys.flatMap((key, index) => {
+    const groupLoss = byGroup.get(key) ?? Number.POSITIVE_INFINITY;
+    const ownLoss = elementAt(losses, index, "losses");
+    return isBestLoss(groupLoss, lowest, floorPctPot) && ownLoss - groupLoss <= LOSS_TIE_TOLERANCE_PCT_POT ? [index] : [];
+  });
 }
 
 /**

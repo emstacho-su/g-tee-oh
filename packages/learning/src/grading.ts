@@ -18,8 +18,8 @@
  * The bucket and the floor are inputs, never recomputed here (ADR 0004, O-150).
  */
 import { requireActions } from "./actions.js";
-import { DEFAULT_GROUPING, GROUPINGS, LOSS_TIE_TOLERANCE_PCT_POT, STREETS, isBestKey } from "./best.js";
-import { bestMemberOf, exactKeys, groupKeys } from "./grouping.js";
+import { LOSS_TIE_TOLERANCE_PCT_POT, isBestKey } from "./best.js";
+import { DEFAULT_GROUPING, GROUPINGS, STREETS, bestMemberOf, exactKeys, groupKeys } from "./grouping.js";
 import { RNG_ROLL_MAX, RNG_ROLL_MIN, rollSelectedAction } from "./rng-bands.js";
 import type { GradeInput, GradeLabel, GradeMode, GradeOutput, Grouping } from "./types.js";
 import {
@@ -49,7 +49,7 @@ export const DAILY_RATED_CAP = 150;
 export const RATED_WEIGHT = 1;
 export const UNRATED_WEIGHT = 0;
 
-export { DEFAULT_GROUPING } from "./best.js";
+export { DEFAULT_GROUPING } from "./grouping.js";
 
 /**
  * Frequencies this close count as tied for the top: above the rounding of f32 frequencies summed

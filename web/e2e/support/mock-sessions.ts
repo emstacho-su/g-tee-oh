@@ -280,7 +280,7 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
     };
     save(session);
     const coverage = target.id === FIXTURE_PART_COVERED_DRILL_ID ? fixturePartCoverage : fixtureFullCoverage;
-    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, automated: null, holdout: null, coverage };
+    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, grouping: target.trainer.grouping, automated: null, holdout: null, coverage };
     return json(STATUS.created, body);
   }
 

@@ -50,7 +50,7 @@ export interface DecisionAreaProps {
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
 
-function Feedback({ state, prompt, grouping, interactive, onNext, onExplain, onExplainDialog }: DecisionAreaProps) {
+function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
   useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
@@ -62,7 +62,8 @@ function Feedback({ state, prompt, grouping, interactive, onNext, onExplain, onE
       feedback={feedback}
       actions={prompt.buttons}
       chosenIndex={decision.actionIndex}
-      grouping={grouping}
+      // The grouping the session was started and graded with, never a setting changed since (PR #33 review round 1).
+      grouping={context.session.grouping}
       street={prompt.street}
       onExplain={onExplain}
     />

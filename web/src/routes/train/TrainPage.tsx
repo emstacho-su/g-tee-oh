@@ -120,7 +120,8 @@ function TrainRun({ mode }: TrainPageProps) {
       {state.kind !== "ended" && !startPanel ? (
         <AutomatedSession
           session={session}
-          grouping={mode === "holdout" ? HOLDOUT_GROUPING : defaults.grouping}
+          // The started session's own grouping once it exists, so a defaults change mid-session changes nothing (PR #33 review round 1).
+          grouping={context?.session.grouping ?? (mode === "holdout" ? HOLDOUT_GROUPING : defaults.grouping)}
           block={block}
           holdout={holdout}
           interactive={interactive}

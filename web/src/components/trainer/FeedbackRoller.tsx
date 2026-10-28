@@ -11,12 +11,15 @@
  * so color is never the only signal.
  *
  * The mark is the grade's: feedback.followed_roll, stored with the attempt (O-371). The scale also
- * reads it with learning's followsRoll over the prompt's buttons, the session's grouping and the
- * street (the one entry grade() uses, O-213), with the chosen NodeAction.index converted to its
- * record position (O-198). If the two disagree an alert says so instead of either mark, so a drift
- * is visible. An attempt stored before the mark existed has followed_roll null and shows the
- * scale's own reading. Input the learning package rejects is left to RngRoller's own alert, and no
- * mark is added then.
+ * reads it with learning's followsRoll over the prompt's buttons, the grouping the session was
+ * started and graded with and the street (the one entry grade() uses, O-213), with the chosen
+ * NodeAction.index converted to its record position (O-198). If both exist and disagree an alert
+ * says so instead of either mark, so a drift is visible. A stored mark counts only when it is a
+ * boolean: an attempt stored before the mark existed (null) or a body without the field (an older
+ * or replayed response) shows the scale's own reading. When the scale cannot read the roll itself
+ * (input the learning package rejects, left to RngRoller's own alert, or a chosen index it cannot
+ * place), the stored mark still shows, in words only. With neither, no mark is guessed (PR #33
+ * review round 1).
  */
 import { followsRoll, rollSelectedAction } from "@g-tee-oh/learning";
 
@@ -48,6 +51,12 @@ interface Reading {
   readonly fellOn: NodeAction;
 }
 
+/** The grade's stored mark, or null when the body has none (null, or the field absent). */
+function storedMark(feedback: DecisionFeedback): boolean | null {
+  const stored: unknown = feedback.followed_roll;
+  return typeof stored === "boolean" ? stored : null;
+}
+
 /** The scale's own reading, or null when the learning package rejects the input. */
 function readRoll(props: FeedbackRollerProps, roll: number): Reading | null {
   const { feedback, actions, chosenIndex, grouping, street } = props;
@@ -71,19 +80,28 @@ interface FollowMarkProps {
   chosen: NodeAction | undefined;
 }
 
-function FollowMark({ reading, roll, chosen }: FollowMarkProps) {
+function markText({ reading, roll, chosen }: FollowMarkProps): string {
   const where = `roll ${roll} fell on ${reading.fellOn.label}`;
-  const text = reading.followed
+  return reading.followed
     ? `${FOLLOW_TEXT.followed}: ${where}`
     : `${FOLLOW_TEXT.notFollowed}: ${where}${chosen === undefined ? "" : `, you chose ${chosen.label}`}`;
+}
+
+/** The mark: a check or a cross for sighted users and the words for everyone, never color alone. */
+function MarkLine({ followed, text }: { followed: boolean; text: string }) {
   return (
-    <p data-testid="rng-follow" data-followed={String(reading.followed)} className="flex items-center gap-2 font-medium">
+    <p data-testid="rng-follow" data-followed={String(followed)} className="flex items-center gap-2 font-medium">
       <span aria-hidden="true" className="font-mono">
-        {reading.followed ? "✓" : "✗"}
+        {followed ? "✓" : "✗"}
       </span>
       <span>{text}</span>
     </p>
   );
+}
+
+/** The grade's stored mark in words, when the scale cannot read the roll itself. */
+function storedMarkText(followed: boolean, roll: number): string {
+  return `${followed ? FOLLOW_TEXT.followed : FOLLOW_TEXT.notFollowed} (roll ${roll})`;
 }
 
 export function FeedbackRoller(props: FeedbackRollerProps) {
@@ -91,7 +109,8 @@ export function FeedbackRoller(props: FeedbackRollerProps) {
   const roll = feedback.rng_roll;
   if (roll === null) return null;
   const reading = readRoll(props, roll);
-  const disagrees = reading !== null && feedback.followed_roll !== null && feedback.followed_roll !== reading.followed;
+  const stored = storedMark(feedback);
+  const disagrees = reading !== null && stored !== null && stored !== reading.followed;
   return (
     <div data-testid="feedback-roller" className="flex flex-col gap-2">
       <RngRoller actions={actions} freqByAction={feedback.freq_by_action} roll={roll} onExplain={onExplain} />
@@ -100,7 +119,11 @@ export function FeedbackRoller(props: FeedbackRollerProps) {
           {FOLLOW_TEXT.disagree}
         </p>
       ) : null}
-      {reading === null || disagrees ? null : <FollowMark reading={reading} roll={roll} chosen={actionOfIndex(actions, chosenIndex)} />}
+      {disagrees ? null : reading !== null ? (
+        <MarkLine followed={reading.followed} text={markText({ reading, roll, chosen: actionOfIndex(actions, chosenIndex) })} />
+      ) : stored !== null ? (
+        <MarkLine followed={stored} text={storedMarkText(stored, roll)} />
+      ) : null}
     </div>
   );
 }

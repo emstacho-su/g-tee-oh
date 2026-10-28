@@ -17,6 +17,15 @@
 import type { ActionKind, GradeAction, Grouping, Street } from "./types.js";
 import { elementAt } from "./validate.js";
 
+/** The grouping mode when none is named (05 section 4: standard grades exact tree sizes). */
+export const DEFAULT_GROUPING: Grouping = "standard";
+
+/** Every grouping mode, for validation. */
+export const GROUPINGS: readonly Grouping[] = Object.freeze(["standard", "grouped", "simple"]);
+
+/** Every street, for validation. */
+export const STREETS: readonly Street[] = Object.freeze(["preflop", "flop", "turn", "river"]);
+
 /** The Simple type of each kind before the all-in is placed (O-211). */
 const SIMPLE_TYPE: Readonly<Record<ActionKind, string>> = Object.freeze({
   fold: "fold",

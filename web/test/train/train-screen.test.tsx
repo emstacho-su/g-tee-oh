@@ -166,9 +166,11 @@ describe("R4.10 automated session", () => {
       [AUTOMATED_PATHS.decide]: [jsonResponse(200, feedback)],
     });
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
-    const actions = await screen.findByRole("group", { name: "Actions" });
+    // The first rolled prompt opens the explainer on first use, which hides the rest of the page from role queries.
+    await screen.findAllByTestId("rng-roller");
     if (screen.queryByRole("dialog") !== null) await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const actions = await screen.findByRole("group", { name: "Actions" });
     act(() => useSessionDefaultsStore.getState().setGrouping("standard"));
     await userEvent.click(within(actions).getByRole("button", { name: /All-in/ }));
     const roller = await screen.findByTestId("feedback-roller");
