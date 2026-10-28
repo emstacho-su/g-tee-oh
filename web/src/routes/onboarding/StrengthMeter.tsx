@@ -2,9 +2,11 @@
  * The live password strength meter (S42, R3.13, O-424): four segments and a word, updated as the
  * password changes. The estimator loads on mount (its own chunk); until then the reading is by
  * length alone. The word sits in a polite live region, so a screen reader hears the change without
- * being interrupted on every key. Colour is never the only signal: the word always says it.
+ * being interrupted on every key. Colour is never the only signal: the word always says it. The
+ * estimate is memoized on the password and the user inputs (review round 1, G), and the caller
+ * memoizes the inputs on the email and the name, so other renders never rerun the estimator.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { cn } from "../../components/ui/index.js";
 import { PASSWORD_TEXT } from "./onboarding-text.js";
@@ -47,8 +49,10 @@ export function useStrengthEstimator(): StrengthEstimator | null {
 
 export function StrengthMeter({ id, password, userInputs }: StrengthMeterProps) {
   const estimator = useStrengthEstimator();
-  const estimate = estimator === null || password === "" ? null : estimator(password, userInputs);
-  const { score, label } = strengthOf(password, estimate);
+  const { score, label } = useMemo(
+    () => strengthOf(password, estimator === null || password === "" ? null : estimator(password, userInputs)),
+    [estimator, password, userInputs],
+  );
   return (
     <div className="flex items-center gap-3" data-testid="strength-meter" data-score={score}>
       <div className="flex flex-1 gap-1" aria-hidden="true">

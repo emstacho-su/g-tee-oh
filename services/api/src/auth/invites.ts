@@ -3,22 +3,31 @@
  * the check inspect and join share.
  *
  * Mechanism:
- * - createInvite refuses an email that already has an account (409), revokes any invite for that
- *   email that is still pending (O-423), and inserts the new row with only the sha256 of a fresh
- *   secret; the secret is returned once so the route can build the link, and is never stored.
+ * - Every write that decides something about an email's invites or account takes
+ *   lockInviteEmail first: a transaction-scoped advisory lock keyed on the normalized email, the
+ *   one key derivation for both create and join (review round 1, A). Create and join for the same
+ *   email therefore run one after the other, so three simultaneous creates leave one working link,
+ *   and a create racing a join either revokes the invite before the join uses it or sees the new
+ *   account and refuses. The partial unique index invite_one_open_per_email_idx is the backstop.
+ *   Lock order is always the email lock, then invite rows, so the two paths cannot deadlock.
+ * - createInvite refuses an email that already has an account (409), revokes every open invite for
+ *   that email, expired ones included (O-423), and inserts the new row with only the sha256 of a
+ *   fresh secret, read back with RETURNING; the secret is returned once so the route can build the
+ *   link, and is never stored.
  * - Status is computed on read (inviteStatus): used, else revoked, else expired when expires_at is
  *   at or before now, else pending. It is never stored, so it cannot go stale.
- * - checkInvite always runs exactly one constant-time digest comparison: against the row's
+ * - usableInvite always runs exactly one constant-time digest comparison: against the row's
  *   secret_hash when the selector names a row, else against UNKNOWN_INVITE_DIGEST, so an unknown
- *   id and a wrong secret cost the same. The invite is usable only when the secret matches and the
- *   row is pending; the caller answers every other case with the same 410 problem (O-422).
- * - Join reads the row with select ... for update inside its transaction, so two joins with one
- *   token serialize and the second sees used_at.
+ *   id and a wrong secret cost the same. The caller answers every unusable case with the same 410
+ *   problem (O-422).
+ * - The admin list selects only the summary's columns, never secret_hash (review round 1, K).
  * Every function takes a Kysely handle, so a caller may pass a transaction; rows are returned as
  * new objects and never mutated.
  */
+import { sql } from "kysely";
+
 import type { Database } from "../db.js";
-import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { HTTP_STATUS, PG_ERROR, pgErrorCode, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import type { InviteStatus, InviteSummary } from "../schemas/invites.js";
 import { newInviteSecret, secretMatches, UNKNOWN_INVITE_DIGEST, type ParsedInviteToken } from "./invite-token.js";
 import { normalizeEmail } from "./users.js";
@@ -29,16 +38,22 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** One fixed text for every bad token (O-422). */
 export const INVITE_INVALID_DETAIL = "This invite link is not valid. It may have expired or been used already.";
+const ACCOUNT_EXISTS_DETAIL = "An account already exists for this email.";
 
-export interface InviteRow {
+/** What a summary shows; no secret. */
+export interface InviteRecord {
   id: string;
   email: string;
-  secretHash: Buffer;
   createdByEmail: string;
   createdAt: Date;
   expiresAt: Date;
   usedAt: Date | null;
   revokedAt: Date | null;
+}
+
+/** A record plus the digest inspect and join compare against. */
+export interface InviteRow extends InviteRecord {
+  secretHash: Buffer;
 }
 
 export interface NewInvite {
@@ -47,17 +62,22 @@ export interface NewInvite {
   secret: string;
 }
 
+export interface InviteCreator {
+  id: string;
+  email: string;
+}
+
 export function inviteExpiry(createdAt: Date): Date {
   return new Date(createdAt.getTime() + INVITE_TTL_DAYS * MS_PER_DAY);
 }
 
-export function inviteStatus(row: Pick<InviteRow, "usedAt" | "revokedAt" | "expiresAt">, now: Date): InviteStatus {
+export function inviteStatus(row: Pick<InviteRecord, "usedAt" | "revokedAt" | "expiresAt">, now: Date): InviteStatus {
   if (row.usedAt !== null) return "used";
   if (row.revokedAt !== null) return "revoked";
   return row.expiresAt.getTime() <= now.getTime() ? "expired" : "pending";
 }
 
-export function toInviteSummary(row: InviteRow, now: Date): InviteSummary {
+export function toInviteSummary(row: InviteRecord, now: Date): InviteSummary {
   return {
     id: row.id,
     email: row.email,
@@ -74,29 +94,42 @@ export function inviteInvalid(): ProblemError {
   return new ProblemError(HTTP_STATUS.gone, PROBLEM_SLUGS.inviteInvalid, { detail: INVITE_INVALID_DETAIL });
 }
 
-function selectInvites(database: Database) {
-  return database
-    .selectFrom("invite")
-    .innerJoin("app_user", "app_user.id", "invite.created_by")
-    .select([
-      "invite.id",
-      "invite.email",
-      "invite.secret_hash",
-      "invite.created_at",
-      "invite.expires_at",
-      "invite.used_at",
-      "invite.revoked_at",
-      "app_user.email as created_by_email",
-    ]);
+function accountExists(): ProblemError {
+  return new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.conflict, { detail: ACCOUNT_EXISTS_DETAIL });
 }
 
-type SelectedInvite = Awaited<ReturnType<ReturnType<typeof selectInvites>["executeTakeFirstOrThrow"]>>;
+/**
+ * Serializes every invite decision about one email until the transaction ends: an advisory lock
+ * keyed on hashtext of the normalized email (review round 1, A). Call it inside a transaction.
+ */
+export async function lockInviteEmail(transaction: Database, rawEmail: string): Promise<void> {
+  await sql`select pg_advisory_xact_lock(hashtext(${normalizeEmail(rawEmail)}))`.execute(transaction);
+}
 
-function toRow(selected: SelectedInvite): InviteRow {
+const RECORD_COLUMNS = [
+  "invite.id",
+  "invite.email",
+  "invite.created_at",
+  "invite.expires_at",
+  "invite.used_at",
+  "invite.revoked_at",
+  "app_user.email as created_by_email",
+] as const;
+
+interface SelectedRecord {
+  id: string;
+  email: string;
+  created_at: Date;
+  expires_at: Date;
+  used_at: Date | null;
+  revoked_at: Date | null;
+  created_by_email: string;
+}
+
+function toRecord(selected: SelectedRecord): InviteRecord {
   return {
     id: selected.id,
     email: selected.email,
-    secretHash: selected.secret_hash,
     createdByEmail: selected.created_by_email,
     createdAt: selected.created_at,
     expiresAt: selected.expires_at,
@@ -105,11 +138,15 @@ function toRow(selected: SelectedInvite): InviteRow {
   };
 }
 
-/** One invite by id; for update locks the invite row for the rest of the transaction. */
+/** One invite with its digest, by id; for update locks the invite row for the rest of the transaction. */
 export async function findInvite(database: Database, id: string, forUpdate = false): Promise<InviteRow | undefined> {
-  const query = selectInvites(database).where("invite.id", "=", id);
+  const query = database
+    .selectFrom("invite")
+    .innerJoin("app_user", "app_user.id", "invite.created_by")
+    .select([...RECORD_COLUMNS, "invite.secret_hash"])
+    .where("invite.id", "=", id);
   const selected = await (forUpdate ? query.forUpdate("invite") : query).executeTakeFirst();
-  return selected === undefined ? undefined : toRow(selected);
+  return selected === undefined ? undefined : { ...toRecord(selected), secretHash: selected.secret_hash };
 }
 
 /**
@@ -121,43 +158,58 @@ export function usableInvite(row: InviteRow | undefined, token: ParsedInviteToke
   return row !== undefined && matches && inviteStatus(row, now) === "pending" ? row : undefined;
 }
 
-async function emailHasAccount(database: Database, email: string): Promise<boolean> {
-  const row = await database.selectFrom("app_user").select("id").where("email", "=", email).executeTakeFirst();
+export async function emailHasAccount(database: Database, email: string): Promise<boolean> {
+  const row = await database.selectFrom("app_user").select("id").where("email", "=", normalizeEmail(email)).executeTakeFirst();
   return row !== undefined;
 }
 
-/** Creates an invite for the email; run it in a transaction so the revoke and insert commit together. */
-export async function createInvite(database: Database, rawEmail: string, createdBy: string, now: Date): Promise<NewInvite> {
-  const email = normalizeEmail(rawEmail);
-  if (await emailHasAccount(database, email)) {
-    throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.conflict, {
-      detail: "An account already exists for this email.",
-    });
-  }
-  await database
+/** Revokes every open invite for the email (expired ones included), except the one named. */
+export async function revokeOpenInvites(database: Database, email: string, now: Date, exceptId?: string): Promise<void> {
+  const base = database
     .updateTable("invite")
     .set({ revoked_at: now })
-    .where("email", "=", email)
+    .where("email", "=", normalizeEmail(email))
     .where("used_at", "is", null)
-    .where("revoked_at", "is", null)
-    .where("expires_at", ">", now)
-    .execute();
+    .where("revoked_at", "is", null);
+  await (exceptId === undefined ? base : base.where("id", "!=", exceptId)).execute();
+}
+
+/**
+ * Creates an invite for the email under the email's lock. Run it in a transaction: the lock, the
+ * account check, the revoke and the insert commit together.
+ */
+export async function createInvite(database: Database, rawEmail: string, creator: InviteCreator, now: Date): Promise<NewInvite> {
+  const email = normalizeEmail(rawEmail);
+  await lockInviteEmail(database, email);
+  if (await emailHasAccount(database, email)) throw accountExists();
+  await revokeOpenInvites(database, email, now);
   const { secret, hash } = newInviteSecret();
-  const inserted = await database
-    .insertInto("invite")
-    .values({ email, secret_hash: hash, created_by: createdBy, created_at: now, expires_at: inviteExpiry(now) })
-    .returning("id")
-    .executeTakeFirstOrThrow();
-  const row = await findInvite(database, inserted.id);
-  if (row === undefined) throw new Error("the invite just inserted could not be read back");
-  return { summary: toInviteSummary(row, now), secret };
+  try {
+    const inserted = await database
+      .insertInto("invite")
+      .values({ email, secret_hash: hash, created_by: creator.id, created_at: now, expires_at: inviteExpiry(now) })
+      .returning(["id", "email", "created_at", "expires_at", "used_at", "revoked_at"])
+      .executeTakeFirstOrThrow();
+    return { summary: toInviteSummary(toRecord({ ...inserted, created_by_email: creator.email }), now), secret };
+  } catch (error: unknown) {
+    // The partial unique index is the backstop; under the lock it should never fire.
+    if (pgErrorCode(error) === PG_ERROR.uniqueViolation) {
+      throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.conflict, { detail: "An open invite for this email already exists." });
+    }
+    throw error;
+  }
 }
 
 /** A page of invites, newest first (uuidv7 ids are time-ordered), after the cursor's id if any. */
-export async function listInvites(database: Database, limit: number, afterId: string | undefined): Promise<InviteRow[]> {
-  const base = selectInvites(database).orderBy("invite.id", "desc").limit(limit + 1);
+export async function listInvites(database: Database, limit: number, afterId: string | undefined): Promise<InviteRecord[]> {
+  const base = database
+    .selectFrom("invite")
+    .innerJoin("app_user", "app_user.id", "invite.created_by")
+    .select(RECORD_COLUMNS)
+    .orderBy("invite.id", "desc")
+    .limit(limit + 1);
   const rows = await (afterId === undefined ? base : base.where("invite.id", "<", afterId)).execute();
-  return rows.map(toRow);
+  return rows.map(toRecord);
 }
 
 /** Revokes a pending or expired invite; revoking twice answers the first revocation. */

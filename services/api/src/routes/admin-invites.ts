@@ -8,8 +8,10 @@
  * Create keeps the default CSRF token check, has its own per-IP limit (O-428) and opts out of
  * Idempotency-Key (O-427): its response holds the only copy of the link, and a stored replay
  * would put that link in idempotency_key. A double submit therefore makes two invites, and the
- * second revokes the first (O-423), so one link works. The create, its revoke of an older pending
- * invite and the insert run in one transaction. The link is APP_ORIGIN/join#<token>: the fragment
+ * second revokes the first (O-423), so one link works. The create runs in one transaction under
+ * the email's advisory lock (auth/invites.ts lockInviteEmail, review round 1, A): the account
+ * check, the revoke of every open invite for the email and the insert commit together, and a
+ * simultaneous create or join for the same email waits its turn. The link is APP_ORIGIN/join#<token>: the fragment
  * never reaches a server, a log or a Referer header. Revoke accepts an Idempotency-Key and runs
  * through idempotentWrite. The list is cursor-paged, newest first, and carries no secret.
  */
@@ -71,7 +73,7 @@ export const adminInviteRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions>
       const now = new Date();
       const created = await requireDatabase(app)
         .transaction()
-        .execute((transaction) => createInvite(transaction, request.body.email, admin.userId, now));
+        .execute((transaction) => createInvite(transaction, request.body.email, { id: admin.userId, email: admin.email }, now));
       return reply.code(HTTP_STATUS.created).send({
         invite: created.summary,
         link: inviteLink(appOrigin, created.summary.id, created.secret),

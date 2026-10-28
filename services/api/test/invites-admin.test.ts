@@ -287,6 +287,23 @@ describe("R3.1 invite table grants", () => {
       await refused("update app_user set is_admin = true where id = $1", [admin.id]);
       const allowed = await appPool.query("update invite set revoked_at = now() where id = $1", [invite.id]);
       expect(allowed.rowCount).toBe(1);
+
+      // Review round 1, E: the state columns only go from null to a value, never back.
+      const member = await createTestUser(database);
+      const used = await insertInvite(pool, { createdBy: admin.id, usedBy: member.id });
+      const final = async (sqlText: string, id: string) => {
+        await expect(appPool.query(sqlText, [id])).rejects.toMatchObject({ code: "23514" });
+      };
+      await final("update invite set revoked_at = null where id = $1", invite.id);
+      await final("update invite set revoked_at = now() - interval '1 day' where id = $1", invite.id);
+      await final("update invite set used_at = null, used_by = null where id = $1", used.id);
+      await final("update invite set used_at = now() - interval '1 day' where id = $1", used.id);
+      await final("update invite set used_by = null, used_at = null where id = $1", used.id);
+      const reopened = await pool.query<{ used_at: Date | null; revoked_at: Date | null }>(
+        "select used_at, revoked_at from invite where id = any($1::uuid[])",
+        [[invite.id, used.id]],
+      );
+      expect(reopened.rows.every((row) => row.used_at !== null || row.revoked_at !== null)).toBe(true);
     } finally {
       await appPool.end();
       await pool.end();

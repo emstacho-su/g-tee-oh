@@ -9597,9 +9597,8 @@
                   },
                   "display_name": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 240,
-                    "description": "1 to 60 characters after trimming; no control or invisible formatting characters (O-426)"
+                    "description": "1 to 60 characters after trimming, at least one letter or digit; no control, invisible or default-ignorable characters (O-426)"
                   },
                   "password": {
                     "type": "string",

@@ -29,6 +29,7 @@ export const JOIN_TEXT = {
   nameMissing: "Enter your name.",
   nameTooLong: "Use 60 characters or fewer for your name.",
   nameInvisible: "Remove invisible or control characters from your name.",
+  nameNoLetter: "Use at least one letter or digit in your name.",
   passwordShort: "Use at least 12 characters for your password.",
   create: "Create account",
   accountExists: "An account already exists for this email. Sign in instead.",

@@ -8,7 +8,8 @@
 -- and used_by are set together, inside the join transaction that creates the user (single use);
 -- revoked_at is set by an admin or when a newer invite for the same email replaces this one (O-423).
 -- Rows are never deleted, so the list doubles as an audit trail: the app role may read and insert,
--- and may update only the three state columns. app_user gains display_name (O-426), 1 to 60
+-- and may update only the three state columns, each only from null to a value (a trigger). A partial
+-- unique index keeps at most one open invite per email. app_user gains display_name (O-426), 1 to 60
 -- characters, null for an account made by the create-user command; the api also rejects control and
 -- invisible formatting characters before a value gets here.
 
@@ -41,12 +42,40 @@ comment on column invite.secret_hash is 'sha256 of the secret half of the link; 
 
 create index invite_email_idx on invite (email);
 
+-- At most one open (neither used nor revoked) invite per email: the backstop behind the api's
+-- per-email advisory lock (S42 review round 1, A). Create revokes every open row for the email,
+-- expired ones included, before it inserts; join revokes the others when it uses one.
+create unique index invite_one_open_per_email_idx on invite (email) where used_at is null and revoked_at is null;
+
+-- used_at, used_by and revoked_at only ever go from null to a value, never back and never to another
+-- value, so the app role's column grant cannot make a used or revoked invite work again (S42 review
+-- round 1, E). Every other column is outside the app role's update grant.
+create function invite_state_is_final() returns trigger
+language plpgsql
+as $$
+begin
+  if (old.used_at is not null and new.used_at is distinct from old.used_at)
+    or (old.used_by is not null and new.used_by is distinct from old.used_by)
+    or (old.revoked_at is not null and new.revoked_at is distinct from old.revoked_at) then
+    raise exception 'an invite''s used and revoked state cannot be changed once set'
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger invite_state_is_final
+  before update on invite
+  for each row execute function invite_state_is_final();
+
 grant select, insert on invite to app;
 grant update (used_at, used_by, revoked_at) on invite to app;
 
 -- migrate:down
 
 revoke all privileges on invite from app;
+drop trigger if exists invite_state_is_final on invite;
+drop function if exists invite_state_is_final();
 drop table if exists invite;
 revoke insert (display_name), update (display_name) on app_user from app;
 alter table app_user drop column if exists display_name;

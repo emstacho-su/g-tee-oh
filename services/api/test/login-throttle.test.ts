@@ -105,4 +105,20 @@ describe("R3.1 login throttle keyed on the email, failures only (O-236)", () => 
     clock.now = WINDOW_MS;
     expect(throttle.check("c").allowed).toBe(true);
   });
+
+  it("R3.1 O-429 with admitUntrackedWhenFull, a full table of over-limit keys still lets a new key through, untracked, and keeps the old locks", () => {
+    const clock = { now: 0 };
+    const throttle = new LoginThrottle({ max: 1, windowMs: WINDOW_MS, maxKeys: 2, now: () => clock.now, admitUntrackedWhenFull: true });
+
+    throttle.recordFailure("a");
+    throttle.recordFailure("b");
+    clock.now = 60_000;
+
+    expect(throttle.check("new-invite-id")).toEqual({ allowed: true });
+    throttle.recordFailure("new-invite-id");
+    expect(throttle.trackedKeys).toBe(2);
+    expect(throttle.check("new-invite-id").allowed).toBe(true);
+    expect(throttle.check("a").allowed).toBe(false);
+    expect(throttle.check("b").allowed).toBe(false);
+  });
 });

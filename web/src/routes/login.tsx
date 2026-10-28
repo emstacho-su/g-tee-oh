@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { HTTP_STATUS } from "../api/http-status.js";
 import { isApiProblem } from "../api/index.js";
+import { EMAIL_SHAPE } from "../auth/account-rules.js";
 import { safeRedirect, useLogin } from "../auth/index.js";
 import { Button, cn, FIELD_CLASS } from "../components/ui/index.js";
 import { AuthShell, EmailChip, Spinner } from "./onboarding/AuthShell.js";
@@ -26,7 +27,6 @@ import { finishWithRedirect, RedirectingState } from "./onboarding/RedirectingSt
 /** The fixed sign-in texts; kept under this name for the screens and tests that read it. */
 export const LOGIN_MESSAGES = SIGN_IN_TEXT;
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_ID = "login-email";
 const PASSWORD_ID = "login-password";
 const MESSAGE_ID = "login-message";

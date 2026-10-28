@@ -194,6 +194,8 @@ describe("R3.1 inspect and join", () => {
     ["a right-to-left override", "Sam‮Rivera"],
     ["a control character", "Sam\u0007"],
     ["61 characters", "a".repeat(61)],
+    ["only a Hangul filler", "ㅤ"],
+    ["only combining marks", "́̂"],
   ])("R3.1 a display name that is %s is 400 and leaves the invite unused", async (_label, displayName) => {
     const invite = await insertInvite(pool, { createdBy: admin.id });
 

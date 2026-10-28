@@ -203,6 +203,17 @@ describe("two-step sign-in", () => {
     expect(await screen.findByText(fixtureSession.user.email)).toBeInTheDocument();
   });
 
+  it("R3.13 signing in clears data an earlier account left in the cache (review round 1, B)", async () => {
+    const view = await openLogin(signedOutWith([sessionResponse()]));
+    view.queryClient.setQueryData(["admin", "invites"], { items: [{ email: "earlier@example.com" }], hasMore: false });
+
+    await signInWith(PASSWORD);
+
+    await screen.findByRole("heading", { level: 1, name: "Home" });
+    expect(view.queryClient.getQueryData(["admin", "invites"])).toBeUndefined();
+    expect(view.queryClient.getQueryData(["auth", "me"])).toMatchObject({ user: { email: fixtureSession.user.email } });
+  });
+
   it("R3.13 an unsafe redirect after sign-in lands home", async () => {
     const { router } = await openLogin(signedOutWith([sessionResponse()]), "/login?redirect=https%3A%2F%2Fevil.example");
 

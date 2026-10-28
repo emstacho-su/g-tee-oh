@@ -1,7 +1,9 @@
 /**
  * The join calls (S42, R3.13, O-349): POST /auth/invites/inspect and POST /auth/join, both public,
  * and useJoin, which, like useLogin, keeps the returned CSRF (cross-site request forgery) token in
- * memory and seeds the me query so home needs no extra /me. The token is only ever a request body
+ * memory, clears every cached query first (a browser signed in as someone else must not show that
+ * account's data under the new one, review round 1, B), then seeds the me query so home needs no
+ * extra /me. The token is only ever a request body
  * field: it is never put in a URL, a query key or storage.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +41,7 @@ export function useJoin() {
     mutationFn: (input) => join(api, input),
     onSuccess: (session) => {
       api.tokens.set(session.csrf_token);
+      queryClient.clear();
       queryClient.setQueryData(ME_QUERY_KEY, session);
     },
   });

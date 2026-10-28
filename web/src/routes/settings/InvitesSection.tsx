@@ -16,16 +16,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 
 import { HTTP_STATUS, isApiProblem } from "../../api/index.js";
+import { EMAIL_SHAPE, INVITE_TTL_DAYS } from "../../auth/account-rules.js";
 import { ME_QUERY_KEY, useAppApi } from "../../auth/index.js";
 import { Button, cn, Dialog, FIELD_CLASS, LoadingNote, Panel } from "../../components/ui/index.js";
 import type { InviteSummary } from "../../contracts.js";
 import { isForbidden, useIsAdmin } from "../../library/use-builder.js";
 import { useIntentMutation } from "../../library/use-intent-mutation.js";
-import { createInvite, INVITES_QUERY_KEY, invitesQueryOptions, revokeInvite } from "./invites-query.js";
+import { createInvite, INVITE_LIST_LIMIT, INVITES_QUERY_KEY, invitesQueryOptions, revokeInvite } from "./invites-query.js";
 import { SettingsSection } from "./SettingsSection.js";
-import { expiresText, INVITES_TEXT, linkExpiryText, revokeDescription } from "./settings-text.js";
+import { expiresText, INVITES_TEXT, invitesDescription, linkExpiryText, moreInvitesText, revokeDescription } from "./settings-text.js";
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
 export function formatInviteDate(iso: string): string {
@@ -259,7 +259,7 @@ function InviteList() {
           ))}
         </ul>
       )}
-      {invites.data.hasMore ? <p className="text-xs text-muted">{INVITES_TEXT.more}</p> : null}
+      {invites.data.hasMore ? <p className="text-xs text-muted">{moreInvitesText(INVITE_LIST_LIMIT)}</p> : null}
       {revoking === null ? null : <RevokeDialog invite={revoking} onClose={() => setRevoking(null)} />}
     </div>
   );
@@ -276,7 +276,7 @@ export function InvitesSection() {
     );
   }
   return (
-    <SettingsSection title={INVITES_TEXT.title} description={INVITES_TEXT.description}>
+    <SettingsSection title={INVITES_TEXT.title} description={invitesDescription(INVITE_TTL_DAYS)}>
       <CreateInviteForm onCreated={setCreated} />
       <InviteList />
       <LinkDialog created={created} onClose={() => setCreated(null)} />

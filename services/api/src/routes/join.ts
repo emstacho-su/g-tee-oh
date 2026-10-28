@@ -3,27 +3,45 @@
  * /auth/invites/inspect and POST /auth/join. Both are public, like login: no session yet, so the
  * CSRF (cross-site request forgery) check is the Origin alone, no Idempotency-Key (single use makes
  * a retry safe: it gets 410), a strict per-IP limit each (O-428), and a shared per-invite cap on
- * failed attempts (O-429) that counts by the token's selector whatever address sends it.
+ * failed attempts (O-429) that counts by the token's selector whatever address sends it. When the
+ * cap's table is full, an id it has not seen is let through (review round 1, D): the 256-bit secret
+ * and the per-IP limits still stand, and a full table must not lock every invite out.
  *
  * Mechanism: the token's shape is checked here, not by the schema, so a malformed token answers
  * the same 410 invite-invalid problem as an unknown, wrong, expired, used or revoked one (O-422).
- * Exactly one constant-time digest comparison runs per request (auth/invites.ts usableInvite).
- * Join does all of its work in one transaction: lock the invite row (select ... for update), check
- * it, create the user with the invite's email, the given name and the existing password rules,
- * mark the invite used by that user, delete the session whose cookie came with the request (no
- * session fixation) and open a new one. Any failure rolls all of it back, so the invite stays
- * unused. Only after the commit does the response set the cookie. The token, the secret and the
- * password are never logged and never echoed: problems carry fixed texts, and Fastify logs neither
- * request nor response bodies.
+ * Exactly one constant-time digest comparison runs per request (auth/invites.ts usableInvite), on a
+ * read that takes no lock. Join then hashes the password with argon2id before it opens its
+ * transaction (review round 1, C), so no lock or pooled connection is held while argon2 runs. The
+ * transaction takes the email's advisory lock (lockInviteEmail, the same one invite create takes,
+ * review round 1, A), locks the invite row and checks it is still pending (the secret_hash cannot
+ * change, so the earlier comparison stands), creates the user with the invite's email, revokes any
+ * other open invite for that email, marks this one used, deletes the session whose cookie came with
+ * the request (no session fixation) and opens a new one. Any failure rolls all of it back, so the
+ * invite stays unused. Only after the commit does the response set the cookie. The token, the
+ * secret and the password are never logged and never echoed: problems carry fixed texts, and
+ * Fastify logs neither request nor response bodies.
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
-import { findInvite, inviteInvalid, markInviteUsed, usableInvite } from "../auth/invites.js";
+import { setSessionCookie } from "../auth/cookie.js";
+import {
+  findInvite,
+  inviteInvalid,
+  inviteStatus,
+  lockInviteEmail,
+  markInviteUsed,
+  revokeOpenInvites,
+  usableInvite,
+  type InviteRow,
+} from "../auth/invites.js";
 import { parseInviteToken, type ParsedInviteToken } from "../auth/invite-token.js";
 import { LoginThrottle } from "../auth/login-throttle.js";
 import { replaceSession, sessionInfo } from "../auth/open-session.js";
-import { createUser, CreateUserError } from "../auth/users.js";
+import { hashPassword } from "../auth/password.js";
+import { createUserWithHash, CreateUserError } from "../auth/users.js";
+import type { Database } from "../db.js";
 import { requireDatabase } from "../http/database.js";
+import { RETRY_AFTER_HEADER } from "../http/headers.js";
 import { PUBLIC, SESSION_COOKIE_NAME } from "../http/openapi.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError, problemResponses } from "../http/problem.js";
 import {
@@ -33,13 +51,11 @@ import {
   INVITE_INSPECT_RATE_LIMIT,
   JOIN_RATE_LIMIT,
 } from "../http/rate-limits.js";
-import { setSessionCookie } from "../auth/cookie.js";
 import { sessionInfoSchema } from "../schemas/auth.js";
-import { inspectInviteBodySchema, invitePreviewSchema, joinBodySchema } from "../schemas/invites.js";
+import { inspectInviteBodySchema, invitePreviewSchema, joinBodySchema, type JoinBody } from "../schemas/invites.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "auth";
-const RETRY_AFTER_HEADER = "retry-after";
 const PUBLIC_POLICY = { auth: "none", csrf: "origin-only", idempotent: false } as const;
 
 function checkAttempts(throttle: LoginThrottle, token: ParsedInviteToken | null): void {
@@ -66,12 +82,48 @@ function accountExists(): ProblemError {
   });
 }
 
+/** The usable invite a token names, read without a lock; the one constant-time comparison. */
+async function checkedInvite(database: Database, token: ParsedInviteToken | null, now: Date): Promise<InviteRow> {
+  const row = token === null ? undefined : await findInvite(database, token.selector);
+  const invite = usableInvite(row, token, now);
+  if (invite === undefined) throw inviteInvalid();
+  return invite;
+}
+
+interface JoinWork {
+  invite: InviteRow;
+  body: JoinBody;
+  passwordHash: string;
+  previousToken: string | undefined;
+  ttlHours: number;
+  now: Date;
+}
+
+/** The join transaction: under the email lock, recheck, create, revoke the rest, mark used, open a session. */
+function commitJoin(database: Database, work: JoinWork) {
+  return database.transaction().execute(async (transaction) => {
+    await lockInviteEmail(transaction, work.invite.email);
+    const locked = await findInvite(transaction, work.invite.id, true);
+    if (locked === undefined || inviteStatus(locked, work.now) !== "pending") throw inviteInvalid();
+    const user = await createUserWithHash(transaction, {
+      email: locked.email,
+      passwordHash: work.passwordHash,
+      displayName: work.body.display_name,
+    });
+    await revokeOpenInvites(transaction, locked.email, work.now, locked.id);
+    await markInviteUsed(transaction, locked.id, user.id, work.now);
+    const session = await replaceSession(transaction, user.id, work.ttlHours, work.previousToken);
+    return { user, session };
+  });
+}
+
 export const joinRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, options, done) => {
   const { sessionTtlHours } = options.config;
   const attempts = new LoginThrottle({
     max: INVITE_ATTEMPT_MAX,
     windowMs: INVITE_ATTEMPT_WINDOW_MS,
     maxKeys: INVITE_ATTEMPT_MAX_KEYS,
+    admitUntrackedWhenFull: true,
   });
 
   app.post(
@@ -90,9 +142,7 @@ export const joinRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app
       const token = parseInviteToken(request.body.token);
       checkAttempts(attempts, token);
       try {
-        const row = token === null ? undefined : await findInvite(requireDatabase(app), token.selector);
-        const invite = usableInvite(row, token, new Date());
-        if (invite === undefined) throw inviteInvalid();
+        const invite = await checkedInvite(requireDatabase(app), token, new Date());
         return { email: invite.email, expires_at: invite.expiresAt.toISOString() };
       } catch (error: unknown) {
         recordIfInvalid(attempts, token, error);
@@ -116,24 +166,20 @@ export const joinRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app
     async (request, reply) => {
       const token = parseInviteToken(request.body.token);
       checkAttempts(attempts, token);
-      const previousToken = request.cookies[SESSION_COOKIE_NAME];
+      const database = requireDatabase(app);
       const now = new Date();
       try {
-        const joined = await requireDatabase(app)
-          .transaction()
-          .execute(async (transaction) => {
-            const row = token === null ? undefined : await findInvite(transaction, token.selector, true);
-            const invite = usableInvite(row, token, now);
-            if (invite === undefined) throw inviteInvalid();
-            const user = await createUser(transaction, {
-              email: invite.email,
-              password: request.body.password,
-              displayName: request.body.display_name,
-            });
-            await markInviteUsed(transaction, invite.id, user.id, now);
-            const session = await replaceSession(transaction, user.id, sessionTtlHours, previousToken);
-            return { user, session };
-          });
+        const invite = await checkedInvite(database, token, now);
+        // argon2id runs here, before the transaction, so no lock waits on it (review round 1, C).
+        const passwordHash = await hashPassword(request.body.password);
+        const joined = await commitJoin(database, {
+          invite,
+          body: request.body,
+          passwordHash,
+          previousToken: request.cookies[SESSION_COOKIE_NAME],
+          ttlHours: sessionTtlHours,
+          now,
+        });
         setSessionCookie(reply, joined.session.token, joined.session.expiresAt);
         return sessionInfo({
           userId: joined.user.id,

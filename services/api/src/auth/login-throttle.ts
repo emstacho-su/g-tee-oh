@@ -15,7 +15,9 @@
  * needed, expired windows go first, then the least recently failed key that is still under the
  * limit; a key over the limit is never evicted, since evicting it would lift its lock. If every
  * tracked key is over the limit, a new key cannot be tracked and is treated as limited until a
- * window ends. The clock is injected so tests do not wait. Entries are replaced, never mutated.
+ * window ends, unless admitUntrackedWhenFull is set: the invite attempt cap (S42 review round 1, D)
+ * lets such a key through untracked, because there a full table would otherwise refuse every new
+ * invite id for a whole window while the 256-bit secret and the per-IP limits still apply. The clock is injected so tests do not wait. Entries are replaced, never mutated.
  */
 const MS_PER_SECOND = 1000;
 
@@ -24,6 +26,8 @@ export interface ThrottleOptions {
   windowMs: number;
   maxKeys: number;
   now?: () => number;
+  /** When every tracked key is over the limit, let a new key through untracked (default false). */
+  admitUntrackedWhenFull?: boolean;
 }
 
 export type ThrottleVerdict = { allowed: true } | { allowed: false; retryAfterSeconds: number };
@@ -38,7 +42,7 @@ export class LoginThrottle {
   readonly #options: Required<ThrottleOptions>;
 
   constructor(options: ThrottleOptions) {
-    this.#options = { now: Date.now, ...options };
+    this.#options = { now: Date.now, admitUntrackedWhenFull: false, ...options };
   }
 
   /** Whether a login for the key may proceed; never counts. */
@@ -49,7 +53,7 @@ export class LoginThrottle {
       return window.failures >= this.#options.max ? this.#refusal(window, now) : { allowed: true };
     }
     this.#dropExpired(now);
-    if (this.#windows.size < this.#options.maxKeys || this.#evictableKey() !== undefined) {
+    if (this.#windows.size < this.#options.maxKeys || this.#evictableKey() !== undefined || this.#options.admitUntrackedWhenFull) {
       return { allowed: true };
     }
     return this.#refusal(this.#earliestWindow(), now);

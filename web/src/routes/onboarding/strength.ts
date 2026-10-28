@@ -10,9 +10,10 @@
  * are passed as user inputs, so a password made of them scores low. Counting is by characters
  * (code points), the same count the server uses.
  */
+import { characterCount, MIN_PASSWORD_LENGTH, meetsPasswordMinimum } from "../../auth/account-rules.js";
 import { STRENGTH_LABELS, type StrengthLabel } from "./onboarding-text.js";
 
-export const MIN_PASSWORD_LENGTH = 12;
+export { characterCount, MIN_PASSWORD_LENGTH };
 /** From this many characters the length-only fallback calls a password Good rather than Fair. */
 const LONG_PASSWORD_LENGTH = 16;
 
@@ -24,12 +25,8 @@ export interface Strength {
   label: StrengthLabel;
 }
 
-export function characterCount(text: string): number {
-  return Array.from(text).length;
-}
-
 export function meetsMinimum(password: string): boolean {
-  return characterCount(password) >= MIN_PASSWORD_LENGTH;
+  return meetsPasswordMinimum(password);
 }
 
 function clampScore(value: number): StrengthScore {

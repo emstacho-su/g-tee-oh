@@ -1,24 +1,27 @@
 /**
  * Join by invite (S42, R3.13, O-349, O-421, O-422, O-424, O-425). The link is /join#<token>.
  *
- * Mechanism: the token is read once from the URL fragment into component state, and the fragment
- * is then removed from the address bar (a replace navigation), so it is not left in the history or
- * shown on screen; the fragment never reaches a server, a log or a Referer header. The token lives
+ * Mechanism: the token is read from the URL fragment into component state, and the fragment is then
+ * removed from the address bar (a replace navigation), so it is not left in the history or shown
+ * on screen; the fragment never reaches a server, a log or a Referer header. A second link opened
+ * on /join in the same tab replaces the token, and the flow is keyed on it, so it starts over for
+ * the new invite (review round 1, H). The token lives
  * only in this component's state and in request bodies, never in a query key or storage. The page
  * asks the api once whether the invite is usable (inspect): while that runs it says so; any bad
  * token gets one fixed message with a way to sign in (O-422). The invite fixes the email (O-421),
  * so the form shows it as a read-only chip and asks only a name and a password, with the live
  * strength meter (O-424, advisory: only the 12-character minimum blocks). The name gets the same
- * checks the api applies (trimmed, 1 to 60 characters, no control or invisible formatting
- * characters). On success the redirecting state shows, then home. Every failure maps to a fixed
+ * checks the api applies (auth/account-rules.ts mirrors them: trimmed, 1 to 60 characters, at least
+ * one letter or digit, no control, invisible or default-ignorable characters). On success the redirecting state shows, then home. Every failure maps to a fixed
  * text by status; the server's detail, the token and the password are never shown.
  */
 import { Label } from "@radix-ui/react-label";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import { HTTP_STATUS } from "../api/http-status.js";
 import { isApiProblem } from "../api/index.js";
+import { MAX_RAW_NAME_LENGTH, meetsPasswordMinimum, nameProblem, type NameProblem } from "../auth/account-rules.js";
 import { inspectInvite, useAppApi, useJoin } from "../auth/index.js";
 import { Button, cn, FIELD_CLASS } from "../components/ui/index.js";
 import type { InvitePreview } from "../contracts.js";
@@ -27,12 +30,16 @@ import { JOIN_TEXT } from "./onboarding/onboarding-text.js";
 import { PasswordField } from "./onboarding/PasswordField.js";
 import { finishWithRedirect, RedirectingState } from "./onboarding/RedirectingState.js";
 import { StrengthMeter } from "./onboarding/StrengthMeter.js";
-import { characterCount, meetsMinimum, strengthInputs } from "./onboarding/strength.js";
+import { strengthInputs } from "./onboarding/strength.js";
 
 const HOME_PATH = "/";
-export const MAX_NAME_LENGTH = 60;
-/** The characters the api refuses in a name: control, invisible formatting, line and paragraph separators. */
-const FORBIDDEN_NAME_CHARACTERS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const NAME_PROBLEM_TEXT: Readonly<Record<NameProblem, string>> = {
+  empty: JOIN_TEXT.nameMissing,
+  "too-long": JOIN_TEXT.nameTooLong,
+  "forbidden-character": JOIN_TEXT.nameInvisible,
+  "no-letter": JOIN_TEXT.nameNoLetter,
+};
+const NAME_TEXTS: ReadonlySet<string> = new Set(Object.values(NAME_PROBLEM_TEXT));
 
 type Phase =
   | { kind: "missing" }
@@ -44,11 +51,8 @@ type Phase =
 
 /** The first client-side problem with the name, or null. */
 export function checkName(rawName: string): string | null {
-  const name = rawName.trim();
-  if (name === "") return JOIN_TEXT.nameMissing;
-  if (FORBIDDEN_NAME_CHARACTERS.test(name)) return JOIN_TEXT.nameInvisible;
-  if (characterCount(name) > MAX_NAME_LENGTH) return JOIN_TEXT.nameTooLong;
-  return null;
+  const problem = nameProblem(rawName);
+  return problem === null ? null : NAME_PROBLEM_TEXT[problem];
 }
 
 export type JoinFailure = { kind: "invalid" } | { kind: "message"; text: string };
@@ -88,10 +92,14 @@ function Notice({ text, children }: NoticeProps) {
   );
 }
 
-/** The token from the fragment, read once, and the fragment removed from the address bar. */
+/**
+ * The token from the fragment, and the fragment removed from the address bar. The latest non-empty
+ * fragment wins, so a second invite link opened in this tab replaces the first (review round 1, H).
+ */
 function useInviteToken(): string {
   const hash = useRouterState({ select: (state) => state.location.hash });
-  const [token] = useState(hash);
+  const [token, setToken] = useState(hash);
+  if (hash !== "" && hash !== token) setToken(hash);
   const navigate = useNavigate();
   useEffect(() => {
     if (hash !== "") void navigate({ to: "/join", hash: "", replace: true });
@@ -116,10 +124,11 @@ function JoinForm({ token, preview, onInvalid, onJoined }: JoinFormProps) {
   const passwordId = useId();
   const strengthId = useId();
   const messageId = useId();
+  const userInputs = useMemo(() => strengthInputs(preview.email, name), [preview.email, name]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const problem = checkName(name) ?? (meetsMinimum(password) ? null : JOIN_TEXT.passwordShort);
+    const problem = checkName(name) ?? (meetsPasswordMinimum(password) ? null : JOIN_TEXT.passwordShort);
     setMessage(problem);
     setAccountExists(false);
     if (problem !== null) return;
@@ -152,9 +161,9 @@ function JoinForm({ token, preview, onInvalid, onJoined }: JoinFormProps) {
           type="text"
           autoComplete="name"
           autoFocus
-          maxLength={240}
+          maxLength={MAX_RAW_NAME_LENGTH}
           value={name}
-          aria-invalid={message === JOIN_TEXT.nameMissing || message === JOIN_TEXT.nameInvisible || message === JOIN_TEXT.nameTooLong}
+          aria-invalid={message !== null && NAME_TEXTS.has(message)}
           onChange={(event) => setName(event.target.value)}
           className={cn(FIELD_CLASS, "h-11 w-full px-3")}
         />
@@ -167,7 +176,7 @@ function JoinForm({ token, preview, onInvalid, onJoined }: JoinFormProps) {
         invalid={message === JOIN_TEXT.passwordShort}
         describedBy={strengthId}
       >
-        <StrengthMeter id={strengthId} password={password} userInputs={strengthInputs(preview.email, name)} />
+        <StrengthMeter id={strengthId} password={password} userInputs={userInputs} />
       </PasswordField>
       {message === null ? null : (
         <p id={messageId} role="alert" className="text-sm text-danger">
@@ -184,9 +193,14 @@ function JoinForm({ token, preview, onInvalid, onJoined }: JoinFormProps) {
 }
 
 export function JoinPage() {
+  const token = useInviteToken();
+  return <JoinFlow key={token} token={token} />;
+}
+
+/** One invite's flow; keyed on the token, so a new link starts it over. */
+function JoinFlow({ token }: { token: string }) {
   const api = useAppApi();
   const navigate = useNavigate();
-  const token = useInviteToken();
   const [phase, setPhase] = useState<Phase>(token === "" ? { kind: "missing" } : { kind: "checking" });
   const [attempt, setAttempt] = useState(0);
 

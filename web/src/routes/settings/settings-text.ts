@@ -34,7 +34,6 @@ export const SETTINGS_TEXT = {
 /** The admin Invites page (S42, R3.5, O-349, O-420, O-423, O-427). */
 export const INVITES_TEXT = {
   title: "Invites",
-  description: "Invite someone by email. Each link works once and expires after 7 days.",
   memberNote: "Invites are for admins.",
   emailLabel: "Email to invite",
   create: "Create invite",
@@ -54,7 +53,6 @@ export const INVITES_TEXT = {
   loading: "Loading the invites.",
   loadFailed: "The invites could not be loaded.",
   tryAgain: "Try again",
-  more: "Showing the 50 most recent invites.",
   revoke: "Revoke",
   revokeTitle: "Revoke this invite?",
   revokeConfirm: "Revoke invite",
@@ -62,6 +60,14 @@ export const INVITES_TEXT = {
   revokeFailed: "The invite could not be revoked. Try again.",
   status: { pending: "Pending", used: "Used", expired: "Expired", revoked: "Revoked" },
 } as const;
+
+export function invitesDescription(ttlDays: number): string {
+  return `Invite someone by email. Each link works once and expires after ${ttlDays} days.`;
+}
+
+export function moreInvitesText(limit: number): string {
+  return `Showing the ${limit} most recent invites.`;
+}
 
 export function revokeDescription(email: string): string {
   return `The link sent to ${email} will stop working. This cannot be undone.`;

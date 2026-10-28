@@ -16,6 +16,7 @@
 import type { FastifyRequest } from "fastify";
 
 import { LoginThrottle } from "../auth/login-throttle.js";
+import { RETRY_AFTER_HEADER } from "../http/headers.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { requireSession } from "../plugins/authenticate.js";
 
@@ -25,8 +26,6 @@ export const ASK_RATE_LIMIT_MAX = 5;
 export const ASK_RATE_LIMIT_WINDOW_MS = 60_000;
 /** The most users tracked at once; a personal deployment has a handful. */
 export const ASK_RATE_LIMIT_MAX_KEYS = 10_000;
-
-const RETRY_AFTER_HEADER = "retry-after";
 
 export interface AskLimiter {
   /** Counts one ask for the request's user, or throws the 429 problem. */

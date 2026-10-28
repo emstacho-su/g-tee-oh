@@ -172,6 +172,42 @@ describe("join page", () => {
     expect(document.body).not.toHaveTextContent(PASSWORD);
     if (status === 409) expect(screen.getByRole("link", { name: "Go to sign in" })).toBeInTheDocument();
   });
+
+  it("R3.13 a blank-looking name is refused in the browser and nothing is sent (review round 1, F)", async () => {
+    const { fake } = await openForm();
+
+    await fillAndSubmit("ㅤ", PASSWORD);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Remove invisible or control characters from your name.");
+    expect(callsTo(fake, "/api/v1/auth/join")).toHaveLength(0);
+  });
+
+  it("R3.13 joining clears the previous account's cached data before seeding the new session (review round 1, B)", async () => {
+    const view = await openForm([jsonResponse(200, JOINED)]);
+    const otherAccountsData = ["admin", "invites"] as const;
+    view.queryClient.setQueryData(otherAccountsData, { items: [{ email: "someone@example.com" }], hasMore: false });
+
+    await fillAndSubmit("Sam", PASSWORD);
+
+    await screen.findByRole("heading", { level: 1, name: "Home" });
+    expect(view.queryClient.getQueryData(otherAccountsData)).toBeUndefined();
+    expect(view.queryClient.getQueryData(["auth", "me"])).toEqual(JOINED);
+  });
+
+  it("R3.13 a second invite link opened in the same tab starts the flow over for the new invite (review round 1, H)", async () => {
+    const secondToken = "01890a5d-ac96-774b-bcce-b302099a8099.zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJ";
+    const secondPreview = { email: "second.member@example.com", expires_at: "2026-11-05T12:00:00Z" };
+    const view = renderApp(`/join#${TOKEN}`, script([jsonResponse(200, PREVIEW), jsonResponse(200, secondPreview)]));
+    expect(await screen.findByTestId("email-chip")).toHaveTextContent(INVITE_EMAIL);
+    await waitFor(() => expect(view.router.state.location.hash).toBe(""));
+
+    await view.router.navigate({ to: "/join", hash: secondToken });
+
+    await waitFor(() => expect(screen.getByTestId("email-chip")).toHaveTextContent(secondPreview.email));
+    const inspects = callsTo(view.fake, "/api/v1/auth/invites/inspect");
+    expect(inspects.map((call) => (JSON.parse(call.body) as { token: string }).token)).toEqual([TOKEN, secondToken]);
+    await waitFor(() => expect(view.router.state.location.hash).toBe(""));
+  });
 });
 
 describe("join checks", () => {
@@ -184,7 +220,14 @@ describe("join checks", () => {
     ["Sam​Rivera", "Remove invisible or control characters from your name."],
     ["Sam\u0007", "Remove invisible or control characters from your name."],
     ["a".repeat(61), "Use 60 characters or fewer for your name."],
-    ["😀".repeat(60), null],
+    [`A${"😀".repeat(59)}`, null],
+    // Review round 1, F: names that look blank.
+    ["😀".repeat(3), "Use at least one letter or digit in your name."],
+    ["ㅤ", "Remove invisible or control characters from your name."],
+    ["ﾠ", "Remove invisible or control characters from your name."],
+    ["⠀", "Use at least one letter or digit in your name."],
+    ["́̂", "Use at least one letter or digit in your name."],
+    ["Zoë", null],
   ])("R3.13 checkName(%j)", (name, expected) => {
     expect(checkName(name)).toBe(expected);
   });

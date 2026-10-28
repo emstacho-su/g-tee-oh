@@ -926,7 +926,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description 1 to 60 characters after trimming; no control or invisible formatting characters (O-426) */
+                        /** @description 1 to 60 characters after trimming, at least one letter or digit; no control, invisible or default-ignorable characters (O-426) */
                         display_name: string;
                         /** @description At least 12 characters (A9 section 3) */
                         password: string;

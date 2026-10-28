@@ -73,7 +73,8 @@ describe("R3.1 display name (O-426)", () => {
 
   it("R3.1 counts characters, not UTF-16 units, up to 60", () => {
     expect(displayNameSchema.parse("é".repeat(60))).toHaveLength(60);
-    expect(displayNameSchema.parse("😀".repeat(60))).toBe("😀".repeat(60));
+    expect(displayNameSchema.parse(`A${"😀".repeat(59)}`)).toBe(`A${"😀".repeat(59)}`);
+    expect(displayNameSchema.safeParse("😀".repeat(3)).success).toBe(false);
     expect(displayNameSchema.safeParse("a".repeat(61)).success).toBe(false);
   });
 
@@ -92,8 +93,20 @@ describe("R3.1 display name (O-426)", () => {
     ["a soft hyphen", "Sam­Rivera"],
     ["a line separator", "Sam Rivera"],
     ["a paragraph separator", "Sam Rivera"],
+    // Review round 1, F: names that look blank or hide characters.
+    ["only a Hangul filler", "ㅤ"],
+    ["only a halfwidth Hangul filler", "ﾠ"],
+    ["only a braille blank", "⠀"],
+    ["only combining marks", "́̂̃"],
+    ["a Hangul filler inside", "SamㅤRivera"],
+    ["a variation selector", "Sam️"],
+    ["only punctuation", "--..--"],
   ])("R3.1 refuses %s", (_label, name) => {
     expect(displayNameSchema.safeParse(name).success).toBe(false);
+  });
+
+  it.each([["Zoë"], ["李小龙"], ["O'Brien-Smith"], ["Ana 2"], ["José María"]])("R3.1 accepts the name %j", (name) => {
+    expect(displayNameSchema.parse(name)).toBe(name);
   });
 
   it("R3.1 the join body refuses a password under 12 characters and an unknown key", () => {

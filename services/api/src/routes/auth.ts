@@ -34,7 +34,7 @@ import type { AppConfig } from "../config.js";
 import type { Database } from "../db.js";
 import { eventHub } from "../events/registry.js";
 import { requireDatabase } from "../http/database.js";
-import { optionalCsrfHeadersSchema } from "../http/headers.js";
+import { optionalCsrfHeadersSchema, RETRY_AFTER_HEADER } from "../http/headers.js";
 import { AUTHENTICATED, OPTIONAL_SESSION, PUBLIC, SESSION_COOKIE_NAME } from "../http/openapi.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError, problemResponses } from "../http/problem.js";
 import {
@@ -47,7 +47,6 @@ import { requireSession } from "../plugins/authenticate.js";
 import { type LoginBody, loginBodySchema, sessionInfoSchema } from "../schemas/auth.js";
 
 const TAG = "auth";
-const RETRY_AFTER_HEADER = "retry-after";
 /** One message for a wrong password and an unknown email, so the answer reveals no account. */
 export const INVALID_CREDENTIALS_DETAIL = "Invalid email or password.";
 

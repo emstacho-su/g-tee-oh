@@ -15,6 +15,8 @@ export const CSRF_HEADER = "x-csrf-token";
 export const IDEMPOTENCY_HEADER = "idempotency-key";
 export const IDEMPOTENCY_REPLAYED_HEADER = "idempotent-replayed";
 export const REQUEST_ID_HEADER = "x-request-id";
+/** Seconds until a refused request may be retried, on every 429 (O-236). */
+export const RETRY_AFTER_HEADER = "retry-after";
 
 export const CSRF_TOKEN_MAX_LENGTH = 128;
 export const IDEMPOTENCY_KEY_PATTERN = /^[\x21-\x7e]{1,255}$/;

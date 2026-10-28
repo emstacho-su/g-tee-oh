@@ -1,7 +1,8 @@
 /**
  * Session hooks (R3.13, O-230). useMe reads the me query (null when signed out). useLogin posts
- * the credentials, keeps the returned CSRF (cross-site request forgery) token in memory and seeds
- * the me query so the next route needs no extra /me. useLogout sends the token, then, whether or
+ * the credentials, keeps the returned CSRF (cross-site request forgery) token in memory, clears
+ * the query cache (an expired session may have left another account's data there; S42 review
+ * round 1, B) and seeds the me query so the next route needs no extra /me. useLogout sends the token, then, whether or
  * not the server answered well, forgets the token and the whole query cache, marks the session
  * signed out and goes to /login: a failed logout must never leave the page looking signed in.
  */
@@ -24,6 +25,7 @@ export function useLogin() {
     mutationFn: (input) => login(api, input),
     onSuccess: (session) => {
       api.tokens.set(session.csrf_token);
+      queryClient.clear();
       queryClient.setQueryData(ME_QUERY_KEY, session);
     },
   });
