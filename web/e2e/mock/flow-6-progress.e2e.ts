@@ -10,7 +10,7 @@
 import { expect, test } from "@playwright/test";
 
 import { FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
-import { expectHeatCells, expectTrendRows, openDrillFromCell, openProgress, toggleBothTables } from "../support/flow-6.js";
+import { expectHeatCells, expectTrendRows, openDrillFromCell, openProgress, expectAccessibleCharts } from "../support/flow-6.js";
 import { installAppMockApi } from "../support/mock-app.js";
 import { signIn } from "../support/sign-in-flow.js";
 
@@ -20,7 +20,7 @@ const HEAT_CELLS = 40;
 /** A practiced class the live 9-handed 1/3 configuration seats. */
 const DRILLED_CELL = /^rfi BB-UTG, live 100 bb:/;
 
-test("R4.12 mock flow 6: /progress draws the leak trend and the heat map, toggles both tables and opens a drill from a cell", async ({ page }) => {
+test("R4.12 mock flow 6: /progress draws the leak trend and the heat map, checks one accessible representation per chart and opens a drill from a cell", async ({ page }) => {
   await installAppMockApi(page);
   await signIn(page, OWNER);
   await openProgress(page);
@@ -31,7 +31,7 @@ test("R4.12 mock flow 6: /progress draws the leak trend and the heat map, toggle
   await expect(page.locator('[data-testid="heat-cell"][data-state="new"]').first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Mastered: yes/ }).first()).toBeVisible();
 
-  await toggleBothTables(page, TREND_ROWS, HEAT_CELLS);
+  await expectAccessibleCharts(page, TREND_ROWS, HEAT_CELLS);
 
   const first = await openDrillFromCell(page, page.getByRole("button", { name: DRILLED_CELL }));
   await openProgress(page);

@@ -66,7 +66,9 @@ describe("R4.10 automated start", () => {
     expect(await screen.findByTestId("scope-all")).toHaveTextContent("All covered configurations");
     expect(screen.getByTestId("start-grouping")).toHaveTextContent("Grouped");
     expect(screen.getByTestId("start-rng")).toHaveTextContent("On");
-    expect(screen.getByRole("link", { name: "Change these in Settings" })).toHaveAttribute("href", "/settings");
+    // S36: each link opens the settings page that holds what it changes (O-360).
+    expect(screen.getByRole("link", { name: "Change the configurations" })).toHaveAttribute("href", "/settings/configurations");
+    expect(screen.getByRole("link", { name: "Change the session defaults" })).toHaveAttribute("href", "/settings/session-defaults");
   });
 
   it("R4.10 Start sends mode automated with grouping and rng, no config_ids and never a seed (O-325)", async () => {

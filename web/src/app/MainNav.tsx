@@ -1,34 +1,31 @@
 /**
- * The Main navigation landmark (R3.13, A7 section 2). Each entry is a router Link; the router sets
- * aria-current="page" on the active one, and exact matching keeps "/" and "/drills" from staying
- * active on their child routes. The active link is also bold and underlined, so color is never the
- * only signal (A7 section 4).
+ * The Main navigation landmark (R3.13, A7 section 2; S36, O-346). Each entry is a router Link; the
+ * router sets aria-current="page" on the active one (exact per entry, nav-items.ts). The pill
+ * look, the scrolling row at phone width and the active state come from the shared PillNav
+ * (components/ui), as the settings section list does.
+ *
+ * Layout: from md up a raised sidebar panel that stays in view below the sticky header. Its height
+ * is capped at the viewport less that offset (top-20, 5rem) and a 1rem gap, and it scrolls inside,
+ * so on a short screen every link stays reachable by Tab and by scrolling.
  */
 import { Link } from "@tanstack/react-router";
 
+import { NAV_PILL_LINK_PROPS, PillNav } from "../components/ui/index.js";
 import { NAV_ITEMS } from "./nav-items.js";
 
-const LINK_CLASSES =
-  "block rounded-md px-3 py-2 text-sm text-text hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2";
-const ACTIVE_CLASSES = "bg-surface-sunken font-semibold underline";
+const PANEL_CLASSES =
+  "md:sticky md:top-20 md:max-h-[calc(100dvh-6rem)] md:w-52 md:shrink-0 md:self-start md:overflow-y-auto md:rounded-2xl md:border md:border-border/50 md:bg-surface-raised md:p-2 md:raised";
 
 export function MainNav() {
   return (
-    <nav aria-label="Main" className="md:w-48 md:shrink-0">
-      <ul className="flex flex-wrap gap-1 md:flex-col">
-        {NAV_ITEMS.map((item) => (
-          <li key={item.to}>
-            <Link
-              to={item.to}
-              activeOptions={{ exact: true }}
-              className={LINK_CLASSES}
-              activeProps={{ className: ACTIVE_CLASSES }}
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <PillNav label="Main" className={PANEL_CLASSES}>
+      {NAV_ITEMS.map((item) => (
+        <li key={item.to} className="shrink-0">
+          <Link to={item.to} activeOptions={{ exact: item.exact }} {...NAV_PILL_LINK_PROPS}>
+            {item.label}
+          </Link>
+        </li>
+      ))}
+    </PillNav>
   );
 }

@@ -50,7 +50,7 @@ function FilterSelect({ label, filter, value, options, onFilterChange }: FilterS
         value={value === undefined ? "" : String(value)}
         disabled={options === undefined}
         onChange={(event) => onFilterChange(filter, event.target.value)}
-        className="h-9 min-w-32 rounded-md border border-border bg-surface-raised px-2 disabled:opacity-50"
+        className="h-9 min-w-32 rounded-md border border-border-strong bg-surface-raised px-2 disabled:opacity-50"
       >
         <option value="">{`Choose ${label.toLowerCase()}`}</option>
         {(options ?? []).map((option) => (

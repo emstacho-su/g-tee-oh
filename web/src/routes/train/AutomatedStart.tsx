@@ -17,7 +17,7 @@ import { GROUPING_LABELS } from "../../drills/labels.js";
 import type { GameConfig } from "../../progress/types.js";
 import { ALL_CONFIGS, type ConfigScope, type SessionDefaults } from "../../store/session-defaults.js";
 import { allConfigsQuery, configLabel } from "../settings/configs-query.js";
-import { SETTINGS_PATH, TRAIN_TEXT } from "./train-text.js";
+import { DEFAULTS_SETTINGS_SECTION, SCOPE_SETTINGS_SECTION, TRAIN_TEXT } from "./train-text.js";
 
 export interface AutomatedStartProps {
   defaults: SessionDefaults;
@@ -74,9 +74,14 @@ export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartPr
         <dt className="text-muted">{TRAIN_TEXT.rng}</dt>
         <dd data-testid="start-rng">{defaults.rng ? TRAIN_TEXT.on : TRAIN_TEXT.off}</dd>
       </dl>
-      <Link to={SETTINGS_PATH} className="self-start text-sm font-medium underline">
-        {TRAIN_TEXT.changeSettings}
-      </Link>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
+        <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="underline">
+          {TRAIN_TEXT.changeScope}
+        </Link>
+        <Link to="/settings/$section" params={{ section: DEFAULTS_SETTINGS_SECTION }} className="underline">
+          {TRAIN_TEXT.changeDefaults}
+        </Link>
+      </div>
       <div className="flex items-center gap-3">
         <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
           {TRAIN_TEXT.startAutomated}

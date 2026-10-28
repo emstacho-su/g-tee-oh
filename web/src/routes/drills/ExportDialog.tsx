@@ -57,7 +57,7 @@ function CodeField({ code }: { code: string }) {
         value={code}
         rows={4}
         onFocus={(event) => event.target.select()}
-        className="rounded-md border border-border bg-surface-sunken p-2 font-mono text-xs break-all"
+        className="rounded-md border border-border-strong bg-surface-sunken p-2 font-mono text-xs break-all"
       />
       <div className="flex items-center gap-3">
         <Button

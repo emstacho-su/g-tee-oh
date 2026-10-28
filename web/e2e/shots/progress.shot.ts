@@ -5,9 +5,9 @@
  *
  * Mechanism: one test per theme and width (1440 and 390). The seasoned learner's test captures
  * /progress full page, then element shots of the leak-cost trend, the mastery heat map, the heat
- * map with the tooltip of a focused cell, the holdout card with its Goodhart flag, and both table
- * fallbacks. A second test per theme and width captures the fresh learner's /progress (createApp
- * MockApi learner "fresh") for the empty states. afterAll merges the records into the manifest;
+ * map with the tooltip of a focused cell and the holdout card with its Goodhart flag; since S36 the
+ * tables are screen-reader only (O-347) and not shot. A second test per theme and width captures
+ * the fresh learner's /progress (createAppMockApi learner "fresh") for the empty states. afterAll merges the records into the manifest;
  * each record's criterion names what it proves.
  */
 import { mkdirSync } from "node:fs";
@@ -22,7 +22,7 @@ import { capture, prepareShotPage, SHOT_TEST_TIMEOUT_MS, THEMES, VIEWPORTS, type
 import { submitLogin } from "../support/sign-in-flow.js";
 
 const OUT_DIR = shotDirectory();
-const SESSION = "S32";
+const SESSION = "S36";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 /** A practiced, due class in the middle of the grid, so its tooltip sits inside the card. */
@@ -35,8 +35,6 @@ const CRITERIA = {
   heatmap: "R4.12 mastery heat map: five-bin ramp with percents, new cells hatched, mastered checked, due dots and recall bars, legend (O-320)",
   tooltip: "R4.12 heat map tooltip on a focused cell: class, known, recall, attempts, mastered and due (A7 section 4)",
   holdout: "R4.12 holdout card: open round progress and the latest closed round per track with the Goodhart flag in words (O-277)",
-  trendTable: "R4.12 leak-cost trend table fallback: the same values week by week, the partial week named (A7 section 4)",
-  heatTable: "R4.12 heat map table fallback: every class with known, recall, attempts, mastered and due (A7 section 4)",
   fresh: "R4.12 /progress for a fresh learner: unrated, no leaks yet, every class new, no holdout round yet (empty states)",
 } as const;
 
@@ -78,12 +76,10 @@ async function chartShots(page: Page, shot: ReturnType<typeof shooter>): Promise
   await expect(page.getByTestId("goodhart-flag")).toBeVisible();
   await shot("progress-holdout", CRITERIA.holdout, page.getByTestId("holdout-card"));
 
-  await page.getByRole("button", { name: "Show table: leak cost trend" }).click();
-  await expect(page.getByTestId("leak-table")).toBeVisible();
-  await shot("progress-leak-table", CRITERIA.trendTable, trend);
-  await page.getByRole("button", { name: "Show table: mastery heat map" }).click();
-  await expect(page.getByTestId("heat-table")).toBeVisible();
-  await shot("progress-heatmap-table", CRITERIA.heatTable, heatmap);
+  // S36, O-347: no visible table toggle and no table to picture (the old progress-leak-table and
+  // progress-heatmap-table shots); the rows and cells carry the values for screen readers.
+  await expect(page.getByRole("button", { name: /^Show (table|chart)/ })).toHaveCount(0);
+  await expect(page.getByTestId("leak-table")).toHaveCount(0);
 }
 
 test.beforeAll(() => {

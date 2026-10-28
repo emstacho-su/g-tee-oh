@@ -70,6 +70,18 @@ describe("R4.12 /progress", () => {
     expect(screen.getAllByTestId("holdout-track")[0]).toHaveTextContent("Opens (September 2026)");
   });
 
+  it("R4.12 no visible table toggle; one accessible representation per chart (O-347, S36 review)", async () => {
+    renderApp("/progress", PROGRESS);
+    expect(await screen.findAllByTestId("heat-cell")).toHaveLength(40);
+    expect(await screen.findAllByTestId("leak-row")).toHaveLength(10);
+    expect(screen.queryByRole("button", { name: /Show (table|chart)/ })).toBeNull();
+    // Tracks: a screen-reader table, the visual rows hidden. Leak trend and heat map: their labelled rows and cells.
+    expect(screen.getByRole("table", { name: "Rating by track" }).closest(".sr-only")).not.toBeNull();
+    expect(screen.getByTestId("track-visual")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByTestId("leak-table")).toBeNull();
+    expect(screen.queryByTestId("heat-table")).toBeNull();
+  });
+
   it("R4.12 a fresh learner sees the empty states", async () => {
     renderApp("/progress", FRESH);
     expect(await screen.findByText("No leaks yet: finish an automated session to see where you lose the most")).toBeInTheDocument();

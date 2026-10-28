@@ -52,3 +52,5 @@ jobs:
         run: just test-tags
       - name: Report schema (R0.11)
         run: just report-check
+      - name: Colour contrast at WCAG AA (R3.13, O-365)
+        run: just contrast

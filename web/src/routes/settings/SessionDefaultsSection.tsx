@@ -1,11 +1,11 @@
 /**
- * The Session defaults section of /settings (S32, S37, R4.12, O-323, O-325, O-344): grouping,
- * Mixed-frequency mode (off by default; the stored field keeps the wire name rng) and
- * the configuration scope the /train start screen offers first. Each change is saved to the
- * session defaults store at once and a status line says so; a seed is never offered.
+ * The Session defaults section of /settings (S32, S36, S37, R4.12, O-323, O-325, O-344, O-360):
+ * grouping and Mixed-frequency mode (off by default; the stored field keeps the wire name rng) for
+ * the /train start screen. Each change is saved to the session defaults store at once and a status
+ * line says so; a seed is never offered.
  *
- * Mechanism: grouping is a ToggleGroup and the mode a checkbox, both written straight to the store. The
- * scope is all covered configurations or a chosen list (ConfigScopePicker) from GET /configs.
+ * Mechanism: grouping is a ToggleGroup and the mode a checkbox, both written straight to the store.
+ * The configuration scope has its own page since S36 (ConfigScopeSection, O-360).
  */
 import { useState } from "react";
 
@@ -13,7 +13,6 @@ import { ToggleGroup } from "../../components/ui/index.js";
 import type { Grouping } from "../../contracts.js";
 import { GROUPINGS, useSessionDefaultsStore } from "../../store/index.js";
 import { SESSION_TEXT } from "../drill-run/labels.js";
-import { ConfigScopePicker } from "./ConfigScopePicker.js";
 import { GROUPING_LABELS } from "../../drills/labels.js";
 import { SESSION_DEFAULTS_TEXT } from "./settings-text.js";
 import { SettingsSection } from "./SettingsSection.js";
@@ -53,7 +52,6 @@ export function SessionDefaultsSection() {
           {SESSION_TEXT.rngHint}
         </p>
       </div>
-      <ConfigScopePicker onSaved={() => setSaved(true)} />
       <p role="status" className="text-sm text-success">
         {saved ? SESSION_DEFAULTS_TEXT.saved : ""}
       </p>

@@ -487,6 +487,14 @@ equity-table:
 report-check:
     node scripts/check-reports.mjs
 
+# Colour contrast (R3.13, O-365): every text and control token pair at WCAG AA in both themes, and validation/reports/contrast.md current
+contrast:
+    node scripts/check-contrast.mjs
+
+# Rewrite validation/reports/contrast.md from web/src/styles.css after a token change (R3.13, O-365)
+contrast-write:
+    node scripts/check-contrast.mjs --write
+
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning coverage-web coverage-api ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning coverage-web coverage-api ts-boundary report-check contrast licenses security guard-test test-tags

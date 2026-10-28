@@ -3,7 +3,9 @@
  * saving grouping, RNG and the configuration scope to the store (with the paged /configs read, the
  * cap and saved ids no longer offered), the Cosmetics section (unlocked items selectable, locked
  * items named with their rule, the equipped felt applied on <html>), the read-only Hotkeys table,
- * and each read's error with Try again, for a member and an admin.
+ * and each read's error with Try again, for a member and an admin. Since S36 each section is its
+ * own page at /settings/<section> and the configuration scope has a page of its own (O-360);
+ * settings-container.test.tsx covers the container.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -54,10 +56,9 @@ afterEach(() => {
 describe("R4.12 /settings session defaults", () => {
   it("R4.12 grouping and Mixed-frequency mode save to the store at once and say so; the mode is off by default (O-344)", async () => {
     const user = userEvent.setup();
-    renderApp("/settings", member);
+    renderApp("/settings/session-defaults", member);
 
     const defaults = await screen.findByRole("region", { name: "Session defaults" });
-    expect(screen.getByText("The builder schedule is for admins.")).toBeInTheDocument();
     await user.click(within(defaults).getByRole("radio", { name: "Simple" }));
     expect(useSessionDefaultsStore.getState().defaults.grouping).toBe("simple");
     expect(within(defaults).getByRole("status")).toHaveTextContent("Saved on this browser.");
@@ -68,9 +69,9 @@ describe("R4.12 /settings session defaults", () => {
 
   it("R4.12 a chosen configuration scope follows the paged list and saves each tick in catalog order", async () => {
     const user = userEvent.setup();
-    const { fake } = renderApp("/settings", member);
+    const { fake } = renderApp("/settings/configurations", member);
 
-    const defaults = await screen.findByRole("region", { name: "Session defaults" });
+    const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(fake.keys()).not.toContain(CONFIGS);
     await user.click(within(defaults).getByRole("radio", { name: "Only the configurations I choose" }));
     const list = await within(defaults).findByRole("list", { name: "Configurations to train" });
@@ -96,9 +97,9 @@ describe("R4.12 /settings session defaults", () => {
   it("R4.12 saved ids the catalog no longer offers are named and can be removed", async () => {
     const user = userEvent.setup();
     useSessionDefaultsStore.getState().setConfigScope(["cfg_6_online_999", FIRST_CONFIG.config_id]);
-    renderApp("/settings", member);
+    renderApp("/settings/configurations", member);
 
-    const defaults = await screen.findByRole("region", { name: "Session defaults" });
+    const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(defaults).findByText("Saved configurations no longer offered: cfg_6_online_999.")).toBeInTheDocument();
     await user.click(within(defaults).getByRole("button", { name: "Remove them" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toEqual([FIRST_CONFIG.config_id]);
@@ -107,9 +108,9 @@ describe("R4.12 /settings session defaults", () => {
   it("R4.12 at 32 chosen configurations (the api's cap) the others cannot be ticked", async () => {
     const many = Array.from({ length: MAX_SCOPE_CONFIGS + 1 }, (_, index) => ({ ...FIRST_CONFIG, config_id: `cfg_6_online_${index + 1}`, depth_cbb: (index + 1) * 100 }));
     useSessionDefaultsStore.getState().setConfigScope(many.slice(0, MAX_SCOPE_CONFIGS).map((config) => config.config_id));
-    renderApp("/settings", { ...member, [CONFIGS]: [jsonResponse(200, { items: many, next_cursor: null })] });
+    renderApp("/settings/configurations", { ...member, [CONFIGS]: [jsonResponse(200, { items: many, next_cursor: null })] });
 
-    const defaults = await screen.findByRole("region", { name: "Session defaults" });
+    const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(defaults).findByText("At most 32 configurations can be chosen.")).toBeInTheDocument();
     expect(within(defaults).getByRole("checkbox", { name: /, 33 bb deep/ })).toBeDisabled();
     expect(within(defaults).getByRole("checkbox", { name: /, 32 bb deep/ })).toBeEnabled();
@@ -118,9 +119,9 @@ describe("R4.12 /settings session defaults", () => {
   it("R4.12 a failed or empty configuration read says so, and Try again reloads it", async () => {
     const user = userEvent.setup();
     useSessionDefaultsStore.getState().setConfigScope([FIRST_CONFIG.config_id]);
-    renderApp("/settings", { ...member, [CONFIGS]: [problemResponse(500, "internal"), jsonResponse(200, { items: [], next_cursor: null })] });
+    renderApp("/settings/configurations", { ...member, [CONFIGS]: [problemResponse(500, "internal"), jsonResponse(200, { items: [], next_cursor: null })] });
 
-    const defaults = await screen.findByRole("region", { name: "Session defaults" });
+    const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(defaults).findByRole("alert")).toHaveTextContent("The configurations could not be loaded.");
     await user.click(within(defaults).getByRole("button", { name: "Try again: the configurations" }));
     expect(await within(defaults).findByText("No configurations are in the catalog yet.")).toBeInTheDocument();
@@ -129,7 +130,7 @@ describe("R4.12 /settings session defaults", () => {
 
 describe("R4.14 /settings cosmetics", () => {
   it("R4.14 unlocked items are selectable; locked items are disabled and named with their unlock rule", async () => {
-    renderApp("/settings", member);
+    renderApp("/settings/cosmetics", member);
 
     const cosmetics = await screen.findByRole("region", { name: "Cosmetics" });
     expect(cosmetics).toHaveTextContent("Cosmetics change only how the app looks; they never change training.");
@@ -147,7 +148,7 @@ describe("R4.14 /settings cosmetics", () => {
 
   it("R4.14 choosing an unlocked felt saves it and applies it across the app", async () => {
     const user = userEvent.setup();
-    renderApp("/settings", member);
+    renderApp("/settings/cosmetics", member);
 
     const felts = await screen.findByRole("group", { name: "Table felt" });
     await user.click(within(felts).getByRole("radio", { name: /Tier III felt/ }));
@@ -160,7 +161,7 @@ describe("R4.14 /settings cosmetics", () => {
 
   it("R4.14 a stored choice that is not unlocked shows None as the effective choice", async () => {
     useCosmeticsStore.getState().equip("card-back", "card-back-streak-60");
-    renderApp("/settings", member);
+    renderApp("/settings/cosmetics", member);
 
     const backs = await screen.findByRole("group", { name: "Card back" });
     expect(within(backs).getByRole("radio", { name: /^None/ })).toBeChecked();
@@ -168,7 +169,7 @@ describe("R4.14 /settings cosmetics", () => {
 
   it("R4.14 a failed unlock read says so and Try again loads the slots", async () => {
     const user = userEvent.setup();
-    renderApp("/settings", { ...member, [STREAK]: [problemResponse(500, "internal"), jsonResponse(200, fixtureStreak)] });
+    renderApp("/settings/cosmetics", { ...member, [STREAK]: [problemResponse(500, "internal"), jsonResponse(200, fixtureStreak)] });
 
     const cosmetics = await screen.findByRole("region", { name: "Cosmetics" });
     expect(await within(cosmetics).findByRole("alert")).toHaveTextContent("Your unlocks could not be loaded.");
@@ -179,7 +180,7 @@ describe("R4.14 /settings cosmetics", () => {
 
 describe("R4.12 /settings hotkeys and layout", () => {
   it("R4.12 the hotkeys table lists the trainer and app shortcuts, read only, without the retired S and U keys (O-327, O-345)", async () => {
-    renderApp("/settings", member);
+    renderApp("/settings/hotkeys", member);
 
     const hotkeys = await screen.findByRole("region", { name: "Hotkeys" });
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
@@ -193,11 +194,10 @@ describe("R4.12 /settings hotkeys and layout", () => {
     expect(within(hotkeys).queryByRole("button")).toBeNull();
   });
 
-  it("R4.12 an admin sees the builder schedule above the S32 sections", async () => {
+  it("R4.12 an admin's /settings opens Session defaults with no admins-only note (S36, O-360)", async () => {
     renderApp("/settings", { ...member, "GET /api/v1/me": [sessionResponse()] });
 
     expect(await screen.findByRole("region", { name: "Session defaults" })).toBeInTheDocument();
     expect(screen.queryByText("The builder schedule is for admins.")).toBeNull();
-    expect(screen.getByRole("region", { name: "Cosmetics" })).toBeInTheDocument();
   });
 });

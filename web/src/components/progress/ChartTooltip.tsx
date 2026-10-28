@@ -10,6 +10,8 @@
  */
 import { useCallback, useState, type ReactNode } from "react";
 
+import { cn, TOOLTIP_LAYER_CLASS } from "../ui/index.js";
+
 /** Gap in px between the trigger and the tooltip. */
 const GAP_PX = 6;
 /** Below this many px from the viewport top, the tooltip opens below its trigger. */
@@ -64,7 +66,7 @@ export function ChartTooltip({ id, anchor, children }: ChartTooltipProps) {
       id={id}
       role="tooltip"
       style={style}
-      className="pointer-events-none fixed z-20 max-w-52 rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-text shadow-md"
+      className={cn("pointer-events-none fixed max-w-52 rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-text shadow-md", TOOLTIP_LAYER_CLASS)}
     >
       {children}
     </div>

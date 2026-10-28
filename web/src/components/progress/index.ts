@@ -21,7 +21,5 @@ export { MasteryHeatMap, NO_CLASSES_TEXT } from "./MasteryHeatMap.js";
 export type { MasteryHeatMapProps } from "./MasteryHeatMap.js";
 export { NO_DATA_TEXT, PARTIAL_WEEK_TEXT, Sparkline } from "./Sparkline.js";
 export type { SparklineProps } from "./Sparkline.js";
-export { SHOW_CHART_TEXT, SHOW_TABLE_TEXT, TableToggle } from "./TableToggle.js";
-export type { TableToggleProps } from "./TableToggle.js";
 export { NO_COVERAGE_TEXT, ratingAxis, TrackBreakdown } from "./TrackBreakdown.js";
 export type { RatingAxis, TrackBreakdownProps } from "./TrackBreakdown.js";
