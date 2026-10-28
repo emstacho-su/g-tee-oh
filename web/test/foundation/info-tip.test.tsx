@@ -6,7 +6,7 @@
  * caller, also inside a dialog.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { Dialog, InfoTip, TOOLTIP_LAYER_CLASS } from "../../src/components/ui/index.js";
@@ -80,10 +80,13 @@ describe("R3.12 InfoTip", () => {
   it("R3.12 works inside a dialog, rendered within the dialog so it is never painted under it", () => {
     render(
       <Dialog open onOpenChange={() => undefined} title="Details">
+        {/* The dialog focuses its first control on open; focus alone would open the tip. */}
+        <button type="button">First</button>
         <InfoTip subject="hand position">{EXPLANATION}</InfoTip>
       </Dialog>,
     );
     const dialog = screen.getByRole("dialog", { name: "Details" });
+    expect(document.querySelector("[data-info-tip-content]")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "About hand position" }));
     const content = document.querySelector("[data-info-tip-content]");
     expect(content).not.toBeNull();

@@ -20,7 +20,7 @@ describe("R3.12 tokenActionLabel", () => {
   });
 
   it("R3.12 returns null for text that is not a token, never a guess", () => {
-    for (const text of ["", "r", "r0", "r025", "q100", "f1", "rr250", "r2.5", " r250"]) {
+    for (const text of ["", "r", "r0", "r025", "q100", "f1", "rr250", "r2.5", " r250", "constructor", "toString"]) {
       expect(tokenActionLabel(text)).toBeNull();
     }
   });

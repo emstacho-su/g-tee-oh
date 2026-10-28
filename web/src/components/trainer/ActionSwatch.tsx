@@ -13,9 +13,14 @@ import type { CSSProperties } from "react";
 
 import { cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
-import { actionColor, actionStyle, type HatchPattern } from "../../theme/action-style.js";
+import { actionColor, actionStyle, hatchInkFor, type HatchPattern } from "../../theme/action-style.js";
 
-const INK = "rgba(0, 0, 0, 0.35)";
+/**
+ * The hatch ink is a custom property too (S38): actionFillStyle sets the ink that suits each
+ * theme's fill (--hatch-light, --hatch-dark, from hatchInkFor) and ACTION_FILL_CLASSES points
+ * --hatch at the current theme's, so the pattern stays visible on deep and on lifted fills.
+ */
+const INK = "var(--hatch)";
 
 interface PatternFill {
   readonly image: string;
@@ -34,14 +39,21 @@ const PATTERN_FILLS: Readonly<Record<HatchPattern, PatternFill>> = {
   dots: { image: `radial-gradient(${INK} 1px, transparent 1.5px)`, size: "5px 5px" },
 };
 
-/** Picks the light or dark custom property by theme; pair with actionFillStyle. */
-export const ACTION_FILL_CLASSES = "bg-(--action-light) dark:bg-(--action-dark)";
+/** Picks the light or dark fill and hatch ink by theme; pair with actionFillStyle. */
+export const ACTION_FILL_CLASSES =
+  "bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]";
+
+type FillProperty = "--action-light" | "--action-dark" | "--hatch-light" | "--hatch-dark";
 
 export function actionFillStyle(action: NodeAction, actions: readonly NodeAction[]): CSSProperties {
   const fill = PATTERN_FILLS[actionStyle(action.kind).pattern];
-  const colors: Record<"--action-light" | "--action-dark", string> = {
-    "--action-light": actionColor(action, actions, "light"),
-    "--action-dark": actionColor(action, actions, "dark"),
+  const light = actionColor(action, actions, "light");
+  const dark = actionColor(action, actions, "dark");
+  const colors: Record<FillProperty, string> = {
+    "--action-light": light,
+    "--action-dark": dark,
+    "--hatch-light": hatchInkFor(light),
+    "--hatch-dark": hatchInkFor(dark),
   };
   return {
     ...colors,
