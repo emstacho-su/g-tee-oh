@@ -3,7 +3,8 @@
  * answer kind, and the conversion to the contract's answer once it is complete. Pure and
  * immutable: every change returns a new draft. A regions draft is always complete, since "no
  * region mixes" is a valid answer; the percent draft keeps the typed text and becomes an answer
- * only when it reads as a number from 0 to 100.
+ * only when it reads as a number from 0 to 100. Since S41 every answer carries a typed reason of 3
+ * to 1,000 characters after trimming (O-412); reasonReady is the client's half of that rule.
  */
 import type { NodeAction, PredictionPrompt } from "../contracts.js";
 import type { FrequencyBand, HandRegion, PredictionAnswer, PredictionKind } from "./types.js";
@@ -66,6 +67,21 @@ export function toAnswer(draft: AnswerDraft): PredictionAnswer | null {
     case "band":
       return draft.band === null ? null : { kind: "band", band: draft.band };
   }
+}
+
+/** The reason's limits after trimming (S41, O-412, the PM's 3 to 1,000); the api cleans and checks again. */
+export const REASON_MIN_CHARS = 3;
+export const REASON_MAX_CHARS = 1000;
+
+/** True when the trimmed reason is long enough to send and within the limit. */
+export function reasonReady(reason: string): boolean {
+  const length = reason.trim().length;
+  return length >= REASON_MIN_CHARS && length <= REASON_MAX_CHARS;
+}
+
+/** The live count under the reason field: "42 / 1000". */
+export function reasonCount(reason: string): string {
+  return `${reason.length} / ${REASON_MAX_CHARS}`;
 }
 
 /** The actions a size answer chooses among: the node's bets, raises and all-ins. */

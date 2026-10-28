@@ -10,14 +10,17 @@
  * The track names from the tracks read name the tracks on the rating and holdout cards. A click to
  * drill from the trend or the heat map goes through useOpenDrill (O-321), whose pending key
  * disables the clicked button and whose message shows in the card that asked. The holdout card's
- * action starts or resumes this month's retest on /train (O-328).
+ * action starts or resumes this month's retest on /train (O-328). S41 adds the frequency card
+ * (R4.12, O-353) between the heat map and the holdout card, with its own read and Try again.
  */
 import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { HoldoutCard, LeakTrendChart, MasteryHeatMap, ProgressCard, RatingCard, StreakBadge, TrackBreakdown } from "../../components/progress/index.js";
+import { FREQUENCY_CARD_TEST_ID, FREQUENCY_TEXT, FrequencyCard } from "../../components/frequency/FrequencyCard.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
+import { frequencyQuery } from "../../progress/frequency-query.js";
 import { describeCosmetic } from "../../cosmetics/catalog.js";
 import { useOpenDrill, type DrillOrigin, type DrillTarget } from "../../progress/open-drill.js";
 import { heatmapQuery, holdoutQuery, leaksQuery, ratingQuery, streakQuery, tracksQuery } from "../../progress/queries.js";
@@ -70,6 +73,7 @@ export function ProgressPage() {
   const heatmap = useQuery(heatmapQuery(api));
   const holdout = useQuery(holdoutQuery(api));
   const streak = useQuery(streakQuery(api));
+  const frequencies = useQuery(frequencyQuery(api));
   const drill = useOpenDrill();
   const trackNames = namesOf(tracks.data);
   const drillFrom = (origin: DrillOrigin) => (target: DrillTarget) => drill.open(target, origin);
@@ -104,6 +108,9 @@ export function ProgressPage() {
       </CardQuery>
       <CardQuery title="Mastery heat map" subject="the heat map" testId="mastery-heatmap" query={heatmap}>
         {(data) => <MasteryHeatMap heatmap={data} onDrill={drillFrom("heatmap")} pendingKey={drill.pendingKey} message={messageFor("heatmap")} />}
+      </CardQuery>
+      <CardQuery title={FREQUENCY_TEXT.title} subject="your frequencies" testId={FREQUENCY_CARD_TEST_ID} query={frequencies}>
+        {(data) => <FrequencyCard comparison={data} />}
       </CardQuery>
       <CardQuery title="Holdout retest" subject="the holdout rounds" testId="holdout-card" query={holdout}>
         {(data) => (

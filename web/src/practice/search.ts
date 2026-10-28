@@ -1,9 +1,10 @@
 /**
- * The /predict and /paint search parameters (S27, R3.16, R3.17, O-302). Both screens run a
- * drill-backed practice session: drill names the user's drill (a UUID, the contract's drill id) and
- * an optional seed of 16 hex digits (the contract's Hex64) is passed to POST /sessions so a session
- * replays. Anything else is dropped; the route components pass the screens only what this returns
- * (the router merges parent search into children, O-286).
+ * The drill and seed parameters /quiz and /paint share (S27, S41, R3.16, R3.17, O-302, O-419): drill
+ * names the user's drill for an old drill-backed link (a UUID, the contract's drill id) and an
+ * optional seed of 16 hex digits (the contract's Hex64) is passed to POST /sessions so a session
+ * replays. Anything else is dropped here; quiz-search.ts and paint-search.ts add their own choices,
+ * and the route components pass the screens only what those return (the router merges parent
+ * search into children, O-286). The /predict redirect keeps exactly these two.
  */
 export interface PracticeSearch {
   drill?: string;

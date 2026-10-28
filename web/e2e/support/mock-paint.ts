@@ -10,7 +10,8 @@
  * fixture token, as the api does (O-230). POST /sessions is answered only for mode range_paint
  * (any other mode returns undefined, so mock-sessions.ts answers drill sessions; mock-app.ts lists
  * this route first): a fixture drill starts a session (201), another id is 404, a bad body or seed
- * 400. GET next is pure: the fixture prompt at the session's version and counter. Submit checks the
+ * 400; since S41 a catalog spot starts one too, checked as the api checks it (mock-catalog-spot.ts:
+ * 400 for a bad spot, 422 no-coverage for an uncovered seat, O-415). GET next is pure: the fixture prompt at the session's version and counter. Submit checks the
  * body shape (400), the session (404), the version and the node (409 stale-state) and that the
  * paint names exactly the prompt's classes with node actions (400), then grades it with the
  * fixture's formula (fixturePaintResult) and advances the version and the counter; a repeat with
@@ -20,6 +21,7 @@ import type { PracticeSession, RangePaintPrompt } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import { fixturePaintDrills, fixturePaintPrompt, fixturePaintResult, fixturePaintSession } from "../../src/fixtures/paint.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
+import { catalogSpotProblem } from "./mock-catalog-spot.js";
 
 const STATUS = { ok: 200, created: 201 } as const;
 const PROBLEMS = {
@@ -89,8 +91,10 @@ function paintFits(paint: Readonly<Record<string, number>>): boolean {
 function startProblem(body: Record<string, unknown>): ProblemSpec | null {
   const drillId = body["drill_id"];
   const seed = body["seed"];
-  if (typeof drillId !== "string") return PROBLEMS.validation;
   if (seed !== undefined && (typeof seed !== "string" || !SEED_PATTERN.test(seed))) return PROBLEMS.validation;
+  // S41 (O-415): a catalog spot instead of a drill, checked as the api checks it.
+  if (body["catalog_spot"] !== undefined) return catalogSpotProblem(body);
+  if (typeof drillId !== "string") return PROBLEMS.validation;
   return fixturePaintDrills.some((drill) => drill.id === drillId) ? null : PROBLEMS.notFound;
 }
 
@@ -113,7 +117,8 @@ export function createMockPaintRoute(): MockRoute {
     const id = `${SESSION_ID_PREFIX}${(FIRST_SESSION_NUMBER + started).toString(16).padStart(SESSION_ID_DIGITS, "0")}`;
     started += 1;
     save({ id, version: 0, counter: 0, replies: new Map() });
-    const body: PracticeSession = { ...fixturePaintSession, session_id: id, drill_id: String(request.body["drill_id"]) };
+    const drillId = request.body["drill_id"];
+    const body: PracticeSession = { ...fixturePaintSession, session_id: id, drill_id: typeof drillId === "string" ? drillId : null };
     return json(STATUS.created, body);
   }
 

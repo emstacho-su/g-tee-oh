@@ -1,34 +1,32 @@
 /**
- * Mocked prediction routes for the shots and mock projects (S27 lane A, R3.16, O-264, O-302): GET
- * /drills (the picker's list), POST /sessions for mode prediction, GET /prediction/{session}/next
- * and POST /prediction/{session}/answer over the contract-typed fixtures in
+ * Mocked quiz routes for the shots and mock projects (S27 lane A, S41, R3.16, O-264, O-302, O-410,
+ * O-412, O-414, O-415): GET /drills, POST /sessions for mode prediction (an old drill start or a
+ * catalog-spot quiz), GET /prediction/{session}/next, POST /prediction/{session}/answer and POST
+ * /sessions/{id}/end for its own sessions, over the contract-typed fixtures in
  * src/fixtures/prediction.ts.
  *
  * Mechanism: createMockPredictionRoute returns a pure route with its own in-memory state: the
- * prediction sessions it started, each with its state version, its answered counter and its
- * Idempotency-Key replies. POST /sessions with another mode returns undefined, so the session
- * route (mock-sessions.ts, listed after this one in mock-app.ts) answers it. Every route answers
- * 401 when signed out and the POSTs 403 csrf unless x-csrf-token is the fixture token, as the api
- * does (O-230). GET next is pure: prompt n is the fixture prompt n modulo six (range and hand
- * ladders alternating through levels 1 to 3) with the session's id, version and a prompt id of
- * its own. An answer must carry the current prompt id and state version (409 stale-state
- * otherwise) and the prompt's answer kind (400 otherwise); it is judged against the fixture truth,
- * advances the counter and the version, and a repeat with the same Idempotency-Key replays the
- * first reply (O-232). A right answer to the range level 1 prompt unlocks level 2.
+ * prediction sessions it started, each with the prompts it walks (mock-quiz.ts startEntries: every
+ * fixture prompt for a drill start, the chosen difficulty's prompts on the chosen ladders for a
+ * quiz), its state version, its answered counter, whether it ended and its Idempotency-Key replies.
+ * POST /sessions with another mode, and the end of a session it did not start, return undefined, so
+ * the session route (mock-sessions.ts, listed after this one in mock-app.ts) answers them. Every
+ * route answers 401 when signed out and the POSTs 403 csrf unless x-csrf-token is the fixture
+ * token, as the api does (O-230). GET next is pure: prompt n is the session's prompt n modulo its
+ * list, with the session's id, version and a prompt id of its own. An answer must carry the current
+ * prompt id and state version (409 stale-state otherwise), the prompt's answer kind (400 otherwise)
+ * and a reason the api accepts (400, mock-quiz.ts rationaleProblem), all checked before anything is
+ * recorded; it is judged against the fixture truth (the result carries level_passed), advances the
+ * counter and the version, and a repeat with the same Idempotency-Key replays the first reply
+ * (O-232). An ended session answers 409 session-ended to next and answer.
  */
 import type { PracticeSession, PredictionPrompt } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import { fixturePaintDrills } from "../../src/fixtures/paint.js";
-import {
-  FIXTURE_PREDICTION_DRILL_ID,
-  fixtureDrillList,
-  fixturePredictionResult,
-  fixturePredictions,
-  fixturePredictionSession,
-  type FixturePrediction,
-} from "../../src/fixtures/prediction.js";
+import { fixtureDrillList, fixturePredictionResult, fixturePredictionSession, type FixturePrediction } from "../../src/fixtures/prediction.js";
 import type { PredictionAnswer } from "../../src/prediction/types.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
+import { SHORT_REASON_DETAIL, rationaleProblem, recapFor, startEntries } from "./mock-quiz.js";
 
 const STATUS = { ok: 200, created: 201 } as const;
 const PROBLEMS = {
@@ -36,12 +34,13 @@ const PROBLEMS = {
   csrf: { status: 403, slug: "csrf", title: "Cross-site request forgery check failed" },
   notFound: { status: 404, slug: "not-found", title: "Not found" },
   stale: { status: 409, slug: "stale-state", title: "Stale state" },
+  ended: { status: 409, slug: "session-ended", title: "Session ended" },
 } as const satisfies Readonly<Record<string, ProblemSpec>>;
 
 const DRILLS_PATH = "/api/v1/drills";
 /**
  * The one drill list the composed app mock serves (this route answers GET /drills before the paint
- * route): every practice fixture drill once, so both the /predict and the /paint pickers find theirs.
+ * route): every practice fixture drill once.
  */
 export const PRACTICE_DRILL_LIST = {
   items: [...new Map([...fixtureDrillList.items, ...fixturePaintDrills].map((drill) => [drill.id, drill])).values()],
@@ -49,8 +48,8 @@ export const PRACTICE_DRILL_LIST = {
 };
 const SESSIONS_PATH = "/api/v1/sessions";
 const PREDICTION_PATH = /^\/api\/v1\/prediction\/([^/]+)\/(next|answer)$/;
+const END_PATH = /^\/api\/v1\/sessions\/([^/]+)\/end$/;
 const PREDICTION_MODE = "prediction";
-const SEED_PATTERN = /^[0-9a-f]{16}$/;
 const IDEMPOTENCY_HEADER = "idempotency-key";
 const ID_PREFIX = "00000000-0000-4000-8000-";
 const PROMPT_ID_PREFIX = "00000000-0000-8000-8000-";
@@ -67,8 +66,11 @@ const ANSWER_KEYS: Readonly<Record<string, readonly string[]>> = {
 
 interface MockPredictionSession {
   readonly id: string;
+  readonly entries: readonly FixturePrediction[];
+  readonly drillId: string | null;
   readonly version: number;
   readonly counter: number;
+  readonly ended: boolean;
   readonly replies: ReadonlyMap<string, MockResponse>;
 }
 
@@ -81,8 +83,8 @@ function padded(prefix: string, number: number): string {
 }
 
 function entryAt(session: MockPredictionSession): FixturePrediction {
-  const entry = fixturePredictions[session.counter % fixturePredictions.length];
-  if (entry === undefined) throw new RangeError("the fixture has no prediction prompts");
+  const entry = session.entries[session.counter % session.entries.length];
+  if (entry === undefined) throw new RangeError("the session has no prediction prompts");
   return entry;
 }
 
@@ -116,10 +118,20 @@ function isAnswerFor(prompt: PredictionPrompt, answer: unknown): answer is Predi
   }
 }
 
-function startProblem(body: Record<string, unknown>): ProblemSpec | null {
-  const seed = body["seed"];
-  if (typeof body["drill_id"] !== "string" || (seed !== undefined && (typeof seed !== "string" || !SEED_PATTERN.test(seed)))) return PROBLEMS.validation;
-  return body["drill_id"] === FIXTURE_PREDICTION_DRILL_ID ? null : PROBLEMS.notFound;
+/** A refused reason, with the api's fixed detail on the short-reason problem. */
+function reasonRefusal(spec: ProblemSpec, path: string): MockResponse {
+  const base = problem(spec, path);
+  return spec.slug === "bad-request" ? { ...base, body: { ...(base.body as object), detail: SHORT_REASON_DETAIL } } : base;
+}
+
+/** The problem an answer body earns before anything is recorded, or null. */
+function answerProblem(session: MockPredictionSession, body: unknown): ProblemSpec | null {
+  const prompt = mockPromptOf(session);
+  if (!isRecord(body) || typeof body["prompt_id"] !== "string" || typeof body["state_version"] !== "number") return PROBLEMS.validation;
+  const reason = rationaleProblem(body["rationale"]);
+  if (reason !== null) return reason;
+  if (body["state_version"] !== session.version || body["prompt_id"] !== prompt.prompt_id) return PROBLEMS.stale;
+  return isAnswerFor(prompt, body["answer"]) ? null : PROBLEMS.validation;
 }
 
 /** A fresh set of prediction routes with their own state. */
@@ -133,12 +145,13 @@ export function createMockPredictionRoute(): MockRoute {
 
   function start(request: MockRequest, body: Record<string, unknown>): MockResponse {
     if (!hasCsrf(request)) return problem(PROBLEMS.csrf, request.path);
-    const failure = startProblem(body);
-    if (failure !== null) return problem(failure, request.path);
-    const session: MockPredictionSession = { id: padded(ID_PREFIX, FIRST_SESSION_NUMBER + started), version: 0, counter: 0, replies: new Map() };
+    const entries = startEntries(body);
+    if (!Array.isArray(entries)) return problem(entries as ProblemSpec, request.path);
+    const drillId = typeof body["drill_id"] === "string" ? body["drill_id"] : null;
+    const id = padded(ID_PREFIX, FIRST_SESSION_NUMBER + started);
     started += 1;
-    save(session);
-    const reply: PracticeSession = { ...fixturePredictionSession, session_id: session.id, state_version: session.version };
+    save({ id, entries, drillId, version: 0, counter: 0, ended: false, replies: new Map() });
+    const reply: PracticeSession = { ...fixturePredictionSession, session_id: id, drill_id: drillId, state_version: 0 };
     return json(STATUS.created, reply);
   }
 
@@ -146,12 +159,11 @@ export function createMockPredictionRoute(): MockRoute {
     const key = request.headers[IDEMPOTENCY_HEADER];
     const replay = key === undefined ? undefined : session.replies.get(key);
     if (replay !== undefined) return replay;
-    const body = request.body;
+    const refused = answerProblem(session, request.body);
+    if (refused !== null) return reasonRefusal(refused, request.path);
+    const body = request.body as { answer: PredictionAnswer };
     const prompt = mockPromptOf(session);
-    if (!isRecord(body) || typeof body["prompt_id"] !== "string" || typeof body["state_version"] !== "number") return problem(PROBLEMS.validation, request.path);
-    if (body["state_version"] !== session.version || body["prompt_id"] !== prompt.prompt_id) return problem(PROBLEMS.stale, request.path);
-    if (!isAnswerFor(prompt, body["answer"])) return problem(PROBLEMS.validation, request.path);
-    const result = { ...fixturePredictionResult(entryAt(session), body["answer"], session.version), prompt_id: prompt.prompt_id };
+    const result = { ...fixturePredictionResult(entryAt(session), body.answer, session.version), prompt_id: prompt.prompt_id };
     const response = json(STATUS.ok, result);
     save({
       ...session,
@@ -170,18 +182,27 @@ export function createMockPredictionRoute(): MockRoute {
     if (writing && !hasCsrf(request)) return problem(PROBLEMS.csrf, request.path);
     const session = sessions.get(id);
     if (session === undefined) return problem(PROBLEMS.notFound, request.path);
+    if (session.ended) return problem(PROBLEMS.ended, request.path);
     return reading ? json(STATUS.ok, mockPromptOf(session)) : answer(session, request);
+  }
+
+  function end(request: MockRequest, session: MockPredictionSession): MockResponse {
+    if (!hasCsrf(request)) return problem(PROBLEMS.csrf, request.path);
+    save({ ...session, ended: true });
+    return json(STATUS.ok, recapFor(session.id));
   }
 
   return (request, { signedIn }) => {
     const method = request.method.toUpperCase();
     const prediction = PREDICTION_PATH.exec(request.path);
+    const ending = method === "POST" ? sessions.get(END_PATH.exec(request.path)?.[1] ?? "") : undefined;
     const listing = request.path === DRILLS_PATH && method === "GET";
     const body = request.body;
     const starting = request.path === SESSIONS_PATH && method === "POST" && isRecord(body) && body["mode"] === PREDICTION_MODE;
-    if (!listing && !starting && prediction === null) return undefined;
+    if (!listing && !starting && prediction === null && ending === undefined) return undefined;
     if (!signedIn) return problem(UNAUTHENTICATED, request.path);
     if (listing) return json(STATUS.ok, PRACTICE_DRILL_LIST);
+    if (ending !== undefined) return end(request, ending);
     if (starting && isRecord(body)) return start(request, body);
     return predictionRoute(request, prediction?.[1] ?? "", prediction?.[2] ?? "");
   };
