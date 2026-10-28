@@ -11,12 +11,12 @@
 import { randomBytes } from "node:crypto";
 
 import type pg from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from "vitest";
 
 import { readBuilderStatus } from "../src/admin/builder-status.js";
 import { buildApp, type ApiApp } from "../src/app.js";
 import { createUser } from "../src/auth/users.js";
-import type { Database } from "../src/db.js";
+import { createDatabaseFromUrl, type Database } from "../src/db.js";
 import type { NotificationListener, NotificationSource } from "../src/events/source.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER } from "../src/http/headers.js";
 import { builderSettingsSchema, builderStatusSchema } from "../src/schemas/insights.js";
@@ -100,8 +100,14 @@ describe("R3.5 admin builder endpoints", () => {
     source = new FakeSource();
     app = buildApp({ database, config: TEST_CONFIG, notifications: source });
     await app.ready();
-    const ownerUser = await createUser(database, { email: uniqueEmail("admin"), password: TEST_PASSWORD, isAdmin: true });
-    owner = await createTestSession(database, ownerUser.id);
+    // The app role cannot set is_admin (PR #25 L1); the owner connection does, as create-user --admin.
+    const ownerDatabase = createDatabaseFromUrl(inject("adminDatabaseUrl"));
+    try {
+      const ownerUser = await createUser(ownerDatabase, { email: uniqueEmail("admin"), password: TEST_PASSWORD, isAdmin: true });
+      owner = await createTestSession(database, ownerUser.id);
+    } finally {
+      await ownerDatabase.destroy();
+    }
     member = await createTestSession(database, (await createTestUser(database)).id);
   });
 

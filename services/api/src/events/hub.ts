@@ -5,8 +5,8 @@
  * server-sent events. There is no replay: a client that reconnects refetches what it shows.
  *
  * Mechanism:
- * - A stream is a sink (the hijacked response) plus its user and admin flag. build_progress goes
- *   to admin streams only; coverage_added and builder_state go to every stream.
+ * - A stream is a sink (the hijacked response) plus its user, session and admin flag. build_progress
+ *   goes to admin streams only; coverage_added and builder_state go to every stream.
  * - Each user may hold at most MAX_STREAMS_PER_USER streams; the route asks hasRoom before it
  *   hijacks the reply, so the refused request still answers a normal 429 problem.
  * - Slow consumers: before each write the hub looks at the sink's queued bytes (writableLength).
@@ -15,6 +15,14 @@
  * - One heartbeat timer writes a comment line to every stream every heartbeatMs, so proxies and
  *   browsers keep an idle stream open. It runs only while a stream is open and never keeps the
  *   process alive on its own.
+ * - Authorization does not stop at the open (PR #25 review L2). At each heartbeat a stream older
+ *   than maxLifetimeMs is ended (the browser reconnects after the retry delay and is
+ *   authenticated afresh), and every other stream's recheck runs: a session that has expired or
+ *   was deleted ends the stream, and the admin flag is replaced by the one read now, so a revoked
+ *   admin stops receiving build_progress. At most one recheck per stream runs at a time; a failed
+ *   one is logged and the stream kept as it was, so a database blip does not drop every client,
+ *   and the lifetime cap bounds how long such a stream lives. closeSession ends a session's streams
+ *   at once (logout).
  */
 import type { FastifyBaseLogger } from "fastify";
 
@@ -23,12 +31,14 @@ import type { NotificationSource } from "./source.js";
 
 /** At most this many open streams per user (O-243). */
 export const MAX_STREAMS_PER_USER = 4;
-/** Milliseconds between heartbeat comments (O-243). */
+/** Milliseconds between heartbeat comments, and between authorization rechecks (O-243). */
 export const HEARTBEAT_INTERVAL_MS = 15_000;
 /** The reconnect delay the stream tells the browser, in milliseconds (O-243). */
 export const SSE_RETRY_MS = 5000;
 /** Bytes a stream may have queued on its socket before the hub ends it as a slow consumer. */
 export const MAX_QUEUED_BYTES_PER_STREAM = 256 * 1024;
+/** A stream is ended at the first heartbeat this long after it opened (O-243, PR #25 review L2). */
+export const MAX_STREAM_LIFETIME_MS = 60 * 60 * 1000;
 
 const HEARTBEAT_COMMENT = ": heartbeat\n\n";
 
@@ -42,10 +52,22 @@ export interface EventSink {
   destroy(): void;
 }
 
+/** What a heartbeat recheck reads: whether the session is still live, and the admin flag now. */
+export interface StreamStatus {
+  live: boolean;
+  isAdmin: boolean;
+}
+
+export type StreamCheck = () => Promise<StreamStatus>;
+
 export interface StreamRequest {
   userId: string;
+  /** The auth_session the stream was opened with; logout ends its streams. */
+  sessionId: string;
   isAdmin: boolean;
   sink: EventSink;
+  /** Run at each heartbeat; absent, the stream is only bounded by the lifetime cap. */
+  recheck?: StreamCheck;
 }
 
 export interface EventStream {
@@ -58,6 +80,9 @@ export interface HubOptions {
   maxQueuedBytes: number;
   heartbeatMs: number;
   retryMs: number;
+  maxLifetimeMs: number;
+  /** The clock in milliseconds, injectable for tests. */
+  now: () => number;
 }
 
 const DEFAULT_OPTIONS: HubOptions = {
@@ -65,6 +90,8 @@ const DEFAULT_OPTIONS: HubOptions = {
   maxQueuedBytes: MAX_QUEUED_BYTES_PER_STREAM,
   heartbeatMs: HEARTBEAT_INTERVAL_MS,
   retryMs: SSE_RETRY_MS,
+  maxLifetimeMs: MAX_STREAM_LIFETIME_MS,
+  now: () => Date.now(),
 };
 
 /** The open stream limit was reached; the route answers 429 before this can happen. */
@@ -80,12 +107,13 @@ export function formatEvent(event: ParsedEvent): string {
   return `event: ${event.channel}\ndata: ${JSON.stringify(event.data)}\n\n`;
 }
 
-type Registered = Readonly<StreamRequest> & { readonly id: number };
+type Registered = Readonly<StreamRequest> & { readonly id: number; readonly openedAt: number };
 
 export class EventHub {
   private readonly options: HubOptions;
   private readonly unsubscribe: () => void;
   private streams: ReadonlyMap<number, Registered> = new Map();
+  private rechecking: ReadonlySet<number> = new Set();
   private nextId = 1;
   private heartbeat: NodeJS.Timeout | null = null;
   private lastState: BuilderStatePayload | null = null;
@@ -124,12 +152,21 @@ export class EventHub {
     if (!this.hasRoom(request.userId)) {
       throw new TooManyStreamsError(this.options.maxStreamsPerUser);
     }
-    const registered: Registered = { ...request, id: this.nextId };
+    const registered: Registered = { ...request, id: this.nextId, openedAt: this.options.now() };
     this.nextId += 1;
     this.streams = new Map([...this.streams, [registered.id, registered]]);
     this.startHeartbeat();
     this.write(registered, `retry: ${this.options.retryMs}\n\n`);
     return { close: () => this.remove(registered.id) };
+  }
+
+  /** Ends every stream opened with the session (logout); returns how many were ended. */
+  closeSession(sessionId: string): number {
+    const ending = [...this.streams.values()].filter((stream) => stream.sessionId === sessionId);
+    for (const stream of ending) {
+      this.end(stream);
+    }
+    return ending.length;
   }
 
   /** Unsubscribes from the source and ends every open stream. */
@@ -176,6 +213,12 @@ export class EventHub {
     stream.sink.write(chunk);
   }
 
+  /** Unregisters a stream and ends its response, so the browser sees the stream close. */
+  private end(stream: Registered): void {
+    this.remove(stream.id);
+    stream.sink.end();
+  }
+
   private remove(id: number): void {
     if (!this.streams.has(id)) {
       return;
@@ -186,14 +229,57 @@ export class EventHub {
     }
   }
 
+  private beat(): void {
+    const now = this.options.now();
+    for (const stream of this.streams.values()) {
+      if (now - stream.openedAt >= this.options.maxLifetimeMs) {
+        this.log.info({ userId: stream.userId }, "ended an event stream at its lifetime cap");
+        this.end(stream);
+        continue;
+      }
+      this.write(stream, HEARTBEAT_COMMENT);
+      void this.recheck(stream);
+    }
+  }
+
+  /** Re-reads the stream's session and admin flag; never rejects. */
+  private async recheck(stream: Registered): Promise<void> {
+    if (stream.recheck === undefined || this.rechecking.has(stream.id)) {
+      return;
+    }
+    this.rechecking = new Set([...this.rechecking, stream.id]);
+    try {
+      this.apply(stream.id, await stream.recheck());
+    } catch (error: unknown) {
+      this.log.warn({ err: error, userId: stream.userId }, "event stream re-check failed; kept the stream");
+    } finally {
+      this.rechecking = new Set([...this.rechecking].filter((id) => id !== stream.id));
+    }
+  }
+
+  /** Ends a stream whose session is gone, or records its current admin flag. */
+  private apply(id: number, status: StreamStatus): void {
+    const current = this.streams.get(id);
+    if (current === undefined) {
+      return;
+    }
+    if (!status.live) {
+      this.log.info({ userId: current.userId }, "ended an event stream whose session ended");
+      this.end(current);
+      return;
+    }
+    if (status.isAdmin !== current.isAdmin) {
+      const updated: Registered = { ...current, isAdmin: status.isAdmin };
+      this.streams = new Map([...this.streams].map(([key, value]) => [key, key === id ? updated : value]));
+    }
+  }
+
   private startHeartbeat(): void {
     if (this.heartbeat !== null) {
       return;
     }
     this.heartbeat = setInterval(() => {
-      for (const stream of this.streams.values()) {
-        this.write(stream, HEARTBEAT_COMMENT);
-      }
+      this.beat();
     }, this.options.heartbeatMs);
     this.heartbeat.unref();
   }

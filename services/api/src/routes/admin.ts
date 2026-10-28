@@ -15,7 +15,6 @@
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
-import { z } from "zod";
 
 import { readBuilderStatus, readStoredSettings, upsertSettings, type BuilderStatus } from "../admin/builder-status.js";
 import { requireAdmin } from "../admin/require-admin.js";
@@ -26,16 +25,11 @@ import { mutatingHeadersSchema } from "../http/headers.js";
 import { idempotentWrite } from "../http/idempotent-write.js";
 import { ADMIN_MUTATE_PROBLEMS, ADMIN_READ_PROBLEMS, AUTHENTICATED } from "../http/openapi.js";
 import { HTTP_STATUS, problemResponses } from "../http/problem.js";
+import { emptyBodySchema } from "../schemas/common.js";
 import { builderSettingsPatchSchema, builderSettingsSchema, builderStatusSchema } from "../schemas/insights.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "admin";
-
-/**
- * Pause and resume take no body. Fastify hands a bodiless POST to validation as null, which the
- * shared emptyBodySchema (optional, not nullable) refuses, so these routes accept null as well.
- */
-const noBodySchema = z.strictObject({}).nullable().optional();
 
 function setPaused(app: FastifyInstance, request: FastifyRequest, paused: boolean): Promise<BuilderStatus> {
   return idempotentWrite(app, request, HTTP_STATUS.ok, async (transaction): Promise<BuilderStatus> => {
@@ -50,7 +44,8 @@ function pauseSchema(summary: string) {
     summary,
     security: AUTHENTICATED,
     headers: mutatingHeadersSchema,
-    body: noBodySchema,
+    // Pause and resume take no body; the shared schema accepts the null Fastify validates then.
+    body: emptyBodySchema,
     response: { 200: builderStatusSchema, ...problemResponses(ADMIN_MUTATE_PROBLEMS) },
   };
 }

@@ -12,7 +12,14 @@
  * security headers, CORS), the event-stream content type and x-accel-buffering no, which tells a
  * buffering proxy to pass each event through at once. The check and the registration are
  * synchronous, so two requests cannot both take the last slot. The stream is unregistered when
- * its connection closes or fails.
+ * its connection closes or fails; the close and error listeners are attached before the admin
+ * lookup awaits, and a client that left during that lookup gets no stream (PR #25 review H2).
+ *
+ * After the open (PR #25 review L2): each stream carries its session id and a recheck
+ * (events/stream-check.ts) that the hub runs at every heartbeat, ending the stream when the
+ * session has expired or was deleted and following the current admin flag; the hub also ends a
+ * stream at the first heartbeat past MAX_STREAM_LIFETIME_MS, and logout ends the session's streams
+ * at once (routes/auth.ts).
  */
 import type { OutgoingHttpHeaders } from "node:http";
 
@@ -20,8 +27,9 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
 import { isAdmin } from "../admin/require-admin.js";
-import { MAX_STREAMS_PER_USER } from "../events/hub.js";
+import { type EventStream, MAX_STREAMS_PER_USER } from "../events/hub.js";
 import { eventHub } from "../events/registry.js";
+import { sessionStreamCheck } from "../events/stream-check.js";
 import { requireDatabase } from "../http/database.js";
 import { REQUEST_ID_HEADER } from "../http/headers.js";
 import { AUTHENTICATED, READ_PROBLEMS } from "../http/openapi.js";
@@ -53,7 +61,44 @@ export function streamHeaders(request: FastifyRequest, reply: FastifyReply): Out
     "content-type": `${EVENT_STREAM_TYPE}; charset=utf-8`,
     "cache-control": "no-store",
     "x-accel-buffering": "no",
+    // A stream the server ends (logout, an ended session, the lifetime cap) closes its connection
+    // rather than leaving it to keep-alive, so shutdown never waits on it (PR #25 review L2).
+    connection: "close",
     [REQUEST_ID_HEADER]: request.id,
+  };
+}
+
+interface WatchedConnection {
+  /** True once the client's connection closed or failed. */
+  gone(): boolean;
+  /** Unregisters the stream when the connection closes or fails (at once if it already has). */
+  attach(stream: EventStream): void;
+}
+
+/**
+ * Watches the response for close and error from before the handler's first await, so neither
+ * event can be missed between the lookup and the registration.
+ */
+function watchConnection(request: FastifyRequest, reply: FastifyReply): WatchedConnection {
+  let closed = false;
+  let stream: EventStream | null = null;
+  const release = (): void => {
+    closed = true;
+    stream?.close();
+  };
+  reply.raw.on("close", release);
+  reply.raw.on("error", (error) => {
+    request.log.warn({ err: error }, "event stream failed");
+    release();
+  });
+  return {
+    gone: () => closed || reply.raw.destroyed || request.raw.socket.destroyed,
+    attach: (opened) => {
+      stream = opened;
+      if (closed) {
+        opened.close();
+      }
+    },
   };
 }
 
@@ -89,21 +134,25 @@ export const eventRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (ap
       },
     },
     async (request, reply) => {
-      const { userId } = requireSession(request);
-      const admin = await isAdmin(requireDatabase(app), userId);
+      const { userId, sessionId } = requireSession(request);
+      const database = requireDatabase(app);
+      // Attached before the first await (PR #25 review H2), so a client that leaves during the
+      // admin lookup is seen and never gets a stream registered that nothing would unregister.
+      const connection = watchConnection(request, reply);
+      const admin = await isAdmin(database, userId);
+      if (connection.gone()) {
+        request.log.info("event stream client left before the stream opened");
+        reply.hijack();
+        reply.raw.destroy();
+        return reply;
+      }
       if (!hub.hasRoom(userId)) {
         throw tooManyStreams();
       }
       reply.hijack();
       reply.raw.writeHead(HTTP_STATUS.ok, streamHeaders(request, reply));
-      const stream = hub.open({ userId, isAdmin: admin, sink: reply.raw });
-      reply.raw.on("close", () => {
-        stream.close();
-      });
-      reply.raw.on("error", (error) => {
-        request.log.warn({ err: error }, "event stream failed");
-        stream.close();
-      });
+      const recheck = sessionStreamCheck(database, sessionId);
+      connection.attach(hub.open({ userId, sessionId, isAdmin: admin, sink: reply.raw, recheck }));
       return reply;
     },
   );

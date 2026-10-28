@@ -26,7 +26,7 @@ try {
 }
 
 const database = createDatabase(processConfig.database);
-const solverQuery = createSolverQuery(processConfig.solverQueryUrl);
+const solverQuery = createSolverQuery(processConfig.solverQueryUrl, { timeoutMs: processConfig.solverQueryTimeoutMs });
 // One LISTEN connection per process for GET /events and the builder state (O-243), as the same
 // app login; LISTEN needs no grant. It connects in the background and reconnects on its own.
 const notifications = createPgNotificationSource({

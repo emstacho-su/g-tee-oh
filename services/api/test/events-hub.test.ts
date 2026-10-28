@@ -1,13 +1,14 @@
 /**
  * The event hub at unit level (R3.4, R3.5, A4 section 4, O-243): a fake notification source and
  * fake stream sinks, so payload validation, the admin-only channel, the per-user stream limit, the
- * heartbeat and the slow-consumer drop are shown without Postgres or sockets.
+ * heartbeat, the slow-consumer drop, the heartbeat recheck, the lifetime cap and closeSession
+ * (PR #25 review L2) are shown without Postgres or sockets.
  */
 import { Writable } from "node:stream";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EventHub, type EventSink, type HubLogger } from "../src/events/hub.js";
+import { EventHub, type EventSink, type HubLogger, MAX_STREAM_LIFETIME_MS } from "../src/events/hub.js";
 import type { NotificationListener, NotificationSource } from "../src/events/source.js";
 
 class FakeSource implements NotificationSource {
@@ -87,6 +88,11 @@ const COVERAGE = { config_id: "cfg_6_online_100", pair: "BB-BTN", flop: "KhQd4s"
 const PROGRESS = { job_id: "j1", line: "r250.c", iteration: 400, exploitability: [0.5, 0.25] };
 const STATE = { state: "throttled", reason: "outside the overnight window" };
 
+/** The identity of a non-admin stream for a user and session. */
+function member(userId: string, sessionId: string): { userId: string; sessionId: string; isAdmin: boolean } {
+  return { userId, sessionId, isAdmin: false };
+}
+
 describe("R3.4 event hub", () => {
   let hub: EventHub | undefined;
 
@@ -99,7 +105,7 @@ describe("R3.4 event hub", () => {
     const source = new FakeSource();
     hub = new EventHub(source, spyLogger());
     const sink = new HealthySink();
-    hub.open({ userId: "u1", isAdmin: false, sink });
+    hub.open({ userId: "u1", sessionId: "s-u1", isAdmin: false, sink });
 
     source.emit("coverage_added", COVERAGE);
     source.emit("builder_state", STATE);
@@ -126,8 +132,8 @@ describe("R3.4 event hub", () => {
     hub = new EventHub(source, spyLogger());
     const member = new HealthySink();
     const admin = new HealthySink();
-    hub.open({ userId: "member", isAdmin: false, sink: member });
-    hub.open({ userId: "admin", isAdmin: true, sink: admin });
+    hub.open({ userId: "member", sessionId: "s-member", isAdmin: false, sink: member });
+    hub.open({ userId: "admin", sessionId: "s-admin", isAdmin: true, sink: admin });
 
     source.emit("build_progress", PROGRESS);
     source.emit("build_progress", { ...PROGRESS, exploitability: null });
@@ -142,7 +148,7 @@ describe("R3.4 event hub", () => {
     const log = spyLogger();
     hub = new EventHub(source, log);
     const sink = new HealthySink();
-    hub.open({ userId: "u1", isAdmin: true, sink });
+    hub.open({ userId: "u1", sessionId: "s-u1", isAdmin: true, sink });
 
     source.emit("coverage_added", "{not json");
     source.emit("coverage_added", { ...COVERAGE, scenario_count: "many" });
@@ -157,11 +163,11 @@ describe("R3.4 event hub", () => {
 
   it("R3.4 allows at most 4 open streams per user and frees a slot when one closes", () => {
     hub = new EventHub(null, spyLogger());
-    const streams = [1, 2, 3, 4].map(() => hub?.open({ userId: "u1", isAdmin: false, sink: new HealthySink() }));
+    const streams = [1, 2, 3, 4].map(() => hub?.open({ userId: "u1", sessionId: "s-u1", isAdmin: false, sink: new HealthySink() }));
 
     expect(hub.hasRoom("u1")).toBe(false);
     expect(hub.hasRoom("u2")).toBe(true);
-    expect(() => hub?.open({ userId: "u1", isAdmin: false, sink: new HealthySink() })).toThrow(/streams/);
+    expect(() => hub?.open({ userId: "u1", sessionId: "s-u1", isAdmin: false, sink: new HealthySink() })).toThrow(/streams/);
 
     streams[0]?.close();
     streams[0]?.close();
@@ -175,8 +181,8 @@ describe("R3.4 event hub", () => {
     hub = new EventHub(source, log, { maxQueuedBytes: 1024 });
     const slow = neverDrainingSink();
     const healthy = new HealthySink();
-    hub.open({ userId: "slow", isAdmin: false, sink: slow });
-    hub.open({ userId: "fine", isAdmin: false, sink: healthy });
+    hub.open({ userId: "slow", sessionId: "s-slow", isAdmin: false, sink: slow });
+    hub.open({ userId: "fine", sessionId: "s-fine", isAdmin: false, sink: healthy });
 
     const events = 40;
     for (let index = 0; index < events; index += 1) {
@@ -196,7 +202,7 @@ describe("R3.4 event hub", () => {
     try {
       hub = new EventHub(null, spyLogger(), { heartbeatMs: 1000 });
       const sink = new HealthySink();
-      hub.open({ userId: "u1", isAdmin: false, sink });
+      hub.open({ userId: "u1", sessionId: "s-u1", isAdmin: false, sink });
 
       await vi.advanceTimersByTimeAsync(2500);
 
@@ -206,11 +212,133 @@ describe("R3.4 event hub", () => {
     }
   });
 
+  it("R3.4 re-checks each stream at the heartbeat and ends one whose session is no longer live (PR #25 L2)", async () => {
+    vi.useFakeTimers();
+    try {
+      hub = new EventHub(null, spyLogger(), { heartbeatMs: 1000 });
+      let live = true;
+      const ending = new HealthySink();
+      const other = new HealthySink();
+      hub.open({ ...member("u1", "s1"), sink: ending, recheck: () => Promise.resolve({ live, isAdmin: false }) });
+      hub.open({ ...member("u1", "s2"), sink: other, recheck: () => Promise.resolve({ live: true, isAdmin: false }) });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(ending.ended).toBe(false);
+
+      live = false;
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(ending.ended).toBe(true);
+      expect(other.ended).toBe(false);
+      expect(hub.streamCount("u1")).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("R3.4 stops sending build_progress to a stream whose admin flag was revoked (PR #25 L2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const source = new FakeSource();
+      hub = new EventHub(source, spyLogger(), { heartbeatMs: 1000 });
+      let isAdmin = true;
+      const sink = new HealthySink();
+      hub.open({ ...member("admin", "s1"), isAdmin: true, sink, recheck: () => Promise.resolve({ live: true, isAdmin }) });
+
+      source.emit("build_progress", PROGRESS);
+      isAdmin = false;
+      await vi.advanceTimersByTimeAsync(1000);
+      source.emit("build_progress", { ...PROGRESS, job_id: "after-revoke" });
+      source.emit("coverage_added", COVERAGE);
+
+      expect(sink.text()).toContain(`"job_id":"${PROGRESS.job_id}"`);
+      expect(sink.text()).not.toContain("after-revoke");
+      expect(sink.text()).toContain("event: coverage_added");
+      expect(sink.ended).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("R3.4 ends a stream at the first heartbeat after its lifetime cap (PR #25 L2)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      hub = new EventHub(null, spyLogger(), { heartbeatMs: 1000, maxLifetimeMs: 2500, now: () => now });
+      const sink = new HealthySink();
+      hub.open({ ...member("u1", "s1"), sink });
+
+      now = 2000;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sink.ended).toBe(false);
+
+      now = 2500;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sink.ended).toBe(true);
+      expect(hub.streamCount()).toBe(0);
+      expect(MAX_STREAM_LIFETIME_MS).toBe(60 * 60 * 1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("R3.4 keeps a stream and logs a warning when its re-check fails, and never runs two at once", async () => {
+    vi.useFakeTimers();
+    try {
+      const log = spyLogger();
+      hub = new EventHub(null, log, { heartbeatMs: 1000 });
+      const sink = new HealthySink();
+      let calls = 0;
+      let release: () => void = () => undefined;
+      const pending = new Promise<never>((_resolve, reject) => {
+        release = () => {
+          reject(new Error("database unavailable"));
+        };
+      });
+      hub.open({
+        ...member("u1", "s1"),
+        sink,
+        recheck: () => {
+          calls += 1;
+          return pending;
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(calls).toBe(1);
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(sink.ended).toBe(false);
+      expect(hub.streamCount("u1")).toBe(1);
+      expect(log.spy).toHaveBeenCalledWith(expect.objectContaining({ userId: "u1" }), expect.stringContaining("re-check"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("R3.4 closeSession ends that session's streams only (logout, PR #25 L2)", () => {
+    hub = new EventHub(null, spyLogger());
+    const loggedOut = [new HealthySink(), new HealthySink()];
+    const otherDevice = new HealthySink();
+    for (const sink of loggedOut) {
+      hub.open({ ...member("u1", "s1"), sink });
+    }
+    hub.open({ ...member("u1", "s2"), sink: otherDevice });
+
+    expect(hub.closeSession("s1")).toBe(2);
+
+    expect(loggedOut.every((sink) => sink.ended)).toBe(true);
+    expect(otherDevice.ended).toBe(false);
+    expect(hub.streamCount("u1")).toBe(1);
+    expect(hub.closeSession("s1")).toBe(0);
+  });
+
   it("R3.4 close ends every stream and unsubscribes from the source", () => {
     const source = new FakeSource();
     hub = new EventHub(source, spyLogger());
     const sink = new HealthySink();
-    hub.open({ userId: "u1", isAdmin: false, sink });
+    hub.open({ userId: "u1", sessionId: "s-u1", isAdmin: false, sink });
     expect(source.listenerCount()).toBe(1);
 
     hub.close();

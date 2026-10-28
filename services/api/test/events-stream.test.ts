@@ -8,98 +8,23 @@
  */
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import type { ReadableStreamDefaultReader, ReadableStreamReadResult } from "node:stream/web";
 
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import { buildApp, type ApiApp } from "../src/app.js";
-import { createUser } from "../src/auth/users.js";
 import type { Database } from "../src/db.js";
 import { createPgNotificationSource, type PgNotificationSource } from "../src/events/pg-source.js";
 import { eventHub } from "../src/events/registry.js";
+import { StreamClient, waitUntil } from "./events-test-kit.js";
 import { sessionCookie, TEST_CONFIG } from "./support/app.js";
 import {
   adminPool,
   appDatabase,
   createTestSession,
   createTestUser,
-  TEST_PASSWORD,
-  uniqueEmail,
   type TestSession,
 } from "./support/database.js";
-
-const WAIT_TIMEOUT_MS = 10_000;
-const POLL_MS = 50;
-const RETRY_LINE = "retry: 5000\n\n";
-
-/** A browser-like event stream reader over fetch. */
-class StreamClient {
-  text = "";
-  private readonly decoder = new TextDecoder();
-
-  private constructor(
-    readonly response: Response,
-    private readonly controller: AbortController,
-  ) {}
-
-  static async open(url: string, session: TestSession): Promise<StreamClient> {
-    const controller = new AbortController();
-    const response = await fetch(url, { headers: { cookie: sessionCookie(session) }, signal: controller.signal });
-    const client = new StreamClient(response, controller);
-    if (response.ok) {
-      client.pump();
-      await client.waitFor(RETRY_LINE);
-    }
-    return client;
-  }
-
-  private pump(): void {
-    const body = this.response.body;
-    if (body === null) {
-      throw new Error("the event stream has no body");
-    }
-    const reader = body.getReader() as ReadableStreamDefaultReader<Uint8Array>;
-    const read = async (): Promise<void> => {
-      for (;;) {
-        const chunk: ReadableStreamReadResult<Uint8Array> = await reader.read();
-        if (chunk.done) {
-          return;
-        }
-        this.text += this.decoder.decode(chunk.value, { stream: true });
-      }
-    };
-    read().catch((error: unknown) => {
-      if (!(error instanceof Error && error.name === "AbortError")) {
-        throw error;
-      }
-    });
-  }
-
-  async waitFor(fragment: string): Promise<void> {
-    const deadline = Date.now() + WAIT_TIMEOUT_MS;
-    while (!this.text.includes(fragment)) {
-      if (Date.now() > deadline) {
-        throw new Error(`timed out waiting for ${JSON.stringify(fragment)}; received ${JSON.stringify(this.text)}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-    }
-  }
-
-  close(): void {
-    this.controller.abort();
-  }
-}
-
-async function waitUntil(condition: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + WAIT_TIMEOUT_MS;
-  while (!condition()) {
-    if (Date.now() > deadline) {
-      throw new Error(`timed out waiting for ${what}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-  }
-}
 
 describe("R3.4 GET /events", () => {
   let database: Database;
@@ -132,7 +57,9 @@ describe("R3.4 GET /events", () => {
     url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}/api/v1/events`;
     memberId = (await createTestUser(database)).id;
     member = await createTestSession(database, memberId);
-    const ownerUser = await createUser(database, { email: uniqueEmail("admin"), password: TEST_PASSWORD, isAdmin: true });
+    // The app role cannot set is_admin (PR #25 L1); the superuser pool does, as create-user --admin would.
+    const ownerUser = await createTestUser(database);
+    await admin.query("update app_user set is_admin = true where id = $1", [ownerUser.id]);
     owner = await createTestSession(database, ownerUser.id);
   });
 

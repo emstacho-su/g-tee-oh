@@ -137,9 +137,16 @@ export async function readFirstLine(input: AsyncIterable<unknown>): Promise<stri
   return line;
 }
 
-/** A one-line description of a failure with every occurrence of the password cut out. */
-export function describeFailure(error: unknown, password: string | undefined): string {
+/**
+ * A one-line description of a failure with every occurrence of each secret (the password, and for
+ * --admin the owner connection URL and its password) cut out.
+ */
+export function describeFailure(error: unknown, ...secrets: readonly (string | undefined)[]): string {
   const message = error instanceof Error ? error.message : String(error);
-  const redacted = password === undefined || password === "" ? message : message.split(password).join(REDACTED);
+  // Longest first, so a secret that contains another is cut out whole.
+  const present = secrets
+    .filter((secret): secret is string => secret !== undefined && secret !== "")
+    .sort((left, right) => right.length - left.length);
+  const redacted = present.reduce((text, secret) => text.split(secret).join(REDACTED), message);
   return `${FAILURE_PREFIX}${redacted.replace(/\s*[\r\n]+\s*/g, " ").trim()}`;
 }

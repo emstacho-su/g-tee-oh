@@ -12,7 +12,10 @@
  * with argon2id (password.ts) and never leaves this module in any form but the hash. A duplicate is
  * detected from Postgres' unique-violation code rather than by a lookup first, so two concurrent
  * calls cannot both succeed. isAdmin sets app_user.is_admin, which the admin builder endpoints
- * require (O-242); it defaults to false.
+ * require (O-242); it defaults to false. The app role holds insert on email and password_hash only
+ * (PR #25 review L1), so a plain account's insert leaves is_admin to its default and an admin can be
+ * created only through a connection as the database owner (cli/create-user-run.ts); on the app
+ * connection isAdmin fails with Postgres' insufficient-privilege error.
  */
 import { z } from "zod";
 
@@ -91,9 +94,13 @@ export async function createUser(database: Database, input: NewUserInput): Promi
   const email = validateNewUser(input);
   const passwordHash = await hashPassword(input.password);
   try {
+    // A plain account never names is_admin: the app role may insert email and password_hash only
+    // (PR #25 review L1), and the column defaults to false. Only the owner connection may set it.
+    const account = { email, password_hash: passwordHash };
+    const values = input.isAdmin === true ? { ...account, is_admin: true } : account;
     const row = await database
       .insertInto("app_user")
-      .values({ email, password_hash: passwordHash, is_admin: input.isAdmin ?? false })
+      .values(values)
       .returning(["id", "email", "is_admin", "created_at"])
       .executeTakeFirstOrThrow();
     return { id: row.id, email: row.email, isAdmin: row.is_admin, createdAt: row.created_at };

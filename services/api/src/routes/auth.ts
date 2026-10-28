@@ -18,7 +18,7 @@
  *
  * Logout's auth policy is "optional": it always answers 204 and clears the cookie, also when the
  * session has expired or none was sent, and a live session is deleted (its CSRF token is still
- * required then). GET /me answers SessionInfo for the session the authentication hook found, so a
+ * required then) and its open event streams are ended (O-243). GET /me answers SessionInfo for the session the authentication hook found, so a
  * browser refresh recovers the CSRF token without logging in again.
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
@@ -32,6 +32,7 @@ import { createSession, deleteExpiredSessions, deleteSession, deleteSessionByTok
 import { findUserCredentials, type UserCredentials } from "../auth/users.js";
 import type { AppConfig } from "../config.js";
 import type { Database } from "../db.js";
+import { eventHub } from "../events/registry.js";
 import { requireDatabase } from "../http/database.js";
 import { optionalCsrfHeadersSchema } from "../http/headers.js";
 import { AUTHENTICATED, OPTIONAL_SESSION, PUBLIC, SESSION_COOKIE_NAME } from "../http/openapi.js";
@@ -158,7 +159,11 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteOptions> = (app, opti
     },
     async (request, reply) => {
       if (request.session !== null) {
-        await deleteSession(requireDatabase(app), request.session.sessionId);
+        const { sessionId } = request.session;
+        await deleteSession(requireDatabase(app), sessionId);
+        // The session's open event streams end now rather than at their next heartbeat recheck
+        // (O-243, PR #25 review L2).
+        eventHub(app).closeSession(sessionId);
       }
       return clearSessionCookie(reply).code(HTTP_STATUS.noContent).send(null);
     },
