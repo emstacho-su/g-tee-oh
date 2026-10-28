@@ -31,7 +31,7 @@ import { transition, type AfterFeedback, type MachineEvent, type MachineState, t
 import { sessionEndedProblem, upstreamInconsistent as inconsistent } from "./problems.js";
 import { drawRoll, type RollDraw } from "./randomness.js";
 import type { SolverPort } from "./solver-port.js";
-import type { HandState, PersistedState } from "./state.js";
+import type { HandState, PersistedState, PreviousHand } from "./state.js";
 
 export { actionAt, sessionEndedProblem, withAction };
 
@@ -182,6 +182,16 @@ const reveal: StepFn = async ({ state }, port) => {
   };
 };
 
+/**
+ * How a hand closed, for the next prompt's previous_hand (O-313). A reveal clears hand.end when
+ * the hand goes on (v1: the flop is shown and the hand ends), so a cleared end with a board is
+ * the street closing; a cleared end with no board is the stop rule ending the hand (spot mode).
+ */
+function previousHandOf(handNo: number, hand: HandState): PreviousHand {
+  const end = hand.end ?? (hand.board.length > 0 ? "street_closed" : "stop_rule");
+  return { hand_no: handNo, history: hand.history.map((entry) => ({ ...entry })), board: [...hand.board], end };
+}
+
 const handEnd: StepFn = ({ state }) => {
   const hand = requireHand(state);
   const next: PersistedState = {
@@ -189,6 +199,7 @@ const handEnd: StepFn = ({ state }) => {
     hand_no: state.hand_no + 1,
     hand: null,
     previous_board: hand.board.length > 0 ? hand.board : null,
+    previous_hand: previousHandOf(state.hand_no, hand),
   };
   return { event: { type: "next_hand" }, context: { state: next, node: undefined } };
 };

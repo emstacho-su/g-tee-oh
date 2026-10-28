@@ -51,5 +51,7 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     rng_roll: roll === null ? null : roll.roll,
     previous_board: state.previous_board === null ? null : [...state.previous_board],
     synthetic: node.synthetic,
+    hand_no: state.hand_no,
+    previous_hand: state.previous_hand ?? null,
   };
 }

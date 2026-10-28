@@ -143,6 +143,8 @@ export const fixturePrompt: TrainerPrompt = {
   rng_roll: null,
   previous_board: null,
   synthetic: true,
+  hand_no: 0,
+  previous_hand: null,
 };
 
 export const fixtureFeedback: DecisionFeedback = {

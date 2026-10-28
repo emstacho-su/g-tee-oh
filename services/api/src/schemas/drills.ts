@@ -191,12 +191,15 @@ export const drillsQuerySchema = pageQuerySchema.extend({
 
 export const drillPageSchema = pageSchema(drillSchema);
 
+/** The longest export code import accepts (O-310, drills/export-code.ts). */
+export const MAX_EXPORT_CODE_LENGTH = 8192;
+
 export const drillExportSchema = z.object({
-  export_code: z.string().describe("g-tee-oh's own encoding of a drill (S26)"),
+  export_code: z.string().describe("g-tee-oh's own encoding of a drill (O-310)"),
 });
 
 export const drillImportBodySchema = z.strictObject({
-  export_code: z.string().min(1).max(8192),
+  export_code: z.string().min(1).max(MAX_EXPORT_CODE_LENGTH),
 });
 
 export type SpotFilter = z.infer<typeof spotFilterSchema>;

@@ -4,7 +4,8 @@
  * prediction and painting. Every decision carries the state_version the client last saw, so a
  * stale or double-submitted decision is detected (A5 section 3); the owners may change these
  * shapes with a visible contract diff. S23 added, additively: the optional session seed on
- * POST /sessions (O-249, O-151), and the prompt's street, rng_roll and previous_board.
+ * POST /sessions (O-249, O-151), and the prompt's street, rng_roll and previous_board. S26 added,
+ * additively: the session's coverage (O-312) and the prompt's hand_no and previous_hand (O-313).
  */
 import { z } from "zod";
 
@@ -49,6 +50,19 @@ export const sessionCreateBodySchema = z.strictObject({
     .describe("The session seed; the same seed and choices replay the same session (O-249). Random when absent"),
 });
 
+/**
+ * The covered part of a drill at POST /sessions (S26, O-312, 05 section 1, ADR 0018), counted
+ * over the drill's (configuration, position pair) candidates: the session runs on the covered
+ * pairs, and every uncovered pair is queued for the builder as a coverage request.
+ */
+export const sessionCoverageSchema = z
+  .object({
+    pairs_total: z.number().int().min(0).describe("Configuration and position pairs the drill's filter reaches"),
+    pairs_covered: z.number().int().min(0).describe("Pairs the library covers; the session runs on these"),
+    pairs_queued: z.number().int().min(0).describe("Uncovered pairs, each queued for the builder"),
+  })
+  .meta({ id: "SessionCoverage" });
+
 export const sessionSchema = z
   .object({
     session_id: uuidSchema,
@@ -57,8 +71,25 @@ export const sessionSchema = z
     state: sessionStateSchema,
     state_version: z.number().int().min(0),
     started_at: timestampSchema,
+    coverage: sessionCoverageSchema.optional().describe("The covered part of the drill; set by POST /sessions (O-312)"),
   })
   .meta({ id: "PracticeSession" });
+
+/**
+ * How a hand ended (S26, O-313): a fold, the street closing (in full-hand mode the flop is then in
+ * the board), the hand leaving the solution's range, or the stop rule (spot mode ends every hand
+ * after the hero's one decision).
+ */
+export const previousHandEndSchema = z.enum(["fold", "street_closed", "off_range", "stop_rule"]);
+
+export const previousHandSchema = z
+  .object({
+    hand_no: z.number().int().min(0),
+    history: z.array(z.object({ position: positionSchema, token: z.string(), label: z.string() })),
+    board: z.array(cardSchema).describe("The board the hand reached; the flop when a full hand ended there"),
+    end: previousHandEndSchema,
+  })
+  .meta({ id: "PreviousHand" });
 
 export const promptSchema = z
   .object({
@@ -88,6 +119,14 @@ export const promptSchema = z
     synthetic: z
       .boolean()
       .describe("True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"),
+    hand_no: z
+      .number()
+      .int()
+      .min(0)
+      .describe("The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313)"),
+    previous_hand: previousHandSchema
+      .nullable()
+      .describe("How the last ended hand closed; null before the first hand ends (O-313)"),
   })
   .meta({ id: "TrainerPrompt" });
 

@@ -1611,9 +1611,7 @@ export interface paths {
         };
         /**
          * A drill's export code
-         * @description g-tee-oh's own encoding of the drill.
-         *
-         *     Answers 501 until S26 builds it (O-38).
+         * @description g-tee-oh's own encoding of the drill's name, tags, spot filter and trainer settings (O-310).
          */
         get: {
             parameters: {
@@ -1633,7 +1631,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            /** @description g-tee-oh's own encoding of a drill (S26) */
+                            /** @description g-tee-oh's own encoding of a drill (O-310) */
                             export_code: string;
                         };
                     };
@@ -1683,15 +1681,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
             };
         };
         put?: never;
@@ -1713,9 +1702,7 @@ export interface paths {
         put?: never;
         /**
          * Import a drill from its export code
-         * @description Creates a drill from an export code.
-         *
-         *     Answers 501 until S26 builds it (O-38).
+         * @description Creates a new drill of the session user from an export code (O-310); never overwrites a drill. A code that is too long, of another version, damaged, expanding past its cap or holding a drill the write rules refuse is a 400 validation problem pointing at body.export_code.
          */
         post: {
             parameters: {
@@ -1773,15 +1760,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (404) */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
                 /** @description Problem (409) */
                 409: {
                     headers: {
@@ -1829,15 +1807,6 @@ export interface paths {
                 };
                 /** @description Problem (500) */
                 500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Problem (501) */
-                501: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4795,6 +4764,8 @@ export interface components {
             preflop_available: boolean;
         };
         PracticeSession: {
+            /** @description The covered part of the drill; set by POST /sessions (O-312) */
+            coverage?: components["schemas"]["SessionCoverage"];
             drill_id: string | null;
             /** @enum {string} */
             mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
@@ -4810,6 +4781,8 @@ export interface components {
             state_version: number;
         };
         PracticeSessionInput: {
+            /** @description The covered part of the drill; set by POST /sessions (O-312) */
+            coverage?: components["schemas"]["SessionCoverageInput"];
             drill_id: string | null;
             /** @enum {string} */
             mode: "automated" | "drill" | "holdout" | "prediction" | "range_paint";
@@ -4823,6 +4796,32 @@ export interface components {
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
             state_version: number;
+        };
+        PreviousHand: {
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /** @enum {string} */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+        };
+        PreviousHandInput: {
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /** @enum {string} */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
         };
         /** @description RFC 9457 problem details (application/problem+json) */
         Problem: {
@@ -4869,6 +4868,22 @@ export interface components {
             ip_mean_equity: number;
             oop_mean_equity: number;
             to_act_advantage_pct_points: number;
+        };
+        SessionCoverage: {
+            /** @description Pairs the library covers; the session runs on these */
+            pairs_covered: number;
+            /** @description Uncovered pairs, each queued for the builder */
+            pairs_queued: number;
+            /** @description Configuration and position pairs the drill's filter reaches */
+            pairs_total: number;
+        };
+        SessionCoverageInput: {
+            /** @description Pairs the library covers; the session runs on these */
+            pairs_covered: number;
+            /** @description Uncovered pairs, each queued for the builder */
+            pairs_queued: number;
+            /** @description Configuration and position pairs the drill's filter reaches */
+            pairs_total: number;
         };
         SessionInfo: {
             /** @description Send as x-csrf-token on every mutating request (O-230) */
@@ -5306,6 +5321,8 @@ export interface components {
             board: string[];
             /** @description Generated from the node's tree actions (ADR 0020) */
             buttons: components["schemas"]["NodeAction"][];
+            /** @description The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313) */
+            hand_no: number;
             hero_hand: string[];
             /** @enum {string} */
             hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
@@ -5318,6 +5335,8 @@ export interface components {
             pot_cbb: number;
             /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
             previous_board: string[] | null;
+            /** @description How the last ended hand closed; null before the first hand ends (O-313) */
+            previous_hand: components["schemas"]["PreviousHand"] | null;
             /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
             rng_roll: number | null;
             /** Format: uuid */
@@ -5339,6 +5358,8 @@ export interface components {
             board: string[];
             /** @description Generated from the node's tree actions (ADR 0020) */
             buttons: components["schemas"]["NodeActionInput"][];
+            /** @description The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313) */
+            hand_no: number;
             hero_hand: string[];
             /** @enum {string} */
             hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
@@ -5351,6 +5372,8 @@ export interface components {
             pot_cbb: number;
             /** @description The board revealed when the previous hand ended (full-hand mode); null when none was */
             previous_board: string[] | null;
+            /** @description How the last ended hand closed; null before the first hand ends (O-313) */
+            previous_hand: components["schemas"]["PreviousHandInput"] | null;
             /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
             rng_roll: number | null;
             /** Format: uuid */

@@ -114,10 +114,12 @@ export async function createSession(call: SessionCall, body: SessionCreateBody):
     throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
   }
   const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot);
+  // O-312: the covered part the session runs on, and the uncovered rest queued below.
+  const coverage = { pairs_total: candidates.length, pairs_covered: covered.length, pairs_queued: gaps.length };
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
     const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });
-    return toSession(row);
+    return { ...toSession(row), coverage };
   });
 }
 

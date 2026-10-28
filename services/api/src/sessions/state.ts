@@ -28,7 +28,7 @@ import {
   streetSchema,
   uuidSchema,
 } from "../schemas/common.js";
-import { hex64Schema, sessionStateSchema } from "../schemas/training.js";
+import { hex64Schema, previousHandSchema, sessionStateSchema } from "../schemas/training.js";
 import { sessionSpotSchema, type SessionSpot } from "./spot.js";
 
 /** The most hero spots a session keeps; a drill over many pairs keeps the first ones found. */
@@ -89,6 +89,8 @@ export const persistedStateSchema = z.strictObject({
   hand: handStateSchema.nullable(),
   previous_board: z.array(cardSchema).nullable(),
   last_attempt_id: uuidSchema.nullable(),
+  /** How the last ended hand closed (S26, O-313); absent on rows written before S26 and before the first hand ends. */
+  previous_hand: previousHandSchema.optional(),
 });
 
 export type HandEnd = z.infer<typeof handEndSchema>;
@@ -96,6 +98,7 @@ export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 export type HeroSpot = z.infer<typeof heroSpotSchema>;
 export type HandState = z.infer<typeof handStateSchema>;
 export type PersistedState = z.infer<typeof persistedStateSchema>;
+export type PreviousHand = z.infer<typeof previousHandSchema>;
 
 /** The state of a new session: dealing hand 0 (A6 section 2). */
 export function initialState(seed: string, spots: readonly HeroSpot[], spot: SessionSpot): PersistedState {
