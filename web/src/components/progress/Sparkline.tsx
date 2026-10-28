@@ -7,10 +7,11 @@
  * crosshair to the nearest week, focus starts it at the last week and the left and right arrow
  * keys step it, and a tooltip states the week and its value ("this week (partial)" for the live
  * week, "no data" for a gap). The image's name lists every week the same way (S36 review), so
- * nothing rests on the shape alone and no second table repeats it. Colors are Tailwind token
- * utilities, so both themes follow.
+ * nothing rests on the shape alone and no second table repeats it. The tooltip is a sighted echo;
+ * an arrow-key step is reported through onAnnounce to the chart's one polite live region (S36
+ * follow-up). Colors are Tailwind token utilities, so both themes follow.
  */
-import { useId, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { formatLeak, formatShortDate } from "../../progress/format.js";
 import { sparklineGeometry, type LeakScale, type SparkBox } from "../../progress/leak-model.js";
@@ -28,32 +29,42 @@ export interface SparklineProps {
   scale: LeakScale;
   /** The class's label, for the image's accessible name. */
   label: string;
+  /**
+   * Called with the week an arrow key moved to ("<label>: Week of Oct 19: 44.4 bb per 1,000
+   * hands"), and with "" when the line loses focus, so the chart's one polite live region tells a
+   * screen reader where keyboard stepping landed. Focus and hover announce nothing: the name has
+   * every week already.
+   */
+  onAnnounce?: (text: string) => void;
 }
 
-function weekText(item: LeakItem, index: number): string {
+/** One week in words; withUnit adds "bb per 1,000 hands" after the value (the tooltip does). */
+function weekText(item: LeakItem, index: number, withUnit: boolean): string {
   const point = item.series[index];
   if (point === undefined) return "";
   const week = point.partial ? `${formatShortDate(point.week)}, ${PARTIAL_WEEK_TEXT}` : `Week of ${formatShortDate(point.week)}`;
-  const value = point.leak_cost_bb_per_1k === null ? NO_DATA_TEXT : `${formatLeak(point.leak_cost_bb_per_1k)} ${UNIT}`;
-  return `${week}: ${value}`;
+  if (point.leak_cost_bb_per_1k === null) return `${week}: ${NO_DATA_TEXT}`;
+  const value = formatLeak(point.leak_cost_bb_per_1k);
+  return `${week}: ${withUnit ? `${value} ${UNIT}` : value}`;
 }
 
 /**
  * The image's name: every week in order with its value, the partial week and the gaps named (S36
- * review). With the table gone this is the screen-reader view of the line (O-347), the same words
- * the tooltip shows week by week.
+ * review). With the table gone this is the screen-reader view of the line (O-347). The unit is
+ * said once, before the weeks, so 26 weeks stay short enough to listen to (S36 follow-up). The
+ * name is the only accessible text: the tooltip echoes one week for sighted users and is not
+ * linked as a description, which would read that week twice.
  */
 function summary(item: LeakItem, label: string): string {
-  return `${label}: ${item.series.map((_, index) => weekText(item, index)).join("; ")}`;
+  return `${label}, ${UNIT} by week: ${item.series.map((_, index) => weekText(item, index, false)).join("; ")}`;
 }
 
 function nearestIndex(weekX: readonly number[], x: number): number {
   return weekX.reduce((best, candidate, index) => (Math.abs(candidate - x) < Math.abs((weekX[best] ?? 0) - x) ? index : best), 0);
 }
 
-export function Sparkline({ item, scale, label }: SparklineProps) {
+export function Sparkline({ item, scale, label, onAnnounce }: SparklineProps) {
   const geometry = sparklineGeometry(item, scale, SPARK_BOX);
-  const tooltipId = useId();
   const tooltip = useTooltipAnchor();
   const [active, setActive] = useState<number | null>(null);
   const lastIndex = item.series.length - 1;
@@ -68,11 +79,17 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
     const step = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
     if (step === 0) return;
     event.preventDefault();
-    setActive((current) => Math.min(Math.max((current ?? lastIndex) + step, 0), lastIndex));
+    const next = Math.min(Math.max((active ?? lastIndex) + step, 0), lastIndex);
+    setActive(next);
+    onAnnounce?.(`${label}: ${weekText(item, next, true)}`);
   };
   const hide = () => {
     setActive(null);
     tooltip.hide();
+  };
+  const leave = () => {
+    hide();
+    onAnnounce?.("");
   };
   const activeX = active === null ? null : geometry.weekX[active];
 
@@ -81,7 +98,6 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
       <svg
         role="img"
         aria-label={summary(item, label)}
-        aria-describedby={active === null ? undefined : tooltipId}
         tabIndex={0}
         width={SPARK_BOX.width}
         height={SPARK_BOX.height}
@@ -94,7 +110,7 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
           setActive(lastIndex);
           tooltip.show(event.currentTarget);
         }}
-        onBlur={hide}
+        onBlur={leave}
         onKeyDown={onKey}
       >
         <line x1={0} x2={SPARK_BOX.width} y1={SPARK_BOX.height - SPARK_BOX.inset} y2={SPARK_BOX.height - SPARK_BOX.inset} className="stroke-border" strokeWidth={1} />
@@ -127,8 +143,8 @@ export function Sparkline({ item, scale, label }: SparklineProps) {
           />
         )}
       </svg>
-      <ChartTooltip id={tooltipId} anchor={active === null ? null : tooltip.anchor}>
-        {active === null ? null : weekText(item, active)}
+      <ChartTooltip anchor={active === null ? null : tooltip.anchor}>
+        {active === null ? null : weekText(item, active, true)}
       </ChartTooltip>
     </span>
   );
