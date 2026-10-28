@@ -92,7 +92,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           actions={prompt.buttons}
           chosenIndex={decision.actionIndex}
           rangeView={<FeedbackRangeView feedback={feedback} />}
-          thresholdCard={<FeedbackThreshold feedback={feedback} />}
+          thresholdCard={<FeedbackThreshold feedback={feedback} actions={prompt.buttons} />}
           roller={roller}
           insights={<FeedbackInsights feedback={feedback} />}
           explanation={<MoreInfoSection key={`more-info-${feedback.attempt_id}`} attemptId={feedback.attempt_id} />}

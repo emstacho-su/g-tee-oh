@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { isHandNotInRange } from "../../api/index.js";
 import { useAppApi } from "../../auth/index.js";
-import type { DecisionFeedback } from "../../contracts.js";
+import type { DecisionFeedback, NodeAction } from "../../contracts.js";
 import { heroHandClass } from "../../poker/hand-class.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { ThresholdCard } from "../panels/ThresholdCard.js";
@@ -23,9 +23,14 @@ import { QueryFailure } from "./FeedbackQueryState.js";
 
 export interface FeedbackThresholdProps {
   feedback: DecisionFeedback;
+  /**
+   * The decided node's actions (the prompt's buttons), so the card names each threshold action and
+   * shows its swatch instead of a token (S38, O-198); without them it names actions from the token.
+   */
+  actions?: readonly NodeAction[];
 }
 
-export function FeedbackThreshold({ feedback }: FeedbackThresholdProps) {
+export function FeedbackThreshold({ feedback, actions }: FeedbackThresholdProps) {
   const api = useAppApi();
   const query = useQuery(
     studyInsightsQuery(api, { solutionId: feedback.solution_id, nodeKey: feedback.node_key, hand: feedback.hand }),
@@ -49,5 +54,5 @@ export function FeedbackThreshold({ feedback }: FeedbackThresholdProps) {
       />
     );
   }
-  return <ThresholdCard card={query.data.threshold_card} heroHand={heroHand} />;
+  return <ThresholdCard card={query.data.threshold_card} heroHand={heroHand} {...(actions === undefined ? {} : { actions })} />;
 }
