@@ -21,9 +21,10 @@
  * - Cache (PR #27 review MEDIUM 6, MEDIUM 7, HIGH 3): one all-configs catalog per solver-query
  *   client for CATALOG_TTL_MS, single flight (concurrent loads share one promise), an expired entry
  *   replaced on the next load. A scope (config_ids) is cut from it in memory (scopeCatalog), so
- *   no subset ever walks solver-query again. A load that fails, that meets a coverage answer whose
- *   database did not answer (a partial catalog), or that finds no class at all is never cached, so
- *   the next call asks again. buildApp subscribes watchCoverageAdded once, which drops the cache on
+ *   no subset ever walks solver-query again. A load that fails (unreachable, a 5xx, or a coverage
+ *   answer whose database did not answer: a partial catalog) is never cached, so the next call asks
+ *   again; a load where every answer succeeded but no class exists is cached for
+ *   EMPTY_CATALOG_TTL_MS only. buildApp subscribes watchCoverageAdded once, which drops the cache on
  *   a coverage_added notification, since new coverage changes classes.
  * - The decision and end transactions never load it: learning/prepare.ts loads it before the lock
  *   and hands it to the hooks as context.prepared.catalog (null when it cannot load).
@@ -44,6 +45,12 @@ import { expectData, type SolverQuery, type SqClassSpot, type SqSpotClassEntry }
 export const CATALOG_DEADLINE_MS = 30_000;
 /** How long a loaded catalog is served from memory before it is read again. */
 export const CATALOG_TTL_MS = 600_000;
+/**
+ * How long a successful but empty catalog (no class anywhere) is served from memory, counted from
+ * the load's start (PR #27 review, PM decision): short, so new classes are seen soon, yet a fresh
+ * install does not re-walk every pair on every decision. coverage_added drops it at once.
+ */
+export const EMPTY_CATALOG_TTL_MS = 30_000;
 /** A reach is a probability; solver-query's f32 sum may round a hair above 1. */
 const MAX_LINE_REACH = 1;
 /** v1 serves no ante variants (O-33). */
@@ -290,8 +297,8 @@ function loadAllConfigs(solverQuery: SolverQuery, database: Database, nowMs: num
   caches.set(solverQuery, entry);
   catalog.then(
     (loaded) => {
-      if (loaded.classes.length === 0) {
-        dropEntry(solverQuery, entry);
+      if (loaded.classes.length === 0 && caches.get(solverQuery) === entry) {
+        caches.set(solverQuery, { expiresAt: nowMs + EMPTY_CATALOG_TTL_MS, catalog });
       }
     },
     () => dropEntry(solverQuery, entry),

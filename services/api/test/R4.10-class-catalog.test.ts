@@ -2,15 +2,17 @@
  * The class catalog over the fixture solver-query (R4.10, O-270, ADR 0004): classes, families and
  * hero seats come from solver-query, every reach is a probability and every prior learning's; pairs
  * the library does not hold are gaps; a scope naming a configuration the catalog does not serve is a
- * 400; every scope is cut from one all-configs load (one in flight), a failed, partial or empty load
- * is never cached, buildApp subscribes the invalidation, and a coverage_added notification drops the
- * cache (PR #27 review HIGH 3, MEDIUM 6, 7, 8).
+ * 400; every scope is cut from one all-configs load (one in flight), a failed or partial load is
+ * never cached, an empty one only for EMPTY_CATALOG_TTL_MS (PR #27 review, PM decision), buildApp
+ * subscribes the invalidation, and a coverage_added notification drops the cache (PR #27 review
+ * HIGH 3, MEDIUM 6, 7, 8).
  */
 import { frequencyPriorPer1000 } from "@g-tee-oh/learning";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   CATALOG_TTL_MS,
+  EMPTY_CATALOG_TTL_MS,
   invalidateClassCatalogs,
   loadClassCatalog,
   watchCoverageAdded,
@@ -157,16 +159,70 @@ describe("R4.10 class catalog over the fixture library (O-270)", { timeout: COLD
     expect(catalog.coveredPairs).toHaveLength(SIX_MAX_PAIRS);
   });
 
-  it("R4.10 an empty catalog is never cached, so the next load asks again (PR #27 review HIGH 3)", async () => {
+  it("R4.10 an empty successful catalog is served from cache for EMPTY_CATALOG_TTL_MS, then read again (PR #27 review, PM decision)", async () => {
     const control = coverageControl();
     const client = fixtureSolverQuery(control.fetch);
     const full = await fullCatalogPairs(database);
+    let clock = 0;
+    const nowMs = () => clock;
+    expect(EMPTY_CATALOG_TTL_MS).toBe(30_000);
     control.rewrite = (body) => ({ ...body, spot_classes: [] });
-    expect((await loadClassCatalog(client, database)).classes).toEqual([]);
+    expect((await loadClassCatalog(client, database, undefined, { nowMs })).classes).toEqual([]);
+    expect(control.calls()).toBe(full);
+    clock = EMPTY_CATALOG_TTL_MS - 1;
+    expect((await loadClassCatalog(client, database, undefined, { nowMs })).classes).toEqual([]);
     expect(control.calls()).toBe(full);
     control.rewrite = null;
-    expect((await loadClassCatalog(client, database)).classes.length).toBeGreaterThan(0);
+    clock = EMPTY_CATALOG_TTL_MS;
+    expect((await loadClassCatalog(client, database, undefined, { nowMs })).classes.length).toBeGreaterThan(0);
     expect(control.calls()).toBe(2 * full);
+    clock = EMPTY_CATALOG_TTL_MS + CATALOG_TTL_MS - 1;
+    await loadClassCatalog(client, database, undefined, { nowMs });
+    expect(control.calls()).toBe(2 * full);
+  });
+
+  it("R4.10 a coverage_added notification clears a cached empty catalog at once (PR #27 review, PM decision)", async () => {
+    const control = coverageControl();
+    const client = fixtureSolverQuery(control.fetch);
+    const full = await fullCatalogPairs(database);
+    const nowMs = () => 0;
+    let listener: NotificationListener = () => undefined;
+    const source: NotificationSource = {
+      subscribe: (added) => {
+        listener = added;
+        return () => undefined;
+      },
+      close: () => Promise.resolve(),
+    };
+    watchCoverageAdded(source);
+    control.rewrite = (body) => ({ ...body, spot_classes: [] });
+    await loadClassCatalog(client, database, undefined, { nowMs });
+    await loadClassCatalog(client, database, undefined, { nowMs });
+    expect(control.calls()).toBe(full);
+    control.rewrite = null;
+    listener("coverage_added", "{}");
+    expect((await loadClassCatalog(client, database, undefined, { nowMs })).classes.length).toBeGreaterThan(0);
+    expect(control.calls()).toBe(2 * full);
+  });
+
+  it("R4.10 a failed load (a 5xx, or a database that did not answer) is never cached, even with no classes (PR #27 review, PM decision)", async () => {
+    const control = coverageControl();
+    const client = fixtureSolverQuery(control.fetch);
+    const full = await fullCatalogPairs(database);
+    const nowMs = () => 0;
+    control.failing = true;
+    await expect(loadClassCatalog(client, database, undefined, { nowMs })).rejects.toBeInstanceOf(ProblemError);
+    const afterServerError = control.calls();
+    expect(afterServerError).toBeGreaterThan(0);
+    await expect(loadClassCatalog(client, database, undefined, { nowMs })).rejects.toBeInstanceOf(ProblemError);
+    expect(control.calls()).toBeGreaterThan(afterServerError);
+    control.failing = false;
+    control.rewrite = (body) => ({ ...body, database: "unavailable", spot_classes: [] });
+    await expect(loadClassCatalog(client, database, undefined, { nowMs })).rejects.toBeInstanceOf(ProblemError);
+    const afterUnavailable = control.calls();
+    control.rewrite = null;
+    expect((await loadClassCatalog(client, database, undefined, { nowMs })).classes.length).toBeGreaterThan(0);
+    expect(control.calls()).toBe(afterUnavailable + full);
   });
 
   it("R4.10 buildApp subscribes the catalog invalidation before any automated session exists (PR #27 review MEDIUM 8)", async () => {
