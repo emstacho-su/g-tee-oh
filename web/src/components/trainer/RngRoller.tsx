@@ -10,9 +10,11 @@
  * selects Raise to 2.5bb". A band narrower than NARROW_BAND_ROLLS rolls shows only its swatch and
  * letter inside the strip, with the full text as its tooltip and for screen readers, because the
  * text would be clipped there; the legend under the strip always lists every band in full, so no
- * band loses its text at any width. The info button calls onExplain; the explainer itself is
- * S25. Input the learning package rejects (lengths that differ, a roll outside 1 to 100, an
- * unknown bucket) renders an alert instead of a guessed strip.
+ * band loses its text at any width. The info button calls onExplain; without onExplain there is
+ * no info button (S25: the explainer draws its own example strip, which must not hold a button
+ * that would only reopen the dialog it sits in). Input the learning package rejects (lengths
+ * that differ, a roll outside 1 to 100, an unknown bucket) renders an alert instead of a guessed
+ * strip.
  *
  * Numbering (O-198): packages/learning returns record positions (RngBand.actionIndex and
  * rollSelectedAction's result), which this component uses only to read actions and the
@@ -33,7 +35,8 @@ export interface RngRollerProps {
   /** One frequency per action, by position in actions (record order). */
   freqByAction: readonly number[];
   roll: number | null;
-  onExplain: () => void;
+  /** Opens the explainer; the info button is left out when absent. */
+  onExplain?: () => void;
 }
 
 type RollerModel =
@@ -76,7 +79,8 @@ function percentOf(rolls: number): string {
   return `${(rolls * PERCENT) / ROLL_SPAN}%`;
 }
 
-function InfoButton({ onExplain }: { onExplain: () => void }) {
+function InfoButton({ onExplain }: { onExplain: (() => void) | undefined }) {
+  if (onExplain === undefined) return null;
   return (
     <Button variant="ghost" size="sm" aria-label="How RNG mode works" onClick={onExplain}>
       <span aria-hidden="true">ⓘ</span>

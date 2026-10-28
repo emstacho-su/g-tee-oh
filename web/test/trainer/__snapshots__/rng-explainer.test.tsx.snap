@@ -1,0 +1,212 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot: why randomize, how the roll works, why it is optional 1`] = `
+<div
+  class="flex flex-col gap-4 text-sm"
+  data-testid="rng-explainer-content"
+>
+  <section
+    class="flex flex-col gap-2"
+  >
+    <h3
+      class="font-semibold"
+    >
+      Why randomize at all
+    </h3>
+    <p>
+      Some hands play more than one action, for example calling some of the time and raising the rest. A hand that mixes is indifferent between those actions: each one earns the same EV (expected value) by itself.
+    </p>
+    <p>
+      The mix matters for your range as a whole. If you always played this hand the same way, an observant opponent could learn which hands take which line and play against that.
+    </p>
+  </section>
+  <section
+    class="flex flex-col gap-2"
+  >
+    <h3
+      class="font-semibold"
+    >
+      How the roll works
+    </h3>
+    <p>
+      Before you act, the app rolls a number from 1 to 100. Your hand's actions are lined up from passive to aggressive: fold, then check or call, then bets and raises from small to large. Each action gets a band as wide as its frequency, and the roll picks the action whose band contains it. That action is labeled Best.
+    </p>
+    <p>
+      Example: 40 percent call and 60 percent raise means rolls 1 to 40 call and 41 to 100 raise. Here the roll is 37, so it lands in the call band.
+    </p>
+    <div
+      class="flex flex-col gap-2"
+      data-selected-index="0"
+      data-testid="rng-roller"
+    >
+      <div
+        class="flex items-center justify-between gap-2"
+      >
+        <p
+          aria-live="polite"
+          class="text-sm font-medium"
+        >
+          Roll 37 selects Call
+        </p>
+      </div>
+      <div
+        class="relative"
+      >
+        <ol
+          aria-label="RNG bands"
+          class="flex h-12 w-full overflow-hidden rounded border border-border"
+        >
+          <li
+            aria-current="true"
+            class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) dark:bg-(--action-dark) outline outline-2 -outline-offset-2 outline-focus"
+            data-action-index="0"
+            data-range="1-40"
+            style="--action-light: #4ade80; --action-dark: #22c55e; background-image: radial-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1.5px); background-size: 5px 5px; width: 40%;"
+            title="1-40 Call"
+          >
+            <span
+              class="flex items-center gap-1 truncate rounded bg-white/80 px-1"
+            >
+              <span
+                class="inline-flex items-center gap-1"
+              >
+                <span
+                  aria-hidden="true"
+                  class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) dark:bg-(--action-dark)"
+                  data-pattern="dots"
+                  data-testid="action-swatch"
+                  style="--action-light: #4ade80; --action-dark: #22c55e; background-image: radial-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1.5px); background-size: 5px 5px;"
+                />
+                <span
+                  aria-hidden="true"
+                  class="font-mono text-xs font-bold"
+                >
+                  C
+                </span>
+              </span>
+              <span
+                data-testid="rng-band-label"
+              >
+                1-40 Call
+              </span>
+            </span>
+          </li>
+          <li
+            class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) dark:bg-(--action-dark)"
+            data-action-index="1"
+            data-range="41-100"
+            style="--action-light: #f87171; --action-dark: #ef4444; background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 6px); width: 60%;"
+            title="41-100 Raise to 2.5bb"
+          >
+            <span
+              class="flex items-center gap-1 truncate rounded bg-white/80 px-1"
+            >
+              <span
+                class="inline-flex items-center gap-1"
+              >
+                <span
+                  aria-hidden="true"
+                  class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) dark:bg-(--action-dark)"
+                  data-pattern="diagonal"
+                  data-testid="action-swatch"
+                  style="--action-light: #f87171; --action-dark: #ef4444; background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 6px);"
+                />
+                <span
+                  aria-hidden="true"
+                  class="font-mono text-xs font-bold"
+                >
+                  R
+                </span>
+              </span>
+              <span
+                data-testid="rng-band-label"
+              >
+                41-100 Raise to 2.5bb
+              </span>
+            </span>
+          </li>
+        </ol>
+        <span
+          aria-hidden="true"
+          class="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 bg-text"
+          data-testid="rng-marker"
+          style="left: 36.5%;"
+        />
+      </div>
+      <ul
+        aria-label="RNG band legend"
+        class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"
+      >
+        <li
+          class="flex items-center gap-1"
+        >
+          <span
+            class="inline-flex items-center gap-1"
+          >
+            <span
+              aria-hidden="true"
+              class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) dark:bg-(--action-dark)"
+              data-pattern="dots"
+              data-testid="action-swatch"
+              style="--action-light: #4ade80; --action-dark: #22c55e; background-image: radial-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1.5px); background-size: 5px 5px;"
+            />
+            <span
+              aria-hidden="true"
+              class="font-mono text-xs font-bold"
+            >
+              C
+            </span>
+          </span>
+          <span>
+            1-40 Call
+          </span>
+        </li>
+        <li
+          class="flex items-center gap-1"
+        >
+          <span
+            class="inline-flex items-center gap-1"
+          >
+            <span
+              aria-hidden="true"
+              class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) dark:bg-(--action-dark)"
+              data-pattern="diagonal"
+              data-testid="action-swatch"
+              style="--action-light: #f87171; --action-dark: #ef4444; background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 6px);"
+            />
+            <span
+              aria-hidden="true"
+              class="font-mono text-xs font-bold"
+            >
+              R
+            </span>
+          </span>
+          <span>
+            41-100 Raise to 2.5bb
+          </span>
+        </li>
+      </ul>
+    </div>
+    <p
+      class="text-muted"
+    >
+      You see only the roll before you act. The bands appear after your decision, because they are the hand's strategy.
+    </p>
+  </section>
+  <section
+    class="flex flex-col gap-2"
+  >
+    <h3
+      class="font-semibold"
+    >
+      Why it is optional
+    </h3>
+    <p>
+      Against opponents who do not track your frequencies, getting the action category right (fold, call or raise) matters more than hitting the exact mix.
+    </p>
+    <p>
+      Grading stays fair either way: any action in your hand's mix whose EV loss is within the noise floor is graded correct, with or without RNG mode.
+    </p>
+  </section>
+</div>
+`;

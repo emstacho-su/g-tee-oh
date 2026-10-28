@@ -2,13 +2,18 @@
  * Component gallery entry (S24, O-267): built only with `vite build --mode harness`, never in the
  * production image. It renders every S24 component with synthetic fixtures so the Playwright
  * shots project can screenshot each one in both themes (O-266). The theme comes from the
- * query string (?theme=dark), so a screenshot never depends on stored state.
+ * query string (?theme=dark), so a screenshot never depends on stored state. S25 adds the RNG
+ * explainer, roll badge and wired feedback sections (rng-sections.tsx); the feedback range view
+ * reads its theme from the app's theme store, so the query-string theme is put into that store
+ * in memory only (setState, not setTheme, so nothing is written to localStorage).
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { HotkeyRoot } from "../hotkeys/index.js";
+import { useThemeStore } from "../store/index.js";
 import { MatrixSections } from "./matrix-sections.js";
+import { RngSections } from "./rng-sections.js";
 import { TableSections, TrainerSections } from "./sections.js";
 import "../styles.css";
 
@@ -20,6 +25,7 @@ function themeFromQuery(): "light" | "dark" {
 
 const theme = themeFromQuery();
 document.documentElement.classList.toggle(DARK, theme === "dark");
+useThemeStore.setState({ theme });
 
 const container = document.getElementById("root");
 if (container === null) throw new Error("gallery: no #root element");
@@ -34,6 +40,7 @@ createRoot(container).render(
         </header>
         <TableSections />
         <TrainerSections />
+        <RngSections />
         <MatrixSections theme={theme} />
       </main>
     </HotkeyRoot>

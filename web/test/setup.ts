@@ -6,8 +6,16 @@
  */
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+
+/**
+ * findBy and waitFor wait this long (Testing Library's default is 1,000 ms). S25's whole-app
+ * renders chain /me, the route's loader and the screen's own reads; under `just ts-test`, which
+ * runs every package's suite in parallel, that chain exceeded one second once on the Zenbook.
+ */
+const ASYNC_UTIL_TIMEOUT_MS = 5_000;
+configure({ asyncUtilTimeout: ASYNC_UTIL_TIMEOUT_MS });
 
 afterEach(cleanup);
 

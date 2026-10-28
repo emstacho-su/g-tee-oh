@@ -8,8 +8,18 @@ import { describeFailureForLog, HTTP_STATUS } from "../../src/api/http-status.js
 import { ApiProblem } from "../../src/api/index.js";
 
 describe("R3.13 http status and log-safe failures", () => {
-  it("R3.13 names the statuses the session code branches on", () => {
-    expect(HTTP_STATUS).toEqual({ unauthorized: 401, forbidden: 403, tooManyRequests: 429 });
+  it("R3.13 names the statuses the session, study and trainer code branch on", () => {
+    expect(HTTP_STATUS).toEqual({
+      badRequest: 400,
+      unauthorized: 401,
+      forbidden: 403,
+      notFound: 404,
+      conflict: 409,
+      unprocessable: 422,
+      tooManyRequests: 429,
+      badGateway: 502,
+      unavailable: 503,
+    });
   });
 
   it("R3.13 describes a problem by status and slug, never by its detail", () => {
