@@ -48,6 +48,13 @@ const CONFIGS = jsonResponse(200, { items: fixtureConfigs, next_cursor: null });
 const CREATED_ID = "00000000-0000-4000-8000-0000000000ab";
 
 describe("R4.12 /progress", () => {
+  it("R4.12 R4.14 the streak card names the next milestone's cosmetic as home does, never by its key", async () => {
+    renderApp("/progress", PROGRESS);
+    const next = await screen.findByTestId("streak-next");
+    expect(next).toHaveTextContent("Next: 30 days unlocks Thirty-day streak badge.");
+    expect(next).not.toHaveTextContent("badge-streak-30");
+  });
+
   it("R4.12 shows the rating, streak, tracks, leak trend, heat map and holdout cards", async () => {
     renderApp("/progress", PROGRESS);
     expect(await screen.findByRole("heading", { level: 1, name: "Progress" })).toBeInTheDocument();

@@ -18,6 +18,7 @@ import { useState, type ReactNode } from "react";
 import { useAppApi } from "../../auth/index.js";
 import { HoldoutCard, LeakTrendChart, MasteryHeatMap, ProgressCard, RatingCard, StreakBadge, TrackBreakdown } from "../../components/progress/index.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
+import { describeCosmetic } from "../../cosmetics/catalog.js";
 import { useOpenDrill, type DrillOrigin, type DrillTarget } from "../../progress/open-drill.js";
 import { heatmapQuery, holdoutQuery, leaksQuery, ratingQuery, streakQuery, tracksQuery } from "../../progress/queries.js";
 import { DEFAULT_LEAK_WEEKS, type LeakWeeks, type TrackKey, type TrackProgress } from "../../progress/types.js";
@@ -81,7 +82,7 @@ export function ProgressPage() {
           {(data) => <RatingCard rating={data} {...(trackNames === undefined ? {} : { trackNames })} />}
         </CardQuery>
         <CardQuery title="Streak" subject="the streak" testId="streak-badge" query={streak}>
-          {(data) => <StreakBadge streak={data} />}
+          {(data) => <StreakBadge streak={data} describeCosmetic={describeCosmetic} />}
         </CardQuery>
       </div>
       <CardQuery title="Tracks" subject="the tracks" testId="track-breakdown" query={tracks}>
