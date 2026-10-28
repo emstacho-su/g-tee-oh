@@ -6,8 +6,8 @@
  * Mechanism: starting from the persisted phase (dealing after POST /sessions, feedback after a
  * decision), the machine (machine.ts) is driven through every phase that needs no hero input until
  * it reaches await_hero. Each step reads solver-query only through pure calls (solver-port.ts):
- * - dealing: hand n is dealt and walked to the hero's decision for the drill's seat, preflop
- *   action families and hands filter, opponent actions before it sampled (deal-walk.ts);
+ * - dealing: hand n is dealt at one of the hero spots POST /sessions stored, so its start node is
+ *   the hero's decision; a hand that finds no passing deal advances the hand number (deal-hand.ts);
  * - opponent_acts: /v1/sample-action draws the opponent's action from the opponent generator state
  *   in the hand, and the returned state replaces it (O-151); the action's next_node_key is the
  *   node the hand moves to (O-245); null ends the hand after a fold and closes the street after
@@ -25,7 +25,7 @@
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { cardSchema } from "../schemas/common.js";
 import type { SqAction, SqNode } from "../solver-query/client.js";
-import { dealFilterOf, dealToHero } from "./deal-walk.js";
+import { dealFilterOf, dealHand } from "./deal-hand.js";
 import { actionAt, withAction } from "./hand-actions.js";
 import { transition, type AfterFeedback, type MachineEvent, type MachineState, type Phase, type StopRule } from "./machine.js";
 import { sessionEndedProblem, upstreamInconsistent as inconsistent } from "./problems.js";
@@ -92,10 +92,10 @@ function requireNodeKey(hand: HandState): string {
   return hand.node_key;
 }
 
-/** The hand walked to the hero's decision for the drill's seat, families and hands (deal-walk.ts). */
+/** The hand dealt at one of the session's hero spots; a later hand number when earlier ones found no hand (deal-hand.ts). */
 const dealing: StepFn = async ({ state }, port) => {
-  const { hand, node } = await dealToHero(state, port);
-  return { event: { type: "dealt", heroToAct: true }, context: { state: { ...state, hand }, node } };
+  const { hand, node, handNo } = await dealHand(state, port);
+  return { event: { type: "dealt", heroToAct: true }, context: { state: { ...state, hand_no: handNo, hand }, node } };
 };
 
 function requireHeroActs(hand: HandState, node: SqNode): SqNode {
@@ -165,7 +165,7 @@ const reveal: StepFn = async ({ state }, port) => {
   if (street === undefined) {
     throw inconsistent("There is no street after the river to reveal.");
   }
-  await port.deal(dealFilterOf(state.line, hand), hand.deal_seed);
+  await port.deal(dealFilterOf(hand), hand.deal_seed);
   const revealed = await port.reveal(hand.deal_id, street);
   const handOver = hand.end === "fold" || hand.end === "off_range";
   const shown: HandState = { ...hand, street, board: cardsOf(revealed.board), end: handOver ? hand.end : null };

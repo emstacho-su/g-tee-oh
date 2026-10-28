@@ -29,6 +29,7 @@
 import { sql } from "kysely";
 import type { z } from "zod";
 
+import { ONCE_KEY_TARGET } from "../coverage-request-key.js";
 import type { Database } from "../db.js";
 import { HTTP_STATUS, PG_ERROR, PROBLEM_SLUGS, ProblemError, pgErrorCode } from "../http/problem.js";
 import type { coverageRequestResultSchema } from "../schemas/study.js";
@@ -57,11 +58,6 @@ export const RECORDED: CoverageRequestResult = Object.freeze({
   queue_position: null,
 });
 
-/**
- * The conflict target of the unique index coverage_request_once_key (db/migrations
- * 20261028000100_api_trainer.sql); index expressions go in their own parentheses.
- */
-const ONCE_KEY_TARGET = sql`user_id, game_config_id, position_pair, (coalesce(flop, '')), (coalesce(line, ''))`;
 
 export interface CoverageSpot {
   userId: string;

@@ -6,12 +6,12 @@
  *   trainer settings are merged with the body's partial settings. Its spot filter is expanded into
  *   covered (configuration, pair) candidates (candidates.ts); the uncovered rest is recorded as
  *   coverage_request rows, once per user and spot (05 section 1, O-240). Each covered pair's tree
- *   is searched for the seats where the hero acts in the drill's preflop action families with a
- *   hand the hands filter keeps (spot-search.ts). A drill with no such seat in any covered pair is
- *   a 422 no-coverage problem naming why, whose gap rows are still recorded in a transaction. The
- *   seed is the body's or 64 random bits (O-249). Hands start at the drill's line, or at the pair's
- *   root, and are walked to the hero's decision (deal-walk.ts). The session, with its copy of the
- *   drill's spot (spot.ts), is written in dealing phase at hand 0 through idempotentWrite.
+ *   is searched once for the hero spots: nodes where a hero seat acts in the drill's preflop
+ *   action families with a hand the hands filter keeps (spot-search.ts). A drill with no hero spot
+ *   is a 422 no-coverage problem naming why, whose gap rows are still recorded in a transaction.
+ *   The seed is the body's or 64 random bits (O-249). The session, with its hero spots and its copy
+ *   of the drill's spot (spot.ts), is written in dealing phase at hand 0 through idempotentWrite;
+ *   each hand is then dealt straight at a hero spot (deal-hand.ts).
  * - next: pure (the S23 binding rule). It derives the prompt from the persisted state and writes
  *   nothing; two calls in a row answer the same prompt. An ended session is 409 session-ended.
  * - end: ended_at, phase ended, and the recap aggregated from the session's attempts. A second end
@@ -31,7 +31,7 @@ import { requireSolverQuery } from "../solver-query/client.js";
 import { candidatesFor, configIdsFor, pairsFor, splitByCoverage } from "./candidates.js";
 import { deriveAwaitHero } from "./derive.js";
 import { filterUnmetProblem, sessionEndedProblem } from "./problems.js";
-import { playableCandidates } from "./spot-search.js";
+import { heroSpotsFor } from "./spot-search.js";
 import { spotOf } from "./spot.js";
 import { transition } from "./machine.js";
 import { toPrompt, type Prompt } from "./prompt.js";
@@ -106,14 +106,14 @@ export async function createSession(call: SessionCall, body: SessionCreateBody):
   const { covered, gaps } = await splitByCoverage(candidates, port);
   const line = filter.line ?? null;
   const spot = spotOf(filter);
-  const playable = await playableCandidates(covered, { heroPositions: filter.hero_positions, spot, line }, port);
-  if (playable.length === 0) {
+  const heroSpots = await heroSpotsFor(covered, { heroPositions: filter.hero_positions, spot, line }, port);
+  if (heroSpots.length === 0) {
     // The gap rows are recorded even though the session is refused (05 section 1, O-240).
     await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, line));
     const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
     throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
   }
-  const state = initialState(body.seed ?? newSessionSeed(), playable, line, spot);
+  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
     const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });

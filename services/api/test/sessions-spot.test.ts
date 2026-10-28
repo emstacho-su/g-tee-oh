@@ -1,58 +1,25 @@
 /**
- * The drill's spot as a session reads it (R3.6, 05 section 4, ADR 0004, O-249): the preflop action
- * families mapped onto the line before the hero acts, hand classes, the hands filter (all, a
- * manual list, close decisions read from solver-query's row), the hero seats a hand may use with
- * and without alternate_seats, and the per-attempt draws of a hand dealt again.
+ * The drill's spot as a session reads it (R3.6, 05 section 4, ADR 0004, O-249): hand classes, the
+ * hands filter (all, a manual list, close decisions read from solver-query's row), the hero spot a
+ * hand picks with and without alternate_seats, and the per-attempt draws of a hand dealt again.
  */
 import { describe, expect, it } from "vitest";
 
-import { familiesOf, lineTokens, matchesFamilies } from "../src/sessions/families.js";
 import { canonicalClass, comboClass } from "../src/sessions/hand-class.js";
 import { attemptDraws, handDraws } from "../src/sessions/randomness.js";
 import {
   CLOSE_LOSS_MAX_PCT_POT,
   CLOSE_MIX_MIN_FREQUENCY,
   comboMayPass,
-  heroSeatsFor,
   isCloseRow,
+  pickSpot,
   rowPasses,
   type HandsFilter,
   type SessionSpot,
 } from "../src/sessions/spot.js";
-import type { Candidate } from "../src/sessions/state.js";
+import type { HeroSpot } from "../src/sessions/state.js";
 
 const ROW = { hand: "AKo", ev_bb: [0, 1], ev_best_bb: 1 };
-
-describe("R3.6 preflop action families over the line before the hero acts", () => {
-  it("R3.6 no raise is raise-first-in; a limp makes it limp/iso", () => {
-    expect(familiesOf([])).toEqual(["rfi"]);
-    expect(familiesOf(["l"])).toEqual(["limp_iso"]);
-  });
-
-  it("R3.6 one raise is vs open and a single-raised pot; a call after it is a squeeze", () => {
-    expect(familiesOf(["r250"])).toEqual(["vs_open", "srp"]);
-    expect(familiesOf(["r250", "c"])).toEqual(["srp", "squeeze"]);
-    expect(familiesOf(["l", "r400"])).toEqual(["limp_iso"]);
-  });
-
-  it("R3.6 two raises are a 3-bet pot, vs 3-bet when the hero made the first raise; three or more are a 4-bet pot", () => {
-    expect(familiesOf(["r250", "r1000"])).toEqual(["three_bet", "vs_three_bet"]);
-    expect(familiesOf(["r250", "r1000", "r2200"])).toEqual(["four_bet"]);
-    expect(familiesOf(["r250", "r1000", "a"])).toEqual(["four_bet"]);
-  });
-
-  it("R3.6 a straddle in the line is the straddle family only", () => {
-    expect(familiesOf(["s200"])).toEqual(["straddle"]);
-    expect(familiesOf(["s200", "r600"])).toEqual(["straddle"]);
-  });
-
-  it("R3.6 a drill matches when any of its families holds; the line's tokens come first", () => {
-    expect(matchesFamilies(["rfi", "vs_open"], ["r250"])).toBe(true);
-    expect(matchesFamilies(["squeeze"], ["r250"])).toBe(false);
-    expect(lineTokens(null)).toEqual([]);
-    expect(lineTokens("r250.c")).toEqual(["r250", "c"]);
-  });
-});
 
 describe("R3.6 hand classes", () => {
   it("R3.6 a combo names its class, high rank first, and a written class is made canonical", () => {
@@ -88,19 +55,30 @@ describe("R3.6 the hands filter", () => {
   });
 });
 
-describe("R3.6 hero seats", () => {
-  const both: Candidate = { config_id: "cfg_6_online_100", pair: "BB-BTN", hero_seats: ["BB", "BTN"] };
-  const spot: SessionSpot = { preflop_action: ["rfi", "vs_open"], hands: { mode: "all" }, alternate_seats: true };
+describe("R3.6 the hero spot a hand picks", () => {
+  const btnOpens: HeroSpot = { config_id: "cfg_6_online_100", pair: "BB-BTN", line: null, hero_seat: "BTN", history: [] };
+  const bbFacesOpen: HeroSpot = {
+    config_id: "cfg_6_online_100",
+    pair: "BB-BTN",
+    line: "r250",
+    hero_seat: "BB",
+    history: [{ position: "BTN", token: "r250", label: "Raise to 2.5bb" }],
+  };
+  const otherPair: HeroSpot = { config_id: "cfg_6_online_100", pair: "CO-BTN", line: null, hero_seat: "CO", history: [] };
+  const spots = [btnOpens, bbFacesOpen, otherPair];
+  const alternate: SessionSpot = { preflop_action: ["rfi", "vs_open"], hands: { mode: "all" }, alternate_seats: true };
 
-  it("R3.6 alternate_seats alternates the pair's playable seats hand by hand", () => {
-    expect(heroSeatsFor(both, spot, 0)).toEqual(["BB"]);
-    expect(heroSeatsFor(both, spot, 1)).toEqual(["BTN"]);
-    expect(heroSeatsFor(both, spot, 2)).toEqual(["BB"]);
+  it("R3.6 alternate_seats alternates the pair's hero seats hand by hand, out of position first", () => {
+    const seats = [0, 1, 2, 3].map((handNo) => pickSpot(spots, alternate, handNo, 0n).hero_seat);
+    expect(seats).toEqual(["BB", "BTN", "BB", "BTN"]);
   });
 
-  it("R3.6 without alternate_seats, or with one playable seat, every playable seat may be the hero", () => {
-    expect(heroSeatsFor(both, { ...spot, alternate_seats: false }, 1)).toEqual(["BB", "BTN"]);
-    expect(heroSeatsFor({ ...both, hero_seats: ["BB"] }, spot, 1)).toEqual(["BB"]);
+  it("R3.6 the draw picks the pair first, then a spot of it; without alternate_seats any of the pair's spots", () => {
+    expect(pickSpot(spots, alternate, 0, 1n)).toEqual(otherPair);
+    const free = { ...alternate, alternate_seats: false };
+    const picked = [0n, 2n, 4n, 6n].map((pick) => pickSpot(spots, free, 0, pick).hero_seat);
+    expect(new Set(picked)).toEqual(new Set(["BTN", "BB"]));
+    expect(() => pickSpot([], free, 0, 0n)).toThrow();
   });
 });
 

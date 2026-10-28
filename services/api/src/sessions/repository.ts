@@ -14,6 +14,7 @@ import { sql, type RawBuilder, type Selectable } from "kysely";
 
 import type { DB } from "@g-tee-oh/contracts";
 
+import { ONCE_KEY_TARGET } from "../coverage-request-key.js";
 import type { Database } from "../db.js";
 import { trainerSettingsSchema, type TrainerSettings } from "../schemas/drills.js";
 import type { PairCandidate } from "./candidates.js";
@@ -144,11 +145,6 @@ export async function writeState(database: Database, write: StateWrite): Promise
   return row === undefined ? undefined : toSessionRow(row);
 }
 
-/**
- * The conflict target of the unique index coverage_request_once_key (db/migrations
- * 20261028000100_api_trainer.sql); index expressions go in their own parentheses.
- */
-const ONCE_KEY_TARGET = sql`user_id, game_config_id, position_pair, (coalesce(flop, '')), (coalesce(line, ''))`;
 
 /**
  * Records the spots a drill reaches that the library does not cover (05 section 1, O-240, ADR

@@ -10,12 +10,14 @@
  * - root: BTN to act; fold, raise to 2.5bb, raise to 3bb (two raises, so Simple mode groups them);
  * - r250: BB to act; fold, call (closes preflop), raise to 10bb;
  * - r250.r1000: BTN to act; fold, call.
- * The deal answers the first entry of `deals` unless the seed picks another (seed modulo the list
+ * Each node carries the action family solver-query's classify gives its line (rfi, facing-open,
+ * facing-3bet). The deal starts at the filter's line (the root without one), with the seat to act
+ * there as hero_position, and picks its cards from `deals` by the seed (seed modulo the list
  * length), so a hands-filter test can be dealt hands that fail the filter first. Hand rows come
  * back labelled with the class solver-query writes in the preflop_169 space; every class plays
  * the node's strategy except 72o, which folds purely (never a close decision). A 404 carries the
- * detail solver-query writes for its cause: a hand outside the node's range, or a node the
- * solution does not hold.
+ * problem type solver-query writes for its cause: hand-not-in-range for a hand outside the node's
+ * range, not-found for a node the solution does not hold.
  * Numbers are test data, chosen so each grading branch is reachable; nothing here is poker math.
  */
 import type { SolverQueryComponents } from "@g-tee-oh/contracts";
@@ -44,6 +46,7 @@ const PURE_FOLD_LOSS = 50;
 
 interface FakeNode {
   toAct: "BTN" | "BB";
+  family: string;
   pot: number;
   stacks: number[];
   spotClass: string | null;
@@ -60,6 +63,7 @@ function action(index: number, token: string, kind: Schemas["ActionKind"], size:
 const TREE: Readonly<Record<string, FakeNode>> = {
   [ROOT_KEY]: {
     toAct: "BTN",
+    family: "rfi",
     pot: 150,
     stacks: [9900, 10000],
     spotClass: "preflop/online/100/rfi/BB-BTN",
@@ -70,6 +74,7 @@ const TREE: Readonly<Record<string, FakeNode>> = {
   },
   [OPEN_KEY]: {
     toAct: "BB",
+    family: "facing-open",
     pot: 400,
     stacks: [9900, 9750],
     spotClass: "preflop/online/100/facing-open/BB-BTN",
@@ -80,6 +85,7 @@ const TREE: Readonly<Record<string, FakeNode>> = {
   },
   [THREE_BET_KEY]: {
     toAct: "BTN",
+    family: "facing-3bet",
     pot: 1300,
     stacks: [9000, 9750],
     spotClass: null,
@@ -91,10 +97,8 @@ const TREE: Readonly<Record<string, FakeNode>> = {
 };
 
 export interface FakeDeal {
-  /** The combo of the seat to act at the start node (BTN). */
-  hero: string;
-  /** The other seat's combo (BB). */
-  villain: string;
+  btn: string;
+  bb: string;
 }
 
 export interface FakeOptions {
@@ -105,8 +109,12 @@ export interface FakeOptions {
   opponentChoice?: Readonly<Record<string, number>>;
   /** Nodes where the hero's hand (AhKd) has no row: a 404 "hand ... is not in the node's range". */
   heroOffRange?: readonly string[];
-  /** Nodes the solution no longer holds for any hand: a 404 "node ... is not in this solution". */
+  /** Nodes the solution does not hold: a 404 not-found on every read. */
   missingNodes?: readonly string[];
+  /** Nodes lost after POST /sessions: a 404 not-found on reads for one hand only. */
+  lostNodes?: readonly string[];
+  /** How many reads for one hand stall until the caller's deadline aborts them. */
+  stallHandReads?: number;
   /** The deals POST /v1/deal answers, picked by the seed modulo the list length. */
   deals?: readonly FakeDeal[];
   /** Milliseconds every coverage answer waits, so a test can watch calls overlap. */
@@ -157,6 +165,7 @@ function nodeBody(solutionId: string, key: string, node: FakeNode, hand: string 
     accuracy_pct_pot: null,
     floor_pct_pot: 0.5,
     spot_class_key: node.spotClass,
+    action_family: node.family,
     actions: node.actions,
     hands: labels.map((label) => handRow(label, node)),
     range_summary: { oop: { combos: 1, reach_weighted_combos: 1 }, ip: { combos: 1, reach_weighted_combos: 1 }, by_action: [] },
@@ -194,7 +203,7 @@ function nextState(state: string): string {
   return ((BigInt(`0x${state}`) + 1n) % (1n << 64n)).toString(16).padStart(16, "0");
 }
 
-type Route = (url: URL, body: Record<string, unknown>) => Response | Promise<Response>;
+type Route = (url: URL, body: Record<string, unknown>, signal: AbortSignal) => Response | Promise<Response>;
 
 interface InFlight {
   now: number;
@@ -223,34 +232,50 @@ function coverageRoute(options: FakeOptions, inFlight: InFlight): Route {
 }
 
 function dealRoute(options: FakeOptions): Route {
-  const deals = options.deals ?? [{ hero: HERO_HAND, villain: VILLAIN_HAND }];
+  const deals = options.deals ?? [{ btn: HERO_HAND, bb: VILLAIN_HAND }];
   return (_url, body) => {
     const deal = deals[Number(BigInt(`0x${String(body.seed)}`) % BigInt(deals.length))] ?? deals[0];
+    const line = (body.filter as { line?: string } | undefined)?.line;
+    const start = line === undefined ? ROOT_KEY : `${ROOT_KEY}${line}`;
+    const btnActs = TREE[start]?.toAct !== "BB";
     return json(200, {
       deal_id: FAKE_DEAL_ID,
       solution_ids: [options.solutionId],
-      start_node_key: ROOT_KEY,
-      hero_position: "BTN",
-      villain_position: "BB",
-      hero_hand: deal?.hero,
-      villain_hand: deal?.villain,
+      start_node_key: start,
+      hero_position: btnActs ? "BTN" : "BB",
+      villain_position: btnActs ? "BB" : "BTN",
+      hero_hand: btnActs ? deal?.btn : deal?.bb,
+      villain_hand: btnActs ? deal?.bb : deal?.btn,
       revealed: { flop: null, turn: null, river: null },
     });
   };
 }
 
+/** A response that never comes until the request's signal aborts, as a stalled solver-query would. */
+function stalled(signal: AbortSignal): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(new Error("aborted by the caller's deadline", { cause: signal.reason })), { once: true });
+  });
+}
+
 function nodesRoute(options: FakeOptions): Route {
   const offRange = new Set(options.heroOffRange ?? []);
   const missing = new Set(options.missingNodes ?? []);
-  return (url) => {
+  const lost = new Set(options.lostNodes ?? []);
+  let stalls = options.stallHandReads ?? 0;
+  return (url, _body, signal) => {
     const key = url.searchParams.get("node_key") ?? "";
     const node = TREE[key];
     const hand = url.searchParams.get("hands");
-    if (node === undefined || missing.has(key)) {
+    if (hand !== null && stalls > 0) {
+      stalls -= 1;
+      return stalled(signal);
+    }
+    if (node === undefined || missing.has(key) || (hand !== null && lost.has(key))) {
       return json(404, notFound(`node ${JSON.stringify(key)} is not in this solution`));
     }
     if (hand === HERO_HAND && offRange.has(key)) {
-      return json(404, notFound(`hand ${JSON.stringify(DEAL_CLASSES[hand])} is not in the node's range`));
+      return json(404, { type: "urn:g-tee-oh:problem:hand-not-in-range", title: "Hand not in range", status: 404, detail: "x" });
     }
     return json(200, nodeBody(options.solutionId, key, node, hand));
   };
@@ -294,7 +319,8 @@ export function fakeSolverQuery(options: FakeOptions): FakeSolverQuery {
     const body = text === "" ? {} : (JSON.parse(text) as Record<string, unknown>);
     calls.push({ method: request.method, path: url.pathname, body });
     const route = table[routeKey(request.method, url.pathname)];
-    return route === undefined ? json(404, notFound("no such route")) : route(url, body);
+    const signal = init?.signal ?? request.signal;
+    return route === undefined ? json(404, notFound("no such route")) : route(url, body, signal);
   };
   return {
     client: createSolverQuery(FAKE_BASE, { fetch: fetchImpl }),

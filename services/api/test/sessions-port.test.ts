@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { splitByCoverage } from "../src/sessions/candidates.js";
 import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "../src/sessions/concurrency.js";
-import { isHandOffRange, solverPort, type SolverPort } from "../src/sessions/solver-port.js";
+import { HAND_OFF_RANGE_TYPE, isHandOffRange, SESSION_DEADLINE_MS, solverPort, type SolverPort } from "../src/sessions/solver-port.js";
 import { createSolverQuery } from "../src/solver-query/client.js";
 import type { SqCoverage } from "../src/solver-query/client.js";
 import type { FastifyRequest } from "fastify";
@@ -63,25 +63,42 @@ function portAnswering(response: () => Response): SolverPort {
   return solverPort(client, { id: "req-1" } as FastifyRequest);
 }
 
-describe("R3.6 a node read's 404 (PR #25 review MEDIUM 5)", () => {
+describe("R3.6 a node read's 404 (PR #25 review MEDIUM 5, re-review LOW 3)", () => {
   const solution = "0190f000-0000-7000-8000-00000000501a";
 
-  it("R3.6 a hand outside the node's range is no row: the hand ends there", async () => {
-    const port = portAnswering(() => problem(`hand "AKo" is not in the node's range`));
+  it("R3.6 a hand-not-in-range problem is no row: the hand ends there", async () => {
+    const port = portAnswering(() => problem("any detail", HAND_OFF_RANGE_TYPE));
     await expect(port.nodeForHand(solution, "cfg_6_online_100/BB-BTN/", "AhKd")).resolves.toBeUndefined();
   });
 
-  it("R3.6 a solution or node the library does not hold is a 502, not an off-range hand", async () => {
-    for (const detail of ["solution 0190f000 is not in the library", `node "cfg_6_online_100/BB-BTN/r9" is not in this solution`]) {
+  it("R3.6 a not-found problem (no such solution or node) is a 502, whatever its detail says", async () => {
+    for (const detail of ["solution 0190f000 is not in the library", `hand "AKo" is not in the node's range`]) {
       const port = portAnswering(() => problem(detail));
       await expect(port.nodeForHand(solution, "cfg_6_online_100/BB-BTN/", "AhKd")).rejects.toMatchObject({ status: 502, slug: "upstream" });
     }
   });
 
-  it("R3.6 the problem body decides: a distinct slug is honoured, another slug or a non-problem body is not off range", () => {
-    expect(isHandOffRange({ type: NOT_FOUND_TYPE, detail: `hand "72o" is not in the node's range` })).toBe(true);
-    expect(isHandOffRange({ type: "urn:g-tee-oh:problem:hand-not-in-range", detail: "anything" })).toBe(true);
-    expect(isHandOffRange({ type: "urn:g-tee-oh:problem:bad-request", detail: `hand "72o" is not in the node's range` })).toBe(false);
+  it("R3.6 only the problem type decides; the detail text is never parsed", () => {
+    expect(isHandOffRange({ type: HAND_OFF_RANGE_TYPE, detail: "anything" })).toBe(true);
+    expect(isHandOffRange({ type: NOT_FOUND_TYPE, detail: `hand "72o" is not in the node's range` })).toBe(false);
+    expect(isHandOffRange({ type: "urn:g-tee-oh:problem:bad-request" })).toBe(false);
     expect(isHandOffRange("not json")).toBe(false);
+  });
+});
+
+/** A fetch that never answers until its signal aborts, as a stalled solver-query would. */
+const stalled: typeof fetch = (input, init) =>
+  new Promise((_resolve, reject) => {
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    signal?.addEventListener("abort", () => reject(new Error("aborted", { cause: signal.reason })), { once: true });
+  });
+
+describe("R3.6 the per-request deadline (PR #25 re-review BLOCKER 2)", () => {
+  it("R3.6 a call past the deadline is a transient 503, and every later call of the request fails fast", async () => {
+    const client = createSolverQuery("http://solver-query.fake:7070", { fetch: stalled });
+    const port = solverPort(client, { id: "req-2" } as FastifyRequest, { deadlineMs: 20 });
+    await expect(port.coverage("cfg_6_online_100", "BB-BTN")).rejects.toMatchObject({ status: 503, slug: "unavailable" });
+    await expect(port.deal({ config_id: "cfg_6_online_100", pair: "BB-BTN" }, "0000000000000001")).rejects.toMatchObject({ status: 503 });
+    expect(SESSION_DEADLINE_MS).toBeGreaterThan(0);
   });
 });

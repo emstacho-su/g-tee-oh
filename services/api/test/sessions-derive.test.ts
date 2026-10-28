@@ -77,6 +77,7 @@ function port(setup: PortSetup): SolverPort & { deals: number } {
 const HAND: HandState = {
   config_id: "cfg_6_online_100",
   pair: "BB-BTN",
+  line: null,
   deal_seed: "0000000000000001",
   deal_id: "0190f000-0000-7000-8000-0000000d0001",
   solution_id: SOLUTION,
@@ -99,8 +100,7 @@ function feedbackState(hand: Partial<HandState> = {}): PersistedState {
     phase: "feedback",
     seed: "00000000deadbeef",
     hand_no: 0,
-    candidates: [{ config_id: "cfg_6_online_100", pair: "BB-BTN", hero_seats: ["BTN"] }],
-    line: null,
+    spots: [{ config_id: "cfg_6_online_100", pair: "BB-BTN", line: null, hero_seat: "BTN", history: [] }],
     spot: { preflop_action: ["rfi"], hands: { mode: "all" }, alternate_seats: false },
     hand: { ...HAND, ...hand },
     previous_board: null,

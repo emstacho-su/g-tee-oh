@@ -9,15 +9,17 @@
  * same cards on a repeat; that is what lets GET /sessions/{id}/next recompute a prompt on every
  * request without writing anything.
  *
+ * One deadline per request (PR #25 re-review BLOCKER 2): a port is made per api request, and every
+ * call it makes shares one AbortSignal that fires SESSION_DEADLINE_MS after the port was made. A
+ * call cut off by it, and any call after it, is a 503 unavailable problem: transient, and since
+ * the deadline only ever cuts reads or aborts the transaction it runs in, nothing is stored.
+ *
  * The one call that may answer "not here" as a fact rather than a failure is the node read for a
- * hand (PR #25 review MEDIUM 5). solver-query answers every 404 with the not-found problem type,
- * so its problem body decides (isHandOffRange): the detail "hand <class> is not in the node's
- * range" (services/solver-query/src/routes/nodes.rs) means the solution holds no row for that hand
- * at that node, a line the equilibrium never plays it to, and the derivation ends the hand there.
- * Any other 404 ("solution ... is not in the library", "node ... is not in this solution") means
- * the library no longer holds what the session was dealt, and is a 502 upstream problem, never
- * silent play. A distinct problem type, HAND_OFF_RANGE_TYPE, is honoured as well, for when
- * solver-query gives the case its own slug.
+ * hand (PR #25 review MEDIUM 5, re-review LOW 3): solver-query answers a hand outside the node's
+ * range with a 404 whose problem type is hand-not-in-range, and the derivation ends the hand
+ * there. Any other 404 (not-found: no such solution or node) means the library no longer holds
+ * what the session was dealt, and is a 502 upstream problem, never silent play. Only the problem
+ * type is read, never its detail text.
  */
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -35,6 +37,10 @@ import {
   type SqSampleAction,
   type UpstreamResult,
 } from "../solver-query/client.js";
+import { deadlineProblem } from "./problems.js";
+
+/** How long one api request may spend on solver-query calls before it answers 503 (BLOCKER 2). */
+export const SESSION_DEADLINE_MS = 2000;
 
 /** The deal filter the api sends: preflop only in v1 (O-145). */
 export interface DealFilter {
@@ -63,24 +69,23 @@ export interface SolverPort {
   coverage(configId: string, pair: string): Promise<SqCoverage>;
 }
 
+export interface SolverPortOptions {
+  /** The request's deadline; SESSION_DEADLINE_MS unless a test shortens it. */
+  deadlineMs?: number;
+}
+
 const DEAL_START_STREET = "preflop";
-const PROBLEM_TYPE_PREFIX = "urn:g-tee-oh:problem:";
-const NOT_FOUND_TYPE = `${PROBLEM_TYPE_PREFIX}not-found`;
-/** The type solver-query would give a hand outside the node's range under its own slug (proposed). */
-export const HAND_OFF_RANGE_TYPE = `${PROBLEM_TYPE_PREFIX}hand-not-in-range`;
-/** solver-query's detail for a hand without a row at the node (routes/nodes.rs hand_rows). */
-const HAND_OFF_RANGE_DETAIL = /^hand .+ is not in the node's range$/;
+/** The problem type solver-query gives a hand outside the node's range (services/solver-query/src/error.rs). */
+export const HAND_OFF_RANGE_TYPE = "urn:g-tee-oh:problem:hand-not-in-range";
+const HAND_OFF_RANGE_SLUG = "hand-not-in-range";
+const PROBLEM_TYPE_SEPARATOR = ":";
 
-const upstreamProblemSchema = z.object({ type: z.string(), detail: z.string() });
+const upstreamProblemSchema = z.object({ type: z.string() });
 
-/** True when a 404 problem body says the hand has no row at the node, rather than no solution or node. */
+/** True when a 404 problem's type says the hand has no row at the node, rather than no solution or node. */
 export function isHandOffRange(body: unknown): boolean {
   const parsed = upstreamProblemSchema.safeParse(body);
-  if (!parsed.success) {
-    return false;
-  }
-  const { type, detail } = parsed.data;
-  return type === HAND_OFF_RANGE_TYPE || (type === NOT_FOUND_TYPE && HAND_OFF_RANGE_DETAIL.test(detail));
+  return parsed.success && parsed.data.type.split(PROBLEM_TYPE_SEPARATOR).at(-1) === HAND_OFF_RANGE_SLUG;
 }
 
 function libraryLost(): ProblemError {
@@ -95,9 +100,10 @@ async function nodeOrOffRange(call: Promise<UpstreamResult<SqNode>>): Promise<Sq
   try {
     result = await call;
   } catch (cause: unknown) {
-    throw Object.assign(new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, {
-      detail: "solver-query could not answer for this node.",
-    }), { cause });
+    throw Object.assign(
+      new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, { detail: "solver-query could not answer for this node." }),
+      { cause },
+    );
   }
   if (result.response.status === HTTP_STATUS.notFound) {
     if (isHandOffRange(result.error)) {
@@ -108,37 +114,65 @@ async function nodeOrOffRange(call: Promise<UpstreamResult<SqNode>>): Promise<Sq
   return expectData(Promise.resolve(result), "this node");
 }
 
-/** The session's solver-query calls over the typed client, carrying the request id (O-158). */
-export function solverPort(client: SolverQuery, request: FastifyRequest): SolverPort {
-  const headers = upstreamHeaders(request);
+type Guard = <T>(call: () => Promise<T>) => Promise<T>;
+
+/** Runs calls under the deadline: refused once it has passed, and a 503 when it cut one off. */
+function deadlineGuard(signal: AbortSignal, deadlineMs: number): Guard {
+  return async (call) => {
+    if (signal.aborted) {
+      throw deadlineProblem(deadlineMs);
+    }
+    try {
+      return await call();
+    } catch (error: unknown) {
+      if (signal.aborted) {
+        throw Object.assign(deadlineProblem(deadlineMs), { cause: error });
+      }
+      throw error;
+    }
+  };
+}
+
+/** The session's solver-query calls over the typed client, carrying the request id (O-158) and one deadline. */
+export function solverPort(client: SolverQuery, request: FastifyRequest, options: SolverPortOptions = {}): SolverPort {
+  const deadlineMs = options.deadlineMs ?? SESSION_DEADLINE_MS;
+  const signal = AbortSignal.timeout(deadlineMs);
+  const guard = deadlineGuard(signal, deadlineMs);
+  const init = { headers: upstreamHeaders(request), signal };
   return {
     deal: (filter, seed) =>
-      expectData(
-        client.POST("/v1/deal", { body: { seed, filter: { ...filter, start_street: DEAL_START_STREET } }, headers }),
-        "a deal for this spot",
+      guard(() =>
+        expectData(
+          client.POST("/v1/deal", { body: { seed, filter: { ...filter, start_street: DEAL_START_STREET } }, ...init }),
+          "a deal for this spot",
+        ),
       ),
     node: (solutionId, nodeKey) =>
-      expectData(client.GET("/v1/nodes", { params: { query: { solution_id: solutionId, node_key: nodeKey } }, headers }), "this node"),
+      guard(() =>
+        expectData(client.GET("/v1/nodes", { params: { query: { solution_id: solutionId, node_key: nodeKey } }, ...init }), "this node"),
+      ),
     nodeForHand: (solutionId, nodeKey, hand) =>
-      nodeOrOffRange(client.GET("/v1/nodes", { params: { query: { solution_id: solutionId, node_key: nodeKey, hands: hand } }, headers })),
+      guard(() =>
+        nodeOrOffRange(client.GET("/v1/nodes", { params: { query: { solution_id: solutionId, node_key: nodeKey, hands: hand } }, ...init })),
+      ),
     sample: (solutionId, nodeKey, hand, rngState) =>
-      expectData(
-        client.POST("/v1/sample-action", {
-          body: { solution_id: solutionId, node_key: nodeKey, hand, rng_state: rngState },
-          headers,
-        }),
-        "an opponent action at this node",
+      guard(() =>
+        expectData(
+          client.POST("/v1/sample-action", { body: { solution_id: solutionId, node_key: nodeKey, hand, rng_state: rngState }, ...init }),
+          "an opponent action at this node",
+        ),
       ),
     reveal: (dealId, street) =>
-      expectData(
-        client.GET("/v1/deal/{id}/reveal", { params: { path: { id: dealId }, query: { street } }, headers }),
-        "this street of the deal",
+      guard(() =>
+        expectData(
+          client.GET("/v1/deal/{id}/reveal", { params: { path: { id: dealId }, query: { street } }, ...init }),
+          "this street of the deal",
+        ),
       ),
-    grade: (call) => expectData(client.POST("/v1/grade", { body: call, headers }), "a grade for this decision"),
+    grade: (call) => guard(() => expectData(client.POST("/v1/grade", { body: call, ...init }), "a grade for this decision")),
     coverage: (configId, pair) =>
-      expectData(
-        client.GET("/v1/coverage", { params: { query: { config_id: configId, pair } }, headers }),
-        "coverage for this spot",
+      guard(() =>
+        expectData(client.GET("/v1/coverage", { params: { query: { config_id: configId, pair } }, ...init }), "coverage for this spot"),
       ),
   };
 }
