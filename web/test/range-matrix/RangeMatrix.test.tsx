@@ -99,6 +99,9 @@ describe("R3.12 RangeMatrix component", () => {
     expect(canvas.width).toBe(780);
     expect(canvas.height).toBe(780);
     expect(canvas.style.width).toBe("390px");
+    // Never wider than its container (a phone), kept square.
+    expect(canvas.style.maxWidth).toBe("100%");
+    expect(canvas.style.aspectRatio).toBe("1 / 1");
   });
 
   it("R3.12 follows a device pixel ratio change, re-subscribing for the new ratio and unsubscribing on unmount", () => {
