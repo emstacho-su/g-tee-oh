@@ -35,7 +35,7 @@ export const TRAIN_TEXT = {
   changeSettings: "Change these in Settings",
   retry: "Try again",
   workedExample: "Worked example: panels visible, not rated",
-  ratedBlock: "Rated: this block counts toward your rating",
+  ratedBlock: "Rated block: first attempts count toward your rating",
   unratedSession: "Not rated",
   holdoutBanner: "Holdout retest: not rated",
   noTrack: "No rating track",

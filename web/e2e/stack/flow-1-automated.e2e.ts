@@ -63,7 +63,7 @@ test("R4.10 R4.12 flow 1: five automated decisions on the stack give the fresh o
   await expectUnratedCard(page);
 
   await startTraining(page, shot, CRITERIA.start);
-  await expect(page.getByTestId("block-rating"), "the seeded owner's first block is rated (O-324)").toHaveText("Rated: this block counts toward your rating");
+  await expect(page.getByTestId("block-rating"), "the seeded owner's first block is rated (O-324)").toHaveText("Rated block: first attempts count toward your rating");
   await playDecisions(page, FLOW_1_DECISIONS, shot, CRITERIA.session);
 
   const rated = await endAndReadRecap(page);

@@ -129,7 +129,7 @@ describe("R4.10 automated session", () => {
     const banner = await screen.findByTestId("block-banner");
     await waitFor(() => expect(within(banner).getByTestId("block-class")).toHaveTextContent("rfi, Opens"));
     expect(within(banner).getByTestId("block-hand")).toHaveTextContent("Hand 1 of 3 in this block");
-    expect(within(banner).getByTestId("block-rating")).toHaveTextContent("Rated: this block counts toward your rating");
+    expect(within(banner).getByTestId("block-rating")).toHaveTextContent("Rated block: first attempts count toward your rating");
     await decide();
     await userEvent.click(screen.getByRole("button", { name: /Next hand/ }));
     await waitFor(() => expect(screen.getByTestId("block-hand")).toHaveTextContent("Hand 2 of 3 in this block"));
