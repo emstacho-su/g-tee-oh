@@ -1,6 +1,6 @@
 /**
  * Placeholder screens for the A7 section 2 routes not built yet (R3.13); S25 replaced /study and
- * /drills/$id/run with their screens. Each shows the screen
+ * /drills/$id/run with their screens, S28 /library and /settings. Each shows the screen
  * name from A7 section 2 as its h1 and names the session that builds it, so a visitor (and the
  * router tests) can tell a missing screen from a broken one.
  */
@@ -19,9 +19,6 @@ export const PLACEHOLDER_SCREENS = {
   predict: { title: "Prediction drills", summary: "Predict the strategy before it is shown.", session: "S27" },
   paint: { title: "Range painting", summary: "Paint a range and compare it.", session: "S27" },
   progress: { title: "Progress", summary: "Rank, tracks, leak-cost trend, mastery heat map, holdout.", session: "S32" },
-  library: { title: "Coverage and builder health", summary: "Coverage view, queue, throughput, storage.", session: "S28" },
-  // A7's settings screen is split: session defaults and cosmetics in S32, the builder schedule in S28.
-  settings: { title: "Settings", summary: "Session defaults, hotkeys, builder schedule, cosmetics.", session: "S28 and S32" },
 } as const satisfies Readonly<Record<string, PlaceholderScreen>>;
 
 export type PlaceholderKey = keyof typeof PLACEHOLDER_SCREENS;

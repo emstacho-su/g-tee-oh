@@ -23,6 +23,10 @@ export interface StudyFiltersProps {
   search: StudySearch;
   catalog: StudyCatalog;
   onFilterChange: (key: FilterKey, raw: string) => void;
+  /** Hides the pair select where another control picks the pair (the /library grid, S28). */
+  hidePair?: boolean;
+  /** The group's accessible name; "Study filters" by default. */
+  label?: string;
 }
 
 interface FilterSelectProps {
@@ -72,15 +76,17 @@ function filterOptions(search: StudySearch, catalog: StudyCatalog) {
   };
 }
 
-export function StudyFilters({ search, catalog, onFilterChange }: StudyFiltersProps) {
+export function StudyFilters({ search, catalog, onFilterChange, hidePair = false, label = "Study filters" }: StudyFiltersProps) {
   const options = filterOptions(search, catalog);
   return (
-    <div role="group" aria-label="Study filters" className="flex flex-wrap gap-3">
+    <div role="group" aria-label={label} className="flex flex-wrap gap-3">
       <FilterSelect label="Format" filter="format" value={search.format} options={FORMAT_OPTIONS} onFilterChange={onFilterChange} />
       <FilterSelect label="Table size" filter="table_size" value={search.table_size} options={options.tableSizes} onFilterChange={onFilterChange} />
       <FilterSelect label="Stake" filter="stake" value={search.stake} options={options.stakes} onFilterChange={onFilterChange} />
       <FilterSelect label="Depth" filter="depth" value={search.depth} options={options.depths} onFilterChange={onFilterChange} />
-      <FilterSelect label="Pair" filter="pair" value={search.pair} options={options.pairs} onFilterChange={onFilterChange} />
+      {hidePair ? null : (
+        <FilterSelect label="Pair" filter="pair" value={search.pair} options={options.pairs} onFilterChange={onFilterChange} />
+      )}
     </div>
   );
 }

@@ -8,10 +8,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { fixtureSession } from "../../src/fixtures/index.js";
+import { fixtureMemberSession, fixtureSession } from "../../src/fixtures/index.js";
+import { fixtureBuilderStatus } from "../../src/fixtures/library.js";
 import { defaultHotkeyStore } from "../../src/hotkeys/index.js";
 import { useThemeStore } from "../../src/store/index.js";
-import { noContent, problemResponse, sessionResponse } from "../api/fake-fetch.js";
+import { jsonResponse, noContent, problemResponse, sessionResponse } from "../api/fake-fetch.js";
 import { renderApp, SIGNED_IN } from "./render-app.js";
 
 const NAV_LINKS: readonly (readonly [string, string])[] = [
@@ -96,7 +97,7 @@ describe("home shell", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("R3.13 the home page shows four cards naming the session that fills each", async () => {
+  it("R3.13 the home page shows four cards, three naming the session that fills each", async () => {
     renderApp("/", SIGNED_IN);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
@@ -104,12 +105,30 @@ describe("home shell", () => {
       ["Today's queue", "Phase 4 (S32)"],
       ["Streak", "S32"],
       ["Rating", "S32"],
-      ["Builder status", "S28"],
     ];
     for (const [title, session] of cards) {
       const card = screen.getByRole("region", { name: title });
       expect(card).toHaveTextContent(`Filled in ${session}`);
     }
+  });
+
+  it("R3.5 the home builder status card shows an admin the builder state and links to /library (O-290)", async () => {
+    renderApp("/", {
+      ...SIGNED_IN,
+      "GET /api/v1/admin/builder": [jsonResponse(200, fixtureBuilderStatus)],
+    });
+
+    const card = await screen.findByRole("region", { name: "Builder status" });
+    await waitFor(() => expect(card).toHaveTextContent("Builder running, 3 builds queued."));
+    expect(within(card).getByRole("link", { name: "Open the library" })).toHaveAttribute("href", "/library");
+  });
+
+  it("R3.5 the home builder status card never asks a member's builder status (O-290)", async () => {
+    const { fake } = renderApp("/", { "GET /api/v1/me": [jsonResponse(200, fixtureMemberSession)] });
+
+    const card = await screen.findByRole("region", { name: "Builder status" });
+    expect(card).toHaveTextContent("Background library builder health is on the Library screen.");
+    expect(fake.keys()).not.toContain("GET /api/v1/admin/builder");
   });
 
   it("R3.13 Sign out sends the token, forgets it and lands on /login", async () => {
