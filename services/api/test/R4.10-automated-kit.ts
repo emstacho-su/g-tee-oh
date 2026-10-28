@@ -61,6 +61,7 @@ export interface PromptBody {
 export interface FeedbackBody {
   rated: boolean;
   label: string;
+  noise_flags: string[];
   state_version: number;
   solution_id: string;
   node_key: string;

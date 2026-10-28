@@ -4,7 +4,11 @@
  * - first attempt: an earlier attempt at the same (solution, node, hand class), in any mode, makes
  *   the decision a non-first attempt;
  * - per-track cap: ratedTodayInTrack counts only today's rated attempts in the block's track, and at
- *   learning's DAILY_RATED_CAP the decision is unrated;
+ *   learning's DAILY_RATED_CAP the decision is unrated, while a twin dealt the same hand under the
+ *   cap is rated. Both tests pin the server seed (buildApp's newSessionSeed): an unseeded session
+ *   otherwise deals a random hand, and on the fixture library of 2026-10-28, 3 of 80 sampled
+ *   unseeded first hands carried the close_ev_mix noise flag, which learning never rates. The cap
+ *   test also freezes Date, so no midnight falls between the seeded rows and the decision;
  * - a client-seeded session's decisions are all unrated and leave every learning table unchanged,
  *   while an unseeded twin over the same cards writes them;
  * - replay: the same seed gives the same blocks and the same prompts.
@@ -12,7 +16,7 @@
 import { DAILY_RATED_CAP } from "@g-tee-oh/learning";
 import type { FastifyRequest } from "fastify";
 import type pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ApiApp } from "../src/app.js";
 import { AUTOMATED_HOOK_PART } from "../src/automated/effects.js";
@@ -20,11 +24,13 @@ import { invalidateClassCatalogs, loadClassCatalog } from "../src/automated/clas
 import { REVIEW_BLOCK_INSTANCES } from "../src/automated/queue.js";
 import type { Database } from "../src/db.js";
 import { EMPTY_PREPARED_LEARNING, type DecisionContext } from "../src/learning/effects.js";
+import { newSessionSeed } from "../src/sessions/randomness.js";
 import { findSession } from "../src/sessions/repository.js";
 import {
   decideOnce,
   derivedNow,
   endSession,
+  type FeedbackBody,
   learningSnapshot,
   ONLINE_100,
   requireAutomated,
@@ -35,7 +41,27 @@ import { TEST_CONFIG } from "./support/app.js";
 import { adminPool, appDatabase } from "./support/database.js";
 import { buildTrainerApp, fixtureSolverQuery } from "./support/solver-query.js";
 
+/**
+ * The server seed an unseeded session draws, pinned by the per-track tests through buildApp's
+ * newSessionSeed: the session stays unseeded (rated eligible), yet its block and first hand are
+ * fixed. On the committed fixture library RATEABLE_SERVER_SEED opens a block in RATEABLE_TRACK and
+ * deals RATEABLE_ITEM first, with no noise flag and not all within the floor, so only the cap can
+ * unrate it. The tests assert the track, the item and the flags before the rated flags, so a
+ * fixture change fails with its own message rather than as the old flake.
+ */
+const RATEABLE_SERVER_SEED = "5eed00000000cafe";
+const RATEABLE_ITEM = {
+  solution: "309fe4b2-2349-8c25-8462-2f1dfcc4ba50",
+  node: "cfg_6_online_100/BB-HJ/r250.r1000",
+  hand: "QhJc",
+} as const;
+const RATEABLE_TRACK = "facing-3bet";
+const NO_NOISE_FLAGS: string[] = [];
+let pinnedSeed: string | undefined;
+
 const SEED = "00000000c0ffee00";
+/** Not a node key of any solution, so a filler attempt is never an earlier attempt at a dealt item. */
+const FILLER_NODE = "r4.10-filler/not-a-node";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REPLAY_DECISIONS = 2 * REVIEW_BLOCK_INSTANCES + 1;
 const TWIN_DECISIONS = REVIEW_BLOCK_INSTANCES + 1;
@@ -48,10 +74,16 @@ let classKeys: string[];
 beforeAll(async () => {
   database = appDatabase();
   pool = adminPool();
-  app = buildTrainerApp(database);
+  app = buildTrainerApp(database, { newSessionSeed: () => pinnedSeed ?? newSessionSeed() });
   await app.ready();
   invalidateClassCatalogs();
   classKeys = (await loadClassCatalog(fixtureSolverQuery(), database, [ONLINE_100])).classes.map((cls) => cls.spotClassKey);
+});
+
+// Reset here, not in a finally of the test body: a timed-out test never reaches its finally.
+afterEach(() => {
+  pinnedSeed = undefined;
+  vi.useRealTimers();
 });
 
 afterAll(async () => {
@@ -85,17 +117,25 @@ async function trackId(key: string): Promise<string> {
   return result.rows[0]?.id ?? "";
 }
 
-/** `count` rated attempts of the user, carrying `track`, created at `at`, in a throwaway drill session. */
+/**
+ * `count` rated attempts of the user, carrying `track`, created at `at`, in a throwaway drill
+ * session, at a node and hand class no deal serves (FILLER_NODE), so they never make the decision
+ * under test a non-first attempt (countEarlierAttemptsAtItem matches solution, node and hand class).
+ */
 async function insertRatedAttempts(userId: string, track: string, count: number, at: Date): Promise<void> {
-  const solution = await pool.query<{ id: string }>("select id from solution where game_config_id = $1 limit 1", [ONLINE_100]);
+  const solution = await pool.query<{ id: string }>("select id from solution where game_config_id = $1 order by id limit 1", [ONLINE_100]);
   const session = await pool.query<{ id: string }>(`insert into practice_session (user_id, mode, settings, state) values ($1, 'drill', '{}', '{}') returning id`, [userId]);
   await pool.query(
     `insert into attempt (user_id, session_id, solution_id, node_key, spot_class_key, track_ids, hand, action_index,
        action_token, ev_chosen_bb, ev_best_bb, ev_loss_bb, ev_loss_pct_pot, floor_pct_pot, score, label, rated, weight, created_at)
-     select $1, $2, $3, 'cfg_6_online_100/BB-BTN/', 'filler', array[$4::uuid], 'AhKd', 0, 'f', 0, 0, 0, 0, 0, 1, 'best', true, 1, $6
+     select $1, $2, $3, $7, 'filler', array[$4::uuid], 'AhKd', 0, 'f', 0, 0, 0, 0, 0, 1, 'best', true, 1, $6
      from generate_series(1, $5)`,
-    [userId, session.rows[0]?.id, solution.rows[0]?.id, track, count, at],
+    [userId, session.rows[0]?.id, solution.rows[0]?.id, track, count, at, FILLER_NODE],
   );
+}
+
+function itemOf(feedback: FeedbackBody): { solution: string; node: string; hand: string } {
+  return { solution: feedback.solution_id, node: feedback.node_key, hand: feedback.hand };
 }
 
 async function reviewSession(seed?: string): Promise<{ player: Player; sessionId: string; trackKey: string }> {
@@ -124,21 +164,36 @@ describe("R4.10 first attempt by item (O-274)", () => {
 
 describe("R4.10 per-track daily cap (O-274, O-214, O-247)", () => {
   it("R4.10 counts only today's rated attempts in the block's track", async () => {
+    pinnedSeed = RATEABLE_SERVER_SEED;
     const { player, sessionId, trackKey } = await reviewSession();
+    expect(trackKey).toBe(RATEABLE_TRACK);
     const context = await contextFor(player, sessionId);
     const other = trackKey === "opens" ? "facing-3bet" : "opens";
-    await insertRatedAttempts(player.userId, await trackId(trackKey), 3, new Date(context.now.getTime() - 60_000));
-    await insertRatedAttempts(player.userId, await trackId(other), 5, new Date(context.now.getTime() - 60_000));
+    // At now itself (the count is inclusive), so a run in the first minute after midnight still counts them.
+    await insertRatedAttempts(player.userId, await trackId(trackKey), 3, context.now);
+    await insertRatedAttempts(player.userId, await trackId(other), 5, context.now);
     await insertRatedAttempts(player.userId, await trackId(trackKey), 7, new Date(context.now.getTime() - 2 * DAY_MS));
     expect((await AUTOMATED_HOOK_PART.beforeGrade?.(context))?.ratedTodayInTrack).toBe(3);
   });
 
   it("R4.10 at the cap the decision is unrated, while a twin under it is rated", async () => {
+    const now = new Date();
+    vi.useFakeTimers({ toFake: ["Date"], now });
+    pinnedSeed = RATEABLE_SERVER_SEED;
     const capped = await reviewSession();
-    await insertRatedAttempts(capped.player.userId, await trackId(capped.trackKey), DAILY_RATED_CAP, new Date(Date.now() - 60_000));
-    expect((await decideOnce(app, capped.player, capped.sessionId)).feedback.rated).toBe(false);
+    expect(capped.trackKey).toBe(RATEABLE_TRACK);
+    await insertRatedAttempts(capped.player.userId, await trackId(capped.trackKey), DAILY_RATED_CAP, now);
+    const atCap = await decideOnce(app, capped.player, capped.sessionId);
     const twin = await reviewSession();
-    expect((await decideOnce(app, twin.player, twin.sessionId)).feedback.rated).toBe(true);
+    const underCap = await decideOnce(app, twin.player, twin.sessionId);
+    // The seed's preconditions: both decisions are RATEABLE_ITEM and carry no noise flag, so the
+    // per-track count is the only difference between them.
+    expect(itemOf(atCap.feedback)).toEqual(RATEABLE_ITEM);
+    expect(itemOf(underCap.feedback)).toEqual(RATEABLE_ITEM);
+    expect(atCap.feedback.noise_flags).toEqual(NO_NOISE_FLAGS);
+    expect(underCap.feedback.noise_flags).toEqual(NO_NOISE_FLAGS);
+    expect(atCap.feedback.rated).toBe(false);
+    expect(underCap.feedback.rated).toBe(true);
   });
 });
 

@@ -57,6 +57,7 @@ import { predictionRoutes } from "./routes/prediction.js";
 import { progressRoutes } from "./routes/progress.js";
 import { rangePaintRoutes } from "./routes/range-paint.js";
 import { sessionRoutes } from "./routes/sessions.js";
+import { newSessionSeed } from "./sessions/randomness.js";
 import { studyRoutes } from "./routes/study.js";
 import type { SolverQuery } from "./solver-query/client.js";
 import { API_VERSION } from "./version.js";
@@ -107,6 +108,12 @@ export interface BuildAppOptions {
   modelClient?: ModelClient;
   /** Where the logger writes when `logger` is on; stdout when absent. Tests capture log lines with it. */
   logStream?: LogStream;
+  /**
+   * The seed of an automated session created without a client seed: 64 random bits
+   * (newSessionSeed) when absent. A test pins it to deal a known hand while the session stays
+   * unseeded, so rated eligible. Other modes draw their own (sessions/modes/*).
+   */
+  newSessionSeed?: () => string;
 }
 
 export function buildApp(options: BuildAppOptions = {}): ApiApp {
@@ -125,6 +132,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   // an automated session was created (subscribes once per source).
   watchCoverageAdded(options.notifications ?? null);
   app.decorate("modelClient", options.modelClient ?? null);
+  app.decorate("newSessionSeed", options.newSessionSeed ?? newSessionSeed);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
   void app.register(security, { config });
