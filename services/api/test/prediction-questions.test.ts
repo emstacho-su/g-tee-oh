@@ -25,13 +25,13 @@ const ACTIONS: SqNode["actions"] = [
   { index: 3, token: "r2500", kind: "raise", label: "Raise to 25bb", size_cbb: 2500, bucket: null, next_node_key: null },
 ];
 
-function row(hand: string, strategy: number[], options: { mixed?: boolean; reach?: number[] | null } = {}): Row {
+function row(hand: string, strategy: number[], options: { mixed?: boolean; reach?: number[] | null; loss?: number[] } = {}): Row {
   return {
     hand,
     strategy,
     ev_bb: strategy.map(() => 0),
     ev_best_bb: 0,
-    loss_pct_pot: strategy.map(() => 0),
+    loss_pct_pot: options.loss ?? strategy.map(() => 0),
     mixed: options.mixed ?? false,
     reach: options.reach === undefined ? [1, 1] : options.reach,
   };
@@ -208,16 +208,19 @@ describe("R3.16 range ladder", () => {
 describe("R3.16 hand ladder", () => {
   const facts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true })]);
 
-  it("R3.16 level 1 asks the most frequent action; ties within the tolerance all count", () => {
-    const question = handQuestion({ node: facts, level: 1, draws: DRAWS });
+  it("R3.16 level 1 asks the highest-EV action (the lowest loss), whatever the frequencies; ties within the loss tolerance all count (ADR 0024, O-374)", () => {
+    const evFacts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true, loss: [5, 0.3, 0, 0.1] })]);
+    const question = handQuestion({ node: evFacts, level: 1, draws: DRAWS });
     if (question === undefined) throw new Error("no question");
-    expect(question).toMatchObject({ answer_kind: "action", hand: "AKs", ladder: "hand" });
-    expect(judgeAnswer(question, facts, { kind: "action", action_index: 3 })).toBe(true);
-    expect(judgeAnswer(question, facts, { kind: "action", action_index: 1 })).toBe(false);
-    const tied = node([row("55", [0, 0.5, 0.5, 0])]);
+    expect(question).toMatchObject({ answer_kind: "action", hand: "AKs", ladder: "hand", question: "What is BB's highest-EV action with AKs?" });
+    expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 2 })).toBe(true);
+    expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 3 }), "the most frequent action is not the highest EV").toBe(false);
+    expect(question.truth).toMatchObject({ action_indexes: [2], frequency_pct: 30 });
+    expect(question.truth.text).toBe("BB's highest-EV action with AKs is Raise to 10bb (played 30.0 percent of the time).");
+    const tied = node([row("55", [0, 0.9, 0.1, 0], { loss: [1, 0, 0.0005, 2] })]);
     const tie = handQuestion({ node: tied, level: 1, draws: DRAWS });
     expect(tie?.truth.action_indexes).toEqual([1, 2]);
-    expect(tie?.truth.text).toBe("BB plays 55 most often as Call or Raise to 10bb (50.0 percent).");
+    expect(tie?.truth.text).toBe("BB's highest-EV action with 55 is Call or Raise to 10bb (played 90.0 percent of the time).");
   });
 
   it("R3.16 level 2 asks the band of the most frequent action, lower edge inclusive", () => {

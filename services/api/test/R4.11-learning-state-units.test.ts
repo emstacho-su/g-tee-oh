@@ -40,6 +40,7 @@ const RATED_OUTPUT: GradeOutput = {
   rated: true,
   weight: 1,
   gradedActionIndex: 1,
+  followedRoll: null,
   bestActionIndexes: [1],
 } as unknown as GradeOutput;
 

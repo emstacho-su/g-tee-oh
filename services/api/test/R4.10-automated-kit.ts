@@ -90,7 +90,6 @@ export async function nextPrompt(app: ApiApp, player: Player, sessionId: string)
 
 export interface Choice {
   actionIndex?: number;
-  confidence?: "sure" | "unsure";
 }
 
 /** GET /next, then POST one decision at the prompt's state version. */
@@ -104,7 +103,6 @@ export async function decideOnce(app: ApiApp, player: Player, sessionId: string,
       state_version: prompt.state_version,
       action_index: choice.actionIndex ?? 0,
       response_ms: RESPONSE_MS,
-      ...(choice.confidence === undefined ? {} : { confidence: choice.confidence }),
     },
   });
   if (response.statusCode !== 200) {

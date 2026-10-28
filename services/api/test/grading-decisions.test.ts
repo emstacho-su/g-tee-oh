@@ -2,8 +2,9 @@
  * POST /sessions/{id}/decisions over a fake solver-query (R3.7, A5 section 3, O-92, O-156, O-232,
  * O-246, O-248): one transaction for the attempt and the state, an Idempotency-Key double submit
  * graded once, a keyless resubmit at the old version refused as stale, feedback equal to a
- * re-render of the stored row, Server-Timing, Simple mode's group member graded from Rust, RNG
- * mode's roll, and ratedTodayInTrack's day boundary.
+ * re-render of the stored row, Server-Timing, Simple mode's group member graded from Rust,
+ * Mixed-frequency mode's roll and followed-the-roll mark (ADR 0024, O-371), the retired confidence
+ * field (O-345, O-373), and ratedTodayInTrack's day boundary.
  */
 import { randomUUID } from "node:crypto";
 
@@ -64,7 +65,7 @@ async function storedFeedbackRows(sessionId: string): Promise<FeedbackRow[]> {
 describe("R3.7 POST /sessions/{id}/decisions", () => {
   it("R3.7 grades the decision, stores the attempt and moves the session to feedback at version 1", async () => {
     const { app, sq, player, sessionId } = await setUp();
-    const response = await decide(app, player, sessionId, { confidence: "unsure" });
+    const response = await decide(app, player, sessionId, {});
     expect(response.statusCode, response.body).toBe(200);
     const feedback = feedbackSchema.parse(response.json());
     expect(feedback).toMatchObject({ label: "best", score: 1, ev_loss_bb: 0, best_action_indexes: [1], rated: false, state_version: 1 });
@@ -84,7 +85,8 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
       action_token: "r250",
       label: "best",
       reference_strategy: "equilibrium",
-      confidence: "unsure",
+      confidence: null,
+      followed_roll: null,
       response_ms: 900,
       state_version: 0,
       graded_action_index: 1,
@@ -94,6 +96,16 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
       [sessionId],
     );
     expect(session.rows[0]).toEqual({ phase: "feedback", state_version: 1, last: feedback.attempt_id });
+    await app.close();
+  });
+
+  it("R3.13 a decision that sends the retired confidence field is a 400 problem and stores nothing (O-345, O-373)", async () => {
+    const { app, player, sessionId } = await setUp();
+    const response = await decide(app, player, sessionId, { confidence: "sure" });
+    expect(response.statusCode).toBe(400);
+    expect(response.headers["content-type"]).toMatch(/^application/problem+json/);
+    expect(response.json()).toMatchObject({ type: "urn:g-tee-oh:problem:bad-request", status: 400 });
+    expect(await storedFeedbackRows(sessionId)).toHaveLength(0);
     await app.close();
   });
 
@@ -192,7 +204,7 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     const { app, sq, player, sessionId } = await setUp({ grouping: "simple" });
     const response = await decide(app, player, sessionId, { action_index: 2 });
     expect(response.statusCode, response.body).toBe(200);
-    // The raise group's summed frequency (0.7) is the hand's top, so the group is Best (O-212).
+    // The raise group grades at its lowest-loss member (raise to 2.5bb, loss 0), the node's lowest loss, so it is Best (ADR 0024).
     expect(response.json()).toMatchObject({ label: "best", ev_loss_bb: 0, ev_loss_pct_pot: 0 });
     const grades = sq.calls.filter((call) => call.path === "/v1/grade").map((call) => (call.body as { action_index: number }).action_index);
     expect(grades).toEqual([2, 1]);
@@ -201,7 +213,7 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     await app.close();
   });
 
-  it("R3.7 RNG mode shows one roll per decision, stable across GETs, and stores it with the attempt (O-213)", async () => {
+  it("R3.10 Mixed-frequency mode shows one roll per decision, stable across GETs, stores it with the attempt, and never moves Best (O-213, ADR 0024)", async () => {
     const { app, player, sessionId } = await setUp({ rng: true });
     const get = async () =>
       promptSchema.parse((await app.inject({ method: "GET", url: `/api/v1/sessions/${sessionId}/next`, headers: player.read })).json());
@@ -210,7 +222,19 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     expect((await get()).rng_roll).toBe(prompt.rng_roll);
     const feedback = feedbackSchema.parse((await decide(app, player, sessionId, {})).json());
     expect(feedback.rng_roll).toBe(prompt.rng_roll);
-    expect(feedback.best_action_indexes).toEqual([(prompt.rng_roll ?? 0) <= 30 ? 0 : 1]);
+    // Best is the lowest loss whatever the roll; the roll only sets the followed mark (fold band 1 to 30, raise 31 to 100).
+    expect(feedback.best_action_indexes).toEqual([1]);
+    expect(feedback.label).toBe("best");
+    expect(feedback.followed_roll).toBe((prompt.rng_roll ?? 0) > 30);
+    const stored = await pool.query<{ followed_roll: boolean | null }>("select followed_roll from attempt where session_id = $1", [sessionId]);
+    expect(stored.rows[0]?.followed_roll).toBe(feedback.followed_roll);
+    await app.close();
+  });
+
+  it("R3.10 with Mixed-frequency mode off the feedback has no roll and no followed mark (ADR 0024 rule 2)", async () => {
+    const { app, player, sessionId } = await setUp();
+    const feedback = feedbackSchema.parse((await decide(app, player, sessionId, {})).json());
+    expect(feedback).toMatchObject({ rng_roll: null, followed_roll: null });
     await app.close();
   });
 });

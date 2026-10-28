@@ -112,7 +112,7 @@ function automated(seeded: boolean): LearningState {
     seeded,
     config_ids: [],
     pick_no: 1,
-    queue: { last_family: null, hypercorrection: [] },
+    queue: { last_family: null },
     block: { spot_class_key: "k", family: "rfi", track_key: "opens", worked_example: false, served: 0, size: 3 },
   };
 }

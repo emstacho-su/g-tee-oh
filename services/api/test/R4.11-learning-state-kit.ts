@@ -23,7 +23,7 @@ export function automatedLearning(spotClassKey: string, seeded = false): Learnin
     seeded,
     config_ids: [KIT_CONFIG],
     pick_no: 1,
-    queue: { last_family: "rfi", hypercorrection: [] },
+    queue: { last_family: "rfi" },
     block: { spot_class_key: spotClassKey, family: "rfi", track_key: "opens", worked_example: false, served: 0, size: 3 },
   };
 }

@@ -1,10 +1,11 @@
 /**
- * Grading inputs and feedback rendering (R3.7, O-92, O-210, O-212, O-213, ADR 0004): the learning
- * policy's input is built from solver-query's numbers only, the best actions follow learning's tie
- * rule or the roll, labels map to the contract's lowercase once, and feedback is a pure function of
- * the stored attempt row.
+ * Grading inputs and feedback rendering (R3.7, R3.8, R3.10, O-92, O-210, O-213, ADR 0004, ADR 0024):
+ * the learning policy's input is built from solver-query's numbers only, the best actions are
+ * learning's lowest-loss groups (the rule grade() labels Best by; the roll and the frequencies never
+ * enter it), labels map to the contract's lowercase once, and feedback, with its followed-the-roll
+ * mark, is a pure function of the stored attempt row.
  */
-import { FREQUENCY_TIE_TOLERANCE, type GradeAction } from "@g-tee-oh/learning";
+import { LOSS_TIE_TOLERANCE_PCT_POT, type GradeAction } from "@g-tee-oh/learning";
 import { describe, expect, it } from "vitest";
 
 import { feedbackSchema } from "../src/schemas/training.js";
@@ -55,6 +56,7 @@ const ROW: FeedbackRow = {
   ev_by_action: [0, 1.5, 1.5],
   rated: false,
   rng_roll: null,
+  followed_roll: null,
   state_version: 4,
   solution_id: "0190f000-0000-7000-8000-0000000000aa",
   node_key: "cfg_6_online_100/BB-BTN/",
@@ -86,17 +88,26 @@ describe("R3.7 grading inputs and feedback", () => {
     expect(() => gradeActions(badBucket, GRADE)).toThrow(expect.objectContaining({ status: 502 }));
   });
 
-  it("R3.7 best actions are every action tied for the top frequency (O-212)", () => {
-    expect(bestActionIndexes(GRADE.freq_by_action, gradeActions(NODE, GRADE), null)).toEqual([1, 2]);
-    const nearTie = [0.2, 0.4, 0.4 - FREQUENCY_TIE_TOLERANCE / 2];
-    expect(bestActionIndexes(nearTie, gradeActions(NODE, GRADE), null)).toEqual([1, 2]);
-    expect(bestActionIndexes([0.1, 0.6, 0.3], gradeActions(NODE, GRADE), null)).toEqual([1]);
+  it("R3.8 best actions are every action tied for the lowest loss, whatever the frequencies (ADR 0024 rule 4, O-343, O-370)", () => {
+    expect(bestActionIndexes(NODE, GRADE, "standard")).toEqual([1, 2]);
+    const nearTie: SqGrade = { ...GRADE, loss_pct_pot_by_action: [37.5, 0, LOSS_TIE_TOLERANCE_PCT_POT / 2] };
+    expect(bestActionIndexes(NODE, nearTie, "standard")).toEqual([1, 2]);
+    const rareRaise: SqGrade = { ...GRADE, freq_by_action: [0.1, 0.89, 0.01], loss_pct_pot_by_action: [37.5, 0.01, 0] };
+    expect(bestActionIndexes(NODE, rareRaise, "standard"), "the rarely played raise is the highest EV").toEqual([2]);
   });
 
-  it("R3.7 in RNG mode the best action is the roll-selected one (O-213)", () => {
-    const actions = gradeActions(NODE, GRADE);
-    expect(bestActionIndexes(GRADE.freq_by_action, actions, 1)).toEqual([0]);
-    expect(bestActionIndexes(GRADE.freq_by_action, actions, 100)).toEqual([2]);
+  it("R3.8 best actions follow the grouping by group, the rule grade() labels by (ADR 0024 rule 4, O-375)", () => {
+    const sized = {
+      ...NODE,
+      street: "flop",
+      actions: [
+        ...NODE.actions,
+        { index: 3, token: "r500", kind: "raise", size_cbb: 500, bucket: "pot", label: "Raise to 5bb", next_node_key: "k/r5" },
+      ],
+    } as unknown as SqNode;
+    const grade: SqGrade = { ...GRADE, freq_by_action: [0.1, 0.1, 0.1, 0.7], loss_pct_pot_by_action: [37.5, 0.2, 0, 0.1] };
+    expect(bestActionIndexes(sized, grade, "standard")).toEqual([2]);
+    expect(bestActionIndexes(sized, grade, "simple")).toEqual([2, 3]);
   });
 
   it("R3.7 the grade input carries street, grouping, roll, drill mode and the revealing panels", () => {
@@ -159,6 +170,7 @@ describe("R3.7 grading inputs and feedback", () => {
       ev_by_action: [0, 1.5, 1.5],
       rated: false,
       rng_roll: null,
+      followed_roll: null,
       state_version: 5,
       solution_id: ROW.solution_id,
       node_key: "cfg_6_online_100/BB-BTN/",
@@ -171,6 +183,13 @@ describe("R3.7 grading inputs and feedback", () => {
       spot_class_key: "srp-btn-open",
     });
     expect(renderFeedback(ROW)).toEqual(feedback);
+  });
+
+  it("R3.10 feedback carries the stored followed-the-roll mark in Mixed-frequency mode (ADR 0024 rule 2, O-371)", () => {
+    const followed = renderFeedback({ ...ROW, rng_roll: 37, followed_roll: true });
+    expect(followed).toMatchObject({ rng_roll: 37, followed_roll: true });
+    expect(feedbackSchema.parse(followed)).toEqual(followed);
+    expect(renderFeedback({ ...ROW, rng_roll: 90, followed_roll: false }).followed_roll).toBe(false);
   });
 
   it("R3.7 a row without the S23 columns cannot render feedback", () => {

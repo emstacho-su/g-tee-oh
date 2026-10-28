@@ -1,9 +1,10 @@
 /**
  * Automated sessions over the test database and the fixture solver-query (R4.10, O-270, O-272,
- * O-274, O-215, ADR 0018): the first block is a worked example with every panel visible and its
- * decisions unrated; the block closes after its three hands, writing a new card due now and mastery
- * at the prior then and not before; consecutive blocks never share a family; a confident miss is
- * served at the first pick the interleave rule allows; a carded class the catalog no longer lists is
+ * O-274, O-345, O-372, ADR 0018): the first block is a worked example with every panel visible and
+ * its decisions unrated; the block closes after its three hands, writing a new card due now and
+ * mastery at the prior then and not before; consecutive blocks never share a family; a missed class
+ * is not promoted and the stored queue state holds no hypercorrection list (the confident-miss rule
+ * was retired with R3.11, O-345); a carded class the catalog no longer lists is
  * skipped and its pair requested, with no solution row written; no covered class is a 422 that
  * still records the gaps; an unknown configuration is a 400.
  */
@@ -116,8 +117,8 @@ describe("R4.10 automated session create and worked-example blocks (O-272)", () 
   });
 });
 
-describe("R4.10 confident misses (O-215)", () => {
-  it("R4.10 a sure miss is served at the first pick the interleave rule allows", async () => {
+describe("R4.10 misses after the confident-miss rule was retired (O-345, O-372)", () => {
+  it("R4.10 a block of misses closes like any other: the stored queue holds only the last family, with no hypercorrection list", async () => {
     const player = await newPlayer(database);
     await seedCards(database, player.userId, classKeys);
     const session = await requireAutomated(app, player);
@@ -126,19 +127,34 @@ describe("R4.10 confident misses (O-215)", () => {
     let sawMiss = false;
     for (let hand = 0; hand < REVIEW_BLOCK_INSTANCES; hand += 1) {
       const worst = worstAction(await derivedNow(database, player.userId, session.session_id));
-      const { feedback } = await decideOnce(app, player, session.session_id, { actionIndex: worst.index, confidence: "sure" });
+      const { feedback } = await decideOnce(app, player, session.session_id, { actionIndex: worst.index });
       sawMiss ||= worst.lossPctPot >= MISTAKE_FROM_PCT_POT && !["best", "correct"].includes(feedback.label);
     }
     expect(sawMiss).toBe(true);
     const afterMiss = await learningOfSession(database, player.userId, session.session_id);
-    expect(afterMiss.queue.hypercorrection).toEqual([missed.spot_class_key]);
     expect(afterMiss.block.family).not.toBe(missed.family);
-    for (let hand = 0; hand < REVIEW_BLOCK_INSTANCES; hand += 1) {
-      await decideOnce(app, player, session.session_id);
-    }
-    const revisited = await learningOfSession(database, player.userId, session.session_id);
-    expect(revisited.block.spot_class_key).toBe(missed.spot_class_key);
-    expect(revisited.queue.hypercorrection).toEqual([]);
+    const stored = await pool.query<{ queue: Record<string, unknown> }>(
+      "select state->'learning'->'queue' as queue from practice_session where id = $1",
+      [session.session_id],
+    );
+    expect(stored.rows[0]?.queue).toEqual({ last_family: afterMiss.block.family });
+  });
+
+  it("R4.10 a session stored before S37 with a pending hypercorrection list still plays, and the list is dropped on the next write (O-372)", async () => {
+    const player = await newPlayer(database);
+    await seedCards(database, player.userId, classKeys);
+    const session = await requireAutomated(app, player);
+    await pool.query(
+      "update practice_session set state = jsonb_set(state, '{learning,queue,hypercorrection}', '["gone/class"]'::jsonb) where id = $1",
+      [session.session_id],
+    );
+    const { feedback } = await decideOnce(app, player, session.session_id);
+    expect(feedback.state_version).toBeGreaterThan(0);
+    const stored = await pool.query<{ queue: Record<string, unknown> }>(
+      "select state->'learning'->'queue' as queue from practice_session where id = $1",
+      [session.session_id],
+    );
+    expect(stored.rows[0]?.queue).not.toHaveProperty("hypercorrection");
   });
 });
 

@@ -57,7 +57,7 @@ async function decide(app: Awaited<ReturnType<typeof setUp>>["app"], player: Pla
     method: "POST",
     url: `/api/v1/sessions/${sessionId}/decisions`,
     headers: player.write,
-    payload: { state_version: version, action_index: actionIndex, response_ms: 1200, confidence: "sure" },
+    payload: { state_version: version, action_index: actionIndex, response_ms: 1200 },
   });
 }
 
@@ -119,7 +119,7 @@ describe("R3.6 POST /sessions", () => {
       method: "POST",
       url: `/api/v1/sessions/${sessionId}/decisions`,
       headers: player.write,
-      payload: { state_version: prompt.state_version, action_index: 0, response_ms: 900, confidence: "sure", mode: "automated" },
+      payload: { state_version: prompt.state_version, action_index: 0, response_ms: 900, mode: "automated" },
     });
     expect(smuggled.statusCode).toBe(400);
     expect((await rowsOf(pool, sessionId)).attempts).toHaveLength(0);
