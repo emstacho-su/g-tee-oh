@@ -11,8 +11,10 @@ import { z } from "zod";
 import { nodeActionSchema } from "./study.js";
 import {
   cardSchema,
+  configIdSchema,
   handClassSchema,
   nodeKeySchema,
+  positionPairSchema,
   positionSchema,
   streetSchema,
   timestampSchema,
@@ -83,6 +85,9 @@ export const promptSchema = z
       .array(cardSchema)
       .nullable()
       .describe("The board revealed when the previous hand ended (full-hand mode); null when none was"),
+    synthetic: z
+      .boolean()
+      .describe("True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"),
   })
   .meta({ id: "TrainerPrompt" });
 
@@ -108,6 +113,13 @@ export const feedbackSchema = z
     rated: z.boolean(),
     rng_roll: z.number().int().nullable(),
     state_version: z.number().int().min(0),
+    // O-280, O-281: where the decision was made, read from the attempt row and its solution row
+    // (O-246), so the feedback panel can fetch the range view and threshold card for that node.
+    solution_id: uuidSchema.describe("The solution the decision was graded against"),
+    node_key: nodeKeySchema.describe("The node the hero decided at"),
+    config_id: configIdSchema,
+    pair: positionPairSchema,
+    hand: z.string().describe("The hero's hand as graded"),
   })
   .meta({ id: "DecisionFeedback" });
 

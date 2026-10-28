@@ -29,7 +29,12 @@ export const CONTRACT_LABELS: Readonly<Record<GradeLabel, ContractLabel>> = {
   Blunder: "blunder",
 };
 
-/** The attempt columns the feedback reads. */
+/**
+ * The attempt columns the feedback reads, plus the configuration and pair of the attempt's
+ * solution row (O-280, O-281): the attempt stores solution_id and node_key, and the solution row
+ * names its configuration and pair, so the feedback panel can fetch the node just decided without
+ * the api parsing a node key (O-245).
+ */
 export type FeedbackRow = Pick<
   Selectable<DB["attempt"]>,
   | "id"
@@ -43,8 +48,13 @@ export type FeedbackRow = Pick<
   | "rated"
   | "rng_roll"
   | "state_version"
->;
+  | "solution_id"
+  | "node_key"
+  | "hand"
+> &
+  Pick<Selectable<DB["solution"]>, "game_config_id" | "position_pair">;
 
+/** The attempt's own columns of a FeedbackRow; the solution's two come from a join (attempts.ts). */
 export const FEEDBACK_COLUMNS = [
   "id",
   "label",
@@ -57,6 +67,9 @@ export const FEEDBACK_COLUMNS = [
   "rated",
   "rng_roll",
   "state_version",
+  "solution_id",
+  "node_key",
+  "hand",
 ] as const;
 
 export function toContractLabel(label: GradeLabel): ContractLabel {
@@ -86,5 +99,10 @@ export function renderFeedback(row: FeedbackRow): Feedback {
     rated: row.rated,
     rng_roll: row.rng_roll,
     state_version: required(row.state_version, "state_version") + 1,
+    solution_id: row.solution_id,
+    node_key: row.node_key,
+    config_id: row.game_config_id,
+    pair: required(row.position_pair, "position_pair"),
+    hand: row.hand,
   };
 }

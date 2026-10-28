@@ -35,8 +35,19 @@ export const nodeActionSchema = z
     size_cbb: z.number().int().nullable(),
     bucket: z.string().nullable(),
     label: z.string(),
+    next_node_key: nodeKeySchema
+      .nullable()
+      .describe("The node this action leads to; null when it ends the solution (O-245, O-280)"),
   })
   .meta({ id: "NodeAction" });
+
+/** One action's share of the acting seat's reach-weighted range, as solver-query sums it (ADR 0004). */
+export const actionShareSchema = z
+  .object({
+    index: z.number().int().min(0),
+    share: z.number().min(0).max(1),
+  })
+  .meta({ id: "ActionShare" });
 
 export const nodeHandRowSchema = z
   .object({
@@ -80,6 +91,9 @@ export const studyNodeSchema = z
       .nullable()
       .describe("The node the api prefetched next; null when the likeliest action ends the solution (R3.3)"),
     synthetic: z.boolean().describe("True when the solution is synthetic test data (O-229, O-57)"),
+    range_by_action: z
+      .array(actionShareSchema)
+      .describe("Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"),
   })
   .meta({ id: "StudyNode" });
 

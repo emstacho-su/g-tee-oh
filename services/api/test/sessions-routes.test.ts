@@ -159,8 +159,12 @@ describe("R3.6 GET /sessions/{id}/next", () => {
       street: "preflop",
       rng_roll: null,
       previous_board: null,
+      synthetic: true,
     });
     expect(prompt.buttons.map((button) => button.token)).toEqual(["f", "r250", "r300"]);
+    // O-245, O-280: each button names the node it leads to; a fold ends the solution.
+    expect(prompt.buttons[0]?.next_node_key).toBeNull();
+    expect(prompt.buttons[1]?.next_node_key).toEqual(expect.any(String));
     await app.close();
   });
 

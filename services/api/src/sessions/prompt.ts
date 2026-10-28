@@ -24,6 +24,7 @@ export function toButton(action: SqAction): NodeButton {
     size_cbb: action.size_cbb,
     bucket: action.bucket ?? null,
     label: action.label,
+    next_node_key: action.next_node_key ?? null,
   };
 }
 
@@ -49,5 +50,6 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     street: streetSchema.parse(node.street),
     rng_roll: roll === null ? null : roll.roll,
     previous_board: state.previous_board === null ? null : [...state.previous_board],
+    synthetic: node.synthetic,
   };
 }

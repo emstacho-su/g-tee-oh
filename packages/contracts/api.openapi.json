@@ -547,6 +547,20 @@
           },
           "label": {
             "type": "string"
+          },
+          "next_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node this action leads to; null when it ends the solution (O-245, O-280)"
           }
         },
         "required": [
@@ -555,7 +569,27 @@
           "kind",
           "size_cbb",
           "bucket",
-          "label"
+          "label",
+          "next_node_key"
+        ]
+      },
+      "ActionShareInput": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "share": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "index",
+          "share"
         ]
       },
       "NodeHandRowInput": {
@@ -730,6 +764,13 @@
           "synthetic": {
             "type": "boolean",
             "description": "True when the solution is synthetic test data (O-229, O-57)"
+          },
+          "range_by_action": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionShareInput"
+            },
+            "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
           }
         },
         "required": [
@@ -748,7 +789,8 @@
           "noise_flags",
           "next_likely_line",
           "next_likely_node_key",
-          "synthetic"
+          "synthetic",
+          "range_by_action"
         ]
       },
       "ThresholdCardInput": {
@@ -2146,6 +2188,10 @@
               }
             ],
             "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
           }
         },
         "required": [
@@ -2162,7 +2208,8 @@
           "visible_panels",
           "street",
           "rng_roll",
-          "previous_board"
+          "previous_board",
+          "synthetic"
         ]
       },
       "DecisionFeedbackInput": {
@@ -2231,6 +2278,32 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
           }
         },
         "required": [
@@ -2244,7 +2317,12 @@
           "ev_by_action",
           "rated",
           "rng_roll",
-          "state_version"
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand"
         ]
       },
       "SessionRecapInput": {
@@ -2833,6 +2911,20 @@
           },
           "label": {
             "type": "string"
+          },
+          "next_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node this action leads to; null when it ends the solution (O-245, O-280)"
           }
         },
         "required": [
@@ -2841,7 +2933,28 @@
           "kind",
           "size_cbb",
           "bucket",
-          "label"
+          "label",
+          "next_node_key"
+        ],
+        "additionalProperties": false
+      },
+      "ActionShare": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "share": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "index",
+          "share"
         ],
         "additionalProperties": false
       },
@@ -3018,6 +3131,13 @@
           "synthetic": {
             "type": "boolean",
             "description": "True when the solution is synthetic test data (O-229, O-57)"
+          },
+          "range_by_action": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionShare"
+            },
+            "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
           }
         },
         "required": [
@@ -3036,7 +3156,8 @@
           "noise_flags",
           "next_likely_line",
           "next_likely_node_key",
-          "synthetic"
+          "synthetic",
+          "range_by_action"
         ],
         "additionalProperties": false
       },
@@ -4452,6 +4573,10 @@
               }
             ],
             "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
           }
         },
         "required": [
@@ -4468,7 +4593,8 @@
           "visible_panels",
           "street",
           "rng_roll",
-          "previous_board"
+          "previous_board",
+          "synthetic"
         ],
         "additionalProperties": false
       },
@@ -4538,6 +4664,32 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
           }
         },
         "required": [
@@ -4551,7 +4703,12 @@
           "ev_by_action",
           "rated",
           "rng_roll",
-          "state_version"
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand"
         ],
         "additionalProperties": false
       },

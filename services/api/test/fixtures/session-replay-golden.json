@@ -22,7 +22,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -30,7 +31,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -38,7 +40,8 @@
       ],
       "street": "preflop",
       "rng_roll": 80,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -58,7 +61,12 @@
       ],
       "rated": false,
       "rng_roll": 80,
-      "state_version": 1
+      "state_version": 1,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Qc4d"
     }
   },
   {
@@ -84,7 +92,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -92,7 +101,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -100,7 +110,8 @@
       ],
       "street": "preflop",
       "rng_roll": 39,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -120,7 +131,12 @@
       ],
       "rated": false,
       "rng_roll": 39,
-      "state_version": 2
+      "state_version": 2,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "6d2c"
     }
   },
   {
@@ -146,7 +162,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -154,7 +171,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -162,7 +180,8 @@
       ],
       "street": "preflop",
       "rng_roll": 29,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -182,7 +201,12 @@
       ],
       "rated": false,
       "rng_roll": 29,
-      "state_version": 3
+      "state_version": 3,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "7c3s"
     }
   },
   {
@@ -208,7 +232,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -216,7 +241,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -224,7 +250,8 @@
       ],
       "street": "preflop",
       "rng_roll": 30,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -244,7 +271,12 @@
       ],
       "rated": false,
       "rng_roll": 30,
-      "state_version": 4
+      "state_version": 4,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "8s7c"
     }
   },
   {
@@ -270,7 +302,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -278,7 +311,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -286,7 +320,8 @@
       ],
       "street": "preflop",
       "rng_roll": 92,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -306,7 +341,12 @@
       ],
       "rated": false,
       "rng_roll": 92,
-      "state_version": 5
+      "state_version": 5,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "9d4h"
     }
   },
   {
@@ -332,7 +372,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -340,7 +381,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -348,7 +390,8 @@
       ],
       "street": "preflop",
       "rng_roll": 43,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -368,7 +411,12 @@
       ],
       "rated": false,
       "rng_roll": 43,
-      "state_version": 6
+      "state_version": 6,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "8d7h"
     }
   },
   {
@@ -394,7 +442,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -402,7 +451,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -410,7 +460,8 @@
       ],
       "street": "preflop",
       "rng_roll": 88,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -430,7 +481,12 @@
       ],
       "rated": false,
       "rng_roll": 88,
-      "state_version": 7
+      "state_version": 7,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ah9s"
     }
   },
   {
@@ -456,7 +512,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -464,7 +521,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -472,7 +530,8 @@
       ],
       "street": "preflop",
       "rng_roll": 13,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -492,7 +551,12 @@
       ],
       "rated": false,
       "rng_roll": 13,
-      "state_version": 8
+      "state_version": 8,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ad4h"
     }
   },
   {
@@ -518,7 +582,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -526,7 +591,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -534,7 +600,8 @@
       ],
       "street": "preflop",
       "rng_roll": 8,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -554,7 +621,12 @@
       ],
       "rated": false,
       "rng_roll": 8,
-      "state_version": 9
+      "state_version": 9,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Kc5c"
     }
   },
   {
@@ -580,7 +652,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -588,7 +661,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -596,7 +670,8 @@
       ],
       "street": "preflop",
       "rng_roll": 8,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -616,7 +691,12 @@
       ],
       "rated": false,
       "rng_roll": 8,
-      "state_version": 10
+      "state_version": 10,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Td2d"
     }
   },
   {
@@ -642,7 +722,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -650,7 +731,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -658,7 +740,8 @@
       ],
       "street": "preflop",
       "rng_roll": 99,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -678,7 +761,12 @@
       ],
       "rated": false,
       "rng_roll": 99,
-      "state_version": 11
+      "state_version": 11,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Qc5s"
     }
   },
   {
@@ -704,7 +792,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -712,7 +801,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -720,7 +810,8 @@
       ],
       "street": "preflop",
       "rng_roll": 2,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -740,7 +831,12 @@
       ],
       "rated": false,
       "rng_roll": 2,
-      "state_version": 12
+      "state_version": 12,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "7c2s"
     }
   },
   {
@@ -766,7 +862,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -774,7 +871,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -782,7 +880,8 @@
       ],
       "street": "preflop",
       "rng_roll": 30,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -802,7 +901,12 @@
       ],
       "rated": false,
       "rng_roll": 30,
-      "state_version": 13
+      "state_version": 13,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Kh9d"
     }
   },
   {
@@ -828,7 +932,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -836,7 +941,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -844,7 +950,8 @@
       ],
       "street": "preflop",
       "rng_roll": 75,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -864,7 +971,12 @@
       ],
       "rated": false,
       "rng_roll": 75,
-      "state_version": 14
+      "state_version": 14,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "As6h"
     }
   },
   {
@@ -901,7 +1013,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -909,7 +1022,8 @@
           "kind": "call",
           "size_cbb": 1000,
           "bucket": null,
-          "label": "Call"
+          "label": "Call",
+          "next_node_key": null
         },
         {
           "index": 2,
@@ -917,7 +1031,8 @@
           "kind": "raise",
           "size_cbb": 2200,
           "bucket": "overbet-large",
-          "label": "Raise to 22bb"
+          "label": "Raise to 22bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250.r1000.r2200"
         }
       ],
       "visible_panels": [
@@ -925,7 +1040,8 @@
       ],
       "street": "preflop",
       "rng_roll": 58,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -947,7 +1063,12 @@
       ],
       "rated": false,
       "rng_roll": 58,
-      "state_version": 15
+      "state_version": 15,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "As6h"
     }
   },
   {
@@ -973,7 +1094,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -981,7 +1103,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -993,7 +1116,8 @@
         "Js",
         "5c",
         "6s"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1013,7 +1137,12 @@
       ],
       "rated": false,
       "rng_roll": 6,
-      "state_version": 16
+      "state_version": 16,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Jd7c"
     }
   },
   {
@@ -1039,7 +1168,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1047,7 +1177,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1055,7 +1186,8 @@
       ],
       "street": "preflop",
       "rng_roll": 5,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1075,7 +1207,12 @@
       ],
       "rated": false,
       "rng_roll": 5,
-      "state_version": 17
+      "state_version": 17,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "7d5c"
     }
   },
   {
@@ -1101,7 +1238,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1109,7 +1247,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1121,7 +1260,8 @@
         "3d",
         "4d",
         "Th"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -1141,7 +1281,12 @@
       ],
       "rated": false,
       "rng_roll": 17,
-      "state_version": 18
+      "state_version": 18,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "QcJc"
     }
   },
   {
@@ -1167,7 +1312,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1175,7 +1321,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1183,7 +1330,8 @@
       ],
       "street": "preflop",
       "rng_roll": 32,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1203,7 +1351,12 @@
       ],
       "rated": false,
       "rng_roll": 32,
-      "state_version": 19
+      "state_version": 19,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "9d8s"
     }
   },
   {
@@ -1229,7 +1382,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1237,7 +1391,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1245,7 +1400,8 @@
       ],
       "street": "preflop",
       "rng_roll": 27,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -1265,7 +1421,12 @@
       ],
       "rated": false,
       "rng_roll": 27,
-      "state_version": 20
+      "state_version": 20,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ac9s"
     }
   },
   {
@@ -1291,7 +1452,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1299,7 +1461,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1307,7 +1470,8 @@
       ],
       "street": "preflop",
       "rng_roll": 74,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1327,7 +1491,12 @@
       ],
       "rated": false,
       "rng_roll": 74,
-      "state_version": 21
+      "state_version": 21,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Jh5c"
     }
   },
   {
@@ -1353,7 +1522,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1361,7 +1531,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1369,7 +1540,8 @@
       ],
       "street": "preflop",
       "rng_roll": 93,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1389,7 +1561,12 @@
       ],
       "rated": false,
       "rng_roll": 93,
-      "state_version": 22
+      "state_version": 22,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "8s6d"
     }
   },
   {
@@ -1415,7 +1592,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1423,7 +1601,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1431,7 +1610,8 @@
       ],
       "street": "preflop",
       "rng_roll": 65,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -1451,7 +1631,12 @@
       ],
       "rated": false,
       "rng_roll": 65,
-      "state_version": 23
+      "state_version": 23,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Kc7s"
     }
   },
   {
@@ -1488,7 +1673,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1496,7 +1682,8 @@
           "kind": "call",
           "size_cbb": 1000,
           "bucket": null,
-          "label": "Call"
+          "label": "Call",
+          "next_node_key": null
         },
         {
           "index": 2,
@@ -1504,7 +1691,8 @@
           "kind": "raise",
           "size_cbb": 2200,
           "bucket": "overbet-large",
-          "label": "Raise to 22bb"
+          "label": "Raise to 22bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250.r1000.r2200"
         }
       ],
       "visible_panels": [
@@ -1512,7 +1700,8 @@
       ],
       "street": "preflop",
       "rng_roll": 5,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1534,7 +1723,12 @@
       ],
       "rated": false,
       "rng_roll": 5,
-      "state_version": 24
+      "state_version": 24,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Kc7s"
     }
   },
   {
@@ -1560,7 +1754,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1568,7 +1763,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1580,7 +1776,8 @@
         "2h",
         "Ts",
         "Tc"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1600,7 +1797,12 @@
       ],
       "rated": false,
       "rng_roll": 92,
-      "state_version": 25
+      "state_version": 25,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Qs3s"
     }
   },
   {
@@ -1626,7 +1828,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1634,7 +1837,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1642,7 +1846,8 @@
       ],
       "street": "preflop",
       "rng_roll": 24,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -1662,7 +1867,12 @@
       ],
       "rated": false,
       "rng_roll": 24,
-      "state_version": 26
+      "state_version": 26,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ad7d"
     }
   },
   {
@@ -1699,7 +1909,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1707,7 +1918,8 @@
           "kind": "call",
           "size_cbb": 1000,
           "bucket": null,
-          "label": "Call"
+          "label": "Call",
+          "next_node_key": null
         },
         {
           "index": 2,
@@ -1715,7 +1927,8 @@
           "kind": "raise",
           "size_cbb": 2200,
           "bucket": "overbet-large",
-          "label": "Raise to 22bb"
+          "label": "Raise to 22bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250.r1000.r2200"
         }
       ],
       "visible_panels": [
@@ -1723,7 +1936,8 @@
       ],
       "street": "preflop",
       "rng_roll": 36,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -1745,7 +1959,12 @@
       ],
       "rated": false,
       "rng_roll": 36,
-      "state_version": 27
+      "state_version": 27,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ad7d"
     }
   },
   {
@@ -1771,7 +1990,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1779,7 +1999,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1791,7 +2012,8 @@
         "2c",
         "4d",
         "Th"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1811,7 +2033,12 @@
       ],
       "rated": false,
       "rng_roll": 59,
-      "state_version": 28
+      "state_version": 28,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Jc6s"
     }
   },
   {
@@ -1837,7 +2064,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1845,7 +2073,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1853,7 +2082,8 @@
       ],
       "street": "preflop",
       "rng_roll": 19,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1873,7 +2103,12 @@
       ],
       "rated": false,
       "rng_roll": 19,
-      "state_version": 29
+      "state_version": 29,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ts4h"
     }
   },
   {
@@ -1899,7 +2134,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1907,7 +2143,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1915,7 +2152,8 @@
       ],
       "street": "preflop",
       "rng_roll": 31,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1935,7 +2173,12 @@
       ],
       "rated": false,
       "rng_roll": 31,
-      "state_version": 30
+      "state_version": 30,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Tc4s"
     }
   },
   {
@@ -1961,7 +2204,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -1969,7 +2213,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -1977,7 +2222,8 @@
       ],
       "street": "preflop",
       "rng_roll": 60,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -1997,7 +2243,12 @@
       ],
       "rated": false,
       "rng_roll": 60,
-      "state_version": 31
+      "state_version": 31,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "7h3s"
     }
   },
   {
@@ -2023,7 +2274,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2031,7 +2283,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2039,7 +2292,8 @@
       ],
       "street": "preflop",
       "rng_roll": 39,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2059,7 +2313,12 @@
       ],
       "rated": false,
       "rng_roll": 39,
-      "state_version": 32
+      "state_version": 32,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "AdTc"
     }
   },
   {
@@ -2096,7 +2355,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2104,7 +2364,8 @@
           "kind": "call",
           "size_cbb": 1000,
           "bucket": null,
-          "label": "Call"
+          "label": "Call",
+          "next_node_key": null
         },
         {
           "index": 2,
@@ -2112,7 +2373,8 @@
           "kind": "raise",
           "size_cbb": 2200,
           "bucket": "overbet-large",
-          "label": "Raise to 22bb"
+          "label": "Raise to 22bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250.r1000.r2200"
         }
       ],
       "visible_panels": [
@@ -2120,7 +2382,8 @@
       ],
       "street": "preflop",
       "rng_roll": 10,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2142,7 +2405,12 @@
       ],
       "rated": false,
       "rng_roll": 10,
-      "state_version": 33
+      "state_version": 33,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "AdTc"
     }
   },
   {
@@ -2168,7 +2436,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2176,7 +2445,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2188,7 +2458,8 @@
         "6c",
         "9h",
         "4s"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -2208,7 +2479,12 @@
       ],
       "rated": false,
       "rng_roll": 83,
-      "state_version": 34
+      "state_version": 34,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Td3h"
     }
   },
   {
@@ -2234,7 +2510,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2242,7 +2519,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2254,7 +2532,8 @@
         "6c",
         "7h",
         "5c"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2274,7 +2553,12 @@
       ],
       "rated": false,
       "rng_roll": 45,
-      "state_version": 35
+      "state_version": 35,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Qs8h"
     }
   },
   {
@@ -2300,7 +2584,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2308,7 +2593,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2316,7 +2602,8 @@
       ],
       "street": "preflop",
       "rng_roll": 19,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2336,7 +2623,12 @@
       ],
       "rated": false,
       "rng_roll": 19,
-      "state_version": 36
+      "state_version": 36,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ah2h"
     }
   },
   {
@@ -2362,7 +2654,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2370,7 +2663,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2378,7 +2672,8 @@
       ],
       "street": "preflop",
       "rng_roll": 6,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2398,7 +2693,12 @@
       ],
       "rated": false,
       "rng_roll": 6,
-      "state_version": 37
+      "state_version": 37,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "Ac8s"
     }
   },
   {
@@ -2424,7 +2724,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2432,7 +2733,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2440,7 +2742,8 @@
       ],
       "street": "preflop",
       "rng_roll": 68,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "best",
@@ -2460,7 +2763,12 @@
       ],
       "rated": false,
       "rng_roll": 68,
-      "state_version": 38
+      "state_version": 38,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "JhJs"
     }
   },
   {
@@ -2497,7 +2805,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2505,7 +2814,8 @@
           "kind": "call",
           "size_cbb": 1000,
           "bucket": null,
-          "label": "Call"
+          "label": "Call",
+          "next_node_key": null
         },
         {
           "index": 2,
@@ -2513,7 +2823,8 @@
           "kind": "raise",
           "size_cbb": 2200,
           "bucket": "overbet-large",
-          "label": "Raise to 22bb"
+          "label": "Raise to 22bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250.r1000.r2200"
         }
       ],
       "visible_panels": [
@@ -2521,7 +2832,8 @@
       ],
       "street": "preflop",
       "rng_roll": 92,
-      "previous_board": null
+      "previous_board": null,
+      "synthetic": true
     },
     "feedback": {
       "label": "inaccuracy",
@@ -2543,7 +2855,12 @@
       ],
       "rated": false,
       "rng_roll": 92,
-      "state_version": 39
+      "state_version": 39,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "JhJs"
     }
   },
   {
@@ -2569,7 +2886,8 @@
           "kind": "fold",
           "size_cbb": 0,
           "bucket": null,
-          "label": "Fold"
+          "label": "Fold",
+          "next_node_key": null
         },
         {
           "index": 1,
@@ -2577,7 +2895,8 @@
           "kind": "raise",
           "size_cbb": 250,
           "bucket": "overbet-large",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "next_node_key": "cfg_6_online_100/BB-BTN/r250"
         }
       ],
       "visible_panels": [
@@ -2589,7 +2908,8 @@
         "3d",
         "6c",
         "7s"
-      ]
+      ],
+      "synthetic": true
     },
     "feedback": {
       "label": "blunder",
@@ -2609,7 +2929,12 @@
       ],
       "rated": false,
       "rng_roll": 92,
-      "state_version": 40
+      "state_version": 40,
+      "solution_id": "f99b054c-6f19-8e69-8003-24060ce3cef7",
+      "node_key": "cfg_6_online_100/BB-BTN/",
+      "config_id": "cfg_6_online_100",
+      "pair": "BB-BTN",
+      "hand": "6c4s"
     }
   }
 ]

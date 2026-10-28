@@ -11,8 +11,8 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "../src/db.js";
-import { countRatedToday } from "../src/grading/attempts.js";
-import { FEEDBACK_COLUMNS, renderFeedback, type FeedbackRow } from "../src/grading/feedback.js";
+import { countRatedToday, feedbackRows } from "../src/grading/attempts.js";
+import { renderFeedback, type FeedbackRow } from "../src/grading/feedback.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER } from "../src/http/headers.js";
 import { SERVER_TIMING_HEADER } from "../src/http/server-timing.js";
 import type { TrainerSettings } from "../src/schemas/drills.js";
@@ -58,7 +58,7 @@ function decide(app: App, player: Player, sessionId: string, body: Record<string
 }
 
 async function storedFeedbackRows(sessionId: string): Promise<FeedbackRow[]> {
-  return database.selectFrom("attempt").select(FEEDBACK_COLUMNS).where("session_id", "=", sessionId).orderBy("id").execute();
+  return feedbackRows(database).where("attempt.session_id", "=", sessionId).orderBy("attempt.id").execute();
 }
 
 describe("R3.7 POST /sessions/{id}/decisions", () => {
@@ -102,6 +102,20 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     expect(row).toBeDefined();
     expect(response.json()).toEqual(renderFeedback(row as FeedbackRow));
     expect(response.json()).toMatchObject({ label: "blunder", ev_loss_pct_pot: 40 });
+    await app.close();
+  });
+
+  it("R3.7 the feedback names the node decided: solution, node key, configuration, pair and hand (O-280, O-281)", async () => {
+    const { app, player, sessionId } = await setUp();
+    const response = await decide(app, player, sessionId, {});
+    expect(response.statusCode, response.body).toBe(200);
+    expect(feedbackSchema.parse(response.json())).toMatchObject({
+      solution_id: solutionId,
+      node_key: ROOT_KEY,
+      config_id: FAKE_CONFIG,
+      pair: FAKE_PAIR,
+      hand: "AhKd",
+    });
     await app.close();
   });
 

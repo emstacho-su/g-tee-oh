@@ -43,6 +43,7 @@ export function toStudyNode(node: Readonly<SqNode>, next: NextLikely): StudyNode
       size_cbb: action.size_cbb,
       bucket: action.bucket ?? null,
       label: action.label,
+      next_node_key: action.next_node_key ?? null,
     })),
     hands: node.hands.map((row) => ({
       hand: row.hand,
@@ -56,6 +57,8 @@ export function toStudyNode(node: Readonly<SqNode>, next: NextLikely): StudyNode
     next_likely_line: next.line,
     next_likely_node_key: next.nodeKey,
     synthetic: node.synthetic,
+    // O-281: copied from solver-query's range summary, never summed here (ADR 0004).
+    range_by_action: node.range_summary.by_action.map((entry) => ({ index: entry.index, share: entry.share })),
   };
 }
 

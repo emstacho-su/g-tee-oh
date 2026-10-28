@@ -56,6 +56,11 @@ const ROW: FeedbackRow = {
   rated: false,
   rng_roll: null,
   state_version: 4,
+  solution_id: "0190f000-0000-7000-8000-0000000000aa",
+  node_key: "cfg_6_online_100/BB-BTN/",
+  hand: "AhKd",
+  game_config_id: "cfg_6_online_100",
+  position_pair: "BB-BTN",
 };
 
 describe("R3.7 grading inputs and feedback", () => {
@@ -151,12 +156,18 @@ describe("R3.7 grading inputs and feedback", () => {
       rated: false,
       rng_roll: null,
       state_version: 5,
+      solution_id: ROW.solution_id,
+      node_key: "cfg_6_online_100/BB-BTN/",
+      config_id: "cfg_6_online_100",
+      pair: "BB-BTN",
+      hand: "AhKd",
     });
     expect(renderFeedback(ROW)).toEqual(feedback);
   });
 
   it("R3.7 a row without the S23 columns cannot render feedback", () => {
     expect(() => renderFeedback({ ...ROW, freq_by_action: null })).toThrow(expect.objectContaining({ status: 500 }));
+    expect(() => renderFeedback({ ...ROW, position_pair: null })).toThrow(expect.objectContaining({ status: 500 }));
     expect(() => renderFeedback({ ...ROW, label: "great" })).toThrow();
   });
 });

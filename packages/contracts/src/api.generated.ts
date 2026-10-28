@@ -4362,6 +4362,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActionShare: {
+            index: number;
+            share: number;
+        };
+        ActionShareInput: {
+            index: number;
+            share: number;
+        };
         Blockers: {
             hand: string;
             top_blocked: {
@@ -4546,30 +4554,56 @@ export interface components {
             /** Format: uuid */
             attempt_id: string;
             best_action_indexes: number[];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
             ev_by_action: number[];
             ev_loss_bb: number;
             ev_loss_pct_pot: number;
             freq_by_action: number[];
+            /** @description The hero's hand as graded */
+            hand: string;
             /** @enum {string} */
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
+            /** @description The node the hero decided at */
+            node_key: string;
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
             rated: boolean;
             rng_roll: number | null;
             score: number;
+            /**
+             * Format: uuid
+             * @description The solution the decision was graded against
+             */
+            solution_id: string;
             state_version: number;
         };
         DecisionFeedbackInput: {
             /** Format: uuid */
             attempt_id: string;
             best_action_indexes: number[];
+            /** @description A game_config identifier, for example cfg_9_live_13_150 */
+            config_id: string;
             ev_by_action: number[];
             ev_loss_bb: number;
             ev_loss_pct_pot: number;
             freq_by_action: number[];
+            /** @description The hero's hand as graded */
+            hand: string;
             /** @enum {string} */
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
+            /** @description The node the hero decided at */
+            node_key: string;
+            /** @description Two positions, out of position first, for example BB-BTN */
+            pair: string;
             rated: boolean;
             rng_roll: number | null;
             score: number;
+            /**
+             * Format: uuid
+             * @description The solution the decision was graded against
+             */
+            solution_id: string;
             state_version: number;
         };
         Drill: {
@@ -4680,6 +4714,8 @@ export interface components {
             /** @enum {string} */
             kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
             label: string;
+            /** @description The node this action leads to; null when it ends the solution (O-245, O-280) */
+            next_node_key: string | null;
             size_cbb: number | null;
             token: string;
         };
@@ -4689,6 +4725,8 @@ export interface components {
             /** @enum {string} */
             kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
             label: string;
+            /** @description The node this action leads to; null when it ends the solution (O-245, O-280) */
+            next_node_key: string | null;
             size_cbb: number | null;
             token: string;
         };
@@ -5164,6 +5202,8 @@ export interface components {
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             pot_cbb: number;
+            /** @description Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004) */
+            range_by_action: components["schemas"]["ActionShare"][];
             /** Format: uuid */
             solution_id: string;
             spot_class_key: string | null;
@@ -5191,6 +5231,8 @@ export interface components {
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             pot_cbb: number;
+            /** @description Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004) */
+            range_by_action: components["schemas"]["ActionShareInput"][];
             /** Format: uuid */
             solution_id: string;
             spot_class_key: string | null;
@@ -5269,6 +5311,8 @@ export interface components {
              * @enum {string}
              */
             street: "preflop" | "flop" | "turn" | "river";
+            /** @description True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280) */
+            synthetic: boolean;
             visible_panels: string[];
         };
         TrainerPromptInput: {
@@ -5300,6 +5344,8 @@ export interface components {
              * @enum {string}
              */
             street: "preflop" | "flop" | "turn" | "river";
+            /** @description True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280) */
+            synthetic: boolean;
             visible_panels: string[];
         };
         TrainerSettings: {

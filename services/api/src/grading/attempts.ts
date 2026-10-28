@@ -17,6 +17,8 @@ import type { Database } from "../db.js";
 import { HTTP_STATUS, PG_ERROR, PROBLEM_SLUGS, ProblemError, pgErrorCode } from "../http/problem.js";
 import { FEEDBACK_COLUMNS, type FeedbackRow } from "./feedback.js";
 
+// The feedback row joins the attempt's solution for its configuration and pair (O-280, O-281).
+
 /** v1 opponents play the equilibrium, and every graded decision records it (ADR 0010, 05 section 3). */
 export const REFERENCE_STRATEGY = "equilibrium";
 
@@ -93,14 +95,29 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         best_action_indexes: [...values.bestActionIndexes],
         graded_action_index: values.gradedActionIndex,
       })
-      .returning(FEEDBACK_COLUMNS)
-      .executeTakeFirstOrThrow();
+      .returning("id")
+      .executeTakeFirstOrThrow()
+      .then((inserted) => selectFeedbackRow(transaction, inserted.id));
   } catch (error: unknown) {
     if (pgErrorCode(error) === PG_ERROR.uniqueViolation) {
       throw Object.assign(staleStateProblem(), { cause: error });
     }
     throw error;
   }
+}
+
+/** Attempts with their solution's configuration and pair: the rows renderFeedback reads (O-280, O-281). */
+export function feedbackRows(database: Database) {
+  return database
+    .selectFrom("attempt")
+    .innerJoin("solution", "solution.id", "attempt.solution_id")
+    .select(FEEDBACK_COLUMNS.map((column) => `attempt.${column}` as const))
+    .select(["solution.game_config_id", "solution.position_pair"]);
+}
+
+/** One attempt's feedback row; inside the decision's transaction it sees the row just inserted. */
+export async function selectFeedbackRow(database: Database, attemptId: string): Promise<FeedbackRow> {
+  return feedbackRows(database).where("attempt.id", "=", attemptId).executeTakeFirstOrThrow();
 }
 
 /** The user's rated attempts since midnight in `timeZone`, as of `now` (O-214, O-247). */

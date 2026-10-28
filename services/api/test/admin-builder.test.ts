@@ -128,7 +128,6 @@ describe("R3.5 admin builder endpoints", () => {
   });
 
   it("R3.5 GET /admin/builder counts the queue by status and storage from the latest ledger row", async () => {
-    const before = await status();
     for (const jobStatus of ["queued", "queued", "running", "failed", "blocked_budget", "done"]) {
       await insertJob(jobStatus);
     }
@@ -138,11 +137,14 @@ describe("R3.5 admin builder endpoints", () => {
 
     const body = await status();
 
-    expect(body.queue.queued).toBeGreaterThanOrEqual(before.queue.queued + 2);
-    expect(body.queue.running).toBeGreaterThanOrEqual(before.queue.running + 1);
-    expect(body.queue.failed).toBeGreaterThanOrEqual(before.queue.failed + 1);
-    expect(body.queue.blocked_budget).toBeGreaterThanOrEqual(before.queue.blocked_budget + 1);
-    expect(body.throughput_per_hour).toBeGreaterThanOrEqual(before.throughput_per_hour + 1 / HOURS_PER_DAY);
+    // Other test files insert and delete their own build_job rows at the same time, so a snapshot
+    // taken before can shrink; the rows this test inserted stay until its own cleanup, so the
+    // counts are at least these (the exact window arithmetic is the next test's, on a fixed clock).
+    expect(body.queue.queued).toBeGreaterThanOrEqual(2);
+    expect(body.queue.running).toBeGreaterThanOrEqual(1);
+    expect(body.queue.failed).toBeGreaterThanOrEqual(1);
+    expect(body.queue.blocked_budget).toBeGreaterThanOrEqual(1);
+    expect(body.throughput_per_hour).toBeGreaterThanOrEqual(1 / HOURS_PER_DAY);
     expect(body.storage).toEqual({ library_bytes: 5_000_000_000, reference_bytes: 1234 });
   });
 

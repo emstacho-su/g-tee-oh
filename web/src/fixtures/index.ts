@@ -31,10 +31,10 @@ export const fixtureSession: SessionInfo = {
 
 /** Four preflop actions at a button open: fold, call, raise to 2.5bb, all-in for 100bb. */
 export const fixtureActions: readonly NodeAction[] = [
-  { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold" },
-  { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call" },
-  { index: 2, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "Raise to 2.5bb" },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb" },
+  { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
+  { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
+  { index: 2, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "Raise to 2.5bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
 ];
 
 const STRENGTH_SCALE = 2 * (GRID_SIZE - 1);
@@ -85,6 +85,12 @@ export const fixtureStudyNode: StudyNode = {
   next_likely_line: "r250",
   next_likely_node_key: "cfg_6_online_100/BB-BTN/r250",
   synthetic: true,
+  range_by_action: [
+    { index: 0, share: 0.55 },
+    { index: 1, share: 0.05 },
+    { index: 2, share: 0.38 },
+    { index: 3, share: 0.02 },
+  ],
 };
 
 // The insight shapes S23 pinned from solver-query's InsightsResponse; invented numbers.
@@ -129,6 +135,7 @@ export const fixturePrompt: TrainerPrompt = {
   street: "preflop",
   rng_roll: null,
   previous_board: null,
+  synthetic: true,
 };
 
 export const fixtureFeedback: DecisionFeedback = {
@@ -143,4 +150,9 @@ export const fixtureFeedback: DecisionFeedback = {
   rated: true,
   rng_roll: 37,
   state_version: 4,
+  solution_id: FIXTURE_SOLUTION_ID,
+  node_key: "cfg_6_online_100/BB-BTN/",
+  config_id: "cfg_6_online_100",
+  pair: "BB-BTN",
+  hand: "AJo",
 };

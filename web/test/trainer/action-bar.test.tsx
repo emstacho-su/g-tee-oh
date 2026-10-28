@@ -13,9 +13,9 @@ import { fixtureActions } from "../../src/fixtures/index.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 
 const FLOP_ACTIONS: readonly NodeAction[] = [
-  { index: 0, token: "x", kind: "check", size_cbb: null, bucket: null, label: "Check" },
-  { index: 1, token: "b330", kind: "bet", size_cbb: 330, bucket: "small", label: "Small" },
-  { index: 2, token: "b1000", kind: "bet", size_cbb: 1000, bucket: "pot", label: "Pot" },
+  { index: 0, token: "x", kind: "check", size_cbb: null, bucket: null, label: "Check", next_node_key: null },
+  { index: 1, token: "b330", kind: "bet", size_cbb: 330, bucket: "small", label: "Small", next_node_key: null },
+  { index: 2, token: "b1000", kind: "bet", size_cbb: 1000, bucket: "pot", label: "Pot", next_node_key: null },
 ];
 
 /** The fixture actions numbered 10 to 13, so a NodeAction.index never equals its position (O-198). */
@@ -114,6 +114,7 @@ describe("R3.13 ActionBar", () => {
       size_cbb: (index + 1) * 100,
       bucket: null,
       label: `Bet ${index + 1}`,
+      next_node_key: null,
     }));
     withRoot(<ActionBar actions={many} grouping="simple" street="river" onAction={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Bet 9" })).toHaveAttribute("aria-keyshortcuts", "9");

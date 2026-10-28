@@ -116,9 +116,9 @@ describe("R3.12 range matrix drawing", () => {
 
   it("R3.12 two sizes of one sized kind get different pattern keys, so shade is not the only signal", () => {
     const actions = [
-      { index: 0, token: "f", kind: "fold" as const, size_cbb: null, bucket: null, label: "Fold" },
-      { index: 1, token: "r250", kind: "raise" as const, size_cbb: 250, bucket: null, label: "Raise 2.5bb" },
-      { index: 2, token: "r600", kind: "raise" as const, size_cbb: 600, bucket: null, label: "Raise 6bb" },
+      { index: 0, token: "f", kind: "fold" as const, size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
+      { index: 1, token: "r250", kind: "raise" as const, size_cbb: 250, bucket: null, label: "Raise 2.5bb", next_node_key: null },
+      { index: 2, token: "r600", kind: "raise" as const, size_cbb: 600, bucket: null, label: "Raise 6bb", next_node_key: null },
     ];
     const hands = fixtureStudyNode.hands.map((row) => ({
       ...row,

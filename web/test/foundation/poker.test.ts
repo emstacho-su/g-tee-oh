@@ -72,8 +72,8 @@ describe("R3.13 action styles", () => {
   });
 
   it("R3.13 shades two raise sizes at one node differently", () => {
-    const small = { index: 0, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "" } as const;
-    const large = { index: 1, token: "r600", kind: "raise", size_cbb: 600, bucket: "overbet-large", label: "" } as const;
+    const small = { index: 0, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "", next_node_key: null } as const;
+    const large = { index: 1, token: "r600", kind: "raise", size_cbb: 600, bucket: "overbet-large", label: "", next_node_key: null } as const;
     const both = [small, large];
     expect(actionColor(small, both, "light")).not.toBe(actionColor(large, both, "light"));
     expect(actionColor(fixtureActions[0]!, fixtureActions, "dark")).toBe(ACTION_STYLES.fold.color.dark);
@@ -82,24 +82,24 @@ describe("R3.13 action styles", () => {
   it("R3.13 caps the shade at the darkest one past four sizes and treats a missing size as 0", () => {
     const sizes = [100, 200, 300, 400, 500, 600];
     const raises = sizes.map(
-      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "" }) as const,
+      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "", next_node_key: null }) as const,
     );
     expect(actionColor(raises[5]!, raises, "light")).toBe(actionColor(raises[3]!, raises, "light"));
-    const unsized = { index: 0, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "" } as const;
+    const unsized = { index: 0, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "", next_node_key: null } as const;
     expect(actionColor(unsized, [unsized], "dark")).toMatch(/^#[0-9a-f]{6}$/);
   });
 
   it("R3.12 sizeRank ranks bets and raises by size ascending and gives unsized kinds 0", () => {
-    const large = { index: 1, token: "r900", kind: "raise", size_cbb: 900, bucket: "pot", label: "" } as const;
-    const small = { index: 2, token: "b300", kind: "bet", size_cbb: 300, bucket: "pot", label: "" } as const;
-    const middle = { index: 3, token: "r600", kind: "raise", size_cbb: 600, bucket: "pot", label: "" } as const;
-    const allIn = { index: 4, token: "a", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "" } as const;
-    const fold = { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "" } as const;
+    const large = { index: 1, token: "r900", kind: "raise", size_cbb: 900, bucket: "pot", label: "", next_node_key: null } as const;
+    const small = { index: 2, token: "b300", kind: "bet", size_cbb: 300, bucket: "pot", label: "", next_node_key: null } as const;
+    const middle = { index: 3, token: "r600", kind: "raise", size_cbb: 600, bucket: "pot", label: "", next_node_key: null } as const;
+    const allIn = { index: 4, token: "a", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "", next_node_key: null } as const;
+    const fold = { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "", next_node_key: null } as const;
     const actions = [fold, large, small, middle, allIn];
     expect([small, middle, large].map((action) => sizeRank(action, actions))).toEqual([0, 1, 2]);
     expect(sizeRank(fold, actions)).toBe(0);
     expect(sizeRank(allIn, actions)).toBe(0);
-    const unsized = { index: 5, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "" } as const;
+    const unsized = { index: 5, token: "b", kind: "bet", size_cbb: null, bucket: null, label: "", next_node_key: null } as const;
     expect(sizeRank(unsized, [unsized, small])).toBe(0);
     expect(sizeRank(small, [unsized, small])).toBe(1);
     expect(sizeRank(middle, [small])).toBe(0);
@@ -108,7 +108,7 @@ describe("R3.13 action styles", () => {
   it("R3.12 actionColor shades by sizeRank, capped at the darkest shade", () => {
     const sizes = [100, 200, 300, 400, 500];
     const raises = sizes.map(
-      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "" }) as const,
+      (size, index) => ({ index, token: `r${size}`, kind: "raise", size_cbb: size, bucket: "pot", label: "", next_node_key: null }) as const,
     );
     const shades = raises.map((raise) => actionColor(raise, raises, "dark"));
     expect(new Set(shades.slice(0, 4)).size).toBe(4);
@@ -128,7 +128,7 @@ describe("R3.13 grade action mapping (O-213)", () => {
   });
 
   it("R3.13 refuses a bucket name learning does not know", () => {
-    const bad = [{ index: 0, token: "b1", kind: "bet", size_cbb: 100, bucket: "huge", label: "" } as const];
+    const bad = [{ index: 0, token: "b1", kind: "bet", size_cbb: 100, bucket: "huge", label: "", next_node_key: null } as const];
     expect(() => toGradeActions(bad)).toThrow(/unknown bucket/);
   });
 });

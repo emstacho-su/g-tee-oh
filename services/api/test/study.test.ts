@@ -66,6 +66,17 @@ describe("R3.3 GET /study/node", () => {
     expect(body.spot_class_key).toBe(upstream.data?.spot_class_key ?? null);
   });
 
+  it("R3.3 carries each action's next node key and range share from solver-query (O-245, O-280, O-281)", async () => {
+    const response = await app.inject({ method: "GET", url: nodeUrl({}), headers: readHeaders(session) });
+    const body = studyNodeSchema.parse(response.json());
+    const upstream = await fixtureSolverQuery().GET(NODES_PATH, {
+      params: { query: { solution_id: body.solution_id, node_key: ROOT, hands: "class" } },
+    });
+    expect(body.actions.map((a) => a.next_node_key)).toEqual(upstream.data?.actions.map((a) => a.next_node_key ?? null));
+    expect(body.actions.some((a) => a.next_node_key !== null)).toBe(true);
+    expect(body.range_by_action).toEqual(upstream.data?.range_summary.by_action);
+  });
+
   it("R3.3 walks a line through next_node_key and reads a node by node_key", async () => {
     const root = studyNodeSchema.parse(
       (await app.inject({ method: "GET", url: nodeUrl({}), headers: readHeaders(session) })).json(),
