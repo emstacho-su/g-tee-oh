@@ -94,15 +94,18 @@ export const trainRoute = screenRoute("/train", "train");
 export const drillsRoute = screenRoute("/drills", "drills");
 export const drillNewRoute = screenRoute("/drills/new", "drillNew");
 export const drillRoute = screenRoute("/drills/$id", "drillEdit");
-// /study and /drills/$id/run are real screens (S25): their search parameters are validated here,
-// so a malformed URL value never reaches the screen or the api (O-286, O-288).
+// /study and /drills/$id/run are real screens (S25, O-286, O-288). validateSearch types the
+// routes' search for links, but the router merges every parent's raw search into a child's
+// (router-core matchRoutes: search = { ...parentSearch, ...strictSearch }), so a key the validator
+// dropped (?seed=XYZ) is still present in useSearch(). The route components therefore pass the
+// screens only what the validator returns for the current search, never useSearch() itself.
 export const drillRunRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/drills/$id/run",
   validateSearch: validateDrillRunSearch,
   component: function DrillRunRouteScreen() {
     const { id } = drillRunRoute.useParams();
-    const { seed } = drillRunRoute.useSearch();
+    const { seed } = validateDrillRunSearch(drillRunRoute.useSearch());
     return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} />;
   },
 });
@@ -111,7 +114,7 @@ export const studyRoute = createRoute({
   path: "/study",
   validateSearch: validateStudySearch,
   component: function StudyRouteScreen() {
-    return <StudyPage search={studyRoute.useSearch()} />;
+    return <StudyPage search={validateStudySearch(studyRoute.useSearch())} />;
   },
 });
 export const predictRoute = screenRoute("/predict", "predict");

@@ -39,6 +39,9 @@ const CRITERIA = {
   matrixEv: "RangeMatrix EV mode (R3.12)",
   matrixWeight: "RangeMatrix range-weight mode (R3.12)",
   matrixTable: "The accessible table fallback renders the same data (DoD 3, R3.12)",
+  explainer: "R3.10 RNG explainer: why randomize, how the roll works with the band example, why it is optional (05 section 7, ADR 0009, O-283)",
+  rollBadge: "R3.10 before the decision only the roll shows, never the bands (O-282)",
+  feedbackWired: "R3.10 R3.13 feedback after the reveal: roller with the roll-selected action labeled Best, range view and threshold card (O-281, O-282)",
 } as const;
 
 const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
@@ -50,6 +53,9 @@ const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
   ["confidence-tap", CRITERIA.confidence],
   ["rng-roller", CRITERIA.roller],
   ["feedback-panel", CRITERIA.feedback],
+  ["rng-explainer", CRITERIA.explainer],
+  ["roll-badge", CRITERIA.rollBadge],
+  ["feedback-wired", CRITERIA.feedbackWired],
   ["action-frequency-table", CRITERIA.panels],
   ["threshold-card", CRITERIA.panels],
   ["range-matrix-frequency", CRITERIA.matrix],

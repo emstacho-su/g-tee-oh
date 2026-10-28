@@ -14,7 +14,7 @@ export { RngRoller } from "./RngRoller.js";
 export type { RngRollerProps } from "./RngRoller.js";
 export { FeedbackPanel, LATER_SESSION_NOTE } from "./FeedbackPanel.js";
 export type { FeedbackPanelProps } from "./FeedbackPanel.js";
-export { RngExplainer } from "./RngExplainer.js";
+export { RngExplainer, RngExplainerContent } from "./RngExplainer.js";
 export type { RngExplainerProps } from "./RngExplainer.js";
 export { useRngExplainer } from "./use-rng-explainer.js";
 export type { RngExplainerControl, UseRngExplainerOptions } from "./use-rng-explainer.js";
