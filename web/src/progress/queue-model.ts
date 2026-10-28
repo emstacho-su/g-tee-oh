@@ -2,17 +2,16 @@
  * The home screen's "Today's queue" (S32, R4.12, O-322): how many practiced classes are due, how
  * many classes were never practiced, and the three costliest leaks, with the text for each.
  *
- * Mechanism: there is no queue endpoint, so the counts come from the heat map read. A practiced
- * class (p_known not null) is due when its retrievability is known and at or under the retention
- * learning schedules it at (retentionFor(mastered): 0.9, or 0.85 once mastered, O-253). A class
- * with p_known null was never practiced. The leaks come from the leak read, ranked by current
+ * Mechanism: there is no queue endpoint, so the counts come from the heat map read, through the
+ * heat map's own isDue and isPracticed (heatmap-model.ts), so the two screens cannot disagree: a
+ * practiced class (p_known not null) is due when its retrievability is at or under the retention
+ * learning schedules it at (O-253); a class with p_known null was never practiced. The leaks come from the leak read, ranked by current
  * cost (a copy is sorted; the read is never changed), and each is joined to its heat map cell by
  * spot_class_key for the position pair and the format and depth: values from the api only, the
  * key itself is never parsed (ADR 0004). A server queue preview can replace this later (O-322).
  */
-import { retentionFor } from "@g-tee-oh/learning";
-
 import { formatLeak } from "./format.js";
+import { isDue, isPracticed } from "./heatmap-model.js";
 import type { HeatmapCell, LeakItem, ProgressHeatmap, ProgressLeaks } from "./types.js";
 
 export const TOP_LEAK_COUNT = 3;
@@ -31,13 +30,7 @@ export interface HomeQueue {
   readonly leaks: readonly QueueLeak[];
 }
 
-export function isPracticed(cell: HeatmapCell): boolean {
-  return cell.p_known !== null;
-}
-
-export function isDue(cell: HeatmapCell): boolean {
-  return isPracticed(cell) && cell.retrievability !== null && cell.retrievability <= retentionFor(cell.mastered);
-}
+export { isDue, isPracticed };
 
 function whereOf(heatmap: ProgressHeatmap, cell: HeatmapCell | undefined): string | null {
   if (cell === undefined) return null;

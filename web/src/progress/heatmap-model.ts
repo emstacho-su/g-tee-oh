@@ -53,9 +53,17 @@ export function heatBin(pKnown: number): HeatBin {
   return (passed + 1) as HeatBin;
 }
 
-/** Due for review: practiced, with retrievability at or under its class's retention (O-253). */
-export function isCellDue(cell: HeatmapCell): boolean {
-  return cell.retrievability !== null && cell.retrievability <= retentionFor(cell.mastered);
+/** Practiced at least once: p_known is set. A class never practiced is "new". */
+export function isPracticed(cell: HeatmapCell): boolean {
+  return cell.p_known !== null;
+}
+
+/**
+ * Due for review: practiced, with retrievability at or under its class's retention (O-253). The one
+ * rule the heat map and the home queue (queue-model.ts) share.
+ */
+export function isDue(cell: HeatmapCell): boolean {
+  return isPracticed(cell) && cell.retrievability !== null && cell.retrievability <= retentionFor(cell.mastered);
 }
 
 const BAND_IN_BB = /^\d+$/;
@@ -144,7 +152,7 @@ function detailsOf(cell: HeatmapCell, due: boolean): string[] {
 }
 
 export function cellView(cell: HeatmapCell, row: HeatmapRow, column: HeatmapColumn): HeatCellView {
-  const due = isCellDue(cell);
+  const due = isDue(cell);
   const classText = classLabel(row, column);
   const details = detailsOf(cell, due);
   return {

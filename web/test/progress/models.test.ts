@@ -14,9 +14,10 @@ import {
   heatBin,
   HEAT_FILL,
   HEAT_INK,
-  isCellDue,
+  isDue,
   NEW_CELL_TEXT,
 } from "../../src/progress/heatmap-model.js";
+import { isDue as queueIsDue } from "../../src/progress/queue-model.js";
 import {
   EMPTY_SCALE_MAX,
   HEATMAP_LOADING_REASON,
@@ -26,7 +27,7 @@ import {
   sharedLeakScale,
   sparklineGeometry,
 } from "../../src/progress/leak-model.js";
-import type { HeatmapCell, LeakItem } from "../../src/progress/types.js";
+import type { HeatmapCell, HeatmapColumn, HeatmapRow, LeakItem } from "../../src/progress/types.js";
 
 const lookup = cellLookup(fixtureHeatmap);
 
@@ -46,13 +47,18 @@ describe("R4.12 heat map model", () => {
   });
 
   it("R4.12 a class is due when R is at or under retentionFor(mastered): 0.9, or 0.85 when mastered", () => {
-    expect(isCellDue(cell(0, 0))).toBe(false); // R 0.98
-    expect(isCellDue(cell(0, 3))).toBe(true); // R 0.83, not mastered
-    expect(isCellDue(cell(6, 1))).toBe(false); // R 0.93, mastered
-    expect(isCellDue(cell(7, 0))).toBe(true); // R 0.83, mastered
-    expect(isCellDue({ ...cell(0, 0), retrievability: 0.9 })).toBe(true);
-    expect(isCellDue({ ...cell(6, 1), retrievability: 0.86 })).toBe(false);
-    expect(isCellDue(cell(0, 2))).toBe(false); // never practiced
+    expect(isDue(cell(0, 0))).toBe(false); // R 0.98
+    expect(isDue(cell(0, 3))).toBe(true); // R 0.83, not mastered
+    expect(isDue(cell(6, 1))).toBe(false); // R 0.93, mastered
+    expect(isDue(cell(7, 0))).toBe(true); // R 0.83, mastered
+    expect(isDue({ ...cell(0, 0), retrievability: 0.9 })).toBe(true);
+    expect(isDue({ ...cell(6, 1), retrievability: 0.86 })).toBe(false);
+    expect(isDue(cell(0, 2))).toBe(false); // never practiced
+    // A class never practiced is new, never due, even if a retrievability came with it.
+    expect(isDue({ ...cell(0, 2), p_known: null, retrievability: 0.1 })).toBe(false);
+    expect(cellView({ ...cell(0, 2), p_known: null, retrievability: 0.1 }, fixtureHeatmap.rows[0] as HeatmapRow, fixtureHeatmap.columns[2] as HeatmapColumn).due).toBe(false);
+    // The heat map and the home queue share one rule.
+    expect(queueIsDue).toBe(isDue);
   });
 
   it("R4.12 groups rows by family in api order and keeps each row's index", () => {
