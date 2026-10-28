@@ -37,10 +37,9 @@ export const SESSION_TEXT = {
   keepPlaying: "Keep playing",
   grading: "Grading your decision",
   loadingPrompt: "Dealing the next hand",
+  loadingDrill: "Loading the drill",
+  ending: "Ending the session",
   retry: "Try again",
-  backToStart: "Back to the start panel",
   recapHeading: "Session recap",
   startAnother: "Start another session",
-  syntheticBanner:
-    "Synthetic test data: these spots come from a labeled synthetic solution, not a reference solve.",
 } as const;

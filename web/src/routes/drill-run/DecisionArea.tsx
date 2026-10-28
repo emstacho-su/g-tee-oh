@@ -22,7 +22,7 @@ import {
   actionButtonLabel,
   type ConfidenceChoice,
 } from "../../components/trainer/index.js";
-import { Button } from "../../components/ui/index.js";
+import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { actionOfIndex } from "../../poker/action-index.js";
@@ -91,7 +91,7 @@ export function DecisionArea(props: DecisionAreaProps) {
       {roll === null ? null : <RollBadge roll={roll} onExplain={onExplain} />}
       <ActionBar actions={prompt.buttons} grouping={grouping} street={prompt.street} disabled={!choosing || !interactive} onAction={onChoose} />
       <ChoiceAndTap {...props} />
-      {state.kind === "submitting" ? <p role="status">{SESSION_TEXT.grading}</p> : null}
+      {state.kind === "submitting" ? <LoadingNote text={SESSION_TEXT.grading} /> : null}
       <Feedback {...props} />
     </div>
   );

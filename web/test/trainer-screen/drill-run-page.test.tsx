@@ -8,17 +8,21 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { ME_QUERY_KEY } from "../../src/auth/index.js";
+import { SYNTHETIC_TEXT } from "../../src/components/ui/index.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import {
   FIXTURE_SEED,
   fixtureDrill,
   fixturePlainFeedback,
   fixturePlainPrompt,
+  fixturePracticeSession,
   fixtureRecap,
   fixtureRngFeedback,
   fixtureRngPrompt,
   fixtureTrainerHands,
 } from "../../src/fixtures/trainer.js";
+import { useTrainerTableStore } from "../../src/store/index.js";
+import { drillQuery } from "../../src/trainer/session-api.js";
 import { jsonResponse, networkFailure, problemResponse } from "../api/fake-fetch.js";
 import { DECIDE_PATH, DRILL_PATH, END_PATH, NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
 
@@ -32,6 +36,7 @@ const PLAY_SCRIPT = {
   [DECIDE_PATH]: [jsonResponse(200, fixturePlainFeedback)],
   [END_PATH]: [jsonResponse(200, fixtureRecap)],
 };
+const NEXT_ONLY = { [NEXT_PATH]: [jsonResponse(200, fixturePlainPrompt)] };
 
 async function startSession(view: RunView): Promise<void> {
   await screen.findByRole("heading", { name: fixtureDrill.name });
@@ -95,8 +100,49 @@ describe("R3.13 drill run start panel", () => {
     expect(alert).toHaveTextContent("queued for the library builder");
     expect(alert).not.toHaveTextContent("server detail never shown");
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
-    await userEvent.click(within(alert).getByRole("button", { name: "Back to the start panel" }));
-    expect(screen.getByRole("button", { name: "Start session" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to the start panel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start session" })).toBeEnabled();
+  });
+
+  it("R3.13 Start works again after a 422: a new request with a new key", async () => {
+    const view = renderRun({ script: { [START_PATH]: [problemResponse(422, "no-coverage"), jsonResponse(201, fixturePracticeSession)], ...NEXT_ONLY } });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await screen.findByRole("group", { name: "Actions" });
+    const [first, second] = view.sentTo(START_PATH);
+    expect(second?.idempotencyKey).not.toBe(first?.idempotencyKey);
+  });
+
+  it("R3.13 Start after a network failure resends the same request and key; a changed RNG switch is sent with a new key", async () => {
+    const view = renderRun({
+      script: { [START_PATH]: [networkFailure(), networkFailure(), jsonResponse(201, fixturePracticeSession)], ...NEXT_ONLY },
+    });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("did not reach the server");
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await waitFor(() => expect(view.sentTo(START_PATH)).toHaveLength(2));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await closeExplainerIfOpen();
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await screen.findByRole("group", { name: "Actions" });
+    const [first, second, third] = view.sentTo(START_PATH);
+    expect(second?.idempotencyKey).toBe(first?.idempotencyKey);
+    expect(second?.body).toEqual(first?.body);
+    expect(third?.idempotencyKey).not.toBe(first?.idempotencyKey);
+    expect(third?.body).toMatchObject({ settings: { rng: true } });
+  });
+
+  it("R3.13 a failed background refetch of the drill does not cover a running session", async () => {
+    const view = renderRun({ script: { ...PLAY_SCRIPT, [DRILL_PATH]: [jsonResponse(200, fixtureDrill), problemResponse(503, "unavailable")] } });
+    await startSession(view);
+    await view.queryClient.refetchQueries({ queryKey: drillQuery(view.api, fixtureDrill.id).queryKey });
+    expect(view.sentTo(DRILL_PATH)).toHaveLength(2);
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: RAISE_NAME })).toBeEnabled();
   });
 
   it("R3.13 a drill that cannot be read shows an explicit error", async () => {
@@ -180,6 +226,62 @@ describe("R3.13 decision requests", () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
+  it("R3.13 a fixed 400 on a decision offers End, not Try again", async () => {
+    const view = renderRun({ script: { ...PLAY_SCRIPT, [DECIDE_PATH]: [problemResponse(400, "validation")] } });
+    await startSession(view);
+    await chooseRaise(view);
+    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The request failed (status 400).");
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "End session" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
+    expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
+  });
+
+  it("R3.13 a session that already ended shows its recap, fetched through POST end", async () => {
+    const view = renderRun({ script: { ...PLAY_SCRIPT, [NEXT_PATH]: [problemResponse(409, "session-ended")] } });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
+    expect(view.sentTo(END_PATH)).toHaveLength(1);
+  });
+
+  it("R3.13 time with the explainer open does not count toward response_ms (O-284)", async () => {
+    const view = renderRun({
+      script: { ...PLAY_SCRIPT, [NEXT_PATH]: [jsonResponse(200, fixtureRngPrompt)], [DECIDE_PATH]: [jsonResponse(200, fixtureRngFeedback)] },
+    });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    await userEvent.click(screen.getByRole("switch", { name: "RNG mode" }));
+    await closeExplainerIfOpen();
+    view.clock.now = SHOWN_AT;
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    const badge = await screen.findByTestId("roll-badge");
+    await closeExplainerIfOpen();
+    view.clock.now = 2_000;
+    await userEvent.click(within(badge).getByRole("button", { name: "How RNG mode works" }));
+    await screen.findByRole("dialog");
+    view.clock.now = 5_000;
+    await closeExplainerIfOpen();
+    view.clock.now = 6_000;
+    await userEvent.click(screen.getByRole("button", { name: RAISE_NAME }));
+    await userEvent.click(screen.getByRole("button", { name: "Sure" }));
+    await screen.findByTestId("feedback-panel");
+    expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ response_ms: 2_000 });
+  });
+
+  it("R3.13 a response that arrives after the screen unmounted writes nothing", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    const late = () => new Promise<Response>((resolve) => (answer = resolve));
+    const view = renderRun({ script: { [NEXT_PATH]: [late] } });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await waitFor(() => expect(view.sentTo(NEXT_PATH)).toHaveLength(1));
+    view.unmount();
+    answer(await jsonResponse(200, fixturePlainPrompt)());
+    await new Promise((done) => setTimeout(done, 0));
+    expect(useTrainerTableStore.getState().prompt).toBeNull();
+  });
+
   it("R3.13 a 409 stale decision refetches the prompt and shows a notice", async () => {
     const view = renderRun({
       script: { ...PLAY_SCRIPT, [DECIDE_PATH]: [problemResponse(409, "stale-state")] },
@@ -235,7 +337,7 @@ describe("R3.13 feedback, next and prefetch", () => {
     expect(screen.getByRole("img", { name: "Ace of hearts" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /Table, 6 seats/ })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Action so far" })).toHaveTextContent("UTG Fold");
-    expect(screen.getByRole("note")).toHaveTextContent("Synthetic");
+    expect(screen.getByTestId("synthetic-banner")).toHaveTextContent(SYNTHETIC_TEXT);
   });
 
   it("R3.10 with RNG on the roll shows before the decision and the roller after it", async () => {
@@ -309,6 +411,20 @@ describe("R3.13 recap after end", () => {
     expect(view.sentTo(END_PATH)[0]?.body).toEqual({});
     await userEvent.click(screen.getByRole("button", { name: "Start another session" }));
     expect(screen.getByRole("button", { name: "Start session" })).toBeInTheDocument();
+  });
+
+  it("R3.13 End pressed again after a failed end reuses the stored key", async () => {
+    const view = renderRun({ script: { ...PLAY_SCRIPT, [END_PATH]: [networkFailure(), jsonResponse(200, fixtureRecap)] } });
+    await startSession(view);
+    await userEvent.click(screen.getByRole("button", { name: "End session" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
+    await screen.findByRole("alert");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "End session" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
+    await screen.findByRole("heading", { name: "Session recap" });
+    const [first, second] = view.sentTo(END_PATH);
+    expect(second?.idempotencyKey).toBe(first?.idempotencyKey);
   });
 
   it("R3.13 a failed end can be retried with the same key", async () => {

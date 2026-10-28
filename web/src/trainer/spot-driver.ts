@@ -11,8 +11,11 @@
  *
  * Every accepted transition bumps a generation counter and each request remembers the generation
  * it started in; an answer that arrives after the state moved on (the session was ended while a
- * prompt loaded, say) is dropped instead of being read as the answer to a later request. The
- * decision is sent only from submitting, which only the confidence tap enters (R3.11).
+ * prompt loaded, say) is dropped instead of being read as the answer to a later request. dispose
+ * (the screen unmounted) bumps the generation once more and stops the driver, so nothing answers
+ * into a screen that is gone. The decision is sent only from submitting, which only the confidence
+ * tap enters (R3.11). A 409 session-ended inside a running session sends End with a new key at
+ * once: the api answers POST end for an ended session with its recap, so the recap is not lost.
  */
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
 import type { PracticeSession, SessionRecap } from "./session-types.js";
@@ -32,16 +35,33 @@ export interface SpotIo {
   /** Called with each failure's problem before the machine sees it (a 401 signs out). */
   onProblem: (problem: SpotProblem) => void;
   now: () => number;
+  /** A fresh Idempotency-Key, for the end request an ended session's recap is fetched with. */
+  newKey: () => string;
 }
 
 export interface SpotDriver {
   getState: () => SpotState;
   send: (event: SpotEvent) => void;
+  /** Stops the driver (the screen unmounted): late answers and later events change nothing. */
+  dispose: () => void;
+  /**
+   * Lets events through again after dispose. React's development double mount (StrictMode) runs
+   * the unmount cleanup once before the real mount, so the mount effect calls this.
+   */
+  activate: () => void;
 }
 
 export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) => void): SpotDriver {
   let state: SpotState = INITIAL_SPOT_STATE;
   let generation = 0;
+  let disposed = false;
+
+  /** A 409 session-ended in a running session: POST end answers an ended session with its recap. */
+  function fetchRecapIfEnded(problem: SpotProblem): void {
+    if (problem.kind === "session_ended" && state.kind === "error" && state.context !== null) {
+      send({ type: "end", key: io().newKey() });
+    }
+  }
 
   function settle<T>(token: number, request: Promise<T>, toEvent: (value: T) => SpotEvent): void {
     request.then(
@@ -53,6 +73,7 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
         const problem = problemOf(error);
         io().onProblem(problem);
         send({ type: "failed", problem });
+        fetchRecapIfEnded(problem);
       },
     );
   }
@@ -91,6 +112,7 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
   }
 
   function send(event: SpotEvent): void {
+    if (disposed) return;
     const next = transition(state, event);
     if (next === state) return;
     state = next;
@@ -99,5 +121,17 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
     enter(next, generation);
   }
 
-  return { getState: () => state, send };
+  function dispose(): void {
+    disposed = true;
+    generation += 1;
+  }
+
+  return {
+    getState: () => state,
+    send,
+    dispose,
+    activate: () => {
+      disposed = false;
+    },
+  };
 }

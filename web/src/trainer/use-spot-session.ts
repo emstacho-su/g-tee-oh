@@ -10,7 +10,10 @@
  * factory (trainer-deps.tsx). A 401 from any request sets the me query to null, which the
  * authenticated layout turns into a trip to /login (query-client.ts does the same for queries).
  * The input and output are read through a ref, so the driver always uses the latest api, cache,
- * drill id and seed without being rebuilt.
+ * drill id and seed without being rebuilt. On unmount the driver is disposed, so a response that
+ * arrives later writes neither the screen state nor the store; the mount effect activates it again,
+ * which React's development double mount needs. The paused option stops the response timer while a
+ * dialog covers the screen and restarts it when the dialog closes (O-284).
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -27,6 +30,8 @@ export interface SpotSessionOptions {
   drillId: string;
   /** The O-288 replay seed, passed to POST /sessions when present. */
   seed: string | undefined;
+  /** True while a dialog covers the screen: the response timer stops (O-284). */
+  paused: boolean;
 }
 
 export interface SpotSession {
@@ -41,10 +46,10 @@ export interface SpotSession {
   reset: () => void;
 }
 
-function useSpotIo({ drillId, seed }: SpotSessionOptions): SpotIo {
+function useSpotIo({ drillId, seed }: Omit<SpotSessionOptions, "paused">): SpotIo {
   const api = useAppApi();
   const queryClient = useQueryClient();
-  const { now } = useTrainerDeps();
+  const { now, newKey } = useTrainerDeps();
   const setPrompt = useTrainerTableStore((store) => store.setPrompt);
   return {
     createSession: (rng, key) => createSession(api, { drillId, rng, seed, key }),
@@ -61,6 +66,7 @@ function useSpotIo({ drillId, seed }: SpotSessionOptions): SpotIo {
       if (problem.kind === "signed_out") queryClient.setQueryData(ME_QUERY_KEY, null);
     },
     now,
+    newKey,
   };
 }
 
@@ -74,8 +80,20 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   const [state, setState] = useState<SpotState>(INITIAL_SPOT_STATE);
   const [driver] = useState(() => createSpotDriver(() => ioRef.current, setState));
   const clearTable = useTrainerTableStore((store) => store.clear);
-  useEffect(() => clearTable, [clearTable]);
+  useEffect(() => {
+    driver.activate();
+    return () => {
+      driver.dispose();
+      clearTable();
+    };
+  }, [driver, clearTable]);
   const { send } = driver;
+  // A newly shown prompt starts its timer running, so it is paused again when a dialog is open.
+  const shownPrompt = state.kind === "await_action" ? state.prompt : null;
+  const { paused } = options;
+  useEffect(() => {
+    send(paused ? { type: "pause", at: now() } : { type: "resume", at: now() });
+  }, [paused, shownPrompt, send, now]);
   return {
     state,
     start: (rng) => send({ type: "start", key: newKey(), rng }),

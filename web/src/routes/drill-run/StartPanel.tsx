@@ -7,7 +7,7 @@
  */
 import { useId } from "react";
 
-import { Button, cn } from "../../components/ui/index.js";
+import { Button, LoadingNote, cn } from "../../components/ui/index.js";
 import type { Drill } from "../../trainer/session-types.js";
 import { GROUPING_NAMES, SESSION_TEXT, STOP_RULE_NAMES } from "./labels.js";
 
@@ -71,7 +71,7 @@ export function StartPanel({ drill, rng, onRngChange, onStart, starting }: Start
         <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
           {SESSION_TEXT.start}
         </Button>
-        {starting ? <p role="status">{SESSION_TEXT.starting}</p> : null}
+        {starting ? <LoadingNote text={SESSION_TEXT.starting} /> : null}
       </div>
     </section>
   );

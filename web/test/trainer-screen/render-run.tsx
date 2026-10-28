@@ -41,6 +41,7 @@ export interface RunView extends RenderResult {
   /** The requests sent to one "METHOD /path" key, in order. */
   sentTo: (key: string) => SentRequest[];
   queryClient: ReturnType<typeof createQueryClient>;
+  api: ReturnType<typeof createAppApi>;
 }
 
 export interface RenderRunOptions {
@@ -101,5 +102,5 @@ export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID }: RenderRu
       </ApiProvider>
     </QueryClientProvider>,
   );
-  return { ...view, sent, clock, queryClient, sentTo: (key) => sent.filter((request) => request.key === key) };
+  return { ...view, sent, clock, queryClient, api, sentTo: (key) => sent.filter((request) => request.key === key) };
 }

@@ -1,9 +1,10 @@
 /**
  * The smaller parts of the drill run screen (S25, R3.13, O-285, ADR 0018): the session recap from
  * POST /sessions/{id}/end, the end-session confirm dialog the E key and the button open, and the
- * session alert that names a failure with fixed, safe text (spot-problem.ts) and offers a retry
- * when the machine has one, or the way back to the start panel when it has none (a drill with no
- * covered spot, whose gaps were queued for the library builder, or an ended session).
+ * session alert that names a failure with fixed, safe text (spot-problem.ts) and offers Try again
+ * only for a transient failure in a session. A failed start needs no button of its own: the start
+ * panel's Start is there (a drill with no covered spot says its gaps were queued for the library
+ * builder), and a fixed failure in a session leaves End session as the way on.
  */
 import { useId } from "react";
 
@@ -69,20 +70,16 @@ export function EndSessionDialog({ open, onOpenChange, onConfirm }: EndSessionDi
 
 export interface SessionAlertProps {
   problem: SpotProblem;
+  /** Offer Try again: only for a transient failure in a session (spot-problem.ts). */
   canRetry: boolean;
   onRetry: () => void;
-  onBack: () => void;
 }
 
-export function SessionAlert({ problem, canRetry, onRetry, onBack }: SessionAlertProps) {
+export function SessionAlert({ problem, canRetry, onRetry }: SessionAlertProps) {
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-danger px-3 py-2">
       <p className="text-danger">{problemMessage(problem)}</p>
-      {canRetry ? (
-        <Button onClick={onRetry}>{SESSION_TEXT.retry}</Button>
-      ) : (
-        <Button onClick={onBack}>{SESSION_TEXT.backToStart}</Button>
-      )}
+      {canRetry ? <Button onClick={onRetry}>{SESSION_TEXT.retry}</Button> : null}
     </div>
   );
 }

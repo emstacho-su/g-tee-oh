@@ -20,13 +20,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useRngExplainer } from "../../components/trainer/index.js";
-import { Button } from "../../components/ui/index.js";
+import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
-import type { SpotState } from "../../trainer/spot-machine.js";
+import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { DecisionArea } from "./DecisionArea.js";
 import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
@@ -51,12 +51,6 @@ function promptOf(state: SpotState): TrainerPrompt | null {
     default:
       return null;
   }
-}
-
-const ENDABLE: ReadonlySet<SpotState["kind"]> = new Set(["loading_prompt", "stale", "await_action", "await_confidence", "feedback"]);
-
-function canEnd(state: SpotState): boolean {
-  return ENDABLE.has(state.kind) || (state.kind === "error" && state.context !== null && state.retry !== null);
 }
 
 function onStartPanel(state: SpotState): boolean {
@@ -90,7 +84,7 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain }: InSessi
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   return (
     <div className="flex flex-col gap-4">
-      {loading ? <p role="status">{SESSION_TEXT.loadingPrompt}</p> : null}
+      {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
           <SpotTable prompt={prompt} />
@@ -124,12 +118,14 @@ interface DrillRunProps {
 }
 
 function DrillRun({ drill, seed }: DrillRunProps) {
-  const session = useSpotSession({ drillId: drill.id, seed });
-  const { state } = session;
   const [rng, setRng] = useState(drill.trainer.rng);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open;
+  // Time under the explainer or the end confirm is not response time (O-284).
+  const session = useSpotSession({ drillId: drill.id, seed, paused: !interactive });
+  const { state } = session;
+  const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(
     { key: END_SESSION_KEY, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
@@ -146,16 +142,18 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   return (
     <>
       {state.kind === "error" ? (
-        <SessionAlert problem={state.problem} canRetry={state.retry !== null} onRetry={session.retry} onBack={session.reset} />
+        // On the start panel, Start is the retry (it reuses the request's key when nothing changed);
+        // in a session, a fixed answer offers End instead of a retry that cannot succeed.
+        <SessionAlert problem={state.problem} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} />
       ) : null}
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
-      {onStartPanel(state) ? (
+      {startPanel ? (
         <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />
       ) : null}
-      {state.kind !== "ended" && !onStartPanel(state) ? (
+      {state.kind !== "ended" && !startPanel ? (
         <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} />
       ) : null}
-      {state.kind === "ending" ? <p role="status">Ending the session</p> : null}
+      {state.kind === "ending" ? <LoadingNote text={SESSION_TEXT.ending} /> : null}
       <EndSessionDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={confirmEnd} />
       <RngExplainer open={explainer.open} onOpenChange={explainer.setOpen} />
     </>
@@ -171,8 +169,9 @@ export function DrillRunPage({ drillId, seed: rawSeed }: DrillRunPageProps) {
   return (
     <section className="flex flex-col gap-4" data-drill-id={drillId}>
       <h1 className="text-2xl font-semibold">{SESSION_TEXT.heading}</h1>
-      {drill.isPending ? <p role="status">Loading the drill</p> : null}
-      {drill.isError ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}
+      {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
+      {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
+      {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}
       {drill.data === undefined ? null : <DrillRun drill={drill.data} seed={seed} />}
     </section>
   );

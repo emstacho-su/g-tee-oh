@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiProblem } from "../../src/api/index.js";
 import { fixtureFeedback } from "../../src/fixtures/index.js";
 import { fixturePlainPrompt, fixturePracticeSession, fixtureRecap } from "../../src/fixtures/trainer.js";
 import { createSpotDriver, type SpotIo } from "../../src/trainer/spot-driver.js";
@@ -34,6 +35,7 @@ function fakeIo(overrides: Partial<SpotIo> = {}): SpotIo {
     onPrompt: vi.fn(),
     onProblem: vi.fn(),
     now: () => 0,
+    newKey: () => "driver-key",
     ...overrides,
   };
 }
@@ -71,6 +73,47 @@ describe("R3.13 spot driver", () => {
     await flush();
     expect(driver.getState().kind).toBe("ended");
     expect(io.onPrompt).not.toHaveBeenCalled();
+  });
+
+  it("R3.13 after dispose (the screen unmounted) a late answer writes nothing and events are ignored", async () => {
+    const read = deferred<typeof fixturePlainPrompt>();
+    const io = fakeIo({ loadPrompt: () => read.promise });
+    const changes = vi.fn();
+    const driver = createSpotDriver(() => io, changes);
+    driver.send({ type: "start", key: "k", rng: false });
+    await flush();
+    const calls = changes.mock.calls.length;
+    driver.dispose();
+    read.resolve(fixturePlainPrompt);
+    await flush();
+    driver.send({ type: "end", key: "end" });
+    expect(changes).toHaveBeenCalledTimes(calls);
+    expect(io.onPrompt).not.toHaveBeenCalled();
+    expect(driver.getState().kind).toBe("loading_prompt");
+  });
+
+  it("R3.13 activate after dispose (React's development double mount) lets events through again", async () => {
+    const changes = vi.fn();
+    const driver = createSpotDriver(() => fakeIo(), changes);
+    driver.dispose();
+    driver.activate();
+    driver.send({ type: "start", key: "k", rng: false });
+    await flush();
+    expect(driver.getState().kind).toBe("await_action");
+  });
+
+  it("R3.13 a 409 session-ended fetches the recap through POST end with a new key", async () => {
+    const endSession = vi.fn(() => Promise.resolve(fixtureRecap));
+    const io = fakeIo({
+      loadPrompt: () => Promise.reject(new ApiProblem({ status: 409, slug: "session-ended", title: "t" })),
+      endSession,
+    });
+    const driver = createSpotDriver(() => io, vi.fn());
+    driver.send({ type: "start", key: "k", rng: false });
+    await flush();
+    await flush();
+    expect(endSession).toHaveBeenCalledWith(fixturePracticeSession.session_id, "driver-key");
+    expect(driver.getState()).toEqual({ kind: "ended", recap: fixtureRecap });
   });
 
   it("R3.13 an ignored event changes nothing and reports nothing", () => {

@@ -7,21 +7,12 @@
 import { useId } from "react";
 
 import { BoardReveal, PokerTable } from "../../components/table/index.js";
+import { SyntheticBanner } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { seatsOfPrompt } from "../../trainer/prompt-seats.js";
-import { SESSION_TEXT } from "./labels.js";
 
 export interface SpotTableProps {
   prompt: TrainerPrompt;
-}
-
-export function SyntheticBanner() {
-  return (
-    <p role="note" className="rounded-md border border-warning bg-surface-sunken px-3 py-2 text-sm">
-      <span className="mr-2 font-semibold">Synthetic</span>
-      {SESSION_TEXT.syntheticBanner}
-    </p>
-  );
 }
 
 export function SpotTable({ prompt }: SpotTableProps) {
