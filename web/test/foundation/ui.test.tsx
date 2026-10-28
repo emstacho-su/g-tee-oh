@@ -107,4 +107,10 @@ describe("R3.13 ui primitives", () => {
     await userEvent.click(screen.getByRole("radio", { name: /9 players/ }));
     expect(onValueChange).toHaveBeenCalledWith("nine");
   });
+
+  it("R3.12 ToggleGroup keeps an unavailable item's detail line and adds its reason after it", () => {
+    const options = [{ value: "two-five", label: "2/5", detail: "10% rake, cap $5.00", disabled: true, reason: "No 9-player game at this stake" }];
+    render(<ToggleGroup label="Stake" value={undefined} options={options} onValueChange={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /2\/5/ })).toHaveAccessibleName("2/5 10% rake, cap $5.00 No 9-player game at this stake");
+  });
 });

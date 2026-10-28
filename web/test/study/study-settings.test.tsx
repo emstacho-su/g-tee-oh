@@ -6,7 +6,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_CONFIG_ID } from "../../src/fixtures/study.js";
+import {
+  FIXTURE_DEEP_CONFIG_ID,
+  FIXTURE_ONLINE_STAKE_ID,
+  FIXTURE_STUDY_CONFIG_ID,
+  fixturePairsByConfig,
+} from "../../src/fixtures/study.js";
 import { validateStudySearch } from "../../src/study/search.js";
 import { problemOf, renderStudy } from "./render-study.js";
 
@@ -162,6 +167,56 @@ describe("R3.12 study settings panel", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByText(SUMMARY)).toBeInTheDocument();
     expect(validateStudySearch(router.state.location.search)).toMatchObject({ depth: 10000, line: "r250" });
+  });
+
+  it("R3.12 the disabled Confirm says why, and the uncovered notice follows the draft", async () => {
+    const user = userEvent.setup();
+    renderStudy(`/study?${ONLINE_100}&pair=CO-BTN`);
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    expect(await within(panel).findByText("First to act: CO is unavailable (not in the library).")).toBeInTheDocument();
+    expect(within(panel).getByText("CO-BTN is not in the library at this configuration.")).toBeInTheDocument();
+
+    await user.click(choice("First to act", /^BTN/));
+    await user.click(choice("Against", /^BB/));
+    expect(within(panel).queryByText(/is not in the library at this configuration/)).not.toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Confirm" })).toBeEnabled();
+  });
+
+  it("R3.12 the panel stays mounted, focus kept, while a new configuration's seats load", async () => {
+    const user = userEvent.setup();
+    let release: (response: Response) => void = () => undefined;
+    const held = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const stale = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=30000&pair=BB-BTN`;
+    renderStudy(stale, (request) => (request.path === `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs` ? held : undefined));
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    const depth = await waitFor(() => choice("Depth", "100bb"));
+    await user.click(depth);
+    expect(await within(panel).findByText("Loading the seats for these settings.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Spot settings" })).toBe(panel);
+    expect(choice("Depth", "100bb")).toHaveFocus();
+
+    release(
+      new Response(JSON.stringify({ items: fixturePairsByConfig[FIXTURE_STUDY_CONFIG_ID], next_cursor: null, config_id: FIXTURE_STUDY_CONFIG_ID }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "Confirm" })).toBeEnabled());
+  });
+
+  it("R3.12 Cancel drops the edited draft, so its failed read never shows over the solution", async () => {
+    const user = userEvent.setup();
+    renderStudy(`/study?${ONLINE_100}&pair=BB-BTN`, (request) =>
+      request.path === `/api/v1/configs/${FIXTURE_DEEP_CONFIG_ID}/pairs` ? problemOf(500, "internal") : undefined,
+    );
+    await user.click(await screen.findByRole("button", { name: "Change settings" }));
+    await user.click(choice("Depth", "200bb"));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("img", { name: /frequency mode/ })).toBeInTheDocument();
+    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("R3.12 a failed catalog read shows an error with a retry and no server detail", async () => {

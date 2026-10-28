@@ -16,7 +16,9 @@ import {
 import { formatBasisPoints, formatCents } from "../../src/poker/format.js";
 import {
   canConfirm,
+  confirmBlocker,
   draftConfigId,
+  draftUncoveredPair,
   draftFromSearch,
   draftPair,
   searchFromDraft,
@@ -164,6 +166,34 @@ describe("R3.12 study settings changes", () => {
     const uncovered: SettingsDraft = { ...ONLINE_100, first: "CO", against: "BTN" };
     expect(canConfirm(CATALOG, uncovered)).toBe(false);
     expect(draftConfigId(fixtureConfigs, { ...ONLINE_100, depth: 20000 })).toBe(FIXTURE_DEEP_CONFIG_ID);
+  });
+});
+
+describe("R3.12 why Confirm is unavailable", () => {
+  it("R3.12 the reason names what is missing, loading or unavailable", () => {
+    expect(confirmBlocker(undefined, {})).toBe("Loading the catalog.");
+    expect(confirmBlocker(CATALOG, {})).toBe("Choose the format.");
+    expect(confirmBlocker(CATALOG, { format: "online" })).toBe("Choose the table size.");
+    expect(confirmBlocker(CATALOG, ONLINE_100)).toBe("Choose who acts first.");
+    expect(confirmBlocker(CATALOG, { ...ONLINE_100, first: "BTN" })).toBe("Choose the opponent.");
+    expect(confirmBlocker(CATALOG, { ...ONLINE_100, first: "CO", against: "BTN" })).toBe(
+      "First to act: CO is unavailable (not in the library).",
+    );
+    const live: SettingsDraft = { format: "live", table_size: 9, stake: LIVE_25_STAKE_ID };
+    expect(confirmBlocker(CATALOG, live)).toBe("Stake: 2/5 is unavailable (no 9-player game at this stake).");
+    expect(confirmBlocker(CATALOG, { ...ONLINE_100, first: "BTN", against: "BB" })).toBeUndefined();
+  });
+
+  it("R3.12 seats waiting on their configuration's pairs say they are loading", () => {
+    const loading: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
+    expect(confirmBlocker(loading, { ...ONLINE_100, first: "BTN", against: "BB" })).toBe("Loading the seats for these settings.");
+    expect(confirmBlocker(loading, ONLINE_100)).toBe("Loading the seats for these settings.");
+  });
+
+  it("R3.12 the uncovered pair the draft names, if any", () => {
+    expect(draftUncoveredPair(CATALOG, { ...ONLINE_100, first: "CO", against: "BTN" })).toBe("CO-BTN");
+    expect(draftUncoveredPair(CATALOG, { ...ONLINE_100, first: "BTN", against: "BB" })).toBeUndefined();
+    expect(draftUncoveredPair(CATALOG, { ...ONLINE_100, first: "CO" })).toBeUndefined();
   });
 });
 

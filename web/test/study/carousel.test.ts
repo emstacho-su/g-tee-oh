@@ -9,15 +9,15 @@ import { seatedPositions } from "../../src/drills/limits.js";
 import { carouselItems, lineDecisions, type CarouselItem } from "../../src/study/carousel.js";
 import { linePrefixes } from "../../src/study/line.js";
 
-type LineNode = Pick<StudyNode, "to_act" | "actions">;
+type LineNode = Pick<StudyNode, "to_act" | "actions" | "street">;
 
 function action(index: number, token: string, kind: NodeAction["kind"], sizeCbb: number | null): NodeAction {
   return { index, token, kind, size_cbb: sizeCbb, bucket: null, label: token, next_node_key: null };
 }
 
-const OPEN: LineNode = { to_act: "BTN", actions: [action(0, "f", "fold", null), action(1, "r250", "raise", 250)] };
-const VERSUS_OPEN: LineNode = { to_act: "BB", actions: [action(0, "f", "fold", null), action(1, "r1100", "raise", 1100)] };
-const VERSUS_RERAISE: LineNode = { to_act: "BTN", actions: [action(0, "f", "fold", null), action(1, "c", "call", null)] };
+const OPEN: LineNode = { street: "preflop", to_act: "BTN", actions: [action(0, "f", "fold", null), action(1, "r250", "raise", 250)] };
+const VERSUS_OPEN: LineNode = { street: "preflop", to_act: "BB", actions: [action(0, "f", "fold", null), action(1, "r1100", "raise", 1100)] };
+const VERSUS_RERAISE: LineNode = { street: "preflop", to_act: "BTN", actions: [action(0, "f", "fold", null), action(1, "c", "call", null)] };
 
 const BB_BTN = { oop: "BB", ip: "BTN" } as const;
 
@@ -37,6 +37,25 @@ describe("R3.12 line prefixes and decisions", () => {
     expect(decisions).toEqual([
       { seat: "BTN", line: "", taken: "Raise 2.5bb" },
       { seat: "BB", line: "r250", taken: undefined },
+    ]);
+  });
+
+  it("R3.12 decisions stop at the first postflop node, so it never becomes a later-orbit item", () => {
+    const flop: LineNode = { street: "flop", to_act: "BB", actions: [action(0, "x", "check", null)] };
+    const called: LineNode = { ...VERSUS_OPEN, actions: [...VERSUS_OPEN.actions, action(2, "c", "call", null)] };
+    const decisions = lineDecisions([OPEN, called, flop], "r250.c");
+    expect(decisions).toEqual([
+      { seat: "BTN", line: "", taken: "Raise 2.5bb" },
+      { seat: "BB", line: "r250", taken: "Call" },
+    ]);
+    const items = carouselItems(seatedPositions(6), BB_BTN, decisions);
+    expect(items.map((item) => `${item.seat}:${item.state}`)).toEqual([
+      "UTG:folded",
+      "HJ:folded",
+      "CO:folded",
+      "BTN:acted",
+      "SB:folded",
+      "BB:acted",
     ]);
   });
 
