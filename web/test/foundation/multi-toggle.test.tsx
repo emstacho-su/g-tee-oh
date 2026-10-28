@@ -23,7 +23,7 @@ describe("R3.16 MultiToggleGroup", () => {
     expect(screen.getByRole("button", { name: "C" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "A" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "A" })).toHaveClass(TACTILE_CLASS);
-    expect(screen.getByRole("button", { name: "B" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "B" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("R3.16 reports the choices in the options' order and never a disabled option", async () => {
@@ -37,6 +37,6 @@ describe("R3.16 MultiToggleGroup", () => {
 
   it("R3.16 the single ToggleGroup disables an option marked disabled", () => {
     render(<ToggleGroup label="Seat" value="a" options={OPTIONS} onValueChange={() => undefined} />);
-    expect(screen.getByRole("radio", { name: "B" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "B" })).toHaveAttribute("aria-disabled", "true");
   });
 });

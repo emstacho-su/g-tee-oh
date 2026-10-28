@@ -1,7 +1,7 @@
 // Tests for the /study node view (S25, R3.12, A7 sections 3 and 4, O-280, O-286, O-287): the three
-// matrix modes, the actions tables, moving down and up the line, the threshold card for a selected
-// hand only, the prefetch of the next likely line, the synthetic banner, the postflop note and the
-// explicit error states.
+// matrix modes, the actions tables, the threshold card for a selected hand only, the synthetic
+// banner, the postflop note and the explicit error states. Moving along the line and the prefetch
+// of the next likely line belong to the position carousel (study-carousel.test.tsx, S39).
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,11 +10,9 @@ import {
   FIXTURE_CHILD_LINE,
   FIXTURE_ONLINE_STAKE_ID,
   FIXTURE_OUT_OF_RANGE_HAND,
-  FIXTURE_STUDY_CONFIG_ID,
   FIXTURE_STUDY_PAIR,
   fixtureRootNode,
 } from "../../src/fixtures/study.js";
-import { studyNodeKey } from "../../src/study/queries.js";
 import { nodeJson, problemOf, renderStudy, type StudyOverride } from "./render-study.js";
 
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
@@ -67,33 +65,6 @@ describe("R3.12 study node view", () => {
       "role",
       "alert",
     );
-  });
-
-  it("R3.12 an ending action is not a link; a continuing one moves down the line and the breadcrumb steps back", async () => {
-    const user = userEvent.setup();
-    const { router } = renderStudy(BASE);
-    const actions = await screen.findByRole("list", { name: "Actions at this node" });
-    expect(within(actions).queryByRole("link", { name: /Fold/ })).not.toBeInTheDocument();
-    expect(within(actions).getByText("Fold").closest("li")).toHaveTextContent("ends the line");
-
-    await user.click(within(actions).getByRole("link", { name: /Raise 2.5bb/ }));
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ line: FIXTURE_CHILD_LINE }));
-    expect(await screen.findByText(/BB to act/)).toBeInTheDocument();
-
-    const crumbs = screen.getByRole("navigation", { name: "Line" });
-    expect(within(crumbs).getByText(FIXTURE_CHILD_LINE)).toHaveAttribute("aria-current", "page");
-    await user.click(within(crumbs).getByRole("link", { name: "Root" }));
-    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("line"));
-    expect(await screen.findByText(/BTN to act/)).toBeInTheDocument();
-  });
-
-  it("R3.12 the next likely action is marked and its node is prefetched before any click", async () => {
-    const { queryClient, nodeRequests } = renderStudy(BASE);
-    const actions = await screen.findByRole("list", { name: "Actions at this node" });
-    expect(within(actions).getByRole("link", { name: /Raise 2.5bb, next likely/ })).toBeInTheDocument();
-    const key = studyNodeKey({ configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: FIXTURE_CHILD_LINE });
-    await waitFor(() => expect(queryClient.getQueryData(key)).toBeDefined());
-    expect(nodeRequests().map((request) => request.query["line"])).toEqual([undefined, FIXTURE_CHILD_LINE]);
   });
 
   it("R3.12 the threshold card loads only for a selected hand", async () => {

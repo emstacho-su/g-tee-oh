@@ -47,8 +47,8 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
     const positions = await screen.findByRole("group", { name: "Positions" });
     await waitFor(() => expect(within(positions).getByRole("button", { name: "BB" })).toBeEnabled());
     expect(within(positions).getAllByRole("button").map((button) => button.textContent)).toEqual(["UTG", "HJ", "CO", "BTN", "SB", "BB"]);
-    expect(within(positions).getByRole("button", { name: "UTG" })).toBeDisabled();
-    expect(within(positions).getByRole("button", { name: "CO" })).toBeDisabled();
+    expect(within(positions).getByRole("button", { name: "UTG" })).toHaveAttribute("aria-disabled", "true");
+    expect(within(positions).getByRole("button", { name: "CO" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("No solved spot yet for UTG, HJ, CO.")).toBeInTheDocument();
   });
 
