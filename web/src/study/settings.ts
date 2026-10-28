@@ -16,7 +16,7 @@
 import type { Position } from "../drills/types.js";
 import { seatedPositions } from "../drills/limits.js";
 import { formatBasisPoints, formatCbb, formatCents } from "../poker/format.js";
-import { resolveConfigId } from "./filters.js";
+import { distinctSorted, FORMAT_OPTIONS, NOT_IN_LIBRARY, resolveConfigId } from "./filters.js";
 import type { GameConfig, PositionPairEntry, Stake } from "./queries.js";
 import { validateStudySearch, MAX_TABLE_SIZE, type StudyFormat, type StudySearch } from "./search.js";
 
@@ -72,23 +72,29 @@ export const SETTING_PROMPTS: Readonly<Record<SettingKey, string>> = {
 export const REASONS = {
   notInCatalog: "Not in the catalog",
   notAtStakeAndSize: "Not at this stake and size",
-  notInLibrary: "Not in the library",
+  notInLibrary: NOT_IN_LIBRARY,
 } as const;
 
-const FORMATS: readonly { value: StudyFormat; label: string }[] = [
-  { value: "online", label: "Online" },
-  { value: "live", label: "Live" },
-];
+/** Why Confirm is unavailable when a field is still empty. */
+export const MISSING_TEXT: Readonly<Record<SettingKey, string>> = {
+  format: "Choose the format.",
+  table_size: "Choose the table size.",
+  stake: "Choose the stake.",
+  depth: "Choose the depth.",
+  first: "Choose who acts first.",
+  against: "Choose the opponent.",
+};
+
+export const BLOCKER_TEXT = {
+  loadingCatalog: "Loading the catalog.",
+  loadingSeats: "Loading the seats for these settings.",
+} as const;
 
 /** Every seat in preflop action order; each table size seats a subsequence of it. */
 const SEAT_ORDER: readonly Position[] = seatedPositions(MAX_TABLE_SIZE);
 
 function formatLabel(format: StudyFormat): string {
-  return FORMATS.find((entry) => entry.value === format)?.label ?? format;
-}
-
-function distinctSorted(values: readonly number[]): number[] {
-  return [...new Set(values)].sort((left, right) => left - right);
+  return FORMAT_OPTIONS.find((entry) => entry.value === format)?.label ?? format;
 }
 
 function choice(value: string, label: string, reason: string | undefined, detail?: string): SettingChoice {
@@ -122,7 +128,7 @@ export function draftConfigId(configs: readonly GameConfig[], draft: SettingsDra
 }
 
 function formatChoices(configs: readonly GameConfig[]): SettingChoice[] {
-  return FORMATS.map(({ value, label }) =>
+  return FORMAT_OPTIONS.map(({ value, label }) =>
     choice(value, label, configs.some((config) => config.format === value) ? undefined : REASONS.notInCatalog),
   );
 }
@@ -172,23 +178,46 @@ function againstChoices(pairs: readonly PositionPairEntry[], seats: readonly Pos
   return seats.slice(start + 1).map((seat) => choice(seat, seat, covered(pairs, first, seat) ? undefined : REASONS.notInLibrary));
 }
 
-/** Each field's choices; undefined for a field whose upper fields are not chosen yet. */
-export function settingChoices(catalog: SettingsCatalog, draft: SettingsDraft): SettingChoices {
-  const { format, table_size: size, stake, depth, first } = draft;
+/** The draft configuration's pairs, or undefined while it is unresolved or they load. */
+function draftPairs(catalog: SettingsCatalog, draft: SettingsDraft): readonly PositionPairEntry[] | undefined {
   const configId = draftConfigId(catalog.configs, draft);
-  const pairs = configId === undefined ? undefined : catalog.pairsOf(configId);
-  const seats = size === undefined ? [] : seatedPositions(size);
-  return {
-    format: formatChoices(catalog.configs),
-    table_size: format === undefined ? undefined : tableSizeChoices(catalog.configs, format),
-    stake: format === undefined || size === undefined ? undefined : stakeChoices(catalog, format, size),
-    depth:
-      format === undefined || size === undefined || stake === undefined
+  return configId === undefined ? undefined : catalog.pairsOf(configId);
+}
+
+/** One field's choices; undefined while its upper fields are not chosen (or its seats load). */
+function fieldChoices(catalog: SettingsCatalog, draft: SettingsDraft, key: SettingKey): readonly SettingChoice[] | undefined {
+  const { format, table_size: size, stake, depth, first } = draft;
+  switch (key) {
+    case "format":
+      return formatChoices(catalog.configs);
+    case "table_size":
+      return format === undefined ? undefined : tableSizeChoices(catalog.configs, format);
+    case "stake":
+      return format === undefined || size === undefined ? undefined : stakeChoices(catalog, format, size);
+    case "depth":
+      return format === undefined || size === undefined || stake === undefined
         ? undefined
-        : depthChoices(catalog.configs, format, size, stake),
-    first: depth === undefined || pairs === undefined ? undefined : firstChoices(pairs, seats),
-    against: first === undefined || pairs === undefined ? undefined : againstChoices(pairs, seats, first),
-  };
+        : depthChoices(catalog.configs, format, size, stake);
+    case "first": {
+      const pairs = draftPairs(catalog, draft);
+      return depth === undefined || size === undefined || pairs === undefined ? undefined : firstChoices(pairs, seatedPositions(size));
+    }
+    case "against": {
+      const pairs = draftPairs(catalog, draft);
+      return first === undefined || size === undefined || pairs === undefined
+        ? undefined
+        : againstChoices(pairs, seatedPositions(size), first);
+    }
+  }
+}
+
+/**
+ * Each field's choices; undefined for a field whose upper fields are not chosen yet. The panel
+ * computes them once per draft (StudyPage's useMemo) and hands them to confirmBlocker.
+ */
+export function settingChoices(catalog: SettingsCatalog, draft: SettingsDraft): SettingChoices {
+  const entries = SETTING_KEYS.map((key) => [key, fieldChoices(catalog, draft, key)] as const);
+  return Object.fromEntries(entries) as Record<SettingKey, readonly SettingChoice[] | undefined>;
 }
 
 function isPosition(value: string): value is Position {
@@ -199,7 +228,7 @@ function isPosition(value: string): value is Position {
 function parseSetting(key: SettingKey, raw: string): SettingsDraft[SettingKey] {
   switch (key) {
     case "format":
-      return FORMATS.find((entry) => entry.value === raw)?.value;
+      return FORMAT_OPTIONS.find((entry) => entry.value === raw)?.value;
     case "table_size":
       return validateStudySearch({ table_size: raw }).table_size;
     case "depth":
@@ -240,22 +269,54 @@ function keepsLower(catalog: SettingsCatalog, draft: SettingsDraft, lower: Setti
   if (current === undefined) return true;
   const upperMissing = SETTING_KEYS.slice(0, SETTING_KEYS.indexOf(lower)).some((upper) => draft[upper] === undefined);
   if (upperMissing) return false;
-  const choices = settingChoices(catalog, draft)[lower];
+  const choices = fieldChoices(catalog, draft, lower);
   // Seats have no choices while the configuration's pairs load: they wait instead of going.
   if (choices === undefined) return lower === "first" || lower === "against";
   return available(choices, current);
 }
 
-/** True when all six fields are chosen, each available, and they name a covered pair. */
-export function canConfirm(catalog: SettingsCatalog, draft: SettingsDraft): boolean {
-  const choices = settingChoices(catalog, draft);
-  const allAvailable = SETTING_KEYS.every((key) => {
-    const options = choices[key];
-    return draft[key] !== undefined && options !== undefined && available(options, draft[key]);
-  });
-  const configId = draftConfigId(catalog.configs, draft);
-  const pairs = configId === undefined ? undefined : catalog.pairsOf(configId);
-  return allAvailable && draftPair(pairs, draft)?.preflop_available === true;
+function isSeat(key: SettingKey): boolean {
+  return key === "first" || key === "against";
+}
+
+/** Why one field blocks Confirm, or undefined when its choice is made and available. */
+function fieldBlocker(key: SettingKey, value: SettingsDraft[SettingKey], choices: readonly SettingChoice[] | undefined): string | undefined {
+  if (choices === undefined) return isSeat(key) ? BLOCKER_TEXT.loadingSeats : MISSING_TEXT[key];
+  if (value === undefined) return MISSING_TEXT[key];
+  const chosen = choices.find((entry) => entry.value === String(value));
+  if (chosen === undefined) return MISSING_TEXT[key];
+  if (!chosen.disabled) return undefined;
+  return `${SETTING_LABELS[key]}: ${chosen.label} is unavailable (${(chosen.reason ?? REASONS.notInLibrary).toLowerCase()}).`;
+}
+
+/**
+ * Why Confirm is unavailable, in the field order: the catalog still loading, the first field left
+ * empty, a seat list still loading, or a chosen value that is unavailable (named with its reason).
+ * Undefined when the six choices name a covered pair. Pass the choices already computed for this
+ * draft to avoid computing them again.
+ */
+export function confirmBlocker(
+  catalog: SettingsCatalog | undefined,
+  draft: SettingsDraft,
+  choices: SettingChoices | undefined = catalog === undefined ? undefined : settingChoices(catalog, draft),
+): string | undefined {
+  if (catalog === undefined || choices === undefined) return BLOCKER_TEXT.loadingCatalog;
+  for (const key of SETTING_KEYS) {
+    const blocker = fieldBlocker(key, draft[key], choices[key]);
+    if (blocker !== undefined) return blocker;
+  }
+  return draftPair(draftPairs(catalog, draft), draft)?.preflop_available === true ? undefined : REASONS.notInLibrary;
+}
+
+/** True when the six choices name a covered pair (confirmBlocker finds nothing). */
+export function canConfirm(catalog: SettingsCatalog, draft: SettingsDraft, choices?: SettingChoices): boolean {
+  return confirmBlocker(catalog, draft, choices) === undefined;
+}
+
+/** The pair the draft's two seats name when the library does not cover it, for the panel's notice. */
+export function draftUncoveredPair(catalog: SettingsCatalog, draft: SettingsDraft): string | undefined {
+  const entry = draftPair(draftPairs(catalog, draft), draft);
+  return entry?.preflop_available === false ? entry.pair : undefined;
 }
 
 /** The pair's two seats, the one that acts first preflop first; undefined for a malformed pair. */

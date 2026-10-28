@@ -123,10 +123,16 @@ function childKey(configId: string, pair: string, line: string): string {
   return `${rootKey(configId, pair)}${line}`;
 }
 
-/** The root's actions: fold ends the line, the others lead on (O-280). */
-function rootActions(configId: string, pair: string): NodeAction[] {
+/**
+ * The root's actions (O-280): only the tokens in `continuing` lead on, to nodes the fixtures hold;
+ * every other action ends the line, so the carousel's child reads (S39) never ask for a node the
+ * fixtures lack.
+ */
+function rootActions(configId: string, pair: string, continuing: readonly string[]): NodeAction[] {
   return fixtureActions.map((action) =>
-    action.kind === "fold" ? { ...action } : { ...action, next_node_key: childKey(configId, pair, action.token) },
+    continuing.includes(action.token)
+      ? { ...action, next_node_key: childKey(configId, pair, action.token) }
+      : { ...action, next_node_key: null },
   );
 }
 
@@ -153,7 +159,7 @@ function shifted(value: number): number {
 export const fixtureRootNode: StudyNode = {
   ...fixtureStudyNode,
   node_key: rootKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR),
-  actions: rootActions(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR),
+  actions: rootActions(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, [FIXTURE_CHILD_LINE]),
   next_likely_line: FIXTURE_CHILD_LINE,
   next_likely_node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, FIXTURE_CHILD_LINE),
 };
@@ -220,7 +226,7 @@ export const fixtureDeepRootNode: StudyNode = {
   solution_id: FIXTURE_DEEP_SOLUTION_ID,
   config_id: FIXTURE_DEEP_CONFIG_ID,
   node_key: rootKey(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR),
-  actions: rootActions(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR),
+  actions: rootActions(FIXTURE_DEEP_CONFIG_ID, FIXTURE_STUDY_PAIR, []),
   next_likely_line: null,
   next_likely_node_key: null,
 };

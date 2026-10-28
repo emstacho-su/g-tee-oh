@@ -2,12 +2,13 @@
  * One study node on screen (S25, R3.12, A7 sections 3 and 4).
  *
  * Mechanism: the synthetic banner when the node is synthetic (O-57), who acts and the pot, the
- * noise flags, the position carousel (S39: the caller's carousel slot, which replaced the line
- * breadcrumb and line steps), then for a preflop node the acting seat's range in the matrix with
- * its mode switch (frequency, EV, range weight; the mode lives in the URL) beside the actions
- * table and the selected hand's threshold card. Selecting a matrix cell writes the hand to the URL. A node on a later
- * street renders the v1.5 note and no matrix, so RangeMatrix never meets exact-combination rows
- * (O-196). After each new node renders, an effect completes the pending node switch timing:
+ * noise flags, then for a preflop node the position carousel (S39: the caller's carousel slot,
+ * which replaced the line breadcrumb and line steps) and the acting seat's range in the matrix
+ * with its mode switch (frequency, EV, range weight; the mode lives in the URL) beside the actions
+ * table and the selected hand's threshold card. Selecting a matrix cell writes the hand to the
+ * URL. A node on a later street renders the v1.5 note, a way back (LineEscape) and no carousel or
+ * matrix, so RangeMatrix never meets exact-combination rows (O-196) and no button walks further
+ * into a postflop subtree (review round 1). After each new node renders, an effect completes the pending node switch timing:
  * React runs the matrix's draw effect first, so the switch's frame comes after the draw's (O-287).
  */
 import { useEffect, type ReactNode } from "react";
@@ -23,6 +24,7 @@ import { lineLabel } from "../../study/line.js";
 import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { HandInsights } from "./HandInsights.js";
+import { LineEscape } from "./LineEscape.js";
 import { NodeActionsPanel } from "./NodeActionsPanel.js";
 import { SyntheticBanner } from "../../components/ui/index.js";
 import { NoiseFlags, PostflopNote } from "./StudyNotices.js";
@@ -38,10 +40,11 @@ export interface NodeViewProps {
   api: AppApi;
   node: StudyNode;
   search: StudySearch;
-  /** The position carousel for this node's line. */
+  /** The position carousel for this node's line; rendered for a preflop node only. */
   carousel: ReactNode;
   onModeChange: (mode: MatrixMode) => void;
   onSelectHand: (hand: string) => void;
+  onOpenLine: (line: string) => void;
 }
 
 function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string | undefined): void {
@@ -53,7 +56,7 @@ function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string |
   }, [metrics, nodeKey, preflop, label]);
 }
 
-export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand }: NodeViewProps) {
+export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine }: NodeViewProps) {
   const theme = useThemeStore((state) => state.theme);
   const sizePx = useMatrixSize();
   const preflop = node.street === "preflop";
@@ -65,7 +68,7 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
       {node.synthetic ? <SyntheticBanner /> : null}
       <p className="text-sm">{`${node.to_act} to act, pot ${formatCbb(node.pot_cbb)}`}</p>
       <NoiseFlags flags={node.noise_flags} />
-      {carousel}
+      {preflop ? carousel : null}
       {preflop ? (
         <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-2">
@@ -86,7 +89,10 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
           </div>
         </div>
       ) : (
-        <PostflopNote street={node.street} />
+        <>
+          <PostflopNote street={node.street} />
+          <LineEscape line={search.line} onOpenLine={onOpenLine} />
+        </>
       )}
     </div>
   );

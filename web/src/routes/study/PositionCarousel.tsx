@@ -19,12 +19,15 @@ import { usePrefersReducedMotion } from "../../components/table/reduced-motion.j
 import { Button, cn } from "../../components/ui/index.js";
 import type { StudyNode } from "../../contracts.js";
 import type { CarouselItem } from "../../study/carousel.js";
+import type { ChildStreets } from "../../study/use-line-nodes.js";
 import { CarouselActions } from "./CarouselActions.js";
 
 export interface PositionCarouselProps {
   items: readonly CarouselItem[];
   node: Pick<StudyNode, "to_act" | "actions" | "next_likely_line">;
   line: string | undefined;
+  /** The known street of each continuing action's child (useChildStreets). */
+  childStreets: ChildStreets;
   onOpenLine: (line: string) => void;
 }
 
@@ -81,7 +84,7 @@ function SeatButton({ item, expanded, actionsId, onPress }: SeatButtonProps) {
   );
 }
 
-export function PositionCarousel({ items, node, line, onOpenLine }: PositionCarouselProps) {
+export function PositionCarousel({ items, node, line, childStreets, onOpenLine }: PositionCarouselProps) {
   const actionsId = useId();
   const [expanded, setExpanded] = useState(true);
   const { scroller, current } = useCurrentInView(line, items.length);
@@ -102,7 +105,7 @@ export function PositionCarousel({ items, node, line, onOpenLine }: PositionCaro
           ))}
         </ol>
       </div>
-      {expanded ? <CarouselActions id={actionsId} node={node} line={line} onOpenLine={onOpenLine} /> : null}
+      {expanded ? <CarouselActions id={actionsId} node={node} line={line} childStreets={childStreets} onOpenLine={onOpenLine} /> : null}
     </section>
   );
 }

@@ -4,11 +4,16 @@
  * stake with its rake, depth, the seat that acts first and its opponent), then Confirm. A field
  * waits with a short prompt until the fields above it are chosen; an unavailable choice stays
  * listed, focusable and announced with its reason (ToggleGroup's aria-disabled items). Confirm is
- * a real disabled button until the six choices name a covered spot, with the reason written
- * beside it. Once a spot is confirmed the panel folds into a one-line summary with "Change
- * settings". The component holds no state: the caller owns the draft and the URL.
+ * a real disabled button until the six choices name a covered spot, with the actual reason
+ * written beside it (confirmBlocker: still loading, a field left empty, or which chosen value is
+ * unavailable and why). The notice names an uncovered pair the draft's seats point at, and a
+ * failed read of the draft's seats shows here with a retry, never over a confirmed solution. Once
+ * a spot is confirmed the panel folds into a one-line summary with "Change settings". The
+ * component holds no state: the caller owns the draft and the URL.
  */
-import { Button, Card, LoadingNote, Panel, ToggleGroup } from "../../components/ui/index.js";
+import { Button, Card, Panel, ToggleGroup } from "../../components/ui/index.js";
+import { catalogFailure } from "../../study/problem-text.js";
+import { FailureAlert } from "./StudyNotices.js";
 import {
   SETTING_KEYS,
   SETTING_LABELS,
@@ -25,17 +30,18 @@ export const PANEL_TEXT = {
   confirm: "Confirm",
   cancel: "Cancel",
   change: "Change settings",
-  incomplete: "Choose every setting to confirm.",
-  loading: "Loading the catalog.",
 } as const;
 
 export interface StudySettingsPanelProps {
   /** Undefined while the catalog loads. */
   choices: SettingChoices | undefined;
   draft: SettingsDraft;
-  confirmable: boolean;
-  /** Shown above the fields, for example when the URL names an uncovered pair. */
+  /** Why Confirm is unavailable; undefined when the choices name a covered spot. */
+  blocker: string | undefined;
+  /** Shown above the fields, for example when the draft's seats name an uncovered pair. */
   notice?: string;
+  /** A failed read of the draft's seats, retried in place. */
+  seatsFailure?: { onRetry: () => void };
   onChange: (key: SettingKey, raw: string) => void;
   onConfirm: () => void;
   /** Offered only when a confirmed spot is behind the panel. */
@@ -65,7 +71,8 @@ function SettingField({ name, choices, value, onChange }: SettingFieldProps) {
   );
 }
 
-export function StudySettingsPanel({ choices, draft, confirmable, notice, onChange, onConfirm, onCancel }: StudySettingsPanelProps) {
+export function StudySettingsPanel(props: StudySettingsPanelProps) {
+  const { choices, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
   return (
     <Card title={PANEL_TEXT.title} description={PANEL_TEXT.description}>
       {notice === undefined ? null : (
@@ -73,7 +80,7 @@ export function StudySettingsPanel({ choices, draft, confirmable, notice, onChan
           {notice}
         </p>
       )}
-      {choices === undefined ? <LoadingNote text={PANEL_TEXT.loading} /> : null}
+      {seatsFailure === undefined ? null : <FailureAlert failure={catalogFailure()} onRetry={seatsFailure.onRetry} />}
       <div className="grid gap-3 md:grid-cols-2">
         {SETTING_KEYS.map((key) => (
           <SettingField
@@ -86,11 +93,11 @@ export function StudySettingsPanel({ choices, draft, confirmable, notice, onChan
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" disabled={!confirmable} onClick={onConfirm}>
+        <Button variant="primary" disabled={blocker !== undefined} onClick={onConfirm}>
           {PANEL_TEXT.confirm}
         </Button>
         {onCancel === undefined ? null : <Button onClick={onCancel}>{PANEL_TEXT.cancel}</Button>}
-        {confirmable ? null : <span className="text-sm text-muted">{PANEL_TEXT.incomplete}</span>}
+        {blocker === undefined ? null : <span className="text-sm text-muted">{blocker}</span>}
       </div>
     </Card>
   );

@@ -6,15 +6,18 @@
  * the page shows a one-line summary and the node area, with the position carousel and the matrix.
  * Otherwise, or after "Change settings", it shows the settings panel and reads no node: the panel
  * edits a draft in component state, seeded from the URL, and Confirm pushes the new settings
- * (searchFromDraft clears the line and hand only when a setting changed). A complete URL whose
- * pair the library does not cover opens the panel with that reason. The screen is keyed by the
- * URL's settings, so a confirmed change starts it afresh with the panel closed. While a complete
- * URL is being checked against the catalog the page says it is loading instead of flashing the
- * panel. A failed catalog read shows an alert with a retry. The page owns one node switch metrics
- * instance per mount and hands it down through context, so Confirm and the carousel mark their
- * requests on the same clock.
+ * (searchFromDraft clears the line and hand only when a setting changed). The screen is keyed by
+ * the URL's settings, so a confirmed change starts it afresh with the panel closed. While a
+ * complete URL is being checked against the catalog the page says it is loading instead of
+ * flashing the panel; only the catalog reads count for that, never the draft's, so editing never
+ * unmounts the panel (review round 1). The panel's choices, its Confirm reason and its uncovered
+ * notice are computed once per draft from the draft itself. Cancel puts the draft back to the URL,
+ * so nothing it read lingers. A failed catalog read shows an alert with a retry; a failed read of
+ * the draft's seats shows inside the panel. The page owns one node switch metrics instance per
+ * mount and hands it down through context, so Confirm and the carousel mark their requests on the
+ * same clock.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { AppApi } from "../../api/index.js";
 import { useAppApi } from "../../auth/index.js";
@@ -24,10 +27,11 @@ import { NodeSwitchMetricsContext, createNodeSwitchMetrics } from "../../study/n
 import { catalogFailure } from "../../study/problem-text.js";
 import type { StudySearch } from "../../study/search.js";
 import {
-  canConfirm,
+  confirmBlocker,
   draftConfigId,
   draftFromSearch,
   draftPair,
+  draftUncoveredPair,
   searchFromDraft,
   settingChoices,
   settingsSignature,
@@ -67,10 +71,12 @@ interface SettingsAreaProps {
 }
 
 function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose }: SettingsAreaProps) {
-  const { catalog } = entry;
-  const confirmable = catalog !== undefined && canConfirm(catalog, draft);
+  const { catalog, draftReads } = entry;
+  const choices = useMemo(() => (catalog === undefined ? undefined : settingChoices(catalog, draft)), [catalog, draft]);
+  const blocker = confirmBlocker(catalog, draft, choices);
+  const uncovered = catalog === undefined ? undefined : draftUncoveredPair(catalog, draft);
   const onConfirm = () => {
-    if (catalog === undefined || !confirmable) return;
+    if (catalog === undefined || blocker !== undefined) return;
     const configId = draftConfigId(catalog.configs, draft);
     const pair = draftPair(configId === undefined ? undefined : catalog.pairsOf(configId), draft);
     if (pair === undefined) return;
@@ -83,10 +89,11 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
   };
   return (
     <StudySettingsPanel
-      choices={catalog === undefined ? undefined : settingChoices(catalog, draft)}
+      choices={choices}
       draft={draft}
-      confirmable={confirmable}
-      {...(entry.uncoveredPair === undefined ? {} : { notice: uncoveredNotice(entry.uncoveredPair) })}
+      blocker={blocker}
+      {...(uncovered === undefined ? {} : { notice: uncoveredNotice(uncovered) })}
+      {...(draftReads.error === null ? {} : { seatsFailure: { onRetry: draftReads.retry } })}
       onChange={onChange}
       onConfirm={onConfirm}
       {...(onClose === undefined ? {} : { onCancel: onClose })}
@@ -104,13 +111,17 @@ function StudyScreen({ api, search }: StudyScreenProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SettingsDraft>(() => draftFromSearch(search));
   const entry = useStudyEntry(api, search, draft);
-  const { configId, studyPair } = entry;
+  const { configId, studyPair, catalogReads } = entry;
   const confirmed = configId !== undefined && studyPair !== undefined && search.table_size !== undefined;
-  const settling = hasAllSettings(search) && entry.error === null && entry.loading && !confirmed && entry.uncoveredPair === undefined;
+  const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
 
   const openSettings = () => {
     setDraft(draftFromSearch(search));
     setEditing(true);
+  };
+  const closeSettings = () => {
+    setDraft(draftFromSearch(search));
+    setEditing(false);
   };
 
   function body() {
@@ -123,7 +134,7 @@ function StudyScreen({ api, search }: StudyScreenProps) {
           draft={draft}
           onDraftChange={setDraft}
           navigation={navigation}
-          {...(confirmed ? { onClose: () => setEditing(false) } : {})}
+          {...(confirmed ? { onClose: closeSettings } : {})}
         />
       );
     }
@@ -147,7 +158,7 @@ function StudyScreen({ api, search }: StudyScreenProps) {
   return (
     <section className="flex flex-col gap-4" data-pair={search.pair}>
       <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
-      {entry.error === null ? null : <FailureAlert failure={catalogFailure()} onRetry={entry.retry} />}
+      {catalogReads.error === null ? null : <FailureAlert failure={catalogFailure()} onRetry={catalogReads.retry} />}
       {body()}
     </section>
   );

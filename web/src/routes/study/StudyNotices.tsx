@@ -17,9 +17,12 @@ export interface PostflopNoteProps {
   street: Street;
 }
 
+/** Why postflop nodes are not served; also the reason on a carousel action into one (S39). */
+export const POSTFLOP_V15 = "Postflop study arrives in v1.5";
+
 /** v1 serves preflop only; the postflop matrix needs the O-196 combination aggregation (v1.5). */
 export function PostflopNote({ street }: PostflopNoteProps) {
-  return <p className="text-muted">{`Postflop study arrives in v1.5. This node is on the ${street}.`}</p>;
+  return <p className="text-muted">{`${POSTFLOP_V15}. This node is on the ${street}.`}</p>;
 }
 
 export interface FailureAlertProps {

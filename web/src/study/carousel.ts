@@ -49,18 +49,24 @@ export function waitingReason(currentSeat: Position): string {
   return `Acts after ${currentSeat}`;
 }
 
-type LineNode = Pick<StudyNode, "to_act" | "actions">;
+type LineNode = Pick<StudyNode, "to_act" | "actions" | "street">;
 
 function takenLabel(actions: readonly NodeAction[], token: string): string {
   const action = actions.find((candidate) => candidate.token === token);
   return action === undefined ? token : exactActionLabel(action);
 }
 
-/** One decision per prefix node; nodes[i] is the node at the line's i-th prefix (root first). */
+/**
+ * One decision per prefix node; nodes[i] is the node at the line's i-th prefix (root first). The
+ * decisions stop before the first postflop node: the carousel is preflop only, so a postflop node
+ * never becomes a later-orbit item (review round 1).
+ */
 export function lineDecisions(nodes: readonly LineNode[], line: string | undefined): LineDecision[] {
   const tokens = lineTokens(line);
   const prefixes = linePrefixes(line);
-  return nodes.map((node, index) => {
+  const firstPostflop = nodes.findIndex((node) => node.street !== "preflop");
+  const preflopNodes = firstPostflop === -1 ? nodes : nodes.slice(0, firstPostflop);
+  return preflopNodes.map((node, index) => {
     const token = tokens[index];
     return {
       seat: node.to_act,

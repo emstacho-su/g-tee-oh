@@ -14,6 +14,7 @@
  * chosen one raised out of the track in bold, so the choice never rests on colour alone.
  */
 import * as RadixToggleGroup from "@radix-ui/react-toggle-group";
+import { Fragment } from "react";
 
 import { cn } from "./cn.js";
 import { CONTROL_EDGE_CLASS, FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
@@ -50,21 +51,31 @@ const STACKED_ITEM_CLASSES = "flex flex-col items-start text-left";
 /** Unavailable items read as such by their dashed edge and their reason, never by fading the text. */
 const UNAVAILABLE_ITEM_CLASSES = "cursor-not-allowed border border-dashed border-border-strong";
 const SECOND_LINE_CLASSES = "text-xs font-normal";
-/** Separates the two lines in the accessible name ("6 players No live game at this size"). */
+const REASON_LINE_CLASSES = "text-xs font-medium";
+/** Separates the lines in the accessible name ("2/5 10% rake No 9-player game at this stake"). */
 const NAME_SEPARATOR = " ";
 
-function secondLine<T extends string>(option: ToggleOption<T>): string | undefined {
-  return option.disabled === true ? option.reason : option.detail;
+/** The smaller lines under the label: the detail, then the reason when the item is unavailable. */
+function extraLines<T extends string>(option: ToggleOption<T>): { text: string; className: string }[] {
+  const reason = option.disabled === true ? option.reason : undefined;
+  return [
+    ...(option.detail === undefined ? [] : [{ text: option.detail, className: SECOND_LINE_CLASSES }]),
+    ...(reason === undefined ? [] : [{ text: reason, className: REASON_LINE_CLASSES }]),
+  ];
 }
 
 function ItemContent<T extends string>({ option }: { option: ToggleOption<T> }) {
-  const second = secondLine(option);
-  if (second === undefined) return <>{option.label}</>;
+  const lines = extraLines(option);
+  if (lines.length === 0) return <>{option.label}</>;
   return (
     <>
       <span>{option.label}</span>
-      {NAME_SEPARATOR}
-      <span className={SECOND_LINE_CLASSES}>{second}</span>
+      {lines.map((line) => (
+        <Fragment key={line.className}>
+          {NAME_SEPARATOR}
+          <span className={line.className}>{line.text}</span>
+        </Fragment>
+      ))}
     </>
   );
 }
@@ -94,7 +105,7 @@ export function ToggleGroup<T extends string>({ label, value, options, onValueCh
             aria-disabled={unavailable ? true : undefined}
             className={cn(
               ITEM_CLASSES,
-              secondLine(option) !== undefined && STACKED_ITEM_CLASSES,
+              extraLines(option).length > 0 && STACKED_ITEM_CLASSES,
               unavailable && UNAVAILABLE_ITEM_CLASSES,
             )}
           >
