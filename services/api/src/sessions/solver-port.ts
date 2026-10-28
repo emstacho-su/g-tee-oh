@@ -35,9 +35,14 @@ import {
   type SqNode,
   type SqReveal,
   type SqSampleAction,
+  type SqSchemas,
   type UpstreamResult,
 } from "../solver-query/client.js";
 import { deadlineProblem } from "./problems.js";
+
+/** One painted class and its action, and solver-query's grade of a painted range (S27, O-300). */
+export type SqPaintedHand = SqSchemas["PaintedHand"];
+export type SqGradeRange = SqSchemas["GradeRangeResponse"];
 
 /** How long one api request may spend on solver-query calls before it answers 503 (BLOCKER 2). */
 export const SESSION_DEADLINE_MS = 2000;
@@ -66,6 +71,8 @@ export interface SolverPort {
   sample(solutionId: string, nodeKey: string, hand: string, rngState: string): Promise<SqSampleAction>;
   reveal(dealId: string, street: string): Promise<SqReveal>;
   grade(call: GradeCall): Promise<SqGrade>;
+  /** A painted range graded by reach-weighted EV loss (S27, R3.17, O-300): every held class, each once. */
+  gradeRange(solutionId: string, nodeKey: string, paint: readonly SqPaintedHand[]): Promise<SqGradeRange>;
   coverage(configId: string, pair: string): Promise<SqCoverage>;
 }
 
@@ -170,6 +177,13 @@ export function solverPort(client: SolverQuery, request: FastifyRequest, options
         ),
       ),
     grade: (call) => guard(() => expectData(client.POST("/v1/grade", { body: call, ...init }), "a grade for this decision")),
+    gradeRange: (solutionId, nodeKey, paint) =>
+      guard(() =>
+        expectData(
+          client.POST("/v1/grade-range", { body: { solution_id: solutionId, node_key: nodeKey, paint: [...paint] }, ...init }),
+          "a grade for this painted range",
+        ),
+      ),
     coverage: (configId, pair) =>
       guard(() =>
         expectData(client.GET("/v1/coverage", { params: { query: { config_id: configId, pair } }, ...init }), "coverage for this spot"),

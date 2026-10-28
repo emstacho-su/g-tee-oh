@@ -2,7 +2,9 @@
  * Training sessions (R3.6, A5 section 3, A6 section 2, O-249, ADR 0018): POST /sessions,
  * GET /sessions/{id}/next and POST /sessions/{id}/end. The route file stays thin and calls these.
  *
- * - create: drill mode only in S23 (O-249). The drill must be the user's (404 otherwise). Its
+ * - create: drill mode (S23, O-249), and since S27 the drill-backed prediction and range_paint
+ *   modes (O-302), which reuse the same spot search and start with a practice state instead of a
+ *   hand; automated and holdout still answer 501 naming S31. The drill must be the user's (404 otherwise). Its
  *   trainer settings are merged with the body's partial settings. Its spot filter is expanded into
  *   covered (configuration, pair) candidates (candidates.ts); the uncovered rest is recorded as
  *   coverage_request rows, once per user and spot (05 section 1, O-240). Each covered pair's tree
@@ -30,7 +32,7 @@ import type { recapSchema, sessionCreateBodySchema, sessionSchema } from "../sch
 import { requireSolverQuery } from "../solver-query/client.js";
 import { candidatesFor, configIdsFor, pairsFor, splitByCoverage } from "./candidates.js";
 import { deriveAwaitHero } from "./derive.js";
-import { filterUnmetProblem, sessionEndedProblem } from "./problems.js";
+import { filterUnmetProblem, requireSessionMode, sessionEndedProblem } from "./problems.js";
 import { heroSpotsFor } from "./spot-search.js";
 import { spotOf } from "./spot.js";
 import { transition } from "./machine.js";
@@ -52,12 +54,16 @@ export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Recap = z.infer<typeof recapSchema>;
 
-const LATER_OWNER: Readonly<Record<Exclude<SessionCreateBody["mode"], "drill">, string>> = {
+type BuiltMode = "drill" | "prediction" | "range_paint";
+
+const LATER_OWNER: Readonly<Record<Exclude<SessionCreateBody["mode"], BuiltMode>, string>> = {
   automated: "S31",
   holdout: "S31",
-  prediction: "S27",
-  range_paint: "S27",
 };
+
+function isBuiltMode(mode: SessionCreateBody["mode"]): mode is BuiltMode {
+  return mode === "drill" || mode === "prediction" || mode === "range_paint";
+}
 
 export interface SessionCall {
   app: FastifyInstance;
@@ -76,16 +82,17 @@ function toSession(row: SessionRow): Session {
   };
 }
 
-function requireDrillMode(body: SessionCreateBody): string {
-  if (body.mode !== "drill") {
+function requireDrillMode(body: SessionCreateBody): { mode: BuiltMode; drillId: string } {
+  const { mode } = body;
+  if (!isBuiltMode(mode)) {
     throw new ProblemError(HTTP_STATUS.notImplemented, PROBLEM_SLUGS.notImplemented, {
-      detail: `${body.mode} sessions are built by ${LATER_OWNER[body.mode]}; S23 serves drill sessions (O-249).`,
+      detail: `${mode} sessions are built by ${LATER_OWNER[mode]}; drill, prediction and range_paint sessions are served (O-249, O-302).`,
     });
   }
   if (body.drill_id === undefined) {
-    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, { detail: "A drill session needs drill_id." });
+    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, { detail: `A ${mode} session needs drill_id.` });
   }
-  return body.drill_id;
+  return { mode, drillId: body.drill_id };
 }
 
 function mergedSettings(stored: unknown, overrides: SessionCreateBody["settings"]): TrainerSettings {
@@ -93,7 +100,7 @@ function mergedSettings(stored: unknown, overrides: SessionCreateBody["settings"
 }
 
 export async function createSession(call: SessionCall, body: SessionCreateBody): Promise<Session> {
-  const drillId = requireDrillMode(body);
+  const { mode, drillId } = requireDrillMode(body);
   const database = requireDatabase(call.app);
   const drill = await findDrill(database, call.userId, drillId);
   if (drill === undefined) {
@@ -116,12 +123,12 @@ export async function createSession(call: SessionCall, body: SessionCreateBody):
       pairsQueued: gaps.length,
     });
   }
-  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot);
+  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, mode === "drill" ? undefined : mode);
   // O-312: the covered part the session runs on, and the uncovered rest queued below.
   const coverage = { pairs_total: candidates.length, pairs_covered: covered.length, pairs_queued: gaps.length };
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
-    const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });
+    const row = await insertSession(transaction, { userId: call.userId, mode, drillId, settings, state });
     return { ...toSession(row), coverage };
   });
 }
@@ -140,6 +147,7 @@ export async function nextPrompt(call: SessionCall, sessionId: string): Promise<
   if (session.state.phase === "ended") {
     throw sessionEndedProblem();
   }
+  requireSessionMode(session, "drill");
   const port = solverPort(requireSolverQuery(call.app), call.request);
   const { settings } = session;
   const derived = await deriveAwaitHero(session.state, { stopRule: settings.stop_rule, rng: settings.rng }, port);

@@ -20,9 +20,10 @@ use utoipa::openapi::OpenApi;
 const COMMITTED_DOCUMENT: &str = "../../packages/contracts/solver-query.openapi.json";
 
 /// Every A5 section 2 operation plus `/metrics` (plan C.1), as (path, method).
-const A5_OPERATIONS: [(&str, &str); 9] = [
+const A5_OPERATIONS: [(&str, &str); 10] = [
     ("/v1/nodes", "get"),
     ("/v1/grade", "post"),
+    ("/v1/grade-range", "post"),
     ("/v1/insights", "get"),
     ("/v1/deal", "post"),
     ("/v1/deal/{id}/reveal", "get"),

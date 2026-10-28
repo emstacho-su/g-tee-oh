@@ -15,6 +15,8 @@
  *   validation/fixtures/library, or SOLVER_QUERY_URL when set), POST /drills answers 201,
  *   POST /sessions in drill mode with a fixed seed answers 201, and GET /sessions/{id}/next answers
  *   200 with a body that parses as a TrainerPrompt and carries at least one button.
+ * A step answered 503 (solver-query slower than the request deadline; the api wrote nothing) is
+ * sent again up to TRANSIENT_ATTEMPTS times, POST /sessions under one Idempotency-Key.
  * A failing case's message names the case, the step, the status and the problem detail only, never
  * a strategy number. The api's global rate limit is per client per minute, so the file's planned
  * requests are checked against it first (at most 64 cases of three requests each).
@@ -39,6 +41,25 @@ const SESSION_SEED = "000000000acce515";
 /** POST /drills, POST /sessions and GET /next per case. */
 const REQUESTS_PER_CASE = 3;
 const CASE_TIMEOUT_MS = 60_000;
+/** Attempts for a step answered 503 unavailable, the transient problem (S25 spot-problem rules). */
+const TRANSIENT_ATTEMPTS = 4;
+const TRANSIENT_WAIT_MS = 1_000;
+const SERVICE_UNAVAILABLE = 503;
+
+/**
+ * Sends a request again while it answers 503, up to TRANSIENT_ATTEMPTS times. The api answers 503
+ * when solver-query is slower than the request deadline and writes nothing ("try again"), which a
+ * loaded machine (the whole workspace suite in parallel, a debug solver-query) can cause; any other
+ * status is returned at once and judged by the case.
+ */
+async function withTransientRetry(send: () => Promise<LightMyRequestResponse>): Promise<LightMyRequestResponse> {
+  let response = await send();
+  for (let attempt = 1; attempt < TRANSIENT_ATTEMPTS && response.statusCode === SERVICE_UNAVAILABLE; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, TRANSIENT_WAIT_MS));
+    response = await send();
+  }
+  return response;
+}
 
 const path = resolveAcceptancePath(process.env.DRILL_ACCEPTANCE_FILE);
 
@@ -96,10 +117,14 @@ describe(`R3.15 drill acceptance: ${path}`, () => {
     const drill = await app.inject({ method: "POST", url: `${API}/drills`, headers: write(), payload: expressed.drill });
     expect(drill.statusCode, stepFailure(entry, "POST /drills", drill)).toBe(201);
     const payload = { mode: "drill", drill_id: drill.json<{ id: string }>().id, seed: SESSION_SEED };
-    const created = await app.inject({ method: "POST", url: `${API}/sessions`, headers: write(), payload });
+    // One Idempotency-Key for every attempt, so a retry after a lost answer never starts two sessions.
+    const sessionHeaders = write();
+    const created = await withTransientRetry(() => app.inject({ method: "POST", url: `${API}/sessions`, headers: sessionHeaders, payload }));
     expect(created.statusCode, stepFailure(entry, "POST /sessions", created)).toBe(201);
     const sessionId = created.json<{ session_id: string }>().session_id;
-    const next = await app.inject({ method: "GET", url: `${API}/sessions/${sessionId}/next`, headers: readHeaders(session) });
+    const next = await withTransientRetry(() =>
+      app.inject({ method: "GET", url: `${API}/sessions/${sessionId}/next`, headers: readHeaders(session) }),
+    );
     expect(next.statusCode, stepFailure(entry, "GET /next", next)).toBe(200);
     const prompt = promptSchema.safeParse(next.json());
     if (!prompt.success) {

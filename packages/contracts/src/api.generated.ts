@@ -1916,10 +1916,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Ask the model about an attempt, behind a feature flag (O-54)
-         * @description Ask the model about an attempt, behind a feature flag (O-54)
-         *
-         *     Answers 501 until S27 builds it (O-38).
+         * Ask the model about an attempt, behind a feature flag and a monthly cap (R3.20, O-54)
+         * @description 503 ask-disabled while the flag is off; 429 ask-cap-reached above the monthly cap; a cache hit spends nothing (O-305 to O-307).
          */
         post: {
             parameters: {
@@ -1949,12 +1947,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            cached: boolean;
-                            cost_cents: number;
-                            text: string;
-                            validated: boolean;
-                        };
+                        "application/json": components["schemas"]["AskResult"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2047,8 +2040,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2071,12 +2073,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * The templated explanation of an attempt
-         * @description The templated explanation of an attempt
-         *
-         *     Answers 501 until S27 builds it (O-38).
-         */
+        /** The templated explanation of an attempt (R3.19) */
         get: {
             parameters: {
                 query?: never;
@@ -2094,11 +2091,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            template: string;
-                            /** @description Every number in it exists in the node or insights data (R3.19, ADR 0016) */
-                            text: string;
-                        };
+                        "application/json": components["schemas"]["MoreInfo"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2146,8 +2139,89 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/explain/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether Ask is available: the feature flag and this month's spend against the cap (O-305, O-306) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AskStatus"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2195,6 +2269,80 @@ export interface paths {
                             status: "ok";
                             version: string;
                         };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/insights/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Range drift for one node family, shown only from 30 decisions and never graded (R3.18, O-304) */
+        get: {
+            parameters: {
+                query: {
+                    spot_class_key: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RangeDrift"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
             };
@@ -2279,12 +2427,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Answer a prediction prompt
-         * @description Answer a prediction prompt
-         *
-         *     Answers 501 until S27 builds it (O-38).
-         */
+        /** Answer a prediction prompt; unrated, no attempt row (R3.16) */
         post: {
             parameters: {
                 query?: never;
@@ -2302,9 +2445,35 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        answer_pct: number;
+                        answer: {
+                            /** @enum {string} */
+                            kind: "yes_no";
+                            value: boolean;
+                        } | {
+                            /** @enum {string} */
+                            kind: "percent";
+                            value: number;
+                        } | {
+                            /** @enum {string} */
+                            kind: "regions";
+                            value: ("pairs" | "suited_aces" | "suited_broadways" | "suited_connectors" | "suited_other" | "offsuit_aces" | "offsuit_broadways" | "offsuit_other")[];
+                        } | {
+                            action_index: number;
+                            /** @enum {string} */
+                            kind: "action";
+                        } | {
+                            /** @enum {string} */
+                            band: "0_25" | "25_50" | "50_75" | "75_100";
+                            /** @enum {string} */
+                            kind: "band";
+                        } | {
+                            action_index: number;
+                            /** @enum {string} */
+                            kind: "size";
+                        };
                         /** Format: uuid */
                         prompt_id: string;
+                        state_version: number;
                     };
                 };
             };
@@ -2315,13 +2484,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            correct_pct: number;
-                            error_pct_points: number;
-                            level: number;
-                            next_level_unlocked: boolean;
-                            within_tolerance: boolean;
-                        };
+                        "application/json": components["schemas"]["PredictionResult"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2414,8 +2577,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2440,9 +2612,7 @@ export interface paths {
         };
         /**
          * The next prediction prompt
-         * @description The next prediction prompt
-         *
-         *     Answers 501 until S27 builds it (O-38).
+         * @description Derived from the session seed and its answered counter; writes nothing (O-302).
          */
         get: {
             parameters: {
@@ -2461,15 +2631,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            hand: string | null;
-                            level: number;
-                            /** @description An opaque node key */
-                            node_key: string;
-                            /** Format: uuid */
-                            prompt_id: string;
-                            question: string;
-                        };
+                        "application/json": components["schemas"]["PredictionPrompt"];
                     };
                 };
                 /** @description Problem (400) */
@@ -2499,6 +2661,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -2517,8 +2688,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3149,6 +3329,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/range-paint/{session}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The next node to paint
+         * @description Derived from the session seed and its counter; writes nothing (O-302).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RangePaintPrompt"];
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (409) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/range-paint/submit": {
         parameters: {
             query?: never;
@@ -3158,12 +3451,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Submit a painted range for grading
-         * @description Submit a painted range for grading
-         *
-         *     Answers 501 until S27 builds it (O-38).
-         */
+        /** Submit a painted range for grading by reach-weighted EV loss; unrated (R3.17) */
         post: {
             parameters: {
                 query?: never;
@@ -3181,12 +3469,13 @@ export interface paths {
                     "application/json": {
                         /** @description An opaque node key */
                         node_key: string;
-                        /** @description Hand class to the action index painted for it */
+                        /** @description Hand class to the NodeAction.index painted for it; every class of the prompt */
                         paint: {
                             [key: string]: number;
                         };
                         /** Format: uuid */
                         session_id: string;
+                        state_version: number;
                     };
                 };
             };
@@ -3197,14 +3486,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            per_hand: {
-                                ev_loss_bb: number;
-                                /** @description A hand class, for example AKs */
-                                hand: string;
-                            }[];
-                            total_ev_loss_bb: number;
-                        };
+                        "application/json": components["schemas"]["RangePaintResult"];
                     };
                 };
                 /** @description Problem (400) */
@@ -3297,8 +3579,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4367,6 +4658,60 @@ export interface components {
             index: number;
             share: number;
         };
+        AskResult: {
+            /** Format: uuid */
+            attempt_id: string;
+            /** @description True when served from the cache, which spends nothing */
+            cached: boolean;
+            cost_cents: number;
+            /** @description Plain text; never rendered as HTML */
+            text: string;
+            /** @description False when the validator still found an unsupported number or name after one regeneration */
+            validated: boolean;
+            warning: string | null;
+        };
+        AskResultInput: {
+            /** Format: uuid */
+            attempt_id: string;
+            /** @description True when served from the cache, which spends nothing */
+            cached: boolean;
+            cost_cents: number;
+            /** @description Plain text; never rendered as HTML */
+            text: string;
+            /** @description False when the validator still found an unsupported number or name after one regeneration */
+            validated: boolean;
+            warning: string | null;
+        };
+        AskStatus: {
+            /** @description Enabled and under the monthly cap; the Ask button is disabled otherwise */
+            available: boolean;
+            cap_cents: number;
+            /** @description The feature flag: off until a model key is configured (O-305) */
+            enabled: boolean;
+            /**
+             * Format: date
+             * @description The first day of the UTC month the spend counts toward
+             */
+            month: string;
+            /** @enum {string} */
+            reason: "ok" | "flag_off" | "cap_reached";
+            spent_cents: number;
+        };
+        AskStatusInput: {
+            /** @description Enabled and under the monthly cap; the Ask button is disabled otherwise */
+            available: boolean;
+            cap_cents: number;
+            /** @description The feature flag: off until a model key is configured (O-305) */
+            enabled: boolean;
+            /**
+             * Format: date
+             * @description The first day of the UTC month the spend counts toward
+             */
+            month: string;
+            /** @enum {string} */
+            reason: "ok" | "flag_off" | "cap_reached";
+            spent_cents: number;
+        };
         Blockers: {
             hand: string;
             top_blocked: {
@@ -4563,6 +4908,8 @@ export interface components {
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
             /** @description The node the hero decided at */
             node_key: string;
+            /** @description Flags from solver-query; any flag makes the decision unrated (05 section 9) */
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             rated: boolean;
@@ -4573,6 +4920,8 @@ export interface components {
              * @description The solution the decision was graded against
              */
             solution_id: string;
+            /** @description Rust's spot class of the node, the node family of range drift (O-304) */
+            spot_class_key: string;
             state_version: number;
         };
         DecisionFeedbackInput: {
@@ -4591,6 +4940,8 @@ export interface components {
             label: "best" | "correct" | "inaccuracy" | "mistake" | "blunder";
             /** @description The node the hero decided at */
             node_key: string;
+            /** @description Flags from solver-query; any flag makes the decision unrated (05 section 9) */
+            noise_flags: ("close_ev_mix" | "rare_line" | "suit_mixing")[];
             /** @description Two positions, out of position first, for example BB-BTN */
             pair: string;
             rated: boolean;
@@ -4601,6 +4952,8 @@ export interface components {
              * @description The solution the decision was graded against
              */
             solution_id: string;
+            /** @description Rust's spot class of the node, the node family of range drift (O-304) */
+            spot_class_key: string;
             state_version: number;
         };
         Drill: {
@@ -4705,6 +5058,28 @@ export interface components {
             straddle: boolean;
             table_size: number;
         };
+        MoreInfo: {
+            /** Format: uuid */
+            attempt_id: string;
+            sections: {
+                /** @enum {string} */
+                template: "facts" | "range_advantage" | "hand_role" | "position" | "blockers";
+                /** @description Every number in it exists in the node or insights data (R3.19, ADR 0016) */
+                text: string;
+                title: string;
+            }[];
+        };
+        MoreInfoInput: {
+            /** Format: uuid */
+            attempt_id: string;
+            sections: {
+                /** @enum {string} */
+                template: "facts" | "range_advantage" | "hand_role" | "position" | "blockers";
+                /** @description Every number in it exists in the node or insights data (R3.19, ADR 0016) */
+                text: string;
+                title: string;
+            }[];
+        };
         /** @description A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued */
         NoCoverageProblem: {
             detail?: string;
@@ -4780,6 +5155,8 @@ export interface components {
             ev_best_bb: number;
             hand: string;
             loss_pct_pot: number[];
+            /** @description Two or more actions at 0.05 or more, as solver-query flags it (O-301) */
+            mixed: boolean;
             reach: number[] | null;
             strategy: number[];
         };
@@ -4788,6 +5165,8 @@ export interface components {
             ev_best_bb: number;
             hand: string;
             loss_pct_pot: number[];
+            /** @description Two or more actions at 0.05 or more, as solver-query flags it (O-301) */
+            mixed: boolean;
             reach: number[] | null;
             strategy: number[];
         };
@@ -4856,6 +5235,146 @@ export interface components {
             /** @enum {string} */
             state: "dealing" | "await_hero" | "opponent_acts" | "feedback" | "street_end" | "reveal" | "hand_end" | "ended";
             state_version: number;
+        };
+        PredictionPrompt: {
+            /** @description The NodeAction.index the question names (threshold, nearest share, band); null otherwise */
+            action_index: number | null;
+            /** @description The node's tree actions (ADR 0020), for action and size answers */
+            actions: components["schemas"]["NodeAction"][];
+            /** @enum {string} */
+            answer_kind: "yes_no" | "percent" | "regions" | "action" | "band" | "size";
+            /** @description The bands to choose from on the band level; null otherwise */
+            bands: ("0_25" | "25_50" | "50_75" | "75_100")[] | null;
+            /** @description The hand class the hand ladder asks about; null on the range ladder */
+            hand: string | null;
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            /** @enum {string} */
+            ladder: "range" | "hand";
+            level: number;
+            /** @description An opaque node key */
+            node_key: string;
+            /**
+             * Format: uuid
+             * @description Derived from the session and its counter, so a repeat GET answers the same prompt
+             */
+            prompt_id: string;
+            question: string;
+            /** @description The regions to choose from on the mixing level; null otherwise */
+            regions: ("pairs" | "suited_aces" | "suited_broadways" | "suited_connectors" | "suited_other" | "offsuit_aces" | "offsuit_broadways" | "offsuit_other")[] | null;
+            /** Format: uuid */
+            session_id: string;
+            spot_class_key: string;
+            state_version: number;
+            /** @description True when the node's solution is synthetic test data (O-57) */
+            synthetic: boolean;
+            /** @description The yes or no question's threshold; null otherwise */
+            threshold_pct: number | null;
+        };
+        PredictionPromptInput: {
+            /** @description The NodeAction.index the question names (threshold, nearest share, band); null otherwise */
+            action_index: number | null;
+            /** @description The node's tree actions (ADR 0020), for action and size answers */
+            actions: components["schemas"]["NodeActionInput"][];
+            /** @enum {string} */
+            answer_kind: "yes_no" | "percent" | "regions" | "action" | "band" | "size";
+            /** @description The bands to choose from on the band level; null otherwise */
+            bands: ("0_25" | "25_50" | "50_75" | "75_100")[] | null;
+            /** @description The hand class the hand ladder asks about; null on the range ladder */
+            hand: string | null;
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            /** @enum {string} */
+            ladder: "range" | "hand";
+            level: number;
+            /** @description An opaque node key */
+            node_key: string;
+            /**
+             * Format: uuid
+             * @description Derived from the session and its counter, so a repeat GET answers the same prompt
+             */
+            prompt_id: string;
+            question: string;
+            /** @description The regions to choose from on the mixing level; null otherwise */
+            regions: ("pairs" | "suited_aces" | "suited_broadways" | "suited_connectors" | "suited_other" | "offsuit_aces" | "offsuit_broadways" | "offsuit_other")[] | null;
+            /** Format: uuid */
+            session_id: string;
+            spot_class_key: string;
+            state_version: number;
+            /** @description True when the node's solution is synthetic test data (O-57) */
+            synthetic: boolean;
+            /** @description The yes or no question's threshold; null otherwise */
+            threshold_pct: number | null;
+        };
+        PredictionResult: {
+            correct: boolean;
+            /** @enum {string} */
+            ladder: "range" | "hand";
+            /** @description The level the answer was given at */
+            level: number;
+            /** @description The ladder's level for this spot class after the answer */
+            new_level: number;
+            next_level_unlocked: boolean;
+            /** Format: uuid */
+            prompt_id: string;
+            state_version: number;
+            truth: {
+                action_indexes: number[] | null;
+                band: ("0_25" | "25_50" | "50_75" | "75_100") | null;
+                frequency_pct: number | null;
+                regions: ("pairs" | "suited_aces" | "suited_broadways" | "suited_connectors" | "suited_other" | "offsuit_aces" | "offsuit_broadways" | "offsuit_other")[] | null;
+                share_pct: number | null;
+                /** @description The solver's answer in words, built from the numbers below */
+                text: string;
+            };
+            window: {
+                /** @description Answers counted at this level, at most the window size */
+                answers: number;
+                correct: number;
+                required_pct: number;
+                size: number;
+            };
+        };
+        PredictionResultInput: {
+            correct: boolean;
+            /** @enum {string} */
+            ladder: "range" | "hand";
+            /** @description The level the answer was given at */
+            level: number;
+            /** @description The ladder's level for this spot class after the answer */
+            new_level: number;
+            next_level_unlocked: boolean;
+            /** Format: uuid */
+            prompt_id: string;
+            state_version: number;
+            truth: {
+                action_indexes: number[] | null;
+                band: ("0_25" | "25_50" | "50_75" | "75_100") | null;
+                frequency_pct: number | null;
+                regions: ("pairs" | "suited_aces" | "suited_broadways" | "suited_connectors" | "suited_other" | "offsuit_aces" | "offsuit_broadways" | "offsuit_other")[] | null;
+                share_pct: number | null;
+                /** @description The solver's answer in words, built from the numbers below */
+                text: string;
+            };
+            window: {
+                /** @description Answers counted at this level, at most the window size */
+                answers: number;
+                correct: number;
+                required_pct: number;
+                size: number;
+            };
         };
         PreviousHand: {
             /** @description The board the hand reached; the flop when a full hand ended there */
@@ -4938,6 +5457,136 @@ export interface components {
             ip_mean_equity: number;
             oop_mean_equity: number;
             to_act_advantage_pct_points: number;
+        };
+        RangeDrift: {
+            by_kind: {
+                /** @enum {string} */
+                kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
+                solver_share: number;
+                user_share: number;
+            }[];
+            ci_high: number | null;
+            ci_low: number | null;
+            confidence: number;
+            decisions: number;
+            /** @description Total variation distance between the user's and the solver's kind shares */
+            distance: number | null;
+            min_decisions: number;
+            /** @description False below min_decisions; every number below is then null or empty */
+            shown: boolean;
+            spot_class_key: string;
+        };
+        RangeDriftInput: {
+            by_kind: {
+                /** @enum {string} */
+                kind: "fold" | "check" | "call" | "limp" | "straddle" | "bet" | "raise" | "all_in";
+                solver_share: number;
+                user_share: number;
+            }[];
+            ci_high: number | null;
+            ci_low: number | null;
+            confidence: number;
+            decisions: number;
+            /** @description Total variation distance between the user's and the solver's kind shares */
+            distance: number | null;
+            min_decisions: number;
+            /** @description False below min_decisions; every number below is then null or empty */
+            shown: boolean;
+            spot_class_key: string;
+        };
+        RangePaintPrompt: {
+            /** @description The brushes: the node's tree actions (ADR 0020) */
+            actions: components["schemas"]["NodeAction"][];
+            /** @description Every class the acting seat holds at the node; each must be painted */
+            hands: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            /** @description An opaque node key */
+            node_key: string;
+            prompt_no: number;
+            /** Format: uuid */
+            session_id: string;
+            /** Format: uuid */
+            solution_id: string;
+            spot_class_key: string;
+            state_version: number;
+            /** @description True when the node's solution is synthetic test data (O-57) */
+            synthetic: boolean;
+        };
+        RangePaintPromptInput: {
+            /** @description The brushes: the node's tree actions (ADR 0020) */
+            actions: components["schemas"]["NodeActionInput"][];
+            /** @description Every class the acting seat holds at the node; each must be painted */
+            hands: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                token: string;
+            }[];
+            /** @description An opaque node key */
+            node_key: string;
+            prompt_no: number;
+            /** Format: uuid */
+            session_id: string;
+            /** Format: uuid */
+            solution_id: string;
+            spot_class_key: string;
+            state_version: number;
+            /** @description True when the node's solution is synthetic test data (O-57) */
+            synthetic: boolean;
+        };
+        RangePaintResult: {
+            floor_pct_pot: number;
+            /** @description An opaque node key */
+            node_key: string;
+            per_hand: {
+                action_index: number;
+                best_action_index: number;
+                /** @description A hand class, for example AKs */
+                hand: string;
+                /** @description The class's EV loss in bb for the painted action */
+                loss_bb: number;
+                loss_pct_pot: number;
+                /** @description Acting reach times combos over the node's reach-weighted combos */
+                weight: number;
+                weighted_loss_bb: number;
+            }[];
+            /** Format: uuid */
+            session_id: string;
+            state_version: number;
+            /** @description solver-query's sum of weighted_loss_bb over every class (O-300) */
+            total_weighted_loss_bb: number;
+        };
+        RangePaintResultInput: {
+            floor_pct_pot: number;
+            /** @description An opaque node key */
+            node_key: string;
+            per_hand: {
+                action_index: number;
+                best_action_index: number;
+                /** @description A hand class, for example AKs */
+                hand: string;
+                /** @description The class's EV loss in bb for the painted action */
+                loss_bb: number;
+                loss_pct_pot: number;
+                /** @description Acting reach times combos over the node's reach-weighted combos */
+                weight: number;
+                weighted_loss_bb: number;
+            }[];
+            /** Format: uuid */
+            session_id: string;
+            state_version: number;
+            /** @description solver-query's sum of weighted_loss_bb over every class (O-300) */
+            total_weighted_loss_bb: number;
         };
         SessionCoverage: {
             /** @description Pairs the library covers; the session runs on these */

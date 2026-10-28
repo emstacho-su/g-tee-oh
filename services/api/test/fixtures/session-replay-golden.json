@@ -69,7 +69,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qc4d"
+      "hand": "Qc4d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -158,7 +160,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "6d2c"
+      "hand": "6d2c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -247,7 +251,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7c3s"
+      "hand": "7c3s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -336,7 +342,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8s7c"
+      "hand": "8s7c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -425,7 +433,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "9d4h"
+      "hand": "9d4h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -514,7 +524,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8d7h"
+      "hand": "8d7h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -603,7 +615,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ah9s"
+      "hand": "Ah9s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -692,7 +706,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad4h"
+      "hand": "Ad4h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -781,7 +797,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc5c"
+      "hand": "Kc5c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -870,7 +888,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Td2d"
+      "hand": "Td2d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -959,7 +979,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qc5s"
+      "hand": "Qc5s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1048,7 +1070,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7c2s"
+      "hand": "7c2s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1137,7 +1161,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kh9d"
+      "hand": "Kh9d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1226,7 +1252,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "As6h"
+      "hand": "As6h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1337,7 +1365,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "As6h"
+      "hand": "As6h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN"
     }
   },
   {
@@ -1439,7 +1469,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jd7c"
+      "hand": "Jd7c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1528,7 +1560,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7d5c"
+      "hand": "7d5c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1625,7 +1659,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "QcJc"
+      "hand": "QcJc",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1714,7 +1750,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "9d8s"
+      "hand": "9d8s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1803,7 +1841,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ac9s"
+      "hand": "Ac9s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1892,7 +1932,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jh5c"
+      "hand": "Jh5c",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -1981,7 +2023,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "8s6d"
+      "hand": "8s6d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2070,7 +2114,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc7s"
+      "hand": "Kc7s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2181,7 +2227,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Kc7s"
+      "hand": "Kc7s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN"
     }
   },
   {
@@ -2283,7 +2331,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qs3s"
+      "hand": "Qs3s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2372,7 +2422,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad7d"
+      "hand": "Ad7d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2483,7 +2535,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ad7d"
+      "hand": "Ad7d",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN"
     }
   },
   {
@@ -2585,7 +2639,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Jc6s"
+      "hand": "Jc6s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2674,7 +2730,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ts4h"
+      "hand": "Ts4h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2763,7 +2821,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Tc4s"
+      "hand": "Tc4s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2852,7 +2912,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "7h3s"
+      "hand": "7h3s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -2941,7 +3003,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "AdTc"
+      "hand": "AdTc",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3052,7 +3116,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "AdTc"
+      "hand": "AdTc",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN"
     }
   },
   {
@@ -3154,7 +3220,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Td3h"
+      "hand": "Td3h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3251,7 +3319,11 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Qs8h"
+      "hand": "Qs8h",
+      "noise_flags": [
+        "close_ev_mix"
+      ],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3340,7 +3412,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ah2h"
+      "hand": "Ah2h",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3429,7 +3503,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "Ac8s"
+      "hand": "Ac8s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3518,7 +3594,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "JhJs"
+      "hand": "JhJs",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   },
   {
@@ -3629,7 +3707,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/r250.r1000",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "JhJs"
+      "hand": "JhJs",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN"
     }
   },
   {
@@ -3731,7 +3811,9 @@
       "node_key": "cfg_6_online_100/BB-BTN/",
       "config_id": "cfg_6_online_100",
       "pair": "BB-BTN",
-      "hand": "6c4s"
+      "hand": "6c4s",
+      "noise_flags": [],
+      "spot_class_key": "preflop/online/100/rfi/BB-BTN"
     }
   }
 ]

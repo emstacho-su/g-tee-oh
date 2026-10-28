@@ -37,8 +37,6 @@ const EXPECTED_PATHS = [
 
 const PLACEHOLDERS: readonly (readonly [string, string, string])[] = [
   ["/train", "Automated training session", "Phase 4 (S32)"],
-  ["/predict", "Prediction drills", "S27"],
-  ["/paint", "Range painting", "S27"],
   ["/progress", "Progress", "S32"],
 ];
 

@@ -13,6 +13,7 @@ import type { MockRequest } from "../../e2e/support/mock-api.js";
 import { createMockDrillRoute, MOCK_DRILL_PATHS, SEEDED_DRILLS } from "../../e2e/support/mock-drills.js";
 import type { Drill, DrillCreate } from "../../src/drills/types.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
+import { FIXTURE_PAINT_DRILL_ID } from "../../src/fixtures/paint.js";
 import { FIXTURE_DRILL_ID, FIXTURE_UNCOVERED_DRILL_ID, fixtureDrill } from "../../src/fixtures/trainer.js";
 
 const SIGNED_IN = { signedIn: true };
@@ -47,7 +48,7 @@ describe("R3.14 mocked drill routes", () => {
     expect(first.items).toHaveLength(5);
     expect(first.next_cursor).not.toBeNull();
     const second = route(request("GET", MOCK_DRILL_PATHS.list, { query: { limit: "5", cursor: first.next_cursor ?? "" } }), SIGNED_IN)?.body as { items: Drill[]; next_cursor: string | null };
-    expect(second.items.map((drill) => drill.id)).toEqual([FIXTURE_DRILL_ID]);
+    expect(second.items.map((drill) => drill.id)).toEqual([FIXTURE_PAINT_DRILL_ID, FIXTURE_DRILL_ID]);
     expect(second.next_cursor).toBeNull();
     expect(route(request("GET", MOCK_DRILL_PATHS.list, { query: { tag: "Bad Tag" } }), SIGNED_IN)?.status).toBe(400);
     expect(route(request("GET", MOCK_DRILL_PATHS.list, { query: { cursor: "nope" } }), SIGNED_IN)?.status).toBe(400);

@@ -27,6 +27,7 @@ import { checkDrillBody } from "../../src/drills/body-rules.js";
 import { EXPORT_CODE_PREFIX, MAX_EXPORT_CODE_LENGTH, TAG_PATTERN } from "../../src/drills/limits.js";
 import type { Drill, DrillCreate, FieldError } from "../../src/drills/types.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
+import { fixturePaintDrill } from "../../src/fixtures/paint.js";
 import {
   FIXTURE_DRILL_ID,
   FIXTURE_UNCOVERED_DRILL_ID,
@@ -89,9 +90,14 @@ export const fixtureUncoveredDrill: Drill = {
   tags: ["synthetic", "uncovered"],
 };
 
-/** The default store, oldest first: every synthetic fixture drill the trainer screens use. */
+/**
+ * The default store, oldest first: every synthetic fixture drill the trainer screens use, and the
+ * S27 painting drill, so the composed app mock's one GET /drills serves the /predict and /paint
+ * pickers as well (this route answers it before theirs).
+ */
 export const SEEDED_DRILLS: readonly Drill[] = [
   fixtureDrill,
+  fixturePaintDrill,
   fixtureStreetDrill,
   fixtureFullHandDrill,
   fixturePartCoveredDrill,

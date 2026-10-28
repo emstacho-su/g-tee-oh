@@ -52,6 +52,7 @@ export function toStudyNode(node: Readonly<SqNode>, next: NextLikely): StudyNode
       ev_best_bb: row.ev_best_bb,
       loss_pct_pot: [...row.loss_pct_pot],
       reach: row.reach === undefined || row.reach === null ? null : [...row.reach],
+      mixed: row.mixed,
     })),
     noise_flags: [...node.noise_flags],
     next_likely_line: next.line,

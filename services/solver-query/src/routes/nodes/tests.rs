@@ -6,7 +6,7 @@ use gto_model::{
     ActionToken, Bucket, Cbb, ComboId, ConfigId, NodeKey, Position, PositionPair, Street,
 };
 
-use super::{HandsFilter, action_label, class_rows, exact_label, spot_class_key};
+use super::{HandsFilter, action_label, class_rows, exact_label, hand_rows, spot_class_key};
 use crate::error::ApiError;
 
 fn action(token: ActionToken, bucket: Option<Bucket>) -> RecordAction {
@@ -88,4 +88,43 @@ fn r2_13_class_rows_weigh_a_class_by_the_acting_seats_reach() {
     assert!((row.ev_bb[1] - 2.0 / 3.0).abs() < 1e-3 && (row.ev_bb[2] - 1.0 / 3.0).abs() < 1e-3);
     assert!((row.ev_best_bb - 1.0).abs() < 1e-6, "{row:?}");
     assert!((row.loss_pct_pot[0] - 20.0).abs() < 1e-3, "{row:?}");
+    assert!(row.mixed, "call and raise at half each: {row:?}");
+}
+
+#[test]
+fn r3_16_rows_flag_a_mix_and_a_class_row_reads_it_from_the_aggregated_strategy() {
+    // AsKs calls purely and AhKh raises purely: each combo is pure, the class row mixes.
+    let pair = PositionPair::new(Position::Bb, Position::Btn).expect("two seats");
+    let combo = |name: &str| name.parse::<ComboId>().expect("a combo").index();
+    let hand = |name: &str, frequencies: Vec<f64>| SolvedHand {
+        hand: combo(name),
+        reach: Some([1.0, 1.0]),
+        frequencies,
+        ev_bb: vec![-1.0, 1.0, 1.0],
+    };
+    let node = SolvedNode {
+        key: NodeKey::preflop(ConfigId::new("cfg_6_online_100").expect("id"), pair, vec![]),
+        to_act: Position::Bb,
+        pot: Cbb(1_000),
+        stacks: [Cbb(10_000), Cbb(10_000)],
+        actions: vec![
+            (ActionToken::Fold, Cbb::ZERO),
+            (ActionToken::Call, Cbb(250)),
+            (ActionToken::Raise(Cbb(800)), Cbb(800)),
+        ],
+        hand_space: HandSpace::Postflop1326,
+        hands: vec![
+            hand("AsKs", vec![0.0, 1.0, 0.0]),
+            hand("AhKh", vec![0.0, 0.0, 1.0]),
+            hand("QsQh", vec![1.0, 0.0, 0.0]),
+        ],
+        accuracy_pct_pot: None,
+    };
+    let view = NodeView::from(NodeRecord::from_solved(&node, pair).expect("quantizes"));
+    let combos = hand_rows(&view, &HandsFilter::All).expect("rows");
+    assert!(combos.iter().all(|row| !row.mixed), "every combo is pure: {combos:?}");
+    let classes = class_rows(&view);
+    let mixed: Vec<(&str, bool)> =
+        classes.iter().map(|row| (row.hand.as_str(), row.mixed)).collect();
+    assert_eq!(mixed, [("QQ", false), ("AKs", true)], "class index order: {classes:?}");
 }

@@ -170,6 +170,12 @@ x-api: &api
     SOLVER_QUERY_URL: http://solver-query:7070
     # The time zone whose midnight starts a training day for the daily rated cap (O-247)
     APP_TIME_ZONE: ${APP_TIME_ZONE:-UTC}
+    # Ask (S27, O-305, O-306): off unless .env turns it on; the key is read by the api only and never
+    # reaches the browser. Enabling Ask with an empty key stops the api at startup.
+    EXPLAIN_ASK_ENABLED: ${EXPLAIN_ASK_ENABLED:-false}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ASK_MODEL: ${ASK_MODEL:-claude-opus-5-5}
+    LLM_MONTHLY_CAP_CENTS: ${LLM_MONTHLY_CAP_CENTS:-1500}
   # A9 section 3, the same hardening as solver-query. Node writes nothing of its own; /tmp is a
   # tmpfs so os.tmpdir() keeps working for a scratch file (private to the container, gone with it).
   read_only: true

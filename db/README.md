@@ -37,6 +37,9 @@ Order of the files:
 | 20261020001000_grants.sql | Revocation from public, grants per role |
 | 20261020001100_seed_catalog.sql | Three stakes, eleven placeholder sizing conventions, eleven game_config rows |
 | 20261027000100_api_auth_idempotency.sql | auth_session token_hash and csrf_token (O-230, O-231), idempotency_key and its app grant (O-232) |
+| 20261027000200_solution_publish_record.sql | The builder's publish record on solution (S18) |
+| 20261028000100_api_trainer.sql | builder_setting writes for app (O-241), app_user.is_admin (O-242), coverage_request (O-240), attempt feedback columns (O-246) |
+| 20261029000100_insights_explanations.sql | prediction_answer and its app grant (O-301), attempt.action_kinds for range drift (O-304) |
 
 ## Role model
 

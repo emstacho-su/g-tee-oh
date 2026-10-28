@@ -24,6 +24,8 @@ import {
   actionButtonLabel,
   type ConfidenceChoice,
 } from "../../components/trainer/index.js";
+import { ExplainControls } from "../../components/explain/ExplainControls.js";
+import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
@@ -43,6 +45,8 @@ export interface DecisionAreaProps {
   onConfidence: (confidence: ConfidenceChoice) => void;
   onNext: () => void;
   onExplain: () => void;
+  /** More info or Ask opened or closed (S27): the screen pauses its hotkeys while one is open. */
+  onExplainDialog?: (open: boolean) => void;
 }
 
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "await_confidence", "submitting", "error"]);
@@ -59,7 +63,7 @@ function ChoiceAndTap({ state, prompt, grouping, interactive, onConfidence }: De
   );
 }
 
-function Feedback({ state, prompt, interactive, onNext, onExplain }: DecisionAreaProps) {
+function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
   useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
@@ -78,6 +82,8 @@ function Feedback({ state, prompt, interactive, onNext, onExplain }: DecisionAre
           rangeView={<FeedbackRangeView feedback={feedback} />}
           thresholdCard={<FeedbackThreshold feedback={feedback} />}
           roller={context.rng ? <FeedbackRoller feedback={feedback} actions={prompt.buttons} onExplain={onExplain} /> : undefined}
+          insights={<FeedbackInsights feedback={feedback} />}
+          explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
         />
       )}
       <Button variant="primary" size="lg" aria-keyshortcuts={NEXT_HAND_KEY} disabled={!interactive} onClick={onNext} className="self-start">

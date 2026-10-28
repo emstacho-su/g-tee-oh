@@ -84,9 +84,10 @@ interface InSessionProps {
   interactive: boolean;
   onAskEnd: () => void;
   onExplain: () => void;
+  onExplainDialog: (open: boolean) => void;
 }
 
-function InSession({ drill, session, interactive, onAskEnd, onExplain }: InSessionProps) {
+function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
   const { state } = session;
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
@@ -107,6 +108,7 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain }: InSessi
             onConfidence={session.tapConfidence}
             onNext={session.next}
             onExplain={onExplain}
+            onExplainDialog={onExplainDialog}
           />
         </>
       )}
@@ -130,8 +132,10 @@ interface DrillRunProps {
 function DrillRun({ drill, seed }: DrillRunProps) {
   const [rng, setRng] = useState(drill.trainer.rng);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // S27: More info and Ask dialogs pause the screen like the explainer and the end confirm.
+  const [explainDialogOpen, setExplainDialogOpen] = useState(false);
   const explainer = useRngExplainer({ hotkey: rng });
-  const interactive = !confirmOpen && !explainer.open;
+  const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284).
   const session = useSpotSession({ drillId: drill.id, seed, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
   const { state } = session;
@@ -162,7 +166,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
         <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
-        <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} />
+        <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />
       ) : null}
       {state.kind === "ending" ? <LoadingNote text={SESSION_TEXT.ending} /> : null}
       <EndSessionDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={confirmEnd} />

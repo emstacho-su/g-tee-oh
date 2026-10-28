@@ -90,6 +90,10 @@ export const PROBLEM_SLUGS = {
   sessionEnded: "session-ended",
   noCoverage: "no-coverage",
   tooManyStreams: "too-many-streams",
+  // S27: practice sessions and the Ask path (O-302, O-307).
+  wrongSessionMode: "wrong-session-mode",
+  askDisabled: "ask-disabled",
+  askCapReached: "ask-cap-reached",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -117,6 +121,9 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "session-ended": "The session has ended",
   "no-coverage": "The library covers no spot this request selects",
   "too-many-streams": "Too many open event streams",
+  "wrong-session-mode": "This route does not serve this session's mode",
+  "ask-disabled": "Ask is off until a model key is configured",
+  "ask-cap-reached": "This month's Ask budget is used",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

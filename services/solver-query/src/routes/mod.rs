@@ -7,6 +7,7 @@
 pub mod coverage;
 pub mod deal;
 pub mod grade;
+pub mod grade_range;
 pub mod healthz;
 pub mod insights;
 pub mod metrics;

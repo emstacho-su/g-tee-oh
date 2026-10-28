@@ -14,7 +14,8 @@
 //! by the acting seat's reach (equal weights without reach, or when no combo reaches), the
 //! row's `ev_best_bb` is the mean of the combos' best EVs, so `ev_best_bb - ev_bb[a]` is the
 //! mean loss of `a`, and the row's reach is the mean over the held combos. At a
-//! `preflop_169` node it equals `all`.
+//! `preflop_169` node it equals `all`. Every row's `mixed` flag is `grade::is_mixed` of the
+//! row's own strategy, the aggregated one for a class row (O-301).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -294,6 +295,7 @@ fn row(hand: String, numbers: &HandNumbers) -> HandRow {
         ev_bb: numbers.ev_bb.clone(),
         loss_pct_pot: numbers.loss_pct_pot(),
         ev_best_bb: numbers.ev_best_bb(),
+        mixed: grade::is_mixed(&numbers.frequencies),
     }
 }
 
@@ -347,10 +349,12 @@ fn class_row(hand: String, members: &[HandNumbers], seat: usize) -> HandRow {
             .fold([0.0_f64; 2], |acc, r| [acc[0] + f64::from(r[0]), acc[1] + f64::from(r[1])]);
         sum.map(|s| narrow_f32(s / count))
     });
+    let strategy = mean(&|m| m.frequencies.clone());
     HandRow {
         hand,
         reach,
-        strategy: mean(&|m| m.frequencies.clone()),
+        mixed: grade::is_mixed(&strategy),
+        strategy,
         ev_bb: mean(&|m| m.ev_bb.clone()),
         loss_pct_pot: mean(&HandNumbers::loss_pct_pot),
         ev_best_bb,
