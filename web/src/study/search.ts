@@ -68,3 +68,11 @@ export function validateStudySearch(search: Record<string, unknown>): StudySearc
   const kept: StudySearch = Object.fromEntries(entries.filter(([, value]) => value !== undefined));
   return kept;
 }
+
+/** The matrix mode when the URL names none (O-286). */
+export const DEFAULT_STUDY_MODE: MatrixMode = "frequency";
+
+/** The matrix mode the screen shows: the URL's, else the default. */
+export function studyModeOf(search: StudySearch): MatrixMode {
+  return search.mode ?? DEFAULT_STUDY_MODE;
+}
