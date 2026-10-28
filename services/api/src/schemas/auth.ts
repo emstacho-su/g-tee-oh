@@ -33,6 +33,11 @@ export const sessionUserSchema = z.object({
   id: uuidSchema,
   email: z.string(),
   created_at: timestampSchema,
+  is_admin: z
+    .boolean()
+    .describe(
+      "app_user.is_admin, read only: whether the builder controls are shown (O-290); the admin routes check it again (O-242)",
+    ),
 });
 
 export const sessionInfoSchema = z

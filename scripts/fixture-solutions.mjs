@@ -140,7 +140,8 @@ export async function seedFixtureSolutions(client, rows) {
   return counts;
 }
 
-function databaseUrl(env) {
+/** DATABASE_URL from the environment, else from the repo .env (also used by fixture-queue.mjs). */
+export function databaseUrl(env) {
   if (!env.DATABASE_URL) {
     try {
       process.loadEnvFile(join(REPO_ROOT, '.env'));

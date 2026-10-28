@@ -149,6 +149,10 @@ db-migrate:
 fixture-solutions:
     node scripts/fixture-solutions.mjs
 
+# Queued build jobs for one fixture spot, so flow 5 sees a queue position where no builder runs; idempotent (R3.4, O-293)
+fixture-queue:
+    node scripts/fixture-queue.mjs
+
 # Migration status
 db-status:
     dbmate status

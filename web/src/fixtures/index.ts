@@ -25,10 +25,17 @@ const FIXTURE_ATTEMPT_ID = "00000000-0000-4000-8000-000000000004";
 /** The synthetic node family of the fixture node and feedback (S27: range drift reads it, O-304). */
 export const FIXTURE_SPOT_CLASS_KEY = "synthetic-rfi-btn";
 
+/** The owner: an admin, so the builder controls show (O-290, O-242). */
 export const fixtureSession: SessionInfo = {
-  user: { id: FIXTURE_USER_ID, email: FIXTURE_USER_EMAIL, created_at: "2026-10-27T12:00:00Z" },
+  user: { id: FIXTURE_USER_ID, email: FIXTURE_USER_EMAIL, created_at: "2026-10-27T12:00:00Z", is_admin: true },
   csrf_token: FIXTURE_CSRF_TOKEN,
   expires_at: "2026-11-03T12:00:00Z",
+};
+
+/** The same session for a member without is_admin: no builder controls (O-290). */
+export const fixtureMemberSession: SessionInfo = {
+  ...fixtureSession,
+  user: { ...fixtureSession.user, is_admin: false },
 };
 
 /** Four preflop actions at a button open: fold, call, raise to 2.5bb, all-in for 100bb. */

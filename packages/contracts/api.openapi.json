@@ -318,12 +318,17 @@
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                 "description": "RFC 3339 timestamp"
+              },
+              "is_admin": {
+                "type": "boolean",
+                "description": "app_user.is_admin, read only: whether the builder controls are shown (O-290); the admin routes check it again (O-242)"
               }
             },
             "required": [
               "id",
               "email",
-              "created_at"
+              "created_at",
+              "is_admin"
             ]
           },
           "csrf_token": {
@@ -2194,6 +2199,420 @@
           "by_kind"
         ]
       },
+      "PracticeSessionInput": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automated",
+              "drill",
+              "holdout",
+              "prediction",
+              "range_paint"
+            ]
+          },
+          "drill_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "dealing",
+              "await_hero",
+              "opponent_acts",
+              "feedback",
+              "street_end",
+              "reveal",
+              "hand_end",
+              "ended"
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "drill_id",
+          "state",
+          "state_version",
+          "started_at"
+        ]
+      },
+      "TrainerPromptInput": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "dealing",
+              "await_hero",
+              "opponent_acts",
+              "feedback",
+              "street_end",
+              "reveal",
+              "hand_end",
+              "ended"
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "hero_hand": {
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[2-9TJQKA][cdhs]$"
+            }
+          },
+          "board": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[2-9TJQKA][cdhs]$"
+            }
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stacks_cbb": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ]
+            }
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeActionInput"
+            },
+            "description": "Generated from the node's tree actions (ADR 0020)"
+          },
+          "visible_panels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ],
+            "description": "The street of the node the hero acts at"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+          },
+          "previous_board": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[2-9TJQKA][cdhs]$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
+          }
+        },
+        "required": [
+          "session_id",
+          "state",
+          "state_version",
+          "hero_position",
+          "hero_hand",
+          "board",
+          "pot_cbb",
+          "stacks_cbb",
+          "history",
+          "buttons",
+          "visible_panels",
+          "street",
+          "rng_roll",
+          "previous_board",
+          "synthetic"
+        ]
+      },
+      "DecisionFeedbackInput": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "label": {
+            "type": "string",
+            "enum": [
+              "best",
+              "correct",
+              "inaccuracy",
+              "mistake",
+              "blunder"
+            ]
+          },
+          "score": {
+            "type": "number"
+          },
+          "ev_loss_bb": {
+            "type": "number"
+          },
+          "ev_loss_pct_pot": {
+            "type": "number"
+          },
+          "best_action_indexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "freq_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rated": {
+            "type": "boolean"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            },
+            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
+          },
+          "spot_class_key": {
+            "type": "string",
+            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "label",
+          "score",
+          "ev_loss_bb",
+          "ev_loss_pct_pot",
+          "best_action_indexes",
+          "freq_by_action",
+          "ev_by_action",
+          "rated",
+          "rng_roll",
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand",
+          "noise_flags",
+          "spot_class_key"
+        ]
+      },
+      "SessionRecapInput": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "rated_decisions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "mean_score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ev_loss_bb_total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "ended_at",
+          "decisions",
+          "rated_decisions",
+          "mean_score",
+          "ev_loss_bb_total"
+        ]
+      },
       "PredictionPromptInput": {
         "type": "object",
         "properties": {
@@ -2771,420 +3190,6 @@
           "per_hand"
         ]
       },
-      "PracticeSessionInput": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "automated",
-              "drill",
-              "holdout",
-              "prediction",
-              "range_paint"
-            ]
-          },
-          "drill_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "dealing",
-              "await_hero",
-              "opponent_acts",
-              "feedback",
-              "street_end",
-              "reveal",
-              "hand_end",
-              "ended"
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "started_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-            "description": "RFC 3339 timestamp"
-          }
-        },
-        "required": [
-          "session_id",
-          "mode",
-          "drill_id",
-          "state",
-          "state_version",
-          "started_at"
-        ]
-      },
-      "TrainerPromptInput": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "dealing",
-              "await_hero",
-              "opponent_acts",
-              "feedback",
-              "street_end",
-              "reveal",
-              "hand_end",
-              "ended"
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "hero_position": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "hero_hand": {
-            "minItems": 2,
-            "maxItems": 2,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[2-9TJQKA][cdhs]$"
-            }
-          },
-          "board": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[2-9TJQKA][cdhs]$"
-            }
-          },
-          "pot_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "stacks_cbb": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "history": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "position": {
-                  "type": "string",
-                  "enum": [
-                    "UTG",
-                    "UTG1",
-                    "UTG2",
-                    "LJ",
-                    "HJ",
-                    "CO",
-                    "BTN",
-                    "SB",
-                    "BB"
-                  ]
-                },
-                "token": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "position",
-                "token",
-                "label"
-              ]
-            }
-          },
-          "buttons": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeActionInput"
-            },
-            "description": "Generated from the node's tree actions (ADR 0020)"
-          },
-          "visible_panels": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "street": {
-            "type": "string",
-            "enum": [
-              "preflop",
-              "flop",
-              "turn",
-              "river"
-            ],
-            "description": "The street of the node the hero acts at"
-          },
-          "rng_roll": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
-          },
-          "previous_board": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[2-9TJQKA][cdhs]$"
-                }
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
-          },
-          "synthetic": {
-            "type": "boolean",
-            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
-          }
-        },
-        "required": [
-          "session_id",
-          "state",
-          "state_version",
-          "hero_position",
-          "hero_hand",
-          "board",
-          "pot_cbb",
-          "stacks_cbb",
-          "history",
-          "buttons",
-          "visible_panels",
-          "street",
-          "rng_roll",
-          "previous_board",
-          "synthetic"
-        ]
-      },
-      "DecisionFeedbackInput": {
-        "type": "object",
-        "properties": {
-          "attempt_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "label": {
-            "type": "string",
-            "enum": [
-              "best",
-              "correct",
-              "inaccuracy",
-              "mistake",
-              "blunder"
-            ]
-          },
-          "score": {
-            "type": "number"
-          },
-          "ev_loss_bb": {
-            "type": "number"
-          },
-          "ev_loss_pct_pot": {
-            "type": "number"
-          },
-          "best_action_indexes": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "freq_by_action": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_by_action": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "rated": {
-            "type": "boolean"
-          },
-          "rng_roll": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "solution_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-            "description": "The solution the decision was graded against"
-          },
-          "node_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "description": "The node the hero decided at"
-          },
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "hand": {
-            "type": "string",
-            "description": "The hero's hand as graded"
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            },
-            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
-          },
-          "spot_class_key": {
-            "type": "string",
-            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
-          }
-        },
-        "required": [
-          "attempt_id",
-          "label",
-          "score",
-          "ev_loss_bb",
-          "ev_loss_pct_pot",
-          "best_action_indexes",
-          "freq_by_action",
-          "ev_by_action",
-          "rated",
-          "rng_roll",
-          "state_version",
-          "solution_id",
-          "node_key",
-          "config_id",
-          "pair",
-          "hand",
-          "noise_flags",
-          "spot_class_key"
-        ]
-      },
-      "SessionRecapInput": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "ended_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-            "description": "RFC 3339 timestamp"
-          },
-          "decisions": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "rated_decisions": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "mean_score": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "ev_loss_bb_total": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "session_id",
-          "ended_at",
-          "decisions",
-          "rated_decisions",
-          "mean_score",
-          "ev_loss_bb_total"
-        ]
-      },
       "Problem": {
         "type": "object",
         "properties": {
@@ -3494,12 +3499,17 @@
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                 "description": "RFC 3339 timestamp"
+              },
+              "is_admin": {
+                "type": "boolean",
+                "description": "app_user.is_admin, read only: whether the builder controls are shown (O-290); the admin routes check it again (O-242)"
               }
             },
             "required": [
               "id",
               "email",
-              "created_at"
+              "created_at",
+              "is_admin"
             ],
             "additionalProperties": false
           },
@@ -5400,6 +5410,425 @@
         ],
         "additionalProperties": false
       },
+      "PracticeSession": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automated",
+              "drill",
+              "holdout",
+              "prediction",
+              "range_paint"
+            ]
+          },
+          "drill_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "dealing",
+              "await_hero",
+              "opponent_acts",
+              "feedback",
+              "street_end",
+              "reveal",
+              "hand_end",
+              "ended"
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "drill_id",
+          "state",
+          "state_version",
+          "started_at"
+        ],
+        "additionalProperties": false
+      },
+      "TrainerPrompt": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "dealing",
+              "await_hero",
+              "opponent_acts",
+              "feedback",
+              "street_end",
+              "reveal",
+              "hand_end",
+              "ended"
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "hero_position": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "hero_hand": {
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[2-9TJQKA][cdhs]$"
+            }
+          },
+          "board": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[2-9TJQKA][cdhs]$"
+            }
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stacks_cbb": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "UTG",
+                    "UTG1",
+                    "UTG2",
+                    "LJ",
+                    "HJ",
+                    "CO",
+                    "BTN",
+                    "SB",
+                    "BB"
+                  ]
+                },
+                "token": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "position",
+                "token",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeAction"
+            },
+            "description": "Generated from the node's tree actions (ADR 0020)"
+          },
+          "visible_panels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ],
+            "description": "The street of the node the hero acts at"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+          },
+          "previous_board": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[2-9TJQKA][cdhs]$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
+          }
+        },
+        "required": [
+          "session_id",
+          "state",
+          "state_version",
+          "hero_position",
+          "hero_hand",
+          "board",
+          "pot_cbb",
+          "stacks_cbb",
+          "history",
+          "buttons",
+          "visible_panels",
+          "street",
+          "rng_roll",
+          "previous_board",
+          "synthetic"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionFeedback": {
+        "type": "object",
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "label": {
+            "type": "string",
+            "enum": [
+              "best",
+              "correct",
+              "inaccuracy",
+              "mistake",
+              "blunder"
+            ]
+          },
+          "score": {
+            "type": "number"
+          },
+          "ev_loss_bb": {
+            "type": "number"
+          },
+          "ev_loss_pct_pot": {
+            "type": "number"
+          },
+          "best_action_indexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "freq_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_by_action": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "rated": {
+            "type": "boolean"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            },
+            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
+          },
+          "spot_class_key": {
+            "type": "string",
+            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "label",
+          "score",
+          "ev_loss_bb",
+          "ev_loss_pct_pot",
+          "best_action_indexes",
+          "freq_by_action",
+          "ev_by_action",
+          "rated",
+          "rng_roll",
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand",
+          "noise_flags",
+          "spot_class_key"
+        ],
+        "additionalProperties": false
+      },
+      "SessionRecap": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "decisions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "rated_decisions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "mean_score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ev_loss_bb_total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "ended_at",
+          "decisions",
+          "rated_decisions",
+          "mean_score",
+          "ev_loss_bb_total"
+        ],
+        "additionalProperties": false
+      },
       "PredictionPrompt": {
         "type": "object",
         "properties": {
@@ -5983,425 +6412,6 @@
           "floor_pct_pot",
           "total_weighted_loss_bb",
           "per_hand"
-        ],
-        "additionalProperties": false
-      },
-      "PracticeSession": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "automated",
-              "drill",
-              "holdout",
-              "prediction",
-              "range_paint"
-            ]
-          },
-          "drill_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "dealing",
-              "await_hero",
-              "opponent_acts",
-              "feedback",
-              "street_end",
-              "reveal",
-              "hand_end",
-              "ended"
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "started_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-            "description": "RFC 3339 timestamp"
-          }
-        },
-        "required": [
-          "session_id",
-          "mode",
-          "drill_id",
-          "state",
-          "state_version",
-          "started_at"
-        ],
-        "additionalProperties": false
-      },
-      "TrainerPrompt": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "dealing",
-              "await_hero",
-              "opponent_acts",
-              "feedback",
-              "street_end",
-              "reveal",
-              "hand_end",
-              "ended"
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "hero_position": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "hero_hand": {
-            "minItems": 2,
-            "maxItems": 2,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[2-9TJQKA][cdhs]$"
-            }
-          },
-          "board": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[2-9TJQKA][cdhs]$"
-            }
-          },
-          "pot_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "stacks_cbb": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "history": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "position": {
-                  "type": "string",
-                  "enum": [
-                    "UTG",
-                    "UTG1",
-                    "UTG2",
-                    "LJ",
-                    "HJ",
-                    "CO",
-                    "BTN",
-                    "SB",
-                    "BB"
-                  ]
-                },
-                "token": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "position",
-                "token",
-                "label"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "buttons": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeAction"
-            },
-            "description": "Generated from the node's tree actions (ADR 0020)"
-          },
-          "visible_panels": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "street": {
-            "type": "string",
-            "enum": [
-              "preflop",
-              "flop",
-              "turn",
-              "river"
-            ],
-            "description": "The street of the node the hero acts at"
-          },
-          "rng_roll": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
-          },
-          "previous_board": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "pattern": "^[2-9TJQKA][cdhs]$"
-                }
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
-          },
-          "synthetic": {
-            "type": "boolean",
-            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
-          }
-        },
-        "required": [
-          "session_id",
-          "state",
-          "state_version",
-          "hero_position",
-          "hero_hand",
-          "board",
-          "pot_cbb",
-          "stacks_cbb",
-          "history",
-          "buttons",
-          "visible_panels",
-          "street",
-          "rng_roll",
-          "previous_board",
-          "synthetic"
-        ],
-        "additionalProperties": false
-      },
-      "DecisionFeedback": {
-        "type": "object",
-        "properties": {
-          "attempt_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "label": {
-            "type": "string",
-            "enum": [
-              "best",
-              "correct",
-              "inaccuracy",
-              "mistake",
-              "blunder"
-            ]
-          },
-          "score": {
-            "type": "number"
-          },
-          "ev_loss_bb": {
-            "type": "number"
-          },
-          "ev_loss_pct_pot": {
-            "type": "number"
-          },
-          "best_action_indexes": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "freq_by_action": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_by_action": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "rated": {
-            "type": "boolean"
-          },
-          "rng_roll": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "state_version": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "solution_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-            "description": "The solution the decision was graded against"
-          },
-          "node_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "description": "The node the hero decided at"
-          },
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "hand": {
-            "type": "string",
-            "description": "The hero's hand as graded"
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            },
-            "description": "Flags from solver-query; any flag makes the decision unrated (05 section 9)"
-          },
-          "spot_class_key": {
-            "type": "string",
-            "description": "Rust's spot class of the node, the node family of range drift (O-304)"
-          }
-        },
-        "required": [
-          "attempt_id",
-          "label",
-          "score",
-          "ev_loss_bb",
-          "ev_loss_pct_pot",
-          "best_action_indexes",
-          "freq_by_action",
-          "ev_by_action",
-          "rated",
-          "rng_roll",
-          "state_version",
-          "solution_id",
-          "node_key",
-          "config_id",
-          "pair",
-          "hand",
-          "noise_flags",
-          "spot_class_key"
-        ],
-        "additionalProperties": false
-      },
-      "SessionRecap": {
-        "type": "object",
-        "properties": {
-          "session_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "ended_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-            "description": "RFC 3339 timestamp"
-          },
-          "decisions": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "rated_decisions": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "mean_score": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "ev_loss_bb_total": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "session_id",
-          "ended_at",
-          "decisions",
-          "rated_decisions",
-          "mean_score",
-          "ev_loss_bb_total"
         ],
         "additionalProperties": false
       }

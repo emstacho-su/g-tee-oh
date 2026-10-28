@@ -10,13 +10,16 @@ import {
   OWNER_EMAIL_VARIABLE,
   OWNER_PASSWORD_VARIABLE,
   OwnerSetupError,
+  ADMIN_DATABASE_URL_VARIABLE,
+  adminDatabaseUrl,
   createOwnerArgs,
+  createOwnerEnv,
   createOwnerInput,
   e2eWebEnv,
   generateOwnerPassword,
   ownerEmail,
 } from '../infra/compose/e2e-owner.mjs';
-import { COMPOSE_ARGS, OWNER_STEP, STEPS } from '../infra/compose/e2e.mjs';
+import { COMPOSE_ARGS, OWNER_STEP, STEPS, resolveOwner } from '../infra/compose/e2e.mjs';
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const PASSWORD_BYTES = 24;
@@ -61,12 +64,29 @@ test('r3_13 ownerEmail refuses a value that is not an address or reads as a flag
   }
 });
 
-test('r3_13 createOwnerArgs runs create-user in the api container with the email only', () => {
+test('r3_13 r3_5 createOwnerArgs runs create-user --admin in the api container, the admin URL passed by name only (O-294)', () => {
   const args = createOwnerArgs(COMPOSE_ARGS, DEFAULT_OWNER_EMAIL);
   assert.deepEqual(args.slice(0, COMPOSE_ARGS.length), COMPOSE_ARGS);
   assert.deepEqual(args.slice(COMPOSE_ARGS.length), [
-    'exec', '-T', 'api', 'node', CREATE_USER_SCRIPT, '--email', DEFAULT_OWNER_EMAIL,
+    'exec', '-T', '-e', ADMIN_DATABASE_URL_VARIABLE, 'api', 'node', CREATE_USER_SCRIPT, '--email', DEFAULT_OWNER_EMAIL, '--admin',
   ]);
+  assert.ok(args.every((argument) => !argument.includes('://')));
+});
+
+test('r3_5 adminDatabaseUrl points DATABASE_URL at the compose postgres service (O-294, O-331)', () => {
+  const fromEnv = adminDatabaseUrl({ DATABASE_URL: 'postgres://postgres:s3cret@localhost:55432/gto?sslmode=disable' });
+  assert.equal(fromEnv, 'postgres://postgres:s3cret@postgres:5432/gto?sslmode=disable');
+  const fromFile = adminDatabaseUrl({}, 'OTHER=1\nDATABASE_URL="postgres://owner:pw@127.0.0.1:5432/gto"\n');
+  assert.equal(fromFile, 'postgres://owner:pw@postgres:5432/gto');
+  assert.throws(() => adminDatabaseUrl({}, 'OTHER=1\n'), OwnerSetupError);
+  assert.throws(() => adminDatabaseUrl({ DATABASE_URL: 'not a url' }), OwnerSetupError);
+});
+
+test('r3_5 createOwnerEnv adds the admin URL to a new object and leaves the parent alone', () => {
+  const parent = { PATH: '/bin' };
+  const env = createOwnerEnv(parent, 'postgres://x@postgres:5432/gto');
+  assert.deepEqual(env, { PATH: '/bin', [ADMIN_DATABASE_URL_VARIABLE]: 'postgres://x@postgres:5432/gto' });
+  assert.deepEqual(parent, { PATH: '/bin' });
 });
 
 test('r3_13 the password never appears in the argument list, only on stdin', () => {
@@ -91,5 +111,19 @@ test('r3_13 e2eWebEnv adds the owner to a new object and leaves the parent envir
 });
 
 test('r3_13 the e2e chain creates the owner after the database steps and before smoke', () => {
-  assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', OWNER_STEP, 'smoke', 'e2e-web']);
+  assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, 'smoke', 'e2e-web']);
+});
+
+test('r3_5 adminDatabaseUrl treats an empty DATABASE_URL as unset and falls back to .env (PR #28 review L7)', () => {
+  const url = adminDatabaseUrl({ DATABASE_URL: '' }, 'DATABASE_URL=postgres://owner:pw@localhost:5432/gto\n');
+  assert.equal(url, 'postgres://owner:pw@postgres:5432/gto');
+  assert.throws(() => adminDatabaseUrl({ DATABASE_URL: '  ' }, ''), OwnerSetupError);
+});
+
+test('r3_5 the e2e owner, admin URL included, is resolved before any step runs (PR #28 review L7)', () => {
+  const owner = resolveOwner({ DATABASE_URL: 'postgres://o:p@127.0.0.1:5432/gto' }, '');
+  assert.equal(owner.email, DEFAULT_OWNER_EMAIL);
+  assert.equal(owner.adminUrl, 'postgres://o:p@postgres:5432/gto');
+  assert.ok(owner.password.length >= MIN_PASSWORD_LENGTH);
+  assert.throws(() => resolveOwner({}, ''), OwnerSetupError);
 });

@@ -30,7 +30,7 @@ const UNAUTHENTICATED_TYPE = "urn:g-tee-oh:problem:unauthenticated";
 const SHORT_TTL_CONFIG: AppConfig = { ...TEST_CONFIG, sessionTtlHours: SHORT_TTL_HOURS };
 
 interface SessionInfoBody {
-  user: { id: string; email: string; created_at: string };
+  user: { id: string; email: string; created_at: string; is_admin: boolean };
   csrf_token: string;
   expires_at: string;
 }
@@ -110,7 +110,7 @@ describe("R3.1 auth routes", () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json<SessionInfoBody>();
-    expect(body.user).toEqual({ id: user.id, email: user.email, created_at: expect.any(String) as unknown });
+    expect(body.user).toEqual({ id: user.id, email: user.email, created_at: expect.any(String) as unknown, is_admin: false });
     expect(Number.isNaN(Date.parse(body.user.created_at))).toBe(false);
     expect(body.csrf_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(Object.keys(body).sort()).toEqual(["csrf_token", "expires_at", "user"]);

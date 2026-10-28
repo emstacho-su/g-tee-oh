@@ -10,8 +10,13 @@
 // an argument (the process list and the CI log would show it), never printed, and never written
 // to .env or any file: it lives in this process's memory, goes to the command's stdin, and
 // reaches Playwright only through the environment of the one e2e-web child process.
+//
+// The owner is an admin (S28, O-294, O-242): create-user --admin connects through
+// CREATE_USER_ADMIN_DATABASE_URL, built from the repo's DATABASE_URL with the compose host, and
+// handed to docker by name in the docker child's environment only, never to Playwright.
 
 import { randomBytes } from 'node:crypto';
+import { parseEnv } from 'node:util';
 
 export const DEFAULT_OWNER_EMAIL = 'e2e-owner@example.com';
 export const OWNER_EMAIL_VARIABLE = 'E2E_OWNER_EMAIL';
@@ -61,9 +66,53 @@ export function ownerEmail(env) {
   return email.toLowerCase();
 }
 
-/** The docker arguments for the create-owner step: the email only, never the password. */
+/** create-user's flag for an admin account and the variable naming its owner connection (O-242). */
+export const ADMIN_FLAG = '--admin';
+export const ADMIN_DATABASE_URL_VARIABLE = 'CREATE_USER_ADMIN_DATABASE_URL';
+/** Where the api container reaches Postgres on the compose network gto. */
+const COMPOSE_DATABASE_HOST = 'postgres';
+const COMPOSE_DATABASE_PORT = '5432';
+
+/**
+ * The docker arguments for the create-owner step: the email and --admin, never the password.
+ * The owner is an admin so flow 5 can drive the builder controls (O-294). `-e NAME` with no value
+ * makes docker copy the variable from its own environment, so the owner connection URL (which
+ * holds the database owner's password) is never an argument either.
+ */
 export function createOwnerArgs(composeArgs, email) {
-  return [...composeArgs, 'exec', '-T', API_SERVICE, 'node', CREATE_USER_SCRIPT, '--email', email];
+  return [
+    ...composeArgs, 'exec', '-T', '-e', ADMIN_DATABASE_URL_VARIABLE, API_SERVICE,
+    'node', CREATE_USER_SCRIPT, '--email', email, ADMIN_FLAG,
+  ];
+}
+
+/**
+ * The owner connection for create-user --admin inside the api container (O-294, O-331): the
+ * repo's DATABASE_URL (the database owner on the published loopback port, as dbmate and
+ * fixture-solutions use it), taken from the environment or else from the .env text, with its host
+ * and port changed to the compose service. Throws when neither names one.
+ */
+export function adminDatabaseUrl(env, envFileText = '') {
+  // An empty or blank value counts as unset, as fixture-solutions treats it (PR #28 review L7).
+  const fromEnv = env.DATABASE_URL?.trim();
+  const configured = fromEnv === undefined || fromEnv === '' ? parseEnv(envFileText).DATABASE_URL?.trim() : fromEnv;
+  if (configured === undefined || configured === '') {
+    throw new OwnerSetupError('DATABASE_URL is not set in the environment or .env; create-owner needs it for --admin');
+  }
+  let url;
+  try {
+    url = new URL(configured);
+  } catch {
+    throw new OwnerSetupError('DATABASE_URL is not a URL');
+  }
+  url.hostname = COMPOSE_DATABASE_HOST;
+  url.port = COMPOSE_DATABASE_PORT;
+  return url.toString();
+}
+
+/** The docker child's environment: the parent's plus the owner connection, as a new object. */
+export function createOwnerEnv(baseEnv, adminUrl) {
+  return { ...baseEnv, [ADMIN_DATABASE_URL_VARIABLE]: adminUrl };
 }
 
 /** What the create-user command reads from stdin: the password as its first line. */

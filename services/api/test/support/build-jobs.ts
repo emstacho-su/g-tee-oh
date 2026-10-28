@@ -52,8 +52,22 @@ export async function deleteBuildJobs(pool: pg.Pool, ids: readonly string[]): Pr
   await pool.query("delete from build_job where id = any($1::uuid[])", [ids]);
 }
 
-export async function countRows(pool: pg.Pool, table: "solution" | "scenario" | "build_job"): Promise<number> {
-  const result = await pool.query<{ count: string }>(`select count(*) as count from ${table}`);
+export interface LibrarySpot {
+  configId: string;
+  pair: string;
+  flop: string;
+}
+
+/**
+ * The solution or scenario rows for one configuration, pair and flop. A test that asserts no row
+ * appeared counts only its own spot: other test files insert solution rows while vitest runs them
+ * in parallel against the same database, so a table-wide count is not the test's to assert.
+ */
+export async function countSpotRows(pool: pg.Pool, table: "solution" | "scenario", spot: LibrarySpot): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `select count(*) as count from ${table} where game_config_id = $1 and position_pair = $2 and flop = $3`,
+    [spot.configId, spot.pair, spot.flop],
+  );
   return Number(result.rows[0]?.count ?? Number.NaN);
 }
 
