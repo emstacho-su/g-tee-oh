@@ -1,12 +1,18 @@
 /**
  * Tests for the /paint screen (S27 lane B, R3.17, O-302) through the whole app over an injected
  * fake fetch: pick a drill, start a range_paint session, paint, submit the painted map, read the
- * graded view, go Next; and the failures it names without echoing a problem's text.
+ * graded view, go Next; and the failures it names without echoing a problem's text. One
+ * Idempotency-Key per paint submission (PR #29 review M4): Try again after a failed or lost answer
+ * resends the same key so the server replays, while a changed paint or the next range gets a new one.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { createAppApi } from "../../src/api/index.js";
+import { App } from "../../src/app/index.js";
+import { createQueryClient } from "../../src/auth/index.js";
 import type { RangePaintPrompt } from "../../src/contracts.js";
 import {
   FIXTURE_PAINT_DRILL_ID,
@@ -17,8 +23,9 @@ import {
   fixturePaintSession,
 } from "../../src/fixtures/paint.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
-import { jsonResponse, problemResponse, type FetchScript, type ResponseFactory } from "../api/fake-fetch.js";
-import { SIGNED_IN, renderApp } from "../app/render-app.js";
+import { createAppRouter } from "../../src/router.js";
+import { createFakeFetch, jsonResponse, problemResponse, type FetchScript, type ResponseFactory } from "../api/fake-fetch.js";
+import { SIGNED_IN, TEST_ORIGIN, renderApp } from "../app/render-app.js";
 import { PAINTER_SUITE } from "./painter-timeout.js";
 
 const DRILLS = "GET /api/v1/drills";
@@ -41,6 +48,29 @@ function script(overrides: Record<string, readonly ResponseFactory[]> = {}): Fet
 async function startPainting(path = "/paint", overrides: Record<string, readonly ResponseFactory[]> = {}) {
   const user = userEvent.setup();
   const app = renderApp(path, script(overrides));
+  await user.click(await screen.findByRole("radio", { name: fixturePaintDrills[0]?.name ?? "" }));
+  await user.click(screen.getByRole("button", { name: /start painting/i }));
+  return { app, user };
+}
+
+/** Renders the app like renderApp and records the Idempotency-Key of every submit (PR #29 review M4). */
+function renderRecordingSubmitKeys(path: string, script: FetchScript) {
+  const fake = createFakeFetch(script);
+  const submitKeys: (string | null)[] = [];
+  const fetch = (request: Request): Promise<Response> => {
+    if (`${request.method} ${new URL(request.url).pathname}` === SUBMIT) submitKeys.push(request.headers.get("idempotency-key"));
+    return fake.fetch(request);
+  };
+  const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch });
+  const queryClient = createQueryClient();
+  const router = createAppRouter({ queryClient, api, history: createMemoryHistory({ initialEntries: [path] }) });
+  render(<App router={router} queryClient={queryClient} api={api} />);
+  return { fake, submitKeys };
+}
+
+async function startPaintingRecordingKeys(overrides: Record<string, readonly ResponseFactory[]>) {
+  const user = userEvent.setup();
+  const app = renderRecordingSubmitKeys("/paint", script(overrides));
   await user.click(await screen.findByRole("radio", { name: fixturePaintDrills[0]?.name ?? "" }));
   await user.click(screen.getByRole("button", { name: /start painting/i }));
   return { app, user };
@@ -98,8 +128,8 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     expect(await screen.findByText(/range 2/i)).toBeInTheDocument();
   });
 
-  it("R3.17 a failed submit keeps the paint and Try again sends it again under a new key", async () => {
-    const { app, user } = await startPainting("/paint", { [SUBMIT]: [problemResponse(502, "upstream"), jsonResponse(200, fixturePaintGraded)] });
+  it("R3.17 a failed submit keeps the paint and Try again resends it under the same Idempotency-Key (PR #29 review M4)", async () => {
+    const { app, user } = await startPaintingRecordingKeys({ [SUBMIT]: [problemResponse(502, "upstream"), jsonResponse(200, fixturePaintGraded)] });
     await user.keyboard("2");
     await user.click(await screen.findByRole("button", { name: /^AA: / }));
     await user.click(screen.getByRole("button", { name: /submit range/i }));
@@ -110,6 +140,27 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     expect(await screen.findByTestId("paint-graded")).toBeInTheDocument();
     const submits = app.fake.calls.filter((call) => call.path === "/api/v1/range-paint/submit");
     expect(submits.map((call) => JSON.parse(call.body) as unknown)).toEqual([JSON.parse(submits[0]?.body ?? "null"), JSON.parse(submits[0]?.body ?? "null")]);
+    expect(app.submitKeys).toHaveLength(2);
+    expect(app.submitKeys[0]).toBeTruthy();
+    expect(app.submitKeys[1]).toBe(app.submitKeys[0]);
+  });
+
+  it("R3.17 a changed paint after a failed submit and the next range each get a new Idempotency-Key (PR #29 review M4)", async () => {
+    const { app, user } = await startPaintingRecordingKeys({
+      [SUBMIT]: [problemResponse(502, "upstream"), jsonResponse(200, fixturePaintGraded), jsonResponse(200, { ...fixturePaintGraded, state_version: 2 })],
+    });
+    await user.keyboard("2");
+    await user.click(await screen.findByRole("button", { name: /^AA: / }));
+    await user.click(screen.getByRole("button", { name: /submit range/i }));
+    await screen.findByRole("alert");
+    await user.keyboard("3");
+    await user.click(screen.getByRole("button", { name: /^AA: / }));
+    await user.click(screen.getByRole("button", { name: /submit range/i }));
+    await user.click(await screen.findByRole("button", { name: /next range/i }));
+    expect(await screen.findByText(/range 2/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /submit range/i }));
+    await waitFor(() => expect(app.submitKeys).toHaveLength(3));
+    expect(new Set(app.submitKeys).size).toBe(3);
   });
 
   it("R3.17 a first-to-act spot with real data shows no history and no synthetic banner", async () => {

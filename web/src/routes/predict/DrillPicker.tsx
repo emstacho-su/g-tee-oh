@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAppApi } from "../../auth/index.js";
 import { LoadingNote } from "../../components/ui/index.js";
-import { drillListQuery } from "../../prediction/api.js";
+import { drillListQuery } from "../../practice/drill-list-query.js";
 import { PREDICTION_TEXT, problemText } from "../../prediction/labels.js";
 
 export function DrillPicker() {

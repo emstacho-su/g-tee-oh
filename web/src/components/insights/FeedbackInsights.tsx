@@ -16,7 +16,7 @@ export function FeedbackInsights({ feedback }: FeedbackInsightsProps) {
   return (
     <div data-testid="feedback-insights" data-spot-class={feedback.spot_class_key} className="flex flex-col gap-3">
       <NoiseFlagsCard flags={feedback.noise_flags} />
-      <DriftCard spotClassKey={feedback.spot_class_key} />
+      <DriftCard spotClassKey={feedback.spot_class_key} attemptId={feedback.attempt_id} />
     </div>
   );
 }

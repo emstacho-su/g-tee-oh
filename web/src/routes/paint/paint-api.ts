@@ -3,7 +3,7 @@
  * client call; a response without data becomes an ApiProblem through problemFromBody, so callers
  * see the status and slug, never the raw body.
  *
- * - paintDrillsQuery: GET /drills, the picker's list (the first page of the user's drills).
+ * The picker's drill list is the shared practice/drill-list-query.ts read (PR #29 review L11).
  * - createPaintSession: POST /sessions with mode range_paint and the drill (O-302).
  * - paintPromptQuery: GET /range-paint/{session}/next keyed by the session and the state version
  *   the prompt follows. next is pure, so the cached prompt never goes stale for its version.
@@ -17,27 +17,11 @@ import { AUTO_CSRF_HEADER, HTTP_STATUS, isApiProblem, problemFromBody } from "..
 import type { AppApi } from "../../api/index.js";
 import type { RangePaintPrompt, RangePaintResult } from "../../contracts.js";
 import { IDEMPOTENCY_HEADER } from "../../trainer/idempotency.js";
-import type { Drill, PracticeSession } from "../../trainer/session-types.js";
+import type { PracticeSession } from "../../trainer/session-types.js";
 
 export const PAINT_QUERY_ROOT = "paint";
-/** The picker lists the first page of drills; the drill library pages the rest. */
-export const PICKER_DRILL_LIMIT = 50;
-const DRILLS_STALE_MS = 60 * 1000;
 const PROMPT_GC_MS = 60 * 1000;
 const RANGE_PAINT_MODE = "range_paint";
-
-export function paintDrillsQuery(api: AppApi) {
-  return queryOptions({
-    queryKey: [PAINT_QUERY_ROOT, "drills"] as const,
-    queryFn: async (): Promise<Drill[]> => {
-      const { data, error, response } = await api.client.GET("/api/v1/drills", { params: { query: { limit: PICKER_DRILL_LIMIT } } });
-      if (data === undefined) throw problemFromBody(response.status, error);
-      return data.items;
-    },
-    staleTime: DRILLS_STALE_MS,
-    retry: false,
-  });
-}
 
 export interface StartPaintInput {
   drillId: string;

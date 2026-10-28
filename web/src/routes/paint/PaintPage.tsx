@@ -2,7 +2,8 @@
  * The /paint screen (S27 lane B, R3.17, 05 section 8, O-300, O-302): range painting over a
  * drill-backed range_paint session.
  *
- * Mechanism: the page lists the user's drills (GET /drills) with the address's drill preselected,
+ * Mechanism: the page lists the user's drills (GET /drills, the drill list shared with /predict,
+ * PR #29 review L11) with the address's drill preselected,
  * and Start painting posts POST /sessions with mode range_paint, the drill and the address's
  * validated seed (so a session replays), under one Idempotency-Key per start attempt (O-232). Once
  * the session exists, PaintRun.tsx paints its prompts. Failures show fixed sentences, never a
@@ -13,11 +14,12 @@ import { useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { LoadingNote } from "../../components/ui/index.js";
+import { drillListQuery } from "../../practice/drill-list-query.js";
 import type { PracticeSearch } from "../../practice/search.js";
 import { validatePracticeSearch } from "../../practice/search.js";
 import { useTrainerDeps } from "../../trainer/trainer-deps.js";
 import { DrillPicker } from "./DrillPicker.js";
-import { createPaintSession, paintDrillsQuery, paintFailureText } from "./paint-api.js";
+import { createPaintSession, paintFailureText } from "./paint-api.js";
 import { PaintRun } from "./PaintRun.js";
 
 export const PAINT_PAGE_TEXT = {
@@ -36,7 +38,7 @@ export function PaintPage({ search }: PaintPageProps) {
   const { newKey } = useTrainerDeps();
   // The router merges the parent's unvalidated search into the child's, so check it again here.
   const { drill: wanted, seed } = validatePracticeSearch({ ...search });
-  const drills = useQuery(paintDrillsQuery(api));
+  const drills = useQuery(drillListQuery(api));
   const [selected, setSelected] = useState<string | null>(wanted ?? null);
   const start = useMutation({
     mutationFn: (drillId: string) => createPaintSession(api, { drillId, seed, key: newKey() }),

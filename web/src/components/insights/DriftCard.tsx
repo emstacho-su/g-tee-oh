@@ -2,7 +2,7 @@
  * The range drift card of the feedback panel (S27 lane C, R3.18, O-304, 05 section 9).
  *
  * Mechanism: the card reads GET /insights/drift for the decision's node family (driftQuery, keyed
- * by spot_class_key). Below the minimum the api hides drift and sends only the count, so the card
+ * by spot_class_key and the decision's attempt id, so the next decision reads again, M9). Below the minimum the api hides drift and sends only the count, so the card
  * says drift appears after that many decisions and how many there are so far. Once shown, it
  * states the distance between the user's action mix and the solver's and its confidence interval
  * as percentages with one decimal, the decision count, a small table of each kind's share for the
@@ -28,6 +28,8 @@ export const DRIFT_INSIGHT_NOTE = "Insight only, never graded.";
 
 export interface DriftCardProps {
   spotClassKey: string;
+  /** The decision the panel shows; a new decision is a new drift read (PR #29 review M9). */
+  attemptId: string;
 }
 
 function hiddenText(drift: RangeDrift): string {
@@ -90,9 +92,9 @@ function DriftBody({ drift }: { drift: RangeDrift }) {
   );
 }
 
-function useDriftContent(spotClassKey: string): ReactNode {
+function useDriftContent(spotClassKey: string, attemptId: string): ReactNode {
   const api = useAppApi();
-  const query = useQuery(driftQuery(api, spotClassKey));
+  const query = useQuery(driftQuery(api, spotClassKey, attemptId));
   if (query.isPending) return <LoadingNote text="Loading range drift" />;
   if (query.isError) {
     return <QueryFailure subject="Range drift" error={query.error} retryLabel="Retry range drift" onRetry={() => void query.refetch()} />;
@@ -100,9 +102,9 @@ function useDriftContent(spotClassKey: string): ReactNode {
   return <DriftBody drift={query.data} />;
 }
 
-export function DriftCard({ spotClassKey }: DriftCardProps) {
+export function DriftCard({ spotClassKey, attemptId }: DriftCardProps) {
   const titleId = useId();
-  const content = useDriftContent(spotClassKey);
+  const content = useDriftContent(spotClassKey, attemptId);
   return (
     <section
       data-testid="drift-card"

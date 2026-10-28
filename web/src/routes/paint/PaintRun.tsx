@@ -5,7 +5,9 @@
  * Mechanism: the prompt is GET /range-paint/{session}/next keyed by the session and the state
  * version it follows (pure, so a cached prompt never goes stale for its version). RangePainter is
  * keyed by the prompt's version, so each prompt starts a fresh paint. Submit posts the painted map
- * with a new Idempotency-Key (useTrainerDeps, O-232); the answer replaces the painter with the
+ * with one Idempotency-Key per submission (use-paint-keys.ts, O-232, PR #29 review M4): Try again
+ * resends the same key, so a lost answer replays instead of a 409, and a changed paint gets a new
+ * key. The answer replaces the painter with the
  * graded view, and Next moves to the version the answer carries. A stale-state answer (another tab
  * moved the session on) offers to load the current range: the prompt is read again and painted
  * from scratch. Failures show fixed sentences (paint-api.ts paintFailureText), never a problem's
@@ -19,8 +21,8 @@ import { PaintGradedView } from "../../components/painter/PaintGradedView.js";
 import { RangePainter } from "../../components/painter/RangePainter.js";
 import { Button, LoadingNote, SyntheticBanner } from "../../components/ui/index.js";
 import type { RangePaintPrompt, RangePaintResult } from "../../contracts.js";
-import { useTrainerDeps } from "../../trainer/trainer-deps.js";
 import { isStalePaint, paintFailureText, paintPromptQuery, submitPaint } from "./paint-api.js";
+import { usePaintKeys } from "./use-paint-keys.js";
 
 export const RUN_TEXT = {
   loading: "Loading the range to paint.",
@@ -76,14 +78,14 @@ function Failure({ error, action, onAction }: FailureProps) {
 
 export function PaintRun({ sessionId, initialVersion }: PaintRunProps) {
   const api = useAppApi();
-  const { newKey } = useTrainerDeps();
+  const keyFor = usePaintKeys();
   const [version, setVersion] = useState(initialVersion);
   const [result, setResult] = useState<RangePaintResult | null>(null);
   const prompt = useQuery(paintPromptQuery(api, sessionId, version));
   const submit = useMutation({
     mutationFn: (paint: Record<string, number>) => {
       if (prompt.data === undefined) throw new Error("no prompt to submit against");
-      return submitPaint(api, { prompt: prompt.data, paint, key: newKey() });
+      return submitPaint(api, { prompt: prompt.data, paint, key: keyFor(prompt.data, paint) });
     },
     onSuccess: setResult,
   });

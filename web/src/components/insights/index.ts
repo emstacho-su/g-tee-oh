@@ -5,4 +5,4 @@ export { FeedbackInsights } from "./FeedbackInsights.js";
 export type { FeedbackInsightsProps } from "./FeedbackInsights.js";
 export { NoiseFlagsCard, NOISE_FLAGS_SENTENCE } from "./NoiseFlagsCard.js";
 export type { NoiseFlagsCardProps } from "./NoiseFlagsCard.js";
-export { driftQuery, driftQueryKey, INSIGHTS_QUERY_ROOT } from "./queries.js";
+export { DRIFT_STALE_MS, driftQuery, driftQueryKey, INSIGHTS_QUERY_ROOT } from "./queries.js";
