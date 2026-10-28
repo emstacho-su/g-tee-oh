@@ -9,7 +9,8 @@
  * frequency to one decimal and the EV in big blinds, then the range weight. Nothing is computed
  * (ADR 0004). Placement is popOutPosition: beside the cell, on the right when it fits and on the
  * left otherwise, top aligned with the cell, and clamped inside the box, so it never overflows a
- * phone screen; a layout effect measures the box and the pop-out once per cell. It is non-modal
+ * phone screen; a layout effect measures the box and the pop-out per cell and again whenever
+ * either resizes (a ResizeObserver over both, review round 1). It is non-modal
  * and not focusable (focus stays on the matrix grid, whose live region reads the same numbers),
  * and its layer comes from components/ui (TOOLTIP_LAYER_CLASS, O-368).
  */
@@ -143,20 +144,31 @@ export function MatrixPopOut(props: MatrixPopOutProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<PopOutPosition | null>(null);
 
+  // Measured when the cell changes and again whenever the matrix box or the pop-out resizes (a
+  // rotated phone, a narrower column, a taller pop-out), clamped inside the box (review round 1, 9).
   useLayoutEffect(() => {
     const element = ref.current;
-    const box = element?.offsetParent;
-    if (element === null || !(box instanceof HTMLElement)) return;
-    setPosition(
-      popOutPosition({
+    const box = element?.parentElement;
+    if (element === null || box === null || box === undefined) return undefined;
+    const measure = () => {
+      // A box that has no size yet (not laid out) keeps the percent placement below.
+      if (box.clientWidth <= 0 || box.clientHeight <= 0) return;
+      const next = popOutPosition({
         row: cell.row,
         col: cell.col,
         boxW: box.clientWidth,
         boxH: box.clientHeight,
         popW: element.offsetWidth,
         popH: element.offsetHeight,
-      }),
-    );
+      });
+      setPosition((current) => (current !== null && current.left === next.left && current.top === next.top ? current : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [cell.row, cell.col]);
 
   // Before the first measure the pop-out sits by the cell in percent of the box.
