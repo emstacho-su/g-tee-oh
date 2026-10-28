@@ -15,7 +15,7 @@
  */
 import type { NodeAction, NodeHandRow, StudyNode } from "../../contracts.js";
 import { HAND_GRID, cellOf, type HandKind } from "../../poker/hands.js";
-import { EV_SCALE_PERCENTILE, MIN_EV_SCALE_BB, nearestRank } from "./scales.js";
+import { EV_NEUTRAL_BB, EV_SCALE_PERCENTILE, MIN_EV_SCALE_BB, nearestRank } from "./scales.js";
 
 export type MatrixMode = "frequency" | "ev" | "weight";
 
@@ -78,11 +78,16 @@ function indexRows(hands: readonly NodeHandRow[], actionCount: number): Readonly
 
 /**
  * The end of the diverging EV scale (O-384): the 90th percentile (nearest rank) of the absolute
- * best EV over the present cells, never below MIN_EV_SCALE_BB, so one huge hand does not wash the
- * rest of the matrix out; beyond it the end step holds.
+ * best EV over the present cells outside the neutral band, never below MIN_EV_SCALE_BB, so one huge
+ * hand does not wash the rest of the matrix out; beyond it the end step holds. Cells inside the band
+ * (a fold's EV is exactly 0) paint neutral and never set the end: on a fold-heavy node they would
+ * otherwise pull the end down to the floor and paint every played hand the end step (review round 1).
  */
 export function evScaleOf(cells: readonly MatrixCell[]): number {
-  const sizes = cells.filter((cell) => cell.present).map((cell) => Math.abs(cell.evBestBb ?? 0));
+  const sizes = cells
+    .filter((cell) => cell.present)
+    .map((cell) => Math.abs(cell.evBestBb ?? 0))
+    .filter((size) => size >= EV_NEUTRAL_BB);
   return Math.max(MIN_EV_SCALE_BB, nearestRank(sizes, EV_SCALE_PERCENTILE) ?? 0);
 }
 
