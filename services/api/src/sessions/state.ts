@@ -26,6 +26,7 @@ import {
   uuidSchema,
 } from "../schemas/common.js";
 import { hex64Schema, sessionStateSchema } from "../schemas/training.js";
+import { sessionSpotSchema, type SessionSpot } from "./spot.js";
 
 /** Why the hand stops at its current node: a fold, the street closing, or a hand the solution never holds there. */
 export const handEndSchema = z.enum(["fold", "street_closed", "off_range"]);
@@ -36,7 +37,15 @@ export const historyEntrySchema = z.strictObject({
   label: z.string(),
 });
 
-export const candidateSchema = z.strictObject({ config_id: configIdSchema, pair: positionPairSchema });
+/**
+ * A spot the session deals: a covered (configuration, pair) and the pair's seats the drill can put
+ * the hero in, in pair order (out of position first), as POST /sessions found them (spot-search.ts).
+ */
+export const candidateSchema = z.strictObject({
+  config_id: configIdSchema,
+  pair: positionPairSchema,
+  hero_seats: z.array(positionSchema).min(1),
+});
 
 export const handStateSchema = z.strictObject({
   config_id: configIdSchema,
@@ -65,6 +74,8 @@ export const persistedStateSchema = z.strictObject({
   hand_no: z.number().int().min(0),
   candidates: z.array(candidateSchema).min(1),
   line: lineSchema.nullable(),
+  /** The drill's families, hands filter and alternate_seats, copied at POST /sessions (spot.ts). */
+  spot: sessionSpotSchema,
   hand: handStateSchema.nullable(),
   previous_board: z.array(cardSchema).nullable(),
   last_attempt_id: uuidSchema.nullable(),
@@ -77,13 +88,14 @@ export type HandState = z.infer<typeof handStateSchema>;
 export type PersistedState = z.infer<typeof persistedStateSchema>;
 
 /** The state of a new session: dealing hand 0 (A6 section 2). */
-export function initialState(seed: string, candidates: readonly Candidate[], line: string | null): PersistedState {
+export function initialState(seed: string, candidates: readonly Candidate[], line: string | null, spot: SessionSpot): PersistedState {
   return persistedStateSchema.parse({
     phase: "dealing",
     seed,
     hand_no: 0,
     candidates: [...candidates],
     line,
+    spot,
     hand: null,
     previous_board: null,
     last_attempt_id: null,

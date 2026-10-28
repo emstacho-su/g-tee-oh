@@ -28,7 +28,13 @@ export const TRAINER: TrainerSettings = {
   panels: { hero_range_matrix: true },
 };
 
-export function drillBody(trainer: Partial<TrainerSettings> = {}, villains: DrillCreateBody["spot_filter"]["villain_positions"] = ["BB"]): DrillCreateBody {
+type SpotFilterBody = DrillCreateBody["spot_filter"];
+
+export function drillBody(
+  trainer: Partial<TrainerSettings> = {},
+  villains: SpotFilterBody["villain_positions"] = ["BB"],
+  spot: Partial<SpotFilterBody> = {},
+): DrillCreateBody {
   return {
     name: "BTN versus BB",
     tags: [],
@@ -42,6 +48,7 @@ export function drillBody(trainer: Partial<TrainerSettings> = {}, villains: Dril
       preflop_action: ["rfi"],
       hands: { mode: "all" },
       alternate_seats: false,
+      ...spot,
     },
     trainer: { ...TRAINER, ...trainer },
   };

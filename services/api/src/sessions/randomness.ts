@@ -69,6 +69,44 @@ export function handDraws(seed: string, handNo: number): HandDraws {
   return { dealSeed, pick, opponentRngState, rollRngState };
 }
 
+/**
+ * The draws of deal attempt `attempt` of a hand (deal-walk.ts): attempt 0 is the hand's own draws;
+ * attempt k from 1 takes the DRAWS_PER_HAND draws starting at draw (k - 1) * DRAWS_PER_HAND of a
+ * SplitMix64 stream seeded with the hand's deal seed, in the handDraws order. A hand dealt again
+ * because the hero's spot or hand did not pass the drill's filter is still a pure function of the
+ * session seed and the hand number.
+ */
+export function attemptDraws(hand: HandDraws, attempt: number): HandDraws {
+  if (!Number.isInteger(attempt) || attempt < 0) {
+    throw new RangeError(`deal attempt ${attempt} must be a non-negative integer`);
+  }
+  if (attempt === 0) {
+    return hand;
+  }
+  let draws = hand;
+  let index = 0;
+  for (draws of dealAttempts(hand)) {
+    if (index === attempt) {
+      break;
+    }
+    index += 1;
+  }
+  return draws;
+}
+
+/** Every deal attempt's draws in order, as attemptDraws defines them, from one stream (no re-skipping). */
+export function* dealAttempts(hand: HandDraws): Generator<HandDraws, never, undefined> {
+  yield hand;
+  const generator = createSplitMix64(fromHex64(hand.dealSeed));
+  for (;;) {
+    const dealSeed = toHex64(generator.nextU64());
+    const pick = generator.nextU64();
+    const opponentRngState = toHex64(generator.nextU64());
+    const rollRngState = toHex64(generator.nextU64());
+    yield { dealSeed, pick, opponentRngState, rollRngState };
+  }
+}
+
 /** The candidate a 64-bit draw picks among `count`. */
 export function pickIndex(draw: bigint, count: number): number {
   if (!Number.isInteger(count) || count < 1) {

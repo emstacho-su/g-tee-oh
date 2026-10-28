@@ -5,10 +5,13 @@
  * - create: drill mode only in S23 (O-249). The drill must be the user's (404 otherwise). Its
  *   trainer settings are merged with the body's partial settings. Its spot filter is expanded into
  *   covered (configuration, pair) candidates (candidates.ts); the uncovered rest is recorded as
- *   coverage_request rows (05 section 1, O-240), and a drill with no covered candidate is a 422
- *   no-coverage problem, whose gap rows are still recorded. The seed is the body's or 64 random
- *   bits (O-249). The deal starts at the drill's line, or at the pair's root when it names none.
- *   The session is written in dealing phase at hand 0 through idempotentWrite.
+ *   coverage_request rows, once per user and spot (05 section 1, O-240). Each covered pair's tree
+ *   is searched for the seats where the hero acts in the drill's preflop action families with a
+ *   hand the hands filter keeps (spot-search.ts). A drill with no such seat in any covered pair is
+ *   a 422 no-coverage problem naming why, whose gap rows are still recorded in a transaction. The
+ *   seed is the body's or 64 random bits (O-249). Hands start at the drill's line, or at the pair's
+ *   root, and are walked to the hero's decision (deal-walk.ts). The session, with its copy of the
+ *   drill's spot (spot.ts), is written in dealing phase at hand 0 through idempotentWrite.
  * - next: pure (the S23 binding rule). It derives the prompt from the persisted state and writes
  *   nothing; two calls in a row answer the same prompt. An ended session is 409 session-ended.
  * - end: ended_at, phase ended, and the recap aggregated from the session's attempts. A second end
@@ -26,7 +29,10 @@ import { storedSpotFilterSchema, trainerSettingsSchema, type TrainerSettings } f
 import type { recapSchema, sessionCreateBodySchema, sessionSchema } from "../schemas/training.js";
 import { requireSolverQuery } from "../solver-query/client.js";
 import { candidatesFor, configIdsFor, pairsFor, splitByCoverage } from "./candidates.js";
-import { deriveAwaitHero, sessionEndedProblem } from "./derive.js";
+import { deriveAwaitHero } from "./derive.js";
+import { filterUnmetProblem, sessionEndedProblem } from "./problems.js";
+import { playableCandidates } from "./spot-search.js";
+import { spotOf } from "./spot.js";
 import { transition } from "./machine.js";
 import { toPrompt, type Prompt } from "./prompt.js";
 import { newSessionSeed } from "./randomness.js";
@@ -99,13 +105,15 @@ export async function createSession(call: SessionCall, body: SessionCreateBody):
   const candidates = candidatesFor(await configIdsFor(database, filter), pairsFor(filter));
   const { covered, gaps } = await splitByCoverage(candidates, port);
   const line = filter.line ?? null;
-  if (covered.length === 0) {
-    await insertCoverageRequests(database, call.userId, gaps, line);
-    throw new ProblemError(HTTP_STATUS.unprocessable, PROBLEM_SLUGS.noCoverage, {
-      detail: `The library covers none of this drill's ${candidates.length} spots; the gaps were queued for the builder.`,
-    });
+  const spot = spotOf(filter);
+  const playable = await playableCandidates(covered, { heroPositions: filter.hero_positions, spot, line }, port);
+  if (playable.length === 0) {
+    // The gap rows are recorded even though the session is refused (05 section 1, O-240).
+    await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, line));
+    const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
+    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
   }
-  const state = initialState(body.seed ?? newSessionSeed(), covered, line);
+  const state = initialState(body.seed ?? newSessionSeed(), playable, line, spot);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
     const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });

@@ -16,15 +16,21 @@ import { canonicalPair, seatedPositions } from "../catalog/seats.js";
 import type { Database } from "../db.js";
 import type { SpotFilter } from "../schemas/drills.js";
 import type { SolverPort } from "./solver-port.js";
-import type { Candidate } from "./state.js";
+import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "./concurrency.js";
 
 /** Centi-big-blinds per big blind: the catalog stores depths in cbb (A4 section 1). */
 export const CBB_PER_BB = 100;
 const NO_ANTE_CBB = 0;
 
+/** A (configuration, pair) a drill reaches, before its seats are searched (spot-search.ts). */
+export interface PairCandidate {
+  config_id: string;
+  pair: string;
+}
+
 export interface CandidateSplit {
-  covered: Candidate[];
-  gaps: Candidate[];
+  covered: PairCandidate[];
+  gaps: PairCandidate[];
 }
 
 type DrillSpotFilter = Pick<SpotFilter, "game_config" | "stake" | "hero_positions" | "villain_positions">;
@@ -55,18 +61,19 @@ export function pairsFor(filter: DrillSpotFilter): string[] {
   return [...new Set(pairs)].sort();
 }
 
-export function candidatesFor(configIds: readonly string[], pairs: readonly string[]): Candidate[] {
+export function candidatesFor(configIds: readonly string[], pairs: readonly string[]): PairCandidate[] {
   return configIds.flatMap((config_id) => pairs.map((pair) => ({ config_id, pair })));
 }
 
-/** Splits candidates by whether solver-query holds a preflop solution for them (ADR 0018). */
-export async function splitByCoverage(candidates: readonly Candidate[], port: SolverPort): Promise<CandidateSplit> {
-  const answers = await Promise.all(
-    candidates.map(async (candidate) => ({
-      candidate,
-      available: (await port.coverage(candidate.config_id, candidate.pair)).preflop.available,
-    })),
-  );
+/**
+ * Splits candidates by whether solver-query holds a preflop solution for them (ADR 0018), asking
+ * at most MAX_CONCURRENT_SOLVER_CALLS at a time (PR #25 review MEDIUM 3).
+ */
+export async function splitByCoverage(candidates: readonly PairCandidate[], port: SolverPort): Promise<CandidateSplit> {
+  const answers = await mapBounded(candidates, MAX_CONCURRENT_SOLVER_CALLS, async (candidate) => ({
+    candidate,
+    available: (await port.coverage(candidate.config_id, candidate.pair)).preflop.available,
+  }));
   return {
     covered: answers.filter((answer) => answer.available).map((answer) => answer.candidate),
     gaps: answers.filter((answer) => !answer.available).map((answer) => answer.candidate),

@@ -6,10 +6,16 @@
  * tests run against the test database without the fixture library. The replay golden
  * (sessions-replay.test.ts) runs against the real fixture solver-query instead.
  *
- * The tree (BTN is the hero at the root, BB the villain):
+ * The tree (BTN acts first at the root, BB second):
  * - root: BTN to act; fold, raise to 2.5bb, raise to 3bb (two raises, so Simple mode groups them);
  * - r250: BB to act; fold, call (closes preflop), raise to 10bb;
  * - r250.r1000: BTN to act; fold, call.
+ * The deal answers the first entry of `deals` unless the seed picks another (seed modulo the list
+ * length), so a hands-filter test can be dealt hands that fail the filter first. Hand rows come
+ * back labelled with the class solver-query writes in the preflop_169 space; every class plays
+ * the node's strategy except 72o, which folds purely (never a close decision). A 404 carries the
+ * detail solver-query writes for its cause: a hand outside the node's range, or a node the
+ * solution does not hold.
  * Numbers are test data, chosen so each grading branch is reachable; nothing here is poker math.
  */
 import type { SolverQueryComponents } from "@g-tee-oh/contracts";
@@ -26,8 +32,15 @@ export const OPEN_KEY = `${ROOT_KEY}r250`;
 export const THREE_BET_KEY = `${ROOT_KEY}r250.r1000`;
 export const HERO_HAND = "AhKd";
 export const VILLAIN_HAND = "QsQc";
+/** A hand whose row folds purely, so a close-decisions filter never keeps it. */
+export const PURE_FOLD_HAND = "7c2d";
 export const FLOP_BOARD = "3cKh4c";
 export const FAKE_DEAL_ID = "0190f000-0000-7000-8000-00000000dea1";
+
+/** The class label of each fake combo's row (preflop_169 space). */
+const DEAL_CLASSES: Readonly<Record<string, string>> = { [HERO_HAND]: "AKo", [VILLAIN_HAND]: "QQ", [PURE_FOLD_HAND]: "72o" };
+const PURE_FOLD_CLASS = "72o";
+const PURE_FOLD_LOSS = 50;
 
 interface FakeNode {
   toAct: "BTN" | "BB";
@@ -77,14 +90,27 @@ const TREE: Readonly<Record<string, FakeNode>> = {
   },
 };
 
+export interface FakeDeal {
+  /** The combo of the seat to act at the start node (BTN). */
+  hero: string;
+  /** The other seat's combo (BB). */
+  villain: string;
+}
+
 export interface FakeOptions {
   solutionId: string;
   /** "config/pair" entries the library covers; the fake pair by default. */
   covered?: readonly string[];
   /** The opponent's action index at a node; 1 (call) at r250 by default. */
   opponentChoice?: Readonly<Record<string, number>>;
-  /** Nodes where the hero's hand has no row (a 404). */
+  /** Nodes where the hero's hand (AhKd) has no row: a 404 "hand ... is not in the node's range". */
   heroOffRange?: readonly string[];
+  /** Nodes the solution no longer holds for any hand: a 404 "node ... is not in this solution". */
+  missingNodes?: readonly string[];
+  /** The deals POST /v1/deal answers, picked by the seed modulo the list length. */
+  deals?: readonly FakeDeal[];
+  /** Milliseconds every coverage answer waits, so a test can watch calls overlap. */
+  coverageDelayMs?: number;
 }
 
 export interface FakeCall {
@@ -97,15 +123,27 @@ export interface FakeSolverQuery {
   client: SolverQuery;
   calls: FakeCall[];
   count(path: string): number;
+  /** The most coverage calls that were in flight at once. */
+  maxCoverageInFlight(): number;
 }
 
-const NOT_FOUND = { type: "urn:g-tee-oh:problem:not-found", title: "Not found", status: 404, detail: "not here" };
+function notFound(detail: string): Record<string, unknown> {
+  return { type: "urn:g-tee-oh:problem:not-found", title: "Not found", status: 404, detail };
+}
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-function nodeBody(solutionId: string, key: string, node: FakeNode): Schemas["NodeResponse"] {
+function handRow(label: string, node: FakeNode): Schemas["HandRow"] {
+  const pure = label === PURE_FOLD_CLASS;
+  const strategy = pure ? node.actions.map((_, index) => (index === 0 ? 1 : 0)) : node.freq;
+  const loss = pure ? node.actions.map((_, index) => (index === 0 ? 0 : PURE_FOLD_LOSS)) : node.loss;
+  return { hand: label, strategy, loss_pct_pot: loss, ev_bb: node.ev, ev_best_bb: Math.max(...node.ev) };
+}
+
+function nodeBody(solutionId: string, key: string, node: FakeNode, hand: string | null): Schemas["NodeResponse"] {
+  const labels = hand === null ? Object.values(DEAL_CLASSES) : [DEAL_CLASSES[hand] ?? hand];
   return {
     solution_id: solutionId,
     node_key: key,
@@ -120,7 +158,7 @@ function nodeBody(solutionId: string, key: string, node: FakeNode): Schemas["Nod
     floor_pct_pot: 0.5,
     spot_class_key: node.spotClass,
     actions: node.actions,
-    hands: [],
+    hands: labels.map((label) => handRow(label, node)),
     range_summary: { oop: { combos: 1, reach_weighted_combos: 1 }, ip: { combos: 1, reach_weighted_combos: 1 }, by_action: [] },
     noise_flags: [],
     synthetic: true,
@@ -156,44 +194,74 @@ function nextState(state: string): string {
   return ((BigInt(`0x${state}`) + 1n) % (1n << 64n)).toString(16).padStart(16, "0");
 }
 
-type Route = (url: URL, body: Record<string, unknown>) => Response;
+type Route = (url: URL, body: Record<string, unknown>) => Response | Promise<Response>;
 
-function routes(options: FakeOptions): Record<string, Route> {
+interface InFlight {
+  now: number;
+  max: number;
+}
+
+function coverageRoute(options: FakeOptions, inFlight: InFlight): Route {
   const covered = new Set(options.covered ?? [`${FAKE_CONFIG}/${FAKE_PAIR}`]);
+  return async (url) => {
+    inFlight.now += 1;
+    inFlight.max = Math.max(inFlight.max, inFlight.now);
+    await new Promise((resolve) => setTimeout(resolve, options.coverageDelayMs ?? 0));
+    inFlight.now -= 1;
+    const key = `${url.searchParams.get("config_id")}/${url.searchParams.get("pair")}`;
+    const available = covered.has(key);
+    return json(200, {
+      config_id: url.searchParams.get("config_id"),
+      pair: url.searchParams.get("pair"),
+      preflop: { available, solution_ids: available ? [options.solutionId] : [], sources: available ? ["fixture"] : [], synthetic: true },
+      flops: [],
+      textures: [],
+      queue: [],
+      database: "unconfigured",
+    });
+  };
+}
+
+function dealRoute(options: FakeOptions): Route {
+  const deals = options.deals ?? [{ hero: HERO_HAND, villain: VILLAIN_HAND }];
+  return (_url, body) => {
+    const deal = deals[Number(BigInt(`0x${String(body.seed)}`) % BigInt(deals.length))] ?? deals[0];
+    return json(200, {
+      deal_id: FAKE_DEAL_ID,
+      solution_ids: [options.solutionId],
+      start_node_key: ROOT_KEY,
+      hero_position: "BTN",
+      villain_position: "BB",
+      hero_hand: deal?.hero,
+      villain_hand: deal?.villain,
+      revealed: { flop: null, turn: null, river: null },
+    });
+  };
+}
+
+function nodesRoute(options: FakeOptions): Route {
   const offRange = new Set(options.heroOffRange ?? []);
+  const missing = new Set(options.missingNodes ?? []);
+  return (url) => {
+    const key = url.searchParams.get("node_key") ?? "";
+    const node = TREE[key];
+    const hand = url.searchParams.get("hands");
+    if (node === undefined || missing.has(key)) {
+      return json(404, notFound(`node ${JSON.stringify(key)} is not in this solution`));
+    }
+    if (hand === HERO_HAND && offRange.has(key)) {
+      return json(404, notFound(`hand ${JSON.stringify(DEAL_CLASSES[hand])} is not in the node's range`));
+    }
+    return json(200, nodeBody(options.solutionId, key, node, hand));
+  };
+}
+
+function routes(options: FakeOptions, inFlight: InFlight): Record<string, Route> {
   const choice: Readonly<Record<string, number>> = { [OPEN_KEY]: 1, ...options.opponentChoice };
-  const { solutionId } = options;
   return {
-    "GET /v1/coverage": (url) => {
-      const key = `${url.searchParams.get("config_id")}/${url.searchParams.get("pair")}`;
-      const available = covered.has(key);
-      return json(200, {
-        config_id: url.searchParams.get("config_id"),
-        pair: url.searchParams.get("pair"),
-        preflop: { available, solution_ids: available ? [solutionId] : [], sources: available ? ["fixture"] : [], synthetic: true },
-        flops: [],
-        textures: [],
-        queue: [],
-        database: "unconfigured",
-      });
-    },
-    "POST /v1/deal": () =>
-      json(200, {
-        deal_id: FAKE_DEAL_ID,
-        solution_ids: [solutionId],
-        start_node_key: ROOT_KEY,
-        hero_position: "BTN",
-        villain_position: "BB",
-        hero_hand: HERO_HAND,
-        villain_hand: VILLAIN_HAND,
-        revealed: { flop: null, turn: null, river: null },
-      }),
-    "GET /v1/nodes": (url) => {
-      const key = url.searchParams.get("node_key") ?? "";
-      const node = TREE[key];
-      const heroMissing = url.searchParams.get("hands") === HERO_HAND && offRange.has(key);
-      return node === undefined || heroMissing ? json(404, NOT_FOUND) : json(200, nodeBody(solutionId, key, node));
-    },
+    "GET /v1/coverage": coverageRoute(options, inFlight),
+    "POST /v1/deal": dealRoute(options),
+    "GET /v1/nodes": nodesRoute(options),
     "POST /v1/sample-action": (_url, body) => {
       const key = String(body.node_key);
       const index = choice[key] ?? 0;
@@ -205,7 +273,7 @@ function routes(options: FakeOptions): Record<string, Route> {
     "POST /v1/grade": (_url, body) => {
       const request = body as unknown as Schemas["GradeRequest"];
       const node = TREE[request.node_key];
-      return node === undefined ? json(404, NOT_FOUND) : json(200, gradeBody(solutionId, request, node));
+      return node === undefined ? json(404, notFound("no such node")) : json(200, gradeBody(options.solutionId, request, node));
     },
   };
 }
@@ -217,7 +285,8 @@ function routeKey(method: string, path: string): string {
 /** A solver-query client over the fake tree, recording every call. */
 export function fakeSolverQuery(options: FakeOptions): FakeSolverQuery {
   const calls: FakeCall[] = [];
-  const table = routes(options);
+  const inFlight: InFlight = { now: 0, max: 0 };
+  const table = routes(options, inFlight);
   const fetchImpl: typeof fetch = async (input, init) => {
     const request = input instanceof Request ? input : new Request(String(input), init);
     const url = new URL(request.url);
@@ -225,11 +294,12 @@ export function fakeSolverQuery(options: FakeOptions): FakeSolverQuery {
     const body = text === "" ? {} : (JSON.parse(text) as Record<string, unknown>);
     calls.push({ method: request.method, path: url.pathname, body });
     const route = table[routeKey(request.method, url.pathname)];
-    return route === undefined ? json(404, NOT_FOUND) : route(url, body);
+    return route === undefined ? json(404, notFound("no such route")) : route(url, body);
   };
   return {
     client: createSolverQuery(FAKE_BASE, { fetch: fetchImpl }),
     calls,
     count: (path) => calls.filter((call) => call.path === path || (path === "reveal" && call.path.endsWith("/reveal"))).length,
+    maxCoverageInFlight: () => inFlight.max,
   };
 }

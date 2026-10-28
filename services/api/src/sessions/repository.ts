@@ -16,7 +16,8 @@ import type { DB } from "@g-tee-oh/contracts";
 
 import type { Database } from "../db.js";
 import { trainerSettingsSchema, type TrainerSettings } from "../schemas/drills.js";
-import { persistedStateSchema, type Candidate, type PersistedState } from "./state.js";
+import type { PairCandidate } from "./candidates.js";
+import { persistedStateSchema, type PersistedState } from "./state.js";
 
 type Json = Selectable<DB["practice_session"]>["state"];
 type PracticeMode = Selectable<DB["practice_session"]>["mode"];
@@ -143,11 +144,21 @@ export async function writeState(database: Database, write: StateWrite): Promise
   return row === undefined ? undefined : toSessionRow(row);
 }
 
-/** Records the spots a drill reaches that the library does not cover (05 section 1, O-240, ADR 0018). */
+/**
+ * The conflict target of the unique index coverage_request_once_key (db/migrations
+ * 20261028000100_api_trainer.sql); index expressions go in their own parentheses.
+ */
+const ONCE_KEY_TARGET = sql`user_id, game_config_id, position_pair, (coalesce(flop, '')), (coalesce(line, ''))`;
+
+/**
+ * Records the spots a drill reaches that the library does not cover (05 section 1, O-240, ADR
+ * 0018), at most once per user and spot: a spot already requested is left as it is (PR #25 review
+ * MEDIUM 4), so repeated POST /sessions over the same drill keep one row per spot.
+ */
 export async function insertCoverageRequests(
   database: Database,
   userId: string,
-  gaps: readonly Candidate[],
+  gaps: readonly PairCandidate[],
   line: string | null,
 ): Promise<void> {
   if (gaps.length === 0) {
@@ -156,6 +167,7 @@ export async function insertCoverageRequests(
   await database
     .insertInto("coverage_request")
     .values(gaps.map((gap) => ({ user_id: userId, game_config_id: gap.config_id, position_pair: gap.pair, line })))
+    .onConflict((conflict) => conflict.expression(ONCE_KEY_TARGET).doNothing())
     .execute();
 }
 

@@ -75,7 +75,7 @@ describe("R3.6 POST /sessions", () => {
     expect(session).toMatchObject({ mode: "drill", drill_id: drillId, state: "dealing", state_version: 0 });
     const stored = await pool.query<{ state: { seed: string; candidates: unknown[] } }>("select state from practice_session where id = $1", [session.session_id]);
     expect(stored.rows[0]?.state.seed).toBe("0123456789abcdef");
-    expect(stored.rows[0]?.state.candidates).toEqual([{ config_id: FAKE_CONFIG, pair: FAKE_PAIR }]);
+    expect(stored.rows[0]?.state.candidates).toEqual([{ config_id: FAKE_CONFIG, pair: FAKE_PAIR, hero_seats: ["BTN"] }]);
     await app.close();
   });
 

@@ -12,8 +12,12 @@
  *    grade a group at another member (O-211); its loss in big blinds then comes from a second grade
  *    call for that member, so the stored EV loss is always Rust's (ADR 0004).
  * 3. In idempotentWrite's transaction (O-232): lock the session row, re-check its version, count
- *    ratedTodayInTrack (O-214, O-247), grade with learning's grade(), insert the attempt row, move
- *    the state to feedback with state_version + 1 (an optimistic write), and render the feedback
+ *    ratedTodayInTrack (O-214, O-247), grade with learning's grade(); when that grades another
+ *    member than step 2's preview (which passed ratedTodayInTrack 0), grade that member with
+ *    solver-query too, so the stored member and its loss always belong together (PR #25 review
+ *    MEDIUM 7; the call runs inside the transaction, bounded by the client timeout), insert the
+ *    attempt row, move the state to feedback with state_version + 1 (an optimistic write), and
+ *    render the feedback
  *    from the inserted row (O-92). Any failure rolls back the attempt with the state, and under an
  *    Idempotency-Key the stored response commits with them, so a retry replays it, graded once.
  */
@@ -29,12 +33,12 @@ import { SQ_GRADE_METRIC, timed } from "../http/server-timing.js";
 import type { decisionBodySchema } from "../schemas/training.js";
 import { actionAt, afterHeroDecision, deriveAwaitHero, type DerivedPrompt } from "../sessions/derive.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
-import { solverPort, type SolverPort } from "../sessions/solver-port.js";
+import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-port.js";
 import { requireSolverQuery, type SqAction, type SqGrade } from "../solver-query/client.js";
 import { countRatedToday, insertAttempt, staleStateProblem, type AttemptValues } from "./attempts.js";
 import { renderFeedback, toContractLabel, type Feedback } from "./feedback.js";
 import { bestActionIndexes, buildGradeInput, gradeActions } from "./policy.js";
-import { sessionEndedProblem } from "../sessions/derive.js";
+import { sessionEndedProblem } from "../sessions/problems.js";
 
 export type DecisionBody = z.infer<typeof decisionBodySchema>;
 
@@ -56,12 +60,20 @@ export interface DecisionRequest {
   now: Date;
 }
 
+/** The group member the policy grades at and solver-query's loss for it, always fetched together. */
+interface GradedMember {
+  index: number;
+  lossBb: number;
+}
+
 interface Graded {
   derived: DerivedPrompt;
   action: SqAction;
   chosen: SqGrade;
-  gradedLossBb: number;
+  member: GradedMember;
 }
+
+type GradeAt = (actionIndex: number) => Promise<SqGrade>;
 
 export function sessionNotFound(): ProblemError {
   return new ProblemError(HTTP_STATUS.notFound, PROBLEM_SLUGS.notFound, { detail: "No session of yours has this id." });
@@ -71,12 +83,12 @@ function referenceOf(sessionId: string, stateVersion: number): string {
   return `${sessionId}:${stateVersion}`.slice(0, MAX_REFERENCE_LENGTH);
 }
 
-function policyOutput(session: SessionRow, graded: Graded, actionIndex: number, ratedToday: number): GradeOutput {
+function policyOutput(session: SessionRow, graded: Pick<Graded, "derived" | "chosen" | "action">, ratedToday: number): GradeOutput {
   return gradeDecision(
     buildGradeInput({
       node: graded.derived.node,
       grade: graded.chosen,
-      actionIndex,
+      actionIndex: graded.action.index,
       rngRoll: graded.derived.roll?.roll ?? null,
       settings: session.settings,
       ratedTodayInTrack: ratedToday,
@@ -84,7 +96,27 @@ function policyOutput(session: SessionRow, graded: Graded, actionIndex: number, 
   );
 }
 
-async function gradeWithSolverQuery(session: SessionRow, decision: DecisionRequest, port: SolverPort): Promise<Graded> {
+/**
+ * The graded pair for member `index`: the one in hand, the chosen action's own loss, or a fresh
+ * grade call for that member, so a stored loss always belongs to the stored member (PR #25 review
+ * MEDIUM 7).
+ */
+export async function settleMember(graded: Graded, index: number, gradeAt: GradeAt): Promise<Graded> {
+  if (index === graded.member.index) {
+    return graded;
+  }
+  if (index === graded.action.index) {
+    return { ...graded, member: { index, lossBb: graded.chosen.loss_bb } };
+  }
+  const member = await gradeAt(index);
+  return { ...graded, member: { index, lossBb: member.loss_bb } };
+}
+
+function gradeAtFor(decision: DecisionRequest, port: SolverPort, call: Omit<GradeCall, "action_index">): GradeAt {
+  return (actionIndex) => timed(decision.reply, SQ_GRADE_METRIC, () => port.grade({ ...call, action_index: actionIndex }));
+}
+
+async function gradeWithSolverQuery(session: SessionRow, decision: DecisionRequest, port: SolverPort): Promise<{ graded: Graded; gradeAt: GradeAt }> {
   const { settings } = session;
   const derived = await deriveAwaitHero(session.state, { stopRule: settings.stop_rule, rng: settings.rng }, port);
   const action = actionAt(derived.node, decision.body.action_index);
@@ -99,18 +131,18 @@ async function gradeWithSolverQuery(session: SessionRow, decision: DecisionReque
     hand: derived.hand.hero_hand,
     reference: referenceOf(session.id, session.stateVersion),
   };
-  const chosen = await timed(decision.reply, SQ_GRADE_METRIC, () => port.grade({ ...call, action_index: action.index }));
-  const partial: Graded = { derived, action, chosen, gradedLossBb: chosen.loss_bb };
-  const gradedIndex = policyOutput(session, partial, action.index, PREVIEW_RATED_TODAY).gradedActionIndex;
-  if (gradedIndex === action.index) {
-    return partial;
-  }
-  const member = await timed(decision.reply, SQ_GRADE_METRIC, () => port.grade({ ...call, action_index: gradedIndex }));
-  return { ...partial, gradedLossBb: member.loss_bb };
+  const gradeAt = gradeAtFor(decision, port, call);
+  const chosen = await gradeAt(action.index);
+  const partial: Graded = { derived, action, chosen, member: { index: action.index, lossBb: chosen.loss_bb } };
+  const previewIndex = policyOutput(session, partial, PREVIEW_RATED_TODAY).gradedActionIndex;
+  return { graded: await settleMember(partial, previewIndex, gradeAt), gradeAt };
 }
 
 function attemptValues(session: SessionRow, decision: DecisionRequest, graded: Graded, outcome: GradeOutput): AttemptValues {
-  const { chosen, derived, action } = graded;
+  const { chosen, derived, action, member } = graded;
+  if (member.index !== outcome.gradedActionIndex) {
+    throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, { detail: "The graded member and its loss disagree." });
+  }
   const actions = gradeActions(derived.node, chosen);
   const roll = derived.roll?.roll ?? null;
   return {
@@ -125,7 +157,7 @@ function attemptValues(session: SessionRow, decision: DecisionRequest, graded: G
     bucket: action.bucket ?? null,
     evChosenBb: chosen.ev_chosen_bb,
     evBestBb: chosen.ev_best_bb,
-    evLossBb: graded.gradedLossBb,
+    evLossBb: graded.member.lossBb,
     evLossPctPot: chosen.loss_pct_pot_by_action[outcome.gradedActionIndex] ?? chosen.loss_pct_pot,
     floorPctPot: chosen.floor_pct_pot,
     score: outcome.score,
@@ -163,7 +195,7 @@ async function readForDecision(decision: DecisionRequest): Promise<SessionRow> {
 export async function submitDecision(decision: DecisionRequest): Promise<Feedback> {
   const session = await readForDecision(decision);
   const port = solverPort(requireSolverQuery(decision.app), decision.request);
-  const graded = await gradeWithSolverQuery(session, decision, port);
+  const preview = await gradeWithSolverQuery(session, decision, port);
   return idempotentWrite(decision.app, decision.request, HTTP_STATUS.ok, async (transaction) => {
     const locked = await lockSession(transaction, decision.userId, session.id);
     if (locked === undefined) {
@@ -173,7 +205,9 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
       throw staleStateProblem();
     }
     const ratedToday = await countRatedToday(transaction, decision.userId, decision.now, decision.config.timeZone);
-    const outcome = policyOutput(session, graded, graded.action.index, ratedToday);
+    const outcome = policyOutput(session, preview.graded, ratedToday);
+    // The real ratedTodayInTrack may grade another member than the preview did: grade that one (MEDIUM 7).
+    const graded = await settleMember(preview.graded, outcome.gradedActionIndex, preview.gradeAt);
     const row = await insertAttempt(transaction, attemptValues(session, decision, graded, outcome));
     const next = afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
     const written = await writeState(transaction, {

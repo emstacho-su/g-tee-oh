@@ -9,7 +9,6 @@
  * (route-config.ts defaults) and write through idempotentWrite (O-232).
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
-import { z } from "zod";
 
 import { submitDecision } from "../grading/decide.js";
 import { mutatingHeadersSchema } from "../http/headers.js";
@@ -21,7 +20,7 @@ import {
 } from "../http/openapi.js";
 import { HTTP_STATUS, problemResponses } from "../http/problem.js";
 import { requireSession } from "../plugins/authenticate.js";
-import { sessionParamsSchema } from "../schemas/common.js";
+import { emptyBodySchema, sessionParamsSchema } from "../schemas/common.js";
 import {
   decisionBodySchema,
   feedbackSchema,
@@ -35,16 +34,13 @@ import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "sessions";
 
-/**
- * POST end takes no body. Fastify validates a bodiless request as null, which the shared
- * emptyBodySchema (optional, not nullable) refuses, so this route accepts null as well.
- */
-const noBodySchema = z.strictObject({}).nullable().optional();
-
 /** POST /sessions also answers 501 for the modes later sessions build (O-249). */
 const CREATE_PROBLEMS = [...UPSTREAM_MUTATE_PROBLEMS, HTTP_STATUS.notImplemented] as const;
-/** GET /next answers 409 session-ended for an ended session. */
-const NEXT_PROBLEMS = [...UPSTREAM_READ_PROBLEMS, HTTP_STATUS.conflict] as const;
+/**
+ * GET /next answers 409 session-ended for an ended session, and 422 no-coverage when no dealt
+ * hand passes the drill's hands filter within the deal bound (sessions/deal-walk.ts).
+ */
+const NEXT_PROBLEMS = [...UPSTREAM_READ_PROBLEMS, HTTP_STATUS.conflict, HTTP_STATUS.unprocessable] as const;
 
 export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, options, done) => {
   app.post(
@@ -122,7 +118,7 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         security: AUTHENTICATED,
         headers: mutatingHeadersSchema,
         params: sessionParamsSchema,
-        body: noBodySchema,
+        body: emptyBodySchema,
         response: { 200: recapSchema, ...problemResponses(MUTATE_ONE_PROBLEMS) },
       },
     },
