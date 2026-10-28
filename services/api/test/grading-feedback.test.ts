@@ -96,7 +96,7 @@ describe("R3.7 grading inputs and feedback", () => {
     expect(bestActionIndexes(NODE, rareRaise, "standard"), "the rarely played raise is the highest EV").toEqual([2]);
   });
 
-  it("R3.8 best actions follow the grouping by group, the rule grade() labels by (ADR 0024 rule 4, O-375)", () => {
+  it("R3.8 best actions are the lowest-loss member of each Best group: the Simple raise type is Best but only its best size is named (ADR 0024 rule 4, O-375 amended in review round 1)", () => {
     const sized = {
       ...NODE,
       street: "flop",
@@ -107,7 +107,7 @@ describe("R3.7 grading inputs and feedback", () => {
     } as unknown as SqNode;
     const grade: SqGrade = { ...GRADE, freq_by_action: [0.1, 0.1, 0.1, 0.7], loss_pct_pot_by_action: [37.5, 0.2, 0, 0.1] };
     expect(bestActionIndexes(sized, grade, "standard")).toEqual([2]);
-    expect(bestActionIndexes(sized, grade, "simple")).toEqual([2, 3]);
+    expect(bestActionIndexes(sized, grade, "simple")).toEqual([2]);
   });
 
   it("R3.7 the grade input carries street, grouping, roll, drill mode and the revealing panels", () => {

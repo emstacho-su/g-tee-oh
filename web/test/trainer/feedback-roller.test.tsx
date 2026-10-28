@@ -25,6 +25,13 @@ const CALL_ROLL = 10;
 const RAISE_INDEX = 2;
 const CALL_INDEX = 1;
 
+/** A feedback body without the followed_roll field, as an older or replayed body arrives (finding 1). */
+function withoutMark(feedback: DecisionFeedback): DecisionFeedback {
+  const copy: Partial<DecisionFeedback> = { ...feedback };
+  delete copy.followed_roll;
+  return copy as DecisionFeedback;
+}
+
 interface RenderOptions {
   feedback?: DecisionFeedback;
   actions?: readonly NodeAction[];
@@ -109,11 +116,36 @@ describe("R3.10 FeedbackRoller", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("R3.10 leaves invalid input to the scale's own alert and adds no mark", () => {
-    renderRoller({ feedback: { ...fixtureFeedback, freq_by_action: [0.5, 0.5] } });
+  it("R3.10 leaves invalid input to the scale's own alert and still shows the grade's stored mark in words (PR #33 review round 1, finding 8)", () => {
+    renderRoller({ feedback: { ...fixtureFeedback, freq_by_action: [0.5, 0.5], followed_roll: false } });
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("alert")).toHaveTextContent("Mixed-frequency bands unavailable");
+    const mark = screen.getByTestId("rng-follow");
+    expect(mark).toHaveAttribute("data-followed", "false");
+    expect(within(mark).getByText("✗")).toHaveAttribute("aria-hidden", "true");
+    expect(mark).toHaveTextContent(`You did not follow the roll (roll ${RAISE_ROLL})`);
+  });
+
+  it("R3.10 a chosen index the scale cannot place falls back to the grade's stored mark (PR #33 review round 1, finding 8)", () => {
+    renderRoller({ feedback: { ...fixtureFeedback, followed_roll: true }, chosenIndex: 99 });
+    const mark = screen.getByTestId("rng-follow");
+    expect(mark).toHaveAttribute("data-followed", "true");
+    expect(mark).toHaveTextContent(`You followed the roll (roll ${RAISE_ROLL})`);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.10 a feedback body without the followed_roll field (an older or replayed body) is not a disagreement: the scale's own reading shows (PR #33 review round 1, finding 1)", () => {
+    renderRoller({ feedback: withoutMark(fixtureFeedback), chosenIndex: CALL_INDEX });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const mark = screen.getByTestId("rng-follow");
+    expect(mark).toHaveAttribute("data-followed", "false");
+    expect(mark).toHaveTextContent(`You did not follow the roll: roll ${RAISE_ROLL} fell on Raise to 2.5bb, you chose Call`);
+  });
+
+  it("R3.10 with neither a stored mark nor a reading of its own, no mark renders and nothing is guessed", () => {
+    renderRoller({ feedback: withoutMark(fixtureFeedback), chosenIndex: 99 });
     expect(screen.queryByTestId("rng-follow")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("R3.10 the scale's info button opens the explainer", async () => {

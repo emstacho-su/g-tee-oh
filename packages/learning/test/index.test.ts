@@ -21,6 +21,7 @@ const S22_FUNCTIONS = [
   "isCorrectLabel",
   "bestActionIndexes",
   "followsRoll",
+  "lowestLossIndexes",
 ] as const;
 
 /**

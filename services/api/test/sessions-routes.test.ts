@@ -62,6 +62,15 @@ async function decide(app: Awaited<ReturnType<typeof setUp>>["app"], player: Pla
 }
 
 describe("R3.6 POST /sessions", () => {
+  it("R3.13 the session body names the grouping its decisions are graded with, so the web never reads a changed default (PR #33 review round 1, finding 3)", async () => {
+    const { app, player, drillId } = await setUp({ grouping: "simple" });
+    const response = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode: "drill", drill_id: drillId } });
+    expect(response.statusCode, response.body).toBe(201);
+    const session = sessionSchema.parse(response.json());
+    expect(session.grouping).toBe("simple");
+    await app.close();
+  });
+
   it("R3.6 a drill session starts in dealing at version 0", async () => {
     const { app, player, drillId } = await setUp();
     const response = await app.inject({

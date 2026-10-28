@@ -31,6 +31,7 @@ import {
   groupKeys,
   isCorrectLabel,
   isRated,
+  lowestLossIndexes,
   scoreFor,
 } from "../src/index.js";
 import type { GradeAction, GradeInput, GradeLabel } from "../src/index.js";
@@ -530,7 +531,7 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009, ADR 0024)", () => {
     };
     expect(grade(input).label).toBe("Best");
     expect(grade({ ...input, actionIndex: 2, lossPctPot: 0.1 }).label, "the raise type grades at its best size").toBe("Best");
-    expect(bestActionIndexes({ actions, grouping: "simple", street: "preflop", floorPctPot: GRADING_FLOOR_PCT_POT })).toEqual([1, 2, 3]);
+    expect(bestActionIndexes({ actions, grouping: "simple", street: "preflop", floorPctPot: GRADING_FLOOR_PCT_POT })).toEqual([1, 3]);
   });
 
   it("R3.8 Simple grouping grades the action type by its best size: raise 2.5x at loss 0.6 and raise 3x at loss 0 grade a Simple raise at loss 0, Best (05 section 6.4 rule 3)", () => {
@@ -563,7 +564,7 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009, ADR 0024)", () => {
     expect(rollOnCall.followedRoll).toBe(false);
   });
 
-  it("R3.8 bestActionIndexes lists every member of every Best group, the same rule grade() labels by (ADR 0024 rule 4, O-375)", () => {
+  it("R3.8 bestActionIndexes lists only the lowest-loss member or members of each Best group, never a worse size of a Best type (ADR 0024 rule 4, O-375 amended in review round 1)", () => {
     const at = (grouping: GradeInput["grouping"], street: GradeInput["street"]): number[] =>
       bestActionIndexes({
         actions: SIZED_NODE_ACTIONS,
@@ -573,14 +574,35 @@ describe("R3.8 grading policy (S22, ADR 0008, ADR 0009, ADR 0024)", () => {
       });
     expect(at("standard", "preflop")).toEqual([SIZED_INDEX.raise300]);
     expect(at(undefined, "preflop")).toEqual([SIZED_INDEX.raise300]);
-    expect(at("simple", "preflop")).toEqual([SIZED_INDEX.raise250, SIZED_INDEX.raise300, SIZED_INDEX.allIn]);
+    // The Simple raise type is Best (its best size is at loss 0), but raise 2.5x (0.6) and all-in (1.4) are not named.
+    expect(at("simple", "preflop")).toEqual([SIZED_INDEX.raise300]);
     for (const grouping of ["standard", "grouped", "simple"] as const) {
       const best = at(grouping, "flop");
       SIZED_NODE_ACTIONS.forEach((_, index) => {
-        const label = grade(sizedInput(index, { grouping, street: "flop" })).label;
-        expect(best.includes(index), `${grouping} index ${index} labelled ${label}`).toBe(label === "Best");
+        const graded = grade(sizedInput(index, { grouping, street: "flop" }));
+        if (best.includes(index)) expect(graded.label, `${grouping} listed index ${index} grades Best`).toBe("Best");
+        if (graded.label === "Best") {
+          expect(best, `${grouping}: the Best group of index ${index} names its graded member`).toContain(graded.gradedActionIndex);
+        }
       });
     }
+  });
+
+  it("R3.8 the label of a chosen worse size still follows its Best group, while bestActionIndexes names only the best size (O-375 amended)", () => {
+    const allIn = grade(sizedInput(SIZED_INDEX.allIn, { grouping: "simple" }));
+    expect(allIn.label).toBe("Best");
+    const best = bestActionIndexes({ actions: SIZED_NODE_ACTIONS, grouping: "simple", street: "preflop", floorPctPot: GRADING_FLOOR_PCT_POT });
+    expect(best).not.toContain(SIZED_INDEX.allIn);
+    expect(best).not.toContain(SIZED_INDEX.raise250);
+  });
+
+  it("R3.8 lowestLossIndexes is the one tie rule over a plain loss list: every loss within LOSS_TIE_TOLERANCE_PCT_POT of the lowest (O-370)", () => {
+    expect(lowestLossIndexes([0.3, 0, 0.0005, 2])).toEqual([1, 2]);
+    expect(lowestLossIndexes([0.3, 0, 0.01, 2])).toEqual([1]);
+    expect(lowestLossIndexes([0.5])).toEqual([0]);
+    expect(() => lowestLossIndexes([])).toThrow(RangeError);
+    expect(() => lowestLossIndexes([0, -1])).toThrow(RangeError);
+    expect(() => lowestLossIndexes([0, Number.NaN])).toThrow(RangeError);
   });
 
   it("R3.8 bestActionIndexes and followsRoll reject malformed input with a RangeError", () => {

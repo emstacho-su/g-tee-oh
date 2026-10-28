@@ -206,6 +206,8 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     expect(response.statusCode, response.body).toBe(200);
     // The raise group grades at its lowest-loss member (raise to 2.5bb, loss 0), the node's lowest loss, so it is Best (ADR 0024).
     expect(response.json()).toMatchObject({ label: "best", ev_loss_bb: 0, ev_loss_pct_pot: 0 });
+    // O-375 amended: the raise type is Best, but only its lowest-loss size (raise to 2.5bb) is named best, not raise to 3bb.
+    expect(response.json<{ best_action_indexes: number[] }>().best_action_indexes).toEqual([1]);
     const grades = sq.calls.filter((call) => call.path === "/v1/grade").map((call) => (call.body as { action_index: number }).action_index);
     expect(grades).toEqual([2, 1]);
     const row = await pool.query("select action_index, graded_action_index from attempt where session_id = $1", [sessionId]);

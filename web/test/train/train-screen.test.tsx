@@ -4,7 +4,7 @@
  * /configs, the block banner for a rated block and a worked example, the holdout banner, choosing an
  * action submits it (the confidence tap is retired), and the problems a start or a session can meet.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -21,6 +21,7 @@ import {
 import { fixtureConfigs } from "../../src/fixtures/study.js";
 import { fixturePlainFeedback } from "../../src/fixtures/trainer.js";
 import type { GameConfig } from "../../src/progress/types.js";
+import { useSessionDefaultsStore } from "../../src/store/index.js";
 import { jsonResponse, networkFailure, problemResponse } from "../api/fake-fetch.js";
 import { AUTOMATED_PATHS, CONFIGS_PATH, HOLDOUT_PATHS, START_PATH, renderTrain, resetDefaults, setDefaults } from "./render-train.js";
 
@@ -152,6 +153,27 @@ describe("R4.10 automated session", () => {
     const body = view.sentTo(AUTOMATED_PATHS.decide)[0]?.body;
     expect(body).toMatchObject({ state_version: 1 });
     expect(body).not.toHaveProperty("confidence");
+  });
+
+  it("R3.10 R4.10 the followed mark reads the grouping the session was started with, not a default changed mid-session (PR #33 review round 1, finding 3)", async () => {
+    setDefaults({ grouping: "simple", rng: true });
+    const rolled = { ...fixtureBlockPrompt(fixtureRatedBlock, 0, FIXTURE_AUTOMATED_SESSION_ID, 1), rng_roll: 37 };
+    // Roll 37 falls on raise to 2.5bb; under Simple the all-in joins the raise type, so the server says followed.
+    const feedback = { ...ratedFeedback, rng_roll: 37, followed_roll: true };
+    await renderTrain("automated", {
+      [START_PATH]: [jsonResponse(201, { ...fixtureAutomatedSession(), grouping: "simple" })],
+      [AUTOMATED_PATHS.next]: [jsonResponse(200, rolled)],
+      [AUTOMATED_PATHS.decide]: [jsonResponse(200, feedback)],
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Start training" }));
+    const actions = await screen.findByRole("group", { name: "Actions" });
+    if (screen.queryByRole("dialog") !== null) await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    act(() => useSessionDefaultsStore.getState().setGrouping("standard"));
+    await userEvent.click(within(actions).getByRole("button", { name: /All-in/ }));
+    const roller = await screen.findByTestId("feedback-roller");
+    expect(within(roller).queryByRole("alert"), "no false disagreement after a defaults change").not.toBeInTheDocument();
+    expect(within(roller).getByTestId("rng-follow")).toHaveAttribute("data-followed", "true");
   });
 
   it("R4.10 a network failure on a decision offers Try again, which resends the same key", async () => {
