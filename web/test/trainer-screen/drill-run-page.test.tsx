@@ -312,12 +312,12 @@ describe("R3.13 feedback, next and prefetch", () => {
     expect(screen.getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise 2.5bb");
   });
 
-  it("R3.13 the table shows the hero's cards, the action so far and the synthetic banner (O-57, O-281)", async () => {
+  it("R3.13 the table shows the hero's cards, the action log and the synthetic banner (O-57, O-281, O-383)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await startSession(view);
     expect(screen.getByRole("img", { name: "Ace of hearts" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /Table, 6 seats/ })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Action so far" })).toHaveTextContent("UTG Fold");
+    expect(screen.getByRole("log", { name: "Action this hand" })).toHaveTextContent("UTG: Fold");
     expect(screen.getByTestId("synthetic-banner")).toHaveTextContent(SYNTHETIC_TEXT);
   });
 
