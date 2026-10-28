@@ -40,17 +40,38 @@ import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDeci
 import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
 import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
+import type { ReplaySpeed } from "./action-replay.js";
 import { useTrainerDeps, type Scheduler } from "./trainer-deps.js";
+import { useActionReplay, type ActionReplay } from "./use-action-replay.js";
 
 export interface SpotSessionOptions {
   /** What POST /sessions starts: a drill (with its O-288 replay seed), an automated session or a holdout retest. */
   spec: SessionStartSpec;
-  /** True while a dialog covers the screen: the response timer stops (O-284), and so does the automatic continue. */
+  /**
+   * True while a dialog covers the screen: the response timer stops (O-284), and so does the
+   * automatic continue. The table's replay pauses both too, inside this hook (O-381).
+   */
   paused: boolean;
   /** The drill's run settings (S26, O-314); absent means spot mode. */
   trainer?: RunSettings;
   /** Sees each prompt as it is shown, after the trainer-table store (S32). */
   onPrompt?: (prompt: TrainerPrompt) => void;
+}
+
+/** Spot mode and automated sessions have no run settings; their replay plays at the normal speed. */
+const DEFAULT_SPEED: ReplaySpeed = "normal";
+
+/** The prompt on screen in a state, if any: the one the table and its replay draw. */
+function promptOnScreen(state: SpotState): TrainerPrompt | null {
+  switch (state.kind) {
+    case "await_action":
+    case "submitting":
+    case "feedback":
+    case "error":
+      return state.prompt;
+    default:
+      return null;
+  }
 }
 
 /** Schedules auto_continue for a reveal that does not pause, and cancels it as the screen moves on. */
@@ -66,6 +87,8 @@ function useAutoContinue(state: SpotState, paused: boolean, schedule: Scheduler,
 
 export interface SpotSession {
   state: SpotState;
+  /** The table's replay of the line before the decision; the timer is paused while it plays (O-381). */
+  replay: ActionReplay;
   start: (rng: boolean) => void;
   /** Takes NodeAction.index (O-198); choosing submits the decision (O-345). */
   chooseAction: (actionIndex: number) => void;
@@ -125,15 +148,21 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
     };
   }, [driver, clearTable]);
   const { send } = driver;
+  const { paused: dialogOpen, trainer } = options;
+  // The table's replay of the line before the decision (S38, O-381) lives here, beside the timer,
+  // so the render that shows a prompt with a line to replay already counts as paused: the timer
+  // gets a pause, never a resume first (review round 1, finding 10).
+  const replay = useActionReplay(promptOnScreen(state), { speed: trainer?.speed ?? DEFAULT_SPEED });
+  const paused = dialogOpen || replay.replaying;
   // A newly shown prompt starts its timer running, so it is paused again when a dialog is open.
   const shownPrompt = state.kind === "await_action" ? state.prompt : null;
-  const { paused, trainer } = options;
   useEffect(() => {
     send(paused ? { type: "pause", at: now() } : { type: "resume", at: now() });
   }, [paused, shownPrompt, send, now]);
   useAutoContinue(state, paused, schedule, send);
   return {
     state,
+    replay,
     start: (rng) => send(trainer === undefined ? { type: "start", key: newKey(), rng } : { type: "start", key: newKey(), rng, trainer }),
     chooseAction: (actionIndex) => send({ type: "choose_action", actionIndex, at: now(), key: newKey() }),
     next: () => send({ type: "next" }),

@@ -32,7 +32,6 @@ import type { TrackKey } from "../../progress/types.js";
 import { ALL_CONFIGS, useSessionDefaultsStore, type SessionDefaults } from "../../store/session-defaults.js";
 import type { SessionStartSpec } from "../../trainer/session-api.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
-import { useActionReplay } from "../../trainer/use-action-replay.js";
 import { useSpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "../drill-run/CoverageNote.js";
 import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
@@ -85,18 +84,14 @@ function TrainRun({ mode }: TrainPageProps) {
   const rng = mode === "automated" && defaults.rng;
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
-  // The replay's last known state: the session is created before the replay reads its prompt.
-  const [replaying, setReplaying] = useState(false);
-  // Time under a dialog or the opponent-action replay is not response time (O-284, O-381).
+  // Time under a dialog is not response time (O-284); the session pauses the timer for the table's
+  // replay itself (O-381), at the normal speed (automated and holdout sessions have no run settings).
   const session = useSpotSession({
     spec: startSpec(mode, defaults),
-    paused: !interactive || replaying,
+    paused: !interactive,
     onPrompt: (prompt) => setMarks((current) => withMark(current, prompt)),
   });
   const { state } = session;
-  // Automated and holdout sessions keep the normal speed (no run settings, O-325).
-  const replay = useActionReplay(promptOf(state));
-  useEffect(() => setReplaying(replay.replaying), [replay.replaying]);
   const trackNames = useTrackNames();
   const heatmap = useQuery({ ...heatmapQuery(api), enabled: mode === "automated" });
   const context = "context" in state ? state.context : null;
@@ -131,7 +126,6 @@ function TrainRun({ mode }: TrainPageProps) {
           grouping={context?.session.grouping ?? (mode === "holdout" ? HOLDOUT_GROUPING : defaults.grouping)}
           block={block}
           holdout={holdout}
-          replay={replay}
           interactive={interactive}
           onAskEnd={() => setConfirmOpen(true)}
           onExplain={() => explainer.setOpen(true)}
