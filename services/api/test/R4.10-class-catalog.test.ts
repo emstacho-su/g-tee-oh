@@ -32,6 +32,12 @@ const ONLINE_100 = "cfg_6_online_100";
 const LIVE_150 = "cfg_9_live_13_150";
 const SIX_MAX_PAIRS = 15;
 const NINE_MAX_PAIRS = 36;
+/** solver-query's problem types (urn:g-tee-oh:problem:<tag>): one solution marked unavailable, or its database down. */
+const SOLUTION_UNAVAILABLE_TYPE = "urn:g-tee-oh:problem:unavailable";
+const DATABASE_UNAVAILABLE_TYPE = "urn:g-tee-oh:problem:database-unavailable";
+const UNAVAILABLE_STATUS = 503;
+/** The pair the per-pair problem tests fault. */
+const FAULTED_PAIR = "BB-BTN";
 /** A cold all-configs load is hundreds of coverage calls, slow under a parallel suite (MEDIUM 6). */
 const COLD_CATALOG_TEST_TIMEOUT_MS = 120_000;
 
@@ -247,4 +253,49 @@ describe("R4.10 class catalog over the fixture library (O-270)", { timeout: COLD
     await app.close();
     await twin.close();
   });
+});
+
+describe("R4.10 a 503 from solver-query (PR #27 review follow-up LOW 4)", () => {
+  it("R4.10 one pair whose solution is marked unavailable is listed unavailable while the other pairs load", async () => {
+    const control = coverageControl();
+    const client = fixtureSolverQuery(control.fetch);
+    control.problemFor = (pair) => (pair === FAULTED_PAIR ? { status: UNAVAILABLE_STATUS, type: SOLUTION_UNAVAILABLE_TYPE } : undefined);
+    const catalog = await loadClassCatalog(client, database, [ONLINE_100]);
+    expect(catalog.unavailablePairs.map((pair) => pair.pair)).toEqual([FAULTED_PAIR]);
+    expect(catalog.coveredPairs).toHaveLength(SIX_MAX_PAIRS - 1);
+  });
+
+  it(
+    "R4.10 a service-wide 503 (no problem type, or solver-query's database unavailable) fails the load and is never cached",
+    async () => {
+      const control = coverageControl();
+      const client = fixtureSolverQuery(control.fetch);
+      const full = await fullCatalogPairs(database);
+      for (const problem of [{ status: UNAVAILABLE_STATUS }, { status: UNAVAILABLE_STATUS, type: DATABASE_UNAVAILABLE_TYPE }]) {
+        control.problemFor = (pair) => (pair === FAULTED_PAIR ? problem : undefined);
+        await expect(loadClassCatalog(client, database, [ONLINE_100]), JSON.stringify(problem)).rejects.toBeInstanceOf(ProblemError);
+      }
+      const afterFailures = control.calls();
+      control.problemFor = null;
+      expect((await loadClassCatalog(client, database, [ONLINE_100])).coveredPairs).toHaveLength(SIX_MAX_PAIRS);
+      expect(control.calls()).toBe(afterFailures + full);
+    },
+    COLD_CATALOG_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "R4.10 every pair answering 503 unavailable is a service-wide failure, never cached as an empty catalog",
+    async () => {
+      const control = coverageControl();
+      const client = fixtureSolverQuery(control.fetch);
+      const full = await fullCatalogPairs(database);
+      control.problemFor = () => ({ status: UNAVAILABLE_STATUS, type: SOLUTION_UNAVAILABLE_TYPE });
+      await expect(loadClassCatalog(client, database)).rejects.toBeInstanceOf(ProblemError);
+      const afterFailure = control.calls();
+      control.problemFor = null;
+      expect((await loadClassCatalog(client, database)).classes.length).toBeGreaterThan(0);
+      expect(control.calls()).toBe(afterFailure + full);
+    },
+    COLD_CATALOG_TEST_TIMEOUT_MS,
+  );
 });

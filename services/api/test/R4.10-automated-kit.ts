@@ -184,14 +184,27 @@ type CoverageBody = Record<string, unknown>;
 
 /**
  * A fetch over the fixture solver-query whose GET /v1/coverage a test controls (PR #27 review HIGH 3,
- * MEDIUM 6, MEDIUM 7): `failing` answers every coverage call with a 500, `rewrite` edits each
- * coverage body before the client reads it; `calls()` counts the coverage calls so far.
+ * MEDIUM 6, MEDIUM 7): `failing` answers every coverage call with a 500, `problemFor` answers a
+ * pair's call with the problem it returns (follow-up LOW 4), `rewrite` edits each coverage body
+ * before the client reads it; `calls()` counts the coverage calls so far.
  */
 export interface CoverageControl {
   fetch: typeof fetch;
   calls: () => number;
   failing: boolean;
+  problemFor: ((pair: string) => CoverageProblem | undefined) | null;
   rewrite: ((body: CoverageBody) => CoverageBody) | null;
+}
+
+/** A problem a coverage call answers with: its status and, when set, its RFC 9457 type. */
+export interface CoverageProblem {
+  status: number;
+  type?: string;
+}
+
+function problemResponse(problem: CoverageProblem): Response {
+  const body = { ...(problem.type === undefined ? {} : { type: problem.type }), status: problem.status, title: "test problem" };
+  return new Response(JSON.stringify(body), { status: problem.status, headers: { "content-type": "application/problem+json" } });
 }
 
 export function coverageControl(): CoverageControl {
@@ -199,6 +212,7 @@ export function coverageControl(): CoverageControl {
   const control: CoverageControl = {
     calls: () => count,
     failing: false,
+    problemFor: null,
     rewrite: null,
     fetch: async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
@@ -211,6 +225,10 @@ export function coverageControl(): CoverageControl {
           status: FAILED_STATUS,
           headers: { "content-type": "application/problem+json" },
         });
+      }
+      const problem = control.problemFor?.(url.searchParams.get("pair") ?? "");
+      if (problem !== undefined) {
+        return problemResponse(problem);
       }
       const response = await fetch(input, init);
       const rewrite = control.rewrite;

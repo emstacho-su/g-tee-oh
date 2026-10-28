@@ -10,8 +10,11 @@
  *   MAX_CONCURRENT_SOLVER_CALLS at a time, under CATALOG_DEADLINE_MS rather than the request
  *   deadline (a cold catalog over every configuration is hundreds of calls). A pair whose preflop
  *   solution is held is covered and contributes its spot_classes; a pair with none is a gap the
- *   caller records as a coverage_request (O-240); a pair whose solution is marked unavailable (503)
- *   is neither, so it is not served and not requested.
+ *   caller records as a coverage_request (O-240); a pair whose solution is marked unavailable (a 503
+ *   with solver-query's solution-unavailable problem type, pair-coverage.ts) is neither, so it is not served
+ *   and not requested. Any other 503 (no problem type, or solver-query's database unavailable) is
+ *   solver-query itself unavailable, and so is every pair answering unavailable: the load fails
+ *   (PR #27 review follow-up LOW 4).
  * - Entries of one spot_class_key across configurations (the same class at 1/3 and 2/5, for
  *   example) merge into one class with one option per (configuration, pair). The class's family is
  *   solver-query's; its track is trackFor(family, the hero seat of its first spot) (O-271); its
@@ -21,8 +24,9 @@
  * - Cache (PR #27 review MEDIUM 6, MEDIUM 7, HIGH 3): one all-configs catalog per solver-query
  *   client for CATALOG_TTL_MS, single flight (concurrent loads share one promise), an expired entry
  *   replaced on the next load. A scope (config_ids) is cut from it in memory (scopeCatalog), so
- *   no subset ever walks solver-query again. A load that fails (unreachable, a 5xx, or a coverage
- *   answer whose database did not answer: a partial catalog) is never cached, so the next call asks
+ *   no subset ever walks solver-query again. A load that fails (unreachable, a 5xx, a service-wide
+ *   503, or a coverage answer whose database did not answer: a partial catalog) is never cached, so
+ *   the next call asks
  *   again; a load where every answer succeeded but no class exists is cached for
  *   EMPTY_CATALOG_TTL_MS only. buildApp subscribes watchCoverageAdded once, which drops the cache on
  *   a coverage_added notification, since new coverage changes classes.
@@ -39,7 +43,10 @@ import { trackFor, type TrackKey } from "../learning/tracks.js";
 import { CBB_PER_BB } from "../sessions/candidates.js";
 import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "../sessions/concurrency.js";
 import { heroSpotSchema, MAX_HERO_SPOTS, type HeroSpot } from "../sessions/state.js";
-import { expectData, type SolverQuery, type SqClassSpot, type SqSpotClassEntry } from "../solver-query/client.js";
+import type { SolverQuery, SqClassSpot } from "../solver-query/client.js";
+import { askPair, failWhenServiceUnavailable, type PairAnswer, type ScopedConfig } from "./pair-coverage.js";
+
+export type { PairAnswer } from "./pair-coverage.js";
 
 /** How long the whole catalog read may take; a cold read over every configuration is many calls (O-270). */
 export const CATALOG_DEADLINE_MS = 30_000;
@@ -57,8 +64,6 @@ const MAX_LINE_REACH = 1;
 const NO_ANTE_CBB = 0;
 const COVERAGE_ADDED_CHANNEL = "coverage_added";
 const SCOPE_KEY_SEPARATOR = ",";
-/** SqCoverage.database when solver-query could not reach its database (O-172). */
-const DATABASE_UNAVAILABLE = "unavailable";
 
 export type CatalogOption = Readonly<{
   configId: string;
@@ -94,23 +99,9 @@ export type ClassCatalog = Readonly<{
   unavailablePairs: readonly CatalogPair[];
 }>;
 
-/** What solver-query answered for one (configuration, pair). */
-export type PairAnswer = Readonly<{
-  configId: string;
-  pair: string;
-  tableSize: number;
-  status: "covered" | "uncovered" | "unavailable";
-  spotClasses: readonly SqSpotClassEntry[];
-}>;
-
 export interface CatalogLoadOptions {
   /** The clock the cache expiry reads; Date.now unless a test fixes it. */
   nowMs?: () => number;
-}
-
-interface ScopedConfig {
-  id: string;
-  tableSize: number;
 }
 
 interface CacheEntry {
@@ -245,37 +236,11 @@ export async function scopedConfigs(database: Database, configIds?: readonly str
   return rows.map((row) => ({ id: row.id, tableSize: row.table_size }));
 }
 
-/** solver-query's database did not answer: its classes may be missing, so the answer is a failure (MEDIUM 7). */
-function databaseUnavailableProblem(): ProblemError {
-  return new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, {
-    detail: "solver-query could not reach its database for the spot classes of this spot.",
-  });
-}
-
-async function askPair(solverQuery: SolverQuery, config: ScopedConfig, pair: string, signal: AbortSignal): Promise<PairAnswer> {
-  const base = { configId: config.id, pair, tableSize: config.tableSize };
-  try {
-    const coverage = await expectData(
-      solverQuery.GET("/v1/coverage", { params: { query: { config_id: config.id, pair, classes: true } }, signal }),
-      "the spot classes of this spot",
-    );
-    if (coverage.database === DATABASE_UNAVAILABLE) {
-      throw databaseUnavailableProblem();
-    }
-    const status = coverage.preflop.available ? "covered" : "uncovered";
-    return { ...base, status, spotClasses: coverage.spot_classes };
-  } catch (error: unknown) {
-    if (error instanceof ProblemError && error.status === HTTP_STATUS.unavailable) {
-      return { ...base, status: "unavailable", spotClasses: [] };
-    }
-    throw error;
-  }
-}
-
 async function readCatalog(solverQuery: SolverQuery, configs: readonly ScopedConfig[]): Promise<ClassCatalog> {
   const signal = AbortSignal.timeout(CATALOG_DEADLINE_MS);
   const questions = configs.flatMap((config) => canonicalPairs(config.tableSize).map(({ pair }) => ({ config, pair })));
   const answers = await mapBounded(questions, MAX_CONCURRENT_SOLVER_CALLS, ({ config, pair }) => askPair(solverQuery, config, pair, signal));
+  failWhenServiceUnavailable(answers);
   return buildClassCatalog(answers);
 }
 
