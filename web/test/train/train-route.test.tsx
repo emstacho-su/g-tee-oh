@@ -63,7 +63,13 @@ describe("R4.12 holdout retest button (O-328)", () => {
     const { rerender } = await renderInRouter(<HoldoutRetestButton />);
     const start = screen.getByRole("link", { name: "Start this month's retest" });
     expect(start).toHaveAttribute("href", "/train?mode=holdout");
-    rerender(<HoldoutRetestButton resume />);
+    rerender(<HoldoutRetestButton open={{ answered: 12, total: 30 }} />);
     expect(within(document.body).getByRole("link", { name: "Resume this month's retest" })).toBeInTheDocument();
+  });
+
+  it("R4.12 a round with every item answered offers no retest and says it is complete", async () => {
+    await renderInRouter(<HoldoutRetestButton open={{ answered: 30, total: 30 }} />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("holdout-retest-complete")).toHaveTextContent("Retest complete for this month");
   });
 });

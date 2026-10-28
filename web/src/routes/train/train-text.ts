@@ -58,6 +58,7 @@ export const TRAIN_TEXT = {
   seeProgress: "See progress",
   retestStart: "Start this month's retest",
   retestResume: "Resume this month's retest",
+  retestComplete: "Retest complete for this month",
 } as const;
 
 const NO_CLASS_IN_SCOPE =

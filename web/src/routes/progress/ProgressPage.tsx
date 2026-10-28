@@ -108,7 +108,7 @@ export function ProgressPage() {
         {(data) => (
           <HoldoutCard
             holdout={data}
-            action={<HoldoutRetestButton resume={data.open !== null} />}
+            action={<HoldoutRetestButton open={data.open} />}
             {...(trackNames === undefined ? {} : { trackNames })}
           />
         )}

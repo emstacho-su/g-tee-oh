@@ -93,6 +93,12 @@ describe("R4.12 /progress", () => {
     expect(await screen.findByTestId("holdout-retest")).toHaveTextContent("Resume");
   });
 
+  it("R4.12 a round with every item answered hides the resume link and says the retest is complete (O-328)", async () => {
+    renderApp("/progress", { ...PROGRESS, "GET /api/v1/progress/holdout": [jsonResponse(200, { ...fixtureHoldout, open: { round_month: "2026-10-01", answered: 30, total: 30 } })] });
+    expect(await screen.findByTestId("holdout-retest-complete")).toBeInTheDocument();
+    expect(screen.queryByTestId("holdout-retest")).not.toBeInTheDocument();
+  });
+
   it("R4.12 a failed card shows its own error and Try again reloads only that read", async () => {
     const { fake } = renderApp("/progress", {
       ...PROGRESS,
