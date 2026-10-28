@@ -338,6 +338,14 @@ export interface PracticeSession {
   drill_id: string | null;
   ended_at: Timestamp | null;
   id: Generated<string>;
+  /**
+   * the last such failure; the closer queues sessions with one after every other idle session
+   */
+  idle_close_failed_at: Timestamp | null;
+  /**
+   * ends the idle closer tried that failed for the session's own reasons (PR #27 review follow-up LOW 3)
+   */
+  idle_close_failures: Generated<number>;
   mode: PracticeMode;
   settings: Json;
   started_at: Generated<Timestamp>;

@@ -7,22 +7,29 @@
  *
  * Mechanism: the period key is the quarter-hour's start (an RFC 3339 instant), due at that instant.
  * A session is idle when it started before the cutoff (now minus IDLE_SESSION_CLOSE_MS) and has no
- * attempt since; at most IDLE_CLOSE_BATCH candidates, oldest first, are locked with FOR UPDATE SKIP
- * LOCKED, so a session a decision holds right now is left for the next run (PR #27 review MEDIUM
- * 11). The end hooks need solver-query for the tier (O-271): without a client the job throws when
+ * attempt since; at most IDLE_CLOSE_BATCH candidates are locked with FOR UPDATE SKIP LOCKED, so a
+ * session a decision holds right now is left for the next run (PR #27 review MEDIUM 11). They are
+ * taken oldest first, except that sessions whose end has failed before come after every other one,
+ * least recently failed first (follow-up LOW 3). The end hooks need solver-query for the tier (O-271): without a client the job throws when
  * it has sessions to end, so nothing is ended without its tier and the run is retried. Each end
  * runs in its own savepoint inside the job's transaction: a session whose end fails for its own
- * reasons is rolled back to its savepoint, logged with its id and skipped (still idle, so the next
- * run tries it again), and never blocks the others; a solver-query failure (unavailable or
+ * reasons is rolled back to its savepoint, logged with its id, recorded on the session
+ * (idle_close_failures, idle_close_failed_at: PR #27 review follow-up LOW 3) and skipped. It stays
+ * idle, so a later run tries it again, but behind every session that has not failed, so a full batch
+ * of failing sessions never keeps the others open. A solver-query failure (unavailable or
  * upstream) is rethrown, so the whole run rolls back and retries with its backoff. An ended session
  * is never a candidate again, so a second run ends nothing.
  *
  * - Prepare (PR #27 review HIGH 3): before each end, learning/prepare.ts prepareLearning runs on the
  *   handle outside the job's transaction (a catalog failure there is null, and cannot abort the
  *   job's transaction), and its result is the end's prepared context, as POST end passes it.
- * - Order (PR #27 review HIGH 5): a user's sessions end in start order, each at an instant
- *   IDLE_END_STEP_MS after the user's previous one in the run, so their rating_history rows never
- *   tie on recorded_at and each end's before-values and tier read the right rows.
+ * - Order (PR #27 review HIGH 5 and follow-up MEDIUM 1): a user's sessions end in the batch's order,
+ *   each IDLE_END_STEP_MS after the user's previous end. The first starts at `now` or, when later,
+ *   IDLE_END_STEP_MS after the user's latest recorded instant (rating_history.recorded_at,
+ *   rating.updated_at, practice_session.ended_at). A follow-up run claimed in the same worker tick
+ *   shares that tick's `now`, so without the floor it would restart at `now`. With it, a user's
+ *   rating_history rows strictly increase on recorded_at across batches and runs, and each end's
+ *   before-values and tier read the right rows.
  * - Batch (PR #27 review MEDIUM 11): a run that filled its batch and ended at least one session
  *   schedules a follow-up job of its own kind due now (period key: this period, then the parent
  *   job's id, so a retried run schedules the same row once), which the worker claims in the same
@@ -97,6 +104,8 @@ export async function lockIdleSessions(transaction: Database, now: Date, limit: 
         ),
       ),
     )
+    // Follow-up LOW 3: sessions whose end failed before go last, least recently failed first.
+    .orderBy(sql`idle_close_failed_at asc nulls first`)
     .orderBy("started_at")
     .orderBy("id")
     .limit(limit)
@@ -106,13 +115,36 @@ export async function lockIdleSessions(transaction: Database, now: Date, limit: 
   return rows.map((row) => ({ id: row.id, userId: row.user_id }));
 }
 
-/** Each session's end instant: a user's sessions, in the given (start) order, IDLE_END_STEP_MS apart. */
-export function planEnds(idle: readonly IdleSession[], now: Date): PlannedEnd[] {
-  const endsPerUser = new Map<string, number>();
+/**
+ * Each user's latest recorded instant: the newest of their rating_history.recorded_at,
+ * rating.updated_at and practice_session.ended_at (follow-up MEDIUM 1). A user with none is absent.
+ */
+export async function userEndFloors(transaction: Database, userIds: readonly string[]): Promise<Map<string, Date>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+  const result = await sql<{ user_id: string; floor: Date | null }>`
+    select users.user_id, greatest(
+      (select max(recorded_at) from rating_history where rating_history.user_id = users.user_id),
+      (select max(updated_at) from rating where rating.user_id = users.user_id),
+      (select max(ended_at) from practice_session where practice_session.user_id = users.user_id)
+    ) as floor
+    from unnest(${[...new Set(userIds)]}::uuid[]) as users (user_id)`.execute(transaction);
+  return new Map(result.rows.flatMap((row) => (row.floor === null ? [] : [[row.user_id, new Date(row.floor)] as const])));
+}
+
+/**
+ * Each session's end instant (see the module doc, Order): a user's sessions in the given order,
+ * IDLE_END_STEP_MS apart, the first at `now` or IDLE_END_STEP_MS after the user's floor, whichever
+ * is later. Pure.
+ */
+export function planEnds(idle: readonly IdleSession[], now: Date, floors: ReadonlyMap<string, Date> = new Map()): PlannedEnd[] {
+  const lastEnd = new Map<string, number>();
   return idle.map((session) => {
-    const index = endsPerUser.get(session.userId) ?? 0;
-    endsPerUser.set(session.userId, index + 1);
-    return { ...session, endAt: new Date(now.getTime() + index * IDLE_END_STEP_MS) };
+    const previous = lastEnd.get(session.userId) ?? floors.get(session.userId)?.getTime();
+    const endMs = previous === undefined ? now.getTime() : Math.max(now.getTime(), previous + IDLE_END_STEP_MS);
+    lastEnd.set(session.userId, endMs);
+    return { ...session, endAt: new Date(endMs) };
   });
 }
 
@@ -128,7 +160,8 @@ export async function closeIdleSessions(context: JobContext, options: IdleCloseO
     throw new Error("idle_session_close needs solver-query for the session-end tier (O-271); retried on the next run");
   }
   const ended: string[] = [];
-  for (const planned of planEnds(idle, context.now)) {
+  const floors = await userEndFloors(context.transaction, idle.map((session) => session.userId));
+  for (const planned of planEnds(idle, context.now, floors)) {
     if (await endInSavepoint(context, planned, solverQuery)) {
       ended.push(planned.id);
     }
@@ -163,10 +196,20 @@ function outsideHandle(context: JobContext): Database {
   return context.database;
 }
 
+/** Follow-up LOW 3: one more failed end on the session, so later runs queue it after the others. */
+async function recordFailedEnd(context: JobContext, sessionId: string): Promise<void> {
+  await context.transaction
+    .updateTable("practice_session")
+    .set((eb) => ({ idle_close_failures: eb("idle_close_failures", "+", 1), idle_close_failed_at: context.now }))
+    .where("id", "=", sessionId)
+    .execute();
+}
+
 /**
  * Ends one session inside its own savepoint: a session whose end fails for its own reasons (a state
- * that no longer parses, for example) is rolled back to the savepoint, logged with its id and
- * skipped, so it never blocks the others; a solver-query failure is rethrown so the run retries.
+ * that no longer parses, for example) is rolled back to the savepoint, logged with its id, recorded
+ * (recordFailedEnd) and skipped, so it never blocks the others; a solver-query failure is rethrown so
+ * the run retries.
  */
 async function endInSavepoint(context: JobContext, planned: PlannedEnd, solverQuery: SolverQuery): Promise<boolean> {
   const { transaction } = context;
@@ -204,6 +247,7 @@ async function endInSavepoint(context: JobContext, planned: PlannedEnd, solverQu
     }
     await sql`rollback to savepoint ${sql.id(IDLE_CLOSE_SAVEPOINT)}`.execute(transaction);
     context.services.log.error({ err: error, session_id: planned.id, job_id: context.job.id }, "idle session end failed; skipped");
+    await recordFailedEnd(context, planned.id);
     return false;
   }
 }

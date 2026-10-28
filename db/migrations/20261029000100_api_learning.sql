@@ -25,6 +25,9 @@
 --   a transient failure resolves nothing, O-334); holdout_item.history keeps the line's actions as
 --   solver-query labelled them at the draw, so serving an item needs no class catalog; and the partial
 --   unique index practice_session_open_holdout_key allows one open holdout session per user.
+-- - The idle closer (PR #27 review follow-up LOW 3): practice_session.idle_close_failures and
+--   idle_close_failed_at record each end that failed for the session's own reasons, so the closer queues
+--   such sessions after every other idle session and one batch of them cannot block the rest.
 -- - app_job is the api's job queue (O-275, ADR 0005): one row per kind and period, claimed with FOR UPDATE
 --   SKIP LOCKED over the queued rows that are due or the running rows whose lease ran out, so a job whose
 --   process died is claimed again. The partial index serves the due scan.
@@ -120,6 +123,15 @@ comment on column holdout_result.outcome is
 create unique index practice_session_open_holdout_key on practice_session (user_id)
   where mode = 'holdout' and ended_at is null;
 
+alter table practice_session
+  add column idle_close_failures integer not null default 0 check (idle_close_failures >= 0),
+  add column idle_close_failed_at timestamptz;
+
+comment on column practice_session.idle_close_failures is
+  'ends the idle closer tried that failed for the session''s own reasons (PR #27 review follow-up LOW 3)';
+comment on column practice_session.idle_close_failed_at is
+  'the last such failure; the closer queues sessions with one after every other idle session';
+
 create table app_job (
   id uuid primary key default uuidv7(),
   kind text not null,
@@ -151,6 +163,9 @@ grant delete on app_job to app;
 revoke all privileges on app_job, holdout_draw, holdout_round, holdout_summary from app;
 drop table if exists app_job;
 drop index if exists practice_session_open_holdout_key;
+alter table practice_session
+  drop column if exists idle_close_failed_at,
+  drop column if exists idle_close_failures;
 alter table holdout_result drop constraint if exists holdout_result_attempt_check;
 alter table holdout_result drop constraint if exists holdout_result_once_key;
 alter table holdout_result drop column if exists outcome;

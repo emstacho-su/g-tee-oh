@@ -92,6 +92,15 @@ describe('R4.11 api learning migration (S31)', () => {
     assert.match(await indexDef(pool, 'attempt_track_ids_idx'), /USING gin \(track_ids\)/);
   });
 
+  test('R4.11 practice_session records failed idle-closer ends: a count from 0 and the last failure (PR #27 review follow-up LOW 3)', async () => {
+    const session = await columns(pool, 'practice_session');
+    assert.deepEqual(
+      { nullable: session.get('idle_close_failures')?.is_nullable, default: session.get('idle_close_failures')?.column_default },
+      { nullable: 'NO', default: '0' },
+    );
+    assert.equal(session.get('idle_close_failed_at')?.is_nullable, 'YES');
+  });
+
   test('R4.11 app_job is keyed by kind and period with a partial index over queued rows (O-275)', async () => {
     const job = await columns(pool, 'app_job');
     for (const name of ['kind', 'period_key', 'run_at', 'status', 'attempts', 'locked_by', 'locked_at', 'last_error']) {
