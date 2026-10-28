@@ -3609,7 +3609,7 @@ export interface paths {
                             /** @enum {string} */
                             pause?: "after_mistake" | "every_action" | "never";
                             quick_result?: boolean;
-                            /** @description RNG mode (05 section 7); off by default */
+                            /** @description Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default */
                             rng?: boolean;
                             /** @enum {string} */
                             speed?: "slow" | "normal" | "fast";
@@ -3790,8 +3790,6 @@ export interface paths {
                 content: {
                     "application/json": {
                         action_index: number;
-                        /** @enum {string} */
-                        confidence?: "sure" | "unsure";
                         prediction_answer?: number;
                         response_ms: number;
                         size_cbb?: number;
@@ -4872,6 +4870,8 @@ export interface components {
             ev_by_action: number[];
             ev_loss_bb: number;
             ev_loss_pct_pot: number;
+            /** @description Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371) */
+            followed_roll: boolean | null;
             freq_by_action: number[];
             /** @description The hero's hand as graded */
             hand: string;
@@ -4908,6 +4908,8 @@ export interface components {
             ev_by_action: number[];
             ev_loss_bb: number;
             ev_loss_pct_pot: number;
+            /** @description Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371) */
+            followed_roll: boolean | null;
             freq_by_action: number[];
             /** @description The hero's hand as graded */
             hand: string;
@@ -6459,7 +6461,7 @@ export interface components {
             previous_board: string[] | null;
             /** @description How the last ended hand closed; null before the first hand ends (O-313) */
             previous_hand: components["schemas"]["PreviousHand"] | null;
-            /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
+            /** @description The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024) */
             rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
@@ -6504,7 +6506,7 @@ export interface components {
             previous_board: string[] | null;
             /** @description How the last ended hand closed; null before the first hand ends (O-313) */
             previous_hand: components["schemas"]["PreviousHandInput"] | null;
-            /** @description The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7) */
+            /** @description The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024) */
             rng_roll: number | null;
             /** Format: uuid */
             session_id: string;
@@ -6550,7 +6552,7 @@ export interface components {
             /** @enum {string} */
             pause: "after_mistake" | "every_action" | "never";
             quick_result: boolean;
-            /** @description RNG mode (05 section 7); off by default */
+            /** @description Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default */
             rng: boolean;
             /** @enum {string} */
             speed: "slow" | "normal" | "fast";
@@ -6583,7 +6585,7 @@ export interface components {
             /** @enum {string} */
             pause: "after_mistake" | "every_action" | "never";
             quick_result: boolean;
-            /** @description RNG mode (05 section 7); off by default */
+            /** @description Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default */
             rng: boolean;
             /** @enum {string} */
             speed: "slow" | "normal" | "fast";

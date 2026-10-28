@@ -220,7 +220,7 @@ describe("R3.16 hand ladder", () => {
     const tied = node([row("55", [0, 0.9, 0.1, 0], { loss: [1, 0, 0.0005, 2] })]);
     const tie = handQuestion({ node: tied, level: 1, draws: DRAWS });
     expect(tie?.truth.action_indexes).toEqual([1, 2]);
-    expect(tie?.truth.text).toBe("BB's highest-EV action with 55 is Call or Raise to 10bb (played 90.0 percent of the time).");
+    expect(tie?.truth.text).toBe("BB's highest-EV action with 55 is Call or Raise to 10bb (played 100.0 percent of the time).");
   });
 
   it("R3.16 level 2 asks the band of the most frequent action, lower edge inclusive", () => {

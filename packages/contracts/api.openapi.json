@@ -1339,7 +1339,7 @@
           },
           "rng": {
             "type": "boolean",
-            "description": "RNG mode (05 section 7); off by default"
+            "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
           },
           "pause": {
             "type": "string",
@@ -1958,7 +1958,7 @@
                 "type": "null"
               }
             ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+            "description": "The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024)"
           },
           "previous_board": {
             "anyOf": [
@@ -2175,6 +2175,13 @@
               }
             ]
           },
+          "followed_roll": {
+            "description": "Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371)",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "state_version": {
             "type": "integer",
             "minimum": 0,
@@ -2252,6 +2259,7 @@
           "ev_by_action",
           "rated",
           "rng_roll",
+          "followed_roll",
           "state_version",
           "solution_id",
           "node_key",
@@ -5767,7 +5775,7 @@
           },
           "rng": {
             "type": "boolean",
-            "description": "RNG mode (05 section 7); off by default"
+            "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
           },
           "pause": {
             "type": "string",
@@ -6395,7 +6403,7 @@
                 "type": "null"
               }
             ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+            "description": "The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024)"
           },
           "previous_board": {
             "anyOf": [
@@ -6614,6 +6622,13 @@
               }
             ]
           },
+          "followed_roll": {
+            "description": "Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371)",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "state_version": {
             "type": "integer",
             "minimum": 0,
@@ -6691,6 +6706,7 @@
           "ev_by_action",
           "rated",
           "rng_roll",
+          "followed_roll",
           "state_version",
           "solution_id",
           "node_key",
@@ -11248,7 +11264,7 @@
                       },
                       "rng": {
                         "type": "boolean",
-                        "description": "RNG mode (05 section 7); off by default"
+                        "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
                       },
                       "pause": {
                         "type": "string",
@@ -11715,13 +11731,6 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
-                  },
-                  "confidence": {
-                    "type": "string",
-                    "enum": [
-                      "sure",
-                      "unsure"
-                    ]
                   },
                   "response_ms": {
                     "type": "integer",

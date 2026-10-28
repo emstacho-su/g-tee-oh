@@ -145,7 +145,7 @@ describe("R4.10 misses after the confident-miss rule was retired (O-345, O-372)"
     await seedCards(database, player.userId, classKeys);
     const session = await requireAutomated(app, player);
     await pool.query(
-      "update practice_session set state = jsonb_set(state, '{learning,queue,hypercorrection}', '["gone/class"]'::jsonb) where id = $1",
+      `update practice_session set state = jsonb_set(state, '{learning,queue,hypercorrection}', '["gone/class"]'::jsonb) where id = $1`,
       [session.session_id],
     );
     const { feedback } = await decideOnce(app, player, session.session_id);

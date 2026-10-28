@@ -103,8 +103,8 @@ describe("R3.7 POST /sessions/{id}/decisions", () => {
     const { app, player, sessionId } = await setUp();
     const response = await decide(app, player, sessionId, { confidence: "sure" });
     expect(response.statusCode).toBe(400);
-    expect(response.headers["content-type"]).toMatch(/^application/problem+json/);
-    expect(response.json()).toMatchObject({ type: "urn:g-tee-oh:problem:bad-request", status: 400 });
+    expect(response.headers["content-type"]).toMatch(/^application\/problem\+json/);
+    expect(response.json()).toMatchObject({ type: "urn:g-tee-oh:problem:validation", status: 400 });
     expect(await storedFeedbackRows(sessionId)).toHaveLength(0);
     await app.close();
   });
