@@ -12,6 +12,7 @@ import { createRoot } from "react-dom/client";
 
 import { HotkeyRoot } from "../hotkeys/index.js";
 import { useThemeStore } from "../store/index.js";
+import { DesignSystemSections } from "./design-sections.js";
 import { MatrixSections } from "./matrix-sections.js";
 import { ProgressSections } from "./progress-sections.js";
 import { RngSections } from "./rng-sections.js";
@@ -39,6 +40,7 @@ createRoot(container).render(
           <h1 className="text-2xl font-bold">Component gallery</h1>
           <p className="text-sm text-muted">S24 components with synthetic data. Press ? for the shortcuts overlay.</p>
         </header>
+        <DesignSystemSections />
         <TableSections />
         <TrainerSections />
         <RngSections />

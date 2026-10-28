@@ -39,7 +39,7 @@ const CRITERIA = {
   running: "R3.5 admin builder health running: state, queue depth, flops per day, storage against budget, labeled placeholders (A9 section 4, O-299)",
   paused: "R3.5 admin builder paused after Pause; Resume offered (O-295)",
   saved: "R3.5 settings edit round trip: CPU share and budget saved, stored values shown (O-296)",
-  schedule: "R3.5 /settings builder schedule: the overnight window form (O-296)",
+  schedule: "R3.5 /settings/builder-schedule: the overnight window form on its own settings page, listed for admins only (O-296, O-360, O-361)",
   member: "O-290 a member's /library: coverage view without builder controls",
 } as const;
 
@@ -98,7 +98,10 @@ async function builderScreens(page: Page, shot: ReturnType<typeof shooter>): Pro
   await expect(page.getByText("Saved. The builder reads the new settings before its next job.")).toBeVisible();
   await shot("library-settings-saved", CRITERIA.saved);
 
+  // Since S36 the schedule is its own settings page, listed for admins only (O-360, O-361).
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Builder schedule" }).click();
+  await expect(page).toHaveURL(/\/settings\/builder-schedule$/);
   await expect(page.getByRole("form", { name: "Builder schedule" })).toBeVisible();
   await shot("settings-builder-schedule", CRITERIA.schedule);
 }

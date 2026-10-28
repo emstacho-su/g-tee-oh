@@ -37,12 +37,13 @@ function BuilderStatusCard() {
 /**
  * Layout (S36, O-346): on a wide screen today's queue takes two columns and two rows, the streak
  * and rating stack beside it, and the builder status runs underneath; one column at phone width.
+ * Cards keep their own height (items-start), so a short queue leaves no empty card body.
  */
 export function HomePage() {
   return (
     <section className="flex flex-col gap-6">
       <PageHeader title="Home" description={HOME_DESCRIPTION} />
-      <div className="grid gap-4 lg:grid-cols-3 [&>*>section]:h-full">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
         <div className="lg:col-span-2 lg:row-span-2">
           <QueueCard />
         </div>
