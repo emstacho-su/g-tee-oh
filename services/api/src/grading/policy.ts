@@ -12,10 +12,13 @@
  * threshold card each show which action the hand takes before the hero acts; the range matrices,
  * charts, hand class, breakdowns, roller and streak counter do not.
  *
- * best_action_indexes is learning's bestActionIndexes: every member of every lowest-loss (highest
- * EV) group under the session's grouping, within LOSS_TIE_TOLERANCE_PCT_POT and at or below the
- * floor, the same rule grade() labels Best by (ADR 0024 rules 1 and 4, O-343, O-375). The roll and
- * the frequencies never enter it; the roll only sets grade()'s followedRoll mark (rule 2, O-344).
+ * best_action_indexes is learning's bestActionIndexes: the Best groups are the lowest-loss (highest
+ * EV) groups under the session's grouping, within LOSS_TIE_TOLERANCE_PCT_POT and at or below the
+ * floor, the same rule grade() labels Best by (ADR 0024 rules 1 and 4, O-343); from each Best group
+ * only its lowest-loss member or members are listed, not every member (O-375 as amended in S37
+ * review). A worse size of a Best type is still labelled Best by its group, but is not listed here.
+ * The roll and the frequencies never enter it; the roll only sets grade()'s followedRoll mark
+ * (rule 2, O-344).
  */
 import {
   ACTION_KINDS,
