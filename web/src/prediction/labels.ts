@@ -38,6 +38,7 @@ export const PREDICTION_TEXT = {
   reasonLabel: "Your reason (required)",
   reasonHint: "Say why, in at least 3 letters, numbers or punctuation marks. It is kept with your answer.",
   reasonRefused: "Your reason was not accepted: type at least 3 letters, numbers or punctuation marks.",
+  reasonTooLong: "Your reason is over 1,000 characters once some letters are counted in full. Shorten it to send it.",
   backToStart: "Back to the start screen",
   correct: "Correct",
   incorrect: "Not this time",

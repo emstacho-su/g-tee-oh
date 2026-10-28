@@ -35,4 +35,5 @@ export type {
   Street,
   TableFormat,
 } from "./node-dump.js";
-export { RATIONALE_MAX_CHARS, RATIONALE_MIN_CHARS, cleanRationale, rationaleReady, visibleRationaleChars } from "./rationale.js";
+export { RATIONALE_MAX_CHARS, RATIONALE_MIN_CHARS, checkRationale, cleanRationale, rationaleReady, visibleRationaleChars } from "./rationale.js";
+export type { RationaleCheck } from "./rationale.js";

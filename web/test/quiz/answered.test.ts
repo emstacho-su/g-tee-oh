@@ -50,14 +50,16 @@ describe("R3.16 the answered list behind Previous (O-414)", () => {
 });
 
 describe("R3.16 the reason rule (O-412, PR #39 review finding 3)", () => {
-  it("R3.16 the web reads the shared rule: 3 visible characters, up to 1,000; the count is the raw length", () => {
+  it("R3.16 the web reads the shared rule: 3 visible characters, up to 1,000; the count is the cleaned length in code points (PR #41 review round 1, finding 8)", () => {
     expect(RATIONALE_MIN_CHARS).toBe(3);
     expect(RATIONALE_MAX_CHARS).toBe(1000);
     expect(rationaleReady("  ab  ")).toBe(false);
     expect(rationaleReady(" abc ")).toBe(true);
     expect(rationaleReady("x".repeat(1001))).toBe(false);
     expect(reasonCount("abc")).toBe("3 / 1000");
-    expect(reasonCount("ㅤㅤㅤ")).toBe("3 / 1000");
+    expect(reasonCount("ㅤㅤㅤ")).toBe("0 / 1000");
+    expect(reasonCount("  a  b  ")).toBe("3 / 1000");
+    expect(reasonCount("\uFB2C".repeat(400))).toBe("1200 / 1000");
   });
 });
 

@@ -294,6 +294,8 @@ describe("R3.16 the typed reason (O-350, O-412, O-413)", () => {
       ["two characters", { rationale: "ok" }],
       ["one character once cleaned", { rationale: "\u0007x​‍" }],
       ["over 1,000 characters", { rationale: "x".repeat(MAX_REASON + 1) }],
+      // PR #39 re-review MEDIUM: 1,000 UTF-16 units that NFC turns into 3,000 code points.
+      ["over 1,000 code points once normalised", { rationale: "\uFB2C".repeat(MAX_REASON) }],
       ["not a string", { rationale: 42 }],
       // Security LOW 1: reasons that only look typed.
       ["Hangul fillers", { rationale: "ㅤㅤㅤ" }],
