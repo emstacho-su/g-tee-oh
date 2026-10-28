@@ -19,6 +19,7 @@ import {
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonResponse, problemResponse, type FetchScript, type ResponseFactory } from "../api/fake-fetch.js";
 import { SIGNED_IN, renderApp } from "../app/render-app.js";
+import { PAINTER_SUITE } from "./painter-timeout.js";
 
 const DRILLS = "GET /api/v1/drills";
 const SESSIONS = "POST /api/v1/sessions";
@@ -50,7 +51,7 @@ function bodyOf(app: ReturnType<typeof renderApp>, key: string): unknown {
   return call === undefined ? undefined : JSON.parse(call.body);
 }
 
-describe("R3.17 /paint", () => {
+describe("R3.17 /paint", PAINTER_SUITE, () => {
   it("R3.17 picks a drill, starts a range_paint session, submits the painted map and shows the grade, then Next", async () => {
     const { app, user } = await startPainting();
     expect(bodyOf(app, SESSIONS)).toMatchObject({ mode: "range_paint", drill_id: FIXTURE_PAINT_DRILL_ID });

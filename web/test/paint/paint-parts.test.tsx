@@ -13,6 +13,7 @@ import { fixturePaintDrills } from "../../src/fixtures/paint.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { DrillPicker } from "../../src/routes/paint/DrillPicker.js";
 import { PAINT_FAILURES, isStalePaint, paintFailureText } from "../../src/routes/paint/paint-api.js";
+import { PAINTER_SUITE } from "./painter-timeout.js";
 
 const TEN_RAISES: NodeAction[] = Array.from({ length: 10 }, (_, index) => ({
   index,
@@ -28,7 +29,7 @@ function problem(status: number, slug: string): ApiProblem {
   return new ApiProblem({ status, slug, title: "t", detail: "server detail text" });
 }
 
-describe("R3.17 BrushPicker", () => {
+describe("R3.17 BrushPicker", PAINTER_SUITE, () => {
   it("R3.17 gives number keys to the first nine brushes only and reports a picked brush", async () => {
     const onBrushChange = vi.fn();
     const user = userEvent.setup();

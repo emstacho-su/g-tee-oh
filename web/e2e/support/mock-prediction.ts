@@ -18,6 +18,7 @@
  */
 import type { PracticeSession, PredictionPrompt } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
+import { fixturePaintDrills } from "../../src/fixtures/paint.js";
 import {
   FIXTURE_PREDICTION_DRILL_ID,
   fixtureDrillList,
@@ -38,6 +39,14 @@ const PROBLEMS = {
 } as const satisfies Readonly<Record<string, ProblemSpec>>;
 
 const DRILLS_PATH = "/api/v1/drills";
+/**
+ * The one drill list the composed app mock serves (this route answers GET /drills before the paint
+ * route): every practice fixture drill once, so both the /predict and the /paint pickers find theirs.
+ */
+export const PRACTICE_DRILL_LIST = {
+  items: [...new Map([...fixtureDrillList.items, ...fixturePaintDrills].map((drill) => [drill.id, drill])).values()],
+  next_cursor: null,
+};
 const SESSIONS_PATH = "/api/v1/sessions";
 const PREDICTION_PATH = /^\/api\/v1\/prediction\/([^/]+)\/(next|answer)$/;
 const PREDICTION_MODE = "prediction";
@@ -172,7 +181,7 @@ export function createMockPredictionRoute(): MockRoute {
     const starting = request.path === SESSIONS_PATH && method === "POST" && isRecord(body) && body["mode"] === PREDICTION_MODE;
     if (!listing && !starting && prediction === null) return undefined;
     if (!signedIn) return problem(UNAUTHENTICATED, request.path);
-    if (listing) return json(STATUS.ok, fixtureDrillList);
+    if (listing) return json(STATUS.ok, PRACTICE_DRILL_LIST);
     if (starting && isRecord(body)) return start(request, body);
     return predictionRoute(request, prediction?.[1] ?? "", prediction?.[2] ?? "");
   };

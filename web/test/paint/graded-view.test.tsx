@@ -61,3 +61,36 @@ describe("R3.17 PaintGradedView", () => {
     expect(onNext).toHaveBeenCalledOnce();
   });
 });
+
+describe("R3.17 PaintGradedView edge cases", () => {
+  it("R3.17 a paint that loses nothing says so instead of a costliest table", () => {
+    const lossless = {
+      ...fixturePaintGraded,
+      total_weighted_loss_bb: 0,
+      per_hand: fixturePaintGraded.per_hand.map((row) => ({
+        ...row,
+        action_index: row.best_action_index,
+        loss_bb: 0,
+        loss_pct_pot: 0,
+        weighted_loss_bb: 0,
+      })),
+    };
+    render(<PaintGradedView prompt={fixturePaintPrompt} result={lossless} onNext={vi.fn()} />);
+    expect(screen.queryByRole("table", { name: /costliest/i })).toBeNull();
+    expect(screen.getByText(/loses nothing/i)).toBeInTheDocument();
+  });
+
+  it("R3.17 an action index the prompt does not name is shown as Action n and a question mark, never a wrong label", () => {
+    const first = fixturePaintGraded.per_hand[0];
+    if (first === undefined) throw new Error("the fixture grade has no rows");
+    const unknown = {
+      ...fixturePaintGraded,
+      per_hand: [{ ...first, action_index: 9, weighted_loss_bb: 0.5 }, ...fixturePaintGraded.per_hand.slice(1)],
+    };
+    render(<PaintGradedView prompt={fixturePaintPrompt} result={unknown} onNext={vi.fn()} />);
+    const grid = screen.getByRole("grid", { name: /graded range/i });
+    const cell = within(grid).getByTitle(new RegExp(`^${first.hand}:`));
+    expect(cell.getAttribute("title")).toContain("painted Action 9");
+    expect(cell).toHaveTextContent("?");
+  });
+});

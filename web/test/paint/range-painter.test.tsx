@@ -11,6 +11,7 @@ import { RangePainter } from "../../src/components/painter/RangePainter.js";
 import { FIXTURE_PAINT_ABSENT, fixturePaintPrompt } from "../../src/fixtures/paint.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { HAND_GRID } from "../../src/poker/hands.js";
+import { PAINTER_SUITE } from "./painter-timeout.js";
 
 const FOLD = "Fold";
 const CALL = "Call";
@@ -36,7 +37,7 @@ function submitted(onSubmit: ReturnType<typeof vi.fn>): Record<string, number> {
   return paint;
 }
 
-describe("R3.17 RangePainter grid", () => {
+describe("R3.17 RangePainter grid", PAINTER_SUITE, () => {
   it("R3.17 renders 169 cells in chart order, each named by its class and painted action, fold first", () => {
     setup();
     const grid = screen.getByRole("grid", { name: /range to paint/i });
@@ -72,7 +73,7 @@ describe("R3.17 RangePainter grid", () => {
   });
 });
 
-describe("R3.17 RangePainter painting", () => {
+describe("R3.17 RangePainter painting", PAINTER_SUITE, () => {
   it("R3.17 a click paints a cell with the selected brush", async () => {
     const { user } = setup();
     await user.click(screen.getByRole("radio", { name: new RegExp(RAISE) }));
@@ -142,7 +143,7 @@ describe("R3.17 RangePainter painting", () => {
   });
 });
 
-describe("R3.17 RangePainter submit", () => {
+describe("R3.17 RangePainter submit", PAINTER_SUITE, () => {
   it("R3.17 Submit sends the painted map: every held class once, no class the node lacks", async () => {
     const { user, onSubmit } = setup();
     await user.keyboard("3");

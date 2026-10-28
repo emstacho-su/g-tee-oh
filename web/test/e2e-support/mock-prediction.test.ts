@@ -4,11 +4,11 @@
 import { describe, expect, it } from "vitest";
 
 import { CSRF_HEADER, createMockApi, type MockApi, type MockRequest } from "../../e2e/support/mock-api.js";
-import { createMockPredictionRoute } from "../../e2e/support/mock-prediction.js";
+import { PRACTICE_DRILL_LIST, createMockPredictionRoute } from "../../e2e/support/mock-prediction.js";
 import { createMockSessionRoute } from "../../e2e/support/mock-sessions.js";
 import type { PredictionPrompt, PredictionResult } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
-import { FIXTURE_PREDICTION_DRILL_ID, fixtureDrillList, fixturePredictions } from "../../src/fixtures/prediction.js";
+import { FIXTURE_PREDICTION_DRILL_ID, fixturePredictions } from "../../src/fixtures/prediction.js";
 
 const SIGNED = { [CSRF_HEADER]: FIXTURE_CSRF_TOKEN };
 
@@ -64,7 +64,7 @@ describe("R3.16 mocked prediction routes", () => {
 
   it("R3.16 GET /drills lists the fixture drills", () => {
     const response = signedInApi().handle(request("GET", "/api/v1/drills"));
-    expect(response).toMatchObject({ status: 200, body: fixtureDrillList });
+    expect(response).toMatchObject({ status: 200, body: PRACTICE_DRILL_LIST });
   });
 
   it("R3.16 POST /sessions answers mode prediction and leaves the drill mode to the session route", () => {
