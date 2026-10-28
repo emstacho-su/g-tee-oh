@@ -4,12 +4,15 @@
  * against the contract's flop shape before anything is sent). The answer reads in plain words,
  * with the queue position when the build was queued, in a polite live region. The request
  * returns at once: the screen shows "Sending" while the api answers and never waits on a solve.
+ * S40 (O-406): the "Request a gap" card of the coverage page, its flop field on FIELD_CLASS.
  */
 import { useId, useState, type FormEvent } from "react";
 
 import { normalizeFlop, requestFailureText, requestResultText } from "../../library/request-text.js";
 import type { GapRequestState } from "../../library/use-gap-request.js";
-import { Button } from "../ui/index.js";
+import { Button, Card, cn, FIELD_CLASS } from "../ui/index.js";
+
+export const GAP_REQUEST_TITLE = "Request a gap";
 
 export interface GapRequestProps {
   pair: string;
@@ -57,13 +60,10 @@ export function GapRequest({ pair, preflopAvailable, request }: GapRequestProps)
   }
 
   return (
-    <section aria-labelledby="gap-request-heading" className="flex flex-col gap-3">
-      <h2 id="gap-request-heading" className="text-lg font-semibold">
-        Request coverage
-      </h2>
-      <p className="text-sm text-muted">
-        A request raises a queued build to the head of the queue or records it for the planner. Nothing is solved while you wait.
-      </p>
+    <Card
+      title={GAP_REQUEST_TITLE}
+      description="A request raises a queued build to the head of the queue or records it for the planner. Nothing is solved while you wait."
+    >
       {preflopAvailable ? null : (
         <Button variant="primary" className="self-start" disabled={request.pending} onClick={() => request.send({})}>
           {`Request ${pair} preflop`}
@@ -83,7 +83,7 @@ export function GapRequest({ pair, preflopAvailable, request }: GapRequestProps)
             placeholder="KhQd4s"
             aria-invalid={flopError !== null}
             onChange={(event) => setFlopText(event.target.value)}
-            className="h-9 w-32 rounded-md border border-border-strong bg-surface-raised px-2 font-mono"
+            className={cn(FIELD_CLASS, "h-10 w-32 px-3 font-mono")}
           />
         </div>
         <Button type="submit" disabled={request.pending}>
@@ -98,6 +98,6 @@ export function GapRequest({ pair, preflopAvailable, request }: GapRequestProps)
       <div aria-live="polite">
         <Outcome request={request} pair={pair} />
       </div>
-    </section>
+    </Card>
   );
 }

@@ -57,7 +57,7 @@ describe("R3.4 R3.5 one Idempotency-Key per intent (O-232)", () => {
   });
 
   it("R3.5 two rapid clicks on Pause send one request", async () => {
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     const pause = await screen.findByRole("button", { name: "Pause the builder" });
 
     fireEvent.click(pause);
@@ -68,7 +68,7 @@ describe("R3.4 R3.5 one Idempotency-Key per intent (O-232)", () => {
   });
 
   it("R3.5 two rapid saves send one settings PATCH", async () => {
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "settings"));
     const share = await screen.findByRole("spinbutton", { name: "CPU share" });
     fireEvent.change(share, { target: { value: "0.8" } });
     const save = screen.getByRole("button", { name: "Save builder settings" });
@@ -114,7 +114,7 @@ describe("R3.5 the build progress line clears", () => {
   const progressText = /^Current build:/;
 
   it("R3.5 a coverage_added for any configuration ends the shown build", async () => {
-    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     await screen.findByTestId("builder-state");
     streams[0]?.emit("build_progress", progress);
     expect(screen.getByText(progressText)).toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("R3.5 the build progress line clears", () => {
   });
 
   it.each(["idle", "paused"])("R3.5 the builder reporting %s ends the shown build", async (state) => {
-    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     await screen.findByTestId("builder-state");
     streams[0]?.emit("build_progress", progress);
 
@@ -139,7 +139,7 @@ describe("R3.5 security follow-ups (O-290, O-297)", () => {
   it("R3.5 a 403 from an admin call rechecks the session, so a revoked admin loses the controls", async () => {
     // The flag is revoked server-side between the status read and the pause.
     let admin = true;
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), {
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"), {
       isAdminNow: () => admin,
       override: (request) => {
         if (request.path !== PAUSE_PATH) return undefined;

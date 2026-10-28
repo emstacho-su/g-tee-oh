@@ -10,6 +10,11 @@
  * announcement, the builder panel running and paused, a saved settings edit, and /settings with
  * the builder schedule. A second test per theme and width captures a member's /library (no
  * builder controls). afterAll merges the records into the shared manifest.
+ *
+ * S40 (O-406, screen review rows 63 to 70): /library is one container with a page per section, so
+ * the coverage pictures are taken on /library/coverage, the running and paused builder on the
+ * Builder state page and the saved settings on the Builder settings page, each reached through
+ * the "Library sections" list.
  */
 import { mkdirSync } from "node:fs";
 
@@ -28,19 +33,19 @@ const OUT_DIR = shotDirectory();
 const SESSION = "S40";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
-const LIBRARY_PATH = `/library?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000`;
+const LIBRARY_PATH = `/library/coverage?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000`;
 const UNCOVERED_PAIR = "CO-BTN";
 
 const CRITERIA = {
-  grid: "R3.4 coverage view: pair grid with preflop availability in words, flops by texture family, build queue with positions (A7 sections 2 and 3, O-291)",
-  recorded: "R3.4 gap request from an uncovered pair: preflop gap recorded, no queue position (O-240)",
-  queued: "R3.4 flow 5: a queued flop requested, answered at once at queue position 1 and moved to the head of the queue (ADR 0018, O-240)",
-  live: "R3.4 live update: a coverage_added event announced in the live region (O-243, O-297)",
-  running: "R3.5 admin builder health running: state, queue depth, flops per day, storage against budget, labeled placeholders (A9 section 4, O-299)",
-  paused: "R3.5 admin builder paused after Pause; Resume offered (O-295)",
-  saved: "R3.5 settings edit round trip: CPU share and budget saved, stored values shown (O-296)",
+  grid: "R3.4 S40 O-406 Coverage page: section list, Configuration and Coverage cards (pair grid with preflop availability in words), then Flops and queue (families, build queue with positions) beside Request a gap (A7 sections 2 and 3, O-291)",
+  recorded: "R3.4 S40 O-406 Request a gap card on an uncovered pair: preflop gap recorded, no queue position (O-240)",
+  queued: "R3.4 S40 O-406 flow 5: a queued flop requested, answered at once at queue position 1 and moved to the head of the queue (ADR 0018, O-240)",
+  live: "R3.4 S40 O-406 live update: a coverage_added event announced in the page header's live line (O-243, O-297)",
+  running: "R3.5 S40 O-406 Builder state page: one card with Pause beside its heading, state, queue depth, flops per day, storage against budget, labeled placeholders (A9 section 4, O-299)",
+  paused: "R3.5 S40 O-406 Builder state page paused after Pause; Resume offered (O-295)",
+  saved: "R3.5 S40 O-406 Builder settings page: CPU share and budget saved, stored values shown, link to the overnight schedule in Settings (O-296)",
   schedule: "R3.5 /settings/builder-schedule: the overnight window form on its own settings page, listed for admins only (O-296, O-360, O-361)",
-  member: "O-290 a member's /library: coverage view without builder controls",
+  member: "O-290 S40 O-406 a member's /library: the Coverage page only, with no builder pages listed and no builder controls",
 } as const;
 
 const records: ShotRecord[] = [];
@@ -80,10 +85,16 @@ async function coverageScreens(page: Page, shot: ReturnType<typeof shooter>): Pr
   await shot("library-gap-recorded", CRITERIA.recorded);
 }
 
+function openSection(page: Page, name: string): Promise<void> {
+  return page.getByRole("navigation", { name: "Library sections" }).getByRole("link", { name, exact: true }).click();
+}
+
 async function builderScreens(page: Page, shot: ReturnType<typeof shooter>): Promise<void> {
-  const health = page.getByRole("region", { name: "Builder health" });
+  await openSection(page, "Builder state");
+  await expect(page).toHaveURL(/\/library\/builder/);
+  const state = page.getByRole("region", { name: "Builder state" });
   await expect(page.getByTestId("builder-state")).toHaveText("Running");
-  await health.scrollIntoViewIfNeeded();
+  await state.scrollIntoViewIfNeeded();
   await shot("library-admin-running", CRITERIA.running);
 
   await page.getByRole("button", { name: "Pause the builder" }).click();
@@ -92,6 +103,8 @@ async function builderScreens(page: Page, shot: ReturnType<typeof shooter>): Pro
   await page.getByRole("button", { name: "Resume the builder" }).click();
   await expect(page.getByTestId("builder-state")).toHaveText("Running");
 
+  await openSection(page, "Builder settings");
+  await expect(page).toHaveURL(/\/library\/settings/);
   await page.getByRole("spinbutton", { name: "CPU share" }).fill("0.75");
   await page.getByRole("spinbutton", { name: "Storage budget (GB)" }).fill("500");
   await page.getByRole("button", { name: "Save builder settings" }).click();
@@ -130,7 +143,9 @@ for (const theme of THEMES) {
       await prepareShotPage(page, theme, viewport);
       await openLibrary(page, false);
       await page.goto(`${LIBRARY_PATH}&pair=${FIXTURE_QUEUE_PAIR}`);
-      await expect(page.getByText("Builder health and controls are for admins.")).toBeVisible();
+      await expect(page.getByRole("table", { name: "Build queue for this pair" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Library sections" }).getByRole("link")).toHaveText(["Coverage"]);
+      await expect(page.getByRole("button", { name: "Pause the builder" })).toHaveCount(0);
       await shooter(page, theme, viewport)("library-member", CRITERIA.member);
     });
   }

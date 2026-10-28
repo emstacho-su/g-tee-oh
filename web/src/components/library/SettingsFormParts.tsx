@@ -1,9 +1,11 @@
 /**
  * Shared pieces of the builder settings forms (S28, R3.5, O-296): one labeled number field with
  * its in-force value, and the save outcome line. Both forms send a PATCH with only the changed
- * keys; this file holds no state.
+ * keys; this file holds no state. Since S40 the field takes the shared FIELD_CLASS (O-369).
  */
 import { useId } from "react";
+
+import { cn, FIELD_CLASS } from "../ui/index.js";
 
 export interface NumberFieldProps {
   label: string;
@@ -33,7 +35,7 @@ export function NumberField({ label, hint, value, current, invalid, onChange, st
         aria-invalid={invalid}
         aria-describedby={hintId}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-40 rounded-md border border-border-strong bg-surface-raised px-2"
+        className={cn(FIELD_CLASS, "h-10 w-40 px-3 aria-[invalid=true]:border-danger")}
       />
       <span id={hintId} className="text-xs text-muted">
         {`${current}. Use ${hint}.`}
