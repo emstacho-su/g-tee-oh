@@ -98,6 +98,32 @@ describe("R3.13 useActionReplay", () => {
     expect(result.current.shown).toBe(3);
   });
 
+  it("R3.13 a digit typed into a field, or pressed with a modifier, does not finish the replay (review round 1, 6)", () => {
+    const { result } = renderReplay(FIRST);
+    const field = document.createElement("input");
+    document.body.append(field);
+    act(() => void fireEvent.keyDown(field, { key: "1" }));
+    expect(result.current.replaying).toBe(true);
+    const editable = document.createElement("div");
+    editable.setAttribute("contenteditable", "true");
+    document.body.append(editable);
+    act(() => void fireEvent.keyDown(editable, { key: "2" }));
+    expect(result.current.replaying).toBe(true);
+    act(() => void fireEvent.keyDown(window, { key: "3", ctrlKey: true }));
+    expect(result.current.replaying).toBe(true);
+    field.remove();
+    editable.remove();
+  });
+
+  it("R3.13 while a dialog is open (keySkip off) an action key does not finish the replay (review round 1, 6)", () => {
+    const { result, rerender } = renderReplay(FIRST, { reducedMotion: false, keySkip: false });
+    act(() => void fireEvent.keyDown(window, { key: "1" }));
+    expect(result.current.replaying).toBe(true);
+    rerender({ current: FIRST, opts: { reducedMotion: false, keySkip: true } });
+    act(() => void fireEvent.keyDown(window, { key: "1" }));
+    expect(result.current.replaying).toBe(false);
+  });
+
   it("R3.13 the same session and state version never replays again", () => {
     const { result, rerender } = renderReplay(FIRST);
     playToEnd(result);

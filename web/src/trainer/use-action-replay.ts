@@ -35,6 +35,11 @@ export interface ReplayOptions {
   speed?: ReplaySpeed;
   /** Overrides the prefers-reduced-motion media query when given. */
   reducedMotion?: boolean;
+  /**
+   * Whether an action key (1 to 9) finishes the replay: true by default; the session turns it off
+   * while a dialog covers the screen, so a key meant for the dialog never touches the table.
+   */
+  keySkip?: boolean;
 }
 
 export interface ReplayLogLine {
@@ -63,6 +68,18 @@ export interface ActionReplay {
 
 /** The action keys that finish a replay (the action bar's 1 to 9). */
 const SKIP_KEY = /^[1-9]$/;
+
+/** A field the user types into: a digit there is text, never an action key (review round 1, 6). */
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.matches("input, textarea, select, [contenteditable='true']");
+}
+
+/** An action key with no modifier, pressed outside a field. */
+function isSkipKey(event: KeyboardEvent): boolean {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  return SKIP_KEY.test(event.key) && !isEditable(event.target);
+}
 
 interface Track {
   /** The prompt the plan was made for: the previous prompt of the next plan. */
@@ -145,14 +162,15 @@ export function useActionReplay(prompt: TrainerPrompt | null, options: ReplayOpt
   }, [key, current.started, stepMs]);
 
   const replaying = !current.finished;
+  const keySkip = options.keySkip ?? true;
   useEffect(() => {
-    if (!replaying) return undefined;
+    if (!replaying || !keySkip) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (SKIP_KEY.test(event.key)) skip();
+      if (isSkipKey(event)) skip();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [replaying, skip]);
+  }, [replaying, keySkip, skip]);
 
   return prompt === null ? viewOf(EMPTY_TRACK, skip) : viewOf(current, skip);
 }

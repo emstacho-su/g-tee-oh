@@ -152,7 +152,7 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   // The table's replay of the line before the decision (S38, O-381) lives here, beside the timer,
   // so the render that shows a prompt with a line to replay already counts as paused: the timer
   // gets a pause, never a resume first (review round 1, finding 10).
-  const replay = useActionReplay(promptOnScreen(state), { speed: trainer?.speed ?? DEFAULT_SPEED });
+  const replay = useActionReplay(promptOnScreen(state), { speed: trainer?.speed ?? DEFAULT_SPEED, keySkip: !dialogOpen });
   const paused = dialogOpen || replay.replaying;
   // A newly shown prompt starts its timer running, so it is paused again when a dialog is open.
   const shownPrompt = state.kind === "await_action" ? state.prompt : null;
