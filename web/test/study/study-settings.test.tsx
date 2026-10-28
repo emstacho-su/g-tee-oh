@@ -219,6 +219,38 @@ describe("R3.12 study settings panel", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("R3.12 a failed read of the draft's seats shows inside the panel, says so and retries there", async () => {
+    const user = userEvent.setup();
+    let failures = 1;
+    renderStudy(`/study?${ONLINE_100}&pair=BB-BTN`, (request) => {
+      if (request.path !== `/api/v1/configs/${FIXTURE_DEEP_CONFIG_ID}/pairs` || failures === 0) return undefined;
+      failures -= 1;
+      return problemOf(500, "internal");
+    });
+    await user.click(await screen.findByRole("button", { name: "Change settings" }));
+    await user.click(choice("Depth", "200bb"));
+    const panel = screen.getByRole("region", { name: "Spot settings" });
+    const alert = await within(panel).findByRole("alert");
+    expect(screen.getAllByRole("alert")).toEqual([alert]);
+    expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
+    expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "Confirm" })).toBeEnabled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a failed read of the URL configuration's seats says so in the panel too", async () => {
+    renderStudy(`/study?${ONLINE_100}`, (request) =>
+      request.path === `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs` ? problemOf(500, "internal") : undefined,
+    );
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("The game catalog could not be loaded.");
+    expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
+  });
+
   it("R3.12 a failed catalog read shows an error with a retry and no server detail", async () => {
     const user = userEvent.setup();
     let failures = 1;

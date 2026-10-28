@@ -19,6 +19,7 @@ import {
   confirmBlocker,
   draftConfigId,
   draftUncoveredPair,
+  fieldWaitText,
   draftFromSearch,
   draftPair,
   searchFromDraft,
@@ -188,6 +189,25 @@ describe("R3.12 why Confirm is unavailable", () => {
     const loading: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
     expect(confirmBlocker(loading, { ...ONLINE_100, first: "BTN", against: "BB" })).toBe("Loading the seats for these settings.");
     expect(confirmBlocker(loading, ONLINE_100)).toBe("Loading the seats for these settings.");
+  });
+
+  it("R3.12 seats whose read failed say they could not be loaded, not that they are loading", () => {
+    const failed: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
+    const draft: SettingsDraft = { ...ONLINE_100, first: "BTN", against: "BB" };
+    expect(confirmBlocker(failed, draft, undefined, { seatsFailed: true })).toBe("The seats for these settings could not be loaded.");
+    expect(confirmBlocker(failed, draft, undefined, { seatsFailed: false })).toBe("Loading the seats for these settings.");
+  });
+
+  it("R3.12 a field waiting on its upper fields prompts for them; seats waiting on a chosen depth say why", () => {
+    const loading: SettingsCatalog = { stakes: fixtureStakes, configs: fixtureConfigs, pairsOf: () => undefined };
+    expect(fieldWaitText(CATALOG, {}, "table_size", false)).toBe("Choose a format first.");
+    expect(fieldWaitText(CATALOG, { format: "online", table_size: 6, stake: FIXTURE_ONLINE_STAKE_ID }, "first", false)).toBe(
+      "Choose a depth first.",
+    );
+    expect(fieldWaitText(loading, ONLINE_100, "first", false)).toBe("Loading the seats for these settings.");
+    expect(fieldWaitText(loading, ONLINE_100, "first", true)).toBe("The seats for these settings could not be loaded.");
+    expect(fieldWaitText(CATALOG, { ...ONLINE_100, depth: 30000 }, "first", false)).toBe("Choose an available depth first.");
+    expect(fieldWaitText(undefined, {}, "format", false)).toBe("Loading the catalog.");
   });
 
   it("R3.12 the uncovered pair the draft names, if any", () => {

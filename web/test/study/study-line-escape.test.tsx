@@ -14,7 +14,7 @@ import {
   FIXTURE_STUDY_PAIR,
   fixtureChildNode,
 } from "../../src/fixtures/study.js";
-import { nodeJson, renderStudy, type StudyOverride } from "./render-study.js";
+import { nodeJson, problemOf, renderStudy, type StudyOverride } from "./render-study.js";
 
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
 const CLOSING_CALL_LINE = `${FIXTURE_CHILD_LINE}.c`;
@@ -97,6 +97,27 @@ describe("R3.12 the carousel stays preflop", () => {
     await waitFor(() => expect(call).toHaveAttribute("aria-disabled", "true"));
     expect(call).toHaveAccessibleName(POSTFLOP_REASON);
     expect(within(actions).getByRole("button", { name: /^Raise 11bb/ })).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("R3.12 a child read that failed leaves its action enabled", async () => {
+    const { nodeRequests } = renderStudy(BASE, (request) =>
+      request.path === "/api/v1/study/node" && request.query["line"] === FIXTURE_CHILD_LINE ? problemOf(503, "unavailable") : undefined,
+    );
+    const actions = await screen.findByRole("region", { name: "BTN's actions" });
+    await waitFor(() => expect(nodeRequests().map((request) => request.query["line"])).toContain(FIXTURE_CHILD_LINE));
+    const raise = within(actions).getByRole("button", { name: /^Raise 2\.5bb/ });
+    expect(raise).not.toHaveAttribute("aria-disabled");
+    expect(raise).not.toHaveAccessibleName(POSTFLOP_REASON);
+  });
+
+  it("R3.12 a child read still loading leaves its action enabled", async () => {
+    const held = new Promise<Response>(() => undefined);
+    const { nodeRequests } = renderStudy(BASE, (request) =>
+      request.path === "/api/v1/study/node" && request.query["line"] === FIXTURE_CHILD_LINE ? held : undefined,
+    );
+    const actions = await screen.findByRole("region", { name: "BTN's actions" });
+    await waitFor(() => expect(nodeRequests().map((request) => request.query["line"])).toContain(FIXTURE_CHILD_LINE));
+    expect(within(actions).getByRole("button", { name: /^Raise 2\.5bb/ })).not.toHaveAttribute("aria-disabled");
   });
 
   it("R3.12 a postflop node shows the v1.5 note with a way back and no carousel", async () => {
