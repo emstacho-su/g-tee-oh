@@ -3,6 +3,7 @@
 //   1. dev-up        builds the solver-query, api and web images and waits for health
 //   2. db-migrate    applies the migrations
 //   3. db-test       migration, role and seed tests (each in a rolled-back transaction)
+//   3b. fixture-solutions  solution rows for the fixture library, so graded attempts can be stored (S23)
 //   4. create-owner  a fresh owner account with a random per-run password (O-263)
 //   5. smoke         health of every service through Caddy
 //   6. e2e-web       the Playwright stack project, with the owner in its environment only
@@ -30,7 +31,7 @@ import {
 
 export const OWNER_STEP = 'create-owner';
 const E2E_WEB_STEP = 'e2e-web';
-export const STEPS = ['dev-up', 'db-migrate', 'db-test', OWNER_STEP, 'smoke', E2E_WEB_STEP];
+export const STEPS = ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', OWNER_STEP, 'smoke', E2E_WEB_STEP];
 
 // The same project arguments as the justfile's compose recipes.
 export const COMPOSE_ARGS = [

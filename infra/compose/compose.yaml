@@ -166,6 +166,10 @@ x-api: &api
     # Believe X-Forwarded-For from private addresses only: the api publishes no port, so only containers
     # on the gto network (Caddy) can reach it; outside compose the api trusts loopback only (O-236)
     TRUSTED_PROXIES: uniquelocal
+    # solver-query on the gto network: its service name and internal port (A5 section 1, S23)
+    SOLVER_QUERY_URL: http://solver-query:7070
+    # The time zone whose midnight starts a training day for the daily rated cap (O-247)
+    APP_TIME_ZONE: ${APP_TIME_ZONE:-UTC}
   # A9 section 3, the same hardening as solver-query. Node writes nothing of its own; /tmp is a
   # tmpfs so os.tmpdir() keeps working for a scratch file (private to the container, gone with it).
   read_only: true

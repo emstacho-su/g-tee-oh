@@ -145,6 +145,10 @@ shots:
 db-migrate:
     dbmate --wait --no-dump-schema up
 
+# Solution rows for the fixture library, so attempts graded on the dev stack can be stored; idempotent (R3.7, O-53)
+fixture-solutions:
+    node scripts/fixture-solutions.mjs
+
 # Migration status
 db-status:
     dbmate status
@@ -232,6 +236,15 @@ bench:
     cargo bench -p gto-solve -p gto-library -p solver-query -p gto-planner -p library-builder --features gto-library/synthetic
     node scripts/bench-report.mjs
 
+# Needs the dev stack up with the fixture library (just dev-up, just db-migrate) and the bench lock;
+# perf never starts or stops the stack. It trusts Caddy's root copied out of the caddy container,
+# creates a per-run owner through create-user (password on stdin), takes 20 warm-up and 200 timed
+# samples per path, writes the report even on a miss, then runs check-reports. BENCH_MACHINE names
+# the machine (default zenbook); --base-url, --ca-file and --out-dir pass through ARGS.
+# p95 of study node read, grade and decision to feedback through Caddy; writes validation/reports/perf-zenbook.json (R3.3, O-40, O-91)
+perf *ARGS:
+    node scripts/perf.mjs {{ARGS}}
+
 # Release build: the three scenarios pack in seconds there and in minutes in debug (O-134).
 # Synthetic library size estimate written by library-pack, seed and parameters printed (R2.7, R-19)
 library-size-estimate:
@@ -291,6 +304,10 @@ coverage-learning:
 # Statement, branch, function and line coverage of web/src at the 80% gate (S24, A9 section 1)
 coverage-web:
     pnpm --filter @g-tee-oh/web coverage
+
+# Statement, branch, function and line coverage of services/api/src at the 80% gate (S23, A9 section 1)
+coverage-api:
+    pnpm --filter @g-tee-oh/api coverage
 
 # Line coverage of solver-query at the 80% gate (O-134, plan D.9); needs cargo-llvm-cov
 coverage-solver-query:
@@ -443,4 +460,4 @@ report-check:
 
 # contracts and contracts-check need a migrated database for the Kysely step, e2e the compose stack, images buildx.
 # Everything the hosted jobs run that needs neither Docker nor a database, in order
-ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning coverage-web ts-boundary report-check licenses security guard-test test-tags
+ci: rust-fmt rust-clippy rust-test rust-boundary gates-check fixtures-check ts-lint ts-typecheck ts-test coverage-learning coverage-web coverage-api ts-boundary report-check licenses security guard-test test-tags

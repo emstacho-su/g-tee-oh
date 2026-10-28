@@ -53,7 +53,7 @@ pub async fn sample_action(
     let space = view.record().hand_space;
     let hand = parse_hand(&request.hand, space)?;
     let frequencies = view.frequencies(hand.index).ok_or_else(|| {
-        ApiError::NotFound(format!("hand {} is not held at this node", hand.label(space)))
+        ApiError::HandNotInRange(format!("hand {} is not held at this node", hand.label(space)))
     })?;
     let mut generator = SplitMix64::from(request.rng_state);
     let roll = generator.next_unit();

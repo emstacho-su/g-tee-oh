@@ -100,7 +100,7 @@ fn grade_response(
     };
     let numbers = grade::hand_numbers(view, hand.index).ok_or_else(|| {
         let label = ApiError::quoted(&hand.label(record.hand_space));
-        ApiError::NotFound(format!("hand {label} is not in the node's range"))
+        ApiError::HandNotInRange(format!("hand {label} is not in the node's range"))
     })?;
     let floor = grade::floor(view, exploitability_pct_pot);
     let units = numbers.loss_units[action];
@@ -116,6 +116,7 @@ fn grade_response(
         ev_best_bb: numbers.ev_best_bb(),
         loss_bb: loss_bb(units, record.pot),
         loss_pct_pot: grade::loss_pct_pot(units),
+        loss_pct_pot_by_action: numbers.loss_pct_pot(),
         floor_pct_pot: floor.pct_pot,
         floor_source: grade::floor_source(floor.source),
         bucket: chosen.bucket.map(|bucket| bucket.as_str().to_owned()),

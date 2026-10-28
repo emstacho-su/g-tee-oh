@@ -68,6 +68,237 @@
         ],
         "description": "RFC 9457 problem details (application/problem+json)"
       },
+      "BuilderStatusInput": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused",
+              "throttled",
+              "idle",
+              "unknown"
+            ],
+            "description": "paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "queue": {
+            "type": "object",
+            "properties": {
+              "queued": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "running": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "blocked_budget": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "queued",
+              "running",
+              "failed",
+              "blocked_budget"
+            ]
+          },
+          "throughput_per_hour": {
+            "type": "number",
+            "description": "Builds done in the last 24 hours, divided by 24"
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "library_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reference_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "library_bytes",
+              "reference_bytes"
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "The stored overrides; an absent key means the builder's default (O-188)"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "queue",
+          "throughput_per_hour",
+          "storage",
+          "settings"
+        ]
+      },
+      "BuilderSettingsPatchInput": {
+        "type": "object",
+        "properties": {
+          "paused": {
+            "type": "boolean"
+          },
+          "cpu_share": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "description": "A share of the solve threads, above 0 and at most 1"
+          },
+          "overnight": {
+            "type": "object",
+            "properties": {
+              "start_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "end_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "utc_offset_minutes": {
+                "type": "integer",
+                "minimum": -1439,
+                "maximum": 1439
+              },
+              "cpu_share": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "description": "A share of the solve threads, above 0 and at most 1"
+              }
+            },
+            "required": [
+              "start_hour",
+              "end_hour",
+              "utc_offset_minutes",
+              "cpu_share"
+            ],
+            "additionalProperties": false
+          },
+          "budget_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "bytes_per_runout": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "bytes_per_flop_tree": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "k_runouts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_runouts_rare": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_frequent_pairs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1326
+          },
+          "plan_configs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+              "description": "A game_config identifier, for example cfg_9_live_13_150"
+            },
+            "description": "Configuration ids the planner enumerates; [] turns planning off"
+          },
+          "target_pct_pot": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "max_iterations": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "max_seconds_per_line": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 86400
+          },
+          "storage_bits": {
+            "type": "number",
+            "enum": [
+              16,
+              32
+            ]
+          },
+          "memory_cap_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "max_attempts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "stale_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 168
+          },
+          "verify_interval_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 720
+          },
+          "plan_interval_minutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10080
+          },
+          "poll_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          }
+        },
+        "additionalProperties": false
+      },
       "SessionInfoInput": {
         "type": "object",
         "properties": {
@@ -270,6 +501,678 @@
           "oop",
           "ip",
           "preflop_available"
+        ]
+      },
+      "NodeActionInput": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "token": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fold",
+              "check",
+              "call",
+              "limp",
+              "straddle",
+              "bet",
+              "raise",
+              "all_in"
+            ]
+          },
+          "size_cbb": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bucket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "next_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node this action leads to; null when it ends the solution (O-245, O-280)"
+          }
+        },
+        "required": [
+          "index",
+          "token",
+          "kind",
+          "size_cbb",
+          "bucket",
+          "label",
+          "next_node_key"
+        ]
+      },
+      "ActionShareInput": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "share": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "index",
+          "share"
+        ]
+      },
+      "NodeHandRowInput": {
+        "type": "object",
+        "properties": {
+          "hand": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_bb": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_best_bb": {
+            "type": "number"
+          },
+          "loss_pct_pot": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "reach": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "hand",
+          "strategy",
+          "ev_bb",
+          "ev_best_bb",
+          "loss_pct_pot",
+          "reach"
+        ]
+      },
+      "StudyNodeInput": {
+        "type": "object",
+        "properties": {
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ]
+          },
+          "to_act": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stacks_cbb": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "floor_pct_pot": {
+            "type": "number"
+          },
+          "spot_class_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeActionInput"
+            }
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeHandRowInput"
+            }
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            }
+          },
+          "next_likely_line": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
+                "description": "A preflop line as dot-separated action tokens, for example r250.c"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The line the api prefetched next (R3.3)"
+          },
+          "next_likely_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node the api prefetched next; null when the likeliest action ends the solution (R3.3)"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the solution is synthetic test data (O-229, O-57)"
+          },
+          "range_by_action": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionShareInput"
+            },
+            "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
+          }
+        },
+        "required": [
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "street",
+          "to_act",
+          "pot_cbb",
+          "stacks_cbb",
+          "floor_pct_pot",
+          "spot_class_key",
+          "actions",
+          "hands",
+          "noise_flags",
+          "next_likely_line",
+          "next_likely_node_key",
+          "synthetic",
+          "range_by_action"
+        ]
+      },
+      "ThresholdCardInput": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "token": {
+                  "type": "string"
+                },
+                "share_taking": {
+                  "type": "number"
+                },
+                "weakest_hand_taking_half": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "index",
+                "token",
+                "share_taking",
+                "weakest_hand_taking_half"
+              ]
+            }
+          },
+          "strongest_folding_hand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hand_position": {
+            "type": "object",
+            "properties": {
+              "hand": {
+                "type": "string"
+              },
+              "equity_vs_villain": {
+                "type": "number"
+              },
+              "rank_in_range": {
+                "type": "number"
+              },
+              "relative": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "position": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "at",
+                        "below"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "position"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "hand",
+              "equity_vs_villain",
+              "rank_in_range",
+              "relative"
+            ]
+          }
+        },
+        "required": [
+          "actions",
+          "strongest_folding_hand",
+          "hand_position"
+        ]
+      },
+      "EquityDistributionInput": {
+        "type": "object",
+        "properties": {
+          "bin_edges": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "oop": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ip": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "bin_edges",
+          "oop",
+          "ip"
+        ]
+      },
+      "RangeAdvantageInput": {
+        "type": "object",
+        "properties": {
+          "oop_mean_equity": {
+            "type": "number"
+          },
+          "ip_mean_equity": {
+            "type": "number"
+          },
+          "to_act_advantage_pct_points": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "oop_mean_equity",
+          "ip_mean_equity",
+          "to_act_advantage_pct_points"
+        ]
+      },
+      "NutAdvantageInput": {
+        "type": "object",
+        "properties": {
+          "threshold_equity": {
+            "type": "number"
+          },
+          "oop_share": {
+            "type": "number"
+          },
+          "ip_share": {
+            "type": "number"
+          },
+          "to_act_advantage": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "threshold_equity",
+          "oop_share",
+          "ip_share",
+          "to_act_advantage"
+        ]
+      },
+      "BlockersInput": {
+        "type": "object",
+        "properties": {
+          "hand": {
+            "type": "string"
+          },
+          "villain_combos_removed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "villain_reach_removed_share": {
+            "type": "number"
+          },
+          "top_blocked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hand": {
+                  "type": "string"
+                },
+                "reach_removed": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hand",
+                "reach_removed"
+              ]
+            }
+          }
+        },
+        "required": [
+          "hand",
+          "villain_combos_removed",
+          "villain_reach_removed_share",
+          "top_blocked"
+        ]
+      },
+      "StudyInsightsInput": {
+        "type": "object",
+        "properties": {
+          "threshold_card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThresholdCardInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity_distribution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EquityDistributionInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "range_advantage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RangeAdvantageInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nut_advantage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutAdvantageInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockers": {
+            "$ref": "#/components/schemas/BlockersInput"
+          },
+          "hand_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "value",
+                  "marginal",
+                  "bluff",
+                  "fold",
+                  "trap"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            }
+          }
+        },
+        "required": [
+          "threshold_card",
+          "equity_distribution",
+          "range_advantage",
+          "nut_advantage",
+          "blockers",
+          "hand_role",
+          "noise_flags"
+        ],
+        "description": "solver-query's InsightsResponse relayed as is; a part it cannot answer at the node is null"
+      },
+      "CoverageInput": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "preflop_available": {
+            "type": "boolean"
+          },
+          "flops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flop": {
+                  "type": "string"
+                },
+                "texture_family": {
+                  "type": "string"
+                },
+                "scenarios": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "flop",
+                "texture_family",
+                "scenarios"
+              ]
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "flop": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "number"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "job_id",
+                "flop",
+                "priority",
+                "position"
+              ]
+            }
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when a held preflop solution is synthetic test data (O-229, O-57)"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "unconfigured",
+              "unavailable"
+            ],
+            "description": "Whether solver-query's database answered; flops and queue are empty unless connected (O-172)"
+          }
+        },
+        "required": [
+          "config_id",
+          "pair",
+          "preflop_available",
+          "flops",
+          "queue",
+          "synthetic",
+          "database"
         ]
       },
       "SpotFilterInput": {
@@ -1069,458 +1972,6 @@
         },
         "additionalProperties": false
       },
-      "BuilderStatusInput": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "running",
-              "paused",
-              "throttled"
-            ]
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "queue": {
-            "type": "object",
-            "properties": {
-              "queued": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "running": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "failed": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "queued",
-              "running",
-              "failed"
-            ]
-          },
-          "throughput_per_hour": {
-            "type": "number"
-          },
-          "storage": {
-            "type": "object",
-            "properties": {
-              "library_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "reference_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "library_bytes",
-              "reference_bytes"
-            ]
-          },
-          "settings": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          }
-        },
-        "required": [
-          "state",
-          "reason",
-          "queue",
-          "throughput_per_hour",
-          "storage",
-          "settings"
-        ]
-      },
-      "NodeActionInput": {
-        "type": "object",
-        "properties": {
-          "index": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "token": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "fold",
-              "check",
-              "call",
-              "limp",
-              "straddle",
-              "bet",
-              "raise",
-              "all_in"
-            ]
-          },
-          "size_cbb": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "bucket": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "label": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "index",
-          "token",
-          "kind",
-          "size_cbb",
-          "bucket",
-          "label"
-        ]
-      },
-      "NodeHandRowInput": {
-        "type": "object",
-        "properties": {
-          "hand": {
-            "type": "string"
-          },
-          "strategy": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_bb": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_best_bb": {
-            "type": "number"
-          },
-          "loss_pct_pot": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "reach": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "hand",
-          "strategy",
-          "ev_bb",
-          "ev_best_bb",
-          "loss_pct_pot",
-          "reach"
-        ]
-      },
-      "StudyNodeInput": {
-        "type": "object",
-        "properties": {
-          "solution_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "node_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "description": "An opaque node key"
-          },
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "street": {
-            "type": "string",
-            "enum": [
-              "preflop",
-              "flop",
-              "turn",
-              "river"
-            ]
-          },
-          "to_act": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "pot_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "stacks_cbb": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "floor_pct_pot": {
-            "type": "number"
-          },
-          "spot_class_key": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "actions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeActionInput"
-            }
-          },
-          "hands": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeHandRowInput"
-            }
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            }
-          },
-          "next_likely_line": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
-                "description": "A preflop line as dot-separated action tokens, for example r250.c"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The line the api prefetched next (R3.3)"
-          }
-        },
-        "required": [
-          "solution_id",
-          "node_key",
-          "config_id",
-          "pair",
-          "street",
-          "to_act",
-          "pot_cbb",
-          "stacks_cbb",
-          "floor_pct_pot",
-          "spot_class_key",
-          "actions",
-          "hands",
-          "noise_flags",
-          "next_likely_line"
-        ]
-      },
-      "StudyInsightsInput": {
-        "type": "object",
-        "properties": {
-          "threshold_card": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "equity_distribution": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "range_advantage": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "nut_advantage": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "blockers": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "hand_role": {
-            "type": "string"
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            }
-          }
-        },
-        "required": [
-          "threshold_card",
-          "equity_distribution",
-          "range_advantage",
-          "nut_advantage",
-          "blockers",
-          "hand_role",
-          "noise_flags"
-        ],
-        "description": "solver-query's InsightsResponse relayed as is; S23 pins the inner shapes"
-      },
-      "CoverageInput": {
-        "type": "object",
-        "properties": {
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "preflop_available": {
-            "type": "boolean"
-          },
-          "flops": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "flop": {
-                  "type": "string"
-                },
-                "texture_family": {
-                  "type": "string"
-                },
-                "scenarios": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "flop",
-                "texture_family",
-                "scenarios"
-              ]
-            }
-          },
-          "queue": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "job_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "flop": {
-                  "type": "string"
-                },
-                "priority": {
-                  "type": "number"
-                },
-                "position": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "job_id",
-                "flop",
-                "priority",
-                "position"
-              ]
-            }
-          }
-        },
-        "required": [
-          "config_id",
-          "pair",
-          "preflop_available",
-          "flops",
-          "queue"
-        ]
-      },
       "PracticeSessionInput": {
         "type": "object",
         "properties": {
@@ -1699,6 +2150,48 @@
             "items": {
               "type": "string"
             }
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ],
+            "description": "The street of the node the hero acts at"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+          },
+          "previous_board": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[2-9TJQKA][cdhs]$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
           }
         },
         "required": [
@@ -1712,7 +2205,11 @@
           "stacks_cbb",
           "history",
           "buttons",
-          "visible_panels"
+          "visible_panels",
+          "street",
+          "rng_roll",
+          "previous_board",
+          "synthetic"
         ]
       },
       "DecisionFeedbackInput": {
@@ -1781,6 +2278,32 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
           }
         },
         "required": [
@@ -1794,7 +2317,12 @@
           "ev_by_action",
           "rated",
           "rng_roll",
-          "state_version"
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand"
         ]
       },
       "SessionRecapInput": {
@@ -1895,6 +2423,240 @@
         ],
         "additionalProperties": false,
         "description": "RFC 9457 problem details (application/problem+json)"
+      },
+      "BuilderStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused",
+              "throttled",
+              "idle",
+              "unknown"
+            ],
+            "description": "paused while the paused setting is on, else the last state the builder announced since the api started, else unknown (O-243)"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "queue": {
+            "type": "object",
+            "properties": {
+              "queued": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "running": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "blocked_budget": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "queued",
+              "running",
+              "failed",
+              "blocked_budget"
+            ],
+            "additionalProperties": false
+          },
+          "throughput_per_hour": {
+            "type": "number",
+            "description": "Builds done in the last 24 hours, divided by 24"
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "library_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reference_bytes": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "library_bytes",
+              "reference_bytes"
+            ],
+            "additionalProperties": false
+          },
+          "settings": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "The stored overrides; an absent key means the builder's default (O-188)"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "queue",
+          "throughput_per_hour",
+          "storage",
+          "settings"
+        ],
+        "additionalProperties": false
+      },
+      "BuilderSettingsPatch": {
+        "type": "object",
+        "properties": {
+          "paused": {
+            "type": "boolean"
+          },
+          "cpu_share": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "description": "A share of the solve threads, above 0 and at most 1"
+          },
+          "overnight": {
+            "type": "object",
+            "properties": {
+              "start_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "end_hour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "utc_offset_minutes": {
+                "type": "integer",
+                "minimum": -1439,
+                "maximum": 1439
+              },
+              "cpu_share": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "description": "A share of the solve threads, above 0 and at most 1"
+              }
+            },
+            "required": [
+              "start_hour",
+              "end_hour",
+              "utc_offset_minutes",
+              "cpu_share"
+            ],
+            "additionalProperties": false
+          },
+          "budget_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "bytes_per_runout": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "bytes_per_flop_tree": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1073741824
+          },
+          "k_runouts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_runouts_rare": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 2352
+          },
+          "k_frequent_pairs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1326
+          },
+          "plan_configs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+              "description": "A game_config identifier, for example cfg_9_live_13_150"
+            },
+            "description": "Configuration ids the planner enumerates; [] turns planning off"
+          },
+          "target_pct_pot": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "max_iterations": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "max_seconds_per_line": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 86400
+          },
+          "storage_bits": {
+            "type": "number",
+            "enum": [
+              16,
+              32
+            ]
+          },
+          "memory_cap_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "max_attempts": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "stale_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 168
+          },
+          "verify_interval_hours": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 720
+          },
+          "plan_interval_minutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10080
+          },
+          "poll_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          }
+        },
+        "additionalProperties": false
       },
       "SessionInfo": {
         "type": "object",
@@ -2102,6 +2864,695 @@
           "oop",
           "ip",
           "preflop_available"
+        ],
+        "additionalProperties": false
+      },
+      "NodeAction": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "token": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fold",
+              "check",
+              "call",
+              "limp",
+              "straddle",
+              "bet",
+              "raise",
+              "all_in"
+            ]
+          },
+          "size_cbb": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bucket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "next_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node this action leads to; null when it ends the solution (O-245, O-280)"
+          }
+        },
+        "required": [
+          "index",
+          "token",
+          "kind",
+          "size_cbb",
+          "bucket",
+          "label",
+          "next_node_key"
+        ],
+        "additionalProperties": false
+      },
+      "ActionShare": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "share": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "index",
+          "share"
+        ],
+        "additionalProperties": false
+      },
+      "NodeHandRow": {
+        "type": "object",
+        "properties": {
+          "hand": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_bb": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ev_best_bb": {
+            "type": "number"
+          },
+          "loss_pct_pot": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "reach": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "hand",
+          "strategy",
+          "ev_bb",
+          "ev_best_bb",
+          "loss_pct_pot",
+          "reach"
+        ],
+        "additionalProperties": false
+      },
+      "StudyNode": {
+        "type": "object",
+        "properties": {
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "An opaque node key"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ]
+          },
+          "to_act": {
+            "type": "string",
+            "enum": [
+              "UTG",
+              "UTG1",
+              "UTG2",
+              "LJ",
+              "HJ",
+              "CO",
+              "BTN",
+              "SB",
+              "BB"
+            ]
+          },
+          "pot_cbb": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stacks_cbb": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "floor_pct_pot": {
+            "type": "number"
+          },
+          "spot_class_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeAction"
+            }
+          },
+          "hands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeHandRow"
+            }
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            }
+          },
+          "next_likely_line": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
+                "description": "A preflop line as dot-separated action tokens, for example r250.c"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The line the api prefetched next (R3.3)"
+          },
+          "next_likely_node_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "An opaque node key"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node the api prefetched next; null when the likeliest action ends the solution (R3.3)"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the solution is synthetic test data (O-229, O-57)"
+          },
+          "range_by_action": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionShare"
+            },
+            "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
+          }
+        },
+        "required": [
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "street",
+          "to_act",
+          "pot_cbb",
+          "stacks_cbb",
+          "floor_pct_pot",
+          "spot_class_key",
+          "actions",
+          "hands",
+          "noise_flags",
+          "next_likely_line",
+          "next_likely_node_key",
+          "synthetic",
+          "range_by_action"
+        ],
+        "additionalProperties": false
+      },
+      "ThresholdCard": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "token": {
+                  "type": "string"
+                },
+                "share_taking": {
+                  "type": "number"
+                },
+                "weakest_hand_taking_half": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "index",
+                "token",
+                "share_taking",
+                "weakest_hand_taking_half"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "strongest_folding_hand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hand_position": {
+            "type": "object",
+            "properties": {
+              "hand": {
+                "type": "string"
+              },
+              "equity_vs_villain": {
+                "type": "number"
+              },
+              "rank_in_range": {
+                "type": "number"
+              },
+              "relative": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "position": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "at",
+                        "below"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "position"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "hand",
+              "equity_vs_villain",
+              "rank_in_range",
+              "relative"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "actions",
+          "strongest_folding_hand",
+          "hand_position"
+        ],
+        "additionalProperties": false
+      },
+      "EquityDistribution": {
+        "type": "object",
+        "properties": {
+          "bin_edges": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "oop": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ip": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "bin_edges",
+          "oop",
+          "ip"
+        ],
+        "additionalProperties": false
+      },
+      "RangeAdvantage": {
+        "type": "object",
+        "properties": {
+          "oop_mean_equity": {
+            "type": "number"
+          },
+          "ip_mean_equity": {
+            "type": "number"
+          },
+          "to_act_advantage_pct_points": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "oop_mean_equity",
+          "ip_mean_equity",
+          "to_act_advantage_pct_points"
+        ],
+        "additionalProperties": false
+      },
+      "NutAdvantage": {
+        "type": "object",
+        "properties": {
+          "threshold_equity": {
+            "type": "number"
+          },
+          "oop_share": {
+            "type": "number"
+          },
+          "ip_share": {
+            "type": "number"
+          },
+          "to_act_advantage": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "threshold_equity",
+          "oop_share",
+          "ip_share",
+          "to_act_advantage"
+        ],
+        "additionalProperties": false
+      },
+      "Blockers": {
+        "type": "object",
+        "properties": {
+          "hand": {
+            "type": "string"
+          },
+          "villain_combos_removed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "villain_reach_removed_share": {
+            "type": "number"
+          },
+          "top_blocked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hand": {
+                  "type": "string"
+                },
+                "reach_removed": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hand",
+                "reach_removed"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "hand",
+          "villain_combos_removed",
+          "villain_reach_removed_share",
+          "top_blocked"
+        ],
+        "additionalProperties": false
+      },
+      "StudyInsights": {
+        "type": "object",
+        "properties": {
+          "threshold_card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThresholdCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity_distribution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EquityDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "range_advantage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RangeAdvantage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nut_advantage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NutAdvantage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockers": {
+            "$ref": "#/components/schemas/Blockers"
+          },
+          "hand_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "value",
+                  "marginal",
+                  "bluff",
+                  "fold",
+                  "trap"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noise_flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "close_ev_mix",
+                "rare_line",
+                "suit_mixing"
+              ]
+            }
+          }
+        },
+        "required": [
+          "threshold_card",
+          "equity_distribution",
+          "range_advantage",
+          "nut_advantage",
+          "blockers",
+          "hand_role",
+          "noise_flags"
+        ],
+        "additionalProperties": false,
+        "description": "solver-query's InsightsResponse relayed as is; a part it cannot answer at the node is null"
+      },
+      "Coverage": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "preflop_available": {
+            "type": "boolean"
+          },
+          "flops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flop": {
+                  "type": "string"
+                },
+                "texture_family": {
+                  "type": "string"
+                },
+                "scenarios": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "flop",
+                "texture_family",
+                "scenarios"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "flop": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "number"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "job_id",
+                "flop",
+                "priority",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when a held preflop solution is synthetic test data (O-229, O-57)"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "unconfigured",
+              "unavailable"
+            ],
+            "description": "Whether solver-query's database answered; flops and queue are empty unless connected (O-172)"
+          }
+        },
+        "required": [
+          "config_id",
+          "pair",
+          "preflop_available",
+          "flops",
+          "queue",
+          "synthetic",
+          "database"
         ],
         "additionalProperties": false
       },
@@ -2904,468 +4355,6 @@
         },
         "additionalProperties": false
       },
-      "BuilderStatus": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "running",
-              "paused",
-              "throttled"
-            ]
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "queue": {
-            "type": "object",
-            "properties": {
-              "queued": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "running": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "failed": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "queued",
-              "running",
-              "failed"
-            ],
-            "additionalProperties": false
-          },
-          "throughput_per_hour": {
-            "type": "number"
-          },
-          "storage": {
-            "type": "object",
-            "properties": {
-              "library_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              "reference_bytes": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              }
-            },
-            "required": [
-              "library_bytes",
-              "reference_bytes"
-            ],
-            "additionalProperties": false
-          },
-          "settings": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          }
-        },
-        "required": [
-          "state",
-          "reason",
-          "queue",
-          "throughput_per_hour",
-          "storage",
-          "settings"
-        ],
-        "additionalProperties": false
-      },
-      "NodeAction": {
-        "type": "object",
-        "properties": {
-          "index": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "token": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "fold",
-              "check",
-              "call",
-              "limp",
-              "straddle",
-              "bet",
-              "raise",
-              "all_in"
-            ]
-          },
-          "size_cbb": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "bucket": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "label": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "index",
-          "token",
-          "kind",
-          "size_cbb",
-          "bucket",
-          "label"
-        ],
-        "additionalProperties": false
-      },
-      "NodeHandRow": {
-        "type": "object",
-        "properties": {
-          "hand": {
-            "type": "string"
-          },
-          "strategy": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_bb": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "ev_best_bb": {
-            "type": "number"
-          },
-          "loss_pct_pot": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "reach": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "hand",
-          "strategy",
-          "ev_bb",
-          "ev_best_bb",
-          "loss_pct_pot",
-          "reach"
-        ],
-        "additionalProperties": false
-      },
-      "StudyNode": {
-        "type": "object",
-        "properties": {
-          "solution_id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "node_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512,
-            "description": "An opaque node key"
-          },
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "street": {
-            "type": "string",
-            "enum": [
-              "preflop",
-              "flop",
-              "turn",
-              "river"
-            ]
-          },
-          "to_act": {
-            "type": "string",
-            "enum": [
-              "UTG",
-              "UTG1",
-              "UTG2",
-              "LJ",
-              "HJ",
-              "CO",
-              "BTN",
-              "SB",
-              "BB"
-            ]
-          },
-          "pot_cbb": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "stacks_cbb": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "floor_pct_pot": {
-            "type": "number"
-          },
-          "spot_class_key": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "actions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeAction"
-            }
-          },
-          "hands": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NodeHandRow"
-            }
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            }
-          },
-          "next_likely_line": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$",
-                "description": "A preflop line as dot-separated action tokens, for example r250.c"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The line the api prefetched next (R3.3)"
-          }
-        },
-        "required": [
-          "solution_id",
-          "node_key",
-          "config_id",
-          "pair",
-          "street",
-          "to_act",
-          "pot_cbb",
-          "stacks_cbb",
-          "floor_pct_pot",
-          "spot_class_key",
-          "actions",
-          "hands",
-          "noise_flags",
-          "next_likely_line"
-        ],
-        "additionalProperties": false
-      },
-      "StudyInsights": {
-        "type": "object",
-        "properties": {
-          "threshold_card": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "equity_distribution": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "range_advantage": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "nut_advantage": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "blockers": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "hand_role": {
-            "type": "string"
-          },
-          "noise_flags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "close_ev_mix",
-                "rare_line",
-                "suit_mixing"
-              ]
-            }
-          }
-        },
-        "required": [
-          "threshold_card",
-          "equity_distribution",
-          "range_advantage",
-          "nut_advantage",
-          "blockers",
-          "hand_role",
-          "noise_flags"
-        ],
-        "additionalProperties": false,
-        "description": "solver-query's InsightsResponse relayed as is; S23 pins the inner shapes"
-      },
-      "Coverage": {
-        "type": "object",
-        "properties": {
-          "config_id": {
-            "type": "string",
-            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          "pair": {
-            "type": "string",
-            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          "preflop_available": {
-            "type": "boolean"
-          },
-          "flops": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "flop": {
-                  "type": "string"
-                },
-                "texture_family": {
-                  "type": "string"
-                },
-                "scenarios": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "flop",
-                "texture_family",
-                "scenarios"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "queue": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "job_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "flop": {
-                  "type": "string"
-                },
-                "priority": {
-                  "type": "number"
-                },
-                "position": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "job_id",
-                "flop",
-                "priority",
-                "position"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "config_id",
-          "pair",
-          "preflop_available",
-          "flops",
-          "queue"
-        ],
-        "additionalProperties": false
-      },
       "PracticeSession": {
         "type": "object",
         "properties": {
@@ -3546,6 +4535,48 @@
             "items": {
               "type": "string"
             }
+          },
+          "street": {
+            "type": "string",
+            "enum": [
+              "preflop",
+              "flop",
+              "turn",
+              "river"
+            ],
+            "description": "The street of the node the hero acts at"
+          },
+          "rng_roll": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+          },
+          "previous_board": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[2-9TJQKA][cdhs]$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The board revealed when the previous hand ended (full-hand mode); null when none was"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"
           }
         },
         "required": [
@@ -3559,7 +4590,11 @@
           "stacks_cbb",
           "history",
           "buttons",
-          "visible_panels"
+          "visible_panels",
+          "street",
+          "rng_roll",
+          "previous_board",
+          "synthetic"
         ],
         "additionalProperties": false
       },
@@ -3629,6 +4664,32 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "solution_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The solution the decision was graded against"
+          },
+          "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The node the hero decided at"
+          },
+          "config_id": {
+            "type": "string",
+            "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$",
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          "pair": {
+            "type": "string",
+            "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$",
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          "hand": {
+            "type": "string",
+            "description": "The hero's hand as graded"
           }
         },
         "required": [
@@ -3642,7 +4703,12 @@
           "ev_by_action",
           "rated",
           "rng_roll",
-          "state_version"
+          "state_version",
+          "solution_id",
+          "node_key",
+          "config_id",
+          "pair",
+          "hand"
         ],
         "additionalProperties": false
       },
@@ -5332,7 +6398,6 @@
         "tags": [
           "study"
         ],
-        "description": "One preflop node from the library\n\nAnswers 501 until S23 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -5363,6 +6428,17 @@
             "name": "line",
             "required": false,
             "description": "The preflop action path; the pair's root when absent"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "in": "query",
+            "name": "node_key",
+            "required": false,
+            "description": "A node key solver-query handed out (a next_likely_node_key); excludes line (O-245)"
           },
           {
             "schema": {
@@ -5451,8 +6527,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5470,7 +6556,6 @@
         "tags": [
           "study"
         ],
-        "description": "Insight data for a hand at a node\n\nAnswers 501 until S23 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -5570,120 +6655,8 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/study/turn-roots": {
-      "get": {
-        "summary": "Every turn root at a flop node",
-        "tags": [
-          "study"
-        ],
-        "description": "Every turn root at a flop node\n\nAnswers 501 until a v1.5 session (O-15) builds it (O-38).",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$"
-            },
-            "in": "query",
-            "name": "config_id",
-            "required": true,
-            "description": "A game_config identifier, for example cfg_9_live_13_150"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$"
-            },
-            "in": "query",
-            "name": "pair",
-            "required": true,
-            "description": "Two positions, out of position first, for example BB-BTN"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$"
-            },
-            "in": "query",
-            "name": "line",
-            "required": true,
-            "description": "A preflop line as dot-separated action tokens, for example r250.c"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^([2-9TJQKA][cdhs]){3}$"
-            },
-            "in": "query",
-            "name": "flop",
-            "required": true,
-            "description": "Three cards, for example KhQd4s"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "roots": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "turn": {
-                            "type": "string"
-                          },
-                          "node_key": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 512,
-                            "description": "An opaque node key"
-                          },
-                          "solution_id": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                          }
-                        },
-                        "required": [
-                          "turn",
-                          "node_key",
-                          "solution_id"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "roots"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
+          "502": {
+            "description": "Problem (502)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5692,48 +6665,8 @@
               }
             }
           },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5751,7 +6684,6 @@
         "tags": [
           "coverage"
         ],
-        "description": "What the library holds for a configuration and pair\n\nAnswers 501 until S23 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -5840,8 +6772,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5855,11 +6797,10 @@
     },
     "/api/v1/coverage/requests": {
       "post": {
-        "summary": "Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)",
+        "summary": "Raise a build's priority for an uncovered spot or record the request; never starts a solve (ADR 0018)",
         "tags": [
           "coverage"
         ],
-        "description": "Raise a build's priority for an uncovered spot; never starts a solve (ADR 0018)\n\nAnswers 501 until S23 builds it (O-38).",
         "requestBody": {
           "required": true,
           "content": {
@@ -5933,6 +6874,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "blocked_budget",
+                        "recorded",
+                        "covered"
+                      ],
+                      "description": "queued: the build job was raised to the queue head; blocked_budget: the job waits on the storage budget, has no queue position and keeps its priority, and the request is recorded; recorded: no job to raise, the request is recorded for the planner; covered: the library already holds the spot, nothing was written"
+                    },
                     "job_id": {
                       "anyOf": [
                         {
@@ -5944,9 +6895,10 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The raised build job; null when the spot is already covered"
+                      "description": "The spot's build job when status is queued or blocked_budget; null when recorded or covered"
                     },
                     "priority": {
+                      "description": "The job's priority after the request; null when job_id is null",
                       "type": [
                         "number",
                         "null"
@@ -5962,10 +6914,12 @@
                         {
                           "type": "null"
                         }
-                      ]
+                      ],
+                      "description": "1 plus the queued jobs the builder claims first; null unless status is queued"
                     }
                   },
                   "required": [
+                    "status",
                     "job_id",
                     "priority",
                     "queue_position"
@@ -6075,8 +7029,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6094,7 +7058,7 @@
         "tags": [
           "sessions"
         ],
-        "description": "Start a practice session\n\nAnswers 501 until S23 builds it (O-38).",
+        "description": "Drill mode in S23; automated and holdout answer 501 until S31, prediction and range_paint until S27 (O-249).",
         "requestBody": {
           "required": true,
           "content": {
@@ -6247,6 +7211,11 @@
                       }
                     },
                     "additionalProperties": false
+                  },
+                  "seed": {
+                    "description": "The session seed; the same seed and choices replay the same session (O-249). Random when absent",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{16}$"
                   }
                 },
                 "required": [
@@ -6405,6 +7374,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -6415,7 +7404,7 @@
         "tags": [
           "sessions"
         ],
-        "description": "The next prompt: table state and the buttons from the tree\n\nAnswers 501 until S23 builds it (O-38).",
+        "description": "Derived from the session state on every call; writes nothing, so a repeat answers the same prompt.",
         "parameters": [
           {
             "schema": {
@@ -6474,6 +7463,26 @@
               }
             }
           },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Problem (429)",
             "content": {
@@ -6494,8 +7503,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6513,7 +7532,6 @@
         "tags": [
           "sessions"
         ],
-        "description": "Submit a decision and receive its feedback; a double submission is graded once\n\nAnswers 501 until S23 builds it (O-38).",
         "requestBody": {
           "required": true,
           "content": {
@@ -6713,8 +7731,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6732,15 +7760,21 @@
         "tags": [
           "sessions"
         ],
-        "description": "End a session and receive its recap\n\nAnswers 501 until S23 builds it (O-38).",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
@@ -6866,6 +7900,765 @@
           },
           "422": {
             "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Server-sent events: coverage_added and builder_state, and build_progress for admins",
+        "tags": [
+          "events"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "text/event-stream (O-243): a retry line, then coverage_added and builder_state to every signed-in user and build_progress to admins only, each as an event line and one JSON data line (A4 section 4), and a heartbeat comment every 15 seconds; no replay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/builder": {
+      "get": {
+        "summary": "Builder queue, throughput, storage and settings",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuilderStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/builder/settings": {
+      "patch": {
+        "summary": "Change builder settings; returns every stored override",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuilderSettingsPatchInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {},
+                      "description": "The stored overrides; an absent key means the builder's default (O-188)"
+                    }
+                  },
+                  "required": [
+                    "settings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/builder/pause": {
+      "post": {
+        "summary": "Pause the builder",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuilderStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/builder/resume": {
+      "post": {
+        "summary": "Resume the builder",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7e]{1,255}$"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuilderStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem (403)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem (409)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem (413)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Problem (415)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem (429)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Problem (500)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/study/turn-roots": {
+      "get": {
+        "summary": "Every turn root at a flop node",
+        "tags": [
+          "study"
+        ],
+        "description": "Every turn root at a flop node\n\nAnswers 501 until a v1.5 session (O-15) builds it (O-38).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$"
+            },
+            "in": "query",
+            "name": "config_id",
+            "required": true,
+            "description": "A game_config identifier, for example cfg_9_live_13_150"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)-(UTG|UTG1|UTG2|LJ|HJ|CO|BTN|SB|BB)$"
+            },
+            "in": "query",
+            "name": "pair",
+            "required": true,
+            "description": "Two positions, out of position first, for example BB-BTN"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][0-9]*(\\.[a-z][0-9]*)*$"
+            },
+            "in": "query",
+            "name": "line",
+            "required": true,
+            "description": "A preflop line as dot-separated action tokens, for example r250.c"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^([2-9TJQKA][cdhs]){3}$"
+            },
+            "in": "query",
+            "name": "flop",
+            "required": true,
+            "description": "Three cards, for example KhQd4s"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "roots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "turn": {
+                            "type": "string"
+                          },
+                          "node_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512,
+                            "description": "An opaque node key"
+                          },
+                          "solution_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "required": [
+                          "turn",
+                          "node_key",
+                          "solution_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "roots"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (400)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem (401)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem (404)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8455,708 +10248,6 @@
                     "cost_cents"
                   ],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/events": {
-      "get": {
-        "summary": "Server-sent events: coverage_added, builder_state, session nudges",
-        "tags": [
-          "events"
-        ],
-        "description": "Server-sent events: coverage_added, builder_state, session nudges\n\nAnswers 501 until S23 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Server-sent events: coverage_added, builder_state, session nudges",
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "type": "string",
-                  "description": "text/event-stream with events coverage_added, builder_state and session_nudge (A4 section 4)"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/builder": {
-      "get": {
-        "summary": "Builder queue, throughput, storage and settings",
-        "tags": [
-          "admin"
-        ],
-        "description": "Builder queue, throughput, storage and settings\n\nAnswers 501 until S23 builds it (O-38).",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BuilderStatus"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/builder/settings": {
-      "patch": {
-        "summary": "Change builder settings",
-        "tags": [
-          "admin"
-        ],
-        "description": "Change builder settings\n\nAnswers 501 until S23 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
-                },
-                "additionalProperties": {}
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "settings": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "settings"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/builder/pause": {
-      "post": {
-        "summary": "Pause the builder",
-        "tags": [
-          "admin"
-        ],
-        "description": "Pause the builder\n\nAnswers 501 until S23 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BuilderStatus"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Problem (400)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Problem (401)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Problem (403)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Problem (404)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Problem (409)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Problem (413)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Problem (415)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Problem (422)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Problem (429)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/builder/resume": {
-      "post": {
-        "summary": "Resume the builder",
-        "tags": [
-          "admin"
-        ],
-        "description": "Resume the builder\n\nAnswers 501 until S23 builds it (O-38).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "in": "header",
-            "name": "x-csrf-token",
-            "required": true,
-            "description": "The csrf_token from POST /auth/login or GET /me (O-230)"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^[\\x21-\\x7e]{1,255}$"
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": false,
-            "description": "Optional; a repeat with the same key and request replays the first response (O-232)"
-          }
-        ],
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BuilderStatus"
                 }
               }
             }

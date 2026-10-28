@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 
 const CONTAINER_START_TIMEOUT_MS = 180_000;
 const TEST_TIMEOUT_MS = 30_000;
+const COVERAGE_GATE_PERCENT = 80;
 
 export default defineConfig({
   test: {
@@ -17,6 +18,13 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/main.ts", "src/openapi-export.ts", "src/cli/create-user.ts"],
       reporter: ["text-summary", "text"],
+      // The 80 percent gate (A9 section 1), enforced by just coverage-api from S23 on.
+      thresholds: {
+        lines: COVERAGE_GATE_PERCENT,
+        branches: COVERAGE_GATE_PERCENT,
+        functions: COVERAGE_GATE_PERCENT,
+        statements: COVERAGE_GATE_PERCENT,
+      },
     },
   },
 });

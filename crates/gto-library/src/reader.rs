@@ -191,6 +191,23 @@ impl<S: ObjectStore> Reader<S> {
         Ok(NodeView::from(record))
     }
 
+    /// Whether the solution holds `key`, from its chunk directory alone: no frame is decoded,
+    /// so a caller can test every child of a node for one record decode (O-245, PR #25 M6).
+    /// Key hashes are unique within a solution (checked at write time, A3 section 1), so a
+    /// present hash names the key; a 64-bit collision with an absent key is not guarded.
+    ///
+    /// # Errors
+    ///
+    /// As `node`, except that an absent key is `Ok(false)`, not `NodeNotFound`.
+    pub fn contains(&self, h: SolutionHandle, key: &NodeKey) -> Result<bool, LibraryError> {
+        let hash = key_hash(key);
+        let Some((prefix, file, slot)) = self.locate(h, key, hash)? else {
+            return Ok(false);
+        };
+        let directory = self.directory(h, &prefix, file, &slot)?;
+        Ok(directory.find(hash).is_some())
+    }
+
     /// Whether the solution can serve reads; `Unavailable` for an unknown handle too.
     #[must_use]
     pub fn availability(&self, h: SolutionHandle) -> Availability {

@@ -17,6 +17,8 @@ The recipes in the root justfile are the contract; continuous integration (CI) c
 
 dbmate and the tests read DATABASE_URL from the environment, then from the gitignored .env at the repo root. The URL is the superuser one, postgres://postgres:...@localhost:5432/gto?sslmode=disable, because the tests SET ROLE to each group role and the migrations create roles and grants.
 
+The app role may write only the email and password_hash of app_user, so it can never set is_admin (O-242). An admin account is created by `create-user --admin`, which connects through CREATE_USER_ADMIN_DATABASE_URL, the owner URL of the same form as DATABASE_URL, passed in the caller's environment for that one command (for example `docker compose exec -T -e CREATE_USER_ADMIN_DATABASE_URL api node dist/create-user.js --admin <email>`); it is deliberately not in .env.example.
+
 Each migration is a timestamped file with a migrate:up and a migrate:down section and a header comment that names its source (A4 section, ADR, O-ID) and explains the mechanism before the rule. Migrations are forward-only in production (A4 section 1): the down sections exist so a developer can roll back locally and so the test suite can prove the pair is consistent. The applied list lives in the schema_migrations table dbmate maintains.
 
 Order of the files:

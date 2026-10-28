@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "build": "node build.mjs",
     "start": "node dist/index.js"
   },

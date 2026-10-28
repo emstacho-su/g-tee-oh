@@ -227,6 +227,23 @@ impl NodeKey {
         }
     }
 
+    /// The key one action later: `token` appended to the actions of the street the node is
+    /// on. The child key solver-query names as an action's `next_node_key` (O-245), so the
+    /// api walks a tree without the key grammar (ADR 0004).
+    #[must_use]
+    pub fn with_action(mut self, token: ActionToken) -> NodeKey {
+        if let Some(river) = self.river.as_mut() {
+            river.actions.push(token);
+        } else if let Some(turn) = self.turn.as_mut() {
+            turn.actions.push(token);
+        } else if let Some(flop) = self.flop.as_mut() {
+            flop.actions.push(token);
+        } else {
+            self.preflop.push(token);
+        }
+        self
+    }
+
     /// The preflop line as text, for example `r300.c`; the manifest and the build paths
     /// name flop trees by it (A3 sections 2 and 3).
     #[must_use]

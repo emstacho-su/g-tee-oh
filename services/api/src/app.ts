@@ -36,11 +36,18 @@ import { authentication } from "./plugins/authenticate.js";
 import { csrfGuard } from "./plugins/csrf.js";
 import { idempotency } from "./plugins/idempotency.js";
 import { security } from "./plugins/security.js";
+import type { NotificationSource } from "./events/source.js";
+import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { catalogRoutes } from "./routes/catalog.js";
+import { coverageRoutes } from "./routes/coverage.js";
 import { drillRoutes } from "./routes/drills.js";
+import { eventRoutes } from "./routes/events.js";
 import { healthzRoutes } from "./routes/healthz.js";
 import { plannedRoutes } from "./routes/planned.js";
+import { sessionRoutes } from "./routes/sessions.js";
+import { studyRoutes } from "./routes/study.js";
+import type { SolverQuery } from "./solver-query/client.js";
 import { API_VERSION } from "./version.js";
 
 export const API_PREFIX = "/api/v1";
@@ -67,6 +74,16 @@ export interface BuildAppOptions {
    * tests: every route still registers, and a handler that needs the database answers 503.
    */
   database?: Database;
+  /**
+   * The solver-query client (S23, ADR 0004). Absent for the OpenAPI export and unit tests; a
+   * handler that needs it then answers 503.
+   */
+  solverQuery?: SolverQuery;
+  /**
+   * Database notifications relayed over GET /events (S23, O-243). Absent for the OpenAPI export
+   * and tests that do not open the stream; the stream then carries heartbeats only.
+   */
+  notifications?: NotificationSource;
 }
 
 export function buildApp(options: BuildAppOptions = {}): ApiApp {
@@ -78,6 +95,8 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   app.setErrorHandler(problemErrorHandler);
   app.setNotFoundHandler(problemNotFoundHandler);
   app.decorate("database", options.database ?? null);
+  app.decorate("solverQuery", options.solverQuery ?? null);
+  app.decorate("notifications", options.notifications ?? null);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
   void app.register(security, { config });
@@ -100,6 +119,11 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(authRoutes, { prefix: API_PREFIX, config });
   void app.register(catalogRoutes, { prefix: API_PREFIX });
   void app.register(drillRoutes, { prefix: API_PREFIX });
+  void app.register(studyRoutes, { prefix: API_PREFIX, config });
+  void app.register(coverageRoutes, { prefix: API_PREFIX, config });
+  void app.register(sessionRoutes, { prefix: API_PREFIX, config });
+  void app.register(eventRoutes, { prefix: API_PREFIX, config });
+  void app.register(adminRoutes, { prefix: API_PREFIX, config });
   void app.register(plannedRoutes, { prefix: API_PREFIX });
 
   // The document describes the routes above; it does not describe itself.

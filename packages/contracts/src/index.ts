@@ -18,7 +18,10 @@ export { manifestSchema, nodeDumpSchema };
 export { InvalidBaseUrlError, assertHttpBaseUrl, createApiClient, createSolverQueryClient } from "./clients.js";
 export type { ClientFactoryOptions } from "./clients.js";
 export type { components as ApiComponents, paths as ApiPaths } from "./api.generated.js";
-export type { paths as SolverQueryPaths } from "./solver-query.generated.js";
+export type {
+  components as SolverQueryComponents,
+  paths as SolverQueryPaths,
+} from "./solver-query.generated.js";
 export type { DB } from "./db.generated.js";
 export { FREQUENCY_SUM_TOLERANCE, checkNodeDumpInvariants } from "./node-dump.js";
 export type {

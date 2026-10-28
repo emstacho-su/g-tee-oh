@@ -3,12 +3,23 @@
  * section 2), declared by S21 for the contract-first commit (O-38). S23 builds the sessions, S27
  * prediction and painting. Every decision carries the state_version the client last saw, so a
  * stale or double-submitted decision is detected (A5 section 3); the owners may change these
- * shapes with a visible contract diff.
+ * shapes with a visible contract diff. S23 added, additively: the optional session seed on
+ * POST /sessions (O-249, O-151), and the prompt's street, rng_roll and previous_board.
  */
 import { z } from "zod";
 
 import { nodeActionSchema } from "./study.js";
-import { cardSchema, handClassSchema, nodeKeySchema, positionSchema, timestampSchema, uuidSchema } from "./common.js";
+import {
+  cardSchema,
+  configIdSchema,
+  handClassSchema,
+  nodeKeySchema,
+  positionPairSchema,
+  positionSchema,
+  streetSchema,
+  timestampSchema,
+  uuidSchema,
+} from "./common.js";
 import { trainerSettingsSchema } from "./drills.js";
 
 export const practiceModeSchema = z.enum(["automated", "drill", "holdout", "prediction", "range_paint"]);
@@ -25,10 +36,17 @@ export const sessionStateSchema = z.enum([
 export const gradeLabelSchema = z.enum(["best", "correct", "inaccuracy", "mistake", "blunder"]);
 export const confidenceSchema = z.enum(["sure", "unsure"]);
 
+/** A 64-bit seed or generator state as sixteen lowercase hexadecimal digits, as solver-query writes it (O-151). */
+export const HEX64_PATTERN = /^[0-9a-f]{16}$/;
+export const hex64Schema = z.string().regex(HEX64_PATTERN).describe("Sixteen lowercase hexadecimal digits (O-151)");
+
 export const sessionCreateBodySchema = z.strictObject({
   mode: practiceModeSchema,
   drill_id: uuidSchema.optional().describe("Required when mode is drill"),
   settings: trainerSettingsSchema.partial().optional(),
+  seed: hex64Schema
+    .optional()
+    .describe("The session seed; the same seed and choices replay the same session (O-249). Random when absent"),
 });
 
 export const sessionSchema = z
@@ -55,6 +73,21 @@ export const promptSchema = z
     history: z.array(z.object({ position: positionSchema, token: z.string(), label: z.string() })),
     buttons: z.array(nodeActionSchema).describe("Generated from the node's tree actions (ADR 0020)"),
     visible_panels: z.array(z.string()),
+    street: streetSchema.describe("The street of the node the hero acts at"),
+    rng_roll: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .nullable()
+      .describe("The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"),
+    previous_board: z
+      .array(cardSchema)
+      .nullable()
+      .describe("The board revealed when the previous hand ended (full-hand mode); null when none was"),
+    synthetic: z
+      .boolean()
+      .describe("True when the node's solution is synthetic test data, for the banner (O-229, O-57, O-280)"),
   })
   .meta({ id: "TrainerPrompt" });
 
@@ -80,6 +113,13 @@ export const feedbackSchema = z
     rated: z.boolean(),
     rng_roll: z.number().int().nullable(),
     state_version: z.number().int().min(0),
+    // O-280, O-281: where the decision was made, read from the attempt row and its solution row
+    // (O-246), so the feedback panel can fetch the range view and threshold card for that node.
+    solution_id: uuidSchema.describe("The solution the decision was graded against"),
+    node_key: nodeKeySchema.describe("The node the hero decided at"),
+    config_id: configIdSchema,
+    pair: positionPairSchema,
+    hand: z.string().describe("The hero's hand as graded"),
   })
   .meta({ id: "DecisionFeedback" });
 

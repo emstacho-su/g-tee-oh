@@ -68,6 +68,11 @@ pub struct ActionView {
     /// size at a preflop node, for example `Raise to 2.5bb` (O-22).
     #[schema(example = "Raise to 2.5bb")]
     pub label: String,
+    /// The node this action leads to when the solution holds it; null when the action
+    /// ends the solution (a fold, or the action that closes its last street). The api walks
+    /// trees through it and never builds a child key itself (O-245, ADR 0004); additive.
+    #[schema(example = "cfg_6_online_100/BB-BTN/r250")]
+    pub next_node_key: Option<String>,
 }
 
 /// One hand's row of the node.
@@ -146,6 +151,13 @@ pub struct NodeResponse {
     pub accuracy_pct_pot: Option<f32>,
     /// The grading floor at this node in percent of the pot (O-22, O-150).
     pub floor_pct_pot: f32,
+    /// The preflop action family of the decision at this node, from
+    /// `gto_model::ActionFamily::classify` over the key's pair and preflop line, as
+    /// `ActionFamily::as_str` (`rfi`, `facing-open`, ...); null at a postflop node. The api
+    /// matches drill families against it and never classifies a line itself (ADR 0004,
+    /// PR #25 re-review); additive.
+    #[schema(example = "facing-open")]
+    pub action_family: Option<String>,
     /// The spot-class key of a preflop node under a catalog configuration; null otherwise.
     #[schema(example = "preflop/online/100/facing-open/BB-BTN")]
     pub spot_class_key: Option<String>,
@@ -157,4 +169,7 @@ pub struct NodeResponse {
     pub range_summary: RangeSummary,
     /// Node-level flags: `rare_line` only.
     pub noise_flags: Vec<NoiseFlag>,
+    /// True when the solution is synthetic test data, from its manifest flag, so the web
+    /// shows the synthetic banner (O-57, O-229); additive.
+    pub synthetic: bool,
 }

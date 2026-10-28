@@ -66,6 +66,7 @@ const gradeResponse: GradeResponse = {
   ev_best_bb: 1.4,
   loss_bb: 0,
   loss_pct_pot: 0,
+  loss_pct_pot_by_action: [28, 3, 0],
   floor_pct_pot: 0.2,
   floor_source: "node_accuracy",
   bucket: "small",

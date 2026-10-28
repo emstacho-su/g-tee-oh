@@ -3,41 +3,29 @@
  * sign-up route, so this is how the owner account is made:
  *
  *   printf '%s\n' "$PASSWORD" | node dist/create-user.js --email owner@example.com
+ *   printf '%s\n' "$PASSWORD" | CREATE_USER_ADMIN_DATABASE_URL=postgres://... node dist/create-user.js --email owner@example.com --admin
  *
- * Mechanism: the arguments and the first line of standard input are parsed by create-user-args.ts,
- * the database settings come from the same environment variables the server reads
- * (loadProcessConfig), and auth/users.ts creates the account. On success the new user id goes to
- * stdout and the exit code is 0; on any failure one line goes to stderr, with the password cut out,
- * and the exit code is 1. The pool is closed either way so the process ends. This file is the
- * thin process wiring and is excluded from coverage; everything it calls is tested.
+ * --admin sets app_user.is_admin, which the admin builder endpoints require (O-242). The app login
+ * cannot set that column (PR #25 review L1), so --admin connects through
+ * CREATE_USER_ADMIN_DATABASE_URL, the database owner's URL; a plain run connects as the app login
+ * from the same environment variables the server reads. cli/create-user-run.ts documents both.
+ *
+ * Mechanism: runCreateUser does the work and never throws. On success the new user id goes to
+ * stdout and the exit code is 0; on any failure one line goes to stderr, with the password and the
+ * owner URL cut out, and the exit code is 1. This file is the thin process wiring and is excluded
+ * from coverage; everything it calls is tested.
  */
 import process from "node:process";
 
-import { createUser } from "../auth/users.js";
-import { loadProcessConfig } from "../config.js";
-import { createDatabase } from "../db.js";
-import { describeFailure, parseCreateUserArgs, readFirstLine } from "./create-user-args.js";
+import { runCreateUser } from "./create-user-run.js";
 
 const EXIT_FAILURE = 1;
 const ARGV_OFFSET = 2;
 
-async function run(): Promise<void> {
-  let password: string | undefined;
-  try {
-    const { email } = parseCreateUserArgs(process.argv.slice(ARGV_OFFSET));
-    password = await readFirstLine(process.stdin);
-    const { database: databaseConfig } = loadProcessConfig(process.env);
-    const database = createDatabase(databaseConfig);
-    try {
-      const user = await createUser(database, { email, password });
-      process.stdout.write(`${user.id}\n`);
-    } finally {
-      await database.destroy();
-    }
-  } catch (error: unknown) {
-    process.stderr.write(`${describeFailure(error, password)}\n`);
-    process.exitCode = EXIT_FAILURE;
-  }
+const outcome = await runCreateUser(process.argv.slice(ARGV_OFFSET), process.stdin, process.env);
+if (outcome.ok) {
+  process.stdout.write(`${outcome.userId}\n`);
+} else {
+  process.stderr.write(`${outcome.message}\n`);
+  process.exitCode = EXIT_FAILURE;
 }
-
-await run();

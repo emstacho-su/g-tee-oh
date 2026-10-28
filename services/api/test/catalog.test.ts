@@ -199,7 +199,9 @@ describe("R3.2 catalog routes", () => {
     expect(status).toBe(200);
     expect(body.config_id).toBe("cfg_6_online_100");
     expect(body.items.map((entry) => entry.pair)).toEqual(SIX_MAX_PAIRS);
-    expect(body.items[0]).toEqual({ pair: "UTG-HJ", oop: "UTG", ip: "HJ", preflop_available: false });
+    // The global setup seeds solution rows for the fixture library (S23, scripts/fixture-solutions.mjs),
+    // whose synthetic 6-max set holds every pair of cfg_6_online_100.
+    expect(body.items[0]).toEqual({ pair: "UTG-HJ", oop: "UTG", ip: "HJ", preflop_available: true });
     expect(contractErrors("get", "/api/v1/configs/{id}/pairs", 200, body)).toEqual([]);
   });
 

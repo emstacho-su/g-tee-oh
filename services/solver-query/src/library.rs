@@ -30,7 +30,7 @@ use std::sync::Arc;
 use gto_library::{
     FsStore, LibraryError, Manifest, ManifestKind, NodeView, Reader, ReaderOptions, Source, is_uuid,
 };
-use gto_model::{ConfigId, NodeKey, PositionPair};
+use gto_model::{ActionToken, ConfigId, NodeKey, PositionPair};
 
 use crate::error::ApiError;
 
@@ -182,6 +182,51 @@ impl Library {
         tokio::task::spawn_blocking(move || self.node(&solution_id, &key))
             .await
             .map_err(|err| ApiError::Internal(format!("the node read did not run: {err}")))?
+    }
+
+    /// The key each of `tokens` leads to from `key`, when the solution holds that node;
+    /// `None` when the action ends the solution (a fold, or the action that closes the
+    /// solution's last street), so the api walks a tree without the key grammar (O-245).
+    ///
+    /// # Errors
+    ///
+    /// As `node`, except that a child the solution does not hold is `None`, not an error.
+    /// Each child is a directory lookup (`Reader::contains`), never a record decode, so a
+    /// node read stays one decode however many actions it offers (PR #25 M6).
+    pub fn next_node_keys(
+        &self,
+        solution_id: &str,
+        key: &NodeKey,
+        tokens: &[ActionToken],
+    ) -> Result<Vec<Option<NodeKey>>, ApiError> {
+        let info = self.resolve(solution_id)?;
+        let reader = self.reader.as_ref().ok_or_else(|| {
+            ApiError::Internal(format!("solution {solution_id} is indexed without a store"))
+        })?;
+        let handle = reader.open(&info.prefix)?;
+        tokens
+            .iter()
+            .map(|token| {
+                let child = key.clone().with_action(*token);
+                Ok(reader.contains(handle, &child)?.then_some(child))
+            })
+            .collect()
+    }
+
+    /// `next_node_keys` on tokio's blocking pool, for handlers.
+    ///
+    /// # Errors
+    ///
+    /// As `next_node_keys`, plus `ApiError::Internal` when the blocking task did not run.
+    pub async fn next_node_keys_blocking(
+        self: Arc<Self>,
+        solution_id: String,
+        key: NodeKey,
+        tokens: Vec<ActionToken>,
+    ) -> Result<Vec<Option<NodeKey>>, ApiError> {
+        tokio::task::spawn_blocking(move || self.next_node_keys(&solution_id, &key, &tokens))
+            .await
+            .map_err(|err| ApiError::Internal(format!("the child lookup did not run: {err}")))?
     }
 
     /// Every indexed solution of one configuration and pair, by id.

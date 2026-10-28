@@ -18,10 +18,13 @@ import { resolveBinary } from "dbmate";
 import pg from "pg";
 import type { TestProject } from "vitest/node";
 
+import { startFixtureSolverQuery } from "./fixture-solver-query.js";
+
 const POSTGRES_IMAGE = "postgres:18-alpine";
 const DATABASE_NAME = "gto";
 const APP_TEST_LOGIN = "app_test_login";
 const MIGRATIONS_DIR = fileURLToPath(new URL("../../../../db/migrations", import.meta.url));
+const FIXTURE_SOLUTIONS_SCRIPT = fileURLToPath(new URL("../../../../scripts/fixture-solutions.mjs", import.meta.url));
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -29,12 +32,28 @@ declare module "vitest" {
     adminDatabaseUrl: string;
     /** app_test_login, a member of app: what the api under test connects as. */
     appDatabaseUrl: string;
+    /** The fixture solver-query's base URL, or "" when it could not start (O-244). */
+    solverQueryUrl: string;
+    /** Why the fixture solver-query is missing, or "" when it runs. */
+    solverQueryError: string;
   }
 }
 
 function migrate(databaseUrl: string): void {
   execFileSync(resolveBinary(), ["--migrations-dir", MIGRATIONS_DIR, "--no-dump-schema", "up"], {
     env: { ...process.env, DATABASE_URL: databaseUrl },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+/**
+ * Solution rows for the committed fixture library (scripts/fixture-solutions.mjs), as the e2e
+ * stack writes them, so an attempt graded against a fixture solution satisfies its foreign key.
+ */
+function seedFixtureSolutions(databaseUrl: string): void {
+  // --dev: this is the run's own throwaway test container, whatever host name Docker reports.
+  execFileSync(process.execPath, [FIXTURE_SOLUTIONS_SCRIPT, "--dev"], {
+    env: { ...process.env, DATABASE_URL: databaseUrl, FIXTURE_LIBRARY_PATH: "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -64,13 +83,25 @@ export default async function setup(project: TestProject): Promise<() => Promise
   container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase(DATABASE_NAME).start();
   const adminUrl = `${container.getConnectionUri()}?sslmode=disable`;
   migrate(adminUrl);
+  seedFixtureSolutions(adminUrl);
   const appPassword = randomBytes(16).toString("hex");
   await createAppLogin(adminUrl, appPassword);
 
   project.provide("adminDatabaseUrl", adminUrl);
   project.provide("appDatabaseUrl", withCredentials(adminUrl, APP_TEST_LOGIN, appPassword));
 
+  // O-53, O-244: the real solver-query binary over the fixture library, as the query role.
+  const fixture = await startFixtureSolverQuery({
+    adminUrl,
+    host: container.getHost(),
+    port: container.getPort(),
+    database: DATABASE_NAME,
+  });
+  project.provide("solverQueryUrl", fixture.url);
+  project.provide("solverQueryError", fixture.error);
+
   return async () => {
+    await fixture.stop();
     await container?.stop();
   };
 }

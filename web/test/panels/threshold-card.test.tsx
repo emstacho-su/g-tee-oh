@@ -13,7 +13,7 @@ describe("R3.12 ThresholdCard", () => {
     render(<ThresholdCard card={fixtureInsights.threshold_card} />);
     const card = screen.getByTestId("threshold-card");
     expect(within(card).getByRole("heading", { name: "Threshold card" })).toBeInTheDocument();
-    expect(within(card).getByText("weakest hand")).toBeInTheDocument();
+    expect(within(card).getAllByText("weakest hand taking half")).toHaveLength(2);
     expect(within(card).getByText("K9o")).toBeInTheDocument();
     expect(within(card).getByText("0.52")).toBeInTheDocument();
     expect(card.querySelectorAll("dl").length).toBeGreaterThanOrEqual(4);
@@ -25,6 +25,11 @@ describe("R3.12 ThresholdCard", () => {
     expect(card).toHaveTextContent("Your hand: AJo");
     const match = within(card).getByText("AJo", { selector: "dd *" });
     expect(match).toHaveAttribute("data-hero", "true");
+  });
+
+  it("R3.12 a node without a threshold card says so (S23: the card is nullable)", () => {
+    render(<ThresholdCard card={null} />);
+    expect(screen.getByTestId("threshold-card")).toHaveTextContent("No threshold data for this node");
   });
 
   it("R3.12 renders arrays, booleans and null as text", () => {

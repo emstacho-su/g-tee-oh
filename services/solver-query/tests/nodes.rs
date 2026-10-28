@@ -7,10 +7,12 @@ mod common;
 use std::fs;
 
 use axum::http::StatusCode;
-use gto_model::{ActionToken, Bucket, Cbb, SpotClass, SpotClassKey, v1_configs};
+use gto_library::HandSpace;
+use gto_model::{ActionToken, Bucket, Cbb, Position, SpotClass, SpotClassKey, v1_configs};
 use serde_json::Value;
 
-use common::{assert_problem, f32_of, get, get_node, packed_fixture, sum};
+use common::plant::{self, node_of_root};
+use common::{assert_problem, f32_of, get, get_node, hand, packed_fixture, sum};
 
 /// How close a strategy row's sum must be to 1.
 const SUM_TOLERANCE: f64 = 1e-5;
@@ -128,6 +130,66 @@ async fn r2_13_nodes_hands_filter_and_errors() {
 
     let unknown = "00000000-0000-4000-8000-000000000000";
     let (status, headers, json) = get_node(fixture.router(), unknown, &key, None).await;
+    assert_problem(status, &headers, &json, StatusCode::NOT_FOUND, "not-found");
+}
+
+#[tokio::test]
+async fn r3_3_nodes_name_each_action_child_and_carry_the_synthetic_flag() {
+    // O-245: an action's next_node_key is the child the solution holds, null when the
+    // action ends the solution, so the api walks the tree without the key grammar.
+    // O-229: the packed fixture is synthetic, so the node carries the banner flag.
+    let pure = || vec![hand(0, [1.0, 1.0], vec![0.0, 1.0, 0.0], vec![-1.0, 0.0, -0.5])];
+    // The root offers fold, call and a raise to 8 bb; the solution holds only the raise's
+    // child, so the fold and the call end it.
+    let planted = plant::plant(&[
+        node_of_root(Position::Btn, HandSpace::Preflop169, pure()),
+        plant::node(800, Position::Bb, HandSpace::Preflop169, pure()),
+    ]);
+    let root_key = "cfg_6_online_100/BB-BTN/";
+
+    let (status, _, json) = get_node(planted.router(), &planted.solution_id, root_key, None).await;
+
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    let next: Vec<Option<&str>> = json["actions"]
+        .as_array()
+        .expect("actions")
+        .iter()
+        .map(|view| view["next_node_key"].as_str())
+        .collect();
+    assert_eq!(next, [None, None, Some(planted.key(800).as_str())], "body was {json}");
+    // PR #25 re-review: the decision's family comes from gto-model's classify (ADR 0004).
+    assert_eq!(json["action_family"], "rfi", "body was {json}");
+    let (status, _, child) =
+        get_node(planted.router(), &planted.solution_id, &planted.key(800), None).await;
+    assert_eq!(status, StatusCode::OK, "body was {child}");
+    assert_eq!(child["action_family"], "facing-open", "body was {child}");
+
+    let fixture = packed_fixture();
+    let (status, _, json) =
+        get_node(fixture.router(), &fixture.solution_id, &fixture.key(0), None).await;
+    assert_eq!(status, StatusCode::OK, "body was {json}");
+    assert_eq!(json["synthetic"], true, "the packed fixture is synthetic: {json}");
+}
+
+#[tokio::test]
+async fn r3_6_an_off_range_hand_is_its_own_problem_type_and_a_missing_node_is_not_found() {
+    // PR #25 re-review LOW 3: the api ends a hand on hand-not-in-range only, and treats a
+    // missing solution or node (not-found) as an error.
+    let only_aces = || vec![hand(0, [1.0, 1.0], vec![0.0, 1.0, 0.0], vec![-1.0, 0.0, -0.5])];
+    let planted = plant::plant(&[node_of_root(Position::Btn, HandSpace::Preflop169, only_aces())]);
+    let root = "cfg_6_online_100/BB-BTN/";
+
+    let (status, headers, json) =
+        get_node(planted.router(), &planted.solution_id, root, Some("72o")).await;
+    assert_problem(status, &headers, &json, StatusCode::NOT_FOUND, "hand-not-in-range");
+
+    let (status, headers, json) =
+        common::grade(planted.router(), &planted.solution_id, root, "72o", 0).await;
+    assert_problem(status, &headers, &json, StatusCode::NOT_FOUND, "hand-not-in-range");
+
+    let missing = "cfg_6_online_100/BB-BTN/r250";
+    let (status, headers, json) =
+        get_node(planted.router(), &planted.solution_id, missing, None).await;
     assert_problem(status, &headers, &json, StatusCode::NOT_FOUND, "not-found");
 }
 

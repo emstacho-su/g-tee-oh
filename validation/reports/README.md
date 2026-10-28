@@ -265,6 +265,45 @@ Fields beyond the envelope:
 
 `BENCH_REPORT_DIR` sends the file elsewhere (development smoke runs); the default is this directory. Hosted continuous integration (CI) never reruns the bench, because runner timing noise would make the number meaningless; the ts job only checks the committed file with `just report-check` (schema, verdict agreement and `pass: true`).
 
+## Trainer latency: `perf-<machine>.json` (R3.3, O-40, O-91, O-248)
+
+Produced by `just perf`, which runs `node scripts/perf.mjs` (modules under `scripts/perf/`) against the running Compose dev stack through Caddy at `https://localhost`. The caller brings the stack up with the fixture library (`just dev-up`, `just db-migrate`) and takes the bench lock, since other heavy work on the machine moves the numbers; the script never starts or stops the stack. Rule 1 applies: the script writes the whole file. S23 built the tool; the committed `perf-zenbook.json` is the Zenbook run at the commit it names.
+
+What the script does, in order:
+
+1. Trust. Caddy serves `tls internal`, a certificate signed by its own root. The script copies that root out of the caddy container (`docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`) and passes it as the certificate authority of its own HTTPS requests only, so certificate checks stay on and no process-wide setting changes. `--ca-file PATH` reads the root from a file instead.
+2. Stack check. `GET /api/v1/healthz` must answer 200; otherwise the script stops with "the dev stack is not up" and the command to bring it up.
+3. Owner. A fresh owner, `perf-<16 hex digits>@example.com`, is created through the api container's bundled create-user with a random password on its standard input, as the e2e chain does (O-263): never an argument, never printed, never written to disk. The script logs in with `POST /api/v1/auth/login`, keeps the session cookie and sends the returned `csrf_token` as `x-csrf-token`, with `Origin` set to the base URL, on every mutating request.
+4. Study node read. The pairs of `cfg_6_online_100` come from `GET /api/v1/configs/cfg_6_online_100/pairs`; every pair whose root `GET /api/v1/study/node` serves is a target, and so is each node along its likeliest line, which the api names as `next_likely_node_key` (read back with `node_key`, at most 4 steps below the root), at most 64 targets. The reads cycle over the targets, so neighboring samples read different nodes; a node on a likeliest line may come from the api's prefetch cache, as it would in use. A sample is the client round trip of one read.
+5. Session. One drill on the BB-BTN pair (button versus big blind preflop, after-action stop rule) through `POST /api/v1/drills`, and one session through `POST /api/v1/sessions` with mode `drill` and the fixed seed `0000000000005eed` (O-249), so two runs deal the same hands.
+6. Grade and decision to feedback. Each sample fetches the prompt with `GET /api/v1/sessions/{id}/next` (not timed), then answers it with `POST /api/v1/sessions/{id}/decisions` carrying the prompt's `state_version` and its own Idempotency-Key. The decision to feedback sample is the client round trip of that POST. The grade sample is the `sq-grade` entry of the response's `Server-Timing` header, the api's own measurement of its solver-query grade call (`services/api/src/http/server-timing.ts`), because solver-query publishes no port on the dev stack (O-248).
+7. Report. The report is built, validated against `report.schema.json` with the same ajv settings as `scripts/check-reports.mjs`, written here, and `scripts/check-reports.mjs` then runs on this directory. A run with a p95 over its limit still writes its file, so the miss is on record, and the command exits 1.
+
+Each path takes 20 untimed warm-up samples and then 200 timed samples, one request at a time. Requests start at least 250 ms apart: the api allows 300 requests per client address per minute, a run makes about 700, and a throttled answer (429) stops the run instead of being timed. A run takes about three minutes.
+
+How p95 is taken and judged: nearest rank, the value at rank `ceil(0.95 n)` of the timed samples sorted ascending, as for `p95_ns` in the benchmark section. A path passes when its p95 is at most its O-40 limit, twice the A9 section 6 budget; `pass` is true only when all three pass.
+
+| Thresholds key | Value | Path |
+|---|---|---|
+| `study-node/p95` | `{ "max": 300, "unit": "ms" }` | Study node read, client round trip of `GET /study/node`. |
+| `grade/p95` | `{ "max": 60, "unit": "ms" }` | The solver-query grade call, from `Server-Timing: sq-grade;dur=<ms>`. |
+| `decision-feedback/p95` | `{ "max": 500, "unit": "ms" }` | Decision to feedback, client round trip of `POST /sessions/{id}/decisions`. |
+
+Fields beyond the envelope:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `report`, `r_ids` | | `perf` and `["R3.3"]`. |
+| `machine` | object | As the benchmark section defines it, from `node:os`; `BENCH_MACHINE` names it and the file (default `zenbook`, must match `^[a-z][a-z0-9-]*$`). |
+| `measurements` | array | Per path `<path>/p95` (judged: `threshold`, `pass` and `samples`), `<path>/p50` and `<path>/max` (informational, no `pass`), all in `ms`, three decimals. |
+| `base_url`, `config_id`, `pair` | string | The origin measured, `cfg_6_online_100` and `BB-BTN`. |
+| `warmup_per_path`, `samples_per_path` | integer | 20 and 200. |
+| `study_targets` | integer | How many distinct nodes the study reads cycled over. |
+| `timings_ms` | object | Every timed sample per path, sorted, so a reader can recompute the percentiles. |
+| `notes` | string | The method, the sample counts, the targets and the timing rule in one sentence each. |
+
+`--out-dir DIR` sends the file elsewhere (development runs); `--base-url URL` measures another origin, which must equal the api's `APP_ORIGIN` because it is also the `Origin` header. Hosted CI never reruns `just perf`; the ts job checks the committed file with `just report-check`, and the in-process latency test (`services/api/test/latency.test.ts`, R3.3) times the same three paths against the fixture solver-query as the CI stand-in.
+
 ## Report files (O-87)
 
 09 section 7 names where each gate report lands and O-87 fixes the file names 09 left open; `v1-gate.md` and the Phase 0 names come from 09 section 7 and the phase doc. The table lists every public report, who writes it and what it proves, so a session knows the name before it writes. Markdown files are gate summaries; JSON files follow `report.schema.json`. The two O-87 names that are fixtures rather than reports, `PROVENANCE-g6a.md` and `g4-spots.json`, live under `validation/fixtures/` and are described in that directory's README. Private reports (the Phase 1 exit, the G4 report, the coverage and quality assurance reports) stay in the capture repo and are only linked from here.
@@ -287,7 +326,7 @@ Fields beyond the envelope:
 | `phase-2-gate.md` | S20 | Markdown | Phase 2 gate and Deploy 1 report, R2.1 to R2.22, with the O-50 memory and O-51 storage pass rules; G4 (R2.11) stays private and is noted. |
 | `recompute.json` | S29, `tools/validate recompute` | JSON gate report | Criterion 3: 200 seeded attempts recomputed through `gto-library` on a path that never calls `solver-query`, the seed in the report (O-60). |
 | `matrix-frame-zenbook.json` | S24, `just bench-web` on the Zenbook under the bench lock | JSON gate report (the matrix frame section above) | R3.12: the range matrix frame p95 under 16 ms per mode at device pixel ratio 2 in headless Chromium, with the renderer named (A7 section 4, O-260). |
-| `perf-zenbook.json` | S29, `just perf` | JSON gate report | Criterion 10 on the Zenbook: p95 against the O-40 thresholds; hosted CI checks the committed file and times the `e2e` job as an advisory only. |
+| `perf-zenbook.json` | S23, `just perf` on the Zenbook under the bench lock (the trainer latency section above); S29 reruns it for the gate | JSON gate report | R3.3 and criterion 10 on the Zenbook: study node read, grade and decision to feedback p95 against the O-40 thresholds; hosted CI checks the committed file and times the `e2e` job as an advisory only. |
 | `keying.json` | S29 | JSON gate report | Criterion 11: live rake keyed by the selected stake over 1/3 and 2/5 (O-18, O-57). |
 | `phase-3-gate.md` | S29 | Markdown | Phase 3 gate, R3.1 to R3.22, with criteria 3, 4, 5, 9, 10 (Zenbook) and 11 by report path; the build-card run names drills only (O-64). |
 | `phase-4-gate.md` | S33 | Markdown | Phase 4 gate, R4.1 to R4.15, criteria 6, 7 and 8; criterion 6 convergence within the O-65 tolerance (25 rating points after 300 items) and the ADR 0011 parameters as accepted per O-56. |

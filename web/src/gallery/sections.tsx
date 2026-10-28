@@ -56,10 +56,10 @@ const NINE_LIVE: readonly TableSeat[] = [
 
 /** A synthetic postflop node with three bet buckets, for the Grouped label layout. */
 const POSTFLOP_ACTIONS: readonly NodeAction[] = [
-  { index: 0, token: "x", kind: "check", size_cbb: null, bucket: null, label: "Check" },
-  { index: 1, token: "b200", kind: "bet", size_cbb: 200, bucket: "small", label: "Small" },
-  { index: 2, token: "b450", kind: "bet", size_cbb: 450, bucket: "pot", label: "Pot" },
-  { index: 3, token: "b2000", kind: "all_in", size_cbb: 2000, bucket: "all-in", label: "All-in" },
+  { index: 0, token: "x", kind: "check", size_cbb: null, bucket: null, label: "Check", next_node_key: null },
+  { index: 1, token: "b200", kind: "bet", size_cbb: 200, bucket: "small", label: "Small", next_node_key: null },
+  { index: 2, token: "b450", kind: "bet", size_cbb: 450, bucket: "pot", label: "Pot", next_node_key: null },
+  { index: 3, token: "b2000", kind: "all_in", size_cbb: 2000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 export function TableSections() {

@@ -5,7 +5,7 @@
  */
 import { Readable } from "node:stream";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import { verifyPassword } from "../src/auth/password.js";
 import {
@@ -20,9 +20,33 @@ import {
   parseCreateUserArgs,
   readFirstLine,
 } from "../src/cli/create-user-args.js";
-import type { Database } from "../src/db.js";
+import { ADMIN_DATABASE_URL_VARIABLE, runCreateUser } from "../src/cli/create-user-run.js";
+import { createDatabaseFromUrl, type Database } from "../src/db.js";
 import { MAX_PASSWORD_LENGTH } from "../src/schemas/auth.js";
 import { appDatabase, uniqueEmail } from "./support/database.js";
+
+const INSUFFICIENT_PRIVILEGE = "42501";
+
+/** The PG* variables the api reads, pointing at the test container as the app login. */
+function appEnvironment(): Record<string, string> {
+  const url = new URL(inject("appDatabaseUrl"));
+  return {
+    PGHOST: url.hostname,
+    PGPORT: url.port,
+    PGDATABASE: url.pathname.slice(1),
+    PGUSER: decodeURIComponent(url.username),
+    APP_DB_PASSWORD: decodeURIComponent(url.password),
+  };
+}
+
+function passwordInput(password: string): Readable {
+  return Readable.from([`${password}\n`]);
+}
+
+async function isAdminFlag(database: Database, id: string): Promise<boolean> {
+  const row = await database.selectFrom("app_user").select("is_admin").where("id", "=", id).executeTakeFirstOrThrow();
+  return row.is_admin;
+}
 
 const GOOD_PASSWORD = "a long enough passphrase";
 
@@ -93,6 +117,34 @@ describe("R3.1 createUser (O-233)", () => {
     });
   });
 
+  it("R3.5 createUser as the app role makes a plain account without naming is_admin (PR #25 L1)", async () => {
+    const plain = await createUser(database, { email: uniqueEmail("plain"), password: GOOD_PASSWORD });
+
+    expect(await isAdminFlag(database, plain.id)).toBe(false);
+    expect(plain.isAdmin).toBe(false);
+  });
+
+  it("R3.5 the app role can never set is_admin: createUser with isAdmin on the app connection is refused (PR #25 L1)", async () => {
+    const email = uniqueEmail("self-admin");
+
+    await expect(createUser(database, { email, password: GOOD_PASSWORD, isAdmin: true })).rejects.toMatchObject({
+      code: INSUFFICIENT_PRIVILEGE,
+    });
+    expect(await database.selectFrom("app_user").select("id").where("email", "=", email).execute()).toEqual([]);
+  });
+
+  it("R3.5 createUser with isAdmin sets the flag through the owner connection (O-242, PR #25 L1)", async () => {
+    const owner = createDatabaseFromUrl(inject("adminDatabaseUrl"));
+    try {
+      const admin = await createUser(owner, { email: uniqueEmail("admin"), password: GOOD_PASSWORD, isAdmin: true });
+
+      expect(await isAdminFlag(database, admin.id)).toBe(true);
+      expect(admin.isAdmin).toBe(true);
+    } finally {
+      await owner.destroy();
+    }
+  });
+
   it("R3.1 normalizeEmail trims and lowercases", () => {
     expect(normalizeEmail("  Owner@Example.COM\t")).toBe("owner@example.com");
   });
@@ -100,8 +152,19 @@ describe("R3.1 createUser (O-233)", () => {
 
 describe("R3.1 create-user command arguments (O-233)", () => {
   it("R3.1 parseCreateUserArgs reads --email VALUE and --email=VALUE", () => {
-    expect(parseCreateUserArgs(["--email", "owner@example.com"])).toEqual({ email: "owner@example.com" });
-    expect(parseCreateUserArgs(["--email=owner@example.com"])).toEqual({ email: "owner@example.com" });
+    expect(parseCreateUserArgs(["--email", "owner@example.com"])).toEqual({ email: "owner@example.com", admin: false });
+    expect(parseCreateUserArgs(["--email=owner@example.com"])).toEqual({ email: "owner@example.com", admin: false });
+  });
+
+  it("R3.5 parseCreateUserArgs reads the --admin flag before or after the email (O-242)", () => {
+    expect(parseCreateUserArgs(["--admin", "--email", "owner@example.com"])).toEqual({
+      email: "owner@example.com",
+      admin: true,
+    });
+    expect(parseCreateUserArgs(["--email=owner@example.com", "--admin"])).toEqual({
+      email: "owner@example.com",
+      admin: true,
+    });
   });
 
   it("R3.1 parseCreateUserArgs rejects a missing, empty, repeated or unknown argument", () => {
@@ -110,8 +173,12 @@ describe("R3.1 create-user command arguments (O-233)", () => {
       ["--email"],
       ["--email="],
       ["--email", "--password"],
+      ["--email", "--admin"],
       ["--email", "a@example.com", "--email", "b@example.com"],
+      ["--email", "a@example.com", "--admin", "--admin"],
+      ["--email", "a@example.com", "--admin=yes"],
       ["--email", "a@example.com", "--password", "secret"],
+      ["--admin"],
       ["a@example.com"],
     ];
     for (const argv of bad) {
@@ -153,5 +220,87 @@ describe("R3.1 create-user command arguments (O-233)", () => {
     expect(described).not.toContain("\n");
     expect(described).not.toContain(password);
     expect(describeFailure("a thrown string", password)).toBe("create-user failed: a thrown string");
+  });
+
+  it("R3.5 describeFailure cuts out every secret it is given", () => {
+    const described = describeFailure(new Error("url postgres://u:pw-one@h/db and pw-two"), "pw-two", "pw-one", undefined);
+
+    expect(described).not.toContain("pw-one");
+    expect(described).not.toContain("pw-two");
+  });
+});
+
+describe("R3.5 create-user connections (O-242, PR #25 L1)", () => {
+  let database: Database;
+
+  beforeAll(() => {
+    database = appDatabase();
+  });
+
+  afterAll(async () => {
+    await database.destroy();
+  });
+
+  it("R3.5 create-user without --admin runs as the app login and never reads the owner variable", async () => {
+    const env = { ...appEnvironment(), [ADMIN_DATABASE_URL_VARIABLE]: "not a url" };
+
+    const outcome = await runCreateUser(["--email", uniqueEmail("cli-plain")], passwordInput(GOOD_PASSWORD), env);
+
+    if (!outcome.ok) {
+      throw new Error(outcome.message);
+    }
+    expect(await isAdminFlag(database, outcome.userId)).toBe(false);
+  });
+
+  it("R3.5 create-user --admin runs through the owner connection and sets is_admin", async () => {
+    const env = { [ADMIN_DATABASE_URL_VARIABLE]: inject("adminDatabaseUrl") };
+
+    const outcome = await runCreateUser(["--email", uniqueEmail("cli-admin"), "--admin"], passwordInput(GOOD_PASSWORD), env);
+
+    if (!outcome.ok) {
+      throw new Error(outcome.message);
+    }
+    expect(await isAdminFlag(database, outcome.userId)).toBe(true);
+  });
+
+  it("R3.5 create-user --admin without the owner variable fails naming it and creates nothing", async () => {
+    const email = uniqueEmail("cli-no-owner");
+
+    const outcome = await runCreateUser(["--email", email, "--admin"], passwordInput(GOOD_PASSWORD), appEnvironment());
+
+    expect(outcome).toEqual({ ok: false, message: expect.stringContaining(ADMIN_DATABASE_URL_VARIABLE) as unknown });
+    expect(await database.selectFrom("app_user").select("id").where("email", "=", email).execute()).toEqual([]);
+  });
+
+  it("R3.5 create-user --admin refuses an owner URL that is not postgres without echoing it", async () => {
+    const secret = "owner-secret-value";
+    const env = { [ADMIN_DATABASE_URL_VARIABLE]: `mysql://root:${secret}@db/gto` };
+
+    const outcome = await runCreateUser(["--email", uniqueEmail(), "--admin"], passwordInput(GOOD_PASSWORD), env);
+
+    expect(outcome).toEqual({ ok: false, message: expect.stringContaining(ADMIN_DATABASE_URL_VARIABLE) as unknown });
+    expect(JSON.stringify(outcome)).not.toContain(secret);
+  });
+
+  it("R3.5 a failure on the owner connection shows neither the owner URL nor the password", async () => {
+    const secret = "unreachable-owner-secret";
+    const env = { [ADMIN_DATABASE_URL_VARIABLE]: `postgres://postgres:${secret}@127.0.0.1:1/gto` };
+
+    const outcome = await runCreateUser(["--email", uniqueEmail(), "--admin"], passwordInput(GOOD_PASSWORD), env);
+
+    expect(outcome.ok).toBe(false);
+    const text = JSON.stringify(outcome);
+    expect(text).toContain("create-user failed: ");
+    expect(text).not.toContain(secret);
+    expect(text).not.toContain(GOOD_PASSWORD);
+  });
+
+  it("R3.1 a usage error is one failure line", async () => {
+    const outcome = await runCreateUser(["--bogus"], passwordInput(GOOD_PASSWORD), appEnvironment());
+
+    expect(outcome).toEqual({
+      ok: false,
+      message: expect.stringMatching(/^create-user failed: unexpected argument/) as unknown,
+    });
   });
 });

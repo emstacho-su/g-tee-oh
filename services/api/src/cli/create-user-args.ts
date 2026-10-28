@@ -3,8 +3,9 @@
  * from standard input, and the one-line failure message. cli/create-user.ts only wires these to the
  * process.
  *
- * Mechanism: the email comes from --email VALUE or --email=VALUE and nothing else is accepted, so a
- * typo fails instead of being ignored. The password never travels as an argument, where the shell
+ * Mechanism: the email comes from --email VALUE or --email=VALUE, and the optional bare --admin flag
+ * makes the account an admin (O-242); nothing else is accepted, so a typo fails instead of being
+ * ignored. The password never travels as an argument, where the shell
  * history and the process list would show it; it is the first line of standard input, read chunk by
  * chunk until the first line ending (CR LF or LF) or the end of input, and capped in size so a
  * stream without a line ending cannot grow without bound. A failure message is one line and has the
@@ -24,7 +25,11 @@ export const MAX_STDIN_BYTES = MAX_PASSWORD_LENGTH * 4;
 const FAILURE_PREFIX = "create-user failed: ";
 const REDACTED = "[redacted]";
 
-export const USAGE = "usage: node dist/create-user.js --email <address>   (the password is read from stdin)";
+/** Makes the new account an admin of the builder endpoints (O-242). */
+export const ADMIN_FLAG = "--admin";
+
+export const USAGE =
+  "usage: node dist/create-user.js --email <address> [--admin]   (the password is read from stdin)";
 
 /** Bad arguments or bad standard input; the message says what to fix. */
 export class CreateUserUsageError extends Error {
@@ -36,6 +41,8 @@ export class CreateUserUsageError extends Error {
 
 export interface CreateUserArgs {
   email: string;
+  /** Set app_user.is_admin (O-242). */
+  admin: boolean;
 }
 
 function emailValue(argv: readonly string[], index: number): { value: string; consumed: number } {
@@ -50,18 +57,33 @@ function emailValue(argv: readonly string[], index: number): { value: string; co
   return { value: next, consumed: 2 };
 }
 
+function isEmailFlag(argument: string): boolean {
+  return argument === EMAIL_FLAG || argument.startsWith(EMAIL_FLAG_PREFIX);
+}
+
+function onlyOnce(seen: boolean, flag: string): void {
+  if (seen) {
+    throw new CreateUserUsageError(`${flag} given more than once. ${USAGE}`);
+  }
+}
+
 /** Parses the command's arguments (process.argv without node and the script). */
 export function parseCreateUserArgs(argv: readonly string[]): CreateUserArgs {
   let email: string | undefined;
+  let admin = false;
   let index = 0;
   while (index < argv.length) {
     const argument = argv[index] ?? "";
-    if (argument !== EMAIL_FLAG && !argument.startsWith(EMAIL_FLAG_PREFIX)) {
+    if (argument === ADMIN_FLAG) {
+      onlyOnce(admin, ADMIN_FLAG);
+      admin = true;
+      index += 1;
+      continue;
+    }
+    if (!isEmailFlag(argument)) {
       throw new CreateUserUsageError(`unexpected argument "${argument}". ${USAGE}`);
     }
-    if (email !== undefined) {
-      throw new CreateUserUsageError(`${EMAIL_FLAG} given more than once. ${USAGE}`);
-    }
+    onlyOnce(email !== undefined, EMAIL_FLAG);
     const { value, consumed } = emailValue(argv, index);
     email = value;
     index += consumed;
@@ -69,7 +91,7 @@ export function parseCreateUserArgs(argv: readonly string[]): CreateUserArgs {
   if (email === undefined || email.trim() === "") {
     throw new CreateUserUsageError(`${EMAIL_FLAG} is required. ${USAGE}`);
   }
-  return { email };
+  return { email, admin };
 }
 
 /**
@@ -115,9 +137,16 @@ export async function readFirstLine(input: AsyncIterable<unknown>): Promise<stri
   return line;
 }
 
-/** A one-line description of a failure with every occurrence of the password cut out. */
-export function describeFailure(error: unknown, password: string | undefined): string {
+/**
+ * A one-line description of a failure with every occurrence of each secret (the password, and for
+ * --admin the owner connection URL and its password) cut out.
+ */
+export function describeFailure(error: unknown, ...secrets: readonly (string | undefined)[]): string {
   const message = error instanceof Error ? error.message : String(error);
-  const redacted = password === undefined || password === "" ? message : message.split(password).join(REDACTED);
+  // Longest first, so a secret that contains another is cut out whole.
+  const present = secrets
+    .filter((secret): secret is string => secret !== undefined && secret !== "")
+    .sort((left, right) => right.length - left.length);
+  const redacted = present.reduce((text, secret) => text.split(secret).join(REDACTED), message);
   return `${FAILURE_PREFIX}${redacted.replace(/\s*[\r\n]+\s*/g, " ").trim()}`;
 }

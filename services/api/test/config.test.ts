@@ -5,6 +5,8 @@ import {
   DEFAULT_APP_ORIGIN,
   DEFAULT_PG_PORT,
   DEFAULT_SESSION_TTL_HOURS,
+  DEFAULT_SOLVER_QUERY_URL,
+  DEFAULT_TIME_ZONE,
   DEFAULT_TRUSTED_PROXIES,
   defaultAppConfig,
   loadProcessConfig,
@@ -53,7 +55,9 @@ describe("R3.1 process configuration", () => {
       appOrigin: DEFAULT_APP_ORIGIN,
       sessionTtlHours: DEFAULT_SESSION_TTL_HOURS,
       trustedProxies: [...DEFAULT_TRUSTED_PROXIES],
+      timeZone: DEFAULT_TIME_ZONE,
     });
+    expect(config.solverQueryUrl).toBe(DEFAULT_SOLVER_QUERY_URL);
     expect(config.database).toEqual({
       host: "postgres",
       port: DEFAULT_PG_PORT,
@@ -92,6 +96,30 @@ describe("R3.1 process configuration", () => {
     for (const bad of ["everyone", "10.0.0.300", "172.18.0.0/40", "loopback,,"]) {
       expect(() => loadProcessConfig({ ...COMPLETE_ENV, TRUSTED_PROXIES: bad }), bad).toThrow(/TRUSTED_PROXIES/);
     }
+  });
+
+  it("R3.3 SOLVER_QUERY_URL is an absolute http base URL (O-244)", () => {
+    expect(loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_URL: "http://127.0.0.1:7070" }).solverQueryUrl).toBe(
+      "http://127.0.0.1:7070",
+    );
+    for (const bad of ["solver-query:7070", "ftp://solver-query", "http://sq/?x=1", "http://sq/#a"]) {
+      expect(() => loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_URL: bad }), bad).toThrow(/SOLVER_QUERY_URL/);
+    }
+  });
+
+  it("R3.3 SOLVER_QUERY_TIMEOUT_MS bounds every solver-query call, 5000 by default (PR #25 M1)", () => {
+    expect(loadProcessConfig(COMPLETE_ENV).solverQueryTimeoutMs).toBe(5000);
+    expect(loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_TIMEOUT_MS: "1500" }).solverQueryTimeoutMs).toBe(1500);
+    for (const bad of ["0", "-1", "abc", "600000"]) {
+      expect(() => loadProcessConfig({ ...COMPLETE_ENV, SOLVER_QUERY_TIMEOUT_MS: bad }), bad).toThrow(/SOLVER_QUERY_TIMEOUT_MS/);
+    }
+  });
+
+  it("R3.7 APP_TIME_ZONE is an IANA zone that starts the training day (O-247)", () => {
+    expect(loadProcessConfig({ ...COMPLETE_ENV, APP_TIME_ZONE: "America/New_York" }).app.timeZone).toBe(
+      "America/New_York",
+    );
+    expect(() => loadProcessConfig({ ...COMPLETE_ENV, APP_TIME_ZONE: "Mars/Olympus" })).toThrow(/APP_TIME_ZONE/);
   });
 
   it("R3.1 one error names every bad variable, API_PORT included (LOW 10)", () => {
