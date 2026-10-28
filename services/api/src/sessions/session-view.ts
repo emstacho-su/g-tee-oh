@@ -22,6 +22,8 @@ export function toSession(row: SessionRow): Session {
     state: row.state.phase,
     state_version: row.stateVersion,
     started_at: row.startedAt.toISOString(),
+    // The grouping the session's decisions are graded with, from its stored settings (PR #33 review round 1).
+    grouping: row.settings.grouping,
   };
   if (learning?.kind === "automated") {
     const { block } = learning;

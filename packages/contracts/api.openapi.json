@@ -1339,7 +1339,7 @@
           },
           "rng": {
             "type": "boolean",
-            "description": "RNG mode (05 section 7); off by default"
+            "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
           },
           "pause": {
             "type": "string",
@@ -1712,6 +1712,15 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "description": "RFC 3339 timestamp"
           },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "grouped",
+              "simple"
+            ],
+            "description": "The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it"
+          },
           "coverage": {
             "description": "The covered part of the drill; set by POST /sessions (O-312)",
             "$ref": "#/components/schemas/SessionCoverageInput"
@@ -1750,6 +1759,7 @@
           "state",
           "state_version",
           "started_at",
+          "grouping",
           "rated_eligible",
           "automated",
           "holdout"
@@ -1958,7 +1968,7 @@
                 "type": "null"
               }
             ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+            "description": "The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024)"
           },
           "previous_board": {
             "anyOf": [
@@ -2175,6 +2185,13 @@
               }
             ]
           },
+          "followed_roll": {
+            "description": "Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371)",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "state_version": {
             "type": "integer",
             "minimum": 0,
@@ -2252,6 +2269,7 @@
           "ev_by_action",
           "rated",
           "rng_roll",
+          "followed_roll",
           "state_version",
           "solution_id",
           "node_key",
@@ -5767,7 +5785,7 @@
           },
           "rng": {
             "type": "boolean",
-            "description": "RNG mode (05 section 7); off by default"
+            "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
           },
           "pause": {
             "type": "string",
@@ -6145,6 +6163,15 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "description": "RFC 3339 timestamp"
           },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "grouped",
+              "simple"
+            ],
+            "description": "The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it"
+          },
           "coverage": {
             "description": "The covered part of the drill; set by POST /sessions (O-312)",
             "$ref": "#/components/schemas/SessionCoverage"
@@ -6183,6 +6210,7 @@
           "state",
           "state_version",
           "started_at",
+          "grouping",
           "rated_eligible",
           "automated",
           "holdout"
@@ -6395,7 +6423,7 @@
                 "type": "null"
               }
             ],
-            "description": "The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"
+            "description": "The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024)"
           },
           "previous_board": {
             "anyOf": [
@@ -6614,6 +6642,13 @@
               }
             ]
           },
+          "followed_roll": {
+            "description": "Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371)",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "state_version": {
             "type": "integer",
             "minimum": 0,
@@ -6691,6 +6726,7 @@
           "ev_by_action",
           "rated",
           "rng_roll",
+          "followed_roll",
           "state_version",
           "solution_id",
           "node_key",
@@ -11248,7 +11284,7 @@
                       },
                       "rng": {
                         "type": "boolean",
-                        "description": "RNG mode (05 section 7); off by default"
+                        "description": "Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"
                       },
                       "pause": {
                         "type": "string",
@@ -11715,13 +11751,6 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
-                  },
-                  "confidence": {
-                    "type": "string",
-                    "enum": [
-                      "sure",
-                      "unsure"
-                    ]
                   },
                   "response_ms": {
                     "type": "integer",

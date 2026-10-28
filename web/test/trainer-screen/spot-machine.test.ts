@@ -1,7 +1,8 @@
 /**
- * The spot-mode client state machine (S25, R3.13, R3.11, O-284): every state against every event,
+ * The spot-mode client state machine (S25, R3.13, O-284, O-345): every state against every event,
  * as a table. A row names a state, an event and the state kind it leads to; "same" means the event
- * is illegal there and transition returns the very same state object (ignored explicitly).
+ * is illegal there and transition returns the very same state object (ignored explicitly). S37
+ * retired the confidence tap (O-345): choosing an action submits it, so await_confidence is gone.
  */
 import { describe, expect, it } from "vitest";
 
@@ -28,7 +29,6 @@ const CHOSEN = 2;
 const TIMER: ResponseTimer = { shownAt: SHOWN_AT, pausedMs: 0, pausedSince: null };
 const DECISION: PendingDecision = {
   actionIndex: CHOSEN,
-  confidence: "sure",
   responseMs: COMMITTED_AT - SHOWN_AT,
   idempotencyKey: "decision-key-1",
   stateVersion: PROMPT.state_version,
@@ -47,14 +47,6 @@ const STATES: Readonly<Record<SpotStateKind, SpotState>> = {
   loading_prompt: { kind: "loading_prompt", context: CONTEXT, version: PROMPT.state_version },
   stale: { kind: "stale", context: CONTEXT },
   await_action: { kind: "await_action", context: CONTEXT, prompt: PROMPT, timer: TIMER, notice: null },
-  await_confidence: {
-    kind: "await_confidence",
-    context: CONTEXT,
-    prompt: PROMPT,
-    timer: TIMER,
-    actionIndex: CHOSEN,
-    responseMs: COMMITTED_AT - SHOWN_AT,
-  },
   submitting: { kind: "submitting", context: CONTEXT, prompt: PROMPT, decision: DECISION },
   feedback: { kind: "feedback", context: CONTEXT, prompt: PROMPT, decision: DECISION, feedback: fixtureFeedback },
   ending: { kind: "ending", context: CONTEXT, key: "end-key" },
@@ -75,8 +67,7 @@ const EVENTS: Readonly<Record<string, SpotEvent>> = {
   start: { type: "start", key: "start-key", rng: true },
   session_started: { type: "session_started", session: fixturePracticeSession },
   prompt_loaded: { type: "prompt_loaded", prompt: PROMPT, at: SHOWN_AT },
-  choose_action: { type: "choose_action", actionIndex: 1, at: COMMITTED_AT },
-  confidence: { type: "confidence", confidence: "unsure", key: "decision-key-2" },
+  choose_action: { type: "choose_action", actionIndex: 1, at: COMMITTED_AT, key: "decision-key-2" },
   decision_succeeded: { type: "decision_succeeded", feedback: fixtureFeedback },
   next: { type: "next" },
   end: { type: "end", key: "end-key-2" },
@@ -99,8 +90,7 @@ const TABLE: Readonly<Record<SpotStateKind, Row>> = {
   starting: { ...ALL_SAME, session_started: "loading_prompt", failed: "error" },
   loading_prompt: { ...ALL_SAME, prompt_loaded: "await_action", end: "ending", failed: "error" },
   stale: { ...ALL_SAME, prompt_loaded: "await_action", end: "ending", failed: "error" },
-  await_action: { ...ALL_SAME, choose_action: "await_confidence", end: "ending", pause: "await_action" },
-  await_confidence: { ...ALL_SAME, choose_action: "await_confidence", confidence: "submitting", end: "ending", pause: "await_confidence" },
+  await_action: { ...ALL_SAME, choose_action: "submitting", end: "ending", pause: "await_action" },
   submitting: { ...ALL_SAME, decision_succeeded: "feedback", failed: "error" },
   feedback: { ...ALL_SAME, next: "loading_prompt", end: "ending" },
   ending: { ...ALL_SAME, ended: "ended", failed: "error" },
@@ -141,40 +131,32 @@ describe("R3.13 spot machine rules", () => {
     });
   });
 
-  it("R3.11 no state before the decision response holds feedback", () => {
+  it("R3.13 no state before the decision response holds feedback", () => {
     for (const state of Object.values(STATES)) {
       if (state.kind === "feedback") continue;
       expect(state).not.toHaveProperty("feedback");
     }
   });
 
-  it("R3.11 the decision is pending only after the confidence tap, with response_ms from shown to committed (O-284)", () => {
-    const chosen = transition(STATES.await_action, { type: "choose_action", actionIndex: CHOSEN, at: COMMITTED_AT });
-    expect(chosen.kind).toBe("await_confidence");
-    expect(chosen).not.toHaveProperty("decision");
-    const tapped = transition(chosen, { type: "confidence", confidence: "sure", key: "k1" });
-    expect(tapped).toEqual({
+  it("R3.13 choosing an action submits it at once with the choice's key and response_ms from shown to the choice, with no confidence (O-345)", () => {
+    const chosen = transition(STATES.await_action, { type: "choose_action", actionIndex: CHOSEN, at: COMMITTED_AT, key: "k1" });
+    expect(chosen).toEqual({
       kind: "submitting",
       context: CONTEXT,
       prompt: PROMPT,
-      decision: { actionIndex: CHOSEN, confidence: "sure", responseMs: 2_450, idempotencyKey: "k1", stateVersion: PROMPT.state_version },
+      decision: { actionIndex: CHOSEN, responseMs: 2_450, idempotencyKey: "k1", stateVersion: PROMPT.state_version },
     });
-  });
-
-  it("R3.11 choosing another action before the tap replaces the choice and its response time", () => {
-    const replaced = transition(STATES.await_confidence, { type: "choose_action", actionIndex: 0, at: 5_000 });
-    expect(replaced).toMatchObject({ kind: "await_confidence", actionIndex: 0, responseMs: 4_000, timer: TIMER });
+    expect(transition(chosen, { type: "choose_action", actionIndex: 0, at: 5_000, key: "k2" }), "a second choice while submitting is ignored").toBe(chosen);
   });
 
   it("R3.13 an action index that is not one of the prompt's buttons is rejected (O-198)", () => {
     const state = STATES.await_action;
-    expect(transition(state, { type: "choose_action", actionIndex: 99, at: COMMITTED_AT })).toBe(state);
+    expect(transition(state, { type: "choose_action", actionIndex: 99, at: COMMITTED_AT, key: "k" })).toBe(state);
   });
 
   it("R3.13 a clock that runs backwards never gives a negative response time", () => {
-    const chosen = transition(STATES.await_action, { type: "choose_action", actionIndex: CHOSEN, at: SHOWN_AT - 10 });
-    const tapped = transition(chosen, { type: "confidence", confidence: "sure", key: "k" });
-    expect(tapped).toMatchObject({ decision: { responseMs: 0 } });
+    const chosen = transition(STATES.await_action, { type: "choose_action", actionIndex: CHOSEN, at: SHOWN_AT - 10, key: "k" });
+    expect(chosen).toMatchObject({ decision: { responseMs: 0 } });
   });
 
   it("R3.13 time while the screen is paused (the explainer is open) does not count toward response_ms (O-284)", () => {
@@ -184,21 +166,14 @@ describe("R3.13 spot machine rules", () => {
     const resumed = transition(paused, { type: "resume", at: 5_000 });
     expect(resumed).toMatchObject({ timer: { shownAt: SHOWN_AT, pausedMs: 3_000, pausedSince: null } });
     expect(transition(resumed, { type: "resume", at: 5_100 })).toBe(resumed);
-    const chosen = transition(resumed, { type: "choose_action", actionIndex: CHOSEN, at: 6_000 });
-    expect(chosen).toMatchObject({ responseMs: 2_000 });
+    const chosen = transition(resumed, { type: "choose_action", actionIndex: CHOSEN, at: 6_000, key: "k" });
+    expect(chosen).toMatchObject({ decision: { responseMs: 2_000 } });
   });
 
   it("R3.13 an action chosen while paused counts only the time before the pause", () => {
     const paused = transition(STATES.await_action, { type: "pause", at: 2_000 });
-    const chosen = transition(paused, { type: "choose_action", actionIndex: CHOSEN, at: 9_000 });
-    expect(chosen).toMatchObject({ responseMs: 1_000 });
-  });
-
-  it("R3.13 pausing after the choice keeps the committed response time", () => {
-    const paused = transition(STATES.await_confidence, { type: "pause", at: 4_000 });
-    const resumed = transition(paused, { type: "resume", at: 9_000 });
-    const tapped = transition(resumed, { type: "confidence", confidence: "sure", key: "k" });
-    expect(tapped).toMatchObject({ decision: { responseMs: COMMITTED_AT - SHOWN_AT } });
+    const chosen = transition(paused, { type: "choose_action", actionIndex: CHOSEN, at: 9_000, key: "k" });
+    expect(chosen).toMatchObject({ decision: { responseMs: 1_000 } });
   });
 
   it("R3.13 a retried decision after a network error or a 503 keeps its Idempotency-Key", () => {
@@ -275,7 +250,7 @@ describe("R3.13 spot machine rules", () => {
   });
 
   it("R3.13 end from any playing state carries the session and the new key; ended holds only the recap", () => {
-    for (const kind of ["await_action", "await_confidence", "feedback", "loading_prompt", "stale", "error"] as const) {
+    for (const kind of ["await_action", "feedback", "loading_prompt", "stale", "error"] as const) {
       expect(canEnd(STATES[kind])).toBe(true);
       expect(transition(STATES[kind], { type: "end", key: "k-end" })).toEqual({ kind: "ending", context: CONTEXT, key: "k-end" });
     }

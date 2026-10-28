@@ -1,5 +1,5 @@
 /**
- * Session defaults for automated training (S32, R4.10, O-323, O-325): the grouping, RNG mode and
+ * Session defaults for automated training (S32, R4.10, O-323, O-325): the grouping, Mixed-frequency mode and
  * configuration scope the /train start screen offers first. These are the only fields an automated
  * session's body may set (services/api/src/automated/settings.ts plus config_ids); a seed is never
  * a default, since a client seed makes a session unrated.

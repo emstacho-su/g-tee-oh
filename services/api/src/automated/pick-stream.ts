@@ -5,8 +5,7 @@
  *
  * Mechanism: a SplitMix64 stream separate from the per-hand draws (sessions/randomness.ts), seeded
  * with the session seed XOR PICK_STREAM_SALT; pick k takes the stream's draw k as a unit draw.
- * pickNext draws at most once per pick, and a hypercorrection pick draws nothing, so each pick has
- * its own draw and the pick counter (state.learning.pick_no) is all the state the stream needs.
+ * pickNext draws exactly once per pick, so each pick has its own draw and the pick counter (state.learning.pick_no) is all the state the stream needs.
  */
 import { createSplitMix64, type RandomSource } from "@g-tee-oh/learning";
 

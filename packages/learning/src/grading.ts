@@ -7,18 +7,21 @@
  * chosen action's group is found under the grouping mode and the node's street (src/grouping.ts);
  * the group grades at its lowest-loss member, whose raw loss in percent of the pot came from Rust
  * (ADR 0004, O-210). The score is exp(-max(0, loss - floor) / tau). The label compares the raw loss
- * with the floor first: at or below it the decision is Best when its group's summed frequency is
- * the hand's highest within FREQUENCY_TIE_TOLERANCE (every tied group counts) or, in RNG mode, when
- * its group holds the roll-selected action, and Correct otherwise, whatever the frequency (ADR 0008,
- * ADR 0009, O-212); above the floor the loss alone decides Inaccuracy (under 1), Mistake (1 to 5
- * inclusive) or Blunder (above 5). The decision is rated only when every anti-farming rule of 06
+ * with the floor first: at or below it the decision is Best when its group is the lowest-loss
+ * (highest EV) group at the node within LOSS_TIE_TOLERANCE_PCT_POT (every tied group counts), and
+ * Correct otherwise (ADR 0024 rule 1, O-343, src/best.ts); above the floor the loss alone decides
+ * Inaccuracy (under 1), Mistake (1 to 5 inclusive) or Blunder (above 5). Frequencies and the roll
+ * never enter the label. In Mixed-frequency mode (rngRoll set) the output adds the separate
+ * followedRoll mark: whether the roll-selected action is in the chosen action's group (ADR 0024
+ * rule 2, O-344). The decision is rated only when every anti-farming rule of 06
  * section 3.6 holds, and a rated decision weighs 1 (v2 adds profile visibility weights, ADR 0010).
  * The bucket and the floor are inputs, never recomputed here (ADR 0004, O-150).
  */
 import { requireActions } from "./actions.js";
-import { bestMemberOf, exactKeys, groupFrequencies, groupKeys } from "./grouping.js";
+import { LOSS_TIE_TOLERANCE_PCT_POT, isBestKey } from "./best.js";
+import { DEFAULT_GROUPING, GROUPINGS, STREETS, bestMemberOf, exactKeys, groupKeys } from "./grouping.js";
 import { RNG_ROLL_MAX, RNG_ROLL_MIN, rollSelectedAction } from "./rng-bands.js";
-import type { GradeInput, GradeLabel, GradeMode, GradeOutput, Grouping, Street } from "./types.js";
+import type { GradeInput, GradeLabel, GradeMode, GradeOutput, Grouping } from "./types.js";
 import {
   elementAt,
   requireBoolean,
@@ -46,12 +49,12 @@ export const DAILY_RATED_CAP = 150;
 export const RATED_WEIGHT = 1;
 export const UNRATED_WEIGHT = 0;
 
-/** The grouping mode when the input names none (05 section 4: standard grades exact tree sizes). */
-export const DEFAULT_GROUPING: Grouping = "standard";
+export { DEFAULT_GROUPING } from "./grouping.js";
 
 /**
- * Summed group frequencies this close count as tied for the top: above the rounding of f32
- * frequencies summed in a double (0.1 + 0.2 against 0.3), far below any real frequency gap.
+ * Frequencies this close count as tied for the top: above the rounding of f32 frequencies summed
+ * in a double (0.1 + 0.2 against 0.3), far below any real frequency gap. The label no longer reads
+ * frequencies (ADR 0024); services/api's prediction frequency questions still compare with it.
  */
 export const FREQUENCY_TIE_TOLERANCE = 1e-6;
 
@@ -59,8 +62,6 @@ export const FREQUENCY_TIE_TOLERANCE = 1e-6;
 const RATED_MODE: GradeMode = "automated";
 
 const GRADE_MODES: readonly GradeMode[] = ["automated", "drill", "holdout", "prediction"];
-const GROUPINGS: readonly Grouping[] = ["standard", "grouped", "simple"];
-const STREETS: readonly Street[] = ["preflop", "flop", "turn", "river"];
 
 /**
  * A validated input: the grouping resolved once, and in RNG mode the record index of the
@@ -159,15 +160,26 @@ function keysOf(input: CheckedInput): string[] {
     : groupKeys(input.actions, input.grouping, input.street);
 }
 
-/** Best rule: the roll-selected action's group in RNG mode, else every group at the top summed frequency. */
+/**
+ * Best rule (ADR 0024 rule 1): the chosen group is the lowest-loss group within the tie tolerance,
+ * at or below the floor. Without an actions list (Standard only) the node's lowest loss is 0, since
+ * every loss is measured against the best action (ADR 0008).
+ */
 function isBestGroup(input: CheckedInput, keys: readonly string[]): boolean {
   const chosenKey = elementAt(keys, input.actionIndex, "keys");
-  if (input.rollSelected !== undefined) {
-    return keys[input.rollSelected] === chosenKey;
+  if (input.actions === undefined) {
+    return input.lossPctPot <= input.floorPctPot && input.lossPctPot <= LOSS_TIE_TOLERANCE_PCT_POT;
   }
-  const totals = groupFrequencies(keys, input.freqByAction);
-  const top = Math.max(...totals.values());
-  return top - (totals.get(chosenKey) ?? 0) <= FREQUENCY_TIE_TOLERANCE;
+  const losses = input.actions.map((action) => action.lossPctPot);
+  return isBestKey(keys, losses, chosenKey, input.floorPctPot);
+}
+
+/** The followed-the-roll mark: null outside Mixed-frequency mode (ADR 0024 rule 2, O-344). */
+function followedRollOf(input: CheckedInput, keys: readonly string[]): boolean | null {
+  if (input.rollSelected === undefined) {
+    return null;
+  }
+  return keys[input.rollSelected] === elementAt(keys, input.actionIndex, "keys");
 }
 
 /** The action the decision grades at and its loss: the chosen action, or its group's lowest-loss member. */
@@ -197,5 +209,6 @@ export function grade(input: GradeInput): GradeOutput {
     rated,
     weight: rated ? RATED_WEIGHT : UNRATED_WEIGHT,
     gradedActionIndex: graded.index,
+    followedRoll: followedRollOf(checked, keys),
   };
 }

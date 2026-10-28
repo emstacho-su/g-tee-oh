@@ -10,6 +10,9 @@
  * automated scope (config_ids) and the holdout track on POST /sessions, the session's
  * rated_eligible flag with its automated block and holdout progress, the prompt's class and track,
  * the feedback's item difficulty and review block, and the recap's rating changes, tier and unlocks.
+ * S37 (ADR 0024, O-345, O-371, O-373) removed the decision body's confidence field (the tap was
+ * retired; a body that still sends it is a 400 under the strict schema) and added the feedback's
+ * followed_roll mark, additively.
  */
 import { z } from "zod";
 
@@ -39,7 +42,6 @@ export const sessionStateSchema = z.enum([
   "ended",
 ]);
 export const gradeLabelSchema = z.enum(["best", "correct", "inaccuracy", "mistake", "blunder"]);
-export const confidenceSchema = z.enum(["sure", "unsure"]);
 export const trackKeySchema = z.enum(TRACK_KEYS).describe("A v1 rating track (O-271)");
 export const fsrsGradeSchema = z.enum(["Again", "Hard", "Good", "Easy"]);
 
@@ -107,6 +109,9 @@ export const sessionSchema = z
     state: sessionStateSchema,
     state_version: z.number().int().min(0),
     started_at: timestampSchema,
+    grouping: z
+      .enum(["standard", "grouped", "simple"])
+      .describe("The grouping the session's decisions are graded with, from its stored settings (O-211); the web reads the followed-the-roll mark with it"),
     coverage: sessionCoverageSchema.optional().describe("The covered part of the drill; set by POST /sessions (O-312)"),
     rated_eligible: z
       .boolean()
@@ -158,7 +163,7 @@ export const promptSchema = z
       .min(1)
       .max(100)
       .nullable()
-      .describe("The 1 to 100 roll of RNG mode, drawn before the hero acts; null when RNG mode is off (05 section 7)"),
+      .describe("The 1 to 100 roll of Mixed-frequency mode (wire name rng), drawn before the hero acts; null when the mode is off (05 section 7, ADR 0024)"),
     previous_board: z
       .array(cardSchema)
       .nullable()
@@ -191,7 +196,6 @@ export const decisionBodySchema = z.strictObject({
   state_version: z.number().int().min(0),
   action_index: z.number().int().min(0),
   size_cbb: z.number().int().positive().optional(),
-  confidence: confidenceSchema.optional(),
   response_ms: z.number().int().min(0),
   prediction_answer: z.number().min(0).max(100).optional(),
 });
@@ -218,6 +222,10 @@ export const feedbackSchema = z
     ev_by_action: z.array(z.number()),
     rated: z.boolean(),
     rng_roll: z.number().int().nullable(),
+    followed_roll: z
+      .boolean()
+      .nullable()
+      .describe("Mixed-frequency mode: whether the chosen action's group holds the roll-selected action; null with the mode off (ADR 0024, O-371)"),
     state_version: z.number().int().min(0),
     // O-280, O-281: where the decision was made, read from the attempt row and its solution row
     // (O-246), so the feedback panel can fetch the range view and threshold card for that node.

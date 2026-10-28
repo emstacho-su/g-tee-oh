@@ -18,7 +18,7 @@
  * Idempotency-Key, 409 session-ended after the end. onEnd sees each recap the first time a session
  * ends (mock-app.ts moves the progress learner with it).
  */
-import type { DecisionFeedback, TrainerPrompt } from "../../src/contracts.js";
+import type { DecisionFeedback, Grouping, TrainerPrompt } from "../../src/contracts.js";
 import {
   FIXTURE_BLOCK_SIZE,
   fixtureAutomatedBlocks,
@@ -26,7 +26,8 @@ import {
   fixtureHoldoutProgress,
   fixtureHoldoutPrompt,
 } from "../../src/fixtures/automated.js";
-import { fixtureTrainerHands, type FixtureHand } from "../../src/fixtures/trainer.js";
+import { fixtureFollowedRoll, fixtureTrainerHands, type FixtureHand } from "../../src/fixtures/trainer.js";
+import { GROUPINGS } from "../../src/store/session-defaults.js";
 import type { TrackKey } from "../../src/progress/types.js";
 import type { AutomatedBlock, PracticeSession, RatingChange, SessionRecap } from "../../src/trainer/session-types.js";
 import { json, problem, type MockRequest, type MockResponse, type ProblemSpec } from "./mock-api.js";
@@ -81,6 +82,8 @@ interface TrainingSession {
   readonly id: string;
   readonly mode: MockTrainingMode;
   readonly rng: boolean;
+  /** The grouping the session grades with, from the start body; holdout is always standard. */
+  readonly grouping: Grouping;
   readonly ratedEligible: boolean;
   readonly version: number;
   readonly graded: readonly Graded[];
@@ -133,6 +136,7 @@ function feedbackOf(session: TrainingSession, actionIndex: number): DecisionFeed
   const graded = best ? { label: "best" as const, score: BEST_SCORE, ev_loss_bb: 0, ev_loss_pct_pot: 0 } : {};
   const worked = session.mode === "automated" && blockAt(decision).worked_example;
   const classKey = session.mode === "automated" ? blockAt(decision).spot_class_key : hand.feedback.spot_class_key;
+  const roll = session.rng ? hand.roll : null;
   return {
     ...hand.feedback,
     ...graded,
@@ -141,7 +145,9 @@ function feedbackOf(session: TrainingSession, actionIndex: number): DecisionFeed
     review_block: reviewBlockOf(session),
     spot_class_key: classKey,
     state_version: session.version + 1,
-    rng_roll: session.rng ? hand.roll : null,
+    rng_roll: roll,
+    // The followed-the-roll mark, as the api stores it (O-371).
+    followed_roll: fixtureFollowedRoll(promptOf(session), hand.feedback, actionIndex, roll, session.grouping),
   };
 }
 
@@ -173,18 +179,19 @@ function recapOf(session: TrainingSession): SessionRecap {
 }
 
 /** The body's problem, or the new session's mode, RNG and rating eligibility. */
-function parseStart(body: unknown): ProblemSpec | Pick<TrainingSession, "mode" | "rng" | "ratedEligible"> {
+function parseStart(body: unknown): ProblemSpec | Pick<TrainingSession, "mode" | "rng" | "grouping" | "ratedEligible"> {
   if (!isRecord(body) || (body["mode"] !== "automated" && body["mode"] !== "holdout")) return PROBLEMS.validation;
   const seeded = body["seed"] !== undefined;
-  if (body["mode"] === "holdout") return seeded ? PROBLEMS.validation : { mode: "holdout", rng: false, ratedEligible: false };
+  if (body["mode"] === "holdout") return seeded ? PROBLEMS.validation : { mode: "holdout", rng: false, grouping: "standard", ratedEligible: false };
   if (!validConfigIds(body["config_ids"])) return PROBLEMS.validation;
   const settings = body["settings"];
   const rng = isRecord(settings) && settings["rng"] === true;
-  return { mode: "automated", rng, ratedEligible: !seeded };
+  const grouping = isRecord(settings) ? GROUPINGS.find((value) => value === settings["grouping"]) : undefined;
+  return { mode: "automated", rng, grouping: grouping ?? "standard", ratedEligible: !seeded };
 }
 
 function sessionBody(session: TrainingSession): PracticeSession {
-  const base = { session_id: session.id, mode: session.mode, drill_id: null, state: "await_hero" as const, state_version: session.version, started_at: STARTED_AT, rated_eligible: session.ratedEligible };
+  const base = { session_id: session.id, mode: session.mode, drill_id: null, state: "await_hero" as const, state_version: session.version, started_at: STARTED_AT, rated_eligible: session.ratedEligible, grouping: session.grouping };
   return session.mode === "automated" ? { ...base, automated: blockAt(0), holdout: null } : { ...base, automated: null, holdout: fixtureHoldoutProgress };
 }
 

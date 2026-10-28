@@ -44,6 +44,7 @@ import {
   fixturePartCoveredDrill,
   fixtureStreetDrill,
   fixtureStreetHands,
+  fixtureFollowedRoll,
   fixtureTrainerHands,
   heroEntry,
   type FixtureHand,
@@ -130,7 +131,6 @@ interface DecisionBody {
   state_version: number;
   action_index: number;
   response_ms: number;
-  confidence?: "sure" | "unsure";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -143,9 +143,9 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isDecisionBody(body: unknown): body is DecisionBody {
   if (!isRecord(body)) return false;
-  const confidence = body["confidence"];
-  const confidenceOk = confidence === undefined || confidence === "sure" || confidence === "unsure";
-  return isNonNegativeInteger(body["state_version"]) && isNonNegativeInteger(body["action_index"]) && isNonNegativeInteger(body["response_ms"]) && confidenceOk;
+  // The api's body is strict and the confidence tap is retired: a body that still sends it is a 400 (O-345, O-373).
+  if ("confidence" in body) return false;
+  return isNonNegativeInteger(body["state_version"]) && isNonNegativeInteger(body["action_index"]) && isNonNegativeInteger(body["response_ms"]);
 }
 
 function cycled<T>(items: readonly T[], index: number): T {
@@ -186,7 +186,10 @@ function feedbackOf(session: MockSession, actionIndex: number): DecisionFeedback
   const hand = decisionAt(session);
   const best = hand.feedback.best_action_indexes.includes(actionIndex);
   const graded = best ? { label: "best" as const, score: BEST_SCORE, ev_loss_bb: 0, ev_loss_pct_pot: 0 } : {};
-  return { ...hand.feedback, ...graded, state_version: session.version + 1, rng_roll: session.rng ? hand.roll : null };
+  const roll = session.rng ? hand.roll : null;
+  // The followed-the-roll mark, as the api stores it (O-371); it never changes the label (ADR 0024).
+  const followed_roll = fixtureFollowedRoll(promptOf(session), hand.feedback, actionIndex, roll);
+  return { ...hand.feedback, ...graded, state_version: session.version + 1, rng_roll: roll, followed_roll };
 }
 
 /** How a street hand ends after the hero's action: a fold, or the street closing (the flop in full-hand mode). */
@@ -277,7 +280,7 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
     };
     save(session);
     const coverage = target.id === FIXTURE_PART_COVERED_DRILL_ID ? fixturePartCoverage : fixtureFullCoverage;
-    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, automated: null, holdout: null, coverage };
+    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: target.id, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, grouping: target.trainer.grouping, automated: null, holdout: null, coverage };
     return json(STATUS.created, body);
   }
 

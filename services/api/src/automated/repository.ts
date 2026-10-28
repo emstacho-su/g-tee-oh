@@ -13,7 +13,7 @@
  * - uncoveredCardPairs: the (configuration, pair) of the last attempt of each class the user holds
  *   a card for that the catalog no longer lists, within the scope (A6 section 3 step 4, O-270).
  */
-import type { Confidence, GradeLabel, TrackAverage } from "@g-tee-oh/learning";
+import type { GradeLabel, TrackAverage } from "@g-tee-oh/learning";
 import { sql } from "kysely";
 
 import type { Database } from "../db.js";
@@ -24,12 +24,6 @@ import { decisionGroups, trackAverageOf, type DecisionGroup } from "../learning-
 import type { PairCandidate } from "../sessions/candidates.js";
 import type { ClassCatalog } from "./class-catalog.js";
 import type { QueueInputs } from "./queue.js";
-
-const CONFIDENCES: readonly Confidence[] = ["sure", "unsure"];
-
-export function confidenceOf(stored: string | null): Confidence | null {
-  return CONFIDENCES.find((confidence) => confidence === stored) ?? null;
-}
 
 /** Per track key, learning's pooled average over its classes; null for a track with no decisions. */
 export function trackAveragesOf(groups: readonly DecisionGroup[], trackIds: ReadonlyMap<TrackKey, string>): Map<TrackKey, TrackAverage | null> {
@@ -79,14 +73,13 @@ export interface BlockAttempt {
   score: number;
   responseMs: number;
   label: GradeLabel;
-  confidence: Confidence | null;
 }
 
 /** The session's last `count` decisions, oldest first. */
 export async function blockAttempts(database: Database, sessionId: string, count: number): Promise<BlockAttempt[]> {
   const rows = await database
     .selectFrom("attempt")
-    .select(["score", "response_ms", "label", "confidence"])
+    .select(["score", "response_ms", "label"])
     .where("session_id", "=", sessionId)
     .orderBy("state_version", "desc")
     .limit(count)
@@ -95,7 +88,6 @@ export async function blockAttempts(database: Database, sessionId: string, count
     score: row.score,
     responseMs: row.response_ms ?? 0,
     label: gradeLabelOf(row.label),
-    confidence: confidenceOf(row.confidence),
   }));
 }
 

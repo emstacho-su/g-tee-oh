@@ -1,22 +1,22 @@
 /**
- * The trainer's client state in spot mode (S25, R3.13, R3.11, O-284, O-198, O-232, A7 section 3).
+ * The trainer's client state in spot mode (S25, S37, R3.13, O-284, O-345, O-198, O-232, A7 section 3).
  * Pure: no input/output, no clock and no randomness. The hook (use-spot-session.ts) reads the clock
  * and makes the Idempotency-Keys through injected dependencies and passes them in the events, so
  * the same state and event always give the same next state.
  *
  * States: idle (the start panel), starting (POST /sessions), loading_prompt (GET /next), stale (GET
- * /next again after a 409 stale-state), await_action, await_confidence (an action is chosen and
- * may still be replaced), submitting (POST decisions), feedback (the reveal, paused until Next),
+ * /next again after a 409 stale-state), await_action, submitting (POST decisions), feedback (the reveal, paused until Next),
  * ending (POST end), ended (the recap), and error (with the request to retry, or none).
  *
  * Rules:
  * - Only the feedback state holds a DecisionFeedback, and it is entered only from submitting on the
- *   decision response; submitting is entered only by the confidence tap. So nothing is revealed and
- *   no decision is sent before the tap (R3.11, O-284).
- * - response_ms is the active time from the prompt shown to the action committed (the last
- *   choose_action), never below zero; pause and resume (the explainer or a dialog over the screen)
- *   stop and restart that clock (response-timer.ts, O-284).
- * - One Idempotency-Key per decision, made at the tap; a retry after a transient failure resends
+ *   decision response; submitting is entered only by choosing an action, which sends it at once:
+ *   the confidence tap was retired (O-345), so nothing is revealed before the choice and the choice
+ *   cannot be replaced once made.
+ * - response_ms is the active time from the prompt shown to the action chosen, never below zero;
+ *   pause and resume (the explainer or a dialog over the screen) stop and restart that clock
+ *   (response-timer.ts, O-284).
+ * - One Idempotency-Key per decision, made at the choice; a retry after a transient failure resends
  *   the same pending decision with the same key, so a double submit is graded once (O-232). Only
  *   transient problems offer a retry (spot-problem.ts); after a fixed answer the screen offers End.
  * - Start from a failed start (the start panel shows Start again) reuses the failed request's key
@@ -37,7 +37,6 @@
  * delay after which the hook sends auto_continue, which leaves only such a reveal (a stray timer
  * cannot skip a paused one). Next leaves any reveal.
  */
-import type { ConfidenceChoice } from "../components/trainer/index.js";
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
 import { advanceHand, type HandProgress } from "./hand-progress.js";
 import { autoContinueMs } from "./pause-rule.js";
@@ -48,7 +47,7 @@ import { isRetryable, type SpotProblem } from "./spot-problem.js";
 export type { SpotProblem } from "./spot-problem.js";
 export type { ResponseTimer } from "./response-timer.js";
 
-/** The started session and whether it runs in RNG mode (the start panel's switch, O-283). */
+/** The started session and whether it runs in Mixed-frequency mode (the start panel's switch, O-283). */
 export interface SessionContext {
   readonly session: PracticeSession;
   readonly rng: boolean;
@@ -61,7 +60,6 @@ export interface SessionContext {
 export interface PendingDecision {
   /** NodeAction.index of the chosen action (O-198). */
   readonly actionIndex: number;
-  readonly confidence: ConfidenceChoice;
   readonly responseMs: number;
   readonly idempotencyKey: string;
   readonly stateVersion: number;
@@ -87,15 +85,6 @@ export type SpotState =
       readonly prompt: TrainerPrompt;
       readonly timer: ResponseTimer;
       readonly notice: PromptNotice | null;
-    }
-  | {
-      readonly kind: "await_confidence";
-      readonly context: SessionContext;
-      readonly prompt: TrainerPrompt;
-      readonly timer: ResponseTimer;
-      readonly actionIndex: number;
-      /** The active time from shown to this choice (O-284). */
-      readonly responseMs: number;
     }
   | { readonly kind: "submitting"; readonly context: SessionContext; readonly prompt: TrainerPrompt; readonly decision: PendingDecision }
   | {
@@ -127,8 +116,8 @@ export type SpotEvent =
   | { readonly type: "start"; readonly key: string; readonly rng: boolean; readonly trainer?: RunSettings }
   | { readonly type: "session_started"; readonly session: PracticeSession }
   | { readonly type: "prompt_loaded"; readonly prompt: TrainerPrompt; readonly at: number }
-  | { readonly type: "choose_action"; readonly actionIndex: number; readonly at: number }
-  | { readonly type: "confidence"; readonly confidence: ConfidenceChoice; readonly key: string }
+  /** Choosing an action sends it: key is the decision's Idempotency-Key (O-232, O-345). */
+  | { readonly type: "choose_action"; readonly actionIndex: number; readonly at: number; readonly key: string }
   | { readonly type: "decision_succeeded"; readonly feedback: DecisionFeedback }
   | { readonly type: "next" }
   /** Sent by the hook's timer when a reveal that does not pause has shown for its delay (O-314). */
@@ -144,7 +133,7 @@ export type SpotEvent =
 export const INITIAL_SPOT_STATE: SpotState = { kind: "idle" };
 
 type ErrorState = Extract<SpotState, { kind: "error" }>;
-type AwaitState = Extract<SpotState, { kind: "await_action" | "await_confidence" }>;
+type AwaitState = Extract<SpotState, { kind: "await_action" }>;
 
 const EMPTY_ERROR = { prompt: null, decision: null, start: null, key: null } as const;
 
@@ -153,35 +142,29 @@ function errorState(problem: SpotProblem, target: RetryTarget, rest: Partial<Omi
 }
 
 function isAwaiting(state: SpotState): state is AwaitState {
-  return state.kind === "await_action" || state.kind === "await_confidence";
+  return state.kind === "await_action";
 }
 
 function hasButton(prompt: TrainerPrompt, actionIndex: number): boolean {
   return prompt.buttons.some((button) => button.index === actionIndex);
 }
 
+/** Choosing an action submits it: the pending decision carries the choice's key and response time (O-345). */
 function chooseAction(state: SpotState, event: Extract<SpotEvent, { type: "choose_action" }>): SpotState {
   if (!isAwaiting(state) || !hasButton(state.prompt, event.actionIndex)) return state;
-  const { context, prompt, timer } = state;
-  return { kind: "await_confidence", context, prompt, timer, actionIndex: event.actionIndex, responseMs: activeMs(timer, event.at) };
+  const decision: PendingDecision = {
+    actionIndex: event.actionIndex,
+    responseMs: activeMs(state.timer, event.at),
+    idempotencyKey: event.key,
+    stateVersion: state.prompt.state_version,
+  };
+  return { kind: "submitting", context: state.context, prompt: state.prompt, decision };
 }
 
 function retime(state: SpotState, update: (timer: ResponseTimer) => ResponseTimer): SpotState {
   if (!isAwaiting(state)) return state;
   const timer = update(state.timer);
   return timer === state.timer ? state : { ...state, timer };
-}
-
-function tapConfidence(state: SpotState, event: Extract<SpotEvent, { type: "confidence" }>): SpotState {
-  if (state.kind !== "await_confidence") return state;
-  const decision: PendingDecision = {
-    actionIndex: state.actionIndex,
-    confidence: event.confidence,
-    responseMs: state.responseMs,
-    idempotencyKey: event.key,
-    stateVersion: state.prompt.state_version,
-  };
-  return { kind: "submitting", context: state.context, prompt: state.prompt, decision };
 }
 
 function promptLoaded(state: SpotState, event: Extract<SpotEvent, { type: "prompt_loaded" }>): SpotState {
@@ -257,7 +240,7 @@ function start(state: SpotState, event: Extract<SpotEvent, { type: "start" }>): 
   return { kind: "starting", ...startRequest(key, event.rng, event.trainer) };
 }
 
-const ENDABLE: ReadonlySet<SpotStateKind> = new Set(["loading_prompt", "stale", "await_action", "await_confidence", "feedback", "error"]);
+const ENDABLE: ReadonlySet<SpotStateKind> = new Set(["loading_prompt", "stale", "await_action", "feedback", "error"]);
 
 /** Whether End is possible: a session is running and no request of its own is under way. */
 export function canEnd(state: SpotState): boolean {
@@ -286,8 +269,6 @@ export function transition(state: SpotState, event: SpotEvent): SpotState {
       return promptLoaded(state, event);
     case "choose_action":
       return chooseAction(state, event);
-    case "confidence":
-      return tapConfidence(state, event);
     case "decision_succeeded":
       return decisionSucceeded(state, event.feedback);
     case "next":

@@ -46,7 +46,7 @@ const AUTOMATED: LearningState = {
   seeded: false,
   config_ids: ["cfg_6_online_100"],
   pick_no: 1,
-  queue: { last_family: "rfi", hypercorrection: [] },
+  queue: { last_family: "rfi" },
   block: {
     spot_class_key: "preflop/online/100/rfi/BB-BTN",
     family: "rfi",

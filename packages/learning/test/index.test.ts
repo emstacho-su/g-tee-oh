@@ -19,9 +19,9 @@ const S22_FUNCTIONS = [
   "splitMix64Source",
   "splitMix64Step",
   "isCorrectLabel",
-  "isConfidentMiss",
-  "aggregateCalibration",
-  "promoteConfidentMiss",
+  "bestActionIndexes",
+  "followsRoll",
+  "lowestLossIndexes",
 ] as const;
 
 /**
@@ -67,7 +67,6 @@ const S30_FUNCTIONS = [
   "leakHistorySnapshot",
   "queuePriority",
   "emptyQueueState",
-  "recordAttempt",
   "pickNext",
 ] as const;
 
@@ -91,6 +90,13 @@ describe("@g-tee-oh/learning", () => {
     const exported = learning as Record<string, unknown>;
     for (const name of S22_FUNCTIONS) {
       expect(typeof exported[name], name).toBe("function");
+    }
+  });
+
+  it("R3.8 the retired R3.11 calibration and confident-miss exports are gone (O-345)", () => {
+    const exported = learning as Record<string, unknown>;
+    for (const name of ["isConfidentMiss", "aggregateCalibration", "promoteConfidentMiss", "recordAttempt"]) {
+      expect(exported[name], name).toBeUndefined();
     }
   });
 

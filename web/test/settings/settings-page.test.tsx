@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe("R4.12 /settings session defaults", () => {
-  it("R4.12 grouping and RNG mode save to the store at once and say so", async () => {
+  it("R4.12 grouping and Mixed-frequency mode save to the store at once and say so; the mode is off by default (O-344)", async () => {
     const user = userEvent.setup();
     renderApp("/settings/session-defaults", member);
 
@@ -62,7 +62,8 @@ describe("R4.12 /settings session defaults", () => {
     await user.click(within(defaults).getByRole("radio", { name: "Simple" }));
     expect(useSessionDefaultsStore.getState().defaults.grouping).toBe("simple");
     expect(within(defaults).getByRole("status")).toHaveTextContent("Saved on this browser.");
-    await user.click(within(defaults).getByRole("checkbox", { name: "RNG mode" }));
+    expect(within(defaults).getByRole("checkbox", { name: "Mixed-frequency mode" })).not.toBeChecked();
+    await user.click(within(defaults).getByRole("checkbox", { name: "Mixed-frequency mode" }));
     expect(useSessionDefaultsStore.getState().defaults.rng).toBe(true);
   });
 
@@ -178,15 +179,17 @@ describe("R4.14 /settings cosmetics", () => {
 });
 
 describe("R4.12 /settings hotkeys and layout", () => {
-  it("R4.12 the hotkeys table lists the trainer and app shortcuts, read only (O-327)", async () => {
+  it("R4.12 the hotkeys table lists the trainer and app shortcuts, read only, without the retired S and U keys (O-327, O-345)", async () => {
     renderApp("/settings/hotkeys", member);
 
     const hotkeys = await screen.findByRole("region", { name: "Hotkeys" });
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
-    expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual(["1 to 9", "S", "U", "N", "E", "I", "?"]);
-    expect(rows[3]).toHaveTextContent("Next hand");
-    expect(rows[4]).toHaveTextContent("End session");
-    expect(rows[5]).toHaveTextContent("How RNG mode works");
+    expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual(["1 to 9", "N", "E", "I", "?"]);
+    expect(rows[0]).toHaveTextContent("Choose an action and submit it");
+    expect(rows[1]).toHaveTextContent("Next hand");
+    expect(rows[2]).toHaveTextContent("End session");
+    expect(rows[3]).toHaveTextContent("How Mixed-frequency mode works");
+    expect(hotkeys).not.toHaveTextContent("Unsure");
     expect(hotkeys).toHaveTextContent("Rebinding keys comes in a later version.");
     expect(within(hotkeys).queryByRole("button")).toBeNull();
   });

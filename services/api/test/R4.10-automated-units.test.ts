@@ -1,8 +1,8 @@
 /**
- * The automated loop's pure rules (R4.10, O-270, O-272, O-274, O-254, O-255, O-256, O-215, the PM
+ * The automated loop's pure rules (R4.10, O-270, O-272, O-274, O-254, O-255, O-256, O-345, the PM
  * seed condition): the rated-rule overrides, the pick stream, the class catalog's merge and priors,
- * queue candidates and priorities from given learning rows, block picks under the interleave and
- * hypercorrection rules, and the block's progress.
+ * queue candidates and priorities from given learning rows, block picks under the interleave rule,
+ * and the block's progress (the confident-miss rule O-215 was retired with R3.11, O-345).
  */
 import {
   frequencyPriorPer1000,
@@ -213,7 +213,7 @@ describe("R4.10 queue candidates and priorities (O-254, O-255)", () => {
   });
 });
 
-describe("R4.10 block picks (O-256, O-272, O-215)", () => {
+describe("R4.10 block picks (O-256, O-272, O-345)", () => {
   const candidates = queueCandidates(CATALOG.classes, EMPTY_QUEUE_INPUTS, NOW);
 
   it("R4.10 a first exposure is a worked-example block of three hands over the class's spots", () => {
@@ -235,29 +235,19 @@ describe("R4.10 block picks (O-256, O-272, O-215)", () => {
     }
   });
 
-  it("R4.10 a confident miss is served at the first pick the interleave rule allows", () => {
-    const missed = recordDecision(learning(), { label: "Mistake", confidence: "sure" });
-    expect(missed.queue.hypercorrection).toEqual([DEFEND.spot_class_key]);
-    const afterBlock = { ...missed.queue, last_family: "facing-open" };
-    const next = pickBlock({ seed: SEED, pickNo: 1, queue: afterBlock, candidates, catalog: CATALOG });
-    expect(next.block.family).not.toBe("facing-open");
-    const then = pickBlock({ seed: SEED, pickNo: 2, queue: next.queue, candidates, catalog: CATALOG });
-    expect(then.block.spot_class_key).toBe(DEFEND.spot_class_key);
-    expect(then.queue.hypercorrection).toEqual([]);
-  });
-
-  it("R4.10 an unsure miss, a correct answer and a seeded session record no hypercorrection", () => {
-    expect(recordDecision(learning(), { label: "Mistake", confidence: "unsure" }).queue.hypercorrection).toEqual([]);
-    expect(recordDecision(learning(), { label: "Best", confidence: "sure" }).queue.hypercorrection).toEqual([]);
-    expect(recordDecision(learning({ seeded: true }), { label: "Blunder", confidence: "sure" }).queue.hypercorrection).toEqual([]);
-    expect(recordDecision(learning(), { label: "Blunder", confidence: null }).queue.hypercorrection).toEqual([]);
+  it("R4.10 a decision only counts toward its block: the queue state is left as it was, whatever the label (O-345)", () => {
+    const before = learning({ queue: { last_family: "facing-open" } });
+    const after = recordDecision(before);
+    expect(after.queue).toEqual({ last_family: "facing-open" });
+    expect(after.block.served).toBe(before.block.served + 1);
+    expect(before.block.served).toBe(0);
   });
 
   it("R4.10 a block completes at its size and the next block resets it", () => {
     let state = learning();
     for (let served = 0; served < REVIEW_BLOCK_INSTANCES; served += 1) {
       expect(isBlockComplete(state)).toBe(false);
-      state = recordDecision(state, { label: "Best", confidence: null });
+      state = recordDecision(state);
     }
     expect(isBlockComplete(state)).toBe(true);
     const pick = pickBlock({ seed: SEED, pickNo: state.pick_no, queue: state.queue, candidates, catalog: CATALOG });

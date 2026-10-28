@@ -1,8 +1,9 @@
 /**
- * Gallery sections for the S25 RNG (random number generator) and feedback components (R3.10,
- * R3.13, O-267, O-282, O-283): the explainer text inline (plus a button and the I key that open
- * the real dialog), the roll badge shown before a decision, and the feedback panel wired with
- * the roller, the range view and the threshold card as the trainer shows it after a decision.
+ * Gallery sections for the Mixed-frequency mode and feedback components (S25, S37, R3.10, R3.13,
+ * O-267, O-283, O-344, O-378): the explainer text inline (plus a button and the I key that open the
+ * real dialog), the roll scale hidden as it stands before a decision, and the feedback panel wired
+ * with the revealed scale and its followed-the-roll mark, the range view and the threshold card as
+ * the trainer shows it after a decision.
  *
  * Mechanism: the range view and the threshold card read through TanStack Query. The gallery has
  * no api, so a private QueryClient is seeded with the synthetic fixtures under the exact keys the
@@ -22,7 +23,7 @@ import {
   FeedbackRoller,
   FeedbackThreshold,
   RngExplainer,
-  RollBadge,
+  RngRoller,
   useRngExplainer,
 } from "../components/trainer/index.js";
 import { RngExplainerContent } from "../components/trainer/RngExplainer.js";
@@ -30,10 +31,10 @@ import { fixtureActions, fixtureFeedback, fixtureInsights, fixtureStudyNode } fr
 import { studyInsightsQuery, studyNodeByKeyQuery } from "../study/queries.js";
 import { GallerySection } from "./sections.js";
 
-/** The hero called; the roll picked the raise, which the grade marks best (fixture feedback). */
+/** The hero called; roll 37 fell on the raise, so the roll was not followed (fixture feedback, O-371). */
 const CHOSEN_INDEX = 1;
-/** The roll the badge shows before a decision; the same roll as the fixture feedback. */
-const BADGE_ROLL = 37;
+/** The roll the hidden scale shows before a decision; the same roll as the fixture feedback. */
+const SCALE_ROLL = 37;
 
 const galleryApi = createAppApi({
   baseUrl: "http://gallery.invalid",
@@ -63,7 +64,7 @@ function ExplainerSection() {
     <GallerySection
       name="rng-explainer"
       title="RngExplainer"
-      note="Why randomize, how the roll works, why it is optional (05 section 7, ADR 0009). The button or the I key opens the dialog."
+      note="What earns Best, how the roll works, why practise mixing (05 section 7, ADR 0024). The button or the I key opens the dialog."
     >
       <div className="flex flex-col gap-3">
         <RngExplainerContent />
@@ -81,7 +82,7 @@ function WiredFeedbackSection() {
     <GallerySection
       name="feedback-wired"
       title="FeedbackPanel, wired"
-      note="After the decision: the roller with the roll-selected action labeled Best, the range view with the hero's class, the threshold card (O-281, O-282)."
+      note="After the decision: the same scale with the bands revealed and the followed-the-roll mark (never Best), the range view with the hero's class, the threshold card (O-281, O-371)."
     >
       <QueryClientProvider client={queryClient}>
         <ApiProvider api={galleryApi}>
@@ -89,7 +90,16 @@ function WiredFeedbackSection() {
             feedback={fixtureFeedback}
             actions={fixtureActions}
             chosenIndex={CHOSEN_INDEX}
-            roller={<FeedbackRoller feedback={fixtureFeedback} actions={fixtureActions} onExplain={() => explainer.setOpen(true)} />}
+            roller={
+              <FeedbackRoller
+                feedback={fixtureFeedback}
+                actions={fixtureActions}
+                chosenIndex={CHOSEN_INDEX}
+                grouping="standard"
+                street="preflop"
+                onExplain={() => explainer.setOpen(true)}
+              />
+            }
             rangeView={<FeedbackRangeView feedback={fixtureFeedback} />}
             thresholdCard={<FeedbackThreshold feedback={fixtureFeedback} />}
           />
@@ -105,11 +115,11 @@ export function RngSections() {
     <>
       <ExplainerSection />
       <GallerySection
-        name="roll-badge"
-        title="RollBadge"
-        note="Before the decision: the roll and the info button only, never the bands (O-282)."
+        name="roll-scale"
+        title="RngRoller, hidden"
+        note="Before the decision: the roll on the 1 to 100 scale and the info button, never the bands (ADR 0024 rule 3, O-344)."
       >
-        <RollBadge roll={BADGE_ROLL} onExplain={() => undefined} />
+        <RngRoller hidden roll={SCALE_ROLL} onExplain={() => undefined} />
       </GallerySection>
       <WiredFeedbackSection />
     </>

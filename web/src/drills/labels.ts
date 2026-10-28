@@ -109,7 +109,7 @@ export const PANEL_LABELS: Readonly<Record<PanelKey, string>> = {
   draw_breakdown: "Draws",
   threshold_card: "Threshold card",
   hero_strategy_matrix: "Your strategy",
-  rng_roller: "RNG roller",
+  rng_roller: "Mixed-frequency roll",
   streak_counter: "Streak counter",
 };
 

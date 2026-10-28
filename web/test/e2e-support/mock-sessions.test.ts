@@ -126,7 +126,7 @@ describe("R3.13 mocked session routes", () => {
     const api = signedInApi();
     const id = start(api, true);
     const prompt = next(api, id).body as PromptBody;
-    const body = { state_version: prompt.state_version, action_index: 2, confidence: "sure", response_ms: 900 };
+    const body = { state_version: prompt.state_version, action_index: 2, response_ms: 900 };
     const headers = { ...SIGNED, "idempotency-key": "k-1" };
     const first = decide(api, id, body, headers);
     expect(first.status).toBe(200);
@@ -143,7 +143,7 @@ describe("R3.13 mocked session routes", () => {
     const id = start(api);
     const version = (next(api, id).body as PromptBody).state_version;
     expect(decide(api, id, { action_index: 0 }).status).toBe(400);
-    expect(decide(api, id, { state_version: version, action_index: 0, response_ms: 1, confidence: "maybe" }).status).toBe(400);
+    expect(decide(api, id, { state_version: version, action_index: 0, response_ms: 1, confidence: "sure" }).status, "the retired confidence field is refused, as the api refuses it (O-373)").toBe(400);
     expect(decide(api, id, { state_version: version, action_index: 9, response_ms: 1 }).status).toBe(400);
     const wrong = decide(api, id, { state_version: version, action_index: 0, response_ms: 1 });
     expect(wrong.body).toMatchObject({ label: "inaccuracy", rng_roll: null });
@@ -271,7 +271,7 @@ function trainingApi(onEnd?: (recap: SessionRecap) => void): MockApi {
 function playTraining(api: MockApi, id: string, count: number): TrainingFeedback[] {
   return Array.from({ length: count }, (_, step) => {
     const prompt = next(api, id).body as PromptBody & { buttons: { index: number }[] };
-    const answer = decide(api, id, { state_version: prompt.state_version, action_index: prompt.buttons[0]?.index ?? 0, response_ms: 1, confidence: "sure" }, { ...SIGNED, "idempotency-key": `k-${step}` });
+    const answer = decide(api, id, { state_version: prompt.state_version, action_index: prompt.buttons[0]?.index ?? 0, response_ms: 1 }, { ...SIGNED, "idempotency-key": `k-${step}` });
     expect(answer.status).toBe(200);
     return answer.body as TrainingFeedback;
   });

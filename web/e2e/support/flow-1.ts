@@ -1,13 +1,14 @@
 /**
- * The steps of flow 1 (A7 section 5, S32, R4.10, R4.12, O-272, O-284, O-324, O-326), shared by the
- * stack flow and its mock twin: read the home rating card, open /train from the main navigation,
- * start with the session defaults, play decisions (an action, then a confidence tap with the S or
- * U key, the feedback, then Next), end the session through the confirm, read the recap, go home
+ * The steps of flow 1 (A7 section 5, S32, S37, R4.10, R4.12, R3.13, O-272, O-284, O-324, O-326,
+ * O-345), shared by the stack flow and its mock twin: read the home rating card, open /train from
+ * the main navigation, start with the session defaults, play decisions (choosing an action submits
+ * it, then the feedback, then Next), end the session through the confirm, read the recap, go home
  * and read the rating card again.
  *
  * Mechanism: every step drives the app through its visible controls and accessible names, as a
- * player would. The confidence keys alternate S and U so both taps are exercised; nothing is
- * revealed before the tap (the flow checks the feedback panel is absent until then, R3.11).
+ * player would. Decisions alternate a click and the 1 key so both ways of choosing are exercised;
+ * nothing is revealed before the choice, and each decision request is checked to carry no
+ * confidence field (the tap was retired, O-345, O-373).
  */
 import { expect, type Page } from "@playwright/test";
 
@@ -15,7 +16,9 @@ import { expect, type Page } from "@playwright/test";
 export const FLOW_1_DECISIONS = 5;
 /** A decision is graded from the library; a cold CI runner gets a generous bound. */
 const FEEDBACK_TIMEOUT_MS = 15_000;
-const CONFIDENCE_KEYS = ["s", "u"] as const;
+/** The action bar's first hotkey. */
+const FIRST_ACTION_KEY = "1";
+const DECISION_PATH = /\/api\/v1\/sessions\/[^/]+\/decisions$/;
 const UNRATED_TEXT = "Unrated";
 const WHOLE_NUMBER = /^\d+$/;
 
@@ -52,12 +55,15 @@ export async function startTraining(page: Page, shot: Flow1Shooter = noShot, cri
   await expect(page.getByTestId("block-banner")).toBeVisible();
 }
 
-/** Plays one decision: an action, the confidence key, the feedback; returns once the reveal shows. */
+/** Plays one decision: choosing the first action submits it; returns once the reveal shows. */
 async function playOne(page: Page, step: number): Promise<void> {
-  await page.getByRole("group", { name: "Actions" }).getByRole("button").first().click();
-  await expect(page.getByTestId("confidence-tap")).toBeVisible();
-  await expect(page.getByTestId("feedback-panel"), "nothing is revealed before the confidence tap").toHaveCount(0);
-  await page.keyboard.press(CONFIDENCE_KEYS[step % CONFIDENCE_KEYS.length] ?? "s");
+  await expect(page.getByTestId("feedback-panel"), "nothing is revealed before the choice").toHaveCount(0);
+  const sent = page.waitForRequest((request) => request.method() === "POST" && DECISION_PATH.test(new URL(request.url()).pathname));
+  if (step % 2 === 0) await page.getByRole("group", { name: "Actions" }).getByRole("button").first().click();
+  else await page.keyboard.press(FIRST_ACTION_KEY);
+  // The browser may send the body as a stream Playwright cannot read back (null); the screen tests cover that case.
+  const body: unknown = (await sent).postDataJSON();
+  if (body !== null && typeof body === "object") expect(body, "the decision body carries no confidence field (O-373)").not.toHaveProperty("confidence");
   await expect(page.getByTestId("feedback-panel")).toBeVisible({ timeout: FEEDBACK_TIMEOUT_MS });
 }
 

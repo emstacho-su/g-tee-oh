@@ -31,7 +31,7 @@ export const TRAIN_TEXT = {
   scopeLoading: "Loading the configuration names",
   scopeError: "The configuration names could not be loaded.",
   grouping: "Grouping",
-  rng: "RNG mode",
+  rng: "Mixed-frequency mode",
   on: "On",
   off: "Off",
   changeScope: "Change the configurations",

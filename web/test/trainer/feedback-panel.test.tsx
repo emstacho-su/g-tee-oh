@@ -42,11 +42,12 @@ describe("R3.13 FeedbackPanel", () => {
     expect(panel).not.toHaveTextContent("Unrated");
   });
 
-  it("R3.13 lists the hand's frequency per action with the best actions marked Best", () => {
+  it("R3.13 lists the hand's frequency per action with the best actions, the highest EV, marked Best (ADR 0024)", () => {
     render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
     const table = screen.getByRole("table", { name: "This hand's strategy" });
     const raiseRow = within(table).getByRole("row", { name: /Raise 2.5bb/ });
     expect(raiseRow).toHaveTextContent("80.0%");
+    expect(raiseRow).toHaveTextContent("0.62bb");
     expect(raiseRow).toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /Fold/ })).not.toHaveTextContent("Best");
   });

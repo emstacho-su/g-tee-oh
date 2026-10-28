@@ -72,6 +72,9 @@ export interface Attempt {
   action_token: string;
   best_action_indexes: number[] | null;
   bucket: string | null;
+  /**
+   * retired with the confidence tap (O-345, O-373): no longer written; rows before S37 keep their value
+   */
   confidence: string | null;
   created_at: Generated<Timestamp>;
   ev_best_bb: number;
@@ -80,6 +83,10 @@ export interface Attempt {
   ev_loss_bb: number;
   ev_loss_pct_pot: number;
   floor_pct_pot: number;
+  /**
+   * Mixed-frequency mode: the chosen group holds the roll-selected action (ADR 0024, O-371); null without a roll
+   */
+  followed_roll: boolean | null;
   freq_by_action: number[] | null;
   /**
    * the action the policy graded: the chosen action, or its group member in Grouped and Simple modes

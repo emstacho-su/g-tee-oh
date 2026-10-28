@@ -80,7 +80,6 @@ async function start(drill: Drill): Promise<void> {
 
 async function decide(action: string): Promise<void> {
   await userEvent.click(await screen.findByRole("button", { name: action }));
-  await userEvent.click(screen.getByRole("button", { name: "Sure" }));
 }
 
 async function counterReads(text: string): Promise<void> {

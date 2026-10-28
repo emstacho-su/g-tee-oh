@@ -1,19 +1,19 @@
 /**
- * The drill session, /drills/$id/run: the trainer in spot mode (S25, R3.13, R3.11, R3.10, A7
+ * The drill session, /drills/$id/run: the trainer in spot mode (S25, S37, R3.13, R3.10, A7
  * sections 2 to 4, O-282 to O-285, O-288, ADR 0018).
  *
  * Mechanism: the page reads the drill (GET /drills/{id}) and shows the start panel: its name,
- * grouping and stop rule, an RNG mode switch that starts at trainer.rng and overrides it for this
+ * grouping and stop rule, a Mixed-frequency mode switch (the wire name stays rng) that starts at trainer.rng and overrides it for this
  * session only, and Start. Start runs useSpotSession (the pure machine in trainer/spot-machine.ts
  * and its requests), with the route's validated seed passed to POST /sessions (O-288). In a session
- * the page shows the table from the prompt, the decision area (roll, actions, confidence tap,
- * feedback, Next), an End session button with a confirm dialog, and the recap after the end.
+ * the page shows the table from the prompt, the decision area (the roll scale, actions, which
+ * submit when chosen (O-345), feedback, Next), an End session button with a confirm dialog, and the recap after the end.
  *
- * The RNG explainer (lane C's useRngExplainer and RngExplainer) opens on first use: when the switch
- * is turned on, and at the first prompt of a session that shows a roll (O-283); the roll badge, the
- * roller and the I key open it at any time. Hotkeys (O-285) go through useHotkey: N next hand (only
- * on the reveal), E end session (opens the confirm), plus 1 to 9, S and U from the trainer
- * components. While a dialog is open the screen's buttons and hotkeys pause.
+ * The Mixed-frequency mode explainer (lane C's useRngExplainer and RngExplainer) opens on first
+ * use: when the switch is turned on, and at the first prompt of a session that shows a roll (O-283);
+ * the roll scale's info button and the I key open it at any time. Hotkeys (O-285) go through
+ * useHotkey: N next hand (only on the reveal), E end session (opens the confirm), plus 1 to 9 from
+ * the action bar (the S and U keys left with the confidence tap, O-345). While a dialog is open the screen's buttons and hotkeys pause.
  *
  * S26 (R3.13, R3.14, O-312 to O-314): the drill's run settings (stop rule, pause, speed,
  * quick_result) go into the session, so street and full-hand modes run on the same screen; above
@@ -51,7 +51,6 @@ export interface DrillRunPageProps {
 function promptOf(state: SpotState): TrainerPrompt | null {
   switch (state.kind) {
     case "await_action":
-    case "await_confidence":
     case "submitting":
     case "feedback":
     case "error":
@@ -105,7 +104,6 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
             grouping={drill.trainer.grouping}
             interactive={interactive}
             onChoose={session.chooseAction}
-            onConfidence={session.tapConfidence}
             onNext={session.next}
             onExplain={onExplain}
             onExplainDialog={onExplainDialog}

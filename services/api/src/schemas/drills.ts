@@ -140,7 +140,7 @@ export const trainerSettingsSchema = z
     stop_rule: z.enum(["after_action", "end_of_street", "end_of_hand"]),
     input: z.enum(["actions", "frequency"]),
     grouping: z.enum(["standard", "grouped", "simple"]),
-    rng: z.boolean().describe("RNG mode (05 section 7); off by default"),
+    rng: z.boolean().describe("Mixed-frequency mode (the wire name stays rng; 05 section 7, ADR 0024, O-344); off by default"),
     pause: z.enum(["after_mistake", "every_action", "never"]),
     speed: z.enum(["slow", "normal", "fast"]),
     quick_result: z.boolean(),
