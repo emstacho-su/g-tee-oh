@@ -1,0 +1,148 @@
+/**
+ * The prediction routes' handlers (R3.16, O-301, O-302, A5 section 3): GET next and POST answer.
+ *
+ * - next: the user's session (404 otherwise), of mode prediction (409 wrong-session-mode), not
+ *   ended (409 session-ended); the prompt is derived (derive.ts) and nothing is written, so two
+ *   calls answer the same prompt. The truth never leaves the server here (predict before peek).
+ * - answer: the same checks, then the body's state_version and prompt_id must be the session's
+ *   current ones (409 stale-state otherwise). The prompt is derived again, the answer judged
+ *   (judge.ts), and in one idempotentWrite transaction the session row is locked and its version
+ *   checked again, one prediction_answer row is inserted and the state is written with the counter
+ *   advanced (state_version moves). The level after the answer is learning's levelFor over the
+ *   stored answers, so next_level_unlocked is true exactly for the answer that crossed. The
+ *   result copies the truth's Rust numbers; no attempt row is written and no rating is touched.
+ */
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { z } from "zod";
+
+import { levelFor } from "@g-tee-oh/learning";
+
+import { sessionNotFound } from "../grading/decide.js";
+import { staleStateProblem } from "../grading/attempts.js";
+import { requireDatabase } from "../http/database.js";
+import { idempotentWrite } from "../http/idempotent-write.js";
+import { HTTP_STATUS } from "../http/problem.js";
+import type { predictionAnswerBodySchema, predictionPromptSchema, predictionResultSchema } from "../schemas/prediction.js";
+import { requireSolverQuery } from "../solver-query/client.js";
+import { requireSessionMode, sessionEndedProblem } from "../sessions/problems.js";
+import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
+import { solverPort } from "../sessions/solver-port.js";
+import { derivePrediction, type DerivedPrediction } from "./derive.js";
+import { judgeAnswer } from "./judge.js";
+import { answerHistory, insertAnswer } from "./repository.js";
+
+export type PredictionPrompt = z.infer<typeof predictionPromptSchema>;
+export type PredictionResult = z.infer<typeof predictionResultSchema>;
+export type PredictionAnswerBody = z.infer<typeof predictionAnswerBodySchema>;
+
+const PREDICTION_MODE = "prediction";
+
+export interface PredictionCall {
+  app: FastifyInstance;
+  request: FastifyRequest;
+  userId: string;
+}
+
+async function readPredictionSession(call: PredictionCall, sessionId: string): Promise<SessionRow> {
+  const session = await findSession(requireDatabase(call.app), call.userId, sessionId);
+  if (session === undefined) {
+    throw sessionNotFound();
+  }
+  requireSessionMode(session, PREDICTION_MODE);
+  if (session.state.phase === "ended") {
+    throw sessionEndedProblem();
+  }
+  return session;
+}
+
+async function derive(call: PredictionCall, session: SessionRow): Promise<DerivedPrediction> {
+  const database = requireDatabase(call.app);
+  const port = solverPort(requireSolverQuery(call.app), call.request);
+  return derivePrediction(session, port, (spotClassKey) => answerHistory(database, call.userId, spotClassKey));
+}
+
+function toPrompt(session: SessionRow, derived: DerivedPrediction): PredictionPrompt {
+  const { question, node, spot } = derived;
+  return {
+    prompt_id: derived.promptId,
+    session_id: session.id,
+    state_version: session.stateVersion,
+    ladder: question.ladder,
+    level: question.level,
+    answer_kind: question.answer_kind,
+    question: question.question,
+    spot_class_key: derived.spotClassKey,
+    node_key: node.node_key,
+    hero_position: spot.hero_seat,
+    history: spot.history.map((entry) => ({ ...entry })),
+    hand: question.hand,
+    actions: node.actions.map((action) => ({
+      index: action.index,
+      token: action.token,
+      kind: action.kind,
+      size_cbb: action.size_cbb,
+      bucket: action.bucket ?? null,
+      label: action.label,
+      next_node_key: action.next_node_key ?? null,
+    })),
+    action_index: question.action_index,
+    threshold_pct: question.threshold_pct,
+    regions: question.regions === null ? null : [...question.regions],
+    bands: question.bands === null ? null : [...question.bands],
+    synthetic: node.synthetic,
+  };
+}
+
+/** GET /prediction/{session}/next: derived, never written. */
+export async function nextPrediction(call: PredictionCall, sessionId: string): Promise<PredictionPrompt> {
+  const session = await readPredictionSession(call, sessionId);
+  return toPrompt(session, await derive(call, session));
+}
+
+function requireCurrent(session: SessionRow, derived: DerivedPrediction, body: PredictionAnswerBody): void {
+  if (session.stateVersion !== body.state_version || derived.promptId !== body.prompt_id) {
+    throw staleStateProblem();
+  }
+}
+
+/** POST /prediction/{session}/answer: judged, recorded unrated, the counter advanced. */
+export async function answerPrediction(call: PredictionCall, sessionId: string, body: PredictionAnswerBody): Promise<PredictionResult> {
+  const session = await readPredictionSession(call, sessionId);
+  const derived = await derive(call, session);
+  requireCurrent(session, derived, body);
+  const correct = judgeAnswer(derived.question, derived.node, body.answer);
+  const { question, spotClassKey } = derived;
+  return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, async (transaction) => {
+    const locked = await lockSession(transaction, call.userId, session.id);
+    if (locked === undefined) {
+      throw sessionNotFound();
+    }
+    if (locked.stateVersion !== session.stateVersion) {
+      throw staleStateProblem();
+    }
+    const record = { userId: call.userId, sessionId: session.id, spotClassKey, ladder: question.ladder, level: question.level, correct };
+    await insertAnswer(transaction, record);
+    const practice = { kind: "prediction" as const, counter: derived.counter + 1, data: locked.state.practice?.data ?? {} };
+    const written = await writeState(transaction, {
+      userId: call.userId,
+      sessionId: session.id,
+      expectedVersion: session.stateVersion,
+      state: { ...locked.state, practice },
+    });
+    if (written === undefined) {
+      throw staleStateProblem();
+    }
+    const after = levelFor(await answerHistory(transaction, call.userId, spotClassKey), { spotClassKey, ladder: question.ladder });
+    return {
+      prompt_id: derived.promptId,
+      correct,
+      ladder: question.ladder,
+      level: question.level,
+      truth: { ...question.truth },
+      window: after.window,
+      next_level_unlocked: after.unlockedNow,
+      new_level: after.level,
+      state_version: written.stateVersion,
+    };
+  });
+}

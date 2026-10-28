@@ -12,9 +12,10 @@
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
 import { mutatingHeadersSchema } from "../http/headers.js";
-import { notImplemented } from "../http/not-implemented.js";
 import { AUTHENTICATED, UPSTREAM_MUTATE_PROBLEMS, UPSTREAM_READ_PROBLEMS } from "../http/openapi.js";
 import { HTTP_STATUS, problemResponses } from "../http/problem.js";
+import { requireSession } from "../plugins/authenticate.js";
+import { answerPrediction, nextPrediction } from "../prediction/service.js";
 import {
   predictionAnswerBodySchema,
   predictionParamsSchema,
@@ -42,7 +43,10 @@ export const predictionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> 
         response: { 200: predictionPromptSchema, ...problemResponses(NEXT_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      const { userId } = requireSession(request);
+      return nextPrediction({ app, request, userId }, request.params.session);
+    },
   );
 
   app.post(
@@ -59,7 +63,10 @@ export const predictionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> 
         response: { 200: predictionResultSchema, ...problemResponses(UPSTREAM_MUTATE_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      const { userId } = requireSession(request);
+      return answerPrediction({ app, request, userId }, request.params.session, request.body);
+    },
   );
 
   done();
