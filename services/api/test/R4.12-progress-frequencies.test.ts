@@ -83,6 +83,13 @@ interface Decisions {
   panels?: boolean;
   spotClassKey?: string;
   nodeKey?: string;
+  /** The solution the decisions were graded on; the fixture's by default. */
+  solutionId?: string;
+  /** Stored frequencies and kinds, when not the node row's own (a rebuilt node with other actions). */
+  freqs?: number[];
+  kinds?: string[];
+  /** How many days ago the decisions were made; now by default. */
+  ageDays?: number;
 }
 
 function strategyOf(node: SqNode, hand: string): number[] {
@@ -96,21 +103,23 @@ async function insertDecisions(player: Player, sessionId: string, decisions: Dec
   await pool.query(
     `insert into attempt (user_id, session_id, solution_id, node_key, spot_class_key, track_ids, hand, hand_class, action_index,
        action_token, ev_chosen_bb, ev_best_bb, ev_loss_bb, ev_loss_pct_pot, floor_pct_pot, score, label, rated, weight,
-       freq_by_action, action_kinds, panels_revealed)
-     select $1, $2, $3, $4, $5, '{}', $6, $6, $7, 'x', 0, 0, 0, 0, 0.5, 1, 'best', false, 1, $8::real[], $9::text[], $10
+       freq_by_action, action_kinds, panels_revealed, created_at)
+     select $1, $2, $3, $4, $5, '{}', $6, $6, $7, 'x', 0, 0, 0, 0, 0.5, 1, 'best', false, 1, $8::real[], $9::text[], $10,
+       now() - make_interval(days => $12::int)
      from generate_series(1, $11::int)`,
     [
       player.userId,
       sessionId,
-      FIXTURE_SOLUTION_ID,
+      decisions.solutionId ?? FIXTURE_SOLUTION_ID,
       decisions.nodeKey ?? node.node_key,
       decisions.spotClassKey ?? node.spot_class_key,
       hand,
       actionIndex,
-      strategyOf(node, hand),
-      node.actions.map((action) => action.kind),
+      decisions.freqs ?? strategyOf(node, hand),
+      decisions.kinds ?? node.actions.map((action) => action.kind),
       decisions.panels ?? false,
       count,
+      decisions.ageDays ?? 0,
     ],
   );
 }
@@ -149,7 +158,7 @@ describe("R4.12 GET /progress/frequencies", () => {
       [OPEN_NODE, 5],
     ]);
     const [spot, below] = view.spots;
-    expect(spot).toMatchObject({ config_id: CONFIG, pair: PAIR, hero_position: "BB", spot_class_key: defend.spot_class_key });
+    expect(spot).toMatchObject({ solution_id: FIXTURE_SOLUTION_ID, config_id: CONFIG, pair: PAIR, hero_position: "BB", spot_class_key: defend.spot_class_key });
     expect(spot?.action_family).toBe(defend.action_family ?? null);
     expect(spot?.actions).toEqual(defend.actions.map((action) => ({ index: action.index, label: action.label, kind: action.kind })));
     const yours = [9 / 31, 16 / 31, 6 / 31];
@@ -205,6 +214,19 @@ describe("R4.12 GET /progress/frequencies", () => {
       await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 50, nodeKey: `${DEFEND_NODE}.r${9001 + gone}` });
     }
     expect((await read(owner)).spots, "r250 is the 13th most played node now").toEqual([]);
+  });
+
+  it("R4.12 a rebuilt node is never pooled across solutions: each solution's decisions are their own spot, labelled by that solution (PR #39 review finding 6)", async () => {
+    const owner = await newPlayer(database);
+    const counted = await sessionFor(owner);
+    // An older build of the same node, with four actions, that the library no longer serves.
+    const older = await insertSolution(pool, CONFIG, PAIR);
+    const fourWide = { freqs: [0.1, 0.2, 0.3, 0.4], kinds: ["fold", "call", "raise", "raise"] };
+    await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 3, count: 40, solutionId: older, ageDays: 30, ...fourWide });
+    await insertDecisions(owner, counted, { node: defend, hand: "AKs", actionIndex: 1, count: 31 });
+    const view = await read(owner);
+    expect(view.spots.map((spot) => [spot.solution_id, spot.node_key, spot.decisions])).toEqual([[FIXTURE_SOLUTION_ID, DEFEND_NODE, 31]]);
+    expect(view.spots[0]?.pooled?.your_freq).toEqual([0, 1, 0]);
   });
 
   it("R4.12 needs a session (401)", async () => {

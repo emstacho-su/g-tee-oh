@@ -4,9 +4,10 @@
  * difficulty and question kinds, the per-level passed mark and the required typed reason.
  *
  * Covered: a catalog spot starts a quiz with no drill on the chosen seat and spot; Easy, Medium and
- * Hard ask levels 1, 2 and 3 whatever the user's unlocks say (free choice, no gate), with today's
- * fallback to level 2; one question kind asks only that ladder; level_passed reads the last 20
- * answers at the asked level; every body rule of the start is a 400 that writes nothing, a spot the
+ * Hard ask levels 1, 2 and 3 whatever the user's unlocks say (free choice, no gate) and never a
+ * lower level or an unchosen ladder, refusing with a clear message when the spots cannot ask it
+ * (O-411 amended, PR #39 review finding 2); one question kind asks only that ladder; level_passed
+ * and the window read the answers at the asked level; every body rule of the start is a 400 that writes nothing, a spot the
  * library cannot serve is a 422 that queues its gaps, an Idempotency-Key replay answers the same
  * session once; the reason is required, cleaned, 3 to 1,000 characters, stored with the answer as
  * jsonb, never echoed and never logged, and a refused reason records nothing.
@@ -20,8 +21,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ApiApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER } from "../src/http/headers.js";
-import { QUIZ_QUESTION_KINDS } from "../src/schemas/practice-start.js";
-import { predictionLadderSchema, predictionPromptSchema, predictionResultSchema } from "../src/schemas/prediction.js";
+import { PREDICTION_LADDERS } from "@g-tee-oh/learning";
+import { predictionPromptSchema, predictionResultSchema } from "../src/schemas/prediction.js";
 import { contractErrors } from "./support/contract.js";
 import { adminPool, appDatabase } from "./support/database.js";
 import { buildTrainerApp } from "./support/solver-query.js";
@@ -141,7 +142,7 @@ describe("R3.16 quiz start from a catalog spot", () => {
     expect(prompt).toMatchObject({ hero_position: "BB", node_key: NODE_KEY, level: 1 });
   });
 
-  it("R3.16 Easy, Medium and Hard ask levels 1, 2 and 3, with today's fallback to level 2 (O-410)", async () => {
+  it("R3.16 Easy, Medium and Hard ask levels 1, 2 and 3 and never a lower level (O-410, O-411 amended)", async () => {
     const levels: Record<string, Array<[string, number, string]>> = {};
     for (const difficulty of ["easy", "medium", "hard"]) {
       const player = await newPlayer(database);
@@ -156,11 +157,32 @@ describe("R3.16 quiz start from a catalog spot", () => {
       ["range", 2, "percent"],
       ["hand", 2, "band"],
     ]);
-    // The fixture node holds one raise, so the hand ladder's size question falls back to the band.
+    // The fixture node holds one raise, so it has no hand size question: a Hard quiz asks the chosen
+    // range ladder at level 3 instead, never the band (PR #39 review finding 2).
     expect(levels["hard"]).toEqual([
       ["range", 3, "regions"],
-      ["hand", 2, "band"],
+      ["range", 3, "regions"],
     ]);
+  });
+
+  it("R3.16 a Hard hand quiz on spots with no size question is refused with a clear message and writes no session (O-411 amended)", async () => {
+    const player = await newPlayer(database);
+    const response = await start(player, quizBody({ quiz: { difficulty: "hard", question_kinds: ["hand"] } }));
+    expect(response.statusCode, response.body).toBe(422);
+    const problem = response.json<{ type: string; detail: string }>();
+    expect(problem.type).toMatch(/no-quiz-questions$/);
+    expect(problem.detail).toBe("No more Hard hand questions in these spots; try more spot types or another difficulty.");
+    expect(await countRows("select 1 from practice_session where user_id = $1", [player.userId])).toBe(0);
+  });
+
+  it("R3.16 a quiz result's window counts the answers at the level asked, not the ladder's unlock level (PR #39 review finding 1)", async () => {
+    const player = await newPlayer(database);
+    const first = await startQuiz(player);
+    const spotClassKey = (await next(player, first)).spot_class_key;
+    await seedAnswers(player, first, spotClassKey, "range", 1, WINDOW);
+    const hard = await startQuiz(player, { quiz: { difficulty: "hard", question_kinds: ["range"] } });
+    const result = predictionResultSchema.parse((await answer(player, hard, await next(player, hard))).json());
+    expect(result).toMatchObject({ level: 3, window: { answers: 1, size: WINDOW } });
   });
 
   it("R3.16 the difficulty is a free choice: unlocks neither raise an Easy quiz nor gate a Hard one (O-410)", async () => {
@@ -175,13 +197,12 @@ describe("R3.16 quiz start from a catalog spot", () => {
   });
 
   it("R3.16 one question kind asks only that ladder (O-411)", async () => {
-    for (const kind of QUIZ_QUESTION_KINDS) {
+    for (const kind of PREDICTION_LADDERS) {
       const player = await newPlayer(database);
       const sessionId = await startQuiz(player, { quiz: { difficulty: "easy", question_kinds: [kind] } });
       const seen = await play(player, sessionId, 3);
       expect(seen.map(([ladder]) => ladder), kind).toEqual([kind, kind, kind]);
     }
-    expect([...QUIZ_QUESTION_KINDS], "the question kinds are the prediction ladders").toEqual(predictionLadderSchema.options);
   });
 
   it("R3.16 level_passed reads the last 20 answers at the asked level (O-410)", async () => {
@@ -274,10 +295,20 @@ describe("R3.16 the typed reason (O-350, O-412, O-413)", () => {
       ["one character once cleaned", { rationale: "\u0007x​‍" }],
       ["over 1,000 characters", { rationale: "x".repeat(MAX_REASON + 1) }],
       ["not a string", { rationale: 42 }],
+      // Security LOW 1: reasons that only look typed.
+      ["Hangul fillers", { rationale: "ㅤㅤㅤ" }],
+      ["halfwidth Hangul fillers", { rationale: "ﾠﾠﾠ" }],
+      ["blank braille patterns", { rationale: "⠀⠀⠀" }],
+      ["combining grapheme joiners", { rationale: "͏͏͏" }],
+      ["variation selectors around two letters", { rationale: "a️️b︎" }],
+      ["bare combining marks", { rationale: "́́́" }],
     ];
     for (const [why, extra] of refused) {
       const response = await answer(player, sessionId, prompt, extra);
       expect(response.statusCode, `${why}: ${response.body}`).toBe(400);
+      // PR #39 review finding 3: the problem names the reason, so the web can say the reason is the fault.
+      const paths = (response.json<{ errors?: Array<{ path: string }> }>().errors ?? []).map((error) => error.path);
+      expect(paths, why).toContain("body.rationale");
     }
     await nothingRecorded(sessionId, prompt);
   });
