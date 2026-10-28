@@ -38,7 +38,7 @@ import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/label
 import { EndSessionDialog } from "../drill-run/SessionParts.js";
 import { AutomatedStart, HoldoutStart } from "./AutomatedStart.js";
 import { AutomatedSession, onStartPanel, promptOf, TrainAlert } from "./AutomatedSession.js";
-import { blockView, familyLookup, holdoutView, withMark, type PromptMark } from "./block-progress.js";
+import { blockView, familyLookup, holdoutView, latestPromptDecided, withMark, type PromptMark } from "./block-progress.js";
 import { TRAIN_TEXT, type TrainMode } from "./train-text.js";
 import { TrainingRecap } from "./TrainingRecap.js";
 
@@ -94,7 +94,7 @@ function TrainRun({ mode }: TrainPageProps) {
   const heatmap = useQuery({ ...heatmapQuery(api), enabled: mode === "automated" });
   const context = "context" in state ? state.context : null;
   const block = blockView(context?.session.automated ?? null, marks, familyLookup(heatmap.data));
-  const holdout = holdoutView(context?.session.holdout ?? null, marks, state.kind === "feedback");
+  const holdout = holdoutView(context?.session.holdout ?? null, marks, latestPromptDecided(state, marks.length));
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(

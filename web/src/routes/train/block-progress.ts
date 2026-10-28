@@ -12,12 +12,15 @@
  * serves every block at one size, O-272); the family of a later class comes from the heat map
  * read (familyLookup), else none is shown. The class key is compared, never parsed (ADR 0004).
  *
- * holdoutView adds this session's decisions (one per prompt after the first, plus the one on the
- * reveal) to the round's answered count, capped at the total.
+ * holdoutView adds this session's decisions (one per prompt after the first, plus one when the
+ * latest prompt is decided) to the round's answered count, capped at the total. The latest prompt
+ * counts as decided from its reveal until the next prompt replaces it (latestPromptDecided), so the
+ * count never drops while Next loads the next prompt.
  */
 import type { TrainerPrompt } from "../../contracts.js";
 import type { ProgressHeatmap, TrackKey } from "../../progress/types.js";
 import type { AutomatedBlock, HoldoutProgress } from "../../trainer/session-types.js";
+import type { SpotState } from "../../trainer/spot-machine.js";
 
 export interface PromptMark {
   readonly sessionId: string;
@@ -104,7 +107,17 @@ export function blockView(initial: AutomatedBlock | null, marks: readonly Prompt
   return marks.reduce<BlockView | null>((view, mark) => step(view, mark, initial, familyOf), null);
 }
 
-/** The round's answered count after this session's decisions; `decided` is true on a reveal. */
+/**
+ * Whether the latest marked prompt has been decided: on its reveal, and while Next loads the next
+ * prompt (a loading_prompt that carries the reveal's state_version). The first load after the
+ * start (no mark yet) and a stale decision (never recorded) do not count.
+ */
+export function latestPromptDecided(state: SpotState, markCount: number): boolean {
+  if (markCount === 0) return false;
+  return state.kind === "feedback" || (state.kind === "loading_prompt" && state.version !== null);
+}
+
+/** The round's answered count after this session's decisions; `decided` is true once the latest prompt is decided. */
 export function holdoutView(initial: HoldoutProgress | null, marks: readonly PromptMark[], decided: boolean): HoldoutView | null {
   if (initial === null) return null;
   const decisions = Math.max(0, marks.length - 1) + (decided ? 1 : 0);

@@ -188,6 +188,19 @@ describe("R4.10 holdout retest (O-328)", () => {
     expect(screen.getByTestId("holdout-answered")).toHaveTextContent("13 of 30 answered");
   });
 
+  it("R4.10 the answered count keeps the decided item while the next prompt loads (O-328)", async () => {
+    await renderTrain("holdout", {
+      ...holdoutScript,
+      [HOLDOUT_PATHS.next]: [jsonResponse(200, fixtureHoldoutPrompt(0, 1)), () => new Promise<Response>(() => undefined)],
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Start the retest" }));
+    await decide();
+    expect(screen.getByTestId("holdout-answered")).toHaveTextContent("13 of 30 answered");
+    await userEvent.click(screen.getByRole("button", { name: /Next hand/ }));
+    await waitFor(() => expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument());
+    expect(screen.getByTestId("holdout-answered")).toHaveTextContent("13 of 30 answered");
+  });
+
   it("R4.10 a finished round (409) and a round with no items (422) each get their own sentence", async () => {
     await renderTrain("holdout", { [START_PATH]: [problemResponse(409, "holdout-complete"), problemResponse(422, "no-holdout-items")] });
     await userEvent.click(screen.getByRole("button", { name: "Start the retest" }));

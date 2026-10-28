@@ -15,7 +15,8 @@ import {
   fixtureWorkedBlock,
 } from "../../src/fixtures/automated.js";
 import { fixtureHeatmap } from "../../src/fixtures/progress.js";
-import { blockView, familyLookup, holdoutView, withMark, type PromptMark } from "../../src/routes/train/block-progress.js";
+import { blockView, familyLookup, holdoutView, latestPromptDecided, withMark, type PromptMark } from "../../src/routes/train/block-progress.js";
+import type { SessionContext } from "../../src/trainer/spot-machine.js";
 import type { TrainerPrompt } from "../../src/contracts.js";
 
 const NO_FAMILY = (): undefined => undefined;
@@ -89,5 +90,14 @@ describe("R4.10 block progress", () => {
     expect(holdoutView(fixtureHoldoutProgress, marksOf(prompts), true)).toEqual({ answered: 14, total: 30 });
     expect(holdoutView({ ...fixtureHoldoutProgress, answered: 30 }, marksOf(prompts), true)).toEqual({ answered: 30, total: 30 });
     expect(holdoutView(null, [], false)).toBeNull();
+  });
+
+  it("R4.10 the latest prompt counts as decided on its reveal and while Next loads, not on the first load (O-328)", () => {
+    const context = { session: {}, rng: false } as unknown as SessionContext;
+    expect(latestPromptDecided({ kind: "loading_prompt", context, version: 1 }, 0)).toBe(false);
+    expect(latestPromptDecided({ kind: "loading_prompt", context, version: 2 }, 1)).toBe(true);
+    expect(latestPromptDecided({ kind: "loading_prompt", context, version: null }, 1)).toBe(false);
+    expect(latestPromptDecided({ kind: "stale", context }, 1)).toBe(false);
+    expect(latestPromptDecided({ kind: "idle" }, 1)).toBe(false);
   });
 });
