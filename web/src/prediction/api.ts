@@ -22,6 +22,7 @@ import { drillProblemFromBody } from "../drills/problem.js";
 import type { QuizChoice } from "../practice/quiz-search.js";
 import type { SessionRecap } from "../progress/types.js";
 import { IDEMPOTENCY_HEADER } from "../trainer/idempotency.js";
+import { endPracticeSession } from "../practice/end-session.js";
 import type { PredictionAnswerBody } from "./types.js";
 
 export const PREDICTION_QUERY_ROOT = "prediction";
@@ -77,11 +78,6 @@ export async function answerPrediction(api: AppApi, sessionId: string, body: Pre
   return data;
 }
 
-export async function endPredictionSession(api: AppApi, sessionId: string, key: string): Promise<SessionRecap> {
-  const { data, error, response } = await api.client.POST("/api/v1/sessions/{id}/end", {
-    params: { path: { id: sessionId }, header: { ...AUTO_CSRF_HEADER, [IDEMPOTENCY_HEADER]: key } },
-    body: {},
-  });
-  if (data === undefined) throw problemFromBody(response.status, error);
-  return data;
+export function endPredictionSession(api: AppApi, sessionId: string, key: string): Promise<SessionRecap> {
+  return endPracticeSession(api, sessionId, key);
 }

@@ -9,7 +9,9 @@
  * just ended. Start writes the choice to the address, so a quiz is linkable, and arms the run for
  * exactly that address: the run mounts only while the address matches what was armed, keyed by its
  * source and seed, so another address (a pasted link included) goes back to the start screen
- * instead of starting. Leaving the run (End quiz, another address, a sign-out) unmounts it, which
+ * instead of starting (practice/use-armed-run.ts). Leaving it by address ends its session and drops
+ * the arm, so browser Back never starts it again (PR #39 re-review LOW). Leaving the run (End quiz,
+ * another address, a sign-out) unmounts it, which
  * drops its answered list. Questions are unrated: nothing on this screen shows a rating, score or
  * grade label.
  */
@@ -20,6 +22,7 @@ import { DrillStartCard } from "../../components/practice/DrillStartCard.js";
 import { PageHeader } from "../../components/ui/index.js";
 import type { PredictionSource } from "../../prediction/api.js";
 import { PREDICTION_TEXT } from "../../prediction/labels.js";
+import { useArmedRun } from "../../practice/use-armed-run.js";
 import { DRILL_QUIZ_TEXT, QUIZ_START_TEXT } from "../../prediction/quiz-text.js";
 import { partialQuizChoice, quizChoiceOf, quizSearchOf, validateQuizSearch, type QuizChoice, type QuizSearch } from "../../practice/quiz-search.js";
 import { QuizRun } from "./QuizRun.js";
@@ -53,26 +56,25 @@ export function QuizPage({ search }: QuizPageProps) {
   const checked = validateQuizSearch({ ...search });
   const source = sourceOf(checked);
   const currentKey = addressKey(checked);
-  const [armed, setArmed] = useState<string | null>(null);
+  const armed = useArmedRun(currentKey);
   const [lastChoice, setLastChoice] = useState<QuizChoice | null>(null);
   const start = (choice: QuizChoice) => {
     const next = quizSearchOf(choice, checked.seed);
-    setArmed(addressKey(next));
+    armed.arm(addressKey(next));
     void navigate({ to: "/quiz", search: next });
   };
   const ended = () => {
-    setArmed(null);
+    armed.disarm();
     setLastChoice(source?.kind === "quiz" ? source.choice : null);
     void navigate({ to: "/quiz", search: {} });
   };
-  const running = source !== null && currentKey !== null && currentKey === armed;
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={PREDICTION_TEXT.heading} description={PREDICTION_TEXT.intro} />
-      {running ? (
-        <QuizRun key={currentKey} source={source} seed={checked.seed} onEnded={ended} />
+      {armed.running && source !== null && currentKey !== null ? (
+        <QuizRun key={currentKey} source={source} seed={checked.seed} onEnded={ended} onSession={armed.reportSession} />
       ) : source?.kind === "drill" ? (
-        <DrillStartCard title={DRILL_QUIZ_TEXT.title} body={DRILL_QUIZ_TEXT.body} startLabel={QUIZ_START_TEXT.start} onStart={() => setArmed(currentKey)} />
+        <DrillStartCard title={DRILL_QUIZ_TEXT.title} body={DRILL_QUIZ_TEXT.body} startLabel={QUIZ_START_TEXT.start} onStart={() => armed.arm(currentKey)} />
       ) : (
         <QuizStart key={JSON.stringify(checked)} initial={{ ...(lastChoice ?? {}), ...partialQuizChoice(checked) }} onStart={start} />
       )}

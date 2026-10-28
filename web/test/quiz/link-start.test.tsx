@@ -120,7 +120,8 @@ describe("R3.16 R3.17 leaving a running session by address ends it, and Back nev
     });
     await waitFor(() => expect(view.sentTo(END_PATH)).toHaveLength(1));
     act(() => view.history.back());
-    expect(await screen.findByRole("button", { name: "Start quiz" })).toBeInTheDocument();
+    // The start screen may re-key once the catalog lands, so query it again rather than hold one element.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start quiz" })).toBeInTheDocument());
     await settled(() => view.queryClient.isFetching() === 0 && view.queryClient.isMutating() === 0);
     expect(view.sentTo(START_PATH)).toHaveLength(1);
     expect(view.sentTo(END_PATH)).toHaveLength(1);
@@ -135,7 +136,7 @@ describe("R3.16 R3.17 leaving a running session by address ends it, and Back nev
     });
     await waitFor(() => expect(app.fake.keys().filter((key) => key === PAINT_END)).toHaveLength(1));
     act(() => app.history.back());
-    expect(await screen.findByRole("button", { name: START_PAINTING })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: START_PAINTING })).toBeInTheDocument());
     await settled(() => app.queryClient.isFetching() === 0 && app.queryClient.isMutating() === 0);
     expect(app.fake.keys().filter((key) => key === START_PATH)).toHaveLength(1);
     expect(app.fake.keys().filter((key) => key === PAINT_END)).toHaveLength(1);
