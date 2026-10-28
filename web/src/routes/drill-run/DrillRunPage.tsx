@@ -137,7 +137,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284).
-  const session = useSpotSession({ drillId: drill.id, seed, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
+  const session = useSpotSession({ spec: { mode: "drill", drillId: drill.id, seed }, paused: !interactive, trainer: runSettingsOf(drill.trainer) });
   const { state } = session;
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);

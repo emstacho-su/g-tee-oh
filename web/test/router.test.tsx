@@ -9,7 +9,7 @@
  * signed-in user to the safe redirect target.
  */
 import { createMemoryHistory } from "@tanstack/react-router";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -34,10 +34,6 @@ const EXPECTED_PATHS = [
   "/library",
   "/settings",
 ] as const;
-
-const PLACEHOLDERS: readonly (readonly [string, string, string])[] = [
-  ["/train", "Automated training session", "Phase 4 (S32)"],
-];
 
 describe("@g-tee-oh/web router", () => {
   it("R0.7 the route tree carries every A7 section 2 route", () => {
@@ -122,13 +118,5 @@ describe("@g-tee-oh/web router", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Sign in" });
     expect(router.state.location.search).toEqual({ redirect: "/progress" });
-  });
-
-  it.each(PLACEHOLDERS)("R3.13 %s shows the %s placeholder naming %s", async (path, title, session) => {
-    renderApp(path, SIGNED_IN);
-
-    const heading = await screen.findByRole("heading", { level: 1, name: title });
-    expect(heading.parentElement).toHaveTextContent(`Built in ${session}`);
-    await waitFor(() => expect(screen.getByTestId("shell").contains(heading)).toBe(true));
   });
 });

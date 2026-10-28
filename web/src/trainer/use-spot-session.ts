@@ -10,7 +10,7 @@
  * factory (trainer-deps.tsx). A 401 from any request sets the me query to null, which the
  * authenticated layout turns into a trip to /login (query-client.ts does the same for queries).
  * The input and output are read through a ref, so the driver always uses the latest api, cache,
- * drill id and seed without being rebuilt. On unmount the driver is disposed, so a response that
+ * start spec and callbacks without being rebuilt. On unmount the driver is disposed, so a response that
  * arrives later writes neither the screen state nor the store; the mount effect activates it again,
  * which React's development double mount needs. The paused option stops the response timer while a
  * dialog covers the screen and restarts it when the dialog closes (O-284).
@@ -21,27 +21,37 @@
  * cancels it whenever the reveal leaves (Next, End, a new state), the screen pauses (a dialog
  * opens: the automatic continue waits, and starts its full delay again when the dialog closes) or
  * the screen unmounts; a timer that still fires after dispose meets a stopped driver.
+ *
+ * S32 (R4.10, R4.12, O-325, O-326, O-328): the session starts from a start spec (session-api.ts
+ * SessionStartSpec: a drill, an automated session or a holdout retest), so /train runs on the same
+ * hook as the drill run. The optional onPrompt option sees each prompt as it is shown (the
+ * automated screen counts the hands of its block from them). When a session ends and its recap
+ * arrives, every progress read is invalidated (invalidateProgress), so the home and /progress
+ * cards refetch the rating, streak and the rest (O-326).
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ME_QUERY_KEY, useAppApi } from "../auth/index.js";
 import type { ConfidenceChoice } from "../components/trainer/index.js";
+import type { TrainerPrompt } from "../contracts.js";
+import { invalidateProgress } from "../progress/queries.js";
 import { useTrainerTableStore } from "../store/index.js";
-import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision } from "./session-api.js";
+import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision, type SessionStartSpec } from "./session-api.js";
 import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
 import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
 import { useTrainerDeps, type Scheduler } from "./trainer-deps.js";
 
 export interface SpotSessionOptions {
-  drillId: string;
-  /** The O-288 replay seed, passed to POST /sessions when present. */
-  seed: string | undefined;
+  /** What POST /sessions starts: a drill (with its O-288 replay seed), an automated session or a holdout retest. */
+  spec: SessionStartSpec;
   /** True while a dialog covers the screen: the response timer stops (O-284), and so does the automatic continue. */
   paused: boolean;
   /** The drill's run settings (S26, O-314); absent means spot mode. */
   trainer?: RunSettings;
+  /** Sees each prompt as it is shown, after the trainer-table store (S32). */
+  onPrompt?: (prompt: TrainerPrompt) => void;
 }
 
 /** Schedules auto_continue for a reveal that does not pause, and cancels it as the screen moves on. */
@@ -67,13 +77,13 @@ export interface SpotSession {
   reset: () => void;
 }
 
-function useSpotIo({ drillId, seed }: Pick<SpotSessionOptions, "drillId" | "seed">): SpotIo {
+function useSpotIo({ spec, onPrompt }: Pick<SpotSessionOptions, "spec" | "onPrompt">): SpotIo {
   const api = useAppApi();
   const queryClient = useQueryClient();
   const { now, newKey } = useTrainerDeps();
   const setPrompt = useTrainerTableStore((store) => store.setPrompt);
   return {
-    createSession: (rng, key) => createSession(api, { drillId, rng, seed, key }),
+    createSession: (rng, key) => createSession(api, { spec, rng, key }),
     loadPrompt: (sessionId, version) =>
       version === null ? fetchNextPrompt(api, sessionId) : queryClient.fetchQuery(nextPromptQuery(api, sessionId, version)),
     prefetchPrompt: (sessionId, version) => {
@@ -81,8 +91,16 @@ function useSpotIo({ drillId, seed }: Pick<SpotSessionOptions, "drillId" | "seed
       void queryClient.prefetchQuery(nextPromptQuery(api, sessionId, version));
     },
     submitDecision: (sessionId, decision) => submitDecision(api, sessionId, decision),
-    endSession: (sessionId, key) => endSession(api, sessionId, key),
-    onPrompt: setPrompt,
+    endSession: async (sessionId, key) => {
+      const recap = await endSession(api, sessionId, key);
+      // The rating, streak and the rest moved; a failed refetch shows on its own card (O-326).
+      void invalidateProgress(queryClient);
+      return recap;
+    },
+    onPrompt: (prompt) => {
+      setPrompt(prompt);
+      onPrompt?.(prompt);
+    },
     onProblem: (problem) => {
       if (problem.kind === "signed_out") queryClient.setQueryData(ME_QUERY_KEY, null);
     },

@@ -46,7 +46,8 @@ export function createAppMockApi(options: AppMockOptions = {}): MockApi {
       drills,
       createMockPredictionRoute(),
       createMockPaintRoute(),
-      createMockSessionRoute({ drillOf: drills.drillOf }),
+      // S32 (mock flow 1): an ended session with rated decisions gives the learner a rating.
+      createMockSessionRoute({ drillOf: drills.drillOf, onEnd: (recap) => (recap.rated_decisions > 0 ? progress.setLearner("seasoned") : undefined) }),
       createMockLibraryRoute({ admin }),
       createMockInsightsRoute(),
       createMockExplainRoute(),

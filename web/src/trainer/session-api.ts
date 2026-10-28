@@ -12,12 +12,21 @@
  *   version the server moved to is unknown.
  * - createSession, submitDecision, endSession: the three POSTs, each with AUTO_CSRF_HEADER (the
  *   csrf fetch fills the token, O-197) and the caller's Idempotency-Key (O-232).
+ *
+ * S32 (R4.10, O-325, O-328): a session starts from a SessionStartSpec, one of three modes.
+ * sessionCreateBody turns it and the RNG choice into the POST /sessions body: a drill session sends
+ * its drill id, settings.rng and the replay seed when one is given (O-288); an automated session
+ * sends settings.grouping and settings.rng (the only settings the api honours,
+ * services/api/src/automated/settings.ts) and config_ids only when a scope was chosen, and never a
+ * seed, since a client seed makes the session unrated; a holdout retest sends its mode alone (the
+ * api fixes its settings and refuses a seed).
  */
+import type { ApiPaths } from "@g-tee-oh/contracts";
 import { queryOptions } from "@tanstack/react-query";
 
 import { AUTO_CSRF_HEADER, problemFromBody } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
-import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
+import type { DecisionFeedback, Grouping, TrainerPrompt } from "../contracts.js";
 import { IDEMPOTENCY_HEADER } from "./idempotency.js";
 import { sessionProblemFromBody } from "./session-problem.js";
 import type { Drill, PracticeSession, SessionRecap } from "./session-types.js";
@@ -58,17 +67,41 @@ export function nextPromptQuery(api: AppApi, sessionId: string, stateVersion: nu
   });
 }
 
+/** How a session starts (S32): a drill run, an automated session or this month's holdout retest. */
+export type SessionStartSpec =
+  | { readonly mode: "drill"; readonly drillId: string; readonly seed: string | undefined }
+  | {
+      readonly mode: "automated";
+      readonly grouping: Grouping;
+      /** The configurations in scope; null means every covered configuration (the api's default). */
+      readonly configIds: readonly string[] | null;
+    }
+  | { readonly mode: "holdout" };
+
+export type SessionCreateBody = ApiPaths["/api/v1/sessions"]["post"]["requestBody"]["content"]["application/json"];
+
+/** The POST /sessions body for a start spec and the RNG choice; an automated body never has a seed. */
+export function sessionCreateBody(spec: SessionStartSpec, rng: boolean): SessionCreateBody {
+  switch (spec.mode) {
+    case "drill":
+      return { mode: "drill", drill_id: spec.drillId, settings: { rng }, ...(spec.seed === undefined ? {} : { seed: spec.seed }) };
+    case "automated":
+      return { mode: "automated", settings: { grouping: spec.grouping, rng }, ...(spec.configIds === null ? {} : { config_ids: [...spec.configIds] }) };
+    case "holdout":
+      return { mode: "holdout" };
+  }
+}
+
 export interface StartSessionInput {
-  drillId: string;
+  spec: SessionStartSpec;
   rng: boolean;
-  seed: string | undefined;
   key: string;
 }
 
-export async function createSession(api: AppApi, { drillId, rng, seed, key }: StartSessionInput): Promise<PracticeSession> {
+export async function createSession(api: AppApi, { spec, rng, key }: StartSessionInput): Promise<PracticeSession> {
   const { data, error, response } = await api.client.POST("/api/v1/sessions", {
     params: { header: { ...AUTO_CSRF_HEADER, [IDEMPOTENCY_HEADER]: key } },
-    body: { mode: "drill", drill_id: drillId, settings: { rng }, ...(seed === undefined ? {} : { seed }) },
+    body: sessionCreateBody(spec, rng),
   });
   // A 422 no-coverage keeps its typed pairs_total and pairs_queued (session-problem.ts, MEDIUM 3).
   if (data === undefined) throw sessionProblemFromBody(response.status, error);
