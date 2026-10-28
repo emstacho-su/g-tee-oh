@@ -3,7 +3,8 @@
  * the head of the queue and never starts a solve. The job stays queued and unclaimed, no solution
  * or scenario row appears, and the api boundary check (scripts/check-api-boundary.mjs: no
  * child_process, execa or library-builder under services/api/src) passes. An Idempotency-Key
- * replay raises nothing twice, and a spot with no job records one coverage_request row.
+ * replay raises nothing twice, a spot with no job records one coverage_request row, and a queued
+ * job is preferred over a blocked_budget one (which is never raised, O-240).
  */
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -85,6 +86,7 @@ describe("R3.4 coverage request path (ADR 0018)", () => {
 
       expect(response.statusCode, response.body).toBe(202);
       const body = coverageRequestResultSchema.parse(response.json());
+      expect(body.status).toBe("queued");
       expect(body.job_id).toBe(raisedId);
       expect(body.queue_position).toBe(1);
       const raised = await readBuildJob(pool, raisedId);
@@ -116,7 +118,7 @@ describe("R3.4 coverage request path (ADR 0018)", () => {
       payload: { config_id: CONFIG, pair: PAIR, flop: RAISED_FLOP },
     });
     expect(response.statusCode, response.body).toBe(202);
-    expect(response.json()).toEqual({ job_id: raisedId, priority: before.priority, queue_position: 1 });
+    expect(response.json()).toEqual({ status: "queued", job_id: raisedId, priority: before.priority, queue_position: 1 });
     expect((await readBuildJob(pool, raisedId ?? "")).priority).toBe(before.priority);
   });
 
@@ -146,7 +148,30 @@ describe("R3.4 coverage request path (ADR 0018)", () => {
       payload: { config_id: CONFIG, pair: PAIR, flop: NO_JOB_FLOP },
     });
     expect(response.statusCode, response.body).toBe(202);
-    expect(response.json()).toEqual({ job_id: null, priority: null, queue_position: null });
+    expect(response.json()).toEqual({ status: "recorded", job_id: null, priority: null, queue_position: null });
     expect(await countCoverageRequests(pool, user.id)).toBe(before + 1);
+  });
+
+  it("R3.4 a queued job is raised ahead of a blocked_budget job for the same spot, which keeps its priority", async () => {
+    const flop = "9d6c2h";
+    const blockedId = await insertBuildJob(pool, {
+      configId: CONFIG,
+      pair: PAIR,
+      flop,
+      priority: 50,
+      status: "blocked_budget",
+      treeConfigHash: "\\x01",
+    });
+    const queuedId = await insertBuildJob(pool, { configId: CONFIG, pair: PAIR, flop, priority: 0.5 });
+    jobIds.push(blockedId, queuedId);
+    const response = await app.inject({
+      method: "POST",
+      url: URL_PATH,
+      headers: mutatingHeaders(session),
+      payload: { config_id: CONFIG, pair: PAIR, flop },
+    });
+    expect(response.statusCode, response.body).toBe(202);
+    expect(response.json()).toMatchObject({ status: "queued", job_id: queuedId, queue_position: 1 });
+    expect((await readBuildJob(pool, blockedId)).priority).toBe(50);
   });
 });

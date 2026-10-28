@@ -203,8 +203,30 @@ export const coverageRequestBodySchema = z.strictObject({
   line: lineSchema.optional(),
 });
 
+/**
+ * What a coverage request did (O-240, PR #25 review M8): queued, the spot's queued build job was
+ * raised to the queue head (or already was); blocked_budget, the spot's build job waits on the
+ * storage budget, so it has no queue position, is not raised and the request is recorded;
+ * recorded, no job could be raised (none, parked or past the queue) and the request is recorded
+ * for the builder's planner; covered, the library already holds the spot and nothing was written.
+ */
+export const coverageRequestStatusSchema = z
+  .enum(["queued", "blocked_budget", "recorded", "covered"])
+  .describe(
+    "queued: the build job was raised to the queue head; blocked_budget: the job waits on the storage budget, " +
+      "has no queue position and keeps its priority, and the request is recorded; recorded: no job to raise, the " +
+      "request is recorded for the planner; covered: the library already holds the spot, nothing was written",
+  );
+
 export const coverageRequestResultSchema = z.object({
-  job_id: uuidSchema.nullable().describe("The raised build job; null when the spot is already covered"),
-  priority: z.number().nullable(),
-  queue_position: z.number().int().nullable(),
+  status: coverageRequestStatusSchema,
+  job_id: uuidSchema
+    .nullable()
+    .describe("The spot's build job when status is queued or blocked_budget; null when recorded or covered"),
+  priority: z.number().nullable().describe("The job's priority after the request; null when job_id is null"),
+  queue_position: z
+    .number()
+    .int()
+    .nullable()
+    .describe("1 plus the queued jobs the builder claims first; null unless status is queued"),
 });

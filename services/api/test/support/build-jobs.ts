@@ -15,6 +15,8 @@ export interface BuildJobFixture {
   flop: string;
   priority: number;
   status?: "queued" | "running" | "done" | "failed" | "blocked_budget";
+  /** Bytea hex literal; two jobs for one spot need different hashes (the build_job key is unique). */
+  treeConfigHash?: string;
 }
 
 export interface BuildJobRow {
@@ -28,7 +30,7 @@ export async function insertBuildJob(pool: pg.Pool, job: BuildJobFixture): Promi
   const result = await pool.query<{ id: string }>(
     `insert into build_job (game_config_id, position_pair, flop, preflop_lines, tree_config_hash, k_runouts, priority, status)
      values ($1, $2, $3, $4::text[], $5::bytea, $6, $7, $8::job_status) returning id`,
-    [job.configId, job.pair, job.flop, TEST_PREFLOP_LINES, TEST_TREE_CONFIG_HASH, TEST_K_RUNOUTS, job.priority, job.status ?? "queued"],
+    [job.configId, job.pair, job.flop, TEST_PREFLOP_LINES, job.treeConfigHash ?? TEST_TREE_CONFIG_HASH, TEST_K_RUNOUTS, job.priority, job.status ?? "queued"],
   );
   const row = result.rows[0];
   if (row === undefined) {
@@ -57,5 +59,24 @@ export async function countRows(pool: pg.Pool, table: "solution" | "scenario" | 
 
 export async function countCoverageRequests(pool: pg.Pool, userId: string): Promise<number> {
   const result = await pool.query<{ count: string }>("select count(*) as count from coverage_request where user_id = $1", [userId]);
+  return Number(result.rows[0]?.count ?? Number.NaN);
+}
+
+export interface RequestedSpot {
+  userId: string;
+  configId: string;
+  pair: string;
+  flop?: string;
+  line?: string;
+}
+
+/** The coverage_request rows for one user and spot; an absent flop or line matches a null column. */
+export async function countSpotRequests(pool: pg.Pool, spot: RequestedSpot): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `select count(*) as count from coverage_request
+     where user_id = $1 and game_config_id = $2 and position_pair = $3
+       and flop is not distinct from $4::text and line is not distinct from $5::text`,
+    [spot.userId, spot.configId, spot.pair, spot.flop ?? null, spot.line ?? null],
+  );
   return Number(result.rows[0]?.count ?? Number.NaN);
 }
