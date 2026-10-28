@@ -27,7 +27,14 @@
  *    stores hand_class, the hero's row label at the node, and panels_revealed. The derivation loads
  *    the session's holdout guard first (sessions/derive-settings.ts).
  */
-import { grade as gradeDecision, type GradeInput, type GradeOutput } from "@g-tee-oh/learning";
+import {
+  DIFFICULTY_BASE,
+  UNRATED_WEIGHT,
+  grade as gradeDecision,
+  withItemExclusion,
+  type GradeInput,
+  type GradeOutput,
+} from "@g-tee-oh/learning";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
@@ -114,7 +121,20 @@ function policyOutput(
     settings: session.settings,
     ratedTodayInTrack: ratedToday,
   });
-  return gradeDecision({ ...input, ...gradeInputOverrides(overrides) });
+  return unrateStep(gradeDecision({ ...input, ...gradeInputOverrides(overrides) }), overrides);
+}
+
+/**
+ * The one post-grade step that unrates (learning/effects.ts GradeOverrides): an all-within-floor
+ * item goes through learning's withItemExclusion (O-274); a client-seeded automated session is
+ * rated false with UNRATED_WEIGHT (PM seed condition).
+ */
+export function unrateStep(output: GradeOutput, overrides: GradeOverrides): GradeOutput {
+  const excluded = withItemExclusion(output, {
+    difficulty: overrides.itemDifficulty ?? DIFFICULTY_BASE,
+    excluded: overrides.itemExcluded === true,
+  });
+  return overrides.forceUnrated === true ? { ...excluded, rated: false, weight: UNRATED_WEIGHT } : excluded;
 }
 
 /**
@@ -243,6 +263,7 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
       userId: decision.userId,
       session,
       derived: preview.graded.derived,
+      grade: preview.graded.chosen,
       solverQuery: requireSolverQuery(decision.app),
       request: decision.request,
     };

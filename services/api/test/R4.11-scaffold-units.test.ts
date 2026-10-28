@@ -86,14 +86,17 @@ const DECISION = {} as DecisionContext;
 const NEXT: PersistedState = { ...S23_STATE };
 
 describe("R4.11 hook composition", () => {
-  it("R4.11 no parts change nothing, and the production list starts empty until the lanes land", async () => {
-    expect(LEARNING_HOOK_PARTS).toEqual([]);
-    for (const hooks of [NO_LEARNING_HOOKS, DEFAULT_LEARNING_HOOKS]) {
-      expect(await hooks.beforeGrade(DECISION)).toEqual({});
-      expect(await hooks.afterInsert({ next: NEXT } as AfterInsertContext)).toEqual({ statePatch: {}, feedbackExtras: {} });
-      expect(await hooks.onSessionEnd({} as SessionEndContext)).toEqual({});
-      expect(await hooks.loadHoldoutGuard({} as HoldoutGuardContext)).toBe(EMPTY_HOLDOUT_GUARD);
-    }
+  it("R4.11 no parts change nothing", async () => {
+    const hooks = NO_LEARNING_HOOKS;
+    expect(await hooks.beforeGrade(DECISION)).toEqual({});
+    expect(await hooks.afterInsert({ next: NEXT } as AfterInsertContext)).toEqual({ statePatch: {}, feedbackExtras: {} });
+    expect(await hooks.onSessionEnd({} as SessionEndContext)).toEqual({});
+    expect(await hooks.loadHoldoutGuard({} as HoldoutGuardContext)).toBe(EMPTY_HOLDOUT_GUARD);
+  });
+
+  it("R4.11 the production list runs the shared effects, then automated, then holdout", () => {
+    expect(LEARNING_HOOK_PARTS.map((part) => part.name)).toEqual(["shared-effects", "automated", "holdout"]);
+    expect(Object.keys(DEFAULT_LEARNING_HOOKS).sort()).toEqual(["afterInsert", "beforeGrade", "loadHoldoutGuard", "onSessionEnd"]);
   });
 
   it("R4.11 later parts win per key, and each afterInsert sees the earlier patches", async () => {

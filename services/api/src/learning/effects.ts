@@ -36,7 +36,7 @@ import type { DerivedPrompt } from "../sessions/derive.js";
 import { EMPTY_HOLDOUT_GUARD, type HoldoutGuard } from "../sessions/holdout-guard.js";
 import type { SessionRow } from "../sessions/repository.js";
 import type { PersistedState } from "../sessions/state.js";
-import type { SolverQuery } from "../solver-query/client.js";
+import type { SolverQuery, SqGrade } from "../solver-query/client.js";
 
 type Feedback = z.infer<typeof feedbackSchema>;
 type Recap = z.infer<typeof recapSchema>;
@@ -52,6 +52,8 @@ export interface DecisionContext {
   session: SessionRow;
   /** The await_hero derivation the decision answers: hand, node (with the hero's row) and roll. */
   derived: DerivedPrompt;
+  /** solver-query's /v1/grade answer for the chosen action: the hand's difficulty_features (O-274). */
+  grade: SqGrade;
   solverQuery: SolverQuery;
   /** The api request, for upstream headers (solver-port.ts). */
   request: FastifyRequest;
@@ -67,6 +69,26 @@ export interface GradeOverrides {
   trackIds?: readonly string[];
   /** attempt.item_difficulty (O-274). */
   itemDifficulty?: number | null;
+  /**
+   * Every action of the item is within the floor (O-274, shared effects): decide.ts's one post-grade
+   * unrate step applies learning's withItemExclusion.
+   */
+  itemExcluded?: boolean;
+  /**
+   * A client-seeded automated session (PM seed condition, Lane A): the same post-grade step sets
+   * rated false with learning's UNRATED_WEIGHT.
+   */
+  forceUnrated?: boolean;
+}
+
+/** The unrate flags OR across parts, so a later part can never undo an earlier unrate. */
+const UNRATE_FLAGS = ["itemExcluded", "forceUnrated"] as const;
+
+function mergeOverrides(left: GradeOverrides, right: GradeOverrides): GradeOverrides {
+  const flags = Object.fromEntries(
+    UNRATE_FLAGS.flatMap((flag) => (left[flag] === true || right[flag] === true ? [[flag, true]] : [])),
+  ) as Pick<GradeOverrides, (typeof UNRATE_FLAGS)[number]>;
+  return { ...left, ...right, ...flags };
 }
 
 export interface AfterInsertContext extends DecisionContext {
@@ -99,6 +121,12 @@ export interface SessionEndContext {
   ended: SessionRow;
   /** False when an ended session is ended again: write nothing, return the same extras. */
   firstEnd: boolean;
+  /**
+   * The solver-query client, for the class catalog the tier's effective weights need (O-271). Every
+   * caller passes the app's (null when the api runs without one); a hook that needs it and finds
+   * null throws the 503 problem, so the end rolls back (requireSolverQuery).
+   */
+  solverQuery: SolverQuery | null;
 }
 
 export type RecapExtras = Partial<Pick<Recap, "rating_changes" | "tier" | "unlocks">>;
@@ -155,7 +183,7 @@ export function composeLearningHooks(parts: readonly LearningHookPart[]): Learni
       let overrides: GradeOverrides = {};
       for (const part of parts) {
         if (part.beforeGrade !== undefined) {
-          overrides = { ...overrides, ...(await part.beforeGrade(context)) };
+          overrides = mergeOverrides(overrides, await part.beforeGrade(context));
         }
       }
       return overrides;

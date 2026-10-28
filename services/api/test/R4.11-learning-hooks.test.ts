@@ -21,6 +21,7 @@ import { createDrill, drillBody, insertSolution, newPlayer, rowsOf, startSession
 
 const HERO_ROW = "AKo";
 const ITEM_DIFFICULTY = 0.42;
+const DEFAULT_PARTS_DIFFICULTY = 1500;
 const SERVER_ERROR = 500;
 
 let database: Database;
@@ -120,11 +121,25 @@ describe("R4.11 learning hooks in the decision transaction", () => {
     await app.close();
   });
 
-  it("R4.11 the default hooks store the hero's row label and whether an answer panel was on", async () => {
-    const { app, player, sessionId } = await setUp(undefined, { panels: { hero_strategy_matrix: true } });
+  it("R4.11 the bare hooks (no parts) store the hero's row label and whether an answer panel was on", async () => {
+    const { app, player, sessionId } = await setUp([], { panels: { hero_strategy_matrix: true } });
     const response = await decide(app, player, sessionId);
     expect(response.statusCode, response.body).toBe(200);
     expect(await attemptRow(sessionId)).toMatchObject({ hand_class: HERO_ROW, panels_revealed: true, track_ids: [], item_difficulty: null });
+    await app.close();
+  });
+
+  it("R4.11 the composed default parts also store the opens track id and the item difficulty", async () => {
+    const { app, player, sessionId } = await setUp(undefined, { panels: { hero_strategy_matrix: true } });
+    const response = await decide(app, player, sessionId);
+    expect(response.statusCode, response.body).toBe(200);
+    // The fake grades with ev_gap 0 and purity 1: learning's itemDifficulty is DIFFICULTY_BASE + GAP_WEIGHT = 1500.
+    expect(await attemptRow(sessionId)).toMatchObject({
+      hand_class: HERO_ROW,
+      panels_revealed: true,
+      track_ids: [trackId],
+      item_difficulty: DEFAULT_PARTS_DIFFICULTY,
+    });
     await app.close();
   });
 });
