@@ -6,14 +6,21 @@
  * routes/insights.ts. The contract is settled by S27's first commit; the handlers live in explain/.
  *
  * Every route reads only the session user's own attempts (ADR 0001); another user's attempt is a
- * 404. Ask takes the CSRF token, an optional Idempotency-Key and a per-user rate limit.
+ * 404. Ask takes the CSRF token, an optional Idempotency-Key and a per-session rate limit of 5 per
+ * minute (explain/rate-limit.ts, O-307).
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
+import { answerAsk } from "../explain/ask.js";
+import { findOwnedAttempt, loadGrounding } from "../explain/grounding.js";
+import { ASK_RATE_LIMIT } from "../explain/rate-limit.js";
+import { askStatus } from "../explain/status.js";
+import { renderMoreInfo } from "../explain/templates.js";
+import { requireDatabase } from "../http/database.js";
 import { mutatingHeadersSchema } from "../http/headers.js";
-import { notImplemented } from "../http/not-implemented.js";
 import { AUTHENTICATED, READ_PROBLEMS, UPSTREAM_MUTATE_PROBLEMS, UPSTREAM_READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
+import { requireSession } from "../plugins/authenticate.js";
 import {
   askBodySchema,
   askResultSchema,
@@ -21,11 +28,14 @@ import {
   attemptParamsSchema,
   moreInfoSchema,
 } from "../schemas/explain.js";
+import { requireSolverQuery } from "../solver-query/client.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const EXPLAIN_TAG = "explain";
 
-export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, _options, done) => {
+export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, options, done) => {
+  const { config } = options;
+
   app.get(
     "/explain/:attempt_id/more-info",
     {
@@ -38,7 +48,12 @@ export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         response: { 200: moreInfoSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      const { attempt_id } = request.params;
+      const attempt = await findOwnedAttempt(requireDatabase(app), requireSession(request).userId, attempt_id);
+      const bundle = await loadGrounding(requireSolverQuery(app), request, attempt);
+      return { attempt_id, sections: renderMoreInfo(bundle.grounding) };
+    },
   );
 
   app.get(
@@ -52,13 +67,16 @@ export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         response: { 200: askStatusSchema, ...problemResponses(READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    async (request) => {
+      requireSession(request);
+      return askStatus(app, config, new Date());
+    },
   );
 
   app.post(
     "/explain/:attempt_id/ask",
     {
-      config: { owner: "S27 lane D" },
+      config: { owner: "S27 lane D", rateLimit: ASK_RATE_LIMIT },
       schema: {
         tags: [EXPLAIN_TAG],
         summary: "Ask the model about an attempt, behind a feature flag and a monthly cap (R3.20, O-54)",
@@ -71,7 +89,7 @@ export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         response: { 200: askResultSchema, ...problemResponses(UPSTREAM_MUTATE_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => answerAsk({ app, config, request, now: new Date() }, request.params.attempt_id, request.body.question),
   );
 
   done();

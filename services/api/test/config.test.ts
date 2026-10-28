@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_API_PORT,
   DEFAULT_APP_ORIGIN,
+  DEFAULT_ASK_MODEL,
+  DEFAULT_LLM_MONTHLY_CAP_CENTS,
   DEFAULT_PG_PORT,
   DEFAULT_SESSION_TTL_HOURS,
   DEFAULT_SOLVER_QUERY_URL,
@@ -56,6 +58,9 @@ describe("R3.1 process configuration", () => {
       sessionTtlHours: DEFAULT_SESSION_TTL_HOURS,
       trustedProxies: [...DEFAULT_TRUSTED_PROXIES],
       timeZone: DEFAULT_TIME_ZONE,
+      explainAskEnabled: false,
+      askModel: DEFAULT_ASK_MODEL,
+      askMonthlyCapCents: DEFAULT_LLM_MONTHLY_CAP_CENTS,
     });
     expect(config.solverQueryUrl).toBe(DEFAULT_SOLVER_QUERY_URL);
     expect(config.database).toEqual({
@@ -136,5 +141,60 @@ describe("R3.1 process configuration", () => {
 
   it("R3.1 the default app configuration is the dev profile's", () => {
     expect(defaultAppConfig().appOrigin).toBe(DEFAULT_APP_ORIGIN);
+  });
+});
+
+describe("R3.20 Ask configuration (O-305, O-306)", () => {
+  const ENV = { PGHOST: "postgres", PGDATABASE: "gto", PGUSER: "app_login", APP_DB_PASSWORD: "secret" };
+  // A made-up value shaped like no real key; no real key is ever used in a test (O-54).
+  const FAKE_KEY = "test-only-not-a-key-0123456789";
+
+  it("R3.20 Ask is off by default, with the skill's model and the 1,500 cent cap (O-5)", () => {
+    const config = loadProcessConfig(ENV);
+    expect(config.app.explainAskEnabled).toBe(false);
+    expect(config.app.askModel).toBe(DEFAULT_ASK_MODEL);
+    expect(config.app.askMonthlyCapCents).toBe(DEFAULT_LLM_MONTHLY_CAP_CENTS);
+    expect(DEFAULT_LLM_MONTHLY_CAP_CENTS).toBe(1500);
+    expect(config.anthropicApiKey).toBeNull();
+    expect(defaultAppConfig().explainAskEnabled).toBe(false);
+  });
+
+  it("R3.20 the key lives in the process configuration only, never in AppConfig", () => {
+    const config = loadProcessConfig({ ...ENV, EXPLAIN_ASK_ENABLED: "true", ANTHROPIC_API_KEY: FAKE_KEY });
+    expect(config.app.explainAskEnabled).toBe(true);
+    expect(config.anthropicApiKey).toBe(FAKE_KEY);
+    expect(JSON.stringify(config.app)).not.toContain(FAKE_KEY);
+  });
+
+  it("R3.20 enabling Ask without a key stops startup with a message naming the variable", () => {
+    expect(() => loadProcessConfig({ ...ENV, EXPLAIN_ASK_ENABLED: "true" })).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => loadProcessConfig({ ...ENV, EXPLAIN_ASK_ENABLED: "true", ANTHROPIC_API_KEY: "  " })).toThrow(
+      /ANTHROPIC_API_KEY/,
+    );
+  });
+
+  it("R3.20 a configuration error never echoes the key's value", () => {
+    let message = "";
+    try {
+      loadProcessConfig({ ...ENV, APP_DB_PASSWORD: "", ANTHROPIC_API_KEY: FAKE_KEY, EXPLAIN_ASK_ENABLED: "maybe" });
+    } catch (error: unknown) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/EXPLAIN_ASK_ENABLED/);
+    expect(message).not.toContain(FAKE_KEY);
+    expect(message).not.toContain("maybe");
+  });
+
+  it("R3.20 the flag reads true, false, 1 and 0 and nothing else", () => {
+    const flag = (raw: string) => loadProcessConfig({ ...ENV, EXPLAIN_ASK_ENABLED: raw, ANTHROPIC_API_KEY: FAKE_KEY }).app.explainAskEnabled;
+    expect([flag("true"), flag("1"), flag("false"), flag("0"), flag(" ")]).toEqual([true, true, false, false, false]);
+    expect(() => flag("yes")).toThrow(/EXPLAIN_ASK_ENABLED/);
+  });
+
+  it("R3.20 ASK_MODEL must be a priced model and the cap a bounded integer", () => {
+    expect(loadProcessConfig({ ...ENV, ASK_MODEL: "claude-sonnet-5-5" }).app.askModel).toBe("claude-sonnet-5-5");
+    expect(() => loadProcessConfig({ ...ENV, ASK_MODEL: "gpt-unknown" })).toThrow(/ASK_MODEL/);
+    expect(loadProcessConfig({ ...ENV, LLM_MONTHLY_CAP_CENTS: "200" }).app.askMonthlyCapCents).toBe(200);
+    expect(() => loadProcessConfig({ ...ENV, LLM_MONTHLY_CAP_CENTS: "-1" })).toThrow(/LLM_MONTHLY_CAP_CENTS/);
   });
 });
