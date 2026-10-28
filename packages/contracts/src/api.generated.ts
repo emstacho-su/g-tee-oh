@@ -2562,12 +2562,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Mastery heat map: family by pair against depth band by format
-         * @description Mastery heat map: family by pair against depth band by format
-         *
-         *     Answers 501 until S31 builds it (O-38).
-         */
+        /** Mastery heat map: family by pair against depth band by format */
         get: {
             parameters: {
                 query?: never;
@@ -2604,6 +2599,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -2622,8 +2626,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2648,12 +2661,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Monthly holdout retest rounds, newest first, and the open round
-         * @description Monthly holdout retest rounds, newest first, and the open round
-         *
-         *     Answers 501 until S31 builds it (O-38).
-         */
+        /** Monthly holdout retest rounds, newest first, and the open round */
         get: {
             parameters: {
                 query?: {
@@ -2713,15 +2721,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
             };
         };
         put?: never;
@@ -2739,12 +2738,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * The top leaks by spot class with their weekly series
-         * @description The top leaks by spot class with their weekly series
-         *
-         *     Answers 501 until S31 builds it (O-38).
-         */
+        /** The top leaks by spot class with their weekly series */
         get: {
             parameters: {
                 query?: {
@@ -2783,6 +2777,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -2801,8 +2804,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2829,9 +2841,7 @@ export interface paths {
         };
         /**
          * The overall rank: weighted rating, deviation band and tier
-         * @description The overall rank: weighted rating, deviation band and tier
-         *
-         *     Answers 501 until S31 builds it (O-38).
+         * @description Recomputed on every read from the track ratings with inactivity applied and the effective track weights (O-252, O-271).
          */
         get: {
             parameters: {
@@ -2869,6 +2879,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -2887,8 +2906,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2913,12 +2941,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Streak state: days, freezes, the repair window and cosmetic unlocks
-         * @description Streak state: days, freezes, the repair window and cosmetic unlocks
-         *
-         *     Answers 501 until S31 builds it (O-38).
-         */
+        /** Streak state: days, freezes, the repair window and cosmetic unlocks */
         get: {
             parameters: {
                 query?: never;
@@ -2973,15 +2996,6 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
             };
         };
         put?: never;
@@ -2999,12 +3013,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Per-track ratings with their effective weights
-         * @description Per-track ratings with their effective weights
-         *
-         *     Answers 501 until S31 builds it (O-38).
-         */
+        /** Per-track ratings with their effective weights */
         get: {
             parameters: {
                 query?: {
@@ -3046,6 +3055,15 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
                 /** @description Problem (429) */
                 429: {
                     headers: {
@@ -3064,8 +3082,17 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
-                /** @description Problem (501) */
-                501: {
+                /** @description Problem (502) */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (503) */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3259,7 +3286,7 @@ export interface paths {
         put?: never;
         /**
          * Start a practice session
-         * @description Drill mode in S23; automated and holdout answer 501 until S31, prediction and range_paint until S27 (O-249).
+         * @description Drill (S23), automated and holdout (S31) sessions; prediction and range_paint answer 501 until S27 (O-249). A client seed makes an automated session unrated; holdout refuses a seed with 400.
          */
         post: {
             parameters: {

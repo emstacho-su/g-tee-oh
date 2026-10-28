@@ -9126,7 +9126,7 @@
         "tags": [
           "sessions"
         ],
-        "description": "Drill mode in S23; automated and holdout answer 501 until S31, prediction and range_paint until S27 (O-249).",
+        "description": "Drill (S23), automated and holdout (S31) sessions; prediction and range_paint answer 501 until S27 (O-249). A client seed makes an automated session unrated; holdout refuses a seed with 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10636,7 +10636,7 @@
         "tags": [
           "progress"
         ],
-        "description": "The overall rank: weighted rating, deviation band and tier\n\nAnswers 501 until S31 builds it (O-38).",
+        "description": "Recomputed on every read from the track ratings with inactivity applied and the effective track weights (O-252, O-271).",
         "security": [
           {
             "sessionCookie": []
@@ -10673,6 +10673,16 @@
               }
             }
           },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Problem (429)",
             "content": {
@@ -10693,8 +10703,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10712,7 +10732,6 @@
         "tags": [
           "progress"
         ],
-        "description": "Per-track ratings with their effective weights\n\nAnswers 501 until S31 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -10774,6 +10793,16 @@
               }
             }
           },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Problem (429)",
             "content": {
@@ -10794,8 +10823,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10813,7 +10852,6 @@
         "tags": [
           "progress"
         ],
-        "description": "The top leaks by spot class with their weekly series\n\nAnswers 501 until S31 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -10863,6 +10901,16 @@
               }
             }
           },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Problem (429)",
             "content": {
@@ -10883,8 +10931,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10902,7 +10960,6 @@
         "tags": [
           "progress"
         ],
-        "description": "Mastery heat map: family by pair against depth band by format\n\nAnswers 501 until S31 builds it (O-38).",
         "security": [
           {
             "sessionCookie": []
@@ -10939,6 +10996,16 @@
               }
             }
           },
+          "404": {
+            "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Problem (429)",
             "content": {
@@ -10959,8 +11026,18 @@
               }
             }
           },
-          "501": {
-            "description": "Problem (501)",
+          "502": {
+            "description": "Problem (502)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem (503)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10978,7 +11055,6 @@
         "tags": [
           "progress"
         ],
-        "description": "Monthly holdout retest rounds, newest first, and the open round\n\nAnswers 501 until S31 builds it (O-38).",
         "parameters": [
           {
             "schema": {
@@ -11059,16 +11135,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "Problem (501)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
           }
         }
       }
@@ -11079,7 +11145,6 @@
         "tags": [
           "progress"
         ],
-        "description": "Streak state: days, freezes, the repair window and cosmetic unlocks\n\nAnswers 501 until S31 builds it (O-38).",
         "security": [
           {
             "sessionCookie": []
@@ -11128,16 +11193,6 @@
           },
           "500": {
             "description": "Problem (500)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Problem (501)",
             "content": {
               "application/problem+json": {
                 "schema": {
