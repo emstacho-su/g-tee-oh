@@ -21,6 +21,7 @@ import { drawPort } from "../src/holdout/draw-port.js";
 import { drawTrackItems, HOLDOUT_ITEMS_PER_TRACK } from "../src/holdout/draw.js";
 import { loadHoldoutGuard } from "../src/holdout/guard.js";
 import { holdoutItems, type HoldoutItem } from "../src/holdout/repository.js";
+import { roundOrder } from "../src/holdout/session-items.js";
 import { HOLDOUT_DRAW_KIND, runHoldoutDraw, type DrawReport } from "../src/jobs/holdout-draw.js";
 import { HOLDOUT_ROUND_KIND, runHoldoutRounds } from "../src/jobs/holdout-round.js";
 import type { ClaimedJob } from "../src/jobs/repository.js";
@@ -36,6 +37,8 @@ import { newPlayer, type Player } from "./sessions-test-kit.js";
 const TRACK = "opens";
 const LONG_TEST_MS = 600_000;
 const RESPONSE_MS = 1500;
+/** This month's round in the earlier-round test: a known order seed, so the test knows its first item. */
+const KNOWN_ORDER_SEED = "0123456789abcdef";
 const LEARNING_TABLES = ["leak_stat", "schedule_card", "mastery", "rating", "rating_history", "streak_day", "cosmetic_unlock"] as const;
 
 let iso: IsolatedDatabase;
@@ -258,4 +261,37 @@ describe("R4.13 the monthly round job", () => {
     expect(body.items[1]?.tracks.find((track) => track.track_key === TRACK)?.answered).toBe(HOLDOUT_ITEMS_PER_TRACK);
     expect(body.open).toMatchObject({ answered: 0 });
   });
+});
+
+describe("R4.13 an open holdout session of an earlier round (PR #27 review follow-up LOW 2)", () => {
+  it(
+    "R4.13 last month's open session does not hold back this round's first item: the create serves it and ends the old session",
+    async () => {
+      const other = await newPlayer(iso.database);
+      const create = () => app.inject({ method: "POST", url: "/api/v1/sessions", headers: other.write, payload: { mode: "holdout", track_key: TRACK } });
+      const opened = await create();
+      expect(opened.statusCode, opened.body).toBe(201);
+      const oldSession = sessionSchema.parse(opened.json()).session_id;
+      // The open session's round becomes last month's; this month's round opens with a known order seed.
+      const moved = await iso.admin.query<{ month: string }>(
+        "update holdout_round set month = (month - interval '1 month')::date where user_id = $1 returning to_char(month + interval '1 month', 'YYYY-MM-DD') as month",
+        [other.userId],
+      );
+      await iso.admin.query("insert into holdout_round (user_id, month, order_seed) values ($1, $2::date, $3)", [other.userId, moved.rows[0]?.month, KNOWN_ORDER_SEED]);
+      const firstItem = roundOrder(await holdoutItems(iso.database, TRACK), KNOWN_ORDER_SEED)[0];
+      // Last month's open session serves exactly this round's first item.
+      await iso.admin.query("update practice_session set state = jsonb_set(state, '{learning,current_item}', to_jsonb($2::text)) where id = $1", [
+        oldSession,
+        firstItem?.id,
+      ]);
+      const created = await create();
+      expect(created.statusCode, created.body).toBe(201);
+      const newSession = sessionSchema.parse(created.json()).session_id;
+      expect((await stateOf(newSession)).learning).toMatchObject({ kind: "holdout", current_item: firstItem?.id });
+      const ended = await iso.admin.query<{ ended_at: Date | null }>("select ended_at from practice_session where id = $1", [oldSession]);
+      expect(ended.rows[0]?.ended_at).not.toBeNull();
+      expect((await app.inject({ method: "POST", url: `/api/v1/sessions/${newSession}/end`, headers: other.write })).statusCode).toBe(200);
+    },
+    LONG_TEST_MS,
+  );
 });

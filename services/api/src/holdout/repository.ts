@@ -61,6 +61,8 @@ export interface HoldoutRound {
 /** A user's open holdout session and the item it serves (null once its round is done). */
 export interface OpenHoldoutSession {
   id: string;
+  /** The round the session serves (PR #27 review follow-up LOW 2: it may be an earlier month's). */
+  roundId: string | null;
   currentItem: string | null;
 }
 
@@ -240,6 +242,8 @@ export async function openHoldoutSessions(database: Database, userId: string): P
     .execute();
   return rows.map((row) => {
     const learning = learningOf(persistedStateSchema.parse(row.state));
-    return { id: row.id, currentItem: learning?.kind === "holdout" ? learning.current_item : null };
+    return learning?.kind === "holdout"
+      ? { id: row.id, roundId: learning.round_id, currentItem: learning.current_item }
+      : { id: row.id, roundId: null, currentItem: null };
   });
 }

@@ -11,7 +11,9 @@
  * - The month's round (APP_TIME_ZONE, O-247) is opened unless it exists; its order seed fixes the
  *   order its items are served in, for every session of the round (holdout/session-items.ts).
  * - Before the transaction (HIGH 4): the scope's unresolved items in that order, less the item the
- *   user's open holdout session serves (it is about to be skipped), are replayed until one is
+ *   user's open holdout session of this round serves (it is about to be skipped; an open session of
+ *   an earlier round skips its item in that round, so it holds nothing back here: PR #27 review
+ *   follow-up LOW 2), are replayed until one is
  *   servable (holdout/serving.ts); deterministic failures are recorded unservable for the round right
  *   away. None unresolved is a 409 holdout-complete, none replaying a 422 no-holdout-items, a spent
  *   budget or a transient failure a 503 that leaves the item unresolved (O-334).
@@ -97,7 +99,9 @@ function refuseSeed(body: SessionCreateBody): void {
 /** The item the create will serve, found before its transaction (see the module doc). */
 async function prepareFirstItem(call: SessionCall, scope: ServingScope, now: Date): Promise<ServableItem> {
   const database = requireDatabase(call.app);
-  const replacing = (await openHoldoutSessions(database, scope.userId)).flatMap((session) => (session.currentItem === null ? [] : [session.currentItem]));
+  const replacing = (await openHoldoutSessions(database, scope.userId)).flatMap((session) =>
+    session.roundId === scope.round.id && session.currentItem !== null ? [session.currentItem] : [],
+  );
   const plan = await servingPlan(database, scope, new Set(replacing));
   if (plan.ordered.length === 0) {
     throw holdoutCompleteProblem(
