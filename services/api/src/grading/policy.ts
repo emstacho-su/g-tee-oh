@@ -25,6 +25,7 @@ import {
   type Bucket,
   type GradeAction,
   type GradeInput,
+  type GradeMode,
   type Street,
 } from "@g-tee-oh/learning";
 
@@ -47,6 +48,24 @@ export interface GradeInputFacts {
   rngRoll: number | null;
   settings: TrainerSettings;
   ratedTodayInTrack: number;
+  /**
+   * The grading mode, taken only from the server-side session row (gradeModeOf), never from a
+   * request field, so a client can never make a drill decision rated (S27 PM review note 2).
+   */
+  mode: GradeMode;
+}
+
+/** The session modes that are graded decision by decision (prediction and range_paint never are, O-302). */
+export type GradedSessionMode = "automated" | "drill" | "holdout";
+
+/** The learning GradeMode of a session row's mode; a practice session never reaches grading. */
+export function gradeModeOf(sessionMode: string): GradeMode {
+  if (sessionMode === "automated" || sessionMode === "drill" || sessionMode === "holdout") {
+    return sessionMode;
+  }
+  throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, {
+    detail: `A ${sessionMode} session has no graded decisions (O-302).`,
+  });
 }
 
 function unreadable(detail: string): ProblemError {
@@ -87,7 +106,7 @@ export function bestActionIndexes(freqByAction: readonly number[], actions: read
   return freqByAction.flatMap((frequency, index) => (top - frequency <= FREQUENCY_TIE_TOLERANCE ? [index] : []));
 }
 
-/** The GradeInput of one drill decision; the chosen loss is the per-action list's entry (O-210). */
+/** The GradeInput of one decision; the chosen loss is the per-action list's entry (O-210). */
 export function buildGradeInput(facts: GradeInputFacts): GradeInput {
   const { node, grade, actionIndex, rngRoll, settings } = facts;
   const actions = gradeActions(node, grade);
@@ -98,7 +117,7 @@ export function buildGradeInput(facts: GradeInputFacts): GradeInput {
     actionIndex,
     ...(rngRoll === null ? {} : { rngRoll }),
     noiseFlags: [...grade.noise_flags],
-    mode: "drill",
+    mode: facts.mode,
     firstAttempt: true,
     panelsRevealed: panelsRevealAnswer(settings),
     grouping: settings.grouping,

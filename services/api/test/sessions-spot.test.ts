@@ -19,7 +19,7 @@ import {
 } from "../src/sessions/spot.js";
 import type { HeroSpot } from "../src/sessions/state.js";
 
-const ROW = { hand: "AKo", ev_bb: [0, 1], ev_best_bb: 1 };
+const ROW = { hand: "AKo", ev_bb: [0, 1], ev_best_bb: 1, mixed: false };
 
 describe("R3.6 hand classes", () => {
   it("R3.6 a combo names its class, high rank first, and a written class is made canonical", () => {

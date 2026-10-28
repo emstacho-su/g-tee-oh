@@ -31,7 +31,8 @@ import "./http/database.js";
 import { SECURITY_SCHEMES } from "./http/openapi.js";
 import { problemErrorHandler, problemNotFoundHandler } from "./http/problem.js";
 import { RATE_LIMIT_EXEMPT } from "./http/rate-limits.js";
-import { serverOptions } from "./http/server-options.js";
+import { type LogStream, serverOptions } from "./http/server-options.js";
+import type { ModelClient } from "./explain/model.js";
 import { authentication } from "./plugins/authenticate.js";
 import { csrfGuard } from "./plugins/csrf.js";
 import { idempotency } from "./plugins/idempotency.js";
@@ -43,8 +44,12 @@ import { catalogRoutes } from "./routes/catalog.js";
 import { coverageRoutes } from "./routes/coverage.js";
 import { drillRoutes } from "./routes/drills.js";
 import { eventRoutes } from "./routes/events.js";
+import { explainRoutes } from "./routes/explain.js";
 import { healthzRoutes } from "./routes/healthz.js";
+import { insightRoutes } from "./routes/insights.js";
 import { plannedRoutes } from "./routes/planned.js";
+import { predictionRoutes } from "./routes/prediction.js";
+import { rangePaintRoutes } from "./routes/range-paint.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { studyRoutes } from "./routes/study.js";
 import type { SolverQuery } from "./solver-query/client.js";
@@ -84,11 +89,18 @@ export interface BuildAppOptions {
    * and tests that do not open the stream; the stream then carries heartbeats only.
    */
   notifications?: NotificationSource;
+  /**
+   * The Ask model (S27, O-305): main.ts builds the Anthropic adapter when EXPLAIN_ASK_ENABLED is on
+   * and a key is configured; tests inject a scripted mock. Absent, Ask answers 503 ask-disabled.
+   */
+  modelClient?: ModelClient;
+  /** Where the logger writes when `logger` is on; stdout when absent. Tests capture log lines with it. */
+  logStream?: LogStream;
 }
 
 export function buildApp(options: BuildAppOptions = {}): ApiApp {
   const config = options.config ?? defaultAppConfig();
-  const app = Fastify(serverOptions(config, options.logger ?? false)).withTypeProvider<ZodTypeProvider>();
+  const app = Fastify(serverOptions(config, options.logger ?? false, options.logStream)).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -97,6 +109,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   app.decorate("database", options.database ?? null);
   app.decorate("solverQuery", options.solverQuery ?? null);
   app.decorate("notifications", options.notifications ?? null);
+  app.decorate("modelClient", options.modelClient ?? null);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
   void app.register(security, { config });
@@ -124,6 +137,11 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(sessionRoutes, { prefix: API_PREFIX, config });
   void app.register(eventRoutes, { prefix: API_PREFIX, config });
   void app.register(adminRoutes, { prefix: API_PREFIX, config });
+  // S27 (R3.16 to R3.20): prediction, range painting, insight cards and explanations.
+  void app.register(predictionRoutes, { prefix: API_PREFIX, config });
+  void app.register(rangePaintRoutes, { prefix: API_PREFIX, config });
+  void app.register(insightRoutes, { prefix: API_PREFIX, config });
+  void app.register(explainRoutes, { prefix: API_PREFIX, config });
   void app.register(plannedRoutes, { prefix: API_PREFIX });
 
   // The document describes the routes above; it does not describe itself.

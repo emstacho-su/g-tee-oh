@@ -91,6 +91,11 @@ pub struct HandRow {
     pub loss_pct_pot: Vec<f32>,
     /// The best action's EV in bb.
     pub ev_best_bb: f32,
+    /// True when two or more actions are played at 5 percent or more (O-153, O-301), the
+    /// rule behind `/v1/grade`'s `difficulty_features.mixed`; a class row of a 1,326-combo
+    /// node reads it from the aggregated strategy, so a class whose combos each play one
+    /// different action is mixed; additive.
+    pub mixed: bool,
 }
 
 /// One seat's range at the node.

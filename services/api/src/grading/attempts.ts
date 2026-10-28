@@ -4,7 +4,8 @@
  * insertAttempt writes one graded decision with every A4 column and the S23 columns that make the
  * feedback a function of the row (O-92, O-246); the unique (session_id, state_version) index turns a
  * second grade of the same decision into a 23505, reported as 409 stale-state, so a decision is
- * graded once even if two requests pass the api's own checks together.
+ * graded once even if two requests pass the api's own checks together. S27 adds action_kinds, the
+ * node's action kinds in record order, which range drift compares by (O-304).
  *
  * countRatedToday is ratedTodayInTrack (O-214): the user's rated attempts since midnight in the
  * configured time zone (O-247), counted at an injected instant so a test fixes the clock. Postgres
@@ -51,6 +52,8 @@ export interface AttemptValues {
   lossPctPotByAction: readonly number[];
   bestActionIndexes: readonly number[];
   gradedActionIndex: number;
+  /** The node's action kinds in record order, as solver-query names them: range drift's input (O-304). */
+  actionKinds: readonly string[];
 }
 
 export function staleStateProblem(): ProblemError {
@@ -94,6 +97,7 @@ export async function insertAttempt(transaction: Database, values: AttemptValues
         loss_pct_pot_by_action: [...values.lossPctPotByAction],
         best_action_indexes: [...values.bestActionIndexes],
         graded_action_index: values.gradedActionIndex,
+        action_kinds: [...values.actionKinds],
       })
       .returning("id")
       .executeTakeFirstOrThrow()

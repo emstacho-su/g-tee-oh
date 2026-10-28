@@ -8,11 +8,10 @@
  */
 import { z } from "zod";
 
-import { nodeActionSchema } from "./study.js";
+import { nodeActionSchema, noiseFlagSchema } from "./study.js";
 import {
   cardSchema,
   configIdSchema,
-  handClassSchema,
   nodeKeySchema,
   positionPairSchema,
   positionSchema,
@@ -120,6 +119,10 @@ export const feedbackSchema = z
     config_id: configIdSchema,
     pair: positionPairSchema,
     hand: z.string().describe("The hero's hand as graded"),
+    // S27 (O-303, R3.18): the noise flags the decision was graded with (05 section 9: graded for
+    // feedback, excluded from the rating) and its Rust spot class, the node family drift reads.
+    noise_flags: z.array(noiseFlagSchema).describe("Flags from solver-query; any flag makes the decision unrated (05 section 9)"),
+    spot_class_key: z.string().describe("Rust's spot class of the node, the node family of range drift (O-304)"),
   })
   .meta({ id: "DecisionFeedback" });
 
@@ -133,39 +136,3 @@ export const recapSchema = z
     ev_loss_bb_total: z.number(),
   })
   .meta({ id: "SessionRecap" });
-
-export const predictionParamsSchema = z.object({ session: uuidSchema });
-
-export const predictionPromptSchema = z.object({
-  prompt_id: uuidSchema,
-  level: z.number().int().min(1),
-  node_key: nodeKeySchema,
-  question: z.string(),
-  hand: handClassSchema.nullable(),
-});
-
-export const predictionAnswerBodySchema = z.strictObject({
-  prompt_id: uuidSchema,
-  answer_pct: z.number().min(0).max(100),
-});
-
-export const predictionResultSchema = z.object({
-  correct_pct: z.number(),
-  error_pct_points: z.number(),
-  within_tolerance: z.boolean(),
-  level: z.number().int().min(1),
-  next_level_unlocked: z.boolean(),
-});
-
-export const rangePaintBodySchema = z.strictObject({
-  session_id: uuidSchema,
-  node_key: nodeKeySchema,
-  paint: z
-    .record(handClassSchema, z.number().int().min(0))
-    .describe("Hand class to the action index painted for it"),
-});
-
-export const rangePaintResultSchema = z.object({
-  total_ev_loss_bb: z.number(),
-  per_hand: z.array(z.object({ hand: handClassSchema, ev_loss_bb: z.number() })),
-});

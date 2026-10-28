@@ -7,7 +7,7 @@ use gto_model::{ActionToken, Cbb, ComboId, ConfigId, HandClass, NodeKey, Positio
 
 use super::{
     MIX_EPSILON, RARE_LINE_REACH, action_shares, best_action, difficulty_features, hand_weight,
-    loss_pct_pot, node_noise_flags, noise_flags, seat_totals,
+    is_mixed, loss_pct_pot, node_noise_flags, noise_flags, seat_totals,
 };
 use crate::api::NoiseFlag;
 
@@ -166,4 +166,17 @@ fn r2_13_range_totals_and_shares_weigh_reach_by_combos() {
     let rare_hand = hand(0, [0.001, 1.0], vec![0.0, 1.0, 0.0], vec![-1.0, 1.0, 0.5]);
     let rare = view(HandSpace::Preflop169, vec![rare_hand]);
     assert_eq!(node_noise_flags(&rare), vec![NoiseFlag::RareLine]);
+}
+
+#[test]
+fn r3_16_is_mixed_counts_actions_at_the_mixing_epsilon_or_more() {
+    assert!(is_mixed(&[0.0, 0.5, 0.5]));
+    assert!(is_mixed(&[0.95, MIX_EPSILON]), "the epsilon itself counts as played");
+    assert!(!is_mixed(&[0.96, 0.04]), "a 4 percent line is not a mix");
+    assert!(!is_mixed(&[1.0]));
+    assert!(!is_mixed(&[]));
+    for frequencies in [[0.0, 0.5, 0.5], [0.96, 0.04, 0.0], [0.9, 0.05, 0.05]] {
+        let features = difficulty_features(&frequencies, &[0, 10, 20], FLOOR);
+        assert_eq!(features.mixed, is_mixed(&frequencies), "{frequencies:?}");
+    }
 }

@@ -3,3 +3,5 @@ export { ActionFrequencyTable, frequencyTableProblem } from "./ActionFrequencyTa
 export type { ActionFrequencyTableProps } from "./ActionFrequencyTable.js";
 export { ThresholdCard, MAX_DEPTH } from "./ThresholdCard.js";
 export type { ThresholdCardProps } from "./ThresholdCard.js";
+export { NoiseFlags, NOISE_FLAG_TEXT } from "./NoiseFlags.js";
+export type { NoiseFlagsProps } from "./NoiseFlags.js";

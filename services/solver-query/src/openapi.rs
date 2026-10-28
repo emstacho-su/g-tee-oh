@@ -25,7 +25,8 @@ use utoipa::OpenApi;
         (name = "nodes", description = "One node of one solution (GET /v1/nodes)"),
         (
             name = "grade",
-            description = "Grade one decision with the preflop floor (POST /v1/grade)"
+            description = "Grade one decision (POST /v1/grade) or a painted preflop range \
+                (POST /v1/grade-range) with the floor"
         ),
         (name = "insights", description = "E3 insight data for one hand (GET /v1/insights)"),
         (name = "deal", description = "Seeded server-side deals and street reveals"),

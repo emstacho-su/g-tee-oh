@@ -17,6 +17,7 @@
 pub mod coverage;
 pub mod deal;
 pub mod grade;
+pub mod grade_range;
 pub mod health;
 pub mod insights;
 pub mod nodes;
@@ -35,6 +36,7 @@ pub use deal::{
     Revealed,
 };
 pub use grade::{DifficultyFeatures, FloorSource, GradeRequest, GradeResponse};
+pub use grade_range::{GradeRangeRequest, GradeRangeResponse, PaintedHand, PaintedHandGrade};
 pub use health::{DatabaseHealth, FixtureLibrary, Healthz, LibraryHealth};
 pub use insights::{
     BlockedClass, Blockers, EquityDistribution, HandPosition, HandRole, InsightsQuery,

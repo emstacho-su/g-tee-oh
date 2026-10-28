@@ -33,7 +33,8 @@ describe("R3.13 FeedbackPanel", () => {
   });
 
   it("R3.13 shows EV loss in bb and percent pot, the chosen action and the roll", () => {
-    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
+    // A rated decision (the fixture is unrated because it carries a noise flag, S27).
+    render(<FeedbackPanel feedback={{ ...fixtureFeedback, noise_flags: [], rated: true }} actions={fixtureActions} chosenIndex={1} />);
     const panel = screen.getByTestId("feedback-panel");
     expect(panel).toHaveTextContent("EV loss 0.01bb (0.73% of pot)");
     expect(panel).toHaveTextContent("Your action: Call");

@@ -129,3 +129,25 @@ export type {
   ShrunkStat,
   TrackAverage,
 } from "./leak-cost.js";
+
+// S27: prediction levels (R3.16)
+export { MAX_PREDICTION_LEVEL, PREDICTION_UNLOCK_PCT, PREDICTION_WINDOW, levelFor, windowUnlocks } from "./prediction-levels.js";
+export type {
+  PredictionAnswerRecord,
+  PredictionLadder,
+  PredictionLadderKey,
+  PredictionLevel,
+  PredictionWindow,
+} from "./prediction-levels.js";
+
+// S27: range drift (R3.18)
+export {
+  DRIFT_BOOTSTRAP_RESAMPLES,
+  DRIFT_BOOTSTRAP_SEED,
+  DRIFT_CONFIDENCE,
+  DRIFT_MIN_DECISIONS,
+  driftKindShares,
+  rangeDrift,
+  totalVariationDistance,
+} from "./drift.js";
+export type { DriftDecision, DriftKindShare, DriftResult, HiddenDrift, ShownDrift } from "./drift.js";

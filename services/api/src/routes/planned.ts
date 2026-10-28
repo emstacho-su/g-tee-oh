@@ -13,29 +13,16 @@ import { notImplemented, plannedDescription } from "../http/not-implemented.js";
 import { AUTHENTICATED, PLANNED_MUTATE_PROBLEMS, PLANNED_READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
 import {
-  askBodySchema,
-  askResultSchema,
-  attemptParamsSchema,
   heatmapSchema,
   holdoutSchema,
   leaksQuerySchema,
   leaksSchema,
-  moreInfoSchema,
   ratingSchema,
   streakSchema,
   tracksSchema,
 } from "../schemas/insights.js";
 import { turnRootsQuerySchema, turnRootsSchema } from "../schemas/study.js";
-import {
-  predictionAnswerBodySchema,
-  predictionParamsSchema,
-  predictionPromptSchema,
-  predictionResultSchema,
-  rangePaintBodySchema,
-  rangePaintResultSchema,
-} from "../schemas/training.js";
 
-const S27 = "S27";
 const S31 = "S31";
 const V1_5 = "a v1.5 session (O-15)";
 
@@ -58,10 +45,6 @@ export interface PlannedRoute {
 
 export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "GET", url: "/study/turn-roots", owner: V1_5, tag: "study", summary: "Every turn root at a flop node", successStatus: 200, success: turnRootsSchema, querystring: turnRootsQuerySchema },
-  // Prediction and range painting (R3.16, R3.17), S27.
-  { method: "GET", url: "/prediction/:session/next", owner: S27, tag: "prediction", summary: "The next prediction prompt", successStatus: 200, success: predictionPromptSchema, params: predictionParamsSchema },
-  { method: "POST", url: "/prediction/:session/answer", owner: S27, tag: "prediction", summary: "Answer a prediction prompt", successStatus: 200, success: predictionResultSchema, params: predictionParamsSchema, body: predictionAnswerBodySchema },
-  { method: "POST", url: "/range-paint/submit", owner: S27, tag: "prediction", summary: "Submit a painted range for grading", successStatus: 200, success: rangePaintResultSchema, body: rangePaintBodySchema },
   // Progress, S31.
   { method: "GET", url: "/progress/rating", owner: S31, tag: "progress", summary: "The overall rank", successStatus: 200, success: ratingSchema },
   { method: "GET", url: "/progress/tracks", owner: S31, tag: "progress", summary: "Per-track ratings", successStatus: 200, success: tracksSchema },
@@ -69,9 +52,6 @@ export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "GET", url: "/progress/heatmap", owner: S31, tag: "progress", summary: "Mastery heat map", successStatus: 200, success: heatmapSchema },
   { method: "GET", url: "/progress/holdout", owner: S31, tag: "progress", summary: "Holdout results", successStatus: 200, success: holdoutSchema },
   { method: "GET", url: "/progress/streak", owner: S31, tag: "progress", summary: "Streak state", successStatus: 200, success: streakSchema },
-  // Explanations (R3.19, R3.20), S27.
-  { method: "GET", url: "/explain/:attempt_id/more-info", owner: S27, tag: "explain", summary: "The templated explanation of an attempt", successStatus: 200, success: moreInfoSchema, params: attemptParamsSchema },
-  { method: "POST", url: "/explain/:attempt_id/ask", owner: S27, tag: "explain", summary: "Ask the model about an attempt, behind a feature flag (O-54)", successStatus: 200, success: askResultSchema, params: attemptParamsSchema, body: askBodySchema },
 ];
 
 function successResponse(route: PlannedRoute) {

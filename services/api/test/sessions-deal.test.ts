@@ -33,7 +33,7 @@ function rootNode(): SqNode {
     floor_pct_pot: 0.5,
     action_family: "rfi",
     actions: [{ index: 0, token: "f", kind: "fold", size_cbb: 0, bucket: null, label: "Fold", next_node_key: null }],
-    hands: [{ hand: "AKo", strategy: [1], loss_pct_pot: [0], ev_bb: [0], ev_best_bb: 0 }],
+    hands: [{ hand: "AKo", strategy: [1], loss_pct_pot: [0], ev_bb: [0], ev_best_bb: 0, mixed: false }],
     range_summary: { oop: { combos: 1, reach_weighted_combos: 1 }, ip: { combos: 1, reach_weighted_combos: 1 }, by_action: [] },
     noise_flags: [],
     synthetic: true,
@@ -77,6 +77,7 @@ function port(combo: (seed: string) => string): Counting {
     reveal: () => Promise.reject(new Error("not used")),
     grade: () => Promise.reject(new Error("not used")),
     coverage: () => Promise.reject(new Error("not used")),
+    gradeRange: () => Promise.reject(new Error("not used")),
   };
 }
 
