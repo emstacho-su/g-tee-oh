@@ -3,9 +3,10 @@
  *
  * Mechanism: a real <table> of 13 rows by 13 columns with rank letters as row and column
  * headers, one cell per hand class in grid order, built from the same MatrixModel the canvas
- * draws (cell-text.ts formats both), so a screen reader user or a sighted user who prefers text
- * reads exactly the numbers the canvas shows. The caption names the mode. RangeMatrix keeps the
- * table in the DOM at all times and points the canvas's aria-describedby at its id.
+ * draws (cell-text.ts formats both), so a screen reader user reads exactly the numbers the canvas
+ * shows. The caption names the mode. RangeMatrix keeps the table in the DOM at all times, for
+ * screen readers only (S38, O-347: no visible table), and points the canvas's aria-describedby at
+ * its id; sighted users get the same numbers from the pop-out.
  */
 import { memo } from "react";
 

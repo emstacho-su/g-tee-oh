@@ -58,6 +58,11 @@ export interface QuestionInput {
   node: SqNode;
   level: number;
   draws: QuestionDraws;
+  /**
+   * A quiz asks exactly its level (O-411 amended, PR #39 review finding 2): a level 3 question the
+   * node cannot ask is undefined instead of the level 2 fallback drill-backed sessions keep.
+   */
+  exactLevel?: boolean;
 }
 
 export function isAggressive(action: Pick<SqNodeAction, "kind">): boolean {

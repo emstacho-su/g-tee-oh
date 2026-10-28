@@ -3,8 +3,12 @@
  * answer kind, and the conversion to the contract's answer once it is complete. Pure and
  * immutable: every change returns a new draft. A regions draft is always complete, since "no
  * region mixes" is a valid answer; the percent draft keeps the typed text and becomes an answer
- * only when it reads as a number from 0 to 100.
+ * only when it reads as a number from 0 to 100. Since S41 every answer carries a typed reason
+ * (O-412); whether it is ready is the shared rule's call (rationaleReady from @g-tee-oh/contracts,
+ * PR #39 review finding 3), which the api applies too, so this module counts nothing of its own.
  */
+import { RATIONALE_MAX_CHARS } from "@g-tee-oh/contracts";
+
 import type { NodeAction, PredictionPrompt } from "../contracts.js";
 import type { FrequencyBand, HandRegion, PredictionAnswer, PredictionKind } from "./types.js";
 
@@ -66,6 +70,15 @@ export function toAnswer(draft: AnswerDraft): PredictionAnswer | null {
     case "band":
       return draft.band === null ? null : { kind: "band", band: draft.band };
   }
+}
+
+/**
+ * The live count under the reason field: the raw length out of the bound, "42 / 1000". It counts
+ * what the textarea's maxLength and the body schema count (UTF-16 units of the raw text); whether
+ * the reason is ready is rationaleReady's call, never this count's.
+ */
+export function reasonCount(reason: string): string {
+  return `${reason.length} / ${RATIONALE_MAX_CHARS}`;
 }
 
 /** The actions a size answer chooses among: the node's bets, raises and all-ins. */

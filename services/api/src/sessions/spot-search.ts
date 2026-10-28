@@ -21,7 +21,7 @@
  * contradicting itself: a 502 upstream problem, never a 404 for the drill (re-review LOW 6).
  */
 import { HTTP_STATUS, ProblemError } from "../http/problem.js";
-import { positionSchema } from "../schemas/common.js";
+import { positionSchema, streetSchema } from "../schemas/common.js";
 import type { SqNode } from "../solver-query/client.js";
 import { familyMatches } from "./action-family.js";
 import type { PairCandidate } from "./candidates.js";
@@ -47,6 +47,8 @@ export interface SpotSearch {
   spot: SessionSpot;
   /** The drill's line, or null for the pair's root. */
   line: string | null;
+  /** S41 (O-411 amended): a hero node is kept only when this accepts it (a quiz that can ask its level there). */
+  accept?: (node: SqNode) => boolean;
 }
 
 interface Pending {
@@ -88,7 +90,7 @@ function children(node: SqNode, pending: Pending): Pending[] {
     if (next === null) {
       return [];
     }
-    const entry = { position: seat, token: action.token, label: action.label };
+    const entry = { position: seat, token: action.token, label: action.label, street: streetSchema.parse(node.street) };
     return [{ key: next, tokens: [...pending.tokens, action.token], history: [...pending.history, entry] }];
   });
 }
@@ -116,7 +118,7 @@ async function spotsIn(candidate: PairCandidate, search: SpotSearch, port: Solve
       continue;
     }
     const hero = wanted.includes(node.to_act) && familyMatches(search.spot.preflop_action, node.action_family);
-    if (hero && anyRowPasses(search.spot.hands, node.hands)) {
+    if (hero && anyRowPasses(search.spot.hands, node.hands) && (search.accept?.(node) ?? true)) {
       found.push(heroSpotAt(candidate, node, pending));
     }
     for (const child of children(node, pending)) {

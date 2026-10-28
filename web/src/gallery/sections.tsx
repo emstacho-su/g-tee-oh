@@ -13,6 +13,7 @@ import type { TableSeat } from "../components/table/index.js";
 import { ActionBar, FeedbackPanel, RngRoller } from "../components/trainer/index.js";
 import type { NodeAction } from "../contracts.js";
 import { fixtureActions, fixtureFeedback, fixtureInsights, fixturePrompt } from "../fixtures/index.js";
+import { GalleryExplanationBody, GalleryInsightsBody, GalleryRangeBody } from "./feedback-gallery-parts.js";
 
 const noop = (): void => undefined;
 
@@ -33,9 +34,19 @@ export function GallerySection({ name, title, note, children }: GallerySectionPr
   );
 }
 
+/** The end of a replay (S38, O-381): the HJ open shows as a badge and a chip at its bet spot. */
 const SIX_MAX: readonly TableSeat[] = [
   { position: "UTG", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
-  { position: "HJ", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
+  {
+    position: "HJ",
+    stackCbb: 10000,
+    isHero: false,
+    hasFolded: false,
+    isButton: false,
+    isStraddle: false,
+    lastAction: "Raise 2.5bb",
+    chip: { label: "Raise 2.5bb", moving: false, durationMs: 0 },
+  },
   { position: "CO", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "BTN", stackCbb: 10000, isHero: true, hasFolded: false, isButton: true, isStraddle: false, cards: ["Ah", "Jd"] },
   { position: "SB", stackCbb: 9950, betCbb: 50, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
@@ -47,9 +58,27 @@ const NINE_LIVE: readonly TableSeat[] = [
   { position: "UTG1", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "UTG2", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
   { position: "LJ", stackCbb: 15000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
-  { position: "HJ", stackCbb: 14200, betCbb: 800, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
+  {
+    position: "HJ",
+    stackCbb: 14200,
+    isHero: false,
+    hasFolded: false,
+    isButton: false,
+    isStraddle: false,
+    lastAction: "Raise 8bb",
+    chip: { label: "Raise 8bb", moving: false, durationMs: 0 },
+  },
   { position: "CO", stackCbb: 15000, isHero: true, hasFolded: false, isButton: false, isStraddle: false, cards: ["Ks", "Qs"] },
-  { position: "BTN", stackCbb: 15000, isHero: false, hasFolded: false, isButton: true, isStraddle: false },
+  {
+    position: "BTN",
+    stackCbb: 14200,
+    isHero: false,
+    hasFolded: false,
+    isButton: true,
+    isStraddle: false,
+    lastAction: "Call 8bb",
+    chip: { label: "Call 8bb", moving: false, durationMs: 0 },
+  },
   { position: "SB", stackCbb: 14950, betCbb: 50, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
   { position: "BB", stackCbb: 14900, betCbb: 100, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
 ];
@@ -65,15 +94,19 @@ const POSTFLOP_ACTIONS: readonly NodeAction[] = [
 export function TableSections() {
   return (
     <>
-      <GallerySection name="poker-table-6" title="PokerTable, 6 seats" note="Preflop, hero on the button, blinds posted.">
+      <GallerySection
+        name="poker-table-6"
+        title="PokerTable, 6 seats"
+        note="Seat cards around the felt after the replay: the HJ open as a badge and a chip, hero on the button. Below 600 px of its own width the table turns portrait."
+      >
         <PokerTable seats={SIX_MAX} potCbb={fixturePrompt.pot_cbb} center={<BoardReveal cards={[]} />} />
       </GallerySection>
       <GallerySection
         name="poker-table-9"
         title="PokerTable, 9 seats with a straddle"
-        note="Live table, UTG straddle marker, a flop on the board."
+        note="A straddled pot preflop after the replay: UTG straddle marker, HJ raise and BTN call chips; the chips clear when the flop's first action starts a new street."
       >
-        <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={["Kh", "7d", "2c"]} />} />
+        <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={[]} />} />
       </GallerySection>
       <GallerySection name="cards" title="CardView" note="Rank and suit symbol with an accessible name; face down; four-color.">
         <div className="flex flex-wrap items-end gap-2">
@@ -122,25 +155,44 @@ export function TrainerSections() {
           onExplain={noop}
         />
       </GallerySection>
-      <GallerySection name="feedback-panel" title="FeedbackPanel" note="Label, EV loss in bb and percent pot, the hand's frequencies.">
+      <GallerySection
+        name="feedback-panel"
+        title="FeedbackPanel"
+        note="As a decision first shows it: the summary (label, your action against the best, the loss, Unrated, the roll), every other section collapsed (O-387)."
+      >
         <FeedbackPanel
           feedback={fixtureFeedback}
           actions={fixtureActions}
           chosenIndex={1}
+          rangeView={<GalleryRangeBody />}
           thresholdCard={<ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" />}
+          insights={<GalleryInsightsBody />}
+          explanation={<GalleryExplanationBody />}
         />
       </GallerySection>
-      <GallerySection name="action-frequency-table" title="ActionFrequencyTable" note="Frequencies and EV as given by the api.">
-        <ActionFrequencyTable
-          actions={fixtureActions}
-          frequencies={fixtureFeedback.freq_by_action}
-          evBb={fixtureFeedback.ev_by_action}
-          highlightIndexes={fixtureFeedback.best_action_indexes}
-          caption="AJo at the button open"
-        />
+      <GallerySection
+        name="action-frequency-table"
+        title="ActionFrequencyTable"
+        note="A list on screen (mix bar, rows, Best chip) and a table for screen readers; frequencies and EV as given by the api."
+      >
+        <div className="max-w-md">
+          <ActionFrequencyTable
+            actions={fixtureActions}
+            frequencies={fixtureFeedback.freq_by_action}
+            evBb={fixtureFeedback.ev_by_action}
+            highlightIndexes={fixtureFeedback.best_action_indexes}
+            caption="AJo at the button open"
+          />
+        </div>
       </GallerySection>
-      <GallerySection name="threshold-card" title="ThresholdCard" note="Rendered generically until S23 pins the shape.">
-        <ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" />
+      <GallerySection
+        name="threshold-card"
+        title="ThresholdCard"
+        note="Plain words in three tiles, actions named from the node, an info tip on each tile's heading."
+      >
+        <div className="max-w-xl">
+          <ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" actions={fixtureActions} />
+        </div>
       </GallerySection>
     </>
   );

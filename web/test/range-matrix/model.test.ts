@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildMatrixModel, evScaleOf } from "../../src/components/range-matrix/model.js";
+import { EV_NEUTRAL_BB, MIN_EV_SCALE_BB, evStep } from "../../src/components/range-matrix/scales.js";
 import type { StudyNode } from "../../src/contracts.js";
 import { fixtureStudyNode } from "../../src/fixtures/index.js";
 import { HAND_GRID } from "../../src/poker/hands.js";
@@ -76,10 +77,35 @@ describe("R3.12 range matrix model", () => {
     expect(() => buildMatrixModel(repeated)).toThrow(/AA/);
   });
 
-  it("R3.12 evScaleOf is the largest absolute best EV of the present cells, never zero", () => {
+  it("R3.12 evScaleOf is the 90th percentile of the absolute best EV over present cells outside the neutral band, at least 0.5bb (O-384)", () => {
     const model = buildMatrixModel(fixtureStudyNode);
-    const expected = Math.max(...fixtureStudyNode.hands.map((row) => Math.abs(row.ev_best_bb)));
-    expect(model.evScaleBb).toBe(expected);
-    expect(evScaleOf([])).toBeGreaterThan(0);
+    // Review round 1: cells the scale paints neutral (folds at EV 0) never set the scale end.
+    const sorted = fixtureStudyNode.hands
+      .map((row) => Math.abs(row.ev_best_bb))
+      .filter((size) => size >= EV_NEUTRAL_BB)
+      .sort((a, b) => a - b);
+    const nearestRank = sorted[Math.ceil(0.9 * sorted.length) - 1] ?? 0;
+    expect(model.evScaleBb).toBe(Math.max(0.5, nearestRank));
+    expect(evScaleOf([])).toBe(0.5);
+  });
+
+  it("R3.12 on a fold-heavy node (155 of 169 classes fold at EV 0) the strong hands still spread over the steps (review round 1)", () => {
+    const base = buildMatrixModel(fixtureStudyNode).cells;
+    const played: Readonly<Record<string, number>> = {
+      AA: 4, KK: 3.5, QQ: 3, AKs: 2.6, JJ: 2.4, AKo: 2, AQs: 1.8, TT: 1.6, KQs: 1.3, AJs: 1.1, "99": 0.9, ATs: 0.8, KJs: 0.7, A5s: 0.6,
+    };
+    const cells = base.map((cell) => ({ ...cell, present: true, evBestBb: played[cell.hand] ?? 0 }));
+    expect(cells.filter((cell) => cell.evBestBb === 0)).toHaveLength(155);
+    const scale = evScaleOf(cells);
+    expect(scale).toBeGreaterThan(MIN_EV_SCALE_BB);
+    const steps = ["AA", "AKs", "A5s"].map((hand) => evStep(played[hand] ?? 0, scale));
+    expect(new Set(steps).size).toBe(3);
+  });
+
+  it("R3.12 one huge EV does not stretch the scale end, and missing cells do not count", () => {
+    const base = buildMatrixModel(fixtureStudyNode).cells;
+    const cells = base.map((cell, index) => ({ ...cell, evBestBb: index === 0 ? 40 : index <= 100 ? 2 : -1, present: index < 150 }));
+    expect(evScaleOf(cells)).toBe(2);
+    expect(evScaleOf(cells.map((cell) => ({ ...cell, evBestBb: 0.1 })))).toBe(0.5);
   });
 });

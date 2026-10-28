@@ -13,11 +13,14 @@
  *   advanced (state_version moves). The level after the answer is learning's levelFor over the
  *   stored answers, so next_level_unlocked is true exactly for the answer that crossed. The
  *   result copies the truth's Rust numbers; no attempt row is written and no rating is touched.
+ * - S41 (O-410, O-412, O-413): the body's reason is cleaned and checked first (rationale.ts, a 400
+ *   before anything is read or written) and stored with the validated answer in the same row; it is
+ *   never echoed. level_passed is learning's windowAtLevel at the asked level, the quiz's passed mark.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
-import { levelFor } from "@g-tee-oh/learning";
+import { levelFor, windowAtLevel } from "@g-tee-oh/learning";
 
 import { sessionNotFound } from "../grading/decide.js";
 import { staleStateProblem } from "../grading/attempts.js";
@@ -29,8 +32,9 @@ import { requireSolverQuery } from "../solver-query/client.js";
 import { requireSessionMode, sessionEndedProblem } from "../sessions/problems.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
 import { solverPort } from "../sessions/solver-port.js";
-import { derivePrediction, deriveShownPrediction, type DerivedPrediction } from "./derive.js";
+import { derivePrediction, deriveShownPrediction, practiceOf, type DerivedPrediction } from "./derive.js";
 import { judgeAnswer } from "./judge.js";
+import { requireRationale } from "./rationale.js";
 import { answerHistory, insertAnswer } from "./repository.js";
 
 export type PredictionPrompt = z.infer<typeof predictionPromptSchema>;
@@ -120,6 +124,7 @@ async function shownPrompt(call: PredictionCall, session: SessionRow, body: Pred
 
 /** POST /prediction/{session}/answer: judged, recorded unrated, the counter advanced. */
 export async function answerPrediction(call: PredictionCall, sessionId: string, body: PredictionAnswerBody): Promise<PredictionResult> {
+  const rationale = requireRationale(body.rationale);
   const session = await readPredictionSession(call, sessionId);
   const derived = await shownPrompt(call, session, body);
   const correct = judgeAnswer(derived.question, derived.node, body.answer);
@@ -132,9 +137,19 @@ export async function answerPrediction(call: PredictionCall, sessionId: string, 
     if (locked.stateVersion !== session.stateVersion) {
       throw staleStateProblem();
     }
-    const record = { userId: call.userId, sessionId: session.id, spotClassKey, ladder: question.ladder, level: question.level, correct };
+    const record = {
+      userId: call.userId,
+      sessionId: session.id,
+      spotClassKey,
+      ladder: question.ladder,
+      level: question.level,
+      correct,
+      rationale,
+      answer: body.answer,
+    };
     await insertAnswer(transaction, record);
-    const practice = { kind: "prediction" as const, counter: derived.counter + 1, data: locked.state.practice?.data ?? {} };
+    // The counter moves on; the kind, data and S41 quiz options are kept as they are.
+    const practice = { ...practiceOf(locked), counter: derived.counter + 1 };
     const written = await writeState(transaction, {
       userId: call.userId,
       sessionId: session.id,
@@ -144,15 +159,21 @@ export async function answerPrediction(call: PredictionCall, sessionId: string, 
     if (written === undefined) {
       throw staleStateProblem();
     }
-    const after = levelFor(await answerHistory(transaction, call.userId, spotClassKey), { spotClassKey, ladder: question.ladder });
+    const history = await answerHistory(transaction, call.userId, spotClassKey);
+    const key = { spotClassKey, ladder: question.ladder };
+    const after = levelFor(history, key);
+    // A quiz asks its own level, so its window and passed mark are that level's (PR #39 review finding 1).
+    const asked = windowAtLevel(history, key, question.level);
+    const isQuiz = practiceOf(locked).quiz !== undefined;
     return {
       prompt_id: derived.promptId,
       correct,
       ladder: question.ladder,
       level: question.level,
       truth: { ...question.truth },
-      window: after.window,
+      window: isQuiz ? asked.window : after.window,
       next_level_unlocked: after.unlockedNow,
+      level_passed: asked.passed,
       new_level: after.level,
       state_version: written.stateVersion,
     };

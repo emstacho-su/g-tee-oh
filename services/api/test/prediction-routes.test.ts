@@ -90,12 +90,17 @@ async function next(player: Player, sessionId: string): Promise<Prompt> {
   return predictionPromptSchema.parse(response.json());
 }
 
-async function post(player: Player, sessionId: string, payload: unknown, headers: Record<string, string> = {}) {
+/** S41 (O-350, O-412): every answer carries a typed reason; this one is used unless a test sends its own. */
+const REASON = "BB defends wide against a button open at this price.";
+
+/** Posts an answer; the body gets REASON as its rationale unless it names one (or names it undefined). */
+async function post(player: Player, sessionId: string, payload: Record<string, unknown>, headers: Record<string, string> = {}) {
+  const body = "rationale" in payload ? payload : { ...payload, rationale: REASON };
   return app.inject({
     method: "POST",
     url: `/api/v1/prediction/${sessionId}/answer`,
     headers: { ...player.write, ...headers },
-    payload: payload as Record<string, unknown>,
+    payload: body,
   });
 }
 
@@ -272,7 +277,8 @@ describe("R3.16 prediction routes", () => {
     expect(range.filter((result) => result.next_level_unlocked)).toHaveLength(1);
     expect(range.at(-1)).toMatchObject({ next_level_unlocked: true, new_level: 2, level: 1 });
     expect(range.at(-1)?.window).toEqual({ answers: 20, correct: 20, size: 20, required_pct: 90 });
-    expect(range.at(-2)).toMatchObject({ next_level_unlocked: false, new_level: 1 });
+    expect(range.at(-2)).toMatchObject({ next_level_unlocked: false, new_level: 1, level_passed: false });
+    expect(range.at(-1)?.level_passed, "S41 (O-410): the window at the asked level passes with the 20th correct answer").toBe(true);
     let prompt = await next(player, sessionId);
     if (prompt.ladder !== "range") {
       await answerOne(player, sessionId, true);

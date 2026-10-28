@@ -28,6 +28,7 @@ const EXPECTED_PATHS = [
   "/drills/$id",
   "/drills/$id/run",
   "/study",
+  "/quiz",
   "/predict",
   "/paint",
   "/progress",
@@ -118,5 +119,25 @@ describe("@g-tee-oh/web router", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Sign in" });
     expect(router.state.location.search).toEqual({ redirect: "/progress" });
+  });
+
+  it("R3.16 /predict redirects to /quiz, keeping drill and seed and dropping unknown parameters (O-419)", async () => {
+    const drill = "00000000-0000-4000-8000-000000000005";
+    const { router } = renderApp(`/predict?drill=${drill}&seed=00000000deadbeef&tab=old`, {
+      ...SIGNED_IN,
+      "POST /api/v1/sessions": [() => new Promise<Response>(() => undefined)],
+    });
+
+    await screen.findByRole("heading", { level: 1, name: "Quizzes" });
+    expect(router.state.location.pathname).toBe("/quiz");
+    expect(router.state.location.search).toEqual({ drill, seed: "00000000deadbeef" });
+  });
+
+  it("R3.16 a bare /predict lands on the /quiz start screen", async () => {
+    const { router } = renderApp("/predict", SIGNED_IN);
+
+    await screen.findByRole("heading", { level: 1, name: "Quizzes" });
+    expect(router.state.location.pathname).toBe("/quiz");
+    expect(router.state.location.search).toEqual({});
   });
 });

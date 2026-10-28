@@ -1,21 +1,21 @@
 /**
- * Screenshot pass of range painting for the owner's review (S27 lane B, R3.17, O-300, O-302). The
- * shots project serves the harness build with the mocked app api (support/mock-app.ts, with
- * support/mock-paint.ts answering the drill list, the range_paint session and the paint routes,
- * O-264), so the pictures show the synthetic fixtures only (O-26).
+ * Screenshot pass of range painting for the owner's review (S27 lane B, S41, R3.17, O-300, O-302,
+ * O-351, O-415). The shots project serves the harness build with the mocked app api
+ * (support/mock-app.ts, with mock-study.ts answering the catalog and support/mock-paint.ts the
+ * catalog-spot range_paint session and the paint routes, O-264), so the pictures show the synthetic
+ * fixtures only (O-26).
  *
- * Mechanism: one test per theme and width. The test signs in, opens /paint and captures the drill
- * picker, the blank painter (every held class on the fold brush, the classes the node lacks marked
+ * Mechanism: one test per theme and width. The test signs in, opens /paint and captures the spot
+ * picker (BB facing a BTN open), the blank painter (every held class on the fold brush, the classes the node lacks marked
  * not in range), the painter after a few strokes (the raise brush picked with its number key and
  * clicked onto two cells, the call brush dragged along a row), and the graded view after Submit
  * (total, shading legend, costliest classes). afterAll merges the records into the shared manifest
- * with session S27 and source mock.
+ * with session S41 and source mock.
  */
 import { mkdirSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { fixturePaintDrill } from "../../src/fixtures/paint.js";
 import { installAppMockApi } from "../support/mock-app.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
 import { capture, prepareShotPage, SHOT_TEST_TIMEOUT_MS, THEMES, VIEWPORTS, type Viewport } from "../support/shots.js";
@@ -24,7 +24,7 @@ import { submitLogin } from "../support/sign-in-flow.js";
 const OUT_DIR = shotDirectory();
 const OWNER = { email: "owner@example.com", password: "synthetic-password" };
 const SOURCE = "mock";
-const SESSION = "S27";
+const SESSION = "S41";
 const DRAG_START = "KK";
 const DRAG_REST = ["KQs", "KJs", "KTs"] as const;
 const DRAG_END = "KTs";
@@ -32,7 +32,8 @@ const CALL_KEY = "2";
 const RAISE_KEY = "3";
 
 const CRITERIA = {
-  picker: "R3.17 drill picker: the user's drills and Start painting, a drill-backed range_paint session (O-302)",
+  picker:
+    "R3.17 spot picker: the goal line, table select, covered seats only, the five spot types, an optional opponent read as Opener when facing an open, Start painting (O-351, O-415, O-416)",
   blank: "R3.17 blank painter: 13 by 13 grid, one brush per node action with pattern and label, every held class on fold, out-of-range cells disabled (O-300)",
   painted: "R3.17 painted range: click, drag and number-key brushes; color never the only signal (A7 section 4)",
   graded: "R3.17 graded range: per-class painted and solver action, loss shading with a legend, total weighted EV loss and costliest classes from solver-query's grade-range (O-300, ADR 0004)",
@@ -68,7 +69,10 @@ async function paintScreens(page: Page, theme: Theme, viewport: Viewport): Promi
   await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
 
   await page.goto("/paint");
-  await page.getByRole("radio", { name: fixturePaintDrill.name }).check();
+  const position = page.getByRole("radiogroup", { name: "Position" });
+  await position.getByRole("radio", { name: "BB" }).click();
+  await page.getByRole("radiogroup", { name: "Spot" }).getByRole("radio", { name: "Facing an open" }).click();
+  await page.getByRole("radiogroup", { name: "Opener" }).getByRole("radio", { name: "BTN" }).click();
   await shot("paint-picker", CRITERIA.picker);
 
   await page.getByRole("button", { name: "Start painting" }).click();

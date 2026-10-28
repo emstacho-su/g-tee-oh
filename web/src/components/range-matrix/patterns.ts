@@ -8,8 +8,10 @@
  * kept in a map, so a frame only looks patterns up and never allocates one. The key is the
  * pattern name plus a size variant: the second and later sizes of a bet or raise at one node get
  * a wider spacing, so two raise sizes differ by spacing as well as by shade; the variant is the
- * action's sizeRank from action-style.ts, the same rank that picks its shade. Missing hands use
- * their own gray hatch. The tile maker is injected (a canvas element in the browser, a fake in
+ * action's sizeRank from action-style.ts, the same rank that picks its shade. The key also names
+ * the hatch ink (S38): dark lines over a light fill, light lines over a dark one, so the pattern
+ * stays visible whatever the action colour (draw.ts picks it from the fill's luminance). Missing
+ * hands use their own hatch. The tile maker is injected (a canvas element in the browser, a fake in
  * tests); a tile without a 2D context yields no pattern, remembered so it is not retried.
  */
 import type { HatchPattern, ThemeName } from "../../theme/action-style.js";
@@ -51,15 +53,28 @@ const LINE_WIDTH_PX = 1;
 const DOT_SIZE_PX = 2;
 const DRAWN_PATTERNS: ReadonlySet<string> = new Set(["diagonal", "reverse", "cross", "vertical", "horizontal", "dots", "missing"]);
 
-export function patternKey(pattern: HatchPattern, variant: number): string {
-  return `${pattern}:${variant}`;
+/** Dark hatch lines for a light fill, light ones for a dark fill (S38: the action colours deepened). */
+export type HatchInk = "dark" | "light";
+
+const HATCH_INKS: ReadonlySet<string> = new Set<HatchInk>(["dark", "light"]);
+const DEFAULT_INK: HatchInk = "dark";
+
+export function patternKey(pattern: HatchPattern, variant: number, ink: HatchInk = DEFAULT_INK): string {
+  return `${pattern}:${variant}:${ink}`;
 }
 
-function parseKey(key: string): { pattern: string; variant: number } | null {
-  const [pattern, variantText] = key.split(":");
+interface ParsedKey {
+  readonly pattern: string;
+  readonly variant: number;
+  readonly ink: HatchInk;
+}
+
+function parseKey(key: string): ParsedKey | null {
+  const [pattern, variantText, inkText = DEFAULT_INK, ...rest] = key.split(":");
   const variant = Number(variantText);
   if (pattern === undefined || !DRAWN_PATTERNS.has(pattern) || !Number.isInteger(variant) || variant < 0) return null;
-  return { pattern, variant };
+  if (rest.length > 0 || !HATCH_INKS.has(inkText)) return null;
+  return { pattern, variant, ink: inkText as HatchInk };
 }
 
 function line(context: TileContext, fromX: number, fromY: number, toX: number, toY: number): void {
@@ -99,7 +114,8 @@ export function createPatternSource<T extends TileCanvas>(
     const tile = makeTile(size);
     const context = tile.getContext("2d");
     if (context === null) return null;
-    const ink = parsed.pattern === "missing" ? palette.missingInk : palette.hatchInk;
+    const hatch = parsed.ink === "light" ? palette.hatchInkLight : palette.hatchInkDark;
+    const ink = parsed.pattern === "missing" ? palette.missingInk : hatch;
     context.strokeStyle = ink;
     context.fillStyle = ink;
     context.lineWidth = Math.max(1, LINE_WIDTH_PX * pixelRatio);

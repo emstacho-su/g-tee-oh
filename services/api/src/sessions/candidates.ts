@@ -12,7 +12,7 @@
  * so the drill runs on its covered part and the builder learns what is missing (05 section 1).
  * Candidates are sorted, so a seed picks the same spot whatever order the database returns.
  */
-import { canonicalPair, seatedPositions } from "../catalog/seats.js";
+import { canonicalPair, seatedPositions, type Position } from "../catalog/seats.js";
 import type { Database } from "../db.js";
 import type { SpotFilter } from "../schemas/drills.js";
 import type { SolverPort } from "./solver-port.js";
@@ -20,7 +20,8 @@ import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "./concurrency.js";
 
 /** Centi-big-blinds per big blind: the catalog stores depths in cbb (A4 section 1). */
 export const CBB_PER_BB = 100;
-const NO_ANTE_CBB = 0;
+/** v1 serves no ante variant (O-33); the drill and catalog-spot starts both read this. */
+export const NO_ANTE_CBB = 0;
 
 /** A (configuration, pair) a drill reaches, before its seats are searched (spot-search.ts). */
 export interface PairCandidate {
@@ -53,9 +54,14 @@ export async function configIdsFor(database: Database, filter: DrillSpotFilter):
 
 /** Every hero and villain seat pairing, out of position first, sorted and without repeats. */
 export function pairsFor(filter: DrillSpotFilter): string[] {
-  const seated = seatedPositions(filter.game_config.table_size);
-  const pairs = filter.hero_positions.flatMap((hero) => {
-    const villains = filter.villain_positions.length > 0 ? filter.villain_positions : seated.filter((seat) => seat !== hero);
+  return pairsAt(filter.game_config.table_size, filter.hero_positions, filter.villain_positions);
+}
+
+/** pairsFor at a table size: every hero against every villain (every other seat when none), sorted (S41 shares it). */
+export function pairsAt(tableSize: number, heroes: readonly Position[], villainSeats: readonly Position[]): string[] {
+  const seated = seatedPositions(tableSize);
+  const pairs = heroes.flatMap((hero) => {
+    const villains = villainSeats.length > 0 ? villainSeats : seated.filter((seat) => seat !== hero);
     return villains.filter((villain) => villain !== hero).map((villain) => canonicalPair(hero, villain).pair);
   });
   return [...new Set(pairs)].sort();

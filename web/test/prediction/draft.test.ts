@@ -67,7 +67,7 @@ describe("R3.16 prediction text", () => {
   it("R3.16 problems show fixed text by slug, then status, never the server's detail", () => {
     expect(problemText(problem(409, "session-ended"))).toMatch(/This session has ended/);
     expect(problemText(problem(409, "wrong-session-mode"))).toMatch(/not a prediction session/);
-    expect(problemText(problem(422, "no-coverage"))).toMatch(/does not cover/);
+    expect(problemText(problem(422, "no-coverage"))).toMatch(/no solved spot/);
     expect(problemText(problem(404, "not-found"))).toMatch(/not found/);
     expect(problemText(problem(401, "unauthenticated"))).toMatch(/Sign in again/);
     expect(problemText(problem(400, "validation"))).toMatch(/could not be read/);

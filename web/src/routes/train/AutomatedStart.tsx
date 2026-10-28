@@ -7,13 +7,18 @@
  * unrated). The names read has its own loading and error states with Try again; a failed read
  * still lets the session start, since the scope's ids are known. An id /configs does not list is
  * shown as the id.
+ *
+ * S38 (R3.13, O-346, O-348; screen review rows 90 and 93): both start panels are raised S36 Cards
+ * with a heading and the intro as their description; the grouping and Mixed-frequency mode read as
+ * chips (SessionLook.tsx), the scope as a sunken block above them.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { Button, Card, LoadingNote } from "../../components/ui/index.js";
 import { GROUPING_LABELS } from "../../drills/labels.js";
+import { SettingChips } from "../drill-run/SessionLook.js";
 import type { GameConfig } from "../../progress/types.js";
 import { ALL_CONFIGS, type ConfigScope, type SessionDefaults } from "../../store/session-defaults.js";
 import { allConfigsQuery, configLabel } from "../settings/configs-query.js";
@@ -60,35 +65,39 @@ function Scope({ scope }: { scope: ConfigScope }) {
   return scope === ALL_CONFIGS ? <span data-testid="scope-all">{TRAIN_TEXT.scopeAll}</span> : <ChosenScope ids={scope} />;
 }
 
-export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartProps) {
+function StartRow({ label, starting, onStart }: { label: string; starting: boolean; onStart: () => void }) {
   return (
-    <section aria-label="Start automated training" data-testid="automated-start" className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface-raised p-4">
-      <p>{TRAIN_TEXT.automatedIntro}</p>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted">{TRAIN_TEXT.scope}</dt>
-        <dd>
-          <Scope scope={defaults.configScope} />
-        </dd>
-        <dt className="text-muted">{TRAIN_TEXT.grouping}</dt>
-        <dd data-testid="start-grouping">{GROUPING_LABELS[defaults.grouping]}</dd>
-        <dt className="text-muted">{TRAIN_TEXT.rng}</dt>
-        <dd data-testid="start-rng">{defaults.rng ? TRAIN_TEXT.on : TRAIN_TEXT.off}</dd>
-      </dl>
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
+        {label}
+      </Button>
+      {starting ? <LoadingNote text={TRAIN_TEXT.starting} /> : null}
+    </div>
+  );
+}
+
+export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartProps) {
+  const chips = [
+    { name: TRAIN_TEXT.grouping, value: GROUPING_LABELS[defaults.grouping], valueTestId: "start-grouping" },
+    { name: TRAIN_TEXT.rng, value: defaults.rng ? TRAIN_TEXT.on : TRAIN_TEXT.off, valueTestId: "start-rng" },
+  ];
+  return (
+    <Card title={TRAIN_TEXT.automatedCardTitle} description={TRAIN_TEXT.automatedIntro} testId="automated-start" className="max-w-xl">
+      <div className="flex flex-col gap-1 rounded-xl bg-surface-sunken px-3 py-2 text-sm">
+        <span className="font-medium text-muted">{TRAIN_TEXT.scope}</span>
+        <Scope scope={defaults.configScope} />
+      </div>
+      <SettingChips label={TRAIN_TEXT.sessionSettings} chips={chips} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
-        <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="underline">
+        <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="text-accent underline underline-offset-2">
           {TRAIN_TEXT.changeScope}
         </Link>
-        <Link to="/settings/$section" params={{ section: DEFAULTS_SETTINGS_SECTION }} className="underline">
+        <Link to="/settings/$section" params={{ section: DEFAULTS_SETTINGS_SECTION }} className="text-accent underline underline-offset-2">
           {TRAIN_TEXT.changeDefaults}
         </Link>
       </div>
-      <div className="flex items-center gap-3">
-        <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
-          {TRAIN_TEXT.startAutomated}
-        </Button>
-        {starting ? <LoadingNote text={TRAIN_TEXT.starting} /> : null}
-      </div>
-    </section>
+      <StartRow label={TRAIN_TEXT.startAutomated} starting={starting} onStart={onStart} />
+    </Card>
   );
 }
 
@@ -100,14 +109,8 @@ export interface HoldoutStartProps {
 /** The holdout retest's start panel (O-328): what it is, and Start; its settings are the api's. */
 export function HoldoutStart({ onStart, starting }: HoldoutStartProps) {
   return (
-    <section aria-label="Start the holdout retest" data-testid="holdout-start" className="flex max-w-xl flex-col gap-4 rounded-lg border border-border bg-surface-raised p-4">
-      <p>{TRAIN_TEXT.holdoutIntro}</p>
-      <div className="flex items-center gap-3">
-        <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
-          {TRAIN_TEXT.startHoldout}
-        </Button>
-        {starting ? <LoadingNote text={TRAIN_TEXT.starting} /> : null}
-      </div>
-    </section>
+    <Card title={TRAIN_TEXT.holdoutCardTitle} description={TRAIN_TEXT.holdoutIntro} testId="holdout-start" className="max-w-xl">
+      <StartRow label={TRAIN_TEXT.startHoldout} starting={starting} onStart={onStart} />
+    </Card>
   );
 }

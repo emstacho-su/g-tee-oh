@@ -48,6 +48,7 @@ const A5_ROUTES = [
   "GET /progress/heatmap",
   "GET /progress/holdout",
   "GET /progress/streak",
+  "GET /progress/frequencies",
   "GET /explain/{attempt_id}/more-info",
   "POST /explain/{attempt_id}/ask",
   "GET /events",

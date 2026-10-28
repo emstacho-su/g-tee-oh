@@ -131,7 +131,9 @@ describe("R3.6 prompt derivation", () => {
     const hand = { ...HAND, street: "flop" as const, board: ["3c", "Kh", "4c"], end: "street_closed" as const };
     const state = { ...feedbackState(), phase: "street_end" as const, hand: { ...hand, street: "preflop" as const, board: [] } };
     const derived = await deriveAwaitHero(state, FULL, solver);
-    expect(derived.hand.history.at(-1)).toEqual({ position: "BB", token: "x", label: "x" });
+    // Each entry names the street it was taken on (S38 review round 1), so the table can clear the
+    // last street's bets when a new street starts without inferring streets itself.
+    expect(derived.hand.history.at(-1)).toEqual({ position: "BB", token: "x", label: "x", street: "flop" });
     expect(derived.node.node_key).toBe(FLOP_BET_KEY);
     expect(derived.hand.opponent_rng_state).toBe("0000000000000002");
   });

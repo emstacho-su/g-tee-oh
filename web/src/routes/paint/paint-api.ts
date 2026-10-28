@@ -1,10 +1,10 @@
 /**
- * The /paint screen's api calls (S27 lane B, R3.17, O-197, O-232, O-302). Each wraps one typed
- * client call; a response without data becomes an ApiProblem through problemFromBody, so callers
- * see the status and slug, never the raw body.
+ * The /paint screen's api calls (S27 lane B, S41, R3.17, O-197, O-232, O-302, O-415). Each wraps
+ * one typed client call; a response without data becomes an ApiProblem through problemFromBody, so
+ * callers see the status and slug, never the raw body.
  *
- * The picker's drill list is the shared practice/drill-list-query.ts read (PR #29 review L11).
- * - createPaintSession: POST /sessions with mode range_paint and the drill (O-302).
+ * - createPaintSession: POST /sessions with mode range_paint over the picker's catalog spot (the
+ *   table, the hero seat, the opener or any seat, the spot type, O-415) or an old link's drill.
  * - paintPromptQuery: GET /range-paint/{session}/next keyed by the session and the state version
  *   the prompt follows. next is pure, so the cached prompt never goes stale for its version.
  * - submitPaint: POST /range-paint/submit with the painted map.
@@ -18,21 +18,38 @@ import type { AppApi } from "../../api/index.js";
 import type { RangePaintPrompt, RangePaintResult } from "../../contracts.js";
 import { IDEMPOTENCY_HEADER } from "../../trainer/idempotency.js";
 import type { PracticeSession } from "../../trainer/session-types.js";
+import type { PaintChoice } from "../../practice/paint-search.js";
 
 export const PAINT_QUERY_ROOT = "paint";
 const PROMPT_GC_MS = 60 * 1000;
 const RANGE_PAINT_MODE = "range_paint";
 
+/** What a painting session starts over: an old drill link, or the picker's table, seat and spot. */
+export type PaintSource = { readonly kind: "drill"; readonly drillId: string } | { readonly kind: "spot"; readonly choice: PaintChoice };
+
 export interface StartPaintInput {
-  drillId: string;
+  source: PaintSource;
   seed: string | undefined;
   key: string;
 }
 
-export async function createPaintSession(api: AppApi, { drillId, seed, key }: StartPaintInput): Promise<PracticeSession> {
+function sourceBody(source: PaintSource) {
+  if (source.kind === "drill") return { drill_id: source.drillId };
+  const { choice } = source;
+  return {
+    catalog_spot: {
+      config_id: choice.config,
+      hero_positions: [choice.position],
+      ...(choice.vs === null ? {} : { villain_positions: [choice.vs] }),
+      spot_types: [choice.spot],
+    },
+  };
+}
+
+export async function createPaintSession(api: AppApi, { source, seed, key }: StartPaintInput): Promise<PracticeSession> {
   const { data, error, response } = await api.client.POST("/api/v1/sessions", {
     params: { header: { ...AUTO_CSRF_HEADER, [IDEMPOTENCY_HEADER]: key } },
-    body: { mode: RANGE_PAINT_MODE, drill_id: drillId, ...(seed === undefined ? {} : { seed }) },
+    body: { mode: RANGE_PAINT_MODE, ...sourceBody(source), ...(seed === undefined ? {} : { seed }) },
   });
   if (data === undefined) throw problemFromBody(response.status, error);
   return data;
@@ -72,8 +89,8 @@ const NO_COVERAGE_SLUG = "no-coverage";
 
 export const PAINT_FAILURES = {
   stale: "This range moved on since it was loaded. Load the current range and paint it again.",
-  noCoverage: "The library covers no spot this drill trains, so there is no range to paint. Pick another drill.",
-  notFound: "This drill or session no longer exists. Pick a drill again.",
+  noCoverage: "The library has no solved spot for this seat and spot yet. It was queued for the builder.",
+  notFound: "This drill or session no longer exists. Pick a spot again.",
   upstream: "The solver service could not answer. Try again in a moment.",
   generic: "Something went wrong. Try again.",
 } as const;

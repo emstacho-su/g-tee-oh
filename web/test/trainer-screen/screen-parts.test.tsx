@@ -10,10 +10,11 @@ import { SessionRecapView } from "../../src/routes/drill-run/SessionParts.js";
 import { SpotTable } from "../../src/routes/drill-run/SpotTable.js";
 
 describe("R3.13 drill run screen parts", () => {
-  it("R3.13 a non-synthetic prompt has no banner, and an empty history says so", () => {
+  it("R3.13 a non-synthetic prompt has no banner, and an empty history says so in the hidden action log (O-383)", () => {
     render(<SpotTable prompt={{ ...fixturePlainPrompt, synthetic: false, history: [] }} />);
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Action so far" })).toHaveTextContent("No action yet");
+    expect(screen.getByRole("log", { name: "Action this hand" })).toHaveTextContent("No action before you");
+    expect(screen.queryByRole("list", { name: "Action so far" })).not.toBeInTheDocument();
   });
 
   it("R3.13 a recap with no rated decision says None rated instead of a score", () => {

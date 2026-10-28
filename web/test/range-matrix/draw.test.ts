@@ -9,11 +9,12 @@ import { describe, expect, it } from "vitest";
 
 import { formatEvShort, formatWeightShort } from "../../src/components/range-matrix/cell-text.js";
 import { cellEdges, drawMatrix, type DrawOptions } from "../../src/components/range-matrix/draw.js";
-import { MATRIX_PALETTES, evFill } from "../../src/components/range-matrix/matrix-theme.js";
+import { MATRIX_PALETTES, evFill, evInk, weightFill, weightInk } from "../../src/components/range-matrix/matrix-theme.js";
 import { buildMatrixModel, type MatrixCell, type MatrixModel } from "../../src/components/range-matrix/model.js";
 import { MISSING_PATTERN_KEY } from "../../src/components/range-matrix/patterns.js";
 import { fixtureStudyNode } from "../../src/fixtures/index.js";
 import { actionColor, actionStyle } from "../../src/theme/action-style.js";
+import { isDarkFill } from "../../src/theme/color-contrast.js";
 import { fakePatternSource, isFakePattern, recordingContext, type RecordedOp } from "./recording-context.js";
 
 const SIZE_PX = 520;
@@ -133,44 +134,79 @@ describe("R3.12 range matrix drawing", () => {
     expect(raiseKeys.size).toBe(2);
   });
 
-  it("R3.12 EV mode prints each present cell's best EV with one decimal on a diverging fill", () => {
+  it("R3.12 EV mode fills each present cell with its step and prints hand and EV in the step's ink", () => {
     const ops = draw(model, { mode: "ev" });
     const palette = MATRIX_PALETTES.light;
-    const scale = new Set([...palette.evNegative, ...palette.evPositive, palette.evNeutral]);
     for (const cell of model.cells) {
       const rect = cellRect(cell);
-      const texts = textsIn(ops, rect);
-      expect(texts).toContain(cell.hand);
-      expect(texts).toContain(formatEvShort(cell.evBestBb ?? 0));
-      const fill = fillsIn(ops, rect).find((op) => typeof op.style === "string" && scale.has(op.style));
+      const ev = cell.evBestBb ?? 0;
+      const fill = fillsIn(ops, rect).find((op) => op.style === evFill(palette, ev, model.evScaleBb));
       expect(fill).toMatchObject({ x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+      const texts = ops.filter((op): op is Extract<RecordedOp, { op: "fillText" }> => op.op === "fillText" && inside(op, rect));
+      expect(texts.map((op) => op.text)).toEqual([cell.hand, formatEvShort(ev)]);
+      expect(texts.every((op) => op.style === evInk(palette, ev, model.evScaleBb))).toBe(true);
     }
     const best = model.cells.reduce((top, cell) => ((cell.evBestBb ?? 0) > (top.evBestBb ?? 0) ? cell : top));
-    const worst = model.cells.reduce((low, cell) => ((cell.evBestBb ?? 0) < (low.evBestBb ?? 0) ? cell : low));
-    const fillOf = (cell: MatrixCell) => fillsIn(ops, cellRect(cell)).find((op) => scale.has(op.style as string))?.style;
-    expect(palette.evPositive).toContain(fillOf(best));
-    if ((worst.evBestBb ?? 0) < 0) expect(palette.evNegative).toContain(fillOf(worst));
+    expect(palette.evPositive).toContain(evFill(palette, best.evBestBb ?? 0, model.evScaleBb));
   });
 
-  it("R3.12 weight mode fills a height proportional to the weight and prints the percent", () => {
+  it("R3.12 EV and weight modes paint no label chips over present cells, only frequency mode does", () => {
+    const chip = MATRIX_PALETTES.light.labelChip;
+    const aa = cellRect(model.cells[0] as MatrixCell);
+    expect(fillsIn(draw(model, { mode: "ev" }), aa).some((op) => op.style === chip)).toBe(false);
+    expect(fillsIn(draw(model, { mode: "weight" }), aa).some((op) => op.style === chip)).toBe(false);
+    expect(fillsIn(draw(model), aa).some((op) => op.style === chip)).toBe(true);
+  });
+
+  it("R3.12 weight mode fills the whole cell with its heat step and prints the percent in the step's ink", () => {
     const ops = draw(model, { mode: "weight" });
     const palette = MATRIX_PALETTES.light;
     for (const cell of model.cells) {
       const rect = cellRect(cell);
       const weight = cell.weight ?? 0;
-      expect(textsIn(ops, rect)).toContain(formatWeightShort(weight));
-      const bar = fillsIn(ops, rect).find((op) => op.style === palette.weightFill);
-      expect(bar).toBeDefined();
-      expect(Math.abs((bar?.h ?? 0) - weight * rect.h)).toBeLessThanOrEqual(1);
-      expect((bar?.y ?? 0) + (bar?.h ?? 0)).toBe(rect.y + rect.h);
+      const fill = fillsIn(ops, rect).find((op) => op.style === weightFill(palette, weight));
+      expect(fill).toMatchObject({ x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+      const value = ops.find(
+        (op): op is Extract<RecordedOp, { op: "fillText" }> =>
+          op.op === "fillText" && inside(op, rect) && op.text === formatWeightShort(weight),
+      );
+      expect(value?.style).toBe(weightInk(palette, weight));
     }
   });
 
-  it("R3.12 weight mode prints a question mark when the reach is unknown", () => {
+  it("R3.12 weight 0 shows the plain ground", () => {
+    const hands = fixtureStudyNode.hands.map((row) => (row.hand === "AA" ? { ...row, reach: [0] } : row));
+    const zero = buildMatrixModel({ ...fixtureStudyNode, hands });
+    const fills = fillsIn(draw(zero, { mode: "weight" }), cellRect(zero.cells[0] as MatrixCell));
+    expect(fills.at(-1)?.style).toBe(MATRIX_PALETTES.light.background);
+    expect(fills.some((op) => MATRIX_PALETTES.light.weightSteps.includes(op.style as string))).toBe(false);
+  });
+
+  it("R3.12 weight mode keeps the missing hatch and prints a question mark when the reach is unknown", () => {
     const hands = fixtureStudyNode.hands.map((row) => (row.hand === "AA" ? { ...row, reach: null } : row));
     const unknown = buildMatrixModel({ ...fixtureStudyNode, hands });
     const ops = draw(unknown, { mode: "weight" });
-    expect(textsIn(ops, cellRect(unknown.cells[0] as MatrixCell))).toContain("?");
+    const rect = cellRect(unknown.cells[0] as MatrixCell);
+    expect(textsIn(ops, rect)).toContain("?");
+    expect(fillsIn(ops, rect).some((op) => isFakePattern(op.style) && op.style.patternKey === MISSING_PATTERN_KEY)).toBe(true);
+  });
+
+  it("R3.12 hatch ink follows the fill: dark fills ask for the light-ink pattern, light fills for the dark-ink one", () => {
+    const actions = [
+      { index: 0, token: "f", kind: "fold" as const, size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
+      { index: 1, token: "c", kind: "call" as const, size_cbb: null, bucket: null, label: "Call", next_node_key: null },
+      { index: 2, token: "a", kind: "all_in" as const, size_cbb: 10000, bucket: null, label: "All-in", next_node_key: null },
+    ];
+    const hands = fixtureStudyNode.hands.map((row) => ({ ...row, strategy: [0.2, 0.4, 0.4], ev_bb: [0, 1, 2], loss_pct_pot: [1, 1, 0] }));
+    const source = fakePatternSource();
+    draw(buildMatrixModel({ actions, hands }), { patterns: source });
+    for (const action of actions.slice(1)) {
+      // One shared lightness split decides light or dark hatch everywhere (review round 1, 5).
+      const dark = isDarkFill(actionColor(action, actions, "light"));
+      const keys = source.requested.filter((key) => key.startsWith(`${actionStyle(action.kind).pattern}:`));
+      expect(keys.length).toBeGreaterThan(0);
+      expect(keys.every((key) => key.endsWith(dark ? ":light" : ":dark"))).toBe(true);
+    }
   });
 
   it("R3.12 a missing hand is drawn gray with the missing hatch and a dash in every mode", () => {
@@ -229,8 +265,8 @@ describe("R3.12 range matrix drawing", () => {
     );
     const odd = buildMatrixModel({ ...fixtureStudyNode, hands });
     const rect = cellRect(odd.cells[0] as MatrixCell);
-    const weightBar = fillsIn(draw(odd, { mode: "weight" }), rect).find((op) => op.style === MATRIX_PALETTES.light.weightFill);
-    expect(weightBar?.h).toBe(rect.h);
+    const weightCell = fillsIn(draw(odd, { mode: "weight" }), rect).find((op) => op.style === MATRIX_PALETTES.light.weightSteps.at(-1));
+    expect(weightCell?.h).toBe(rect.h);
     const colors = new Set(odd.actions.map((action) => actionColor(action, odd.actions, "light")));
     const bars = fillsIn(draw(odd), rect).filter((op) => typeof op.style === "string" && colors.has(op.style));
     expect(bars.reduce((sum, bar) => sum + bar.w, 0)).toBe(rect.w);
@@ -271,11 +307,13 @@ describe("R3.12 range matrix drawing", () => {
 describe("R3.12 range matrix EV scale", () => {
   const palette = MATRIX_PALETTES.dark;
 
-  it("R3.12 zero EV is neutral and the ends of the scale take the strongest step", () => {
+  it("R3.12 an EV inside the 0.05bb band is neutral and the ends of the scale take the strongest step", () => {
     expect(evFill(palette, 0, 2)).toBe(palette.evNeutral);
+    expect(evFill(palette, 0.001, 2)).toBe(palette.evNeutral);
+    expect(evFill(palette, -0.049, 2)).toBe(palette.evNeutral);
     expect(evFill(palette, 2, 2)).toBe(palette.evPositive.at(-1));
     expect(evFill(palette, -5, 2)).toBe(palette.evNegative.at(-1));
-    expect(evFill(palette, 0.001, 2)).toBe(palette.evPositive[0]);
-    expect(evFill(palette, -0.001, 2)).toBe(palette.evNegative[0]);
+    expect(evFill(palette, 0.06, 2)).toBe(palette.evPositive[0]);
+    expect(evFill(palette, -0.06, 2)).toBe(palette.evNegative[0]);
   });
 });

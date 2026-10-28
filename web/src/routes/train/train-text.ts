@@ -63,6 +63,10 @@ export const TRAIN_TEXT = {
   retestStart: "Start this month's retest",
   retestResume: "Resume this month's retest",
   retestComplete: "Retest complete for this month",
+  // S38 restyle: the start cards' headings and the chip list's name.
+  automatedCardTitle: "What this session uses",
+  holdoutCardTitle: "What the retest is",
+  sessionSettings: "Session settings",
 } as const;
 
 const NO_CLASS_IN_SCOPE =

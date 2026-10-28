@@ -10,6 +10,7 @@ import { ProblemError } from "../src/http/problem.js";
 import { laddersFor, promptDraws, promptIdOf } from "../src/prediction/derive.js";
 import { FREQUENCY_BANDS, bandOf, handQuestion } from "../src/prediction/hand-questions.js";
 import { judgeAnswer } from "../src/prediction/judge.js";
+import { canAskQuiz, noQuizQuestionsProblem } from "../src/prediction/quiz-questions.js";
 import { actingSeatIndex, actionLabel, frequencyOf, heldRows } from "../src/prediction/question.js";
 import { rangeQuestion, targetShare, thresholdChoices } from "../src/prediction/range-questions.js";
 import { HAND_REGIONS, allHandClasses, regionOf, regionsHolding } from "../src/prediction/regions.js";
@@ -208,7 +209,7 @@ describe("R3.16 range ladder", () => {
 describe("R3.16 hand ladder", () => {
   const facts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true })]);
 
-  it("R3.16 level 1 accepts every action at or below the floor, as grading labels Best or Correct, and the reveal names the lowest-loss action with the frequencies (ADR 0024, O-374, O-379)", () => {
+  it("R3.16 level 1 accepts every action at or below the floor, as grading labels Best or Correct, and the reveal names the lowest-loss action or actions with their frequencies, then only the other correct actions with theirs, leaving that clause out when there are none (ADR 0024, O-374, O-379, PR #39 review finding 4)", () => {
     // Floor 0.5 (the node's floor_pct_pot): raise to 10bb (0) and raise to 25bb (0.1) are within it, call (0.8) and fold (5) are not.
     const evFacts = node([row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true, loss: [5, 0.8, 0, 0.1] })]);
     const question = handQuestion({ node: evFacts, level: 1, draws: DRAWS });
@@ -219,13 +220,13 @@ describe("R3.16 hand ladder", () => {
     expect(judgeAnswer(question, evFacts, { kind: "action", action_index: 1 }), "an action above the floor is wrong").toBe(false);
     expect(question.truth).toMatchObject({ action_indexes: [2, 3], frequency_pct: 30 });
     expect(question.truth.text).toBe(
-      "BB's highest-EV action with AKs is Raise to 10bb. Within the noise floor, so also correct: Raise to 10bb 30.0 percent, Raise to 25bb 50.0 percent.",
+      "BB's highest-EV action with AKs is Raise to 10bb (30.0 percent). Within the noise floor, so also correct: Raise to 25bb (50.0 percent).",
     );
     const tied = node([row("55", [0, 0.9, 0.1, 0], { loss: [1, 0, 0.0005, 2] })]);
     const tie = handQuestion({ node: tied, level: 1, draws: DRAWS });
     expect(tie?.truth.action_indexes).toEqual([1, 2]);
     expect(tie?.truth.text).toBe(
-      "BB's highest-EV action with 55 is Call or Raise to 10bb. Within the noise floor, so also correct: Call 90.0 percent, Raise to 10bb 10.0 percent.",
+      "BB's highest-EV action with 55 is Call (90.0 percent) or Raise to 10bb (10.0 percent).",
     );
   });
 
@@ -283,5 +284,42 @@ describe("R3.16 judging refuses answers that do not fit the prompt", () => {
     if (question === undefined) throw new Error("no question");
     const broken = { ...question, truth: { ...question.truth, share_pct: null } };
     expect(() => judgeAnswer(broken, facts, { kind: "yes_no", value: true })).toThrow(ProblemError);
+  });
+});
+
+describe("R3.16 a quiz never downgrades a level (PR #39 review finding 2, O-411 amended)", () => {
+  it("R3.16 at an exact level the hand ladder's size question tries the other held hands and never falls back to the band", () => {
+    // 72o (drawn first) never raises; AKs plays the 25bb raise most, so the exact level 3 asks AKs.
+    const mixedNode = node([row("72o", [1, 0, 0, 0]), row("AKs", [0, 0.2, 0.3, 0.5], { mixed: true })]);
+    const exact = handQuestion({ node: mixedNode, level: 3, draws: DRAWS, exactLevel: true });
+    expect(exact).toMatchObject({ level: 3, answer_kind: "size", hand: "AKs" });
+    const passive = node([row("72o", [1, 0, 0, 0])]);
+    expect(handQuestion({ node: passive, level: 3, draws: DRAWS, exactLevel: true }), "no hand raises: no question").toBeUndefined();
+    const oneRaise = node([row("AKs", [0, 0.5, 0.5])], [0.4, 0.4, 0.2], { actions: ACTIONS.slice(0, 3) });
+    expect(handQuestion({ node: oneRaise, level: 3, draws: DRAWS, exactLevel: true }), "one raise size: no question").toBeUndefined();
+    expect(handQuestion({ node: passive, level: 3, draws: DRAWS })?.level, "without exactLevel the band fallback stays").toBe(2);
+  });
+
+  it("R3.16 at an exact level the range ladder's regions question needs the 169-class space", () => {
+    const combos = node([], undefined, { hand_space: "postflop_1326" });
+    expect(rangeQuestion({ node: combos, level: 3, draws: DRAWS, exactLevel: true })).toBeUndefined();
+    expect(rangeQuestion({ node: combos, level: 3, draws: DRAWS })?.level).toBe(2);
+  });
+
+  it("R3.16 canAskQuiz says whether a node can ask the quiz's level on one of its chosen ladders", () => {
+    const oneRaise = node([row("AKs", [0, 0.5, 0.5], { mixed: true })], [0.4, 0.4, 0.2], { actions: ACTIONS.slice(0, 3) });
+    expect(canAskQuiz(oneRaise, { level: 3, ladders: ["hand"] })).toBe(false);
+    expect(canAskQuiz(oneRaise, { level: 3, ladders: ["hand", "range"] })).toBe(true);
+    expect(canAskQuiz(oneRaise, { level: 2, ladders: ["hand"] })).toBe(true);
+  });
+
+  it("R3.16 the no-questions problem names the difficulty and kind and suggests what to change", () => {
+    const problem = noQuizQuestionsProblem({ level: 3, ladders: ["hand"] });
+    expect(problem.status).toBe(422);
+    expect(problem.slug).toBe("no-quiz-questions");
+    expect(problem.detail).toBe("No more Hard hand questions in these spots; try more spot types or another difficulty.");
+    expect(noQuizQuestionsProblem({ level: 1, ladders: ["range", "hand"] }).detail).toBe(
+      "No more Easy questions in these spots; try more spot types or another difficulty.",
+    );
   });
 });

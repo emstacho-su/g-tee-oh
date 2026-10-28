@@ -72,7 +72,8 @@ const SESSION_COLUMNS = [
   "ended_at",
 ] as const;
 
-function toJsonb(value: unknown): RawBuilder<Json> {
+/** A value as a jsonb parameter (bound, never interpolated); S41's prediction answers share it. */
+export function toJsonb(value: unknown): RawBuilder<Json> {
   return sql<Json>`cast(${JSON.stringify(value)} as jsonb)`;
 }
 

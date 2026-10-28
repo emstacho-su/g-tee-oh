@@ -17,6 +17,7 @@ import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { DrillRunPage } from "../../src/routes/drill-run/DrillRunPage.js";
 import { TrainerDepsProvider, type Scheduler, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
 import { createFakeFetch, jsonResponse, type FetchScript } from "../api/fake-fetch.js";
+import { setReducedMotion } from "../support/motion.js";
 import { createScreenRouter, ScreenRouterView, type ScreenRouter } from "./screen-router.js";
 
 export const ORIGIN = "http://localhost:4173";
@@ -55,6 +56,11 @@ export interface RenderRunOptions {
   drillId?: string;
   /** The timer for the automatic continue (S26, O-314); the app's setTimeout when absent. */
   schedule?: Scheduler;
+  /**
+   * Play the opponent-action replay (S38, O-381). Off by default: the screen renders under
+   * prefers-reduced-motion, so the replay shows its end at once (test/support/motion.ts).
+   */
+  motion?: boolean;
 }
 
 /** The drill read plus a 201 session, the usual first two answers. */
@@ -72,7 +78,8 @@ function parseBody(text: string): unknown {
   }
 }
 
-export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule }: RenderRunOptions): RunView {
+export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule, motion = false }: RenderRunOptions): RunView {
+  setReducedMotion(!motion);
   const fake = createFakeFetch({ ...BASE_SCRIPT, ...script });
   const sent: SentRequest[] = [];
   const fetch = async (request: Request): Promise<Response> => {

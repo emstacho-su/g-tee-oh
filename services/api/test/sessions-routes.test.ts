@@ -222,9 +222,10 @@ describe("R3.6 GET /sessions/{id}/next", () => {
     const sessionId = await startSession(app, player, drillId);
     await decide(app, player, sessionId, 0, 1);
     const prompt = await next(app, player, sessionId);
+    // Each entry names its street (S38 review round 1).
     expect(prompt.history).toEqual([
-      { position: "BTN", token: "r250", label: "r250" },
-      { position: "BB", token: "r1000", label: "r1000" },
+      { position: "BTN", token: "r250", label: "r250", street: "preflop" },
+      { position: "BB", token: "r1000", label: "r1000", street: "preflop" },
     ]);
     expect(prompt.pot_cbb).toBe(1300);
     const samples = sq.calls.filter((call) => call.path === "/v1/sample-action");

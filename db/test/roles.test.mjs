@@ -337,6 +337,25 @@ describe('R3.16 R3.18 insight tables (S27, O-301, O-304)', () => {
     });
   });
 
+  test('R3.16 prediction_answer keeps a nullable reason of 1 to 1,000 characters and the answer as jsonb; app can never edit the reason (S41, O-412, O-413)', async () => {
+    await withRollback(pool, async (client) => {
+      const { rows } = await client.query(
+        `select column_name, data_type, is_nullable from information_schema.columns
+         where table_name = 'prediction_answer' and column_name in ('rationale', 'answer') order by column_name`,
+      );
+      assert.deepEqual(rows, [
+        { column_name: 'answer', data_type: 'jsonb', is_nullable: 'YES' },
+        { column_name: 'rationale', data_type: 'text', is_nullable: 'YES' },
+      ]);
+      const check = await client.query(
+        `select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'prediction_answer_rationale_length'`,
+      );
+      assert.match(check.rows[0]?.def ?? '', /char_length\(rationale\).*1.*1000/);
+      await asRole(client, 'app', 'select rationale, answer from prediction_answer limit 1');
+      await expectDenied(client, 'app', "update prediction_answer set rationale = 'edited' where false");
+    });
+  });
+
   test('R3.18 attempt.action_kinds is a nullable text array (older rows keep null)', async () => {
     await withRollback(pool, async (client) => {
       const { rows } = await client.query(

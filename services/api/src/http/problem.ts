@@ -99,6 +99,8 @@ export const PROBLEM_SLUGS = {
   wrongSessionMode: "wrong-session-mode",
   askDisabled: "ask-disabled",
   askCapReached: "ask-cap-reached",
+  // S41: a quiz whose spots cannot ask its difficulty on its chosen kinds (O-411 amended).
+  noQuizQuestions: "no-quiz-questions",
   // S42: invite links (O-422).
   inviteInvalid: "invite-invalid",
 } as const;
@@ -133,6 +135,7 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "wrong-session-mode": "This route does not serve this session's mode",
   "ask-disabled": "Ask is off until a model key is configured",
   "ask-cap-reached": "This month's Ask budget is used",
+  "no-quiz-questions": "No questions at this difficulty in these spots",
   "invite-invalid": "This invite link is not valid",
 };
 
