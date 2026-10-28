@@ -115,6 +115,9 @@ function recapOf(session: MockSession): SessionRecap {
     rated_decisions: session.graded.length,
     mean_score: session.graded.length === 0 ? null : total / session.graded.length,
     ev_loss_bb_total: session.graded.reduce((sum, entry) => sum + entry.evLossBb, 0),
+    rating_changes: [],
+    tier: null,
+    unlocks: [],
   };
 }
 
@@ -161,7 +164,7 @@ export function createMockSessionRoute(): MockRoute {
     const id = `${SESSION_ID_PREFIX}${number.toString(16).padStart(SESSION_ID_DIGITS, "0")}`;
     const session: MockSession = { id, rng: rngOf(request.body), hand: 0, version: 1, graded: [], replies: new Map(), recap: null };
     save(session);
-    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: FIXTURE_DRILL_ID, state: "await_hero", state_version: session.version, started_at: STARTED_AT };
+    const body: PracticeSession = { session_id: id, mode: "drill", drill_id: FIXTURE_DRILL_ID, state: "await_hero", state_version: session.version, started_at: STARTED_AT, rated_eligible: false, automated: null, holdout: null };
     return json(STATUS.created, body);
   }
 

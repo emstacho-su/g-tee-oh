@@ -6,6 +6,7 @@
  * no-coverage with a named reason, O-249). The reason names which part of the filter failed, so the
  * player knows what to change in the drill.
  */
+import type { GradedSessionMode } from "../grading/policy.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 
 /** Why a drill's filter cannot be dealt, as the 422 detail names it. */
@@ -32,6 +33,19 @@ export function wrongSessionModeProblem(actual: string, expected: string): Probl
 export function requireSessionMode(session: { mode: string }, expected: string): void {
   if (session.mode !== expected) {
     throw wrongSessionModeProblem(session.mode, expected);
+  }
+}
+
+/**
+ * The trainer routes (next, decisions) serve every graded mode (grading/policy.ts GradedSessionMode):
+ * drill (S23) and the S31 automated and holdout sessions. A prediction or range_paint session is a
+ * 409 wrong-session-mode (O-302).
+ */
+export const GRADED_SESSION_MODES: readonly GradedSessionMode[] = Object.freeze(["drill", "automated", "holdout"]);
+
+export function requireGradedSessionMode(session: { mode: string }): void {
+  if (!GRADED_SESSION_MODES.some((mode) => mode === session.mode)) {
+    throw wrongSessionModeProblem(session.mode, GRADED_SESSION_MODES.join(", "));
   }
 }
 

@@ -38,7 +38,8 @@ export interface SessionRow {
 export interface NewSession {
   userId: string;
   mode: PracticeMode;
-  drillId: string;
+  /** The drill of a drill session; null for automated and holdout sessions (S31). */
+  drillId: string | null;
   settings: TrainerSettings;
   state: PersistedState;
 }

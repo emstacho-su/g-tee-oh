@@ -1,131 +1,111 @@
 /**
- * Training sessions (R3.6, A5 section 3, A6 section 2, O-249, ADR 0018): POST /sessions,
+ * Training sessions (R3.6, R4.10, R4.13, A5 section 3, A6 section 2, O-249, ADR 0018): POST /sessions,
  * GET /sessions/{id}/next and POST /sessions/{id}/end. The route file stays thin and calls these.
  *
- * - create: drill mode (S23, O-249), and since S27 the drill-backed prediction and range_paint
- *   modes (O-302), which reuse the same spot search and start with a practice state instead of a
- *   hand; automated and holdout still answer 501 naming S31. The drill must be the user's (404 otherwise). Its
- *   trainer settings are merged with the body's partial settings. Its spot filter is expanded into
- *   covered (configuration, pair) candidates (candidates.ts); the uncovered rest is recorded as
- *   coverage_request rows, once per user and spot (05 section 1, O-240). Each covered pair's tree
- *   is searched once for the hero spots: nodes where a hero seat acts in the drill's preflop
- *   action families with a hand the hands filter keeps (spot-search.ts). A drill with no hero spot
- *   is a 422 no-coverage problem naming why, whose gap rows are still recorded in a transaction.
- *   The seed is the body's or 64 random bits (O-249). The session, with its hero spots and its copy
- *   of the drill's spot (spot.ts), is written in dealing phase at hand 0 through idempotentWrite;
- *   each hand is then dealt straight at a hero spot (deal-hand.ts).
- * - next: pure (the S23 binding rule). It derives the prompt from the persisted state and writes
- *   nothing; two calls in a row answer the same prompt. An ended session is 409 session-ended.
- * - end: ended_at, phase ended, and the recap aggregated from the session's attempts. A second end
- *   returns the same recap without writing (repeat-safe).
+ * - create: dispatches by mode (the S31 mode split): drill, and S27's drill-backed prediction and
+ *   range_paint modes (O-302, which start with a practice state instead of a hand), to
+ *   sessions/modes/drill.ts (S23's code); automated to modes/automated.ts; holdout to
+ *   modes/holdout.ts (which ends the user's open holdout session through endLockedSession first,
+ *   PR #27 review HIGH 1).
+ * - next: pure (the S23 binding rule). It serves the graded modes only (drill, automated, holdout;
+ *   a prediction or range_paint session is 409 wrong-session-mode, S27 O-302). It derives the
+ *   prompt from the persisted state with the session's holdout guard (derive-settings.ts, read
+ *   only) and writes nothing; two calls in a row answer the same prompt. An ended session is 409
+ *   session-ended. One exception (PR #27 review HIGH 3): an automated session whose closed block
+ *   waits for its next pick gets that pick first, in one write (automated/resume-block.ts); the
+ *   prompts after it are again write-free.
+ * - end: ended_at, phase ended, and the recap aggregated from the session's attempts, plus the
+ *   learning hooks' extras (onSessionEnd, inside the same transaction: rating, tier, unlocks). A
+ *   second end returns the same recap without writing (repeat-safe; the hooks run with firstEnd
+ *   false and write nothing). endLockedSession is the end path inside a caller's transaction, so
+ *   the idle-session job ends a session exactly as POST end does (O-275). The hooks' prepare phase
+ *   (learning/prepare.ts) runs before the end transaction opens, so no end hook loads the class
+ *   catalog under the lock (PR #27 review HIGH 3); the idle job prepares each session the same way.
  */
-import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
-import { findDrill } from "../drills/repository.js";
 import { sessionNotFound } from "../grading/decide.js";
 import { requireDatabase } from "../http/database.js";
 import { idempotentWrite } from "../http/idempotent-write.js";
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
-import { storedSpotFilterSchema, trainerSettingsSchema, type TrainerSettings } from "../schemas/drills.js";
-import type { recapSchema, sessionCreateBodySchema, sessionSchema } from "../schemas/training.js";
-import { requireSolverQuery } from "../solver-query/client.js";
-import { candidatesFor, configIdsFor, pairsFor, splitByCoverage } from "./candidates.js";
+import { resumePendingBlock } from "../automated/resume-block.js";
+import { EMPTY_PREPARED_LEARNING, type LearningHooks, type PreparedLearning } from "../learning/effects.js";
+import { prepareLearning } from "../learning/prepare.js";
+import type { Database } from "../db.js";
+import type { recapSchema } from "../schemas/training.js";
+import { requireSolverQuery, type SolverQuery } from "../solver-query/client.js";
 import { deriveAwaitHero } from "./derive.js";
-import { filterUnmetProblem, requireSessionMode, sessionEndedProblem } from "./problems.js";
-import { heroSpotsFor } from "./spot-search.js";
-import { spotOf } from "./spot.js";
+import { deriveSettingsFor } from "./derive-settings.js";
 import { transition } from "./machine.js";
+import { createAutomatedSession } from "./modes/automated.js";
+import { createDrillSession } from "./modes/drill.js";
+import { createHoldoutSession, type ReplaceOpenSession } from "./modes/holdout.js";
+import { requireGradedSessionMode, sessionEndedProblem } from "./problems.js";
 import { toPrompt, type Prompt } from "./prompt.js";
-import { newSessionSeed } from "./randomness.js";
-import {
-  findSession,
-  insertCoverageRequests,
-  insertSession,
-  lockSession,
-  recapStats,
-  writeState,
-  type SessionRow,
-} from "./repository.js";
+import { findSession, lockSession, recapStats, writeState, type SessionRow } from "./repository.js";
+import type { SessionCall, SessionCreateBody } from "./session-call.js";
+import type { Session } from "./session-view.js";
 import { solverPort } from "./solver-port.js";
-import { initialState } from "./state.js";
 
-export type SessionCreateBody = z.infer<typeof sessionCreateBodySchema>;
-export type Session = z.infer<typeof sessionSchema>;
+export type { SessionCall, SessionCreateBody } from "./session-call.js";
+export type { Session } from "./session-view.js";
 export type Recap = z.infer<typeof recapSchema>;
 
-type BuiltMode = "drill" | "prediction" | "range_paint";
-
-const LATER_OWNER: Readonly<Record<Exclude<SessionCreateBody["mode"], BuiltMode>, string>> = {
-  automated: "S31",
-  holdout: "S31",
-};
-
-function isBuiltMode(mode: SessionCreateBody["mode"]): mode is BuiltMode {
-  return mode === "drill" || mode === "prediction" || mode === "range_paint";
+/** POST /sessions/{id}/end, with the clock and the day's time zone the end hooks use. */
+export interface EndCall extends SessionCall {
+  now: Date;
+  timeZone: string;
 }
 
-export interface SessionCall {
-  app: FastifyInstance;
-  request: FastifyRequest;
+/** One end inside a caller's transaction (POST end, the idle-session job). */
+export interface SessionEnd {
+  hooks: LearningHooks;
   userId: string;
+  sessionId: string;
+  now: Date;
+  timeZone: string;
+  /** The app's solver-query client, for the end hooks' class catalog (O-271); null without one. */
+  solverQuery: SolverQuery | null;
+  /** What prepareLearning read for this session before the transaction opened. */
+  prepared: PreparedLearning;
 }
 
-function toSession(row: SessionRow): Session {
-  return {
-    session_id: row.id,
-    mode: row.mode,
-    drill_id: row.drillId,
-    state: row.state.phase,
-    state_version: row.stateVersion,
-    started_at: row.startedAt.toISOString(),
-  };
+/** The clock and APP_TIME_ZONE a create reads (S31: the holdout round's month, O-276, O-247). */
+export interface CreateClock {
+  now: Date;
+  timeZone: string;
 }
 
-function requireDrillMode(body: SessionCreateBody): { mode: BuiltMode; drillId: string } {
-  const { mode } = body;
-  if (!isBuiltMode(mode)) {
-    throw new ProblemError(HTTP_STATUS.notImplemented, PROBLEM_SLUGS.notImplemented, {
-      detail: `${mode} sessions are built by ${LATER_OWNER[mode]}; drill, prediction and range_paint sessions are served (O-249, O-302).`,
+export async function createSession(call: SessionCall, body: SessionCreateBody, clock: CreateClock): Promise<Session> {
+  switch (body.mode) {
+    case "drill":
+    case "prediction":
+    case "range_paint":
+      return createDrillSession(call, body, body.mode);
+    case "automated":
+      return createAutomatedSession(call, body, clock.now);
+    case "holdout":
+      return createHoldoutSession(call, body, clock, replaceOpenHoldout(call, clock));
+  }
+}
+
+/**
+ * PR #27 review HIGH 1: a holdout create ends the user's open holdout session through the shared end
+ * path, so its served item is skipped exactly as a POST end skips it. Nothing is prepared: a holdout
+ * session's end hooks read no prepared context (only the holdout part acts on it, writing the skip).
+ */
+function replaceOpenHoldout(call: SessionCall, clock: CreateClock): ReplaceOpenSession {
+  return async (transaction, sessionId) => {
+    await endLockedSession(transaction, {
+      hooks: call.app.learningHooks,
+      userId: call.userId,
+      sessionId,
+      now: clock.now,
+      timeZone: clock.timeZone,
+      solverQuery: call.app.solverQuery,
+      prepared: EMPTY_PREPARED_LEARNING,
     });
-  }
-  if (body.drill_id === undefined) {
-    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, { detail: `A ${mode} session needs drill_id.` });
-  }
-  return { mode, drillId: body.drill_id };
-}
-
-function mergedSettings(stored: unknown, overrides: SessionCreateBody["settings"]): TrainerSettings {
-  return trainerSettingsSchema.parse({ ...trainerSettingsSchema.parse(stored), ...overrides });
-}
-
-export async function createSession(call: SessionCall, body: SessionCreateBody): Promise<Session> {
-  const { mode, drillId } = requireDrillMode(body);
-  const database = requireDatabase(call.app);
-  const drill = await findDrill(database, call.userId, drillId);
-  if (drill === undefined) {
-    throw new ProblemError(HTTP_STATUS.notFound, PROBLEM_SLUGS.notFound, { detail: "No drill of yours has this id." });
-  }
-  const settings = mergedSettings(drill.trainer_settings, body.settings);
-  const filter = storedSpotFilterSchema.parse(drill.spot_filter);
-  const port = solverPort(requireSolverQuery(call.app), call.request);
-  const candidates = candidatesFor(await configIdsFor(database, filter), pairsFor(filter));
-  const { covered, gaps } = await splitByCoverage(candidates, port);
-  const line = filter.line ?? null;
-  const spot = spotOf(filter);
-  const heroSpots = await heroSpotsFor(covered, { heroPositions: filter.hero_positions, spot, line }, port);
-  if (heroSpots.length === 0) {
-    // The gap rows are recorded even though the session is refused (05 section 1, O-240).
-    await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, line));
-    const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
-    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
-  }
-  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, mode === "drill" ? undefined : mode);
-  return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
-    await insertCoverageRequests(transaction, call.userId, gaps, line);
-    const row = await insertSession(transaction, { userId: call.userId, mode, drillId, settings, state });
-    return toSession(row);
-  });
+  };
 }
 
 async function requireSession(call: SessionCall, sessionId: string): Promise<SessionRow> {
@@ -137,19 +117,20 @@ async function requireSession(call: SessionCall, sessionId: string): Promise<Ses
 }
 
 /** The next prompt, derived and never written (GET is pure). */
-export async function nextPrompt(call: SessionCall, sessionId: string): Promise<Prompt> {
-  const session = await requireSession(call, sessionId);
-  if (session.state.phase === "ended") {
+export async function nextPrompt(call: SessionCall, sessionId: string, now: Date = new Date()): Promise<Prompt> {
+  const stored = await requireSession(call, sessionId);
+  if (stored.state.phase === "ended") {
     throw sessionEndedProblem();
   }
-  requireSessionMode(session, "drill");
+  requireGradedSessionMode(stored);
+  const session = await resumePendingBlock(call, stored, now);
   const port = solverPort(requireSolverQuery(call.app), call.request);
-  const { settings } = session;
-  const derived = await deriveAwaitHero(session.state, { stopRule: settings.stop_rule, rng: settings.rng }, port);
-  return toPrompt(session.id, session.stateVersion, derived, settings);
+  const settings = await deriveSettingsFor(call.app, call.userId, session);
+  const derived = await deriveAwaitHero(session.state, settings, port);
+  return toPrompt(session.id, session.stateVersion, derived, session.settings);
 }
 
-async function recapOf(database: Parameters<typeof recapStats>[0], row: SessionRow): Promise<Recap> {
+async function recapOf(database: Database, row: SessionRow): Promise<Recap> {
   const stats = await recapStats(database, row.id);
   if (row.endedAt === null) {
     throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, { detail: "The ended session has no end time." });
@@ -161,30 +142,69 @@ async function recapOf(database: Parameters<typeof recapStats>[0], row: SessionR
     rated_decisions: stats.ratedDecisions,
     mean_score: stats.meanScore,
     ev_loss_bb_total: stats.evLossBbTotal,
+    rating_changes: [],
+    tier: null,
+    unlocks: [],
   };
 }
 
-/** Ends the session and returns its recap; ending an ended session returns the same recap. */
-export async function endSession(call: SessionCall, sessionId: string): Promise<Recap> {
-  return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, async (transaction) => {
-    const locked = await lockSession(transaction, call.userId, sessionId);
-    if (locked === undefined) {
-      throw sessionNotFound();
-    }
-    if (locked.state.phase === "ended") {
-      return recapOf(transaction, locked);
-    }
-    const phase = transition({ phase: locked.state.phase, stopRule: locked.settings.stop_rule }, { type: "session_ended" }).phase;
-    const ended = await writeState(transaction, {
-      userId: call.userId,
-      sessionId,
-      expectedVersion: locked.stateVersion,
-      state: { ...locked.state, phase },
-      end: true,
-    });
-    if (ended === undefined) {
-      throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.staleState, { detail: "The session moved on; end it again." });
-    }
-    return recapOf(transaction, ended);
+/**
+ * Ends the session inside `transaction` and returns its recap; an ended session returns the same
+ * recap without writing. Locks the row first, so two ends never both write.
+ */
+export async function endLockedSession(transaction: Database, end: SessionEnd): Promise<Recap> {
+  const locked = await lockSession(transaction, end.userId, end.sessionId);
+  if (locked === undefined) {
+    throw sessionNotFound();
+  }
+  const hookContext = {
+    transaction,
+    now: end.now,
+    timeZone: end.timeZone,
+    userId: end.userId,
+    session: locked,
+    solverQuery: end.solverQuery,
+    prepared: end.prepared,
+  };
+  if (locked.state.phase === "ended") {
+    const extras = await end.hooks.onSessionEnd({ ...hookContext, ended: locked, firstEnd: false });
+    return { ...(await recapOf(transaction, locked)), ...extras };
+  }
+  const phase = transition({ phase: locked.state.phase, stopRule: locked.settings.stop_rule }, { type: "session_ended" }).phase;
+  const ended = await writeState(transaction, {
+    userId: end.userId,
+    sessionId: end.sessionId,
+    expectedVersion: locked.stateVersion,
+    state: { ...locked.state, phase },
+    end: true,
   });
+  if (ended === undefined) {
+    throw new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.staleState, { detail: "The session moved on; end it again." });
+  }
+  const extras = await end.hooks.onSessionEnd({ ...hookContext, ended, firstEnd: true });
+  return { ...(await recapOf(transaction, ended)), ...extras };
+}
+
+/** Ends the session and returns its recap; ending an ended session returns the same recap. */
+export async function endSession(call: EndCall, sessionId: string): Promise<Recap> {
+  const session = await requireSession(call, sessionId);
+  const prepared = await prepareLearning(call.app.learningHooks, {
+    database: requireDatabase(call.app),
+    solverQuery: call.app.solverQuery,
+    userId: call.userId,
+    session,
+    now: call.now,
+    log: call.request.log,
+    purpose: "end",
+  });
+  const end: SessionEnd = {
+    hooks: call.app.learningHooks,
+    userId: call.userId,
+    sessionId,
+    now: call.now,
+    timeZone: call.timeZone,
+    solverQuery: call.app.solverQuery,
+    prepared,
+  };
+  return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, (transaction) => endLockedSession(transaction, end));
 }

@@ -28,8 +28,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub use coverage::{
-    CoverageQuery, CoverageResponse, CoverageSource, DatabaseState, FlopCoverage, PreflopCoverage,
-    QueueEntry, TextureCoverage,
+    ClassHistoryEntry, ClassSpot, CoverageQuery, CoverageResponse, CoverageSource, DatabaseState,
+    FlopCoverage, PreflopCoverage, QueueEntry, SpotClassEntry, TextureCoverage,
 };
 pub use deal::{
     DealFilter, DealRequest, DealResponse, Hex64, InvalidHex64, RevealQuery, RevealResponse,

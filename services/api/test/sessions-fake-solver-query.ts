@@ -235,6 +235,7 @@ function coverageRoute(options: FakeOptions, inFlight: InFlight): Route {
       textures: [],
       queue: [],
       database: "unconfigured",
+      spot_classes: [],
     });
   };
 }

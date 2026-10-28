@@ -37,7 +37,10 @@ import { authentication } from "./plugins/authenticate.js";
 import { csrfGuard } from "./plugins/csrf.js";
 import { idempotency } from "./plugins/idempotency.js";
 import { security } from "./plugins/security.js";
+import { watchCoverageAdded } from "./automated/class-catalog.js";
 import type { NotificationSource } from "./events/source.js";
+import type { LearningHooks } from "./learning/effects.js";
+import { DEFAULT_LEARNING_HOOKS } from "./learning/hooks.js";
 import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { catalogRoutes } from "./routes/catalog.js";
@@ -49,6 +52,7 @@ import { healthzRoutes } from "./routes/healthz.js";
 import { insightRoutes } from "./routes/insights.js";
 import { plannedRoutes } from "./routes/planned.js";
 import { predictionRoutes } from "./routes/prediction.js";
+import { progressRoutes } from "./routes/progress.js";
 import { rangePaintRoutes } from "./routes/range-paint.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { studyRoutes } from "./routes/study.js";
@@ -90,6 +94,11 @@ export interface BuildAppOptions {
    */
   notifications?: NotificationSource;
   /**
+   * The S31 learning hooks run inside the decision and session-end transactions (learning/effects.ts).
+   * DEFAULT_LEARNING_HOOKS when absent; a test may inject its own.
+   */
+  learningHooks?: LearningHooks;
+  /**
    * The Ask model (S27, O-305): main.ts builds the Anthropic adapter when EXPLAIN_ASK_ENABLED is on
    * and a key is configured; tests inject a scripted mock. Absent, Ask answers 503 ask-disabled.
    */
@@ -109,6 +118,10 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   app.decorate("database", options.database ?? null);
   app.decorate("solverQuery", options.solverQuery ?? null);
   app.decorate("notifications", options.notifications ?? null);
+  app.decorate("learningHooks", options.learningHooks ?? DEFAULT_LEARNING_HOOKS);
+  // PR #27 review MEDIUM 8: new coverage drops the class catalog cache from the start, not only once
+  // an automated session was created (subscribes once per source).
+  watchCoverageAdded(options.notifications ?? null);
   app.decorate("modelClient", options.modelClient ?? null);
 
   // Order matters: each plugin's hooks run in registration order, before any route below.
@@ -137,6 +150,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(sessionRoutes, { prefix: API_PREFIX, config });
   void app.register(eventRoutes, { prefix: API_PREFIX, config });
   void app.register(adminRoutes, { prefix: API_PREFIX, config });
+  void app.register(progressRoutes, { prefix: API_PREFIX, config });
   // S27 (R3.16 to R3.20): prediction, range painting, insight cards and explanations.
   void app.register(predictionRoutes, { prefix: API_PREFIX, config });
   void app.register(rangePaintRoutes, { prefix: API_PREFIX, config });

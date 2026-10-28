@@ -66,6 +66,9 @@ export const fixturePracticeSession: PracticeSession = {
   state: "await_hero",
   state_version: fixturePrompt.state_version,
   started_at: FIXTURE_TIME,
+  rated_eligible: false,
+  automated: null,
+  holdout: null,
 };
 
 /** The big blind facing a button open: fold, call, three-bet to 9bb, all-in. */
@@ -169,6 +172,9 @@ export const fixtureRecap: SessionRecap = {
   rated_decisions: 3,
   mean_score: 0.75,
   ev_loss_bb_total: 0.19,
+  rating_changes: [],
+  tier: null,
+  unlocks: [],
 };
 
 /** The NodeAction rows of the first hand, for tests that pick a button by its index (O-198). */

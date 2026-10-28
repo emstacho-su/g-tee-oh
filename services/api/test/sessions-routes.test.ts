@@ -79,15 +79,8 @@ describe("R3.6 POST /sessions", () => {
     await app.close();
   });
 
-  it("R3.6 automated and holdout answer 501 naming S31 (O-249)", async () => {
-    const { app, player } = await setUp();
-    for (const mode of ["automated", "holdout"] as const) {
-      const response = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode } });
-      expect(response.statusCode, mode).toBe(501);
-      expect(response.json<{ detail: string }>().detail).toContain("S31");
-    }
-    await app.close();
-  });
+  // Every POST /sessions mode is served now: S27 built prediction and range_paint (R3.16, R3.17) and
+  // S31 automated and holdout (R4.10, R4.13), so no mode answers 501 any more.
 
   it("R3.16 R3.17 prediction and range_paint sessions are drill-backed and start awaiting their first prompt (O-302)", async () => {
     const { app, player, drillId } = await setUp();

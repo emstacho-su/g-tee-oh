@@ -12,18 +12,8 @@ import { mutatingHeadersSchema } from "../http/headers.js";
 import { notImplemented, plannedDescription } from "../http/not-implemented.js";
 import { AUTHENTICATED, PLANNED_MUTATE_PROBLEMS, PLANNED_READ_PROBLEMS } from "../http/openapi.js";
 import { problemResponses } from "../http/problem.js";
-import {
-  heatmapSchema,
-  holdoutSchema,
-  leaksQuerySchema,
-  leaksSchema,
-  ratingSchema,
-  streakSchema,
-  tracksSchema,
-} from "../schemas/insights.js";
 import { turnRootsQuerySchema, turnRootsSchema } from "../schemas/study.js";
 
-const S31 = "S31";
 const V1_5 = "a v1.5 session (O-15)";
 
 type Method = "GET" | "POST" | "PATCH";
@@ -45,13 +35,8 @@ export interface PlannedRoute {
 
 export const PLANNED_ROUTES: readonly PlannedRoute[] = [
   { method: "GET", url: "/study/turn-roots", owner: V1_5, tag: "study", summary: "Every turn root at a flop node", successStatus: 200, success: turnRootsSchema, querystring: turnRootsQuerySchema },
-  // Progress, S31.
-  { method: "GET", url: "/progress/rating", owner: S31, tag: "progress", summary: "The overall rank", successStatus: 200, success: ratingSchema },
-  { method: "GET", url: "/progress/tracks", owner: S31, tag: "progress", summary: "Per-track ratings", successStatus: 200, success: tracksSchema },
-  { method: "GET", url: "/progress/leaks", owner: S31, tag: "progress", summary: "Leak cost by spot class over recent weeks", successStatus: 200, success: leaksSchema, querystring: leaksQuerySchema },
-  { method: "GET", url: "/progress/heatmap", owner: S31, tag: "progress", summary: "Mastery heat map", successStatus: 200, success: heatmapSchema },
-  { method: "GET", url: "/progress/holdout", owner: S31, tag: "progress", summary: "Holdout results", successStatus: 200, success: holdoutSchema },
-  { method: "GET", url: "/progress/streak", owner: S31, tag: "progress", summary: "Streak state", successStatus: 200, success: streakSchema },
+  // Prediction, range painting and explanations moved to their route files (S27, R3.16 to R3.20).
+  // Progress moved to routes/progress.ts (S31, R4.12).
 ];
 
 function successResponse(route: PlannedRoute) {

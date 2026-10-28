@@ -20,6 +20,7 @@ import "fastify";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { createSolverQueryClient, type SolverQueryComponents } from "@g-tee-oh/contracts";
+import { z } from "zod";
 
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 
@@ -30,6 +31,11 @@ export type SqNode = SqSchemas["NodeResponse"];
 export type SqAction = SqSchemas["ActionView"];
 export type SqGrade = SqSchemas["GradeResponse"];
 export type SqCoverage = SqSchemas["CoverageResponse"];
+/** One spot class of a (configuration, pair) from GET /v1/coverage?classes=true (S31, O-270). */
+export type SqSpotClassEntry = SqSchemas["SpotClassEntry"];
+/** One decision node of a spot class, with its line, hero seat, pot, line reach and history (O-270). */
+export type SqClassSpot = SqSchemas["ClassSpot"];
+export type SqClassHistoryEntry = SqSchemas["ClassHistoryEntry"];
 export type SqInsights = SqSchemas["InsightsResponse"];
 export type SqDeal = SqSchemas["DealResponse"];
 export type SqReveal = SqSchemas["RevealResponse"];
@@ -109,6 +115,18 @@ function upstreamProblem(status: number, what: string): ProblemError {
   return new ProblemError(HTTP_STATUS.badGateway, PROBLEM_SLUGS.upstream, {
     detail: `solver-query could not answer for ${what}.`,
   });
+}
+
+const upstreamProblemTypeSchema = z.object({ type: z.string() });
+const UPSTREAM_PROBLEM_TYPE_SEPARATOR = ":";
+
+/**
+ * The tag of a solver-query problem body (the last part of its urn:g-tee-oh:problem:<tag> type), or
+ * undefined when the body is not a problem with a type (a proxy's 503, for example).
+ */
+export function upstreamProblemTag(body: unknown): string | undefined {
+  const parsed = upstreamProblemTypeSchema.safeParse(body);
+  return parsed.success ? parsed.data.type.split(UPSTREAM_PROBLEM_TYPE_SEPARATOR).at(-1) : undefined;
 }
 
 /**

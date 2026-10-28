@@ -70,3 +70,9 @@ export function canonicalPairs(tableSize: number): readonly CanonicalPair[] {
   const seats = seatedPositions(tableSize);
   return seats.flatMap((first, index) => seats.slice(index + 1).map((second) => canonicalPair(first, second)));
 }
+
+/**
+ * The two blind seats (Position::Sb and Position::Bb), naming data: a hero in one of them defends
+ * its blind, which is how the S31 tracks split facing-open decisions (learning/tracks.ts, O-271).
+ */
+export const BLIND_POSITIONS: readonly Position[] = ["SB", "BB"];

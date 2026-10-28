@@ -40,6 +40,7 @@ Order of the files:
 | 20261027000200_solution_publish_record.sql | The builder's publish record on solution (S18) |
 | 20261028000100_api_trainer.sql | builder_setting writes for app (O-241), app_user.is_admin (O-242), coverage_request (O-240), attempt feedback columns (O-246) |
 | 20261029000100_insights_explanations.sql | prediction_answer and its app grant (O-301), attempt.action_kinds for range drift (O-304) |
+| 20261029000200_api_learning.sql | The seven tracks (O-271), attempt hand_class and panels_revealed (O-274), the holdout draw, round, summary and result columns (O-276, O-277), one open holdout session per user, the idle closer's failure columns on practice_session, app_job (O-275) |
 
 ## Role model
 
