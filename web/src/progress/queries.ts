@@ -43,7 +43,8 @@ export const progressKeys = {
   streak: [PROGRESS_QUERY_ROOT, "streak"] as const,
 };
 
-const shared = { staleTime: PROGRESS_STALE_MS, retry: false, refetchOnMount: "always" } as const;
+/** A remount inside the stale time reuses the read; ending a session invalidates them all (O-326). */
+const shared = { staleTime: PROGRESS_STALE_MS, retry: false } as const;
 
 export function ratingQuery(api: AppApi) {
   return queryOptions({

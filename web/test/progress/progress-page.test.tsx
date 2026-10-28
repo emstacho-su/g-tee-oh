@@ -99,6 +99,19 @@ describe("R4.12 /progress", () => {
     expect(screen.queryByTestId("holdout-retest")).not.toBeInTheDocument();
   });
 
+  it("R4.12 leaving and reopening /progress within the stale time reads nothing again (O-326)", async () => {
+    const { router, fake } = renderApp("/progress", PROGRESS);
+    expect(await screen.findByTestId("rating-value")).toHaveTextContent("1612");
+    await router.navigate({ to: "/" });
+    expect(await screen.findByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
+    await router.navigate({ to: "/progress" });
+    expect(await screen.findByRole("heading", { level: 1, name: "Progress" })).toBeInTheDocument();
+    expect(await screen.findByTestId("rating-value")).toHaveTextContent("1612");
+    for (const read of ["rating", "streak", "heatmap", "holdout"]) {
+      expect(fake.keys().filter((key) => key === `GET /api/v1/progress/${read}`)).toHaveLength(1);
+    }
+  });
+
   it("R4.12 a failed card shows its own error and Try again reloads only that read", async () => {
     const { fake } = renderApp("/progress", {
       ...PROGRESS,
