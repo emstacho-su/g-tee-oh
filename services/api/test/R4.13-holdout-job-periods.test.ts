@@ -35,7 +35,8 @@ describe("R4.13 holdout job periods", () => {
     expect(HOLDOUT_ROUND_JOB.kind).toBe(HOLDOUT_ROUND_KIND);
     expect(HOLDOUT_DRAW_JOB.kind).toBe(HOLDOUT_DRAW_KIND);
     expect(Object.values(JOB_KINDS)).toEqual(expect.arrayContaining([HOLDOUT_ROUND_KIND, HOLDOUT_DRAW_KIND]));
-    expect(HOLDOUT_ROUND_JOB.nextPeriod).toBe(holdoutRoundPeriod);
-    expect(HOLDOUT_DRAW_JOB.nextPeriod).toBe(holdoutDrawPeriod);
+    const at = new Date("2026-11-15T12:00:00Z");
+    expect(HOLDOUT_ROUND_JOB.nextPeriod(at, NEW_YORK)).toEqual(holdoutRoundPeriod(at, NEW_YORK));
+    expect(HOLDOUT_DRAW_JOB.nextPeriod(at, NEW_YORK)).toEqual(holdoutDrawPeriod(at, NEW_YORK));
   });
 });
