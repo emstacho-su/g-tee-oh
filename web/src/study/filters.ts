@@ -14,7 +14,7 @@
  */
 import { formatCbb } from "../poker/format.js";
 import type { GameConfig, PositionPairEntry, Stake } from "./queries.js";
-import { validateStudySearch, type StudySearch } from "./search.js";
+import { validateStudySearch, type StudyFormat, type StudySearch } from "./search.js";
 import type { MatrixMode } from "../components/range-matrix/model.js";
 
 export const FILTER_KEYS = ["format", "table_size", "stake", "depth", "pair"] as const;
@@ -26,7 +26,8 @@ export interface SelectOption {
   readonly disabled?: boolean;
 }
 
-export const FORMAT_OPTIONS: readonly SelectOption[] = [
+/** The two formats; shared with the study settings panel (settings.ts, S39). */
+export const FORMAT_OPTIONS: readonly (SelectOption & { readonly value: StudyFormat })[] = [
   { value: "online", label: "Online" },
   { value: "live", label: "Live" },
 ];
@@ -47,7 +48,8 @@ const KEPT_BELOW: Readonly<Partial<Record<FilterKey, readonly FilterKey[]>>> = {
 /** Parameters that belong to one node and go whenever a filter changes. */
 const NODE_KEYS: readonly (keyof StudySearch)[] = ["line", "hand"];
 
-function distinctSorted(values: readonly number[]): number[] {
+/** The distinct values, ascending; shared with settings.ts (S39). */
+export function distinctSorted(values: readonly number[]): number[] {
   return [...new Set(values)].sort((left, right) => left - right);
 }
 

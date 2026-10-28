@@ -33,6 +33,11 @@ export function breadcrumbSteps(line: string | undefined): BreadcrumbStep[] {
   return [{ label: ROOT_STEP_LABEL, line: "" }, ...steps];
 }
 
+/** Every line from the root to this one, the root ("") first: the nodes the carousel reads (S39). */
+export function linePrefixes(line: string | undefined): string[] {
+  return breadcrumbSteps(line).map((step) => step.line);
+}
+
 export function lineLabel(line: string | undefined): string {
   return line === undefined || line === "" ? ROOT_LOG_LABEL : line;
 }
