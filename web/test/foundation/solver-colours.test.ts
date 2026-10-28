@@ -12,11 +12,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { ACTION_INK_CLASSES, actionFillStyle } from "../../src/components/trainer/ActionSwatch.js";
 import { contrastRatio, relativeLuminance } from "../../src/theme/color-contrast.js";
 import {
+  ACTION_INK,
   ACTION_STYLES,
   HATCH_INK,
   SIZE_SHADES,
+  actionInkFor,
   hatchInkFor,
   type ThemeName,
 } from "../../src/theme/action-style.js";
@@ -90,6 +93,25 @@ describe("R3.13 action colours on the S36 grounds (O-346)", () => {
       expect(new Set(SIZE_SHADES[theme]).size).toBe(SIZE_SHADES[theme].length);
     });
   }
+
+  it("R3.13 text printed straight on an action fill (a painted cell) takes an ink at 4.5:1 on every color and shade", () => {
+    for (const theme of THEMES) {
+      const failures = everyActionColour(theme)
+        .map(([name, colour]) => ({ theme, name, colour, ratio: contrastRatio(actionInkFor(colour), colour) }))
+        .filter((pair) => pair.ratio < TEXT_MINIMUM);
+      expect(failures).toEqual([]);
+    }
+    expect([ACTION_INK.onDark, ACTION_INK.onLight]).toContain(actionInkFor("#dc2626"));
+  });
+
+  it("R3.13 actionFillStyle and ACTION_FILL_CLASSES carry the ink per theme, so callers never hard-code a text color on a fill", () => {
+    const raise = { index: 0, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "", next_node_key: null } as const;
+    const style = actionFillStyle(raise, [raise]) as Record<string, string>;
+    expect(style["--ink-light"]).toBe(actionInkFor(ACTION_STYLES.raise.color.light));
+    expect(style["--ink-dark"]).toBe(actionInkFor(ACTION_STYLES.raise.color.dark));
+    expect(ACTION_INK_CLASSES).toContain("text-(--ink-light)");
+    expect(ACTION_INK_CLASSES).toContain("dark:text-(--ink-dark)");
+  });
 
   it("R3.13 the hatch ink is light on dark fills and dark on light fills, so patterns stay visible", () => {
     expect(hatchInkFor("#7f1d1d")).toBe(HATCH_INK.onDark);

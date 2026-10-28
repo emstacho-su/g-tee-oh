@@ -13,7 +13,7 @@ import type { CSSProperties } from "react";
 
 import { cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
-import { actionColor, actionStyle, hatchInkFor, type HatchPattern } from "../../theme/action-style.js";
+import { actionColor, actionInkFor, actionStyle, hatchInkFor, type HatchPattern } from "../../theme/action-style.js";
 
 /**
  * The hatch ink is a custom property too (S38): actionFillStyle sets the ink that suits each
@@ -43,7 +43,14 @@ const PATTERN_FILLS: Readonly<Record<HatchPattern, PatternFill>> = {
 export const ACTION_FILL_CLASSES =
   "bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]";
 
-type FillProperty = "--action-light" | "--action-dark" | "--hatch-light" | "--hatch-dark";
+/**
+ * Text printed on an action fill takes the ink that suits each theme's fill (--ink-light,
+ * --ink-dark, from actionInkFor) at 4.5:1; pair with ACTION_FILL_CLASSES and actionFillStyle
+ * instead of a fixed text color.
+ */
+export const ACTION_INK_CLASSES = "text-(--ink-light) dark:text-(--ink-dark)";
+
+type FillProperty = "--action-light" | "--action-dark" | "--hatch-light" | "--hatch-dark" | "--ink-light" | "--ink-dark";
 
 export function actionFillStyle(action: NodeAction, actions: readonly NodeAction[]): CSSProperties {
   const fill = PATTERN_FILLS[actionStyle(action.kind).pattern];
@@ -54,6 +61,8 @@ export function actionFillStyle(action: NodeAction, actions: readonly NodeAction
     "--action-dark": dark,
     "--hatch-light": hatchInkFor(light),
     "--hatch-dark": hatchInkFor(dark),
+    "--ink-light": actionInkFor(light),
+    "--ink-dark": actionInkFor(dark),
   };
   return {
     ...colors,

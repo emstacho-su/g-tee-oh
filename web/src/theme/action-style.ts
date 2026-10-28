@@ -26,7 +26,7 @@
  * shape, so their entries stay on one line each and carry no comments.
  */
 import type { ActionKind, NodeAction } from "../contracts.js";
-import { relativeLuminance } from "./color-contrast.js";
+import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 
 export type ThemeName = "light" | "dark";
 export type HatchPattern = "none" | "diagonal" | "cross" | "dots" | "vertical" | "horizontal" | "reverse";
@@ -78,6 +78,21 @@ export const HATCH_INK = {
 /** The hatch ink for one fill color (a hex value). */
 export function hatchInkFor(fill: string): string {
   return relativeLuminance(fill) < HATCH_INK.lightnessSplit ? HATCH_INK.onDark : HATCH_INK.onLight;
+}
+
+/**
+ * The ink for text printed on an action fill (a roll band's label, a painted cell): white on the
+ * deep light-theme fills, the deepened umber of the dark ground (from 735751 umber) on the lifted
+ * dark-theme fills, whichever reads better, so every fill keeps its text at 4.5:1 (WCAG 1.4.3).
+ */
+export const ACTION_INK = {
+  onDark: "#ffffff",
+  onLight: "#1c1210",
+} as const;
+
+/** The text ink for one fill color (a hex value): the one of the two with the higher contrast. */
+export function actionInkFor(fill: string): string {
+  return contrastRatio(ACTION_INK.onDark, fill) >= contrastRatio(ACTION_INK.onLight, fill) ? ACTION_INK.onDark : ACTION_INK.onLight;
 }
 
 const SIZED_KINDS: ReadonlySet<ActionKind> = new Set<ActionKind>(["bet", "raise"]);
