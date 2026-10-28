@@ -82,7 +82,7 @@ async function trainerScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   await expect(page.getByTestId("feedback-panel")).toHaveCount(0);
   await shot("trainer-confidence", CRITERIA.confidence);
 
-  await page.getByRole("button", { name: "Sure" }).click();
+  await page.getByRole("button", { name: "Sure", exact: true }).click();
   await expect(page.getByTestId("feedback-panel")).toBeVisible();
   await page.waitForLoadState("networkidle");
   await shot("trainer-feedback", CRITERIA.feedback);

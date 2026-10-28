@@ -22,7 +22,7 @@ import { resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { THEME_STORAGE_KEY } from "../../src/store/theme.js";
+import { THEME_STORAGE_KEY } from "../../src/store/theme-key.js";
 import { ownerCredentials } from "../support/owner-credentials.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord } from "../support/shot-manifest.js";
 import { capture, DESKTOP, THEMES } from "../support/shots.js";

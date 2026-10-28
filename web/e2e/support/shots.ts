@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
-import { THEME_STORAGE_KEY } from "../../src/store/theme.js";
+import { THEME_STORAGE_KEY } from "../../src/store/theme-key.js";
 import type { ShotRecord, ShotSource, Theme } from "./shot-manifest.js";
 
 export interface Viewport {

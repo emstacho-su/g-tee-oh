@@ -162,7 +162,7 @@ async function playToMixedHand(page: Page, prompts: Map<number, TrainerPrompt>, 
     await expect(page.getByTestId("feedback-panel")).toHaveCount(0);
     if (hand === 1) await shot("flow4-confidence", CRITERIA.tap);
     const answer = page.waitForResponse((response) => isPath(response, "POST", /\/sessions\/[^/]+\/decisions$/));
-    await page.getByRole("button", { name: "Sure" }).click();
+    await page.getByRole("button", { name: "Sure", exact: true }).click();
     const response = await answer;
     expect(response.status(), "POST decisions").toBe(HTTP_OK);
     const feedback = (await response.json()) as DecisionFeedback;
