@@ -13,8 +13,13 @@
  */
 import type { AnswerCheck } from "./validator.js";
 
-/** max_tokens of one Ask call: thinking and the answer together (Claude Opus 5.5 always thinks). */
-export const ASK_MAX_TOKENS = 4000;
+/**
+ * max_tokens of one Ask call: thinking (low effort) and the answer together (Claude Opus 5.5
+ * always thinks). The answer is a few short paragraphs, a few hundred tokens; 2,000 leaves room
+ * for low-effort thinking and lets a full-length call finish inside ASK_REQUEST_TIMEOUT_MS at the
+ * slowest planned output rate (anthropic-model.ts; PR #29 review HIGH 1). It was 4,000.
+ */
+export const ASK_MAX_TOKENS = 2000;
 /** The first answer and at most one regeneration (O-308). */
 export const MAX_MODEL_CALLS = 2;
 /** An upper bound on what a regeneration turn adds to the prompt, for the spend reservation. */

@@ -34,6 +34,11 @@ export async function spentCents(database: Database, month: string): Promise<num
   return row?.cents ?? 0;
 }
 
+/** Whether a reservation of `cents` fits under the cap after `spent` (reserveSpend and the status). */
+export function fitsCap(spentSoFar: number, cents: number, capCents: number): boolean {
+  return spentSoFar + cents <= capCents;
+}
+
 /**
  * Adds `cents` to the month under a row lock unless the month would then pass `capCents`.
  * Returns true when reserved.
@@ -53,7 +58,7 @@ export async function reserveSpend(database: Database, month: string, cents: num
         .where("month", "=", monthDate(month))
         .forUpdate()
         .executeTakeFirstOrThrow();
-      if (row.cents + cents > capCents) {
+      if (!fitsCap(row.cents, cents, capCents)) {
         return false;
       }
       await transaction.updateTable("llm_spend").set({ cents: row.cents + cents }).where("month", "=", monthDate(month)).execute();

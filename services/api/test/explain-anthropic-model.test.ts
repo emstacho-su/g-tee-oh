@@ -8,7 +8,17 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ANTHROPIC_MESSAGES_URL, ANTHROPIC_VERSION, ASK_EFFORT, createAnthropicModel } from "../src/explain/anthropic-model.js";
+import {
+  ANTHROPIC_MESSAGES_URL,
+  ANTHROPIC_VERSION,
+  ASK_EFFORT,
+  ASK_MIN_OUTPUT_TOKENS_PER_SECOND,
+  ASK_REQUEST_TIMEOUT_MS,
+  createAnthropicModel,
+} from "../src/explain/anthropic-model.js";
+import { ASK_MAX_TOKENS } from "../src/explain/prompt.js";
+
+const MS_PER_SECOND = 1000;
 import { ModelCallError } from "../src/explain/model.js";
 
 // A made-up value shaped like no real key (O-54).
@@ -129,5 +139,51 @@ describe("R3.20 Anthropic model adapter", () => {
     const model = createAnthropicModel({ apiKey: FAKE_KEY, model: MODEL, fetch: hanging, timeoutMs: 20 });
     const error = await failureOf(model.complete(REQUEST));
     expect(error.message).toMatch(/timed out/);
+  });
+});
+
+describe("R3.20 what a failed call costs (PR #29 review HIGH 1)", () => {
+  const USAGE = { input_tokens: 700, output_tokens: 410 };
+
+  it("R3.20 a non-2xx answer charges nothing: the API did not bill it", async () => {
+    const error = await failureOf(adapter(529, { type: "error", error: { type: "overloaded_error" } }).complete(REQUEST));
+    expect(error.charge).toEqual({ kind: "none" });
+  });
+
+  it("R3.20 a refusal carries the usage the reply reported", async () => {
+    const error = await failureOf(adapter(200, messageBody({ stop_reason: "refusal", content: [], usage: USAGE })).complete(REQUEST));
+    expect(error.charge).toEqual({ kind: "usage", usage: { inputTokens: 700, outputTokens: 410 } });
+  });
+
+  it("R3.20 a thinking-only reply carries the usage the reply reported", async () => {
+    const thinkingOnly = messageBody({ stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "" }], usage: USAGE });
+    const error = await failureOf(adapter(200, thinkingOnly).complete(REQUEST));
+    expect(error.charge).toEqual({ kind: "usage", usage: { inputTokens: 700, outputTokens: 410 } });
+  });
+
+  it("R3.20 a wrong shape with a readable usage carries it; without one the charge is unknown", async () => {
+    const withUsage = await failureOf(adapter(200, { content: "not a list", usage: USAGE }).complete(REQUEST));
+    expect(withUsage.charge).toEqual({ kind: "usage", usage: { inputTokens: 700, outputTokens: 410 } });
+    const withoutUsage = await failureOf(adapter(200, { usage: "none" }).complete(REQUEST));
+    expect(withoutUsage.charge).toEqual({ kind: "unknown" });
+    const notJson = await failureOf(adapter(200, "<html>gateway</html>").complete(REQUEST));
+    expect(notJson.charge).toEqual({ kind: "unknown" });
+  });
+
+  it("R3.20 a timeout or network failure after the request was sent may have been billed: the charge is unknown", async () => {
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "TimeoutError")));
+      });
+    const timedOut = await failureOf(createAnthropicModel({ apiKey: FAKE_KEY, model: MODEL, fetch: hanging, timeoutMs: 20 }).complete(REQUEST));
+    expect(timedOut.charge).toEqual({ kind: "unknown" });
+    const failing: typeof fetch = () => Promise.reject(new TypeError("socket hang up"));
+    const dropped = await failureOf(createAnthropicModel({ apiKey: FAKE_KEY, model: MODEL, fetch: failing }).complete(REQUEST));
+    expect(dropped.charge).toEqual({ kind: "unknown" });
+  });
+
+  it("R3.20 the timeout fits max_tokens at the slowest output rate assumed", () => {
+    const slowestSeconds = ASK_MAX_TOKENS / ASK_MIN_OUTPUT_TOKENS_PER_SECOND;
+    expect(slowestSeconds * MS_PER_SECOND).toBeLessThan(ASK_REQUEST_TIMEOUT_MS);
   });
 });

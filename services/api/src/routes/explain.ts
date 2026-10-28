@@ -6,14 +6,15 @@
  * routes/insights.ts. The contract is settled by S27's first commit; the handlers live in explain/.
  *
  * Every route reads only the session user's own attempts (ADR 0001); another user's attempt is a
- * 404. Ask takes the CSRF token, an optional Idempotency-Key and a per-session rate limit of 5 per
- * minute (explain/rate-limit.ts, O-307).
+ * 404. Ask takes the CSRF token, an optional Idempotency-Key, the global per-address limit and a
+ * per-user limit of 5 per minute in its own onRequest hook (explain/rate-limit.ts, O-307, PR #29
+ * review M3).
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
 import { answerAsk } from "../explain/ask.js";
 import { findOwnedAttempt, loadGrounding } from "../explain/grounding.js";
-import { ASK_RATE_LIMIT } from "../explain/rate-limit.js";
+import { createAskLimiter } from "../explain/rate-limit.js";
 import { askStatus } from "../explain/status.js";
 import { renderMoreInfo } from "../explain/templates.js";
 import { requireDatabase } from "../http/database.js";
@@ -35,6 +36,7 @@ const EXPLAIN_TAG = "explain";
 
 export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, options, done) => {
   const { config } = options;
+  const askLimiter = createAskLimiter();
 
   app.get(
     "/explain/:attempt_id/more-info",
@@ -76,7 +78,11 @@ export const explainRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
   app.post(
     "/explain/:attempt_id/ask",
     {
-      config: { owner: "S27 lane D", rateLimit: ASK_RATE_LIMIT },
+      config: { owner: "S27 lane D" },
+      onRequest: (request, _reply, hookDone) => {
+        askLimiter.take(request);
+        hookDone();
+      },
       schema: {
         tags: [EXPLAIN_TAG],
         summary: "Ask the model about an attempt, behind a feature flag and a monthly cap (R3.20, O-54)",

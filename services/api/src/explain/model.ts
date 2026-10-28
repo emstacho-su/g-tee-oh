@@ -10,6 +10,8 @@
  */
 import "fastify";
 
+import type { TokenUsage } from "./pricing.js";
+
 export interface ModelRequest {
   system: string;
   user: string;
@@ -28,16 +30,32 @@ export interface ModelClient {
 }
 
 /**
- * A model call that failed. It carries the HTTP status when there was one and nothing else: its
- * message is fixed text, never the upstream body or the key, and it has no cause.
+ * What a failed call may have cost (PR #29 review HIGH 1), so the spend is settled to it and the
+ * cap holds even when calls fail:
+ * - none: the API answered a non-2xx status, which it does not bill; the call is refunded.
+ * - usage: a 2xx body was read and reported its usage (a refusal, a reply with thinking only, a
+ *   reply of the wrong shape whose usage still parsed); the call is settled at that usage.
+ * - unknown: the request was sent but no usage was read (a timeout, a dropped connection, a body
+ *   that was not JSON); the API may have billed it, so the call keeps its full reservation.
+ */
+export type ModelCharge = { kind: "none" } | { kind: "usage"; usage: TokenUsage } | { kind: "unknown" };
+
+const UNKNOWN_CHARGE: ModelCharge = { kind: "unknown" };
+
+/**
+ * A model call that failed. It carries the HTTP status when there was one and what the call may
+ * have cost, nothing else: its message is fixed text, never the upstream body or the key, and it
+ * has no cause. An error built without a charge is unknown, the safe default for the cap.
  */
 export class ModelCallError extends Error {
   readonly status: number | null;
+  readonly charge: ModelCharge;
 
-  constructor(reason: string, options: { status?: number } = {}) {
+  constructor(reason: string, options: { status?: number; charge?: ModelCharge } = {}) {
     super(`the model call failed: ${reason}`);
     this.name = "ModelCallError";
     this.status = options.status ?? null;
+    this.charge = options.charge ?? UNKNOWN_CHARGE;
   }
 }
 

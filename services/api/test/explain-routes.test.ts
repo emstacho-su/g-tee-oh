@@ -20,15 +20,18 @@ import type { Database } from "../src/db.js";
 import { createAnthropicModel } from "../src/explain/anthropic-model.js";
 import { UNVALIDATED_WARNING } from "../src/explain/ask.js";
 import { buildGrounding, type GroundingSources } from "../src/explain/grounding.js";
-import type { ModelClient } from "../src/explain/model.js";
-import { worstCaseCents } from "../src/explain/pricing.js";
+import { ModelCallError, type ModelClient } from "../src/explain/model.js";
+import { costCents, worstCaseCents } from "../src/explain/pricing.js";
+import { GROUNDING_CHARS_BOUND, askPromptChars, callReservationCents, statusReservationCents } from "../src/explain/reservation.js";
+import { SESSION_COOKIE_NAME } from "../src/http/openapi.js";
+import { GLOBAL_RATE_LIMIT_MAX } from "../src/http/rate-limits.js";
 import { ASK_MAX_TOKENS, MAX_MODEL_CALLS, REGENERATION_NOTE_MAX_CHARS, systemPrompt, userTurn } from "../src/explain/prompt.js";
 import { validateAnswer } from "../src/explain/validator.js";
 import { monthOf, spentCents } from "../src/explain/spend.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER } from "../src/http/headers.js";
-import { TEST_CONFIG } from "./support/app.js";
+import { TEST_CONFIG, mutatingHeaders, readHeaders } from "./support/app.js";
 import { contractErrors } from "./support/contract.js";
-import { adminPool, appDatabase } from "./support/database.js";
+import { adminPool, appDatabase, createTestSession } from "./support/database.js";
 import { FIXTURE_CONFIG, FIXTURE_NODE_KEY, FIXTURE_PAIR, FIXTURE_SOLUTION_ID } from "./support/explain-sources.js";
 import { mockModel } from "./support/mock-model.js";
 import { unsupportedBySimpleExtraction } from "./support/number-membership.js";
@@ -272,8 +275,8 @@ describe("R3.20 POST /explain/{attempt_id}/ask: flag, cap and ownership", () => 
     await fixture.app.close();
   });
 
-  it("R3.20 a model failure is a 502 with a fixed message and refunds the reservation", async () => {
-    const model = mockModel(new Error("upstream exploded with secret detail"));
+  it("R3.20 a non-2xx model answer is a 502 with a fixed message and refunds the reservation", async () => {
+    const model = mockModel(new ModelCallError("upstream exploded with secret detail", { status: 500, charge: { kind: "none" } }));
     const fixture = await setUp(ENABLED, model);
     const before = await currentSpend();
     const response = await ask(fixture, fixture.attempt55, `${QUESTION} (failure)`);
@@ -333,7 +336,7 @@ describe("R3.20 POST /explain/{attempt_id}/ask: answers, validation and cache", 
   });
 
   it("R3.20 a failed regeneration keeps the first answer, unvalidated", async () => {
-    const model = mockModel({ text: PLANTED_ANSWER }, new Error("second call failed"));
+    const model = mockModel({ text: PLANTED_ANSWER }, new ModelCallError("second call failed", { status: 503, charge: { kind: "none" } }));
     const fixture = await setUp(ENABLED, model);
     const response = await ask(fixture, fixture.attempt55, `${QUESTION} (regeneration fails)`);
     expect(response.statusCode).toBe(200);
@@ -498,4 +501,251 @@ describe("R3.20 the model key never leaves the process configuration (O-305, PM3
       expect(logged).toContain(status === 200 ? '"msg":"ask answered"' : '"msg":"ask model call failed"');
     });
   }
+});
+
+/** A gate a test opens by hand, to hold a model call open. */
+function manualGate(): { gate: Promise<void>; open: () => void } {
+  let open: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { gate, open };
+}
+
+/** One call's worst-case reservation for `question` on the 5h5d attempt. */
+async function perCallReservation(fixture: Fixture, question: string): Promise<number> {
+  const bundle = buildGrounding(await liveSources(fixture.attempt55, "5h5d", 0));
+  return callReservationCents(ENABLED.askModel, askPromptChars(bundle.canonical, question));
+}
+
+const BILLING_KEY = "test-only-not-a-key-billing";
+
+function anthropicReplying(status: number, body: unknown): ModelClient {
+  const reply = () => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
+  return createAnthropicModel({ apiKey: BILLING_KEY, model: "claude-opus-5-5", fetch: reply });
+}
+
+describe("R3.20 every billed call is counted against the cap (PR #29 review HIGH 1)", () => {
+  const USAGE = { input_tokens: 900, output_tokens: 1300 };
+  const usageCost = costCents("claude-opus-5-5", { inputTokens: 900, outputTokens: 1300 });
+
+  it("R3.20 a refusal is a 502 and the spend settles at the usage its reply reported", async () => {
+    const model = anthropicReplying(200, { model: "claude-opus-5-5", stop_reason: "refusal", content: [], usage: USAGE });
+    const fixture = await setUp(ENABLED, model);
+    const before = await currentSpend();
+    const response = await ask(fixture, fixture.attempt55, `${QUESTION} (refusal billed)`);
+    expect(response.statusCode).toBe(502);
+    expect(usageCost).toBeGreaterThan(0);
+    expect(await currentSpend()).toBe(before + usageCost);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a thinking-only reply is a 502 and the spend settles at its usage", async () => {
+    const thinkingOnly = { model: "claude-opus-5-5", stop_reason: "max_tokens", content: [{ type: "thinking", thinking: "" }], usage: USAGE };
+    const fixture = await setUp(ENABLED, anthropicReplying(200, thinkingOnly));
+    const before = await currentSpend();
+    const response = await ask(fixture, fixture.attempt55, `${QUESTION} (thinking only billed)`);
+    expect(response.statusCode).toBe(502);
+    expect(await currentSpend()).toBe(before + usageCost);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a timeout after the request was sent keeps that call's reservation", async () => {
+    const hanging: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "TimeoutError")));
+      });
+    const model = createAnthropicModel({ apiKey: BILLING_KEY, model: "claude-opus-5-5", fetch: hanging, timeoutMs: 20 });
+    const fixture = await setUp(ENABLED, model);
+    const question = `${QUESTION} (timed out)`;
+    const perCall = await perCallReservation(fixture, question);
+    const before = await currentSpend();
+    const response = await ask(fixture, fixture.attempt55, question);
+    expect(response.statusCode).toBe(502);
+    expect(response.json<{ detail: string }>().detail).not.toMatch(/nothing was charged/);
+    expect(await currentSpend()).toBe(before + perCall);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a failed regeneration's usage is counted with the first call's", async () => {
+    const regenerationUsage = { inputTokens: 1100, outputTokens: 150 };
+    const model = mockModel(
+      { text: PLANTED_ANSWER, inputTokens: 1000, outputTokens: 200 },
+      new ModelCallError("the model refused", { status: 200, charge: { kind: "usage", usage: regenerationUsage } }),
+    );
+    const fixture = await setUp(ENABLED, model);
+    const before = await currentSpend();
+    const response = await ask(fixture, fixture.attempt55, `${QUESTION} (regeneration billed)`);
+    expect(response.statusCode).toBe(200);
+    const expected = costCents("claude-opus-5-5", { inputTokens: 1000, outputTokens: 200 }) + costCents("claude-opus-5-5", regenerationUsage);
+    expect(response.json()).toMatchObject({ validated: false, cost_cents: expected });
+    expect(await currentSpend()).toBe(before + expected);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a regeneration that fails with an unknown charge keeps that call's reservation", async () => {
+    const model = mockModel({ text: PLANTED_ANSWER, inputTokens: 1000, outputTokens: 200 }, new Error("socket hang up"));
+    const fixture = await setUp(ENABLED, model);
+    const question = `${QUESTION} (regeneration unknown)`;
+    const perCall = await perCallReservation(fixture, question);
+    const before = await currentSpend();
+    const response = await ask(fixture, fixture.attempt55, question);
+    expect(response.statusCode).toBe(200);
+    expect(await currentSpend()).toBe(before + costCents("claude-opus-5-5", { inputTokens: 1000, outputTokens: 200 }) + perCall);
+    await fixture.app.close();
+  });
+});
+
+describe("R3.20 an Ask holds its Idempotency-Key claim for its whole run (PR #29 review HIGH 2)", () => {
+  it("R3.20 the claim is renewed between the calls, so a same-key retry is 409 in-flight and never reserves or calls again", async () => {
+    const first = manualGate();
+    const second = manualGate();
+    const model = mockModel({ text: PLANTED_ANSWER, gate: first.gate }, { text: VALID_ANSWER, gate: second.gate });
+    const fixture = await setUp(ENABLED, model);
+    const key = randomUUID();
+    const question = `${QUESTION} (long ask)`;
+    const before = await currentSpend();
+    const running = ask(fixture, fixture.attempt55, question, { [IDEMPOTENCY_HEADER]: key });
+    await vi.waitFor(() => expect(model.calls).toHaveLength(1));
+    // The first call ran past the lease: without a renewal the claim would look dead to a retry.
+    await pool.query("update idempotency_key set created_at = now() - interval '10 minutes' where user_id = $1 and key = $2", [
+      fixture.player.userId,
+      key,
+    ]);
+    first.open();
+    await vi.waitFor(() => expect(model.calls).toHaveLength(2));
+    const spentDuringAsk = await currentSpend();
+    const retry = await ask(fixture, fixture.attempt55, question, { [IDEMPOTENCY_HEADER]: key });
+    expect(retry.statusCode).toBe(409);
+    expect(retry.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:idempotency-in-flight");
+    expect(await currentSpend()).toBe(spentDuringAsk);
+    second.open();
+    const answered = await running;
+    expect(answered.statusCode, answered.body).toBe(200);
+    expect(answered.json()).toMatchObject({ text: VALID_ANSWER, validated: true });
+    expect(model.calls).toHaveLength(2);
+    expect(await currentSpend()).toBe(before + answered.json<{ cost_cents: number }>().cost_cents);
+    await fixture.app.close();
+  });
+});
+
+describe("R3.20 the Ask limit is per user, after authentication, under the global limit (PR #29 review M3)", () => {
+  function askAs(fixture: Fixture, headers: Record<string, string>) {
+    return fixture.app.inject({ method: "POST", url: `/api/v1/explain/${fixture.attempt55}/ask`, headers, payload: { question: QUESTION } });
+  }
+
+  it("R3.20 percent-encoded and reordered cookie variants of one session share one bucket", async () => {
+    const fixture = await setUp(TEST_CONFIG);
+    const token = fixture.player.session.token;
+    const encoded = [...token].map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join("");
+    const cookie = `theme=dark; ${SESSION_COOKIE_NAME}=${encoded}`;
+    const check = await fixture.app.inject({ method: "GET", url: "/api/v1/explain/status", headers: { cookie } });
+    expect(check.statusCode, "the encoded cookie authenticates the same session").toBe(200);
+    const statuses: number[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      statuses.push((await askAs(fixture, fixture.player.write)).statusCode);
+    }
+    statuses.push((await askAs(fixture, { ...fixture.player.write, cookie })).statusCode);
+    expect(statuses).toEqual([503, 503, 503, 503, 503, 429]);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a fresh login of the same user shares the user's bucket", async () => {
+    const fixture = await setUp(TEST_CONFIG);
+    for (let index = 0; index < 5; index += 1) {
+      expect((await askAs(fixture, fixture.player.write)).statusCode).toBe(503);
+    }
+    const fresh = await createTestSession(database, fixture.player.userId);
+    const response = await askAs(fixture, mutatingHeaders(fresh));
+    expect(response.statusCode).toBe(429);
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:rate-limited");
+    expect(Number(response.headers["retry-after"])).toBeGreaterThan(0);
+    await fixture.app.close();
+  });
+
+  it("R3.20 another user has a bucket of their own", async () => {
+    const fixture = await setUp(TEST_CONFIG);
+    for (let index = 0; index < 6; index += 1) {
+      await askAs(fixture, fixture.player.write);
+    }
+    const other = await newPlayer(database);
+    const response = await fixture.app.inject({
+      method: "POST",
+      url: `/api/v1/explain/${await insertAttempt(other, "5h5d", 0)}/ask`,
+      headers: other.write,
+      payload: { question: QUESTION },
+    });
+    expect(response.statusCode).toBe(503);
+    await fixture.app.close();
+  });
+
+  it("R3.20 the global per-address limit applies to Ask: unauthenticated asks are 401 until it trips", async () => {
+    const fixture = await setUp(TEST_CONFIG);
+    const stranger = { cookie: `${SESSION_COOKIE_NAME}=not-a-session` };
+    const statuses = new Set<number>();
+    for (let request = 1; request <= GLOBAL_RATE_LIMIT_MAX; request += 1) {
+      statuses.add((await askAs(fixture, stranger)).statusCode);
+    }
+    expect([...statuses]).toEqual([401]);
+    const blocked = await askAs(fixture, stranger);
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:rate-limited");
+    await fixture.app.close();
+  });
+});
+
+describe("R3.20 the status says unavailable when one Ask's reservation would not fit (PR #29 review M8)", () => {
+  it("R3.20 with 10 cents of room (1,490 of 1,500) the status is cap_reached, because an Ask reserves more", async () => {
+    const spent = await currentSpend();
+    const reservation = statusReservationCents(ENABLED.askModel);
+    expect(reservation).toBeGreaterThan(10);
+    const tight = await setUp({ ...ENABLED, askMonthlyCapCents: spent + 10 }, mockModel());
+    const status = await tight.app.inject({ method: "GET", url: "/api/v1/explain/status", headers: readHeaders(tight.player.session) });
+    expect(status.json()).toMatchObject({ enabled: true, available: false, reason: "cap_reached" });
+    await tight.app.close();
+    const room = await setUp({ ...ENABLED, askMonthlyCapCents: spent + reservation }, mockModel());
+    const open = await room.app.inject({ method: "GET", url: "/api/v1/explain/status", headers: readHeaders(room.player.session) });
+    expect(open.json()).toMatchObject({ available: true, reason: "ok" });
+    await room.app.close();
+  });
+
+  it("R3.20 the status bound covers the fixture groundings, so the status never says ok for an Ask the cap refuses", async () => {
+    const fixture = await setUp(TEST_CONFIG);
+    for (const [hand, actionIndex] of [
+      ["5h5d", 0],
+      ["7h2d", 1],
+    ] as const) {
+      const bundle = buildGrounding(await liveSources(fixture.attempt55, hand, actionIndex));
+      expect(bundle.canonical.length).toBeLessThan(GROUNDING_CHARS_BOUND);
+    }
+    await fixture.app.close();
+  });
+});
+
+/** How long the single-flight test holds the first call open while the second request arrives. */
+const SECOND_ASK_SETTLE_MS = 750;
+
+describe("R3.20 identical concurrent misses pay once (PR #29 review L10)", () => {
+  it("R3.20 two users asking the same question about the same grounding at once make one model call", async () => {
+    const held = manualGate();
+    const model = mockModel({ text: VALID_ANSWER, gate: held.gate }, { text: VALID_ANSWER });
+    const fixture = await setUp(ENABLED, model);
+    const other = await newPlayer(database);
+    const otherAttempt = await insertAttempt(other, "5h5d", 0);
+    const question = `${QUESTION} (single flight)`;
+    const before = await currentSpend();
+    const firstAsk = ask(fixture, fixture.attempt55, question);
+    await vi.waitFor(() => expect(model.calls).toHaveLength(1));
+    const secondAsk = fixture.app.inject({ method: "POST", url: `/api/v1/explain/${otherAttempt}/ask`, headers: other.write, payload: { question } });
+    // Hold the first call open long enough for the second request to reach its cache check while
+    // the first is still generating; without single flight it misses and calls the model too.
+    await new Promise((resolve) => setTimeout(resolve, SECOND_ASK_SETTLE_MS));
+    held.open();
+    const answers = await Promise.all([firstAsk, secondAsk]);
+    expect(answers.map((answer) => answer.statusCode)).toEqual([200, 200]);
+    expect(answers.map((answer) => answer.json<{ cached: boolean }>().cached).sort()).toEqual([false, true]);
+    expect(model.calls).toHaveLength(1);
+    expect(await currentSpend()).toBe(before + (answers[0]?.json<{ cost_cents: number }>().cost_cents ?? 0));
+    await fixture.app.close();
+  });
 });
