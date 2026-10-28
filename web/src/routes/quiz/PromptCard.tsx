@@ -1,6 +1,6 @@
 /**
  * One quiz prompt (S27 lane A, S41, R3.16, O-301, O-57, O-412, O-414): the ladder and level badge
- * ("Range level 2 of 3"), the spot (the hero's seat, the action so far, the hand on the hand
+ * ("Range level 2 of 3", with the difficulty's name beside it for a quiz session), the spot (the hero's seat, the action so far, the hand on the hand
  * ladder), the question, the synthetic banner when the solution is a fixture, the answer input and
  * the required reason inside a form whose submit is the Submit button or Enter outside the reason.
  * No strategy number is shown before the answer (predict before peek, O-302): the prompt carries
@@ -25,6 +25,10 @@ export interface PromptCardProps {
   submitting: boolean;
   /** An earlier answer under review: nothing can be changed or sent. */
   readOnly?: boolean;
+  /** A quiz's difficulty name ("Hard"), shown beside the level badge; absent for a drill-backed run. */
+  difficulty?: string;
+  /** The api refused the last reason sent (a 400 naming body.rationale). */
+  reasonRefused?: boolean;
   onDraft: (draft: AnswerDraft) => void;
   onReason: (reason: string) => void;
   onSubmit: () => void;
@@ -56,7 +60,25 @@ function ReasonText({ reason }: { reason: string }) {
   );
 }
 
-export function PromptCard({ prompt, draft, reason, answered, canSubmit, submitting, readOnly = false, onDraft, onReason, onSubmit }: PromptCardProps) {
+const BADGE_CLASS = "rounded-full border border-border px-3 py-1 text-xs font-semibold";
+
+function Badges({ prompt, difficulty }: { prompt: PredictionPrompt; difficulty: string | undefined }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <p className={BADGE_CLASS} data-testid="level-badge">
+        {levelBadge(prompt.ladder, prompt.level)}
+      </p>
+      {difficulty === undefined ? null : (
+        <p className={BADGE_CLASS} data-testid="difficulty-badge">
+          {difficulty}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function PromptCard(props: PromptCardProps) {
+  const { prompt, draft, reason, answered, canSubmit, submitting, readOnly = false, difficulty, reasonRefused = false, onDraft, onReason, onSubmit } = props;
   const locked = readOnly || answered || submitting;
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -67,15 +89,13 @@ export function PromptCard({ prompt, draft, reason, answered, canSubmit, submitt
     <Panel>
       <form aria-labelledby={questionId} onSubmit={submit} className="flex flex-col gap-4">
         {prompt.synthetic ? <SyntheticBanner /> : null}
-        <p className="self-start rounded-full border border-border px-3 py-1 text-xs font-semibold" data-testid="level-badge">
-          {levelBadge(prompt.ladder, prompt.level)}
-        </p>
+        <Badges prompt={prompt} difficulty={difficulty} />
         <SpotLine prompt={prompt} />
         <h2 id={questionId} className="text-lg font-semibold">
           {prompt.question}
         </h2>
         <AnswerInput prompt={prompt} draft={draft} disabled={locked} onChange={onDraft} />
-        {readOnly ? <ReasonText reason={reason} /> : <ReasonField value={reason} disabled={locked} onChange={onReason} />}
+        {readOnly ? <ReasonText reason={reason} /> : <ReasonField value={reason} disabled={locked} refused={reasonRefused} onChange={onReason} />}
         {answered || readOnly ? null : (
           <Button type="submit" variant="primary" className="self-start" disabled={!canSubmit} aria-keyshortcuts={SUBMIT_KEY}>
             {submitting ? PREDICTION_TEXT.submitting : PREDICTION_TEXT.submit}

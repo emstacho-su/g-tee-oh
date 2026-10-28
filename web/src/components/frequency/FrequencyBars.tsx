@@ -5,10 +5,9 @@
  * and every action's two shares, in the api's order (the largest gap first). The whole visual is
  * aria-hidden: FrequencyTable carries the same numbers for screen readers.
  */
+import { PERCENT_SCALE, formatPercent } from "../../progress/format.js";
 import type { FrequencyRow, HandFrequency, SpotFrequency } from "../../progress/frequency-model.js";
-import { percentText } from "../../progress/frequency-model.js";
 
-const PERCENT_SCALE = 100;
 const BAR_TRACK_CLASS = "h-2.5 flex-1 overflow-hidden rounded-full bg-surface-sunken";
 
 interface BarProps {
@@ -21,7 +20,7 @@ function Bar({ who, share, fillClass }: BarProps) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-24 shrink-0 tabular-nums">
-        {who} {percentText(share)}
+        {who} {formatPercent(share)}
       </span>
       <span className={BAR_TRACK_CLASS}>
         <span className={`block h-full rounded-full ${fillClass}`} style={{ width: `${Math.round(share * PERCENT_SCALE)}%` }} />
@@ -48,7 +47,7 @@ function HandRow({ hand, actions }: { hand: HandFrequency; actions: SpotFrequenc
           const { yours, solver } = shareAt(hand, position);
           return (
             <span key={action.index} className="tabular-nums">
-              {action.label}: you {percentText(yours)}, solver {percentText(solver)}
+              {action.label}: you {formatPercent(yours)}, solver {formatPercent(solver)}
             </span>
           );
         })}

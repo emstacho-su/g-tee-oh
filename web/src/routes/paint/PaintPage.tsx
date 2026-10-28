@@ -2,19 +2,22 @@
  * The /paint screen (S27 lane B, S41, R3.17, 05 section 8, O-300, O-302, O-351, O-415): range
  * painting by table, seat and spot.
  *
- * Mechanism: the address decides what shows. A full valid choice (config, position, spot, the
- * optional opener vs and seed, paint-search.ts) starts a catalog-spot range_paint session; an old
- * ?drill=<uuid> link starts a drill-backed one. Anything else shows the spot picker, filled from
- * the address's valid parts; Start painting writes the choice to the address. The start posts POST
- * /sessions under one Idempotency-Key per start attempt (O-232): a failed start shows a fixed
+ * Mechanism: the address only prefills; a session starts on the player's Start, never because a
+ * link was opened (PR #39 security LOW 2). An old ?drill=<uuid> link shows a start card naming the
+ * drill-backed painting session; anything else shows the spot picker, filled from the address's
+ * valid parts (a full valid choice: config, position, spot, the optional opener vs and seed,
+ * paint-search.ts). Start painting writes the choice to the address and arms the start for exactly
+ * that address, so another address goes back to the picker instead of starting. The start posts
+ * POST /sessions under one Idempotency-Key per start attempt (O-232): a failed start shows a fixed
  * sentence and Try again, which is a new attempt with a new key. Once the session exists,
  * PaintRun.tsx paints its prompts. Keying the start by the address starts afresh when it changes.
  */
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
+import { DrillStartCard } from "../../components/practice/DrillStartCard.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import { paintChoiceOf, paintSearchOf, partialPaintChoice, validatePaintSearch, type PaintChoice, type PaintSearch } from "../../practice/paint-search.js";
 import { useTrainerDeps } from "../../trainer/trainer-deps.js";
@@ -26,6 +29,8 @@ export const PAINT_PAGE_TEXT = {
   heading: "Range painting",
   starting: "Starting a range-painting session.",
   retry: "Try again",
+  drillTitle: "Paint a range from a saved drill",
+  drillBody: "This link opens range painting over a saved drill. Nothing starts until you press Start painting.",
 } as const;
 
 export interface PaintPageProps {
@@ -43,7 +48,10 @@ function sourceOf(search: PaintSearch): PaintSource | null {
   return choice === null ? null : { kind: "spot", choice };
 }
 
-/** Starts the session once on mount; Try again is a new attempt under a new Idempotency-Key. */
+/**
+ * Starts the session once on mount, which the page allows only after the player's Start; Try again
+ * is a new attempt under a new Idempotency-Key.
+ */
 function PaintStart({ source, seed }: PaintStartProps) {
   const api = useAppApi();
   const { newKey } = useTrainerDeps();
@@ -70,19 +78,35 @@ function PaintStart({ source, seed }: PaintStartProps) {
   return <LoadingNote text={PAINT_PAGE_TEXT.starting} />;
 }
 
+/** The start key of an address as the route will validate it, so a Start and its address agree. */
+function addressKey(search: PaintSearch): string | null {
+  const checked = validatePaintSearch({ ...search });
+  const source = sourceOf(checked);
+  return source === null ? null : `${JSON.stringify(source)}:${checked.seed ?? ""}`;
+}
+
 export function PaintPage({ search }: PaintPageProps) {
   const navigate = useNavigate();
   // The router merges the parent's unvalidated search into the child's, so check it again here.
   const checked = validatePaintSearch({ ...search });
   const source = sourceOf(checked);
-  const start = (choice: PaintChoice) => void navigate({ to: "/paint", search: paintSearchOf(choice, checked.seed) });
+  const currentKey = addressKey(checked);
+  const [armed, setArmed] = useState<string | null>(null);
+  const start = (choice: PaintChoice) => {
+    const next = paintSearchOf(choice, checked.seed);
+    setArmed(addressKey(next));
+    void navigate({ to: "/paint", search: next });
+  };
+  const running = source !== null && currentKey !== null && currentKey === armed;
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={PAINT_PAGE_TEXT.heading} description={PICKER_TEXT.goal} />
-      {source === null ? (
-        <SpotPicker key={JSON.stringify(checked)} initial={partialPaintChoice(checked)} onStart={start} />
+      {running ? (
+        <PaintStart key={currentKey} source={source} seed={checked.seed} />
+      ) : source?.kind === "drill" ? (
+        <DrillStartCard title={PAINT_PAGE_TEXT.drillTitle} body={PAINT_PAGE_TEXT.drillBody} startLabel={PICKER_TEXT.start} onStart={() => setArmed(currentKey)} />
       ) : (
-        <PaintStart key={`${JSON.stringify(source)}:${checked.seed ?? ""}`} source={source} seed={checked.seed} />
+        <SpotPicker key={JSON.stringify(checked)} initial={partialPaintChoice(checked)} onStart={start} />
       )}
     </section>
   );

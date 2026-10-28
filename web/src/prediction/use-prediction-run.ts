@@ -4,17 +4,22 @@
  * Mechanism: on mount the hook starts a prediction session over its source, an old drill link or
  * the start screen's catalog choice (POST /sessions with mode prediction, the optional seed and one
  * Idempotency-Key kept for the life of the screen, so a repeated start replays instead of opening a
- * second session). The prompt is read through predictionPromptQuery at a local cursor; the answer
- * being composed and its typed reason are held per prompt id (draft.ts), so leaving to review an
- * earlier answer and coming back finds them intact. Submit needs a complete answer and a reason of
- * 3 characters after trimming, and posts both with the prompt's id and state_version and an
- * Idempotency-Key kept per prompt, so a retry of the same answer is recorded once. Each result is
- * appended to the answered list (answered.ts: the prompt as shown, the draft, the reason and the
- * result, newest last, at most 50), which lives only in this hook's state: unmounting the run (End
- * quiz, a sign-out, another address) drops it. The result stays on screen until Next, which moves
- * the cursor. A 409 stale-state answer moves the cursor too, so the current prompt is read again,
- * and a notice says so; every other failure is kept for the screen to show as fixed text.
+ * second session). The page mounts the run only after the player presses Start (PR #39 security
+ * LOW 2), never because a link was opened. The prompt is read through predictionPromptQuery at a
+ * local cursor; the answer being composed and its typed reason are held per prompt id (draft.ts),
+ * so leaving to review an earlier answer and coming back finds them intact. Submit needs a complete
+ * answer and a reason the shared rule accepts (rationaleReady from @g-tee-oh/contracts, the api's
+ * own rule, PR #39 review finding 3), and posts both with the prompt's id and state_version and an
+ * Idempotency-Key kept per prompt, so a retry of the same answer is recorded once. A 400 that names
+ * body.rationale is reported apart (reasonRefused) and cleared by the next edit of the reason.
+ * Each result is appended to the answered list (answered.ts: the prompt as shown, the draft, the
+ * reason and the result, newest last, at most 50), which lives only in this hook's state:
+ * unmounting the run (End quiz, a sign-out, another address) drops it. The result stays on screen
+ * until Next, which moves the cursor. A 409 stale-state answer moves the cursor too, so the current
+ * prompt is read again, and a notice says so; every other failure is kept for the screen to show
+ * as fixed text.
  */
+import { rationaleReady } from "@g-tee-oh/contracts";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -24,7 +29,8 @@ import type { PredictionPrompt, PredictionResult } from "../contracts.js";
 import { useTrainerDeps } from "../trainer/trainer-deps.js";
 import { appendAnswered, type AnsweredItem } from "./answered.js";
 import { answerPrediction, predictionPromptQuery, startPredictionSession, type PredictionSource } from "./api.js";
-import { emptyDraft, reasonReady, toAnswer, type AnswerDraft } from "./draft.js";
+import { emptyDraft, toAnswer, type AnswerDraft } from "./draft.js";
+import { isRationaleRefused } from "./labels.js";
 
 const STALE_SLUG = "stale-state";
 
@@ -43,6 +49,8 @@ export interface PredictionRun {
   reason: string;
   setReason: (reason: string) => void;
   canSubmit: boolean;
+  /** The last answer was refused for its reason (a 400 naming body.rationale). */
+  reasonRefused: boolean;
   submitting: boolean;
   submit: () => void;
   result: PredictionResult | undefined;
@@ -136,7 +144,8 @@ export function usePredictionRun(input: PredictionRunInput): PredictionRun {
   const mine = prompt !== undefined && held?.promptId === prompt.prompt_id ? held : null;
   const draft = prompt === undefined ? null : (mine?.draft ?? emptyDraft(prompt.answer_kind));
   const reason = mine?.reason ?? "";
-  const complete = draft !== null && toAnswer(draft) !== null && reasonReady(reason);
+  const complete = draft !== null && toAnswer(draft) !== null && rationaleReady(reason);
+  const reasonRefused = isRationaleRefused(answer.error);
   const result = answer.data !== undefined && answer.data.prompt_id === prompt?.prompt_id ? answer.data : undefined;
   const canSubmit = complete && !answer.isPending && result === undefined;
   const { reset } = answer;
@@ -157,8 +166,12 @@ export function usePredictionRun(input: PredictionRunInput): PredictionRun {
     draft,
     setDraft: (value) => hold({ draft: value }),
     reason,
-    setReason: (value) => hold({ reason: value }),
+    setReason: (value) => {
+      if (reasonRefused) reset();
+      hold({ reason: value });
+    },
     canSubmit,
+    reasonRefused,
     submitting: answer.isPending,
     submit: () => {
       if (prompt === undefined || draft === null || !canSubmit) return;
@@ -169,6 +182,6 @@ export function usePredictionRun(input: PredictionRunInput): PredictionRun {
     next,
     answered,
     staleNotice,
-    error: start.error ?? promptQuery.error ?? (isStale(answer.error) ? null : answer.error),
+    error: start.error ?? promptQuery.error ?? (isStale(answer.error) || reasonRefused ? null : answer.error),
   };
 }

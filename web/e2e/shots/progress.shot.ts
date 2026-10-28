@@ -8,8 +8,10 @@
  * map with the tooltip of a focused cell, the holdout card with its Goodhart flag and (S41, O-353)
  * the frequency card; the fresh learner's run adds the frequency card's empty state; since S36 the
  * tables are screen-reader only (O-347) and not shot. A second test per theme and width captures
- * the fresh learner's /progress (createAppMockApi learner "fresh") for the empty states. afterAll merges the records into the manifest;
- * each record's criterion names what it proves.
+ * the fresh learner's /progress (createAppMockApi learner "fresh") for the empty states. afterAll
+ * merges the records into the manifest: the screens S41 changed (progress-page,
+ * progress-frequencies, progress-frequencies-empty) under session S41, the rest under S36. Each
+ * record's criterion names what it proves.
  */
 import { mkdirSync } from "node:fs";
 
@@ -24,6 +26,7 @@ import { submitLogin } from "../support/sign-in-flow.js";
 
 const OUT_DIR = shotDirectory();
 const SESSION = "S36";
+const S41_SESSION = "S41";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 /** A practiced, due class in the middle of the grid, so its tooltip sits inside the card. */
@@ -42,11 +45,15 @@ const CRITERIA = {
   frequenciesEmpty: "R4.12 frequency card with no spot yet: how many preflop decisions at one spot fill it (O-417)",
 } as const;
 
+/** The screens S41 changed are filed under S41; S36's other progress shots stay under S36. */
+const S41_SCREENS: ReadonlySet<string> = new Set(["progress-frequencies", "progress-frequencies-empty", "progress-page"]);
 const records: ShotRecord[] = [];
+const s41Records: ShotRecord[] = [];
 
 function shooter(page: Page, theme: Theme, viewport: Viewport) {
   return async (screen: string, criterion: string, target: Parameters<typeof capture>[0] = page) => {
-    records.push(await capture(target, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE }));
+    const record = await capture(target, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE });
+    (S41_SCREENS.has(screen) ? s41Records : records).push(record);
   };
 }
 
@@ -101,6 +108,7 @@ test.beforeAll(() => {
 
 test.afterAll(() => {
   mergeShotManifest(OUT_DIR, SESSION, records);
+  mergeShotManifest(OUT_DIR, S41_SESSION, s41Records);
 });
 
 for (const theme of THEMES) {

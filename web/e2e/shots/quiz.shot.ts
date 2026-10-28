@@ -9,7 +9,9 @@
  * opens /quiz and fills the start screen (BB, Facing an open, both question kinds, Easy), then
  * walks the Easy quiz: the range yes or no prompt, its result with the passed mark, the hand action
  * prompt with its reason typed, its result and Previous's read-only review, and End quiz. It then
- * opens a Medium and a Hard quiz by address for the other four answer kinds. afterAll merges the
+ * opens a Medium and a Hard quiz by address for the other four answer kinds (an address only fills
+ * the start screen, so each presses Start quiz, PR #39 security LOW 2), and a Hard quiz on hand
+ * questions only, which the mocked api answers with no-quiz-questions. afterAll merges the
  * records into the shared manifest with session S41 and source mock.
  */
 import { mkdirSync } from "node:fs";
@@ -29,7 +31,7 @@ const SESSION = "S41";
 const SUBMIT = "Submit answer";
 const NEXT = "Next question";
 const REASON_LABEL = "Your reason (required)";
-const QUIZ_ADDRESS = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&kinds=range,hand&difficulty=";
+const QUIZ_ADDRESS = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&";
 
 const CRITERIA = {
   start:
@@ -38,10 +40,12 @@ const CRITERIA = {
   handAction: "R3.16 Easy hand question: the highest-EV action as the node's tree actions with swatches, a reason typed with its live count (O-379, O-412, ADR 0020)",
   rangePercent: "R3.16 Medium range question: the share to the nearest 5 percent in a number field (O-301, O-410)",
   handBand: "R3.16 Medium hand question: the frequency band of the hand's most frequent action (O-301, O-410)",
-  rangeRegions: "R3.16 Hard range question: which named hand regions hold a mixed class, as checkboxes (O-301, O-410)",
+  rangeRegions: "R3.16 Hard range question: which named hand regions hold a mixed class, as checkboxes, with Hard named beside the level badge (O-301, O-410)",
   handSize: "R3.16 Hard hand question: the raise size played most, over the aggressive actions only (O-301, O-410)",
   result: "R3.16 quiz result: correct as word and symbol, the solver's answer, Passed Easy at this spot, the window count, no unlock wording, unrated (O-410)",
   previous: "R3.16 Previous: a read-only review of an earlier answer with its reason as text and its reveal, Previous, Newer and Back to current question (O-414)",
+  noQuestions:
+    "R3.16 no question left: a Hard quiz on hand questions only says No more Hard hand questions in these spots, in its own words, with End quiz and Back to the start screen (O-411 amended)",
 } as const;
 
 const records: ShotRecord[] = [];
@@ -59,6 +63,14 @@ async function submitAndNext(page: Page, reason: string): Promise<void> {
   await page.getByRole("button", { name: SUBMIT }).click();
   await expect(page.getByTestId("prediction-result")).toBeVisible();
   await page.getByRole("button", { name: NEXT }).click();
+}
+
+/** Opens a quiz address, which only fills the start screen (PR #39 security LOW 2), and presses Start quiz. */
+async function startByAddress(page: Page, choice: string): Promise<void> {
+  await page.goto(`${QUIZ_ADDRESS}${choice}`);
+  const start = page.getByRole("button", { name: "Start quiz" });
+  await expect(start).toBeEnabled();
+  await start.click();
 }
 
 async function fillStart(page: Page): Promise<void> {
@@ -111,7 +123,7 @@ async function quizScreens(page: Page, theme: Theme, viewport: Viewport): Promis
 
   await easyQuiz(page, shot);
 
-  await page.goto(`${QUIZ_ADDRESS}medium`);
+  await startByAddress(page, "kinds=range,hand&difficulty=medium");
   await showsQuestion(page, "percent");
   await shot("quiz-range-percent", CRITERIA.rangePercent);
   await page.getByRole("spinbutton").fill("40");
@@ -119,12 +131,18 @@ async function quizScreens(page: Page, theme: Theme, viewport: Viewport): Promis
   await showsQuestion(page, "band");
   await shot("quiz-hand-band", CRITERIA.handBand);
 
-  await page.goto(`${QUIZ_ADDRESS}hard`);
+  await startByAddress(page, "kinds=range,hand&difficulty=hard");
   await showsQuestion(page, "regions");
+  await expect(page.getByTestId("difficulty-badge")).toHaveText("Hard");
   await shot("quiz-range-regions", CRITERIA.rangeRegions);
   await submitAndNext(page, "Pairs and suited hands mix the most.");
   await showsQuestion(page, "size");
   await shot("quiz-hand-size", CRITERIA.handSize);
+
+  // The mocked api has no Hard hand question in these spots (mock-quiz.ts), so the start answers 422.
+  await startByAddress(page, "kinds=hand&difficulty=hard");
+  await expect(page.getByTestId("no-quiz-questions")).toBeVisible();
+  await shot("quiz-no-questions", CRITERIA.noQuestions);
 }
 
 test.beforeAll(() => {

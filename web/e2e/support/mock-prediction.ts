@@ -15,7 +15,7 @@
  * token, as the api does (O-230). GET next is pure: prompt n is the session's prompt n modulo its
  * list, with the session's id, version and a prompt id of its own. An answer must carry the current
  * prompt id and state version (409 stale-state otherwise), the prompt's answer kind (400 otherwise)
- * and a reason the api accepts (400, mock-quiz.ts rationaleProblem), all checked before anything is
+ * and a reason the api accepts (400 naming body.rationale, mock-quiz.ts rationaleProblem), all checked before anything is
  * recorded; it is judged against the fixture truth (the result carries level_passed), advances the
  * counter and the version, and a repeat with the same Idempotency-Key replays the first reply
  * (O-232). An ended session answers 409 session-ended to next and answer.
@@ -26,7 +26,7 @@ import { fixturePaintDrills } from "../../src/fixtures/paint.js";
 import { fixtureDrillList, fixturePredictionResult, fixturePredictionSession, type FixturePrediction } from "../../src/fixtures/prediction.js";
 import type { PredictionAnswer } from "../../src/prediction/types.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
-import { SHORT_REASON_DETAIL, rationaleProblem, recapFor, startEntries } from "./mock-quiz.js";
+import { REASON_FIELD_ERRORS, SHORT_REASON_DETAIL, rationaleProblem, recapFor, startEntries } from "./mock-quiz.js";
 
 const STATUS = { ok: 200, created: 201 } as const;
 const PROBLEMS = {
@@ -118,20 +118,27 @@ function isAnswerFor(prompt: PredictionPrompt, answer: unknown): answer is Predi
   }
 }
 
-/** A refused reason, with the api's fixed detail on the short-reason problem. */
+/** A refused reason: its problem names body.rationale, with the api's fixed detail on the short-reason one. */
 function reasonRefusal(spec: ProblemSpec, path: string): MockResponse {
   const base = problem(spec, path);
-  return spec.slug === "bad-request" ? { ...base, body: { ...(base.body as object), detail: SHORT_REASON_DETAIL } } : base;
+  const detail = spec.slug === "bad-request" ? { detail: SHORT_REASON_DETAIL } : {};
+  return { ...base, body: { ...(base.body as object), ...detail, errors: REASON_FIELD_ERRORS } };
+}
+
+interface AnswerRefusal {
+  readonly spec: ProblemSpec;
+  /** The reason is what was refused. */
+  readonly reason: boolean;
 }
 
 /** The problem an answer body earns before anything is recorded, or null. */
-function answerProblem(session: MockPredictionSession, body: unknown): ProblemSpec | null {
+function answerProblem(session: MockPredictionSession, body: unknown): AnswerRefusal | null {
   const prompt = mockPromptOf(session);
-  if (!isRecord(body) || typeof body["prompt_id"] !== "string" || typeof body["state_version"] !== "number") return PROBLEMS.validation;
+  if (!isRecord(body) || typeof body["prompt_id"] !== "string" || typeof body["state_version"] !== "number") return { spec: PROBLEMS.validation, reason: false };
   const reason = rationaleProblem(body["rationale"]);
-  if (reason !== null) return reason;
-  if (body["state_version"] !== session.version || body["prompt_id"] !== prompt.prompt_id) return PROBLEMS.stale;
-  return isAnswerFor(prompt, body["answer"]) ? null : PROBLEMS.validation;
+  if (reason !== null) return { spec: reason, reason: true };
+  if (body["state_version"] !== session.version || body["prompt_id"] !== prompt.prompt_id) return { spec: PROBLEMS.stale, reason: false };
+  return isAnswerFor(prompt, body["answer"]) ? null : { spec: PROBLEMS.validation, reason: false };
 }
 
 /** A fresh set of prediction routes with their own state. */
@@ -160,7 +167,7 @@ export function createMockPredictionRoute(): MockRoute {
     const replay = key === undefined ? undefined : session.replies.get(key);
     if (replay !== undefined) return replay;
     const refused = answerProblem(session, request.body);
-    if (refused !== null) return reasonRefusal(refused, request.path);
+    if (refused !== null) return refused.reason ? reasonRefusal(refused.spec, request.path) : problem(refused.spec, request.path);
     const body = request.body as { answer: PredictionAnswer };
     const prompt = mockPromptOf(session);
     const result = { ...fixturePredictionResult(entryAt(session), body.answer, session.version), prompt_id: prompt.prompt_id };

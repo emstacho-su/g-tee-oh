@@ -2,10 +2,13 @@
  * The quiz's fixed text (S27 lane A, S41, R3.16, O-301, O-410, O-412, O-414, A7 section 4):
  * headings, the level badge, the names of the hand regions and frequency bands, the result wording
  * and one fixed message per problem kind. A failure is always shown through problemText, so a
- * server detail never reaches the screen. Nothing here names a rating, score or grade label:
+ * server detail never reaches the screen. Two problems have their own words: a 400 naming
+ * body.rationale is the reason's fault (shown beside the reason field, PR #39 review finding 3), and
+ * a 422 no-quiz-questions is told from the quiz's own choices (quiz-text.ts noQuestionsText). Nothing here names a rating, score or grade label:
  * questions are unrated (05 section 8). The start screen's words live in quiz-text.ts.
  */
 import { HTTP_STATUS, isApiProblem } from "../api/index.js";
+import { fieldErrorsOfFailure } from "../drills/problem.js";
 import type { FrequencyBand, HandRegion, PredictionLadder } from "./types.js";
 
 export const PREDICTION_SCOPE = "Quiz";
@@ -33,7 +36,9 @@ export const PREDICTION_TEXT = {
   bandLegend: "Frequency band",
   answerLegend: "Your answer",
   reasonLabel: "Your reason (required)",
-  reasonHint: "Say why, in at least 3 characters. It is kept with your answer.",
+  reasonHint: "Say why, in at least 3 letters, numbers or punctuation marks. It is kept with your answer.",
+  reasonRefused: "Your reason was not accepted: type at least 3 letters, numbers or punctuation marks.",
+  backToStart: "Back to the start screen",
   correct: "Correct",
   incorrect: "Not this time",
   unlocked: "Next level unlocked",
@@ -79,9 +84,14 @@ export function unlockedText(ladder: PredictionLadder, level: number): string {
   return `${PREDICTION_TEXT.unlocked}: ${levelBadge(ladder, level)}`;
 }
 
+/** "Medium" for level 2: a quiz's difficulty is the level it asks (O-410). */
+export function difficultyName(level: number): string {
+  return DIFFICULTY_NAMES[level - 1] ?? DIFFICULTY_NAMES[0] ?? "";
+}
+
 /** "Passed Medium at this spot": the difficulty of the level the answer was given at (O-410). */
 export function passedText(level: number): string {
-  return `Passed ${DIFFICULTY_NAMES[level - 1] ?? DIFFICULTY_NAMES[0]} at this spot`;
+  return `Passed ${difficultyName(level)} at this spot`;
 }
 
 /** "Last 20 at this level: 18 correct of 20 (90 percent ...)": what the window does for this run. */
@@ -90,11 +100,15 @@ export function windowText(window: { answers: number; correct: number; size: num
   return `Last ${window.size} at this level: ${window.correct} correct of ${window.answers} (${window.required_pct} percent ${meaning})`;
 }
 
+/** The api's 422 when a quiz's spots cannot ask its difficulty on its chosen kinds (O-411 amended). */
+export const NO_QUIZ_QUESTIONS_SLUG = "no-quiz-questions";
+
 const PROBLEM_TEXT = {
   notFound: "This quiz or its drill was not found. Start a new quiz.",
   ended: "This session has ended. Start a new quiz.",
   wrongMode: "This session is not a prediction session. Start a new quiz.",
   noCoverage: "The library has no solved spot for these choices yet. They were queued for the builder.",
+  noQuestions: "No more questions in these spots; try more spot types or another difficulty.",
   signedOut: "Your session expired. Sign in again.",
   unavailable: "The solver service did not answer. Try again in a moment.",
   invalid: "That answer could not be read. Check it and submit again.",
@@ -105,6 +119,7 @@ const SLUG_TEXT: Readonly<Record<string, string>> = {
   "session-ended": PROBLEM_TEXT.ended,
   "wrong-session-mode": PROBLEM_TEXT.wrongMode,
   "no-coverage": PROBLEM_TEXT.noCoverage,
+  [NO_QUIZ_QUESTIONS_SLUG]: PROBLEM_TEXT.noQuestions,
 };
 
 const STATUS_TEXT: Readonly<Record<number, string>> = {
@@ -114,6 +129,19 @@ const STATUS_TEXT: Readonly<Record<number, string>> = {
   [HTTP_STATUS.badGateway]: PROBLEM_TEXT.unavailable,
   [HTTP_STATUS.unavailable]: PROBLEM_TEXT.unavailable,
 };
+
+/** True for the api's 422 when the quiz's spots have no question left at its difficulty (O-411 amended). */
+export function isNoQuizQuestions(error: unknown): boolean {
+  return isApiProblem(error) && error.status === HTTP_STATUS.unprocessable && error.slug === NO_QUIZ_QUESTIONS_SLUG;
+}
+
+/** The body path the api names when it refuses the answer's reason (PR #39 review finding 3). */
+const RATIONALE_PATH = "body.rationale";
+
+/** True for a 400 whose problem names the reason among its field errors. */
+export function isRationaleRefused(error: unknown): boolean {
+  return isApiProblem(error) && error.status === HTTP_STATUS.badRequest && fieldErrorsOfFailure(error).some((entry) => entry.path === RATIONALE_PATH);
+}
 
 /** The fixed message for a failed request: by problem slug, then by status; never the server's detail. */
 export function problemText(error: unknown): string {

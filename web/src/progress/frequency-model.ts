@@ -5,15 +5,14 @@
  * Mechanism: a spot is named only from the response's fields (the hero seat, the action family in
  * words, the pair and the configuration), never by reading node_key or spot_class_key, which are
  * opaque. When the configuration list is loaded the configuration takes its label (settings'
- * configLabel), else its id; two spots that would share a name are numbered. Shares are the api's
- * 0 to 1 fractions written as whole percents. The gap of a row is its largest difference between
- * your share and the solver's; the api already sorts the hand rows by it, so the card keeps the
- * api's order and the gap is only read, never used to reorder.
+ * configLabel), else its id; two spots that would share a name are numbered. A spot is keyed by
+ * its solution and node (spotKey), since a rebuilt node keeps its node_key under a new solution
+ * (PR #39 review finding 6). The api already sorts the hand rows by their largest gap, so the card
+ * keeps the api's order; shares are written with the progress format's formatPercent.
  */
 import type { ApiComponents } from "@g-tee-oh/contracts";
 
 import { configLabel } from "../routes/settings/configs-query.js";
-import { formatPercent } from "./format.js";
 import type { GameConfig } from "./types.js";
 
 type Schemas = ApiComponents["schemas"];
@@ -41,6 +40,8 @@ const FAMILY_WORDS: Readonly<Record<string, string>> = {
 };
 const UNKNOWN_FAMILY = "preflop spot";
 const FIRST_DUPLICATE_NUMBER = 2;
+/** A solution id is a uuid, so this never occurs inside one. */
+const SPOT_KEY_SEPARATOR = "|";
 
 export function familyWords(family: string | null): string {
   return family === null ? UNKNOWN_FAMILY : (FAMILY_WORDS[family] ?? UNKNOWN_FAMILY);
@@ -52,24 +53,22 @@ function spotName(spot: SpotFrequency, configs: readonly GameConfig[] | undefine
   return `${spot.hero_position} ${familyWords(spot.action_family)} (${spot.pair}), ${table}`;
 }
 
+/**
+ * A spot's identity: its solution and its node (PR #39 review finding 6). A rebuilt node keeps its
+ * node_key under a new solution, so the node_key alone can name two spots.
+ */
+export function spotKey(spot: Pick<SpotFrequency, "solution_id" | "node_key">): string {
+  return `${spot.solution_id}${SPOT_KEY_SEPARATOR}${spot.node_key}`;
+}
+
 /** One select option per spot, in the api's order, every label distinct. */
 export function spotOptions(spots: readonly SpotFrequency[], configs: readonly GameConfig[] | undefined): SpotOption[] {
   const names = spots.map((spot) => spotName(spot, configs));
   return spots.map((spot, index) => {
     const name = names[index] ?? spot.node_key;
     const earlier = names.slice(0, index).filter((other) => other === name).length;
-    return { value: spot.node_key, label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})` };
+    return { value: spotKey(spot), label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})` };
   });
-}
-
-/** "38%" from 0.384. */
-export function percentText(share: number): string {
-  return formatPercent(share);
-}
-
-/** The largest difference between your share and the solver's over a row's actions. */
-export function largestGap(row: FrequencyRow): number {
-  return row.your_freq.reduce((largest, yours, index) => Math.max(largest, Math.abs(yours - (row.solver_freq[index] ?? 0))), 0);
 }
 
 /** "12 of 30 decisions at this spot". */

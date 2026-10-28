@@ -7,12 +7,16 @@
  *   shared catalog check (mock-catalog-spot.ts) and carry valid quiz options (a known difficulty,
  *   one or two distinct question kinds); its prompts are the fixture prompts at the difficulty's
  *   level (Easy 1, Medium 2, Hard 3) on the chosen ladders, alternating in fixture order. Quiz
- *   options on a drill start are refused, as the api refuses them.
+ *   options on a drill start are refused, as the api refuses them. A Hard quiz on hand questions
+ *   only is a 422 no-quiz-questions (O-411 amended), so a shot can show that answer.
  * - rationaleProblem: the answer's reason as the api checks it, the schema first (a string of 1 to
- *   1,000 characters after trimming, else 400 validation), then the cleaned length (under 3 is a
- *   400 bad-request with the api's fixed detail).
+ *   1,000 characters after trimming, else 400 validation), then the shared rule (rationaleReady
+ *   from @g-tee-oh/contracts, else a 400 bad-request with the api's fixed detail). Either refusal
+ *   names body.rationale in the problem's errors (REASON_FIELD_ERRORS, PR #39 review finding 3).
  * - recapFor: the recap of an ended quiz, which records nothing rated.
  */
+import { RATIONALE_MAX_CHARS, rationaleReady } from "@g-tee-oh/contracts";
+
 import type { SessionRecap } from "../../src/progress/types.js";
 import { FIXTURE_PREDICTION_DRILL_ID, fixturePredictions, type FixturePrediction } from "../../src/fixtures/prediction.js";
 import { CATALOG_PROBLEMS, catalogSpotProblem } from "./mock-catalog-spot.js";
@@ -22,11 +26,15 @@ export const QUIZ_PROBLEMS = {
   validation: CATALOG_PROBLEMS.validation,
   badRequest: { status: 400, slug: "bad-request", title: "Bad request" },
   notFound: { status: 404, slug: "not-found", title: "Not found" },
+  noQuestions: { status: 422, slug: "no-quiz-questions", title: "No questions at this difficulty in these spots" },
 } as const satisfies Readonly<Record<string, ProblemSpec>>;
 
 export const SHORT_REASON_DETAIL = "Type a reason of at least 3 characters.";
-const REASON_MIN_CHARS = 3;
-const REASON_MAX_CHARS = 1000;
+const REASON_PATH = "body.rationale";
+const REASON_MESSAGE = "The reason was not accepted";
+/** The quiz the mock has no question for, so a shot can show no-quiz-questions: Hard on hand questions only. */
+const NO_QUESTIONS_DIFFICULTY = "hard";
+const NO_QUESTIONS_KINDS: readonly string[] = ["hand"];
 const DIFFICULTY_LEVELS: Readonly<Record<string, number>> = { easy: 1, medium: 2, hard: 3 };
 const KINDS: readonly string[] = ["range", "hand"];
 const SEED_PATTERN = /^[0-9a-f]{16}$/;
@@ -55,16 +63,26 @@ export function startEntries(body: Record<string, unknown>): readonly FixturePre
   }
   const entries = body["quiz"] === undefined ? fixturePredictions : quizEntries(body["quiz"]);
   if (entries === null) return QUIZ_PROBLEMS.validation;
-  return catalogSpotProblem(body) ?? entries;
+  return catalogSpotProblem(body) ?? (asksNothing(body["quiz"]) ? QUIZ_PROBLEMS.noQuestions : entries);
+}
+
+/** True for the one quiz the mock answers no-quiz-questions to (O-411 amended): Hard, hand questions only. */
+function asksNothing(quiz: unknown): boolean {
+  if (!isRecord(quiz) || quiz["difficulty"] !== NO_QUESTIONS_DIFFICULTY) return false;
+  const kinds = quiz["question_kinds"];
+  return Array.isArray(kinds) && kinds.length === NO_QUESTIONS_KINDS.length && kinds.every((kind) => NO_QUESTIONS_KINDS.includes(String(kind)));
 }
 
 /** The problem a reason earns as the api checks it, or null when it is accepted. */
 export function rationaleProblem(rationale: unknown): ProblemSpec | null {
   if (typeof rationale !== "string") return QUIZ_PROBLEMS.validation;
   const trimmed = rationale.trim();
-  if (trimmed.length === 0 || trimmed.length > REASON_MAX_CHARS) return QUIZ_PROBLEMS.validation;
-  return trimmed.replace(/\s+/g, " ").length < REASON_MIN_CHARS ? QUIZ_PROBLEMS.badRequest : null;
+  if (trimmed.length === 0 || trimmed.length > RATIONALE_MAX_CHARS) return QUIZ_PROBLEMS.validation;
+  return rationaleReady(trimmed) ? null : QUIZ_PROBLEMS.badRequest;
 }
+
+/** The field errors a refused reason carries, naming body.rationale as the api does. */
+export const REASON_FIELD_ERRORS: readonly { path: string; message: string }[] = [{ path: REASON_PATH, message: REASON_MESSAGE }];
 
 export function recapFor(sessionId: string): SessionRecap {
   return {

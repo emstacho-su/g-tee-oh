@@ -3,8 +3,8 @@
  * with the same numbers as the bars and hand rows. One row for all hands pooled, then one per hand
  * class in the api's order; one column per action holding "your share, the solver's share".
  */
+import { formatPercent } from "../../progress/format.js";
 import type { FrequencyRow, SpotFrequency } from "../../progress/frequency-model.js";
-import { percentText } from "../../progress/frequency-model.js";
 
 export interface FrequencyTableProps {
   spot: SpotFrequency;
@@ -19,7 +19,7 @@ function Cells({ row, count }: { row: FrequencyRow; count: number }) {
     <>
       {Array.from({ length: count }, (_, index) => (
         <td key={index}>
-          {percentText(row.your_freq[index] ?? 0)}, {percentText(row.solver_freq[index] ?? 0)}
+          {formatPercent(row.your_freq[index] ?? 0)}, {formatPercent(row.solver_freq[index] ?? 0)}
         </td>
       ))}
     </>

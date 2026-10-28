@@ -16,12 +16,16 @@ const MIN_SPOT_DECISIONS = 30;
 const MIN_HAND_DECISIONS = 10;
 const CONFIG_ID = "cfg_6_online_100";
 const PAIR = "BB-BTN";
+/** Each spot names the solution it was graded on (PR #39 review finding 6); synthetic ids. */
+const FACING_OPEN_SOLUTION_ID = "00000000-0000-4000-8000-0000000f0001";
+const OPEN_SOLUTION_ID = "00000000-0000-4000-8000-0000000f0002";
 
 export const fixtureFrequencies: FrequencyComparison = {
   min_spot_decisions: MIN_SPOT_DECISIONS,
   min_hand_decisions: MIN_HAND_DECISIONS,
   spots: [
     {
+      solution_id: FACING_OPEN_SOLUTION_ID,
       node_key: `${CONFIG_ID}/${PAIR}/r250`,
       spot_class_key: "preflop/online/100/facing-open/BB-BTN",
       config_id: CONFIG_ID,
@@ -41,6 +45,7 @@ export const fixtureFrequencies: FrequencyComparison = {
       ],
     },
     {
+      solution_id: OPEN_SOLUTION_ID,
       node_key: `${CONFIG_ID}/${PAIR}/`,
       spot_class_key: "preflop/online/100/rfi/BB-BTN",
       config_id: CONFIG_ID,

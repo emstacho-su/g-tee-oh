@@ -6,7 +6,8 @@
  * (ADR 0004). A select on the shared field class picks one of the most played preflop spots, each
  * named from the response's fields (frequency-model.ts), with the configuration's label once the
  * configuration list is loaded (settings' allConfigsQuery; until then, or if it fails, the id).
- * A spot below the minimum sample shows only "n of 30 decisions at this spot" (the minimum is the
+ * Each spot is keyed by its solution and node (spotKey, PR #39 review finding 6), so a rebuilt node
+ * with the same node_key stays its own option. A spot below the minimum sample shows only "n of 30 decisions at this spot" (the minimum is the
  * response's min_spot_decisions); a spot at or above it shows paired bars per action and the hand
  * rows (FrequencyBars, aria-hidden) and the same numbers in a screen-reader table (FrequencyTable).
  * With no spot the card says how to fill it.
@@ -15,7 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
-import { sampleText, spotOptions, type FrequencyComparison } from "../../progress/frequency-model.js";
+import { sampleText, spotKey, spotOptions, type FrequencyComparison } from "../../progress/frequency-model.js";
 import { allConfigsQuery } from "../../routes/settings/configs-query.js";
 import { Card, FIELD_CLASS, cn } from "../ui/index.js";
 import { FrequencyBars } from "./FrequencyBars.js";
@@ -40,8 +41,9 @@ export function FrequencyCard({ comparison }: FrequencyCardProps) {
   const configs = useQuery(allConfigsQuery(api));
   const options = spotOptions(comparison.spots, configs.data);
   const [chosen, setChosen] = useState<string | null>(null);
-  const spot = comparison.spots.find((entry) => entry.node_key === chosen) ?? comparison.spots[0];
-  const label = options.find((option) => option.value === spot?.node_key)?.label ?? "";
+  const spot = comparison.spots.find((entry) => spotKey(entry) === chosen) ?? comparison.spots[0];
+  const chosenKey = spot === undefined ? "" : spotKey(spot);
+  const label = options.find((option) => option.value === chosenKey)?.label ?? "";
 
   return (
     <Card title={FREQUENCY_TEXT.title} description={FREQUENCY_TEXT.description} testId={FREQUENCY_CARD_TEST_ID}>
@@ -55,7 +57,7 @@ export function FrequencyCard({ comparison }: FrequencyCardProps) {
             </label>
             <select
               id={selectId}
-              value={spot.node_key}
+              value={chosenKey}
               onChange={(event) => setChosen(event.target.value)}
               className={cn(FIELD_CLASS, "h-10 max-w-full px-2 text-sm sm:max-w-xl")}
             >

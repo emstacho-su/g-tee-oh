@@ -17,6 +17,8 @@ export interface ReviewCardProps {
   index: number;
   count: number;
   flavor: RunFlavor;
+  /** The quiz's difficulty name, as on the current question; absent for a drill-backed run. */
+  difficulty?: string;
   onOlder: () => void;
   onNewer: () => void;
   onBack: () => void;
@@ -24,7 +26,7 @@ export interface ReviewCardProps {
 
 const ignore = (): void => undefined;
 
-export function ReviewCard({ item, index, count, flavor, onOlder, onNewer, onBack }: ReviewCardProps) {
+export function ReviewCard({ item, index, count, flavor, difficulty, onOlder, onNewer, onBack }: ReviewCardProps) {
   return (
     <div className="flex flex-col gap-4">
       <nav aria-label="Earlier answers" className="flex flex-wrap items-center gap-2">
@@ -48,6 +50,7 @@ export function ReviewCard({ item, index, count, flavor, onOlder, onNewer, onBac
           reason={item.reason}
           answered
           readOnly
+          {...(difficulty === undefined ? {} : { difficulty })}
           canSubmit={false}
           submitting={false}
           onDraft={ignore}
