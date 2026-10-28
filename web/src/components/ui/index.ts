@@ -6,4 +6,7 @@ export type { DialogProps } from "./Dialog.js";
 export { ToggleGroup } from "./ToggleGroup.js";
 export type { ToggleGroupProps, ToggleOption } from "./ToggleGroup.js";
 export { cn } from "./cn.js";
+export { LoadingNote } from "./LoadingNote.js";
+export type { LoadingNoteProps } from "./LoadingNote.js";
+export { SyntheticBanner, SYNTHETIC_TEXT } from "./SyntheticBanner.js";
 export { VisuallyHidden } from "@radix-ui/react-visually-hidden";

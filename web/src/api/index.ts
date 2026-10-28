@@ -6,5 +6,7 @@ export type { CsrfFetchOptions, FetchFn } from "./csrf-fetch.js";
 export { createCsrfTokenHolder } from "./csrf-token.js";
 export type { CsrfTokenHolder } from "./csrf-token.js";
 export { API_PATHS, CSRF_HEADER } from "./paths.js";
+export { HTTP_STATUS } from "./http-status.js";
+export { HAND_NOT_IN_RANGE_SLUG, isHandNotInRange } from "./problem-kinds.js";
 export { ApiProblem, isApiProblem, PROBLEM_SLUG, problemFromBody, problemFromResponse } from "./problem.js";
 export type { ApiProblemInit } from "./problem.js";

@@ -1,13 +1,20 @@
 /**
- * The HTTP (Hypertext Transfer Protocol) status codes the web's session handling branches on, in
- * one place (R3.13), so a 401 means the same thing in the client, the hooks and the pages.
+ * The HTTP (Hypertext Transfer Protocol) status codes the web branches on, in one place (R3.13;
+ * S25 added the study and trainer codes), so a status means the same thing in the client, the
+ * hooks, the study screen and the trainer.
  */
 import { isApiProblem } from "./problem.js";
 
 export const HTTP_STATUS = {
+  badRequest: 400,
   unauthorized: 401,
   forbidden: 403,
+  notFound: 404,
+  conflict: 409,
+  unprocessable: 422,
   tooManyRequests: 429,
+  badGateway: 502,
+  unavailable: 503,
 } as const;
 
 /**

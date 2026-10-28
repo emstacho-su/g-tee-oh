@@ -23,14 +23,19 @@ import type { RouterHistory } from "@tanstack/react-router";
 import type { AppApi } from "./api/index.js";
 import { describeFailureForLog } from "./api/http-status.js";
 import { AuthLayout } from "./app/AuthLayout.js";
+import { parseSearchAsStrings, stringifySearchAsStrings } from "./app/search-serialization.js";
 import { RootLayout } from "./app/RootLayout.js";
 import type { RouterContext } from "./app/router-context.js";
 import { SessionError } from "./app/SessionError.js";
 import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
+import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { placeholderRoute } from "./routes/placeholders.js";
 import type { PlaceholderKey } from "./routes/placeholders.js";
+import { StudyPage } from "./routes/study/StudyPage.js";
+import { validateStudySearch } from "./study/search.js";
+import { validateDrillRunSearch } from "./trainer/run-search.js";
 
 export interface LoginSearch {
   redirect?: string;
@@ -90,8 +95,29 @@ export const trainRoute = screenRoute("/train", "train");
 export const drillsRoute = screenRoute("/drills", "drills");
 export const drillNewRoute = screenRoute("/drills/new", "drillNew");
 export const drillRoute = screenRoute("/drills/$id", "drillEdit");
-export const drillRunRoute = screenRoute("/drills/$id/run", "drillRun");
-export const studyRoute = screenRoute("/study", "study");
+// /study and /drills/$id/run are real screens (S25, O-286, O-288). validateSearch types the
+// routes' search for links, but the router merges every parent's raw search into a child's
+// (router-core matchRoutes: search = { ...parentSearch, ...strictSearch }), so a key the validator
+// dropped (?seed=XYZ) is still present in useSearch(). The route components therefore pass the
+// screens only what the validator returns for the current search, never useSearch() itself.
+export const drillRunRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/$id/run",
+  validateSearch: validateDrillRunSearch,
+  component: function DrillRunRouteScreen() {
+    const { id } = drillRunRoute.useParams();
+    const { seed } = validateDrillRunSearch(drillRunRoute.useSearch());
+    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} />;
+  },
+});
+export const studyRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/study",
+  validateSearch: validateStudySearch,
+  component: function StudyRouteScreen() {
+    return <StudyPage search={validateStudySearch(studyRoute.useSearch())} />;
+  },
+});
 export const predictRoute = screenRoute("/predict", "predict");
 export const paintRoute = screenRoute("/paint", "paint");
 export const progressRoute = screenRoute("/progress", "progress");
@@ -126,6 +152,10 @@ export function createAppRouter({ queryClient, api, history }: AppRouterOptions)
   return createRouter({
     routeTree,
     context: { queryClient, api },
+    // Every query value stays the string in the URL, so ?hand=77 and numeric-looking seeds reach
+    // the string-only validators intact (search-serialization.ts, O-286, O-288).
+    parseSearch: parseSearchAsStrings,
+    stringifySearch: stringifySearchAsStrings,
     ...(history === undefined ? {} : { history }),
   });
 }

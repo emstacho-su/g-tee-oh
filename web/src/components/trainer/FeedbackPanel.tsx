@@ -30,6 +30,8 @@ export interface FeedbackPanelProps {
   chosenIndex: number;
   rangeView?: ReactNode;
   thresholdCard?: ReactNode;
+  /** The RNG roller after the reveal, when the session has RNG mode on (S25, O-282). */
+  roller?: ReactNode;
   onMoreInfo?: () => void;
   onAsk?: () => void;
 }
@@ -61,7 +63,16 @@ function LaterButton({ label, onClick }: { label: string; onClick: (() => void) 
   return <Button onClick={onClick}>{label}</Button>;
 }
 
-export function FeedbackPanel({ feedback, actions, chosenIndex, rangeView, thresholdCard, onMoreInfo, onAsk }: FeedbackPanelProps) {
+export function FeedbackPanel({
+  feedback,
+  actions,
+  chosenIndex,
+  rangeView,
+  thresholdCard,
+  roller,
+  onMoreInfo,
+  onAsk,
+}: FeedbackPanelProps) {
   const chosen = actionOfIndex(actions, chosenIndex);
   if (chosen === undefined) {
     return (
@@ -94,6 +105,7 @@ export function FeedbackPanel({ feedback, actions, chosenIndex, rangeView, thres
         highlightIndexes={feedback.best_action_indexes}
         caption="This hand's strategy"
       />
+      {roller}
       {rangeView}
       {thresholdCard}
       <div className="flex gap-2">

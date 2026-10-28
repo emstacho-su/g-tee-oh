@@ -8,9 +8,11 @@
  */
 import { create } from "zustand";
 
-export type Theme = "light" | "dark";
+import { THEME_STORAGE_KEY } from "./theme-key.js";
 
-export const THEME_STORAGE_KEY = "gto-theme";
+export { THEME_STORAGE_KEY };
+
+export type Theme = "light" | "dark";
 const DARK_CLASS = "dark";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
