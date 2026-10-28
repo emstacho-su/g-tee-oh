@@ -17,7 +17,8 @@
  *   stop rule;
  * - reveal: the next street's cards from /v1/deal/{id}/reveal, after the deal is posted again so
  *   solver-query holds it even if its store dropped it (a pure function of seed and filter);
- * - hand_end: the next hand number, the revealed board kept as previous_board.
+ * - hand_end: the next hand number, the revealed board kept as previous_board, and previous_hand
+ *   with the end the loop named on the edge into hand_end (hand-end.ts, PR #30 review MEDIUM 5).
  * A hand whose solution holds no row for the acting hand at a node (a line the equilibrium never
  * plays it to) ends there ("off_range"). The loop is bounded by MAX_DERIVATION_STEPS; exceeding it
  * is a 500, since every real hand reaches the hero in a few steps.
@@ -28,11 +29,12 @@ import type { SqAction, SqNode } from "../solver-query/client.js";
 import { dealFilterOf, dealHand } from "./deal-hand.js";
 import { EMPTY_HOLDOUT_GUARD, type HoldoutGuard } from "./holdout-guard.js";
 import { actionAt, withAction } from "./hand-actions.js";
+import { handEndAt, type PreviousHandEnd } from "./hand-end.js";
 import { transition, type AfterFeedback, type MachineEvent, type MachineState, type Phase, type StopRule } from "./machine.js";
 import { sessionEndedProblem, upstreamInconsistent as inconsistent } from "./problems.js";
 import { drawRoll, type RollDraw } from "./randomness.js";
 import type { SolverPort } from "./solver-port.js";
-import type { HandState, PersistedState } from "./state.js";
+import type { HandState, PersistedState, PreviousHand } from "./state.js";
 
 export { actionAt, sessionEndedProblem, withAction };
 
@@ -62,6 +64,8 @@ export interface DerivedPrompt {
 interface Context {
   state: PersistedState;
   node: SqNode | undefined;
+  /** How the hand ended, set on the transition into hand_end only (hand-end.ts). */
+  ended?: PreviousHandEnd | undefined;
 }
 
 interface Step {
@@ -185,13 +189,22 @@ const reveal: StepFn = async ({ state }, port) => {
   };
 };
 
-const handEnd: StepFn = ({ state }) => {
+/** The ended hand for the next prompt's previous_hand (O-313), with the end its transition recorded. */
+function previousHandOf(handNo: number, hand: HandState, end: PreviousHandEnd): PreviousHand {
+  return { hand_no: handNo, history: hand.history.map((entry) => ({ ...entry })), board: [...hand.board], end };
+}
+
+const handEnd: StepFn = ({ state, ended }) => {
   const hand = requireHand(state);
+  if (ended === undefined) {
+    throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, { detail: "The hand ended with no recorded reason." });
+  }
   const next: PersistedState = {
     ...state,
     hand_no: state.hand_no + 1,
     hand: null,
     previous_board: hand.board.length > 0 ? hand.board : null,
+    previous_hand: previousHandOf(state.hand_no, hand, ended),
   };
   return { event: { type: "next_hand" }, context: { state: next, node: undefined } };
 };
@@ -231,8 +244,11 @@ export async function deriveAwaitHero(state: PersistedState, settings: DeriveSet
       throw sessionEndedProblem();
     }
     const result = await STEPS[machine.phase](context, port, settings);
-    machine = transition(machine, result.event);
-    context = { node: result.context.node, state: { ...result.context.state, phase: machine.phase } };
+    const next = transition(machine, result.event);
+    // MEDIUM 5: how the hand ended is named on the edge into hand_end, from the phase it leaves (hand-end.ts).
+    const ended = next.phase === "hand_end" ? handEndAt(machine.phase, settings.stopRule, requireHand(result.context.state)) : undefined;
+    machine = next;
+    context = { node: result.context.node, state: { ...result.context.state, phase: machine.phase }, ended };
   }
   throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, {
     detail: `The session did not reach a decision within ${MAX_DERIVATION_STEPS} steps.`,

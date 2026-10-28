@@ -33,6 +33,9 @@ import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
 import { PredictPage } from "./routes/predict/PredictPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
+import { validateDrillBuilderSearch, validateDrillsSearch } from "./drills/search.js";
+import { DrillBuilderPage } from "./routes/drills/DrillBuilderPage.js";
+import { DrillsPage } from "./routes/drills/DrillsPage.js";
 import { validateLibrarySearch } from "./library/search.js";
 import { LibraryPage } from "./routes/library/LibraryPage.js";
 import { SettingsPage } from "./routes/settings/SettingsPage.js";
@@ -98,9 +101,27 @@ function screenRoute<TPath extends string>(path: TPath, key: PlaceholderKey) {
 }
 
 export const trainRoute = screenRoute("/train", "train");
-export const drillsRoute = screenRoute("/drills", "drills");
-export const drillNewRoute = screenRoute("/drills/new", "drillNew");
-export const drillRoute = screenRoute("/drills/$id", "drillEdit");
+// The drill library and builder (S26, R3.14) re-validate their search in the route component for
+// the parent-merge reason given below for /study.
+export const drillsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills",
+  validateSearch: validateDrillsSearch,
+  component: function DrillsRouteScreen() {
+    return <DrillsPage search={validateDrillsSearch(drillsRoute.useSearch())} />;
+  },
+});
+export const drillNewRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/drills/new", component: () => <DrillBuilderPage /> });
+export const drillRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/$id",
+  validateSearch: validateDrillBuilderSearch,
+  component: function DrillBuilderRouteScreen() {
+    const { id } = drillRoute.useParams();
+    const { saved } = validateDrillBuilderSearch(drillRoute.useSearch());
+    return <DrillBuilderPage key={id} drillId={id} justCreated={saved === "1"} />;
+  },
+});
 // /study and /drills/$id/run are real screens (S25, O-286, O-288). validateSearch types the
 // routes' search for links, but the router merges every parent's raw search into a child's
 // (router-core matchRoutes: search = { ...parentSearch, ...strictSearch }), so a key the validator

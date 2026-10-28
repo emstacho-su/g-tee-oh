@@ -42,6 +42,9 @@
       "rng_roll": 80,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 0,
+      "hand_decision_no": 1,
+      "previous_hand": null,
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -119,6 +122,25 @@
       "rng_roll": 39,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 1,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 0,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -196,6 +218,25 @@
       "rng_roll": 29,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 2,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 1,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -273,6 +314,25 @@
       "rng_roll": 30,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 3,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 2,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -350,6 +410,25 @@
       "rng_roll": 92,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 4,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 3,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -427,6 +506,25 @@
       "rng_roll": 43,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 5,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 4,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -504,6 +602,25 @@
       "rng_roll": 88,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 6,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 5,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -581,6 +698,25 @@
       "rng_roll": 13,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 7,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 6,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -658,6 +794,25 @@
       "rng_roll": 8,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 8,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 7,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -735,6 +890,25 @@
       "rng_roll": 8,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 9,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 8,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -812,6 +986,25 @@
       "rng_roll": 99,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 10,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 9,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -889,6 +1082,25 @@
       "rng_roll": 2,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 11,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 10,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -966,6 +1178,25 @@
       "rng_roll": 30,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 12,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 11,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1043,6 +1274,25 @@
       "rng_roll": 75,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 13,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 12,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1140,6 +1390,25 @@
       "rng_roll": 58,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 13,
+      "hand_decision_no": 2,
+      "previous_hand": {
+        "hand_no": 12,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
       "track_key": "facing-3bet",
       "worked_example": false
@@ -1223,6 +1492,34 @@
         "6s"
       ],
       "synthetic": true,
+      "hand_no": 14,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 13,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          },
+          {
+            "position": "BTN",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "Js",
+          "5c",
+          "6s"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1300,6 +1597,25 @@
       "rng_roll": 5,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 15,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 14,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1381,6 +1697,29 @@
         "Th"
       ],
       "synthetic": true,
+      "hand_no": 16,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 15,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "3d",
+          "4d",
+          "Th"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1458,6 +1797,25 @@
       "rng_roll": 32,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 17,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 16,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1535,6 +1893,25 @@
       "rng_roll": 27,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 18,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 17,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1612,6 +1989,25 @@
       "rng_roll": 74,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 19,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 18,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1689,6 +2085,25 @@
       "rng_roll": 93,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 20,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 19,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1766,6 +2181,25 @@
       "rng_roll": 65,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 21,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 20,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -1863,6 +2297,25 @@
       "rng_roll": 5,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 21,
+      "hand_decision_no": 2,
+      "previous_hand": {
+        "hand_no": 20,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
       "track_key": "facing-3bet",
       "worked_example": false
@@ -1946,6 +2399,34 @@
         "Tc"
       ],
       "synthetic": true,
+      "hand_no": 22,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 21,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          },
+          {
+            "position": "BTN",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "2h",
+          "Ts",
+          "Tc"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2023,6 +2504,25 @@
       "rng_roll": 24,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 23,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 22,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2120,6 +2620,25 @@
       "rng_roll": 36,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 23,
+      "hand_decision_no": 2,
+      "previous_hand": {
+        "hand_no": 22,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          }
+        ],
+        "board": [],
+        "end": "off_range"
+      },
       "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
       "track_key": "facing-3bet",
       "worked_example": false
@@ -2203,6 +2722,34 @@
         "Th"
       ],
       "synthetic": true,
+      "hand_no": 24,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 23,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          },
+          {
+            "position": "BTN",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "2c",
+          "4d",
+          "Th"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2280,6 +2827,25 @@
       "rng_roll": 19,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 25,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 24,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2357,6 +2923,25 @@
       "rng_roll": 31,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 26,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 25,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2434,6 +3019,25 @@
       "rng_roll": 60,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 27,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 26,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2511,6 +3115,25 @@
       "rng_roll": 39,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 28,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 27,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2608,6 +3231,25 @@
       "rng_roll": 10,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 28,
+      "hand_decision_no": 2,
+      "previous_hand": {
+        "hand_no": 27,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
       "track_key": "facing-3bet",
       "worked_example": false
@@ -2691,6 +3333,34 @@
         "4s"
       ],
       "synthetic": true,
+      "hand_no": 29,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 28,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          },
+          {
+            "position": "BTN",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "6c",
+          "9h",
+          "4s"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2772,6 +3442,29 @@
         "5c"
       ],
       "synthetic": true,
+      "hand_no": 30,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 29,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "6c",
+          "7h",
+          "5c"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2851,6 +3544,25 @@
       "rng_roll": 19,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 31,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 30,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -2928,6 +3640,25 @@
       "rng_roll": 6,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 32,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 31,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -3005,6 +3736,25 @@
       "rng_roll": 68,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 33,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 32,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false
@@ -3102,6 +3852,25 @@
       "rng_roll": 92,
       "previous_board": null,
       "synthetic": true,
+      "hand_no": 33,
+      "hand_decision_no": 2,
+      "previous_hand": {
+        "hand_no": 32,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "f",
+            "label": "Fold"
+          }
+        ],
+        "board": [],
+        "end": "fold"
+      },
       "spot_class_key": "preflop/online/100/facing-3bet/BB-BTN",
       "track_key": "facing-3bet",
       "worked_example": false
@@ -3185,6 +3954,34 @@
         "7s"
       ],
       "synthetic": true,
+      "hand_no": 34,
+      "hand_decision_no": 1,
+      "previous_hand": {
+        "hand_no": 33,
+        "history": [
+          {
+            "position": "BTN",
+            "token": "r250",
+            "label": "Raise to 2.5bb"
+          },
+          {
+            "position": "BB",
+            "token": "r1000",
+            "label": "Raise to 10bb"
+          },
+          {
+            "position": "BTN",
+            "token": "c",
+            "label": "Call"
+          }
+        ],
+        "board": [
+          "3d",
+          "6c",
+          "7s"
+        ],
+        "end": "street_closed"
+      },
       "spot_class_key": "preflop/online/100/rfi/BB-BTN",
       "track_key": "opens",
       "worked_example": false

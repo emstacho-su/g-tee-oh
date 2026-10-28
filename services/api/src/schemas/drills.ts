@@ -131,7 +131,8 @@ export const spotFilterSchema = z
   .superRefine(checkSpotFilter)
   .meta({
     id: "SpotFilterWrite",
-    description: "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)",
+    description:
+      "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates, three distinct cards in each board flop)",
   });
 
 export const trainerSettingsSchema = z
@@ -191,12 +192,20 @@ export const drillsQuerySchema = pageQuerySchema.extend({
 
 export const drillPageSchema = pageSchema(drillSchema);
 
+/** The longest export code import accepts (O-310, drills/export-code.ts). */
+export const MAX_EXPORT_CODE_LENGTH = 8192;
+/** Format version 1 of g-tee-oh's export code (O-310); published as the export response's pattern. */
+export const EXPORT_CODE_PREFIX = "gteeoh1.";
+
 export const drillExportSchema = z.object({
-  export_code: z.string().describe("g-tee-oh's own encoding of a drill (S26)"),
+  export_code: z
+    .string()
+    .startsWith(EXPORT_CODE_PREFIX)
+    .describe(`g-tee-oh's own encoding of a drill (O-310); starts with ${EXPORT_CODE_PREFIX}`),
 });
 
 export const drillImportBodySchema = z.strictObject({
-  export_code: z.string().min(1).max(8192),
+  export_code: z.string().min(1).max(MAX_EXPORT_CODE_LENGTH),
 });
 
 export type SpotFilter = z.infer<typeof spotFilterSchema>;

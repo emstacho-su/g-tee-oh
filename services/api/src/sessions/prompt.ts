@@ -30,6 +30,15 @@ export function toButton(action: SqAction): NodeButton {
   };
 }
 
+/**
+ * The hero's decision index within the hand, from 1 (O-335): 1 plus the hero's entries in the
+ * history after the entries the hand was dealt with (state.ts dealt_history_length).
+ */
+export function handDecisionNo(hand: DerivedPrompt["hand"]): number {
+  const dealtWith = hand.dealt_history_length ?? 0;
+  return 1 + hand.history.slice(dealtWith).filter((entry) => entry.position === hand.hero_position).length;
+}
+
 /** The panels the trainer settings turn on, in the A7 order (O-235). */
 export function visiblePanels(settings: TrainerSettings): string[] {
   return PANEL_KEYS.filter((key) => settings.panels[key] === true);
@@ -60,6 +69,9 @@ export function toPrompt(sessionId: string, stateVersion: number, derived: Deriv
     rng_roll: roll === null ? null : roll.roll,
     previous_board: state.previous_board === null ? null : [...state.previous_board],
     synthetic: node.synthetic,
+    hand_no: state.hand_no,
+    hand_decision_no: handDecisionNo(hand),
+    previous_hand: state.previous_hand ?? null,
     // S31 (O-270, O-271): the class and its track come from solver-query's names for the node.
     spot_class_key: node.spot_class_key ?? null,
     track_key: trackFor(node.action_family ?? null, hand.hero_position),

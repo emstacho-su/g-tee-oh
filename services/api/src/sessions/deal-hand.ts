@@ -108,6 +108,7 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
     end: null,
     last_action_kind: null,
     history: spot.history,
+    dealt_history_length: spot.history.length,
     board: [],
     opponent_rng_state: draws.opponentRngState,
     roll_rng_state: draws.rollRngState,

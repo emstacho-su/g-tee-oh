@@ -9,10 +9,11 @@
  * (05 section 1, O-240). Each covered pair's tree is searched once for the hero spots: nodes where a
  * hero seat acts in the drill's preflop action families with a hand the hands filter keeps
  * (spot-search.ts). A drill with no hero spot is a 422 no-coverage problem naming why, whose gap
- * rows are still recorded in a transaction. The seed is the body's or 64 random bits (O-249). The
+ * rows are still recorded in a transaction, and whose problem carries pairs_total and pairs_queued
+ * (S26, O-318). The seed is the body's or 64 random bits (O-249). The
  * session, with its hero spots and its copy of the drill's spot (spot.ts), is written in dealing
  * phase at hand 0 through idempotentWrite; each hand is then dealt straight at a hero spot
- * (deal-hand.ts).
+ * (deal-hand.ts). The created session carries its coverage counts (S26, O-312).
  */
 import { findDrill } from "../../drills/repository.js";
 import { requireDatabase } from "../../http/database.js";
@@ -64,16 +65,21 @@ export async function createDrillSession(call: SessionCall, body: SessionCreateB
     // The gap rows are recorded even though the session is refused (05 section 1, O-240).
     await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, line));
     const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
-    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
+    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`, {
+      pairsTotal: candidates.length,
+      pairsQueued: gaps.length,
+    });
   }
   // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
   const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, {
     seeded: body.seed !== undefined,
     ...(mode === "drill" ? {} : { practice: mode }),
   });
+  // O-312: the covered part the session runs on, and the uncovered rest queued below.
+  const coverage = { pairs_total: candidates.length, pairs_covered: covered.length, pairs_queued: gaps.length };
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
     const row = await insertSession(transaction, { userId: call.userId, mode, drillId, settings, state });
-    return toSession(row);
+    return { ...toSession(row), coverage };
   });
 }

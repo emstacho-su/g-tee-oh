@@ -39,15 +39,20 @@ function pointerSegment(segment: string): string {
   return segment.replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
+/** Statuses from this one up are problems, served as application/problem+json (http/problem.ts). */
+const FIRST_PROBLEM_STATUS = 400;
+const PROBLEM_CONTENT_TYPE = "application/problem+json";
+
 /** The validator of one operation's response schema, e.g. ("get", "/api/v1/drills/{id}", 200). */
 export function responseValidator(method: HttpMethod, path: string, status: number): ValidateFunction {
-  const pointer = ["paths", path, method, "responses", String(status), "content", JSON_CONTENT_TYPE, "schema"]
+  const contentType = status >= FIRST_PROBLEM_STATUS ? PROBLEM_CONTENT_TYPE : JSON_CONTENT_TYPE;
+  const pointer = ["paths", path, method, "responses", String(status), "content", contentType, "schema"]
     .map(pointerSegment)
     .join("/");
   // Ajv compiles a reference once and caches it, so repeated calls are cheap.
   const validate = ajv.getSchema(`${DOCUMENT_ID}#/${pointer}`);
   if (validate === undefined) {
-    throw new Error(`the committed contract has no ${method.toUpperCase()} ${path} ${status} JSON response`);
+    throw new Error(`the committed contract has no ${method.toUpperCase()} ${path} ${status} ${contentType} response`);
   }
   return validate;
 }

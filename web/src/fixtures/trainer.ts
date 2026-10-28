@@ -9,6 +9,13 @@
  * show, and the feedback for that hand. The frequencies are invented; each hand's roll lands in the
  * band of an action listed in its best_action_indexes, so the roller and the grade agree (O-213).
  * fixtureRngPrompt and fixturePlainPrompt are the first hand with and without its roll.
+ *
+ * S26 (R3.13, R3.14, O-312 to O-314) adds a street-mode drill (end_of_street, pause after_mistake,
+ * speed fast), a full-hand drill (end_of_hand, pause every_action), a partly covered drill, the
+ * coverage answers, and two street hands. A street hand is the hero's first decision, the
+ * opponents' answer the mocked api appends to the history before the hero's second decision, the
+ * second decision (facing a three-bet), the opponent's closing call after a four-bet, and the flop
+ * a full hand reveals.
  */
 import type {
   DecisionFeedback,
@@ -16,12 +23,18 @@ import type {
   TrainerPrompt,
   TrainerSettings,
 } from "../contracts.js";
-import type { Drill, PracticeSession, SessionRecap } from "../trainer/session-types.js";
+import type { Drill, PracticeSession, SessionCoverage, SessionRecap } from "../trainer/session-types.js";
 import { fixtureActions, fixtureFeedback, fixturePrompt } from "./index.js";
 
 export const FIXTURE_DRILL_ID = "00000000-0000-4000-8000-000000000010";
 /** A drill whose spots the library does not cover: POST /sessions answers 422 no-coverage. */
 export const FIXTURE_UNCOVERED_DRILL_ID = "00000000-0000-4000-8000-000000000011";
+/** A drill in street mode (end_of_street): two hero decisions per hand (S26, R3.13). */
+export const FIXTURE_STREET_DRILL_ID = "00000000-0000-4000-8000-000000000012";
+/** A drill in full-hand mode (end_of_hand): the hand ends when the flop is dealt in v1. */
+export const FIXTURE_FULL_HAND_DRILL_ID = "00000000-0000-4000-8000-000000000013";
+/** A drill the library covers in part: the session runs, and the rest is queued (O-312). */
+export const FIXTURE_PART_COVERED_DRILL_ID = "00000000-0000-4000-8000-000000000014";
 export const FIXTURE_SEED = "0123456789abcdef";
 const FIXTURE_TIME = "2026-10-27T12:00:00Z";
 const FIXTURE_ENDED_TIME = "2026-10-27T12:20:00Z";
@@ -179,3 +192,117 @@ export const fixtureRecap: SessionRecap = {
 
 /** The NodeAction rows of the first hand, for tests that pick a button by its index (O-198). */
 export const fixtureTrainerActions: readonly NodeAction[] = fixtureActions;
+
+/** Street mode: a reveal pauses only after an inaccuracy, a mistake or a blunder (O-314). */
+export const fixtureStreetDrill: Drill = {
+  ...fixtureDrill,
+  id: FIXTURE_STREET_DRILL_ID,
+  name: "Opens and three-bets, street mode (synthetic)",
+  trainer: { ...fixtureTrainerSettings, stop_rule: "end_of_street", pause: "after_mistake", speed: "fast" },
+};
+
+/** Full-hand mode: every reveal pauses; in v1 the hand ends when the flop is dealt (O-314). */
+export const fixtureFullHandDrill: Drill = {
+  ...fixtureDrill,
+  id: FIXTURE_FULL_HAND_DRILL_ID,
+  name: "Opens to the flop, full-hand mode (synthetic)",
+  trainer: { ...fixtureTrainerSettings, stop_rule: "end_of_hand", pause: "every_action" },
+};
+
+/** Spot mode over a filter the library covers in part (O-312). */
+export const fixturePartCoveredDrill: Drill = {
+  ...fixtureDrill,
+  id: FIXTURE_PART_COVERED_DRILL_ID,
+  name: "Late-position opens, partly covered (synthetic)",
+  spot_filter: { ...fixtureDrill.spot_filter, hero_positions: ["CO", "BTN", "SB"] },
+};
+
+/** Every pair the drill reaches is covered. */
+export const fixtureFullCoverage: SessionCoverage = { pairs_total: 1, pairs_covered: 1, pairs_queued: 0 };
+/** Two of three pairs covered; the third was queued for the builder. */
+export const fixturePartCoverage: SessionCoverage = { pairs_total: 3, pairs_covered: 2, pairs_queued: 1 };
+
+export type FixtureHistoryEntry = TrainerPrompt["history"][number];
+
+/** The hero facing a three-bet to 9bb: fold, call, four-bet to 22bb, all-in. */
+const FACING_THREE_BET_ACTIONS: readonly NodeAction[] = [
+  { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
+  { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
+  { index: 2, token: "r2200", kind: "raise", size_cbb: 2200, bucket: "pot", label: "Raise to 22bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+];
+
+const BIG_BLIND_THREE_BET: FixtureHistoryEntry = { position: "BB", token: "r900", label: "Raise to 9bb" };
+const BIG_BLIND_CALL: FixtureHistoryEntry = { position: "BB", token: "c", label: "Call" };
+const FACING_THREE_BET_POT_CBB = 1150;
+/** The second decision's hand_decision_no: the hero's second decision in the hand (O-335). */
+const SECOND_DECISION_NO = 2;
+
+export interface FixtureStreetHand {
+  /** The hero's first decision. */
+  readonly first: FixtureHand;
+  /** The opponents' answer to the hero's open, appended before the second decision. */
+  readonly answer: readonly FixtureHistoryEntry[];
+  /** The second decision; its history shows the hero's best first action (the mock puts in the chosen one). */
+  readonly second: FixtureHand;
+  /** The opponent's call that closes the street after a four-bet. */
+  readonly closing: FixtureHistoryEntry;
+  /** The flop a full hand reveals when the street closes (v1 ends the hand there). */
+  readonly flop: readonly string[];
+}
+
+/** The hero's history entry for an action of a prompt. */
+export function heroEntry(prompt: TrainerPrompt, action: NodeAction): FixtureHistoryEntry {
+  return { position: prompt.hero_position, token: action.token, label: action.label };
+}
+
+function secondDecision(first: FixtureHand, answer: readonly FixtureHistoryEntry[], feedback: Partial<DecisionFeedback>): FixtureHand {
+  const open = first.prompt.buttons.find((button) => button.index === first.feedback.best_action_indexes[0]);
+  if (open === undefined) throw new RangeError("a fixture hand's best action names no button");
+  return {
+    prompt: {
+      ...first.prompt,
+      history: [...first.prompt.history, heroEntry(first.prompt, open), ...answer],
+      hand_decision_no: SECOND_DECISION_NO,
+      pot_cbb: FACING_THREE_BET_POT_CBB,
+      buttons: [...FACING_THREE_BET_ACTIONS],
+    },
+    roll: 58,
+    feedback: {
+      ...first.feedback,
+      label: "mistake",
+      score: 0.38,
+      ev_loss_bb: 0.42,
+      ev_loss_pct_pot: 3.65,
+      freq_by_action: [0.2, 0.6, 0.2, 0],
+      ev_by_action: [0, 0.35, 0.12, -1.8],
+      best_action_indexes: [1],
+      ...feedback,
+    },
+  };
+}
+
+const BUTTON_ANSWER: readonly FixtureHistoryEntry[] = [{ position: "SB", token: "f", label: "Fold" }, BIG_BLIND_THREE_BET];
+const CUTOFF_ANSWER: readonly FixtureHistoryEntry[] = [
+  { position: "BTN", token: "f", label: "Fold" },
+  { position: "SB", token: "f", label: "Fold" },
+  BIG_BLIND_THREE_BET,
+];
+
+/** The hands a street or full-hand session deals, in order, then again from the first. */
+export const fixtureStreetHands: readonly FixtureStreetHand[] = [
+  {
+    first: BUTTON_OPEN,
+    answer: BUTTON_ANSWER,
+    second: secondDecision(BUTTON_OPEN, BUTTON_ANSWER, { node_key: "cfg_6_online_100/BTN-BB/r250-r900" }),
+    closing: BIG_BLIND_CALL,
+    flop: ["Qs", "7c", "2d"],
+  },
+  {
+    first: CUTOFF_OPEN,
+    answer: CUTOFF_ANSWER,
+    second: secondDecision(CUTOFF_OPEN, CUTOFF_ANSWER, { node_key: "cfg_6_online_100/CO-BB/r250-r900" }),
+    closing: BIG_BLIND_CALL,
+    flop: ["Jh", "Td", "4s"],
+  },
+];
