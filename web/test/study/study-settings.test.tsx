@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   FIXTURE_DEEP_CONFIG_ID,
+  FIXTURE_LIVE_STAKE_ID,
   FIXTURE_ONLINE_STAKE_ID,
   FIXTURE_STUDY_CONFIG_ID,
   fixturePairsByConfig,
@@ -53,7 +54,8 @@ describe("R3.12 study settings panel", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Solution browser" })).toBeInTheDocument();
     const panel = screen.getByRole("region", { name: "Spot settings" });
     expect(within(panel).getByText("Choose the settings, then Confirm.")).toBeInTheDocument();
-    expect(within(panel).getByText("Choose a format first.")).toBeInTheDocument();
+    // Every field below the format names the format, the first upper field missing (PR 37 round 1).
+    expect(within(panel).getAllByText("Choose a format first.")).toHaveLength(5);
     expect(within(panel).getByRole("button", { name: "Confirm" })).toBeDisabled();
     expect(nodeRequests()).toEqual([]);
     expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
@@ -127,9 +129,11 @@ describe("R3.12 study settings panel", () => {
     const { nodeRequests } = renderStudy(`/study?${ONLINE_100}&pair=CO-BTN`);
     const panel = await screen.findByRole("region", { name: "Spot settings" });
     expect(await within(panel).findByText("CO-BTN is not in the library at this configuration.")).toBeInTheDocument();
-    const btn = await waitFor(() => choice("Against", /^BTN/));
-    expect(btn).toHaveAttribute("aria-checked", "true");
-    expect(btn).toHaveAccessibleName(/Not in the library/);
+    // The uncovered seat is shown chosen with its reason; the field below it names that seat.
+    const co = await waitFor(() => choice("First to act", /^CO/));
+    expect(co).toHaveAttribute("aria-checked", "true");
+    expect(co).toHaveAccessibleName(/Not in the library/);
+    expect(within(panel).getByText("Choose an available seat to act first.")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Confirm" })).toBeDisabled();
     expect(nodeRequests()).toEqual([]);
     expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
@@ -193,7 +197,9 @@ describe("R3.12 study settings panel", () => {
     const panel = await screen.findByRole("region", { name: "Spot settings" });
     const depth = await waitFor(() => choice("Depth", "100bb"));
     await user.click(depth);
-    expect(await within(panel).findByText("Loading the seats for these settings.")).toBeInTheDocument();
+    // The seat fields and the Confirm reason all say so (S39 follow-up: no "Choose a depth first.").
+    expect(await within(panel).findAllByText("Loading the seats for these settings.")).toHaveLength(3);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Spot settings" })).toBe(panel);
     expect(choice("Depth", "100bb")).toHaveFocus();
 
@@ -217,6 +223,63 @@ describe("R3.12 study settings panel", () => {
     expect(await screen.findByRole("img", { name: /frequency mode/ })).toBeInTheDocument();
     expect(screen.getByText(SUMMARY)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a failed read of the draft's seats shows inside the panel, says so and retries there", async () => {
+    const user = userEvent.setup();
+    let failures = 1;
+    renderStudy(`/study?${ONLINE_100}&pair=BB-BTN`, (request) => {
+      if (request.path !== `/api/v1/configs/${FIXTURE_DEEP_CONFIG_ID}/pairs` || failures === 0) return undefined;
+      failures -= 1;
+      return problemOf(500, "internal");
+    });
+    await user.click(await screen.findByRole("button", { name: "Change settings" }));
+    await user.click(choice("Depth", "200bb"));
+    const panel = screen.getByRole("region", { name: "Spot settings" });
+    const alert = await within(panel).findByRole("alert");
+    expect(screen.getAllByRole("alert")).toEqual([alert]);
+    expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
+    expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "Confirm" })).toBeEnabled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a failed read of the URL configuration's seats says so in the panel, with the panel's Retry", async () => {
+    const user = userEvent.setup();
+    let failures = 1;
+    renderStudy(`/study?${ONLINE_100}`, (request) => {
+      if (request.path !== `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs` || failures === 0) return undefined;
+      failures -= 1;
+      return problemOf(500, "internal");
+    });
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    const alert = await within(panel).findByRole("alert");
+    expect(screen.getAllByRole("alert")).toEqual([alert]);
+    expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(await waitFor(() => choice("First to act", /^BTN/))).not.toHaveAttribute("aria-disabled");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a link with depth and pair but no stake: the seat fields ask for the stake", async () => {
+    renderStudy(`/study?format=online&table_size=6&depth=10000&pair=BB-BTN`);
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    await waitFor(() => expect(within(panel).getAllByText("Choose a stake first.")).toHaveLength(3));
+    expect(within(panel).getByText("Choose the stake.")).toBeInTheDocument();
+    expect(within(panel).queryByText(/depth first/)).not.toBeInTheDocument();
+  });
+
+  it("R3.12 a link whose stake belongs to the other format: the seats and Confirm name the stake, not the depth", async () => {
+    renderStudy(`/study?format=online&table_size=6&stake=${FIXTURE_LIVE_STAKE_ID}&depth=10000&pair=BB-BTN`);
+    const panel = await screen.findByRole("region", { name: "Spot settings" });
+    await waitFor(() => expect(within(panel).getAllByText("Choose an available stake first.")).toHaveLength(3));
+    expect(within(panel).getByText("Choose the stake.")).toBeInTheDocument();
+    expect(within(panel).queryByText(/depth first/i)).not.toBeInTheDocument();
   });
 
   it("R3.12 a failed catalog read shows an error with a retry and no server detail", async () => {

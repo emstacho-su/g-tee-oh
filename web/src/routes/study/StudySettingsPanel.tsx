@@ -1,9 +1,10 @@
 /**
  * The study settings panel and its summary (S39, R3.12, O-354, O-390, O-392). The panel asks for
  * the spot before any solution shows: six segmented choices from the catalog (format, table size,
- * stake with its rake, depth, the seat that acts first and its opponent), then Confirm. A field
- * waits with a short prompt until the fields above it are chosen; an unavailable choice stays
- * listed, focusable and announced with its reason (ToggleGroup's aria-disabled items). Confirm is
+ * stake with its rake, depth, the seat that acts first and its opponent), then Confirm. Each field
+ * renders its state from fieldStates: its choices, or the one reason it waits (the upper field
+ * missing or unavailable, the catalog loading, the seats loading or failed); an unavailable choice
+ * stays listed, focusable and announced with its reason (ToggleGroup's aria-disabled items). Confirm is
  * a real disabled button until the six choices name a covered spot, with the actual reason
  * written beside it (confirmBlocker: still loading, a field left empty, or which chosen value is
  * unavailable and why). The notice names an uncovered pair the draft's seats point at, and a
@@ -14,15 +15,7 @@
 import { Button, Card, Panel, ToggleGroup } from "../../components/ui/index.js";
 import { catalogFailure } from "../../study/problem-text.js";
 import { FailureAlert } from "./StudyNotices.js";
-import {
-  SETTING_KEYS,
-  SETTING_LABELS,
-  SETTING_PROMPTS,
-  type SettingChoice,
-  type SettingChoices,
-  type SettingKey,
-  type SettingsDraft,
-} from "../../study/settings.js";
+import { SETTING_KEYS, SETTING_LABELS, type FieldState, type FieldStates, type SettingKey, type SettingsDraft } from "../../study/settings.js";
 
 export const PANEL_TEXT = {
   title: "Spot settings",
@@ -33,8 +26,8 @@ export const PANEL_TEXT = {
 } as const;
 
 export interface StudySettingsPanelProps {
-  /** Undefined while the catalog loads. */
-  choices: SettingChoices | undefined;
+  /** Each field's choices or the reason it waits (fieldStates), computed once per draft. */
+  fields: FieldStates;
   draft: SettingsDraft;
   /** Why Confirm is unavailable; undefined when the choices name a covered spot. */
   blocker: string | undefined;
@@ -50,29 +43,29 @@ export interface StudySettingsPanelProps {
 
 interface SettingFieldProps {
   name: SettingKey;
-  choices: readonly SettingChoice[] | undefined;
+  state: FieldState;
   value: string | undefined;
   onChange: (key: SettingKey, raw: string) => void;
 }
 
-function SettingField({ name, choices, value, onChange }: SettingFieldProps) {
+function SettingField({ name, state, value, onChange }: SettingFieldProps) {
   const label = SETTING_LABELS[name];
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span aria-hidden="true" className="text-sm font-medium">
         {label}
       </span>
-      {choices === undefined ? (
-        <p className="text-sm text-muted">{SETTING_PROMPTS[name]}</p>
+      {state.kind === "waiting" ? (
+        <p className="text-sm text-muted">{state.reason}</p>
       ) : (
-        <ToggleGroup label={label} value={value} options={choices} onValueChange={(next) => onChange(name, next)} wrap />
+        <ToggleGroup label={label} value={value} options={state.choices} onValueChange={(next) => onChange(name, next)} wrap />
       )}
     </div>
   );
 }
 
 export function StudySettingsPanel(props: StudySettingsPanelProps) {
-  const { choices, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
+  const { fields, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
   return (
     <Card title={PANEL_TEXT.title} description={PANEL_TEXT.description}>
       {notice === undefined ? null : (
@@ -86,7 +79,7 @@ export function StudySettingsPanel(props: StudySettingsPanelProps) {
           <SettingField
             key={key}
             name={key}
-            choices={choices?.[key]}
+            state={fields[key]}
             value={draft[key] === undefined ? undefined : String(draft[key])}
             onChange={onChange}
           />
