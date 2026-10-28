@@ -111,7 +111,10 @@ export async function createSession(call: SessionCall, body: SessionCreateBody):
     // The gap rows are recorded even though the session is refused (05 section 1, O-240).
     await database.transaction().execute((transaction) => insertCoverageRequests(transaction, call.userId, gaps, line));
     const reason = covered.length === 0 ? "noCoverage" : "noHeroNode";
-    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
+    throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`, {
+      pairsTotal: candidates.length,
+      pairsQueued: gaps.length,
+    });
   }
   const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot);
   // O-312: the covered part the session runs on, and the uncovered rest queued below.

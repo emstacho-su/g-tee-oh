@@ -10,9 +10,11 @@
  * Mechanism: the loader checks the envelope only. A case's drill must be a JSON object, but it is
  * expressed separately by expressDrill, the api's own DrillCreate schema (src/schemas/drills.ts,
  * including the SpotFilterWrite cross-field rules), so a drill that does not express fails its own
- * case and the other cases still run. A missing file, bad JSON and an envelope failure each throw
- * an AcceptanceFileError whose message names the file and the cause (Zod issue paths and messages,
- * never the file's values). A relative path is read from the repository root, wherever vitest runs.
+ * case and the other cases still run. A path not ending in .json, a missing file, bad JSON and an
+ * envelope failure each throw an AcceptanceFileError whose message names the file and the cause:
+ * bad JSON by line and column only, an envelope failure by Zod issue paths and messages, never
+ * the file's values (PR #30 review LOW 7). A relative path is read from the repository root,
+ * wherever vitest runs.
  */
 import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -29,6 +31,8 @@ export const ACCEPTANCE_FILE_VERSION = 1;
 export const MAX_CASES = 64;
 export const MAX_CASE_NAME_LENGTH = 120;
 export const MAX_TEXT_LENGTH = 2000;
+/** The only file type the runner reads (PR #30 review LOW 7). */
+export const JSON_EXTENSION = ".json";
 
 const caseSchema = z.strictObject({
   name: z.string().trim().min(1).max(MAX_CASE_NAME_LENGTH),
@@ -81,8 +85,35 @@ export function issueLines(error: z.ZodError): string {
     .join("; ");
 }
 
-/** Reads and checks an acceptance file; throws AcceptanceFileError naming the path and the cause. */
+export interface TextPosition {
+  line: number;
+  column: number;
+}
+
+/** The 1-based line and column of a character offset in text. */
+export function lineAndColumn(text: string, offset: number): TextPosition {
+  const before = text.slice(0, offset).split("\n");
+  return { line: before.length, column: (before.at(-1)?.length ?? 0) + 1 };
+}
+
+/** The parser reports the failing offset as "position N"; only that number is read from it. */
+const JSON_ERROR_POSITION = /position (\d+)/;
+
+/** Where JSON.parse failed: its reported offset, or the end of the text (truncated JSON reports none). */
+function jsonErrorPosition(text: string, error: unknown): TextPosition {
+  const reported = error instanceof SyntaxError ? JSON_ERROR_POSITION.exec(error.message)?.[1] : undefined;
+  return lineAndColumn(text, reported === undefined ? text.length : Number(reported));
+}
+
+/**
+ * Reads and checks an acceptance file; throws AcceptanceFileError naming the path and the cause.
+ * Only .json paths are read (LOW 7), and bad JSON is reported by line and column only: the
+ * parser's message quotes the file's text, so it never reaches the output.
+ */
 export function loadAcceptanceFile(path: string): AcceptanceFile {
+  if (!path.toLowerCase().endsWith(JSON_EXTENSION)) {
+    throw new AcceptanceFileError(`the acceptance file ${path} is not a ${JSON_EXTENSION} file`);
+  }
   let text: string;
   try {
     text = readFileSync(path, "utf8");
@@ -93,7 +124,8 @@ export function loadAcceptanceFile(path: string): AcceptanceFile {
   try {
     json = JSON.parse(text);
   } catch (error: unknown) {
-    throw new AcceptanceFileError(`the acceptance file ${path} is not valid JSON: ${describeError(error)}`);
+    const { line, column } = jsonErrorPosition(text, error);
+    throw new AcceptanceFileError(`the acceptance file ${path} is not valid JSON (line ${line}, column ${column})`);
   }
   const parsed = acceptanceFileSchema.safeParse(json);
   if (!parsed.success) {

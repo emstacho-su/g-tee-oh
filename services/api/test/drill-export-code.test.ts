@@ -10,14 +10,19 @@ import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
 import {
+  checkExportable,
   decodeExportCode,
   encodeExportCode,
   EXPORT_CODE_PREFIX,
   ExportCodeError,
   MAX_EXPORT_CODE_LENGTH,
   MAX_INFLATED_BYTES,
+  MAX_PAYLOAD_ARRAY_ITEMS,
+  MAX_PAYLOAD_DEPTH,
+  structureIssue,
 } from "../src/drills/export-code.js";
-import type { DrillCreateBody } from "../src/schemas/drills.js";
+import { MAX_PROBLEM_ERRORS } from "../src/http/field-error-cap.js";
+import { MAX_DRILL_NAME_LENGTH, MAX_TAGS, type DrillCreateBody } from "../src/schemas/drills.js";
 
 const RFI: DrillCreateBody = {
   name: "BTN RFI boundary hands",
@@ -171,5 +176,46 @@ describe("R3.14 drill export code (O-310)", () => {
 
   it("R3.14 a JSON array payload is refused", () => {
     expect(failure(codeOf([RFI])).reason).toBe("invalid");
+  });
+});
+
+describe("R3.14 export code bounds (PR #30 review MEDIUM 1, MEDIUM 2, LOW 12)", () => {
+  it("R3.14 a list longer than any drill holds is one issue at the payload, before any schema runs", () => {
+    const error = failure(codeOf({ ...RFI, tags: Array.from({ length: MAX_PAYLOAD_ARRAY_ITEMS + 1 }, () => "x") }));
+    expect(error.issues).toEqual([{ path: "", message: `A list in the drill holds more than ${MAX_PAYLOAD_ARRAY_ITEMS} items.` }]);
+  });
+
+  it("R3.14 nesting deeper than a drill does is refused without walking it", () => {
+    const deep = Array.from({ length: 1000 }).reduce<unknown>((inner) => [inner], 0);
+    const error = failure(codeOf({ ...RFI, tags: deep }));
+    expect(error.issues[0]?.message).toContain(`${MAX_PAYLOAD_DEPTH} levels`);
+    expect(structureIssue(RFI)).toBeUndefined();
+  });
+
+  it("R3.14 a name over the write limit is refused by the shape, not passed on", () => {
+    const error = failure(codeOf({ ...RFI, name: "n".repeat(MAX_DRILL_NAME_LENGTH + 1) }));
+    expect(error.issues.map((issue) => issue.path)).toEqual(["name"]);
+  });
+
+  it("R3.14 many issues are capped at 20 and the rest counted", () => {
+    // Within the length limits, so the shape reports each wrong-typed entry: 20 tags plus 9 positions.
+    const tags = Array.from({ length: MAX_TAGS }, () => 0);
+    const error = failure(codeOf({ ...RFI, tags, spot_filter: { ...RFI.spot_filter, hero_positions: Array.from({ length: 9 }, () => "XX") } }));
+    expect(error.issues).toHaveLength(MAX_PROBLEM_ERRORS);
+    expect(error.omitted).toBe(MAX_TAGS + 9 - MAX_PROBLEM_ERRORS);
+  });
+
+  it("R3.14 checkExportable passes a drill meeting the write rules and names the rule a legacy drill breaks", () => {
+    expect(checkExportable(RFI)).toEqual({ ok: true, drill: RFI });
+    const legacy = { ...RFI, spot_filter: { ...RFI.spot_filter, villain_positions: ["BTN" as const] } };
+    const check = checkExportable(legacy);
+    expect(check.ok).toBe(false);
+    expect(check.ok ? [] : check.issues.map((issue) => issue.path)).toContain("spot_filter.villain_positions.0");
+  });
+
+  it("R3.14 an import code whose board flop repeats a card is refused at that flop", () => {
+    const repeated = { ...FULL, spot_filter: { ...FULL.spot_filter, board: { flops: ["Kh7d2c", "KhKh3c"] } } };
+    const error = failure(codeOf(repeated));
+    expect(error.issues.map((issue) => issue.path)).toContain("spot_filter.board.flops.1");
   });
 });

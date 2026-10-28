@@ -27,6 +27,7 @@ type Prompt = ReturnType<typeof promptSchema.parse>;
 
 const OPEN_ACTION = 1;
 const FOLD_ACTION = 0;
+const CALL_ACTION = 1;
 const THREE_BET_CHOICE = 2;
 
 let database: Database;
@@ -45,13 +46,18 @@ afterAll(async () => {
 });
 
 type Villains = DrillCreateBody["spot_filter"]["villain_positions"];
+type Fake = Omit<FakeOptions, "solutionId">;
+type SpotOverrides = Partial<DrillCreateBody["spot_filter"]>;
 
-async function setUp(trainer: Partial<TrainerSettings>, fake: Omit<FakeOptions, "solutionId"> = {}, villains: Villains = ["BB"]) {
+/** A drill whose hero spot is BTN facing BB's 3-bet: the spot's history already holds two raises. */
+const FACING_THREE_BET: SpotOverrides = { preflop_action: ["vs_three_bet"] };
+
+async function setUp(trainer: Partial<TrainerSettings>, fake: Fake = {}, villains: Villains = ["BB"], spot: SpotOverrides = {}) {
   const sq = fakeSolverQuery({ solutionId, ...fake });
   const app = trainerApp(database, sq.client);
   await app.ready();
   const player = await newPlayer(database);
-  const drillId = await createDrill(app, player, drillBody(trainer, villains));
+  const drillId = await createDrill(app, player, drillBody(trainer, villains, spot));
   return { app, player, drillId };
 }
 
@@ -75,8 +81,8 @@ async function decide(app: App, player: Player, sessionId: string, version: numb
 }
 
 /** The first prompt, the decision on it, and the prompt after. */
-async function firstTwo(trainer: Partial<TrainerSettings>, action: number, fake: Omit<FakeOptions, "solutionId"> = {}) {
-  const { app, player, drillId } = await setUp(trainer, fake);
+async function firstTwo(trainer: Partial<TrainerSettings>, action: number, fake: Fake = {}, spot: SpotOverrides = {}) {
+  const { app, player, drillId } = await setUp(trainer, fake, ["BB"], spot);
   const sessionId = await startSession(app, player, drillId);
   const first = await next(app, player, sessionId);
   await decide(app, player, sessionId, first.state_version, action);
@@ -154,5 +160,79 @@ describe("R3.13 prompts mark hand boundaries (O-313)", () => {
       last_attempt_id: null,
     };
     expect(persistedStateSchema.safeParse(old).success).toBe(true);
+  });
+});
+
+describe("R3.14 a fully uncovered drill's 422 carries its counts as typed members (MEDIUM 3, O-318)", () => {
+  it("R3.14 the no-coverage problem names pairs_total and pairs_queued and matches the contract", async () => {
+    const { app, player, drillId } = await setUp({ stop_rule: "after_action" }, { covered: [] }, []);
+    const response = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode: "drill", drill_id: drillId } });
+    expect(response.statusCode, response.body).toBe(422);
+    const body = response.json<Record<string, unknown>>();
+    expect(body).toMatchObject({ type: "urn:g-tee-oh:problem:no-coverage", pairs_total: 5, pairs_queued: 5 });
+    expect(contractErrors("post", "/api/v1/sessions", 422, body)).toEqual([]);
+    // The members are typed in the contract: a negative count is refused there.
+    expect(contractErrors("post", "/api/v1/sessions", 422, { ...body, pairs_queued: -1 })).not.toEqual([]);
+    await app.close();
+  });
+});
+
+describe("R3.13 previous_hand.end is recorded where the hand ends (MEDIUM 5)", () => {
+  it("R3.13 a hero call that closes preflop under after_action ends the hand by the stop rule", async () => {
+    const { first, second } = await firstTwo({ stop_rule: "after_action" }, CALL_ACTION, {}, FACING_THREE_BET);
+    expect(first.buttons[CALL_ACTION]?.kind).toBe("call");
+    expect(second.previous_hand).toMatchObject({ hand_no: first.hand_no, board: [], end: "stop_rule" });
+  });
+
+  it("R3.13 a hero fold under after_action is still recorded as a fold", async () => {
+    const { second } = await firstTwo({ stop_rule: "after_action" }, FOLD_ACTION);
+    expect(second.previous_hand).toMatchObject({ board: [], end: "fold" });
+  });
+
+  it("R3.13 an opponent's fold in street mode is recorded as a fold", async () => {
+    const { second } = await firstTwo({ stop_rule: "end_of_street" }, OPEN_ACTION, { opponentChoice: { [OPEN_KEY]: FOLD_ACTION } });
+    expect(second.previous_hand).toMatchObject({ board: [], end: "fold" });
+    expect(second.previous_hand?.history.map((entry) => entry.position)).toEqual(["BTN", "BB"]);
+  });
+
+  it("R3.13 a hero call that closes preflop in street mode is recorded as the street closing", async () => {
+    const { second } = await firstTwo({ stop_rule: "end_of_street" }, CALL_ACTION, {}, FACING_THREE_BET);
+    expect(second.previous_hand).toMatchObject({ board: [], end: "street_closed" });
+  });
+
+  it("R3.13 a hero call that closes preflop in full-hand mode is recorded at the flop reveal, with the flop", async () => {
+    const { second } = await firstTwo({ stop_rule: "end_of_hand" }, CALL_ACTION, {}, FACING_THREE_BET);
+    expect(second.previous_hand).toMatchObject({ board: ["3c", "Kh", "4c"], end: "street_closed" });
+  });
+});
+
+describe("R3.13 hand_decision_no counts the hero's decisions in the hand (O-335)", () => {
+  it("R3.13 a fresh 3-bet spot, dealt at a line with two raises, is decision 1", async () => {
+    const { app, player, drillId } = await setUp({ stop_rule: "end_of_street" }, {}, ["BB"], FACING_THREE_BET);
+    const sessionId = await startSession(app, player, drillId);
+    const first = await next(app, player, sessionId);
+    expect(first.history.map((entry) => entry.position)).toEqual(["BTN", "BB"]);
+    expect(first.hand_decision_no).toBe(1);
+    await app.close();
+  });
+
+  it("R3.13 street mode: the hero's second decision in one hand is decision 2, and a reload still answers 2", async () => {
+    const fake: Fake = { opponentChoice: { [OPEN_KEY]: THREE_BET_CHOICE } };
+    const { app, player, drillId } = await setUp({ stop_rule: "end_of_street" }, fake);
+    const sessionId = await startSession(app, player, drillId);
+    const first = await next(app, player, sessionId);
+    expect(first.hand_decision_no).toBe(1);
+    await decide(app, player, sessionId, first.state_version, OPEN_ACTION);
+    const second = await next(app, player, sessionId);
+    expect(second.hand_no).toBe(first.hand_no);
+    expect(second.hand_decision_no).toBe(2);
+    const reloaded = await next(app, player, sessionId);
+    expect(reloaded.hand_decision_no).toBe(2);
+    await app.close();
+  });
+
+  it("R3.13 the next hand starts again at decision 1", async () => {
+    const { second } = await firstTwo({ stop_rule: "end_of_street" }, OPEN_ACTION);
+    expect(second.hand_decision_no).toBe(1);
   });
 });

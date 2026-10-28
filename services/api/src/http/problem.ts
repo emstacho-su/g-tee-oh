@@ -10,10 +10,23 @@
  * everything else becomes a generic 500 whose body says nothing about the cause. The cause goes
  * to the log only, so a stack trace, SQL text or an internal identifier never reaches the
  * client (A9 section 3).
+ *
+ * Bounds (PR #30 review MEDIUM 1, field-error-cap.ts): buildProblem keeps at most
+ * MAX_PROBLEM_ERRORS field errors and puts the count of the rest in errors_omitted, and a
+ * validation issue about unknown keys names the object and the count, never the key text, so no
+ * request can make a problem large or make it echo what was sent.
+ *
+ * Extensions (RFC 9457 section 3.2): a ProblemError may carry extension members (numbers only),
+ * such as the no-coverage problem's pairs_total and pairs_queued. They are written before the
+ * standard members, so an extension can never replace type, status or errors. A route that
+ * answers one declares it on that status's response schema; the shared Problem schema stays as it
+ * was, so every other route's contract is unchanged.
  */
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import { z } from "zod";
+
+import { capErrors, MAX_PROBLEM_ERRORS, safeIssueMessage } from "./field-error-cap.js";
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
 
@@ -133,7 +146,17 @@ export const problemSchema = z
     detail: z.string().optional(),
     instance: z.string().optional().describe("The request path"),
     request_id: z.string().optional().describe("The x-request-id of the failed request"),
-    errors: z.array(problemFieldErrorSchema).optional().describe("Field errors of a validation problem"),
+    errors: z
+      .array(problemFieldErrorSchema)
+      .max(MAX_PROBLEM_ERRORS)
+      .optional()
+      .describe(`Field errors of a validation problem; at most ${MAX_PROBLEM_ERRORS}`),
+    errors_omitted: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(`How many field errors were left out of errors, which lists at most ${MAX_PROBLEM_ERRORS}; absent when none were`),
   })
   .meta({ id: "Problem", description: "RFC 9457 problem details (application/problem+json)" });
 
@@ -144,9 +167,16 @@ export function problemType(slug: ProblemSlug): string {
   return `${PROBLEM_TYPE_PREFIX}${slug}`;
 }
 
+/** RFC 9457 extension members of one problem: named numbers, declared by the route that answers them. */
+export type ProblemExtensions = Readonly<Record<string, number>>;
+
 export interface ProblemErrorOptions {
   detail?: string;
   errors?: readonly ProblemFieldError[];
+  /** Errors a caller already left out before passing errors (the export code decoder caps its own). */
+  errorsOmitted?: number;
+  /** Extension members written next to the standard ones; they never replace a standard member. */
+  extensions?: ProblemExtensions;
   /** Extra response headers, such as Retry-After. */
   headers?: Readonly<Record<string, string>>;
 }
@@ -157,6 +187,8 @@ export class ProblemError extends Error {
   readonly slug: ProblemSlug;
   readonly detail: string | undefined;
   readonly errors: readonly ProblemFieldError[] | undefined;
+  readonly errorsOmitted: number;
+  readonly extensions: ProblemExtensions;
   readonly headers: Readonly<Record<string, string>>;
 
   constructor(status: number, slug: ProblemSlug, options: ProblemErrorOptions = {}) {
@@ -166,8 +198,23 @@ export class ProblemError extends Error {
     this.slug = slug;
     this.detail = options.detail;
     this.errors = options.errors;
+    this.errorsOmitted = options.errorsOmitted ?? 0;
+    this.extensions = options.extensions ?? {};
     this.headers = options.headers ?? {};
   }
+}
+
+/** The errors member and, past the cap, errors_omitted (field-error-cap.ts). */
+function cappedErrorMembers(
+  errors: readonly ProblemFieldError[] | undefined,
+  alreadyOmitted = 0,
+): Pick<Problem, "errors" | "errors_omitted"> {
+  if (errors === undefined) {
+    return {};
+  }
+  const { kept, omitted } = capErrors(errors);
+  const total = omitted + alreadyOmitted;
+  return { errors: kept, ...(total === 0 ? {} : { errors_omitted: total }) };
 }
 
 export function buildProblem(
@@ -177,13 +224,14 @@ export function buildProblem(
   options: ProblemErrorOptions = {},
 ): Problem {
   return {
+    ...options.extensions,
     type: problemType(slug),
     title: TITLES[slug],
     status,
     ...(options.detail === undefined ? {} : { detail: options.detail }),
     instance: request.url.split("?")[0] ?? request.url,
     request_id: request.id,
-    ...(options.errors === undefined ? {} : { errors: [...options.errors] }),
+    ...cappedErrorMembers(options.errors, options.errorsOmitted),
   };
 }
 
@@ -198,7 +246,11 @@ function validationErrors(error: unknown): ProblemFieldError[] | undefined {
   const context = (error as { validationContext?: string }).validationContext ?? "request";
   return error.validation.map((issue) => {
     const pointer = issue.instancePath.replace(/^\//, "").replaceAll("/", ".");
-    return { path: pointer === "" ? context : `${context}.${pointer}`, message: issue.message ?? "invalid" };
+    const keys = (issue.params as { keys?: unknown } | undefined)?.keys;
+    return {
+      path: pointer === "" ? context : `${context}.${pointer}`,
+      message: safeIssueMessage(issue.keyword, issue.message ?? "invalid", keys),
+    };
   });
 }
 
@@ -215,6 +267,8 @@ export function problemErrorHandler(error: FastifyError, request: FastifyRequest
     const problem = buildProblem(error.status, error.slug, request, {
       ...(error.detail === undefined ? {} : { detail: error.detail }),
       ...(error.errors === undefined ? {} : { errors: error.errors }),
+      errorsOmitted: error.errorsOmitted,
+      extensions: error.extensions,
     });
     return sendProblem(reply, problem, error.headers);
   }

@@ -12,6 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ApiApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
 import { EXPORT_CODE_PREFIX, MAX_INFLATED_BYTES } from "../src/drills/export-code.js";
+import { insertDrill } from "../src/drills/repository.js";
+import { MAX_PROBLEM_ERRORS } from "../src/http/field-error-cap.js";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_REPLAYED_HEADER } from "../src/http/headers.js";
 import { problemSchema } from "../src/http/problem.js";
 import type { Drill, DrillCreateBody } from "../src/schemas/drills.js";
@@ -48,6 +50,15 @@ const DRILL: DrillCreateBody = {
     panels: { hero_range_matrix: true, threshold_card: true },
   },
 };
+
+/** A tags array of this many entries inflates to about 60 KiB, under the inflate cap. */
+const TAG_BOMB_ENTRIES = 30_000;
+/** The bomb's code stays short (the review's case was about 150 characters; this one is about 630). */
+const SHORT_CODE_LENGTH = 1024;
+/** A refused code's problem stays a few KB at most. */
+const SMALL_PROBLEM_BYTES = 4096;
+/** Key text that must never come back in a response. */
+const SECRET_KEY = "zzkeytextzz";
 
 interface ProblemBody {
   type: string;
@@ -167,6 +178,42 @@ describe("R3.14 drill export and import routes", () => {
     const code = `${EXPORT_CODE_PREFIX}${deflateSync(Buffer.from(JSON.stringify(payload))).toString("base64url")}`;
     const problem = await refused(code);
     expect(problem.errors?.some((error) => error.path.startsWith("body.export_code.trainer"))).toBe(true);
+  });
+
+  it("R3.14 a short code inflating to tens of thousands of tags answers a small 400 (MEDIUM 1)", async () => {
+    const payload = { ...DRILL, tags: Array.from({ length: TAG_BOMB_ENTRIES }, () => 0) };
+    const code = `${EXPORT_CODE_PREFIX}${deflateSync(Buffer.from(JSON.stringify(payload)), { level: 9 }).toString("base64url")}`;
+    expect(code.length).toBeLessThan(SHORT_CODE_LENGTH);
+    const response = await importCode(owner, code);
+    expect(response.statusCode).toBe(400);
+    expect(response.body.length).toBeLessThan(SMALL_PROBLEM_BYTES);
+    const problem = response.json<ProblemBody>();
+    expect(problem.errors?.length ?? 0).toBeGreaterThan(0);
+    expect(problem.errors?.length ?? 0).toBeLessThanOrEqual(MAX_PROBLEM_ERRORS);
+  });
+
+  it("R3.14 unknown keys in a code are counted, never echoed (MEDIUM 1)", async () => {
+    const payload = { ...DRILL, trainer: { ...DRILL.trainer, [SECRET_KEY]: true, [`${SECRET_KEY}2`]: 1 } };
+    const code = `${EXPORT_CODE_PREFIX}${deflateSync(Buffer.from(JSON.stringify(payload))).toString("base64url")}`;
+    const response = await importCode(owner, code);
+    expect(response.statusCode).toBe(400);
+    expect(response.body).not.toContain(SECRET_KEY);
+    expect(response.json<ProblemBody>().errors).toContainEqual({ path: "body.export_code.trainer", message: "2 unknown keys" });
+  });
+
+  it("R3.14 exporting a stored drill that breaks a write rule answers 422 naming the rule (MEDIUM 2)", async () => {
+    const legacy: DrillCreateBody = { ...DRILL, spot_filter: { ...DRILL.spot_filter, hero_positions: ["BTN"], villain_positions: ["BTN"] } };
+    const row = await insertDrill(database, ownerId, legacy);
+    const response = await app.inject({ method: "GET", url: `${API}/drills/${row.id}/export`, headers: readHeaders(owner) });
+    expect(response.statusCode).toBe(422);
+    expect(response.headers["content-type"]).toContain("application/problem+json");
+    const body = response.json<unknown>();
+    expect(contractErrors("get", "/api/v1/drills/{id}/export", 422, body)).toEqual([]);
+    const problem = problemSchema.parse(body);
+    expect(problem.type).toBe("urn:g-tee-oh:problem:validation");
+    expect(problem.detail?.startsWith("This drill can no longer be exported:")).toBe(true);
+    expect(problem.errors?.some((error) => error.path.startsWith("drill.spot_filter"))).toBe(true);
+    expect(problem.errors?.length ?? 0).toBeLessThanOrEqual(MAX_PROBLEM_ERRORS);
   });
 
   it("R3.14 a refused import writes no drill", async () => {

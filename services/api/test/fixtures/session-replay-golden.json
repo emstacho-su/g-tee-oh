@@ -43,6 +43,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 0,
+      "hand_decision_no": 1,
       "previous_hand": null
     },
     "feedback": {
@@ -115,6 +116,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 1,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 0,
         "history": [
@@ -203,6 +205,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 2,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 1,
         "history": [
@@ -291,6 +294,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 3,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 2,
         "history": [
@@ -379,6 +383,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 4,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 3,
         "history": [
@@ -467,6 +472,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 5,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 4,
         "history": [
@@ -555,6 +561,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 6,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 5,
         "history": [
@@ -643,6 +650,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 7,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 6,
         "history": [
@@ -731,6 +739,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 8,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 7,
         "history": [
@@ -819,6 +828,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 9,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 8,
         "history": [
@@ -907,6 +917,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 10,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 9,
         "history": [
@@ -995,6 +1006,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 11,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 10,
         "history": [
@@ -1083,6 +1095,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 12,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 11,
         "history": [
@@ -1171,6 +1184,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 13,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 12,
         "history": [
@@ -1279,6 +1293,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 13,
+      "hand_decision_no": 2,
       "previous_hand": {
         "hand_no": 12,
         "history": [
@@ -1373,6 +1388,7 @@
       ],
       "synthetic": true,
       "hand_no": 14,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 13,
         "history": [
@@ -1470,6 +1486,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 15,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 14,
         "history": [
@@ -1562,6 +1579,7 @@
       ],
       "synthetic": true,
       "hand_no": 16,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 15,
         "history": [
@@ -1654,6 +1672,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 17,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 16,
         "history": [
@@ -1742,6 +1761,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 18,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 17,
         "history": [
@@ -1830,6 +1850,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 19,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 18,
         "history": [
@@ -1918,6 +1939,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 20,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 19,
         "history": [
@@ -2006,6 +2028,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 21,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 20,
         "history": [
@@ -2114,6 +2137,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 21,
+      "hand_decision_no": 2,
       "previous_hand": {
         "hand_no": 20,
         "history": [
@@ -2208,6 +2232,7 @@
       ],
       "synthetic": true,
       "hand_no": 22,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 21,
         "history": [
@@ -2305,6 +2330,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 23,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 22,
         "history": [
@@ -2413,6 +2439,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 23,
+      "hand_decision_no": 2,
       "previous_hand": {
         "hand_no": 22,
         "history": [
@@ -2507,6 +2534,7 @@
       ],
       "synthetic": true,
       "hand_no": 24,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 23,
         "history": [
@@ -2604,6 +2632,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 25,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 24,
         "history": [
@@ -2692,6 +2721,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 26,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 25,
         "history": [
@@ -2780,6 +2810,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 27,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 26,
         "history": [
@@ -2868,6 +2899,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 28,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 27,
         "history": [
@@ -2976,6 +3008,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 28,
+      "hand_decision_no": 2,
       "previous_hand": {
         "hand_no": 27,
         "history": [
@@ -3070,6 +3103,7 @@
       ],
       "synthetic": true,
       "hand_no": 29,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 28,
         "history": [
@@ -3171,6 +3205,7 @@
       ],
       "synthetic": true,
       "hand_no": 30,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 29,
         "history": [
@@ -3263,6 +3298,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 31,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 30,
         "history": [
@@ -3351,6 +3387,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 32,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 31,
         "history": [
@@ -3439,6 +3476,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 33,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 32,
         "history": [
@@ -3547,6 +3585,7 @@
       "previous_board": null,
       "synthetic": true,
       "hand_no": 33,
+      "hand_decision_no": 2,
       "previous_hand": {
         "hand_no": 32,
         "history": [
@@ -3641,6 +3680,7 @@
       ],
       "synthetic": true,
       "hand_no": 34,
+      "hand_decision_no": 1,
       "previous_hand": {
         "hand_no": 33,
         "history": [

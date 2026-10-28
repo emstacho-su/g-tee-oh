@@ -76,11 +76,17 @@ export const sessionSchema = z
   .meta({ id: "PracticeSession" });
 
 /**
- * How a hand ended (S26, O-313): a fold, the street closing (in full-hand mode the flop is then in
- * the board), the hand leaving the solution's range, or the stop rule (spot mode ends every hand
- * after the hero's one decision).
+ * How a hand ended (S26, O-313), recorded on the transition that ended it (sessions/hand-end.ts,
+ * PR #30 review MEDIUM 5): a fold; the street closing (in full-hand mode the hand ends when the
+ * flop is shown, and the flop is then in the board); the hand leaving the solution's range; or the
+ * stop rule (spot mode ends every hand after the hero's one decision, even when that decision
+ * closed the street).
  */
-export const previousHandEndSchema = z.enum(["fold", "street_closed", "off_range", "stop_rule"]);
+export const previousHandEndSchema = z
+  .enum(["fold", "street_closed", "off_range", "stop_rule"])
+  .describe(
+    "fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)",
+  );
 
 export const previousHandSchema = z
   .object({
@@ -124,6 +130,13 @@ export const promptSchema = z
       .int()
       .min(0)
       .describe("The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313)"),
+    hand_decision_no: z
+      .number()
+      .int()
+      .min(1)
+      .describe(
+        "The hero's decision index within this hand, from 1; actions the hand was dealt with (its spot's line) do not count (O-335)",
+      ),
     previous_hand: previousHandSchema
       .nullable()
       .describe("How the last ended hand closed; null before the first hand ends (O-313)"),

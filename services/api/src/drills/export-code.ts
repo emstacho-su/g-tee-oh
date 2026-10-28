@@ -17,34 +17,51 @@
  * 4. inflate: zlib inflateSync with maxOutputLength MAX_INFLATED_BYTES, so a compression bomb is
  *    stopped by zlib itself before more than the cap is ever produced (RangeError ERR_BUFFER_TOO_LARGE);
  * 5. JSON: the inflated bytes must be UTF-8 JSON;
- * 6. shape: a strict Zod object (unknown keys rejected at every depth) with the stored shapes;
- * 7. write rules: drillCreateBodySchema, the same rules a POST /drills body meets (SpotFilterWrite).
+ * 6. structure: no array longer than MAX_PAYLOAD_ARRAY_ITEMS (the largest list a drill may hold)
+ *    and no nesting deeper than MAX_PAYLOAD_DEPTH, checked before any schema runs, so a short code
+ *    that inflates to tens of thousands of entries is one issue, never one issue per entry
+ *    (PR #30 review MEDIUM 1);
+ * 7. shape: a strict Zod object (unknown keys rejected at every depth) with the stored shapes and
+ *    the write limits on name and tags;
+ * 8. write rules: drillCreateBodySchema, the same rules a POST /drills body meets (SpotFilterWrite).
+ * Issues are capped at MAX_PROBLEM_ERRORS with the rest counted, and unknown keys are reported as
+ * a count at their object's path, never by their text (http/field-error-cap.ts).
+ *
+ * Export runs step 8 on the stored drill too (exportIssues, MEDIUM 2): a drill written before a
+ * write rule existed is refused rather than exported as a code its own import would refuse.
  */
 import { deflateSync, inflateSync } from "node:zlib";
 import { z } from "zod";
 
 import { canonicalJson } from "../http/canonical-json.js";
+import { capErrors, safeIssueMessage } from "../http/field-error-cap.js";
 import {
   drillCreateBodySchema,
+  EXPORT_CODE_PREFIX,
+  MAX_DRILL_NAME_LENGTH,
   MAX_EXPORT_CODE_LENGTH,
+  MAX_FLOPS,
+  MAX_TAGS,
   storedSpotFilterSchema,
   trainerSettingsSchema,
   type DrillCreateBody,
 } from "../schemas/drills.js";
 
-export { MAX_EXPORT_CODE_LENGTH };
+export { EXPORT_CODE_PREFIX, MAX_EXPORT_CODE_LENGTH };
 
-/** Format version 1 of g-tee-oh's export code (O-310). */
-export const EXPORT_CODE_PREFIX = "gteeoh1.";
 /** The most bytes a code may inflate to (64 KiB); a real drill inflates to under 2 KiB. */
 export const MAX_INFLATED_BYTES = 64 * 1024;
+/** The longest list a drill may hold: the explicit flop subset (schemas/drills.ts MAX_FLOPS). */
+export const MAX_PAYLOAD_ARRAY_ITEMS = MAX_FLOPS;
+/** The deepest a drill nests (payload, spot_filter, board, flops) with room to spare. */
+export const MAX_PAYLOAD_DEPTH = 6;
 
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]{2,}$/;
 
-/** The decoded payload's shape: strict at every depth, before the write rules run. */
+/** The decoded payload's shape: strict at every depth, with the write limits, before the write rules run. */
 const exportPayloadShapeSchema = z.strictObject({
-  name: z.string(),
-  tags: z.array(z.string()),
+  name: z.string().max(MAX_DRILL_NAME_LENGTH),
+  tags: z.array(z.string()).max(MAX_TAGS),
   spot_filter: storedSpotFilterSchema,
   trainer: trainerSettingsSchema,
 });
@@ -57,6 +74,12 @@ export interface ExportCodeIssue {
   message: string;
 }
 
+/** At most MAX_PROBLEM_ERRORS issues, and how many were left out. */
+export interface CappedIssues {
+  issues: ExportCodeIssue[];
+  omitted: number;
+}
+
 const FAILURE_TEXT: Readonly<Record<ExportCodeFailure, string>> = {
   too_long: `The export code is longer than ${MAX_EXPORT_CODE_LENGTH} characters.`,
   version: `The export code does not start with ${EXPORT_CODE_PREFIX}, the export code version this server reads.`,
@@ -65,16 +88,21 @@ const FAILURE_TEXT: Readonly<Record<ExportCodeFailure, string>> = {
   invalid: "The export code decodes to a drill this server does not accept.",
 };
 
+const NO_ISSUES: CappedIssues = { issues: [], omitted: 0 };
+
 /** Why an export code was refused; the route answers it as a 400 validation problem. */
 export class ExportCodeError extends Error {
   readonly reason: ExportCodeFailure;
   readonly issues: readonly ExportCodeIssue[];
+  /** Issues left out past the cap (http/field-error-cap.ts). */
+  readonly omitted: number;
 
-  constructor(reason: ExportCodeFailure, issues: readonly ExportCodeIssue[] = []) {
+  constructor(reason: ExportCodeFailure, capped: CappedIssues = NO_ISSUES) {
     super(FAILURE_TEXT[reason]);
     this.name = "ExportCodeError";
     this.reason = reason;
-    this.issues = issues;
+    this.issues = capped.issues;
+    this.omitted = capped.omitted;
   }
 }
 
@@ -104,8 +132,38 @@ function parseJson(bytes: Buffer): unknown {
   }
 }
 
-function issuesOf(error: z.ZodError): ExportCodeIssue[] {
-  return error.issues.map((issue) => ({ path: issue.path.map(String).join("."), message: issue.message }));
+/**
+ * The first structural bound the value breaks, or undefined. The issue's path is the payload's
+ * (""), because a deeper path could hold key text the code supplied. Recursion stops at
+ * MAX_PAYLOAD_DEPTH, so it is bounded however the JSON nests.
+ */
+export function structureIssue(value: unknown, depth = 0): ExportCodeIssue | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  if (depth >= MAX_PAYLOAD_DEPTH) {
+    return { path: "", message: `The drill nests deeper than ${MAX_PAYLOAD_DEPTH} levels.` };
+  }
+  if (Array.isArray(value) && value.length > MAX_PAYLOAD_ARRAY_ITEMS) {
+    return { path: "", message: `A list in the drill holds more than ${MAX_PAYLOAD_ARRAY_ITEMS} items.` };
+  }
+  for (const child of Object.values(value)) {
+    const issue = structureIssue(child, depth + 1);
+    if (issue !== undefined) {
+      return issue;
+    }
+  }
+  return undefined;
+}
+
+/** Zod issues as dotted paths with safe messages, capped (http/field-error-cap.ts). */
+export function issuesOf(error: z.ZodError): CappedIssues {
+  const { kept, omitted } = capErrors(error.issues);
+  const issues = kept.map((issue) => ({
+    path: issue.path.map(String).join("."),
+    message: safeIssueMessage(issue.code, issue.message, "keys" in issue ? issue.keys : undefined),
+  }));
+  return { issues, omitted };
 }
 
 /** The DrillCreate body an export code holds; throws ExportCodeError on any failed guard. */
@@ -121,6 +179,10 @@ export function decodeExportCode(code: string): DrillCreateBody {
     throw new ExportCodeError("malformed");
   }
   const json = parseJson(inflate(body));
+  const structure = structureIssue(json);
+  if (structure !== undefined) {
+    throw new ExportCodeError("invalid", { issues: [structure], omitted: 0 });
+  }
   const shape = exportPayloadShapeSchema.safeParse(json);
   if (!shape.success) {
     throw new ExportCodeError("invalid", issuesOf(shape.error));
@@ -130,4 +192,13 @@ export function decodeExportCode(code: string): DrillCreateBody {
     throw new ExportCodeError("invalid", issuesOf(drill.error));
   }
   return drill.data;
+}
+
+/** A stored drill checked against today's write rules before export (MEDIUM 2). */
+export type ExportCheck = { ok: true; drill: DrillCreateBody } | ({ ok: false } & CappedIssues);
+
+/** The stored drill as the write rules accept it, or the rules it breaks (capped). */
+export function checkExportable(drill: DrillCreateBody): ExportCheck {
+  const parsed = drillCreateBodySchema.safeParse(drill);
+  return parsed.success ? { ok: true, drill: parsed.data } : { ok: false, ...issuesOf(parsed.error) };
 }

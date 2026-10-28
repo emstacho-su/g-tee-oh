@@ -5,8 +5,49 @@
  * ended session (409 session-ended), and a drill whose spot filter the library cannot satisfy (422
  * no-coverage with a named reason, O-249). The reason names which part of the filter failed, so the
  * player knows what to change in the drill.
+ *
+ * The no-coverage problem POST /sessions answers also carries the drill's counts as RFC 9457
+ * extension members (S26, PR #30 review MEDIUM 3, O-318): pairs_total, the (configuration, pair)
+ * candidates the drill reaches, and pairs_queued, the uncovered ones queued for the builder. A
+ * client reads them as numbers instead of parsing the detail text. NoCoverageProblem declares them
+ * on that route's 422 response; they are optional there because the same status also answers an
+ * Idempotency-Key mismatch, and GET /next's no-coverage problem (no hand in range) has no counts.
  */
-import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { z } from "zod";
+
+import { HTTP_STATUS, PROBLEM_CONTENT_TYPE, PROBLEM_SLUGS, ProblemError, problemSchema } from "../http/problem.js";
+
+export const noCoverageProblemSchema = problemSchema
+  .extend({
+    pairs_total: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("No-coverage only: the (configuration, position pair) candidates the drill's filter reaches"),
+    pairs_queued: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("No-coverage only: the uncovered candidates, each queued for the builder"),
+  })
+  .meta({
+    id: "NoCoverageProblem",
+    description: "A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued",
+  });
+
+/** POST /sessions's 422 response entry, which declares the no-coverage extension members. */
+export const NO_COVERAGE_RESPONSE = {
+  description: "Problem (422): no-coverage, with pairs_total and pairs_queued, or an Idempotency-Key mismatch",
+  content: { [PROBLEM_CONTENT_TYPE]: { schema: noCoverageProblemSchema } },
+};
+
+/** The counts a refused drill reports (O-312's coverage, less the covered part). */
+export interface UncoveredCounts {
+  pairsTotal: number;
+  pairsQueued: number;
+}
 
 /** Why a drill's filter cannot be dealt, as the 422 detail names it. */
 export const FILTER_UNMET_REASONS = {
@@ -32,8 +73,9 @@ export function sessionEndedProblem(): ProblemError {
   return new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.sessionEnded, { detail: "This session has ended." });
 }
 
-export function filterUnmetProblem(reason: FilterUnmetReason, extra = ""): ProblemError {
+export function filterUnmetProblem(reason: FilterUnmetReason, extra = "", counts?: UncoveredCounts): ProblemError {
   return new ProblemError(HTTP_STATUS.unprocessable, PROBLEM_SLUGS.noCoverage, {
     detail: `This drill cannot be dealt: ${FILTER_UNMET_REASONS[reason]}.${extra === "" ? "" : ` ${extra}`}`,
+    ...(counts === undefined ? {} : { extensions: { pairs_total: counts.pairsTotal, pairs_queued: counts.pairsQueued } }),
   });
 }

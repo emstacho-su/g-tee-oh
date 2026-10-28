@@ -14,6 +14,7 @@ import {
   AcceptanceFileError,
   DEFAULT_ACCEPTANCE_FILE,
   expressDrill,
+  lineAndColumn,
   loadAcceptanceFile,
   REPO_ROOT,
   resolveAcceptancePath,
@@ -91,6 +92,30 @@ describe("R3.15 the drill acceptance file", () => {
   it("R3.15 a file that is not JSON is rejected", () => {
     const error = loadError(written("bad.json", "{ version: 1,"));
     expect(error.message).toMatch(/not valid JSON/);
+  });
+
+  it("R3.15 bad JSON is reported only as a line and column, never the parser's text or the file's (LOW 7)", () => {
+    const path = written("bad-line.json", '{\n  "version": 1,\n  zzfilecontentzz: true\n}');
+    const error = loadError(path);
+    expect(error.message).toBe(`the acceptance file ${path} is not valid JSON (line 3, column 3)`);
+    expect(error.message).not.toContain("zzfilecontentzz");
+  });
+
+  it("R3.15 truncated JSON is reported at the end of the file (LOW 7)", () => {
+    const path = written("truncated.json", '{\n  "version": 1,');
+    expect(loadError(path).message).toBe(`the acceptance file ${path} is not valid JSON (line 2, column 16)`);
+  });
+
+  it("R3.15 a path not ending in .json is refused before it is read (LOW 7)", () => {
+    const present = written("cases.txt", JSON.stringify(file()));
+    expect(loadError(present).message).toBe(`the acceptance file ${present} is not a .json file`);
+    const absent = join(directory, "absent.yaml");
+    expect(loadError(absent).message).toBe(`the acceptance file ${absent} is not a .json file`);
+  });
+
+  it("R3.15 lineAndColumn turns an offset into a line and column", () => {
+    expect(lineAndColumn("ab\ncd", 4)).toEqual({ line: 2, column: 2 });
+    expect(lineAndColumn("abc", 0)).toEqual({ line: 1, column: 1 });
   });
 
   it("R3.15 an unknown top-level key is rejected", () => {

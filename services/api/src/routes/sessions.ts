@@ -29,6 +29,7 @@ import {
   sessionCreateBodySchema,
   sessionSchema,
 } from "../schemas/training.js";
+import { NO_COVERAGE_RESPONSE } from "../sessions/problems.js";
 import { createSession, endSession, nextPrompt } from "../sessions/service.js";
 import type { ConfiguredRouteOptions } from "./route-options.js";
 
@@ -53,7 +54,7 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
         security: AUTHENTICATED,
         headers: mutatingHeadersSchema,
         body: sessionCreateBodySchema,
-        response: { 201: sessionSchema, ...problemResponses(CREATE_PROBLEMS) },
+        response: { 201: sessionSchema, ...problemResponses(CREATE_PROBLEMS), [HTTP_STATUS.unprocessable]: NO_COVERAGE_RESPONSE },
       },
     },
     async (request, reply) => {

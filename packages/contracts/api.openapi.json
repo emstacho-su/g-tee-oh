@@ -41,7 +41,8 @@
             "type": "string"
           },
           "errors": {
-            "description": "Field errors of a validation problem",
+            "description": "Field errors of a validation problem; at most 20",
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",
@@ -59,6 +60,12 @@
                 "message"
               ]
             }
+          },
+          "errors_omitted": {
+            "description": "How many field errors were left out of errors, which lists at most 20; absent when none were",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -1737,7 +1744,7 @@
           "alternate_seats"
         ],
         "additionalProperties": false,
-        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)"
+        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates, three distinct cards in each board flop)"
       },
       "TrainerSettingsInput": {
         "type": "object",
@@ -2129,7 +2136,8 @@
               "street_closed",
               "off_range",
               "stop_rule"
-            ]
+            ],
+            "description": "fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)"
           }
         },
         "required": [
@@ -2302,6 +2310,12 @@
             "maximum": 9007199254740991,
             "description": "The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313)"
           },
+          "hand_decision_no": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "The hero's decision index within this hand, from 1; actions the hand was dealt with (its spot's line) do not count (O-335)"
+          },
           "previous_hand": {
             "anyOf": [
               {
@@ -2331,6 +2345,7 @@
           "previous_board",
           "synthetic",
           "hand_no",
+          "hand_decision_no",
           "previous_hand"
         ]
       },
@@ -2490,6 +2505,79 @@
           "ev_loss_bb_total"
         ]
       },
+      "NoCoverageProblemInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URN naming the problem, urn:g-tee-oh:problem:<slug>"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "description": "The request path",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "The x-request-id of the failed request",
+            "type": "string"
+          },
+          "errors": {
+            "description": "Field errors of a validation problem; at most 20",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Dotted path of the offending field, prefixed by its location"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ]
+            }
+          },
+          "errors_omitted": {
+            "description": "How many field errors were left out of errors, which lists at most 20; absent when none were",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pairs_total": {
+            "description": "No-coverage only: the (configuration, position pair) candidates the drill's filter reaches",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pairs_queued": {
+            "description": "No-coverage only: the uncovered candidates, each queued for the builder",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "description": "A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued"
+      },
       "Problem": {
         "type": "object",
         "properties": {
@@ -2517,7 +2605,8 @@
             "type": "string"
           },
           "errors": {
-            "description": "Field errors of a validation problem",
+            "description": "Field errors of a validation problem; at most 20",
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",
@@ -2536,6 +2625,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "errors_omitted": {
+            "description": "How many field errors were left out of errors, which lists at most 20; absent when none were",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         },
         "required": [
@@ -4240,7 +4335,7 @@
           "alternate_seats"
         ],
         "additionalProperties": false,
-        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates)"
+        "description": "A spot filter as written; also checked across fields (seated positions, disjoint seats, stake by format, no duplicates, three distinct cards in each board flop)"
       },
       "TrainerSettings": {
         "type": "object",
@@ -4637,7 +4732,8 @@
               "street_closed",
               "off_range",
               "stop_rule"
-            ]
+            ],
+            "description": "fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)"
           }
         },
         "required": [
@@ -4812,6 +4908,12 @@
             "maximum": 9007199254740991,
             "description": "The hand this decision belongs to; equal on two prompts of one hand (street and full-hand modes, O-313)"
           },
+          "hand_decision_no": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "The hero's decision index within this hand, from 1; actions the hand was dealt with (its spot's line) do not count (O-335)"
+          },
           "previous_hand": {
             "anyOf": [
               {
@@ -4841,6 +4943,7 @@
           "previous_board",
           "synthetic",
           "hand_no",
+          "hand_decision_no",
           "previous_hand"
         ],
         "additionalProperties": false
@@ -5002,6 +5105,81 @@
           "ev_loss_bb_total"
         ],
         "additionalProperties": false
+      },
+      "NoCoverageProblem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URN naming the problem, urn:g-tee-oh:problem:<slug>"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "description": "The request path",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "The x-request-id of the failed request",
+            "type": "string"
+          },
+          "errors": {
+            "description": "Field errors of a validation problem; at most 20",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Dotted path of the offending field, prefixed by its location"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "errors_omitted": {
+            "description": "How many field errors were left out of errors, which lists at most 20; absent when none were",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pairs_total": {
+            "description": "No-coverage only: the (configuration, position pair) candidates the drill's filter reaches",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pairs_queued": {
+            "description": "No-coverage only: the uncovered candidates, each queued for the builder",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "additionalProperties": false,
+        "description": "A problem (RFC 9457); the no-coverage problem of POST /sessions adds pairs_total and pairs_queued"
       }
     }
   },
@@ -6517,7 +6695,7 @@
         "tags": [
           "drills"
         ],
-        "description": "g-tee-oh's own encoding of the drill's name, tags, spot filter and trainer settings (O-310).",
+        "description": "g-tee-oh's own encoding of the drill's name, tags, spot filter and trainer settings (O-310). A stored drill that today's write rules refuse (written before a rule existed) is a 422 validation problem whose detail starts with \"This drill can no longer be exported:\" and whose errors name the failing paths.",
         "parameters": [
           {
             "schema": {
@@ -6545,7 +6723,9 @@
                   "properties": {
                     "export_code": {
                       "type": "string",
-                      "description": "g-tee-oh's own encoding of a drill (O-310)"
+                      "format": "starts_with",
+                      "pattern": "^gteeoh1\\..*",
+                      "description": "g-tee-oh's own encoding of a drill (O-310); starts with gteeoh1."
                     }
                   },
                   "required": [
@@ -6578,6 +6758,16 @@
           },
           "404": {
             "description": "Problem (404)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem (422)",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7553,11 +7743,11 @@
             }
           },
           "422": {
-            "description": "Problem (422)",
+            "description": "Problem (422): no-coverage, with pairs_total and pairs_queued, or an Idempotency-Key mismatch",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Problem"
+                  "$ref": "#/components/schemas/NoCoverageProblem"
                 }
               }
             }

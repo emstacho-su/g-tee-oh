@@ -74,6 +74,13 @@ export const handStateSchema = z.strictObject({
   end: handEndSchema.nullable(),
   last_action_kind: actionKindSchema.nullable(),
   history: z.array(historyEntrySchema),
+  /**
+   * How many history entries the hand was dealt with: its hero spot's line (S26, O-335). The
+   * hero's decisions in the hand are the hero's entries after these, so a spot dealt facing a
+   * 3-bet (whose line holds the hero's own open) starts at decision 1. Absent on rows written
+   * before S26, which then count from the start of the history.
+   */
+  dealt_history_length: z.number().int().min(0).optional(),
   board: z.array(cardSchema),
   opponent_rng_state: hex64Schema,
   roll_rng_state: hex64Schema,
