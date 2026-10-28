@@ -131,12 +131,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -228,12 +230,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -325,12 +329,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -422,12 +428,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -519,12 +527,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -616,12 +626,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -713,12 +725,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -810,12 +824,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -907,12 +923,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1004,12 +1022,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1101,12 +1121,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1198,12 +1220,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1295,12 +1319,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1360,12 +1386,14 @@
         {
           "position": "BTN",
           "token": "r250",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "street": "preflop"
         },
         {
           "position": "BB",
           "token": "r1000",
-          "label": "Raise to 10bb"
+          "label": "Raise to 10bb",
+          "street": "preflop"
         }
       ],
       "buttons": [
@@ -1412,12 +1440,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1515,17 +1545,20 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           },
           {
             "position": "BTN",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -1621,12 +1654,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1722,12 +1757,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -1823,12 +1860,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -1920,12 +1959,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2017,12 +2058,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2114,12 +2157,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2211,12 +2256,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2276,12 +2323,14 @@
         {
           "position": "BTN",
           "token": "r250",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "street": "preflop"
         },
         {
           "position": "BB",
           "token": "r1000",
-          "label": "Raise to 10bb"
+          "label": "Raise to 10bb",
+          "street": "preflop"
         }
       ],
       "buttons": [
@@ -2328,12 +2377,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2431,17 +2482,20 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           },
           {
             "position": "BTN",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -2537,12 +2591,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2602,12 +2658,14 @@
         {
           "position": "BTN",
           "token": "r250",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "street": "preflop"
         },
         {
           "position": "BB",
           "token": "r1000",
-          "label": "Raise to 10bb"
+          "label": "Raise to 10bb",
+          "street": "preflop"
         }
       ],
       "buttons": [
@@ -2654,12 +2712,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2757,17 +2817,20 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           },
           {
             "position": "BTN",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -2863,12 +2926,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -2960,12 +3025,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3057,12 +3124,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3154,12 +3223,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3219,12 +3290,14 @@
         {
           "position": "BTN",
           "token": "r250",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "street": "preflop"
         },
         {
           "position": "BB",
           "token": "r1000",
-          "label": "Raise to 10bb"
+          "label": "Raise to 10bb",
+          "street": "preflop"
         }
       ],
       "buttons": [
@@ -3271,12 +3344,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3374,17 +3449,20 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           },
           {
             "position": "BTN",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -3484,12 +3562,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [
@@ -3587,12 +3667,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3684,12 +3766,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3781,12 +3865,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -3846,12 +3932,14 @@
         {
           "position": "BTN",
           "token": "r250",
-          "label": "Raise to 2.5bb"
+          "label": "Raise to 2.5bb",
+          "street": "preflop"
         },
         {
           "position": "BB",
           "token": "r1000",
-          "label": "Raise to 10bb"
+          "label": "Raise to 10bb",
+          "street": "preflop"
         }
       ],
       "buttons": [
@@ -3898,12 +3986,14 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "f",
-            "label": "Fold"
+            "label": "Fold",
+            "street": "preflop"
           }
         ],
         "board": [],
@@ -4001,17 +4091,20 @@
           {
             "position": "BTN",
             "token": "r250",
-            "label": "Raise to 2.5bb"
+            "label": "Raise to 2.5bb",
+            "street": "preflop"
           },
           {
             "position": "BB",
             "token": "r1000",
-            "label": "Raise to 10bb"
+            "label": "Raise to 10bb",
+            "street": "preflop"
           },
           {
             "position": "BTN",
             "token": "c",
-            "label": "Call"
+            "label": "Call",
+            "street": "preflop"
           }
         ],
         "board": [

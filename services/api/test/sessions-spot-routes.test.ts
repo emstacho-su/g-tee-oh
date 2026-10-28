@@ -34,7 +34,8 @@ type Prompt = ReturnType<typeof promptSchema.parse>;
 type SpotFilterBody = DrillCreateBody["spot_filter"];
 
 const SPOT_MODE: Partial<TrainerSettings> = { stop_rule: "after_action" };
-const OPEN = { position: "BTN", token: "r250", label: "r250" };
+// Every history entry names its street (S38 review round 1); a spot line is preflop.
+const OPEN = { position: "BTN", token: "r250", label: "r250", street: "preflop" };
 
 let database: Database;
 let pool: pg.Pool;
@@ -129,7 +130,7 @@ describe("R3.6 each hand is dealt at a stored hero spot (PR #25 review HIGH 1, r
     const started = performance.now();
     const prompt = await next(app, player, sessionId);
     expect(performance.now() - started).toBeLessThan(SESSION_DEADLINE_MS);
-    expect(prompt.history).toEqual([OPEN, { position: "BB", token: "r1000", label: "r1000" }]);
+    expect(prompt.history).toEqual([OPEN, { position: "BB", token: "r1000", label: "r1000", street: "preflop" }]);
     expect(prompt.hero_position).toBe("BTN");
     expect(sq.count("/v1/deal") - dealsBefore).toBe(1);
     expect(sq.count("/v1/sample-action")).toBe(0);

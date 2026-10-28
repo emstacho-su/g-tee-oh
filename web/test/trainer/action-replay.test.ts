@@ -100,6 +100,26 @@ describe("R3.13 seatActions and logLines (O-383)", () => {
     expect(all.get("CO")?.folded).toBe(true);
   });
 
+  it("R3.13 a full-hand flop prompt clears the preflop bets and badges, and folds stay folded (review round 1)", () => {
+    const pre = (entry: Entry): Entry => ({ ...entry, street: "preflop" });
+    const flopCheck: Entry = { position: "BB", token: "x", label: "Check", street: "flop" };
+    const handHistory: Entry[] = [pre(fold("UTG")), pre(raise("BTN", 250)), pre(call("BB")), flopCheck];
+    // Mid-replay, still preflop: the open and the call sit at the bet spots.
+    const preflop = seatActions(handHistory, 3);
+    expect(preflop.get("BTN")).toEqual({ label: "Raise 2.5bb", folded: false, chip: "Raise 2.5bb" });
+    expect(preflop.get("BB")).toEqual({ label: "Call", folded: false, chip: "Call" });
+    // The flop's first action starts a new street: the pot holds the preflop chips, so no seat
+    // keeps a preflop chip or badge, and the preflop fold still folds UTG.
+    const flop = seatActions(handHistory, 4);
+    expect(flop.get("BTN")).toBeUndefined();
+    expect(flop.get("BB")).toEqual({ label: "Check", folded: false, chip: null });
+    expect(flop.get("UTG")).toEqual({ label: "Fold", folded: true, chip: null });
+  });
+
+  it("R3.13 entries without a street (stored before review round 1) stay one street", () => {
+    expect(seatActions(history, 4).get("HJ")).toEqual({ label: "Raise 2.5bb", folded: false, chip: "Raise 2.5bb" });
+  });
+
   it("R3.13 a check shows a badge and no chip", () => {
     expect(seatActions([{ position: "BB", token: "x", label: "Check" }], 1).get("BB")).toEqual({ label: "Check", folded: false, chip: null });
   });

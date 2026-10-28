@@ -99,15 +99,27 @@ export function planReplay(previous: TrainerPrompt | null, current: TrainerPromp
   };
 }
 
-/** What each seat shows after the first `shown` entries: its last action. */
+/**
+ * What each seat shows after the first `shown` entries (S38 review round 1). Badges and chips belong
+ * to the street being played: when an entry's street (the api's history entry street) differs from
+ * the entry before it, a new street has started, the pot holds the earlier bets, and every seat's
+ * badge and chip clear. A fold folds the seat for the rest of the hand. Entries without a street
+ * (stored before the field existed) count as the street of the entry before them, so an old history
+ * stays one street; the web never infers a street from the actions.
+ */
 export function seatActions(history: readonly HistoryEntry[], shown: number): ReadonlyMap<Position, SeatAction> {
-  const seats = new Map<Position, SeatAction>();
+  const folds = new Map<Position, SeatAction>();
+  let street: HistoryEntry["street"];
+  let onStreet = new Map<Position, SeatAction>();
   for (const entry of history.slice(0, shown)) {
+    if (entry.street !== undefined && street !== undefined && entry.street !== street) onStreet = new Map();
+    street = entry.street ?? street;
     const folded = entry.token === FOLD_TOKEN;
-    const chip = folded || entry.token === CHECK_TOKEN ? null : entry.label;
-    seats.set(entry.position, { label: entry.label, folded, chip });
+    const action: SeatAction = { label: entry.label, folded, chip: folded || entry.token === CHECK_TOKEN ? null : entry.label };
+    if (folded) folds.set(entry.position, action);
+    onStreet.set(entry.position, action);
   }
-  return seats;
+  return new Map([...folds, ...onStreet]);
 }
 
 /** The log's lines after the first `shown` entries, with "Your turn" once the replay has ended (O-383). */

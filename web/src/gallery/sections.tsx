@@ -104,9 +104,9 @@ export function TableSections() {
       <GallerySection
         name="poker-table-9"
         title="PokerTable, 9 seats with a straddle"
-        note="Live table after the replay: UTG straddle marker, HJ raise and BTN call chips, a flop on the board."
+        note="A straddled pot preflop after the replay: UTG straddle marker, HJ raise and BTN call chips; the chips clear when the flop's first action starts a new street."
       >
-        <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={["Kh", "7d", "2c"]} />} />
+        <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={[]} />} />
       </GallerySection>
       <GallerySection name="cards" title="CardView" note="Rank and suit symbol with an accessible name; face down; four-color.">
         <div className="flex flex-wrap items-end gap-2">

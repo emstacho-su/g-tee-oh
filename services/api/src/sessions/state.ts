@@ -55,6 +55,8 @@ export const historyEntrySchema = z.strictObject({
   position: positionSchema,
   token: z.string(),
   label: z.string(),
+  /** The street the action was taken on (S38 review round 1); absent on entries stored before it. */
+  street: streetSchema.optional(),
 });
 
 /**
