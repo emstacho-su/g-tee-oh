@@ -80,10 +80,18 @@ export async function pauseThenResume(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Pause the builder" })).toBeVisible();
 }
 
-/** Changes the CPU share, saves, reloads, sees it stored, and restores the value it found. */
+/**
+ * Changes the CPU share, saves, reloads, sees it stored, then restores the value in force it
+ * found (PR #28 review L8). When that value was the builder default, no route can delete the
+ * override (the app role has no delete grant on builder_setting, O-241, and the PATCH has no
+ * reset), so the restore stores the default's own value: the builder behaves exactly as before,
+ * and the field's hint then says "Now <value>" without "(builder default)". The e2e database is
+ * fresh on every run (infra/compose/e2e.mjs), so nothing carries over between runs.
+ */
 export async function settingsRoundTrip(page: Page, newShare: string): Promise<void> {
   const field = () => page.getByRole("spinbutton", { name: "CPU share" });
   const original = await field().inputValue();
+  expect(original, "the CPU share field shows the value in force").not.toBe("");
   const save = async (value: string) => {
     await field().fill(value);
     await page.getByRole("button", { name: "Save builder settings" }).click();
@@ -92,5 +100,7 @@ export async function settingsRoundTrip(page: Page, newShare: string): Promise<v
   await save(newShare);
   await page.reload();
   await expect(field()).toHaveValue(newShare);
-  if (original !== newShare) await save(original);
+  await save(original);
+  await page.reload();
+  await expect(field()).toHaveValue(original);
 }

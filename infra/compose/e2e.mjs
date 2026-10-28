@@ -72,7 +72,7 @@ function createOwner(owner) {
   const args = createOwnerArgs(COMPOSE_ARGS, owner.email);
   const result = spawnSync('docker', args, {
     ...SPAWN_DEFAULTS,
-    env: createOwnerEnv(process.env, adminDatabaseUrl(process.env, readEnvFile())),
+    env: createOwnerEnv(process.env, owner.adminUrl),
     input: createOwnerInput(owner.password),
     stdio: ['pipe', 'inherit', 'inherit'],
   });
@@ -102,11 +102,22 @@ function runStep(step, owner) {
   return step === E2E_WEB_STEP ? just(step, e2eWebEnv(process.env, owner)) : just(step);
 }
 
+/**
+ * The run's owner: email, a fresh password and the admin connection URL. Resolved before anything
+ * starts, so a bad E2E_OWNER_EMAIL or a missing DATABASE_URL fails before the stack builds.
+ */
+export function resolveOwner(env, envFileText) {
+  return {
+    email: ownerEmail(env),
+    password: generateOwnerPassword(),
+    adminUrl: adminDatabaseUrl(env, envFileText),
+  };
+}
+
 export function main() {
   let status = 0;
   try {
-    // Resolved before anything starts, so a bad E2E_OWNER_EMAIL fails before the stack builds.
-    const owner = { email: ownerEmail(process.env), password: generateOwnerPassword() };
+    const owner = resolveOwner(process.env, readEnvFile());
     for (const step of STEPS) {
       status = runStep(step, owner);
       if (status !== 0) {

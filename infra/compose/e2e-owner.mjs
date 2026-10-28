@@ -93,7 +93,9 @@ export function createOwnerArgs(composeArgs, email) {
  * and port changed to the compose service. Throws when neither names one.
  */
 export function adminDatabaseUrl(env, envFileText = '') {
-  const configured = env.DATABASE_URL ?? parseEnv(envFileText).DATABASE_URL;
+  // An empty or blank value counts as unset, as fixture-solutions treats it (PR #28 review L7).
+  const fromEnv = env.DATABASE_URL?.trim();
+  const configured = fromEnv === undefined || fromEnv === '' ? parseEnv(envFileText).DATABASE_URL?.trim() : fromEnv;
   if (configured === undefined || configured === '') {
     throw new OwnerSetupError('DATABASE_URL is not set in the environment or .env; create-owner needs it for --admin');
   }

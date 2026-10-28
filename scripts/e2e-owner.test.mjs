@@ -19,7 +19,7 @@ import {
   generateOwnerPassword,
   ownerEmail,
 } from '../infra/compose/e2e-owner.mjs';
-import { COMPOSE_ARGS, OWNER_STEP, STEPS } from '../infra/compose/e2e.mjs';
+import { COMPOSE_ARGS, OWNER_STEP, STEPS, resolveOwner } from '../infra/compose/e2e.mjs';
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const PASSWORD_BYTES = 24;
@@ -112,4 +112,18 @@ test('r3_13 e2eWebEnv adds the owner to a new object and leaves the parent envir
 
 test('r3_13 the e2e chain creates the owner after the database steps and before smoke', () => {
   assert.deepEqual(STEPS, ['dev-up', 'db-migrate', 'db-test', 'fixture-solutions', 'fixture-queue', OWNER_STEP, 'smoke', 'e2e-web']);
+});
+
+test('r3_5 adminDatabaseUrl treats an empty DATABASE_URL as unset and falls back to .env (PR #28 review L7)', () => {
+  const url = adminDatabaseUrl({ DATABASE_URL: '' }, 'DATABASE_URL=postgres://owner:pw@localhost:5432/gto\n');
+  assert.equal(url, 'postgres://owner:pw@postgres:5432/gto');
+  assert.throws(() => adminDatabaseUrl({ DATABASE_URL: '  ' }, ''), OwnerSetupError);
+});
+
+test('r3_5 the e2e owner, admin URL included, is resolved before any step runs (PR #28 review L7)', () => {
+  const owner = resolveOwner({ DATABASE_URL: 'postgres://o:p@127.0.0.1:5432/gto' }, '');
+  assert.equal(owner.email, DEFAULT_OWNER_EMAIL);
+  assert.equal(owner.adminUrl, 'postgres://o:p@postgres:5432/gto');
+  assert.ok(owner.password.length >= MIN_PASSWORD_LENGTH);
+  assert.throws(() => resolveOwner({}, ''), OwnerSetupError);
 });

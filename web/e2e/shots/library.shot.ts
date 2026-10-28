@@ -122,7 +122,7 @@ for (const theme of THEMES) {
       await builderScreens(page, shot);
     });
 
-    test(`O-290 library screenshot, member, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
+    test(`R3.5 O-290 library screenshot, member, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
       test.setTimeout(SHOT_TEST_TIMEOUT_MS);
       await prepareShotPage(page, theme, viewport);
       await openLibrary(page, false);
