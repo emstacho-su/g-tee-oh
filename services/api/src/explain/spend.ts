@@ -6,9 +6,11 @@
  * its own short transaction, under a row lock (insert the month if absent, then select ... for
  * update), and refuses when spent plus the reservation would pass the cap. Two concurrent asks at
  * the cap edge therefore serialize on the lock and only one fits. The reservation commits before
- * the call, so every later ask sees it. After the call, settleSpend swaps the reservation for the
- * real cost (the usage the API reported, priced in pricing.ts); on a failed call it is settled to
- * zero, a full refund. The cents never go below zero.
+ * the call, so every later ask sees it. After the calls, settleSpend swaps the reservation for
+ * what they may have cost (ask.ts, PR #29 review HIGH 1): an answer's usage priced in pricing.ts;
+ * for a failed call, the usage its reply reported, nothing for a non-2xx status (the only full
+ * refund), or the call's whole reservation when it was sent and no usage came back. Each Ask
+ * settles once. The cents never go below zero.
  */
 import { type RawBuilder, sql } from "kysely";
 

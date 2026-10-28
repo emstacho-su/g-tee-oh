@@ -16,6 +16,8 @@ export interface ScriptedReply {
   outputTokens?: number;
   /** When set, the call resolves only after this promise does. */
   gate?: Promise<void>;
+  /** When set, the call fails with this error once the gate opens (a failure held open). */
+  fail?: Error;
 }
 
 export interface MockModel extends ModelClient {
@@ -42,6 +44,9 @@ export function mockModel(...initial: readonly (ScriptedReply | Error)[]): MockM
         throw reply;
       }
       await reply.gate;
+      if (reply.fail !== undefined) {
+        throw reply.fail;
+      }
       return {
         text: reply.text,
         inputTokens: reply.inputTokens ?? DEFAULT_INPUT_TOKENS,

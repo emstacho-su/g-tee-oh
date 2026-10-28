@@ -16,14 +16,15 @@
  * 7. the model: one call, validated (validator.ts); on failure one regeneration that names the
  *    unsupported values in a second user turn, validated again. The Idempotency-Key claim is
  *    renewed before each call and on a timer while it runs (claim-hold.ts, PR #29 review HIGH 2);
- *    a claim found lost stops the Ask with a 409 before another call;
+ *    a claim found lost stops the Ask with a 409 before another call, and a renewal that errors
+ *    stops it with what it spent: a 503 before the first call, the paid first answer after it;
  * 8. the spend settles to what the calls may have cost (PR #29 review HIGH 1): a call that
  *    answered costs its usage; a failed call costs the usage its reply reported, nothing for a
  *    non-2xx status, or its full reservation when the request was sent and no usage came back
  *    (model.ts ModelCharge). A failed first call answers 502 with a fixed message; a failed
  *    regeneration keeps the first answer, unvalidated, and its cost is counted too;
- * 9. one idempotent write (idempotentWrite): the spend settled and the answer stored (on conflict
- *    do nothing), committed with the Idempotency-Key's response.
+ * 9. the spend settles once in its own statement, then one idempotent write (idempotentWrite)
+ *    stores the answer (on conflict do nothing) with the Idempotency-Key's response.
  *
  * The log line carries the attempt id, cached, validated, cost and token counts; never the key, the
  * prompt, the question or the answer (PM3).
@@ -71,12 +72,13 @@ interface Generated {
 type CallOutcome =
   | { kind: "answered"; response: ModelResponse; cents: number }
   | { kind: "failed"; cents: number; errorName: string }
-  | { kind: "claim-lost" };
+  | { kind: "claim-lost" }
+  | { kind: "claim-unknown"; errorName: string };
 
 /** The Ask stopped before an answer; `cents` is what its calls may have cost. */
 class AskStopped extends Error {
   constructor(
-    readonly reason: "model" | "claim-lost",
+    readonly reason: "model" | "claim-lost" | "claim-unknown",
     readonly cents: number,
     readonly errorName: string,
   ) {
@@ -115,6 +117,12 @@ function modelProblem(): ProblemError {
   });
 }
 
+function claimUnknownProblem(): ProblemError {
+  return new ProblemError(HTTP_STATUS.unavailable, PROBLEM_SLUGS.unavailable, {
+    detail: "The Ask could not be started; nothing was charged. Try again.",
+  });
+}
+
 function claimLostProblem(): ProblemError {
   return new ProblemError(HTTP_STATUS.conflict, PROBLEM_SLUGS.idempotencyInFlight, {
     detail: "This request's Idempotency-Key claim was taken over by a retry; the Ask stopped.",
@@ -148,16 +156,30 @@ function failedCallCents(pricing: Pricing, error: unknown): number {
   }
 }
 
-/** One model call, after renewing the claim; never throws. */
+function nameOf(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+/** Renews the claim; a database error is its own outcome, so the Ask stops with what it spent. */
+async function renewed(hold: ClaimHold): Promise<CallOutcome | null> {
+  try {
+    return (await hold.renew()) ? null : { kind: "claim-lost" };
+  } catch (error: unknown) {
+    return { kind: "claim-unknown", errorName: nameOf(error) };
+  }
+}
+
+/** One model call, after renewing the claim; never throws (PR #29 re-review LOW 3). */
 async function callModel(model: ModelClient, hold: ClaimHold, pricing: Pricing, system: string, user: string): Promise<CallOutcome> {
-  if (!(await hold.renew())) {
-    return { kind: "claim-lost" };
+  const stopped = await renewed(hold);
+  if (stopped !== null) {
+    return stopped;
   }
   try {
     const response = await model.complete({ system, user, maxTokens: ASK_MAX_TOKENS });
     return { kind: "answered", response, cents: costCents(pricing.config.askModel, response) };
   } catch (error: unknown) {
-    return { kind: "failed", cents: failedCallCents(pricing, error), errorName: error instanceof Error ? error.name : typeof error };
+    return { kind: "failed", cents: failedCallCents(pricing, error), errorName: nameOf(error) };
   }
 }
 
@@ -167,6 +189,9 @@ async function generate(model: ModelClient, hold: ClaimHold, pricing: Pricing, b
   const first = await callModel(model, hold, pricing, system, userTurn(question));
   if (first.kind === "claim-lost") {
     throw new AskStopped("claim-lost", NOTHING, "claim-lost");
+  }
+  if (first.kind === "claim-unknown") {
+    throw new AskStopped("claim-unknown", NOTHING, first.errorName);
   }
   if (first.kind === "failed") {
     throw new AskStopped("model", first.cents, first.errorName);
@@ -184,6 +209,10 @@ async function generate(model: ModelClient, hold: ClaimHold, pricing: Pricing, b
     // The regeneration failed after a first answer that was paid for: keep it, unvalidated, and
     // count what the failed call may have cost too.
     return { ...kept, cents: first.cents + second.cents };
+  }
+  if (second.kind === "claim-unknown") {
+    // The claim could not be renewed, so no second call is made; the paid first answer is kept.
+    return { ...kept, cents: first.cents };
   }
   const secondCheck = validateAnswer(second.response.text, bundle);
   return {
@@ -217,19 +246,19 @@ function serveHit(context: AskContext, attemptId: string, cached: CachedAnswer):
   return idempotentWrite(context.app, context.request, HTTP_STATUS.ok, () => Promise.resolve(hit));
 }
 
+/**
+ * Settles the spend once, in its own short statement, and only then stores the answer with the
+ * Idempotency-Key response (PR #29 re-review LOW 2). The calls were made whatever happens to the
+ * write, so the spend never depends on it; and a write whose COMMIT succeeded but reported an
+ * error cannot trigger a second settlement that would lower the recorded spend.
+ */
 async function storeGenerated(context: AskContext, key: CacheKey, attemptId: string, month: string, reserved: number, generated: Generated) {
+  await settleSpend(requireDatabase(context.app), month, reserved, generated.cents);
   const result = resultOf(attemptId, generated, false, generated.cents);
-  try {
-    return await idempotentWrite(context.app, context.request, HTTP_STATUS.ok, async (transaction) => {
-      await settleSpend(transaction, month, reserved, generated.cents);
-      await storeAnswer(transaction, key, { text: generated.text, validated: generated.validated, model: generated.model, costCents: generated.cents });
-      return result;
-    });
-  } catch (error: unknown) {
-    // The calls were made and may have been billed: record that even though the write failed.
-    await settleSpend(requireDatabase(context.app), month, reserved, generated.cents);
-    throw error;
-  }
+  return idempotentWrite(context.app, context.request, HTTP_STATUS.ok, async (transaction) => {
+    await storeAnswer(transaction, key, { text: generated.text, validated: generated.validated, model: generated.model, costCents: generated.cents });
+    return result;
+  });
 }
 
 /** Reserves, calls the model under the held claim, settles and stores (steps 6 to 9). */
@@ -260,6 +289,10 @@ async function generateAndStore(context: AskContext, model: ModelClient, bundle:
     if (error.reason === "claim-lost") {
       throw claimLostProblem();
     }
+    if (error.reason === "claim-unknown") {
+      context.request.log.warn({ error_name: error.errorName }, "ask could not renew its Idempotency-Key claim");
+      throw claimUnknownProblem();
+    }
     context.request.log.warn({ error_name: error.errorName, cost_cents: error.cents }, "ask model call failed");
     throw modelProblem();
   } finally {
@@ -286,10 +319,12 @@ export async function answerAsk(context: AskContext, attemptId: string, rawQuest
   if (cached !== undefined) {
     return serveHit(context, attemptId, cached);
   }
-  // No await between this check and runAlone, so two misses cannot both start generating.
-  const running = runningFor(flightKey);
-  if (running !== undefined) {
-    // An identical ask is generating; its outcome (answer or failure) is its own request's.
+  // While an identical ask is generating, wait for it and read the cache again. A flight that
+  // failed leaves no answer, so the check repeats: the first waiter to find no flight starts the
+  // next one and the others wait on it (PR #29 re-review LOW 1). The loop condition is the last
+  // step before runAlone, with no await between, so two misses cannot both start generating.
+  for (let running = runningFor(flightKey); running !== undefined; running = runningFor(flightKey)) {
+    // The flight's outcome (answer or failure) belongs to its own request.
     await running.catch(() => undefined);
     const generatedMeanwhile = await findCached(database, key);
     if (generatedMeanwhile !== undefined) {

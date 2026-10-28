@@ -33,6 +33,7 @@ import { TEST_CONFIG, mutatingHeaders, readHeaders } from "./support/app.js";
 import { contractErrors } from "./support/contract.js";
 import { adminPool, appDatabase, createTestSession } from "./support/database.js";
 import { FIXTURE_CONFIG, FIXTURE_NODE_KEY, FIXTURE_PAIR, FIXTURE_SOLUTION_ID } from "./support/explain-sources.js";
+import { faultyDatabase } from "./support/faulty-database.js";
 import { mockModel } from "./support/mock-model.js";
 import { unsupportedBySimpleExtraction } from "./support/number-membership.js";
 import { buildTrainerApp, fixtureSolverQuery } from "./support/solver-query.js";
@@ -746,6 +747,107 @@ describe("R3.20 identical concurrent misses pay once (PR #29 review L10)", () =>
     expect(answers.map((answer) => answer.json<{ cached: boolean }>().cached).sort()).toEqual([false, true]);
     expect(model.calls).toHaveLength(1);
     expect(await currentSpend()).toBe(before + (answers[0]?.json<{ cost_cents: number }>().cost_cents ?? 0));
+    await fixture.app.close();
+  });
+});
+
+describe("R3.20 Ask hardening after the re-review (PR #29 re-review LOW 1 to 4)", () => {
+  const FIRST_USAGE = { inputTokens: 1000, outputTokens: 200 };
+  const firstCost = costCents("claude-opus-5-5", FIRST_USAGE);
+  const RENEW_SQL = /update "idempotency_key" set "created_at"/i;
+  const TAKE_OVER_SQL = "update idempotency_key set claim_token = gen_random_uuid() where user_id = $1 and key = $2";
+
+  async function faultyApp(model: ModelClient) {
+    const faulty = faultyDatabase();
+    const app = buildTrainerApp(faulty.database, { config: ENABLED, modelClient: model });
+    await app.ready();
+    const player = await newPlayer(database);
+    const attemptId = await insertAttempt(player, "5h5d", 0);
+    const askWith = (question: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: "POST", url: `/api/v1/explain/${attemptId}/ask`, headers: { ...player.write, ...headers }, payload: { question } });
+    const close = async () => {
+      await app.close();
+      await faulty.database.destroy();
+    };
+    return { faulty, askWith, close };
+  }
+
+  it("R3.20 a failed single flight lets one waiter generate and serves the other from the cache (LOW 1)", async () => {
+    const held = manualGate();
+    const overloaded = new ModelCallError("the API answered 529", { status: 529, charge: { kind: "none" } });
+    const model = mockModel({ text: VALID_ANSWER, gate: held.gate, fail: overloaded }, { text: VALID_ANSWER }, { text: VALID_ANSWER });
+    const fixture = await setUp(ENABLED, model);
+    const question = `${QUESTION} (failed flight)`;
+    const first = ask(fixture, fixture.attempt55, question);
+    await vi.waitFor(() => expect(model.calls).toHaveLength(1));
+    const waiters = [ask(fixture, fixture.attempt55, question), ask(fixture, fixture.attempt55, question)];
+    await new Promise((resolve) => setTimeout(resolve, SECOND_ASK_SETTLE_MS));
+    held.open();
+    const answers = await Promise.all([first, ...waiters]);
+    expect(answers.map((answer) => answer.statusCode).sort()).toEqual([200, 200, 502]);
+    expect(model.calls).toHaveLength(2);
+    await fixture.app.close();
+  });
+
+  it("R3.20 a store whose COMMIT succeeded but errored settles the spend once, never lowering it (LOW 2)", async () => {
+    const model = mockModel({ text: VALID_ANSWER, inputTokens: 2500, outputTokens: 500 });
+    const target = await faultyApp(model);
+    const before = await currentSpend();
+    target.faulty.commitThenFail(/insert into "explanation"/i);
+    const response = await target.askWith(`${QUESTION} (commit error)`);
+    expect(target.faulty.fired()).toBe(1);
+    expect(response.statusCode).toBe(500);
+    expect(await currentSpend()).toBe(before + 2);
+    await target.close();
+  });
+
+  it("R3.20 a claim renewal that errors before the regeneration keeps the paid first answer (LOW 3)", async () => {
+    const first = manualGate();
+    const model = mockModel({ text: PLANTED_ANSWER, gate: first.gate, ...FIRST_USAGE }, { text: VALID_ANSWER });
+    const target = await faultyApp(model);
+    const before = await currentSpend();
+    const running = target.askWith(`${QUESTION} (renew error)`, { [IDEMPOTENCY_HEADER]: randomUUID() });
+    await vi.waitFor(() => expect(model.calls).toHaveLength(1));
+    target.faulty.failNext(RENEW_SQL);
+    first.open();
+    const response = await running;
+    expect(target.faulty.fired()).toBe(1);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ text: PLANTED_ANSWER, validated: false, cost_cents: firstCost });
+    expect(model.calls).toHaveLength(1);
+    expect(await currentSpend()).toBe(before + firstCost);
+    await target.close();
+  });
+
+  it("R3.20 a claim renewal that errors before the first call stops with nothing spent and no model call (LOW 3)", async () => {
+    const model = mockModel({ text: VALID_ANSWER });
+    const target = await faultyApp(model);
+    const before = await currentSpend();
+    target.faulty.failNext(RENEW_SQL);
+    const response = await target.askWith(`${QUESTION} (renew error first)`, { [IDEMPOTENCY_HEADER]: randomUUID() });
+    expect(target.faulty.fired()).toBe(1);
+    expect(response.statusCode).toBe(503);
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:unavailable");
+    expect(model.calls).toHaveLength(0);
+    expect(await currentSpend()).toBe(before);
+    await target.close();
+  });
+
+  it("R3.20 a claim taken over mid-Ask answers 409 before a second call and keeps the first call's cost (LOW 4)", async () => {
+    const first = manualGate();
+    const model = mockModel({ text: PLANTED_ANSWER, gate: first.gate, ...FIRST_USAGE }, { text: VALID_ANSWER });
+    const fixture = await setUp(ENABLED, model);
+    const key = randomUUID();
+    const before = await currentSpend();
+    const running = ask(fixture, fixture.attempt55, `${QUESTION} (taken over)`, { [IDEMPOTENCY_HEADER]: key });
+    await vi.waitFor(() => expect(model.calls).toHaveLength(1));
+    await pool.query(TAKE_OVER_SQL, [fixture.player.userId, key]);
+    first.open();
+    const response = await running;
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:idempotency-in-flight");
+    expect(model.calls).toHaveLength(1);
+    expect(await currentSpend()).toBe(before + firstCost);
     await fixture.app.close();
   });
 });
