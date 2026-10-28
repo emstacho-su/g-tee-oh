@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  assertDevDatabase,
   DEFAULT_LIBRARY,
   FixtureManifestError,
   listFixtureSolutions,
@@ -12,7 +13,15 @@ import {
 } from '../fixture-solutions.mjs';
 
 const ID = '07e6f131-29b1-8211-a009-4441d463643d';
-const MANIFEST = { kind: 'preflop', source: 'reference', id: ID, config_id: 'cfg_6_online_100', pair: 'BB-CO', engine_version: 'synthetic' };
+const MANIFEST = {
+  kind: 'preflop',
+  source: 'reference',
+  id: ID,
+  config_id: 'cfg_6_online_100',
+  pair: 'BB-CO',
+  engine_version: 'synthetic',
+  synthetic: true,
+};
 
 test('R3.7 a preflop manifest becomes a published row with a fixture uri', () => {
   const row = toSolutionRow(MANIFEST, 'preflop/cfg_6_online_100/x/manifest.json');
@@ -23,6 +32,7 @@ test('R3.7 a preflop manifest becomes a published row with a fixture uri', () =>
     position_pair: 'BB-CO',
     engine_version: 'synthetic',
     manifest_uri: 'fixture:preflop/cfg_6_online_100/x/manifest.json',
+    synthetic: true,
   });
   assert.ok(Object.isFrozen(row));
 });
@@ -51,6 +61,36 @@ test('R3.7 the committed fixture library lists every preflop manifest once', () 
   assert.ok(rows.every((row) => row.manifest_uri.startsWith('fixture:preflop/')));
 });
 
+test('R3.7 only a database on this machine or the compose service is seeded without --dev (PR #25 L3)', () => {
+  for (const url of [
+    'postgres://u:p@localhost:5432/gto',
+    'postgres://u:p@127.0.0.1:65145/postgres?sslmode=disable',
+    'postgres://u:p@[::1]:5432/gto',
+    'postgres://u:p@postgres:5432/gto',
+  ]) {
+    assert.doesNotThrow(() => assertDevDatabase(url, []), url);
+  }
+  for (const url of ['postgres://u:p@db.example.com:5432/gto', 'postgres://u:p@10.0.0.5/gto', 'not a url']) {
+    assert.throws(() => assertDevDatabase(url, []), /refuses|not a URL/, url);
+  }
+  assert.doesNotThrow(() => assertDevDatabase('postgres://u:p@db.example.com:5432/gto', ['--dev']));
+  assert.throws(() => assertDevDatabase('postgres://u:p@localhost/gto', ['--other']), /unknown argument/);
+});
+
+test('R3.7 only synthetic manifests are seeded; a real solution is skipped and counted (PR #25 L3)', async () => {
+  const client = {
+    async query(sql) {
+      if (sql.startsWith('select id from game_config')) return { rows: [{ id: 'cfg_6_online_100' }] };
+      return { rowCount: 1 };
+    },
+  };
+  const real = toSolutionRow({ ...MANIFEST, synthetic: false }, 'p/r/manifest.json');
+  const absent = toSolutionRow({ ...MANIFEST, id: ID.replace('07e6', '37e6'), synthetic: undefined }, 'p/a/manifest.json');
+  const synthetic = toSolutionRow({ ...MANIFEST, id: ID.replace('07e6', '47e6') }, 'p/s/manifest.json');
+  const counts = await seedFixtureSolutions(client, [real, absent, synthetic]);
+  assert.deepEqual(counts, { inserted: 1, present: 0, skipped: 0, notSynthetic: 2 });
+});
+
 test('R3.7 seeding skips configs outside the catalog and counts what exists', async () => {
   const calls = [];
   const client = {
@@ -66,6 +106,6 @@ test('R3.7 seeding skips configs outside the catalog and counts what exists', as
     toSolutionRow({ ...MANIFEST, id: ID.replace('07e6', '27e6'), config_id: 'cfg_2_online_norake_10' }, 'p/3/manifest.json'),
   ];
   const counts = await seedFixtureSolutions(client, rows);
-  assert.deepEqual(counts, { inserted: 1, present: 1, skipped: 1 });
+  assert.deepEqual(counts, { inserted: 1, present: 1, skipped: 1, notSynthetic: 0 });
   assert.equal(calls.length, 2, 'no insert for a config outside the catalog');
 });

@@ -15,8 +15,10 @@
 // nothing), run as the superuser of DATABASE_URL (the app role cannot write the library, A4
 // section 3), and never touch a row that already exists.
 //
-// Usage: node scripts/fixture-solutions.mjs   (DATABASE_URL from the environment or .env;
-// FIXTURE_LIBRARY_PATH defaults to validation/fixtures/library)
+// Usage: node scripts/fixture-solutions.mjs [--dev]   (DATABASE_URL from the environment or .env;
+// FIXTURE_LIBRARY_PATH defaults to validation/fixtures/library). Without --dev the database host
+// must be this machine or the compose postgres service, and only manifests with synthetic true
+// are written (PR #25 security review L3).
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -32,6 +34,9 @@ const MANIFEST = 'manifest.json';
 const URI_SCHEME = 'fixture:';
 const ALLOWED_SOURCES = new Set(['own', 'reference']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DEV_FLAG = '--dev';
+/** This machine and the compose service name of the database (infra/compose/compose.yaml). */
+const DEV_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', 'postgres']);
 
 /** Raised for a manifest that cannot become a row; the message names the file. */
 export class FixtureManifestError extends Error {
@@ -65,7 +70,26 @@ export function toSolutionRow(manifest, uriPath) {
     position_pair: manifest.pair,
     engine_version: typeof manifest.engine_version === 'string' ? manifest.engine_version : null,
     manifest_uri: `${URI_SCHEME}${uriPath}`,
+    synthetic: manifest.synthetic === true,
   });
+}
+
+/**
+ * Refuses a database that is neither on this machine nor the compose postgres service, unless
+ * --dev says the caller means it (PR #25 security review L3): this script writes published
+ * solution rows, which must never land in a real library by accident.
+ */
+export function assertDevDatabase(url, args) {
+  const unknown = args.filter((arg) => arg !== DEV_FLAG);
+  if (unknown.length > 0) throw new Error(`unknown argument ${unknown[0]}; the only flag is ${DEV_FLAG}`);
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error('DATABASE_URL is not a URL');
+  }
+  if (args.includes(DEV_FLAG) || DEV_HOSTS.has(host)) return;
+  throw new Error(`refuses to write to ${host}: only ${[...DEV_HOSTS].join(', ')} without ${DEV_FLAG}`);
 }
 
 /** Every preflop manifest under `root` as a row, in path order. */
@@ -88,8 +112,14 @@ export function listFixtureSolutions(root) {
 export async function seedFixtureSolutions(client, rows) {
   const catalog = await client.query('select id from game_config');
   const known = new Set(catalog.rows.map((row) => row.id));
-  const counts = { inserted: 0, present: 0, skipped: 0 };
+  const counts = { inserted: 0, present: 0, skipped: 0, notSynthetic: 0 };
   for (const row of rows) {
+    // PR #25 L3: the seed writes synthetic test data only; a real solution reaches the table
+    // through capture or the builder, never through this script.
+    if (!row.synthetic) {
+      counts.notSynthetic += 1;
+      continue;
+    }
     if (!known.has(row.game_config_id)) {
       counts.skipped += 1;
       continue;
@@ -118,16 +148,19 @@ function databaseUrl(env) {
   return process.env.DATABASE_URL;
 }
 
-export async function main(env = process.env) {
+export async function main(env = process.env, args = process.argv.slice(2)) {
   const root = env.FIXTURE_LIBRARY_PATH ? resolve(env.FIXTURE_LIBRARY_PATH) : DEFAULT_LIBRARY;
+  const url = databaseUrl(env);
+  assertDevDatabase(url, args);
   const rows = listFixtureSolutions(root);
-  const client = new pg.Client({ connectionString: databaseUrl(env) });
+  const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {
     const counts = await seedFixtureSolutions(client, rows);
     console.log(
       `fixture-solutions: ${counts.inserted} inserted, ${counts.present} already present, ` +
-        `${counts.skipped} skipped (config outside the catalog) from ${rows.length} manifests`,
+        `${counts.skipped} skipped (config outside the catalog), ${counts.notSynthetic} skipped ` +
+        `(not synthetic) from ${rows.length} manifests`,
     );
   } finally {
     await client.end();
