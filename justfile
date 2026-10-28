@@ -153,6 +153,11 @@ fixture-solutions:
 fixture-queue:
     node scripts/fixture-queue.mjs
 
+# Runs after create-owner in the e2e chain, which passes E2E_OWNER_EMAIL; needs the dev stack up with the api container.
+# The e2e owner's schedule cards and leak history, so flow 1 is rated and flow 6 draws a trend; idempotent (R4.10, R4.12, O-324)
+fixture-learning:
+    node scripts/fixture-learning.mjs
+
 # Migration status
 db-status:
     dbmate status
