@@ -228,6 +228,32 @@ export interface GameConfig {
   table_size: number;
 }
 
+export interface HandRecord {
+  /**
+   * the decision that ended the hand (O-401)
+   */
+  attempt_id: string;
+  /**
+   * the board the hand reached: the flop when a full hand ended at its reveal
+   */
+  board: Generated<string[]>;
+  created_at: Generated<Timestamp>;
+  /**
+   * previous_hand.end: fold, street_closed, off_range or stop_rule
+   */
+  end_reason: string;
+  hand_no: number;
+  hero_hand: string;
+  hero_position: string;
+  /**
+   * the hand's actions as the prompt showed them, each with its street
+   */
+  history: Json;
+  id: Generated<string>;
+  session_id: string;
+  user_id: string;
+}
+
 export interface HoldoutDraw {
   drawn_at: Generated<Timestamp>;
   items: number;
@@ -528,6 +554,7 @@ export interface DB {
   drill: Drill;
   explanation: Explanation;
   game_config: GameConfig;
+  hand_record: HandRecord;
   holdout_draw: HoldoutDraw;
   holdout_item: HoldoutItem;
   holdout_result: HoldoutResult;
