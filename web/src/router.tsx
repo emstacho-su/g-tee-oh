@@ -29,8 +29,12 @@ import { SessionError } from "./app/SessionError.js";
 import { fetchMe, meQueryOptions, safeRedirect } from "./auth/index.js";
 import { HomePage } from "./routes/home.js";
 import { LoginPage } from "./routes/login.js";
+import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { placeholderRoute } from "./routes/placeholders.js";
 import type { PlaceholderKey } from "./routes/placeholders.js";
+import { StudyPage } from "./routes/study/StudyPage.js";
+import { validateStudySearch } from "./study/search.js";
+import { validateDrillRunSearch } from "./trainer/run-search.js";
 
 export interface LoginSearch {
   redirect?: string;
@@ -90,8 +94,26 @@ export const trainRoute = screenRoute("/train", "train");
 export const drillsRoute = screenRoute("/drills", "drills");
 export const drillNewRoute = screenRoute("/drills/new", "drillNew");
 export const drillRoute = screenRoute("/drills/$id", "drillEdit");
-export const drillRunRoute = screenRoute("/drills/$id/run", "drillRun");
-export const studyRoute = screenRoute("/study", "study");
+// /study and /drills/$id/run are real screens (S25): their search parameters are validated here,
+// so a malformed URL value never reaches the screen or the api (O-286, O-288).
+export const drillRunRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/drills/$id/run",
+  validateSearch: validateDrillRunSearch,
+  component: function DrillRunRouteScreen() {
+    const { id } = drillRunRoute.useParams();
+    const { seed } = drillRunRoute.useSearch();
+    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} />;
+  },
+});
+export const studyRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/study",
+  validateSearch: validateStudySearch,
+  component: function StudyRouteScreen() {
+    return <StudyPage search={studyRoute.useSearch()} />;
+  },
+});
 export const predictRoute = screenRoute("/predict", "predict");
 export const paintRoute = screenRoute("/paint", "paint");
 export const progressRoute = screenRoute("/progress", "progress");

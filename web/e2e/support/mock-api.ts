@@ -10,7 +10,8 @@
  * non-empty password; anything else gets the same 401 problem, and a body that is not the
  * contract shape a 400 validation problem. POST /auth/logout requires the x-csrf-token header to
  * equal the fixture csrf_token (O-230): a 403 csrf problem otherwise, else 204 and the session
- * ends. Every other /api/v1 path answers 501, as unbuilt api routes do. Bodies are typed by the
+ * ends. Feature routes passed in options (S25: the study and session routes, composed in
+ * mock-app.ts) are tried next; every other /api/v1 path answers 501, as unbuilt api routes do. Bodies are typed by the
  * contract (src/contracts.ts and the generated paths) and the session is the shared fixture, so
  * the mock, the unit tests and the gallery agree on every shape. Every request is recorded, in
  * order, so a test can assert what the app sent. installMockApi wires a handler to a page.
@@ -20,7 +21,7 @@ import type { Page, Request, Route } from "@playwright/test";
 
 import { HTTP_STATUS } from "../../src/api/http-status.js";
 import { API_PATHS, CSRF_HEADER } from "../../src/api/paths.js";
-import type { Problem, SessionInfo } from "../../src/contracts.js";
+import type { Problem } from "../../src/contracts.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL, fixtureSession } from "../../src/fixtures/index.js";
 
 // The paths and the header come from the app's own module, so the mock and the app can never
@@ -50,6 +51,8 @@ export interface MockRequest {
   readonly method: string;
   /** The URL path without the query string. */
   readonly path: string;
+  /** The query string's parameters; a repeated name keeps its last value (S25). */
+  readonly query: Readonly<Record<string, string>>;
   /** Header names in lower case, as Playwright reports them. */
   readonly headers: Readonly<Record<string, string>>;
   /** The parsed JSON body, or undefined when there is none or it is not JSON. */
@@ -59,13 +62,30 @@ export interface MockRequest {
 export interface MockResponse {
   readonly status: number;
   readonly contentType?: string;
-  readonly body?: SessionInfo | Problem;
+  /** A JSON value typed by the contract at its source (SessionInfo, Problem, StudyNode and so on). */
+  readonly body?: unknown;
 }
 
 export interface MockApi {
   handle(request: MockRequest): MockResponse;
   /** Every request handled so far, oldest first. */
   requests(): readonly MockRequest[];
+}
+
+/**
+ * A feature's mocked routes (S25: mock-study.ts, mock-sessions.ts). It answers the requests it
+ * owns and returns undefined for every other one, so createMockApi tries the next route and
+ * finally answers 501. signedIn reports the shared sign-in state, since every app route needs it.
+ */
+export type MockRoute = (request: MockRequest, context: MockRouteContext) => MockResponse | undefined;
+
+export interface MockRouteContext {
+  readonly signedIn: boolean;
+}
+
+export interface MockApiOptions {
+  /** Feature routes tried in order after the auth routes; none by default (auth only). */
+  readonly routes?: readonly MockRoute[];
 }
 
 interface ProblemSpec {
@@ -87,10 +107,19 @@ const CSRF: ProblemSpec = {
 };
 const NOT_IMPLEMENTED: ProblemSpec = { status: STATUS.notImplemented, slug: "not-implemented", title: "Not implemented" };
 
-function problem(spec: ProblemSpec, path: string): MockResponse {
+/** A problem response with the api's type prefix (exported for the feature routes, S25). */
+export function problem(spec: ProblemSpec, path: string): MockResponse {
   const body: Problem = { type: `${PROBLEM_PREFIX}${spec.slug}`, title: spec.title, status: spec.status, instance: path };
   return { status: spec.status, contentType: PROBLEM_TYPE, body };
 }
+
+/** A JSON response (exported for the feature routes, S25). */
+export function json(status: number, body: unknown): MockResponse {
+  return { status, contentType: JSON_TYPE, body };
+}
+
+export type { ProblemSpec };
+export { UNAUTHENTICATED };
 
 function session(): MockResponse {
   return { status: STATUS.ok, contentType: JSON_TYPE, body: fixtureSession };
@@ -107,7 +136,8 @@ function acceptsLogin(body: LoginBody): boolean {
 }
 
 /** A fresh mocked api, signed out, with an empty request log. */
-export function createMockApi(): MockApi {
+export function createMockApi(options: MockApiOptions = {}): MockApi {
+  const featureRoutes = options.routes ?? [];
   let signedIn = false;
   let log: readonly MockRequest[] = [];
 
@@ -124,6 +154,10 @@ export function createMockApi(): MockApi {
       if (request.headers[CSRF_HEADER] !== FIXTURE_CSRF_TOKEN) return problem(CSRF, request.path);
       signedIn = false;
       return { status: STATUS.noContent };
+    }
+    for (const featureRoute of featureRoutes) {
+      const response = featureRoute(request, { signedIn });
+      if (response !== undefined) return response;
     }
     return problem(NOT_IMPLEMENTED, request.path);
   }
@@ -148,9 +182,11 @@ function parseBody(request: Request): unknown {
 }
 
 async function toMockRequest(request: Request): Promise<MockRequest> {
+  const url = new URL(request.url());
   return {
     method: request.method(),
-    path: new URL(request.url()).pathname,
+    path: url.pathname,
+    query: Object.fromEntries(url.searchParams),
     headers: await request.allHeaders(),
     body: parseBody(request),
   };

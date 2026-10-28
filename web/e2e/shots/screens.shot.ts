@@ -1,50 +1,26 @@
 /**
- * Screenshot pass for the owner's review (S24 step 3, O-67, O-266). The shots project serves the
- * harness build (vite preview on 4173, O-267) with the mocked api (O-264), so no Docker is
- * needed and the pictures show synthetic data only (O-26).
+ * Screenshot pass for the owner's review (S24 step 3, O-67, O-266), moved onto the shared helpers
+ * in S25 (O-289). The shots project serves the harness build (vite preview on 4173, O-267) with
+ * the mocked api (O-264), so no Docker is needed and the pictures show synthetic data only (O-26).
  *
- * Mechanism: one test per theme and width. Each test sets the theme before any page script runs
- * (localStorage "gto-theme" for the app, ?theme= for the gallery), emulates reduced motion so no
- * card is caught mid-animation, waits two animation frames after each change so the canvas
- * matrix has drawn, and saves PNGs to SCREENSHOT_DIR (default test-results/shots) as
- * <screen>-<theme>-<width>.png. Every shot is listed in manifest.json beside the PNGs with its
- * screen, theme, width, file path and the handoff acceptance criterion it demonstrates, so the
- * review page can be built without guessing. Desktop is the product target (01 section 2); the
- * phone width is a sanity view only (O-266).
+ * Mechanism: one test per theme and width. Each test prepares the page (support/shots.ts), walks
+ * the login, the home shell, the shortcuts overlay and a placeholder route, then every gallery
+ * section, and saves PNGs as <screen>-<theme>-<width>.png into the shot folder (SCREENSHOT_DIR,
+ * default test-results/shots). afterAll merges its records into manifest.json beside the PNGs
+ * (support/shot-manifest.ts), so the S25 study and trainer files add to the same manifest.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync } from "node:fs";
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { installMockApi } from "../support/mock-api.js";
+import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
+import { capture, prepareShotPage, SHOT_TEST_TIMEOUT_MS, THEMES, VIEWPORTS, type Viewport } from "../support/shots.js";
 import { submitLogin } from "../support/sign-in-flow.js";
 
-type Theme = "light" | "dark";
-
-interface Viewport {
-  readonly label: string;
-  readonly width: number;
-  readonly height: number;
-}
-
-interface ShotRecord {
-  screen: string;
-  theme: Theme;
-  width: number;
-  height: number;
-  file: string;
-  criterion: string;
-}
-
-const THEMES: readonly Theme[] = ["light", "dark"];
-const VIEWPORTS: readonly Viewport[] = [
-  { label: "desktop", width: 1440, height: 900 },
-  { label: "phone", width: 390, height: 844 },
-];
-const OUT_DIR = resolve(process.env.SCREENSHOT_DIR ?? "test-results/shots");
-const THEME_STORAGE_KEY = "gto-theme";
+const OUT_DIR = shotDirectory();
 const OWNER = { email: "owner@example.com", password: "synthetic-password" };
+const SOURCE = "mock";
 
 const CRITERIA = {
   login: "Login page renders (DoD 1: login page, home shell and route placeholders render)",
@@ -84,56 +60,33 @@ const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
 
 const records: ShotRecord[] = [];
 
-async function settle(page: Page): Promise<void> {
-  await page.evaluate(
-    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
-  );
-}
-
-async function capture(
-  target: Page | Locator,
-  page: Page,
-  shot: { screen: string; theme: Theme; viewport: Viewport; criterion: string },
-): Promise<void> {
-  // Park the pointer in the corner so no button is caught in its hover state.
-  await page.mouse.move(0, 0);
-  await settle(page);
-  const file = join(OUT_DIR, `${shot.screen}-${shot.theme}-${shot.viewport.label}.png`);
-  if ("goto" in target) await target.screenshot({ path: file, fullPage: true });
-  else await target.screenshot({ path: file });
-  records.push({
-    screen: shot.screen,
-    theme: shot.theme,
-    width: shot.viewport.width,
-    height: shot.viewport.height,
-    file,
-    criterion: shot.criterion,
-  });
-}
-
 async function appScreens(page: Page, theme: Theme, viewport: Viewport): Promise<void> {
+  const shot = async (screen: string, criterion: string) => {
+    records.push(await capture(page, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE }));
+  };
   await installMockApi(page);
   await page.goto("/login");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-  await capture(page, page, { screen: "login", theme, viewport, criterion: CRITERIA.login });
+  await shot("login", CRITERIA.login);
 
   await submitLogin(page, { email: "someone-else@example.com", password: "wrong" });
   await expect(page.getByRole("alert")).toBeVisible();
-  await capture(page, page, { screen: "login-error", theme, viewport, criterion: CRITERIA.loginError });
+  await shot("login-error", CRITERIA.loginError);
 
   await submitLogin(page, OWNER);
   await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
-  await capture(page, page, { screen: "home", theme, viewport, criterion: CRITERIA.home });
+  await shot("home", CRITERIA.home);
 
   await page.keyboard.press("?");
   const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(overlay).toBeVisible();
-  await capture(page, page, { screen: "shortcuts-overlay", theme, viewport, criterion: CRITERIA.shortcuts });
+  await shot("shortcuts-overlay", CRITERIA.shortcuts);
   await page.keyboard.press("Escape");
 
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Study" }).click();
+  // /study became a real screen in S25; /library is still a placeholder (S28).
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Library" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await capture(page, page, { screen: "placeholder-study", theme, viewport, criterion: CRITERIA.placeholder });
+  await shot("placeholder-library", CRITERIA.placeholder);
 }
 
 async function galleryScreens(page: Page, theme: Theme, viewport: Viewport): Promise<void> {
@@ -143,7 +96,7 @@ async function galleryScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   for (const [name, criterion] of GALLERY_SECTIONS) {
     const section = page.getByTestId(`gallery-${name}`);
     await section.scrollIntoViewIfNeeded();
-    await capture(section, page, { screen: `gallery-${name}`, theme, viewport, criterion });
+    records.push(await capture(section, page, OUT_DIR, { screen: `gallery-${name}`, theme, viewport, criterion, source: SOURCE }));
   }
 }
 
@@ -152,22 +105,14 @@ test.beforeAll(() => {
 });
 
 test.afterAll(() => {
-  const manifest = { session: "S24", generated: new Date().toISOString(), directory: OUT_DIR, shots: records };
-  writeFileSync(join(OUT_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  mergeShotManifest(OUT_DIR, "S24", records);
 });
 
 for (const theme of THEMES) {
   for (const viewport of VIEWPORTS) {
     test(`R3.12 R3.13 screenshots, ${theme} theme, ${viewport.label} width`, async ({ page }) => {
-      test.setTimeout(120_000);
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.emulateMedia({ reducedMotion: "reduce", colorScheme: theme });
-      await page.addInitScript(
-        ([key, value]) => {
-          window.localStorage.setItem(key, value);
-        },
-        [THEME_STORAGE_KEY, theme] as const,
-      );
+      test.setTimeout(SHOT_TEST_TIMEOUT_MS);
+      await prepareShotPage(page, theme, viewport);
       await appScreens(page, theme, viewport);
       await galleryScreens(page, theme, viewport);
     });

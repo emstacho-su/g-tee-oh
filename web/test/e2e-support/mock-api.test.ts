@@ -14,7 +14,7 @@ const PROBLEM_JSON = "application/problem+json";
 const JSON_TYPE = "application/json";
 
 function request(method: string, path: string, init: Partial<MockRequest> = {}): MockRequest {
-  return { method, path, headers: {}, body: undefined, ...init };
+  return { method, path, query: {}, headers: {}, body: undefined, ...init };
 }
 
 const ME = request("GET", "/api/v1/me");
