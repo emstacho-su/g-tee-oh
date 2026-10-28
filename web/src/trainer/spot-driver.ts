@@ -1,5 +1,5 @@
 /**
- * The driver that runs the spot machine's requests (S25, R3.13, R3.11, O-284, A7 section 4).
+ * The driver that runs the spot machine's requests (S25, R3.13, O-284, O-345, A7 section 4).
  *
  * Mechanism: send(event) computes the next state with the pure transition. An ignored event
  * (transition returned the same state) does nothing. An accepted one stores the state, reports it

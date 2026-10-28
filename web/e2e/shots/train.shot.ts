@@ -31,7 +31,7 @@ const SESSION = "S32";
 const CRITERIA = {
   start: "R4.10 automated start: one line on what it does, configuration scope, grouping and RNG from the session defaults, a Settings link and Start; no seed offered (O-323, O-325)",
   prompt: "R4.10 rated block prompt: banner with family, track name, hand 1 of 3 in the block and that it counts toward the rating, above the table and actions (O-272)",
-  feedback: "R4.10 R3.11 feedback after the confidence tap: label, EV loss, frequencies, range view and threshold card, Next and End session (O-284)",
+  feedback: "R4.10 R3.13 feedback after the choice, which submits it (the confidence tap is retired, O-345): label, EV loss, frequencies, range view and threshold card, Next and End session",
   worked: "R4.10 worked example prompt: banner says Worked example: panels visible, not rated (O-272, O-325)",
   confirm: "R4.10 end confirm: End this session? with Keep playing and End session (O-285)",
   recap: "R4.10 recap: decisions, rated decisions, mean score percent, EV loss, per-track rating before (new) and after with RD, tier held by a named track, the unlocked badge, Train again and See progress (O-325)",
@@ -43,8 +43,6 @@ const records: ShotRecord[] = [];
 
 async function decide(page: Page): Promise<void> {
   await page.getByRole("group", { name: "Actions" }).getByRole("button").first().click();
-  await expect(page.getByTestId("confidence-tap")).toBeVisible();
-  await page.getByRole("button", { name: "Sure", exact: true }).click();
   await expect(page.getByTestId("feedback-panel")).toBeVisible();
 }
 
