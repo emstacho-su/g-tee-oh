@@ -1,6 +1,7 @@
 /**
- * POST /sessions in drill mode (R3.6, O-249, O-240, ADR 0018), S23's code moved unchanged out of
- * sessions/service.ts by the S31 mode split.
+ * POST /sessions in drill mode (R3.6, O-249, O-240, ADR 0018), S23's code moved out of
+ * sessions/service.ts by the S31 mode split, and the drill-backed prediction and range_paint modes
+ * S27 added (O-302): the same spot search, starting with a practice state instead of a hand.
  *
  * The drill must be the user's (404 otherwise). Its trainer settings are merged with the body's
  * partial settings. Its spot filter is expanded into covered (configuration, pair) candidates
@@ -30,9 +31,12 @@ import { heroSpotsFor } from "../spot-search.js";
 import { spotOf } from "../spot.js";
 import { initialState } from "../state.js";
 
-function requireDrillId(body: SessionCreateBody): string {
+/** The modes a drill backs: drill itself (S23) and S27's practice modes (O-302). */
+export type DrillBackedMode = "drill" | "prediction" | "range_paint";
+
+function requireDrillId(body: SessionCreateBody, mode: DrillBackedMode): string {
   if (body.drill_id === undefined) {
-    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, { detail: "A drill session needs drill_id." });
+    throw new ProblemError(HTTP_STATUS.badRequest, PROBLEM_SLUGS.badRequest, { detail: `A ${mode} session needs drill_id.` });
   }
   return body.drill_id;
 }
@@ -41,8 +45,8 @@ function mergedSettings(stored: unknown, overrides: SessionCreateBody["settings"
   return trainerSettingsSchema.parse({ ...trainerSettingsSchema.parse(stored), ...overrides });
 }
 
-export async function createDrillSession(call: SessionCall, body: SessionCreateBody): Promise<Session> {
-  const drillId = requireDrillId(body);
+export async function createDrillSession(call: SessionCall, body: SessionCreateBody, mode: DrillBackedMode): Promise<Session> {
+  const drillId = requireDrillId(body, mode);
   const database = requireDatabase(call.app);
   const drill = await findDrill(database, call.userId, drillId);
   if (drill === undefined) {
@@ -63,10 +67,13 @@ export async function createDrillSession(call: SessionCall, body: SessionCreateB
     throw filterUnmetProblem(reason, `${gaps.length} of its ${candidates.length} spots were queued for the builder.`);
   }
   // PR #27 review HIGH 2: a client-supplied seed marks the session seeded (no learning state).
-  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, null, body.seed !== undefined);
+  const state = initialState(body.seed ?? newSessionSeed(), heroSpots, spot, {
+    seeded: body.seed !== undefined,
+    ...(mode === "drill" ? {} : { practice: mode }),
+  });
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, gaps, line);
-    const row = await insertSession(transaction, { userId: call.userId, mode: "drill", drillId, settings, state });
+    const row = await insertSession(transaction, { userId: call.userId, mode, drillId, settings, state });
     return toSession(row);
   });
 }

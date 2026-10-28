@@ -13,6 +13,7 @@ import { LISTEN_HOST, loadProcessConfig } from "./config.js";
 import { createDatabase } from "./db.js";
 import { createPgNotificationSource, LISTEN_APPLICATION_NAME } from "./events/pg-source.js";
 import { startJobWorker, type JobWorker } from "./jobs/worker.js";
+import { createAnthropicModel } from "./explain/anthropic-model.js";
 import { createSolverQuery } from "./solver-query/client.js";
 
 const SHUTDOWN_SIGNALS = ["SIGTERM", "SIGINT"] as const;
@@ -41,7 +42,20 @@ const notifications = createPgNotificationSource({
   password: processConfig.database.password,
   application_name: LISTEN_APPLICATION_NAME,
 });
-const app = buildApp({ logger: true, config: processConfig.app, database, solverQuery, notifications });
+// Ask (O-305): the model adapter exists only when the flag is on; loadProcessConfig already refused
+// the flag without a key. The key goes to the adapter and nowhere else.
+const modelClient =
+  processConfig.app.explainAskEnabled && processConfig.anthropicApiKey !== null
+    ? createAnthropicModel({ apiKey: processConfig.anthropicApiKey, model: processConfig.app.askModel })
+    : undefined;
+const app = buildApp({
+  logger: true,
+  config: processConfig.app,
+  database,
+  solverQuery,
+  notifications,
+  ...(modelClient === undefined ? {} : { modelClient }),
+});
 notifications.start(app.log);
 let jobWorker: JobWorker | undefined;
 

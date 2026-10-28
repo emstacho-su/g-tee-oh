@@ -2,15 +2,18 @@
  * Training sessions (R3.6, R4.10, R4.13, A5 section 3, A6 section 2, O-249, ADR 0018): POST /sessions,
  * GET /sessions/{id}/next and POST /sessions/{id}/end. The route file stays thin and calls these.
  *
- * - create: dispatches by mode (the S31 mode split): drill to sessions/modes/drill.ts (S23's code),
- *   automated to modes/automated.ts, holdout to modes/holdout.ts (which ends the user's open holdout
- *   session through endLockedSession first, PR #27 review HIGH 1); prediction and range_paint answer
- *   501 naming S27 (O-249).
- * - next: pure (the S23 binding rule). It derives the prompt from the persisted state with the
- *   session's holdout guard (derive-settings.ts, read only) and writes nothing; two calls in a row
- *   answer the same prompt. An ended session is 409 session-ended. One exception (PR #27 review
- *   HIGH 3): an automated session whose closed block waits for its next pick gets that pick first,
- *   in one write (automated/resume-block.ts); the prompts after it are again write-free.
+ * - create: dispatches by mode (the S31 mode split): drill, and S27's drill-backed prediction and
+ *   range_paint modes (O-302, which start with a practice state instead of a hand), to
+ *   sessions/modes/drill.ts (S23's code); automated to modes/automated.ts; holdout to
+ *   modes/holdout.ts (which ends the user's open holdout session through endLockedSession first,
+ *   PR #27 review HIGH 1).
+ * - next: pure (the S23 binding rule). It serves the graded modes only (drill, automated, holdout;
+ *   a prediction or range_paint session is 409 wrong-session-mode, S27 O-302). It derives the
+ *   prompt from the persisted state with the session's holdout guard (derive-settings.ts, read
+ *   only) and writes nothing; two calls in a row answer the same prompt. An ended session is 409
+ *   session-ended. One exception (PR #27 review HIGH 3): an automated session whose closed block
+ *   waits for its next pick gets that pick first, in one write (automated/resume-block.ts); the
+ *   prompts after it are again write-free.
  * - end: ended_at, phase ended, and the recap aggregated from the session's attempts, plus the
  *   learning hooks' extras (onSessionEnd, inside the same transaction: rating, tier, unlocks). A
  *   second end returns the same recap without writing (repeat-safe; the hooks run with firstEnd
@@ -37,7 +40,7 @@ import { transition } from "./machine.js";
 import { createAutomatedSession } from "./modes/automated.js";
 import { createDrillSession } from "./modes/drill.js";
 import { createHoldoutSession, type ReplaceOpenSession } from "./modes/holdout.js";
-import { sessionEndedProblem } from "./problems.js";
+import { requireGradedSessionMode, sessionEndedProblem } from "./problems.js";
 import { toPrompt, type Prompt } from "./prompt.js";
 import { findSession, lockSession, recapStats, writeState, type SessionRow } from "./repository.js";
 import type { SessionCall, SessionCreateBody } from "./session-call.js";
@@ -47,8 +50,6 @@ import { solverPort } from "./solver-port.js";
 export type { SessionCall, SessionCreateBody } from "./session-call.js";
 export type { Session } from "./session-view.js";
 export type Recap = z.infer<typeof recapSchema>;
-
-const S27 = "S27";
 
 /** POST /sessions/{id}/end, with the clock and the day's time zone the end hooks use. */
 export interface EndCall extends SessionCall {
@@ -78,15 +79,13 @@ export interface CreateClock {
 export async function createSession(call: SessionCall, body: SessionCreateBody, clock: CreateClock): Promise<Session> {
   switch (body.mode) {
     case "drill":
-      return createDrillSession(call, body);
+    case "prediction":
+    case "range_paint":
+      return createDrillSession(call, body, body.mode);
     case "automated":
       return createAutomatedSession(call, body, clock.now);
     case "holdout":
       return createHoldoutSession(call, body, clock, replaceOpenHoldout(call, clock));
-    default:
-      throw new ProblemError(HTTP_STATUS.notImplemented, PROBLEM_SLUGS.notImplemented, {
-        detail: `${body.mode} sessions are built by ${S27}; S23 serves drill sessions (O-249).`,
-      });
   }
 }
 
@@ -123,6 +122,7 @@ export async function nextPrompt(call: SessionCall, sessionId: string, now: Date
   if (stored.state.phase === "ended") {
     throw sessionEndedProblem();
   }
+  requireGradedSessionMode(stored);
   const session = await resumePendingBlock(call, stored, now);
   const port = solverPort(requireSolverQuery(call.app), call.request);
   const settings = await deriveSettingsFor(call.app, call.userId, session);

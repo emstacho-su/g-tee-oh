@@ -122,7 +122,7 @@ async function prepareFirstItem(call: SessionCall, scope: ServingScope, now: Dat
 }
 
 async function insertHoldoutSession(transaction: Database, userId: string, learning: HoldoutLearning, first: ServableItem): Promise<SessionRow> {
-  const state = initialState(newSessionSeed(), [first.spot], HOLDOUT_SESSION_SPOT, learning);
+  const state = initialState(newSessionSeed(), [first.spot], HOLDOUT_SESSION_SPOT, { learning });
   try {
     return await insertSession(transaction, { userId, mode: "holdout", drillId: null, settings: HOLDOUT_SETTINGS, state });
   } catch (error: unknown) {

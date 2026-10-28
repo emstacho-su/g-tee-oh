@@ -16,6 +16,7 @@ import type { z } from "zod";
 import type { DB } from "@g-tee-oh/contracts";
 
 import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
+import { noiseFlagSchema } from "../schemas/study.js";
 import { gradeLabelSchema, type feedbackSchema } from "../schemas/training.js";
 
 export type ContractLabel = z.infer<typeof gradeLabelSchema>;
@@ -52,6 +53,8 @@ export type FeedbackRow = Pick<
   | "node_key"
   | "hand"
   | "item_difficulty"
+  | "noise_flags"
+  | "spot_class_key"
 > &
   Pick<Selectable<DB["solution"]>, "game_config_id" | "position_pair">;
 
@@ -72,6 +75,8 @@ export const FEEDBACK_COLUMNS = [
   "node_key",
   "hand",
   "item_difficulty",
+  "noise_flags",
+  "spot_class_key",
 ] as const;
 
 export function toContractLabel(label: GradeLabel): ContractLabel {
@@ -109,5 +114,7 @@ export function renderFeedback(row: FeedbackRow): Feedback {
     item_difficulty: row.item_difficulty,
     // S31: set by the learning hooks when the decision closes an automated review block (O-272).
     review_block: null,
+    noise_flags: row.noise_flags.map((flag) => noiseFlagSchema.parse(flag)),
+    spot_class_key: row.spot_class_key,
   };
 }

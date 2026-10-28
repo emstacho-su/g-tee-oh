@@ -138,6 +138,19 @@ export const holdoutLearningSchema = z.strictObject({
 
 export const learningStateSchema = z.discriminatedUnion("kind", [automatedLearningSchema, holdoutLearningSchema]);
 
+/**
+ * The state of a prediction or range-painting session (S27, O-302): its kind, the number of prompts
+ * answered (the next prompt is derived from the session seed and this counter, so GET next stays
+ * pure and no strategy leaves the server before the answer), and mode-owned data that prediction/
+ * and range-paint/ parse with their own schemas. Drill sessions have none.
+ */
+export const practiceKindSchema = z.enum(["prediction", "range_paint"]);
+export const practiceStateSchema = z.strictObject({
+  kind: practiceKindSchema,
+  counter: z.number().int().min(0),
+  data: z.record(z.string(), z.unknown()),
+});
+
 export const persistedStateSchema = z.strictObject({
   phase: sessionStateSchema,
   seed: hex64Schema,
@@ -148,12 +161,16 @@ export const persistedStateSchema = z.strictObject({
   hand: handStateSchema.nullable(),
   previous_board: z.array(cardSchema).nullable(),
   last_attempt_id: uuidSchema.nullable(),
-  /** S31: null for drill sessions and rows written before S31. */
+  /** S31: null for drill and practice sessions and rows written before S31. */
   learning: learningStateSchema.nullable().default(null),
   /** PR #27 review HIGH 2: the session was created with a client-supplied seed (any mode). */
   seeded: z.boolean().default(false),
+  /** Present only on prediction and range_paint sessions (S27, O-302). */
+  practice: practiceStateSchema.optional(),
 });
 
+export type PracticeKind = z.infer<typeof practiceKindSchema>;
+export type PracticeState = z.infer<typeof practiceStateSchema>;
 export type HandEnd = z.infer<typeof handEndSchema>;
 export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 export type HeroSpot = z.infer<typeof heroSpotSchema>;
@@ -176,16 +193,29 @@ export function isSeededSession(state: Pick<PersistedState, "learning" | "seeded
   return state.seeded === true || (learning?.kind === "automated" && learning.seeded);
 }
 
-/** The state of a new session: dealing hand 0 (A6 section 2); seeded per PR #27 review HIGH 2. */
+/** What a new session's state carries beyond its seed and spots (each mode sets its own). */
+export interface InitialStateExtras {
+  /** S31: an automated or holdout session's learning state; null (the default) otherwise. */
+  learning?: LearningState | null;
+  /** PR #27 review HIGH 2: created with a client-supplied seed. */
+  seeded?: boolean;
+  /** S27 (O-302): a prediction or range_paint session's kind. */
+  practice?: PracticeKind;
+}
+
+/**
+ * The state of a new session: dealing hand 0 (A6 section 2); seeded per PR #27 review HIGH 2. A
+ * prediction or range_paint session starts awaiting its first prompt at counter 0 (O-302); the
+ * trainer machine never drives it.
+ */
 export function initialState(
   seed: string,
   spots: readonly HeroSpot[],
   spot: SessionSpot,
-  learning: LearningState | null = null,
-  seeded = false,
+  extras: InitialStateExtras = {},
 ): PersistedState {
   return persistedStateSchema.parse({
-    phase: "dealing",
+    phase: extras.practice === undefined ? "dealing" : "await_hero",
     seed,
     hand_no: 0,
     spots: [...spots],
@@ -193,7 +223,8 @@ export function initialState(
     hand: null,
     previous_board: null,
     last_attempt_id: null,
-    learning,
-    seeded,
+    learning: extras.learning ?? null,
+    seeded: extras.seeded ?? false,
+    ...(extras.practice === undefined ? {} : { practice: { kind: extras.practice, counter: 0, data: {} } }),
   });
 }

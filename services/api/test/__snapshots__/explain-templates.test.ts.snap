@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`R3.19 More info templates > R3.19 the blockers template matches its snapshot 1`] = `
+{
+  "template": "blockers",
+  "text": "5h5d removes 21 of the opponent's combos, 3.6% of its weighted range.
+
+Most blocked classes, most first: A5o, 55, K5o, A5s, K5s.",
+  "title": "Blockers",
+}
+`;
+
+exports[`R3.19 More info templates > R3.19 the facts template matches its snapshot 1`] = `
+{
+  "template": "facts",
+  "text": "The solver plays 5h5d (55) as BB: Fold 0.0% (EV 0.00 bb), Call 50.2% (EV 0.65 bb), Raise to 10bb 49.8% (EV 0.65 bb). Best by EV: Call.
+
+You chose Fold, which loses 0.65 bb, 16.3% of the pot.
+
+Across the whole range, BB plays Fold 77.2%, Call 9.7%, Raise to 10bb 13.1%.
+
+Raise to 10bb: 13.1% of the range takes it, and the weakest hand taking it at least half the time is KTs. This hand sits above the Raise to 10bb threshold. The strongest hand folding at least half the time is 44. Its equity against the opponent's range is 51.6%, and it ranks at 86.9% of its own range by equity.",
+  "title": "The facts",
+}
+`;
+
+exports[`R3.19 More info templates > R3.19 the hand_role template matches its snapshot 1`] = `
+{
+  "template": "hand_role",
+  "text": "The solver reads 55 here as a trap: a strong hand played passively to keep weaker hands in.
+
+You chose Fold; the best action by EV is Call.",
+  "title": "Hand role",
+}
+`;
+
+exports[`R3.19 More info templates > R3.19 the position template matches its snapshot 1`] = `
+{
+  "template": "position",
+  "text": "BB acts here against BTN, preflop.
+
+BB plays the rest of the hand out of position, which tends to realize less of its equity. The solver gives no equity realization figure preflop, so this is a sentence rather than a number.",
+  "title": "Position and equity realization",
+}
+`;
+
+exports[`R3.19 More info templates > R3.19 the range_advantage template matches its snapshot 1`] = `
+{
+  "template": "range_advantage",
+  "text": "Mean equity of each range: BB 39.4%, BTN 60.6%. The acting seat is -10.6 percentage points from an even split.
+
+Share of each range at or above 80.0% equity: BB 0.4%, BTN 2.6%; the acting seat's share minus the other's is -2.2 percentage points.",
+  "title": "Range and nut advantage",
+}
+`;

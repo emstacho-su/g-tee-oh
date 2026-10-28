@@ -59,8 +59,8 @@ import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-
 import { requireSolverQuery, type SqAction, type SqGrade } from "../solver-query/client.js";
 import { countRatedToday, insertAttempt, staleStateProblem, type AttemptValues } from "./attempts.js";
 import { renderFeedback, toContractLabel, type Feedback } from "./feedback.js";
-import { bestActionIndexes, buildGradeInput, gradeActions, panelsRevealAnswer } from "./policy.js";
-import { sessionEndedProblem } from "../sessions/problems.js";
+import { bestActionIndexes, buildGradeInput, gradeActions, gradeModeOf, panelsRevealAnswer } from "./policy.js";
+import { requireGradedSessionMode, sessionEndedProblem } from "../sessions/problems.js";
 
 export type DecisionBody = z.infer<typeof decisionBodySchema>;
 
@@ -127,6 +127,8 @@ function policyOutput(
     rngRoll: graded.derived.roll?.roll ?? null,
     settings: session.settings,
     ratedTodayInTrack: ratedToday,
+    // S27 PM review note 2: the mode comes from the session row (gradeModeOf), never a request field.
+    mode: gradeModeOf(session.mode),
   });
   return unrateStep(gradeDecision({ ...input, ...gradeInputOverrides(overrides) }), overrides);
 }
@@ -232,6 +234,8 @@ function attemptValues(
     panelsRevealed: overrides.panelsRevealed ?? panelsRevealAnswer(session.settings),
     trackIds: overrides.trackIds ?? [],
     itemDifficulty: overrides.itemDifficulty ?? null,
+    // gradeActions above validated every kind; Rust names them (ADR 0004, O-304).
+    actionKinds: actions.map((gradeAction) => gradeAction.kind),
   };
 }
 
@@ -243,6 +247,7 @@ async function readForDecision(decision: DecisionRequest): Promise<SessionRow> {
   if (session.state.phase === "ended") {
     throw sessionEndedProblem();
   }
+  requireGradedSessionMode(session);
   if (session.stateVersion !== decision.body.state_version || pendingPickOf(session) !== null) {
     throw staleStateProblem();
   }

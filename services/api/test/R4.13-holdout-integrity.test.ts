@@ -315,7 +315,7 @@ describe("R4.13 the session-end tier reads the prepared catalog", () => {
       mode: "automated",
       drillId: null,
       settings: HOLDOUT_SETTINGS,
-      state: initialState(DRAW_SEED, [{ config_id: "cfg_6_online_100", pair: "BB-BTN", line: null, hero_seat: "BTN", history: [] }], HOLDOUT_SESSION_SPOT, automatedLearning("preflop/class")),
+      state: initialState(DRAW_SEED, [{ config_id: "cfg_6_online_100", pair: "BB-BTN", line: null, hero_seat: "BTN", history: [] }], HOLDOUT_SESSION_SPOT, { learning: automatedLearning("preflop/class") }),
       stateVersion: 1,
       startedAt: now,
       endedAt: now,

@@ -110,7 +110,7 @@ const SPOT = { preflop_action: ["rfi" as const], hands: { mode: "all" as const }
 const HERO_SPOT = { config_id: "cfg_6_online_100", pair: "BB-BTN", line: null, hero_seat: "BTN" as const, history: [] };
 
 async function automatedSession(player: Player, seeded: boolean): Promise<SessionRow> {
-  const state = initialState("00000000000000aa", [HERO_SPOT], SPOT, automated(seeded));
+  const state = initialState("00000000000000aa", [HERO_SPOT], SPOT, { learning: automated(seeded) });
   return insertSession(database, { userId: player.userId, mode: "automated", drillId: null, settings: { ...TRAINER, stop_rule: "after_action" }, state });
 }
 

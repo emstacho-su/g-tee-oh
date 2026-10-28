@@ -56,7 +56,7 @@ export async function insertSessionRow(pool: pg.Pool, fixture: SessionFixture): 
       KIT_SEED,
       [{ config_id: KIT_CONFIG, pair: KIT_PAIR, line: null, hero_seat: "BTN", history: [] }],
       { preflop_action: ["rfi"], hands: { mode: "all" }, alternate_seats: false },
-      fixture.learning ?? null,
+      { learning: fixture.learning ?? null },
     ),
     seeded: fixture.seeded ?? false,
   };

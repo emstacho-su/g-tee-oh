@@ -26,3 +26,14 @@ export type FeedbackLabel = DecisionFeedback["label"];
 export type NoiseFlag = StudyNode["noise_flags"][number];
 export type PanelKey = keyof TrainerSettings["panels"];
 export type Grouping = TrainerSettings["grouping"];
+
+// S27 (R3.16 to R3.20, O-303): prediction, range painting, insight cards and explanations.
+export type PracticeSession = Schemas["PracticeSession"];
+export type PredictionPrompt = Schemas["PredictionPrompt"];
+export type PredictionResult = Schemas["PredictionResult"];
+export type RangePaintPrompt = Schemas["RangePaintPrompt"];
+export type RangePaintResult = Schemas["RangePaintResult"];
+export type RangeDrift = Schemas["RangeDrift"];
+export type MoreInfo = Schemas["MoreInfo"];
+export type AskResult = Schemas["AskResult"];
+export type AskStatus = Schemas["AskStatus"];

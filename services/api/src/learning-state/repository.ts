@@ -3,7 +3,7 @@
  * attempts that count toward leak stats, and the stored-label mapping back to learning's labels.
  *
  * Mechanism:
- * - Tracks are seeded rows (migration 20261029000100); attempt.track_ids holds their uuids, so the
+ * - Tracks are seeded rows (migration 20261029000200); attempt.track_ids holds their uuids, so the
  *   key (tracks.ts) and the id meet here. The seven rows never change after the migration, so the
  *   map is read once per process and cached, only once it holds every key (PR #27 review LOW 15):
  *   a decision then resolves its track without a query.

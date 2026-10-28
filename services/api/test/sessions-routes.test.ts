@@ -79,15 +79,53 @@ describe("R3.6 POST /sessions", () => {
     await app.close();
   });
 
-  // S31 Lane A: automated sessions are served now (R4.10, test/R4.10-*.test.ts), so automated left this list.
-  // S31 Lane C: holdout sessions are served now (R4.13, test/R4.13-holdout.test.ts), so holdout left it too.
-  it("R3.6 prediction and range_paint answer 501 naming S27 (O-249)", async () => {
-    const { app, player } = await setUp();
-    for (const [mode, owner] of [["prediction", "S27"], ["range_paint", "S27"]] as const) {
-      const response = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode } });
-      expect(response.statusCode, mode).toBe(501);
-      expect(response.json<{ detail: string }>().detail).toContain(owner);
+  // Every POST /sessions mode is served now: S27 built prediction and range_paint (R3.16, R3.17) and
+  // S31 automated and holdout (R4.10, R4.13), so no mode answers 501 any more.
+
+  it("R3.16 R3.17 prediction and range_paint sessions are drill-backed and start awaiting their first prompt (O-302)", async () => {
+    const { app, player, drillId } = await setUp();
+    for (const mode of ["prediction", "range_paint"] as const) {
+      const missing = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode } });
+      expect(missing.statusCode, mode).toBe(400);
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/sessions",
+        headers: player.write,
+        payload: { mode, drill_id: drillId, seed: "0123456789abcdef" },
+      });
+      expect(response.statusCode, response.body).toBe(201);
+      const session = sessionSchema.parse(response.json());
+      expect(session).toMatchObject({ mode, drill_id: drillId, state: "await_hero", state_version: 0 });
+      const stored = await pool.query<{ state: { practice: unknown; hand: unknown } }>("select state from practice_session where id = $1", [session.session_id]);
+      expect(stored.rows[0]?.state.practice).toEqual({ kind: mode, counter: 0, data: {} });
+      expect(stored.rows[0]?.state.hand).toBeNull();
+      // The drill routes refuse a practice session (409 wrong-session-mode), so it never reaches grading.
+      const nextResponse = await app.inject({ method: "GET", url: `/api/v1/sessions/${session.session_id}/next`, headers: player.read });
+      expect(nextResponse.statusCode).toBe(409);
+      expect(nextResponse.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:wrong-session-mode");
+      const decision = await decide(app, player, session.session_id, 0, 0);
+      expect(decision.statusCode).toBe(409);
+      expect(decision.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:wrong-session-mode");
+      expect((await rowsOf(pool, session.session_id)).attempts).toHaveLength(0);
     }
+    await app.close();
+  });
+
+  it("R3.18 a decision body cannot carry a grading mode: the mode comes from the session row only (PM review note 2)", async () => {
+    const { app, player, drillId } = await setUp();
+    const sessionId = await startSession(app, player, drillId);
+    const prompt = await next(app, player, sessionId);
+    const smuggled = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/decisions`,
+      headers: player.write,
+      payload: { state_version: prompt.state_version, action_index: 0, response_ms: 900, confidence: "sure", mode: "automated" },
+    });
+    expect(smuggled.statusCode).toBe(400);
+    expect((await rowsOf(pool, sessionId)).attempts).toHaveLength(0);
+    const honest = await decide(app, player, sessionId, prompt.state_version, prompt.buttons[0]?.index ?? 0);
+    expect(honest.statusCode, honest.body).toBe(200);
+    expect(honest.json<{ rated: boolean }>().rated).toBe(false);
     await app.close();
   });
 

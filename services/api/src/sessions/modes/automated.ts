@@ -53,7 +53,7 @@ export async function createAutomatedSession(call: SessionCall, body: SessionCre
     queue: next.pick.queue,
     block: next.pick.block,
   };
-  const state = initialState(seed, next.pick.spots, AUTOMATED_SESSION_SPOT, learning, body.seed !== undefined);
+  const state = initialState(seed, next.pick.spots, AUTOMATED_SESSION_SPOT, { learning, seeded: body.seed !== undefined });
   const settings = automatedSettings(body.settings);
   return idempotentWrite(call.app, call.request, HTTP_STATUS.created, async (transaction) => {
     await insertCoverageRequests(transaction, call.userId, next.gaps, NO_LINE);

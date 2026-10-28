@@ -65,6 +65,10 @@ export interface AppUser {
 
 export interface Attempt {
   action_index: number;
+  /**
+   * the node's action kinds in record order, from solver-query (O-304)
+   */
+  action_kinds: string[] | null;
   action_token: string;
   best_action_indexes: number[] | null;
   bucket: string | null;
@@ -354,6 +358,17 @@ export interface PracticeSession {
   user_id: string;
 }
 
+export interface PredictionAnswer {
+  correct: boolean;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  ladder: string;
+  level: number;
+  session_id: string;
+  spot_class_key: string;
+  user_id: string;
+}
+
 export interface Rating {
   mu: number;
   rd: number;
@@ -499,6 +514,7 @@ export interface DB {
   mastery: Mastery;
   opponent_profile: OpponentProfile;
   practice_session: PracticeSession;
+  prediction_answer: PredictionAnswer;
   rating: Rating;
   rating_history: RatingHistory;
   scenario: Scenario;

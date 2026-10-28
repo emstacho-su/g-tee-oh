@@ -96,7 +96,7 @@ afterAll(async () => {
 describe("R4.13 no holdout item is served in a drill or automated deal", () => {
   const states = (): { mode: string; state: PersistedState }[] => [
     { mode: "drill", state: initialState(SEED, heroSpotsOf(rfi).filter((spot) => spot.pair === PAIR), SPOT) },
-    { mode: "automated", state: initialState(SEED, heroSpotsOf(facingOpen).filter((spot) => spot.pair === PAIR), SPOT, automatedLearning(facingOpen)) },
+    { mode: "automated", state: initialState(SEED, heroSpotsOf(facingOpen).filter((spot) => spot.pair === PAIR), SPOT, { learning: automatedLearning(facingOpen) }) },
   ];
 
   it(

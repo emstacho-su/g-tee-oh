@@ -326,6 +326,28 @@ describe('R3.4 to R3.7 api trainer tables (S23, O-240 to O-246)', () => {
   });
 });
 
+describe('R3.16 R3.18 insight tables (S27, O-301, O-304)', () => {
+  test('R3.16 app inserts and reads prediction_answer but cannot change or delete it; builder cannot see it', async () => {
+    await withRollback(pool, async (client) => {
+      await asRole(client, 'app', 'select * from prediction_answer limit 1');
+      await expectDenied(client, 'app', 'update prediction_answer set correct = true where false');
+      await expectDenied(client, 'app', 'delete from prediction_answer where false');
+      await expectDenied(client, 'builder', 'select * from prediction_answer limit 1');
+      await expectDenied(client, 'query', 'select * from prediction_answer limit 1');
+    });
+  });
+
+  test('R3.18 attempt.action_kinds is a nullable text array (older rows keep null)', async () => {
+    await withRollback(pool, async (client) => {
+      const { rows } = await client.query(
+        `select data_type, is_nullable from information_schema.columns
+         where table_name = 'attempt' and column_name = 'action_kinds'`,
+      );
+      assert.deepEqual(rows, [{ data_type: 'ARRAY', is_nullable: 'YES' }]);
+    });
+  });
+});
+
 describe('R3.1 api tables (S21, O-230 to O-232)', () => {
   test('R3.1 app reads and writes idempotency_key; builder, capture and query cannot see it', async () => {
     await withRollback(pool, async (client) => {

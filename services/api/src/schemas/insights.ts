@@ -1,6 +1,6 @@
 /**
  * Progress, explanation, events and admin schemas (A5 section 3), declared by S21 for the
- * contract-first commit (O-38). Owners: progress S31 (R4.x), explanations S27 (R3.19, R3.20),
+ * contract-first commit (O-38). Owners: progress S31 (R4.x) (S27 moved explanations to explain.ts),
  * events and admin S23 (R3.4, R3.5). Shapes are drafts the owners may change with a visible
  * contract diff; S31 replaced the progress drafts (R4.12).
  */
@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { builderSettingValueSchemas } from "../admin/settings-keys.js";
 import { pageQuerySchema, pageSchema } from "../http/pagination.js";
-import { timestampSchema, uuidSchema } from "./common.js";
+import { timestampSchema } from "./common.js";
 import { tierSchema, trackKeySchema } from "./training.js";
 
 // S31 (R4.12, O-271 to O-279): the six progress shapes replace S21's drafts. Track keys come from
@@ -153,24 +153,6 @@ export const streakSchema = z
     next_milestone: z.object({ days: z.number().int().min(1), cosmetic_key: z.string() }).nullable(),
   })
   .meta({ id: "ProgressStreak" });
-
-export const attemptParamsSchema = z.object({ attempt_id: uuidSchema });
-
-export const moreInfoSchema = z.object({
-  template: z.string(),
-  text: z.string().describe("Every number in it exists in the node or insights data (R3.19, ADR 0016)"),
-});
-
-export const askBodySchema = z.strictObject({
-  question: z.string().trim().min(1).max(500),
-});
-
-export const askResultSchema = z.object({
-  text: z.string(),
-  validated: z.boolean(),
-  cached: z.boolean(),
-  cost_cents: z.number().int(),
-});
 
 export const builderStatusSchema = z
   .object({

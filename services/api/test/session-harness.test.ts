@@ -36,7 +36,8 @@ describe("R3.1 session harness", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/v1/prediction/0190f0e1-0000-7000-8000-000000000001/next",
+      // S27 built prediction and S31 progress; turn roots is the one route still planned (v1.5, O-15).
+      url: "/api/v1/study/turn-roots?config_id=cfg_6_online_100&pair=BB-BTN&line=r250.c&flop=KhQd4s",
       headers: readHeaders(session),
     });
 
@@ -45,7 +46,7 @@ describe("R3.1 session harness", () => {
     expect(response.json<{ type: string; status: number; detail: string }>()).toMatchObject({
       type: "urn:g-tee-oh:problem:not-implemented",
       status: 501,
-      detail: expect.stringContaining("S27") as unknown,
+      detail: expect.stringContaining("v1.5") as unknown,
     });
   });
 

@@ -174,3 +174,21 @@ export async function releaseKey(database: Database, claim: IdempotencyClaim): P
     .where("status_code", "is", null)
     .execute();
 }
+
+/**
+ * Restarts the lease of a claim the request still owns and has not completed (PR #29 review
+ * HIGH 2): a handler that runs longer than IDEMPOTENCY_LEASE_SECONDS (Ask's model calls) renews it
+ * while it works, so a same-key retry finds it in flight instead of taking it over. Returns false
+ * when the claim is no longer this request's (taken over, settled or released).
+ */
+export async function renewKey(database: Database, claim: IdempotencyClaim): Promise<boolean> {
+  const result = await database
+    .updateTable("idempotency_key")
+    .set({ created_at: sql<Date>`now()` })
+    .where("user_id", "=", claim.userId)
+    .where("key", "=", claim.key)
+    .where("claim_token", "=", claim.token)
+    .where("status_code", "is", null)
+    .executeTakeFirst();
+  return result.numUpdatedRows > 0n;
+}

@@ -35,7 +35,7 @@ function node(key: string, street: string, toAct: string, tokens: string[], next
       label: token,
       next_node_key: next[index] ?? null,
     })),
-    hands: [{ hand: "AKo", strategy: tokens.map(() => 1 / tokens.length), loss_pct_pot: tokens.map(() => 0), ev_bb: tokens.map(() => 0), ev_best_bb: 0 }],
+    hands: [{ hand: "AKo", strategy: tokens.map(() => 1 / tokens.length), loss_pct_pot: tokens.map(() => 0), ev_bb: tokens.map(() => 0), ev_best_bb: 0, mixed: tokens.length > 1 }],
     range_summary: { oop: { combos: 1, reach_weighted_combos: 1 }, ip: { combos: 1, reach_weighted_combos: 1 }, by_action: [] },
     noise_flags: [],
     synthetic: true,
@@ -71,6 +71,7 @@ function port(setup: PortSetup): SolverPort & { deals: number } {
     reveal: () => Promise.resolve({ deal_id: "d", street: "flop", cards: [], board: setup.board ?? "3cKh4c" }),
     grade: () => Promise.reject(new Error("not used")),
     coverage: () => Promise.reject(new Error("not used")),
+    gradeRange: () => Promise.reject(new Error("not used")),
   });
 }
 

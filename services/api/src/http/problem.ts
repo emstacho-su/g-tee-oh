@@ -80,6 +80,10 @@ export const PROBLEM_SLUGS = {
   // S31: holdout sessions (R4.13, O-276).
   noHoldoutItems: "no-holdout-items",
   holdoutComplete: "holdout-complete",
+  // S27: practice sessions and the Ask path (O-302, O-307).
+  wrongSessionMode: "wrong-session-mode",
+  askDisabled: "ask-disabled",
+  askCapReached: "ask-cap-reached",
 } as const;
 
 export type ProblemSlug = (typeof PROBLEM_SLUGS)[keyof typeof PROBLEM_SLUGS];
@@ -109,6 +113,9 @@ const TITLES: Readonly<Record<ProblemSlug, string>> = {
   "too-many-streams": "Too many open event streams",
   "no-holdout-items": "No holdout items are drawn for this scope yet",
   "holdout-complete": "Every holdout item of this round is answered",
+  "wrong-session-mode": "This route does not serve this session's mode",
+  "ask-disabled": "Ask is off until a model key is configured",
+  "ask-cap-reached": "This month's Ask budget is used",
 };
 
 /** The status Fastify-originated 4xx errors map to, by slug. */

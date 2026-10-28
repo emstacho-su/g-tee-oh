@@ -2,7 +2,7 @@
  * The seven v1 tracks and the one track of each spot class (R4.11, O-271, 06 section 2): every
  * Rust action family at every seat maps to exactly the track the table names, squeeze and
  * facing-open split by the blinds, an unknown family maps to none, and the table equals the track
- * rows the migration seeds (20261029000100_api_learning.sql).
+ * rows the migration seeds (20261029000200_api_learning.sql).
  */
 import { describe, expect, it } from "vitest";
 
