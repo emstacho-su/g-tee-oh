@@ -79,9 +79,11 @@ describe("R3.6 POST /sessions", () => {
     await app.close();
   });
 
-  it("R3.6 automated and holdout answer 501 naming S31, prediction and range_paint naming S27 (O-249)", async () => {
+  // S31 Lane A: automated sessions are served now (R4.10, test/R4.10-*.test.ts), so automated left this list.
+  // S31 Lane C: holdout sessions are served now (R4.13, test/R4.13-holdout.test.ts), so holdout left it too.
+  it("R3.6 prediction and range_paint answer 501 naming S27 (O-249)", async () => {
     const { app, player } = await setUp();
-    for (const [mode, owner] of [["automated", "S31"], ["holdout", "S31"], ["prediction", "S27"], ["range_paint", "S27"]] as const) {
+    for (const [mode, owner] of [["prediction", "S27"], ["range_paint", "S27"]] as const) {
       const response = await app.inject({ method: "POST", url: "/api/v1/sessions", headers: player.write, payload: { mode } });
       expect(response.statusCode, mode).toBe(501);
       expect(response.json<{ detail: string }>().detail).toContain(owner);

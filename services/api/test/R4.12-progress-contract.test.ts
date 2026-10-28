@@ -37,12 +37,14 @@ function createSession(payload: Record<string, unknown>) {
 }
 
 describe("R4.12 progress routes in the contract", () => {
-  it("R4.12 each progress route answers 501 naming S31 for a signed-in user and 401 without one", async () => {
+  it("R4.12 each progress route is built (no 501) for a signed-in user and 401 without one", async () => {
+    // S31 Lane C: the handlers are real now. This app has no solver-query, so the routes that read
+    // the class catalog (tracks, leaks, heatmap) are a 503; the rest answer 200 (R4.12-progress-routes covers the bodies).
+    const catalogRoutes: readonly string[] = ["tracks", "leaks", "heatmap"];
     for (const path of PROGRESS_PATHS) {
       const url = `/api/v1/progress/${path}`;
       const response = await app.inject({ method: "GET", url, headers: readHeaders(session) });
-      expect(response.statusCode, path).toBe(501);
-      expect(response.json<{ detail: string }>().detail, path).toContain("S31");
+      expect(response.statusCode, path).toBe(catalogRoutes.includes(path) ? 503 : 200);
       const anonymous = await app.inject({ method: "GET", url });
       expect(anonymous.statusCode, path).toBe(401);
     }
@@ -57,13 +59,13 @@ describe("R4.12 progress routes in the contract", () => {
 });
 
 describe("R4.10 POST /sessions body fields", () => {
-  it("R4.10 automated with a scope and holdout with a track parse and answer 501 naming S31", async () => {
+  it("R4.10 automated with a scope and holdout with a track parse; automated reaches its lane (503 here, no solver-query)", async () => {
+    // S31 Lane A: automated sessions are built now; this app has no solver-query, so a parsed body is a 503.
     const automated = await createSession({ mode: "automated", config_ids: [CONFIG] });
-    expect(automated.statusCode, automated.body).toBe(501);
-    expect(automated.json<{ detail: string }>().detail).toContain("S31");
+    expect(automated.statusCode, automated.body).toBe(503);
+    // S31 Lane C: holdout sessions are built now; without solver-query a parsed body is a 503 as well.
     const holdout = await createSession({ mode: "holdout", track_key: "blind-defense" });
-    expect(holdout.statusCode, holdout.body).toBe(501);
-    expect(holdout.json<{ detail: string }>().detail).toContain("S31");
+    expect(holdout.statusCode, holdout.body).toBe(503);
   });
 
   it("R4.10 an unknown track, an empty or oversized scope and a malformed configuration are 400", async () => {

@@ -133,7 +133,7 @@ export function buildApp(options: BuildAppOptions = {}): ApiApp {
   void app.register(sessionRoutes, { prefix: API_PREFIX, config });
   void app.register(eventRoutes, { prefix: API_PREFIX, config });
   void app.register(adminRoutes, { prefix: API_PREFIX, config });
-  void app.register(progressRoutes, { prefix: API_PREFIX });
+  void app.register(progressRoutes, { prefix: API_PREFIX, config });
   void app.register(plannedRoutes, { prefix: API_PREFIX });
 
   // The document describes the routes above; it does not describe itself.

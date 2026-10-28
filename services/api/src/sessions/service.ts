@@ -23,7 +23,7 @@ import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import type { LearningHooks } from "../learning/effects.js";
 import type { Database } from "../db.js";
 import type { recapSchema } from "../schemas/training.js";
-import { requireSolverQuery } from "../solver-query/client.js";
+import { requireSolverQuery, type SolverQuery } from "../solver-query/client.js";
 import { deriveAwaitHero } from "./derive.js";
 import { deriveSettingsFor } from "./derive-settings.js";
 import { transition } from "./machine.js";
@@ -56,16 +56,24 @@ export interface SessionEnd {
   sessionId: string;
   now: Date;
   timeZone: string;
+  /** The app's solver-query client, for the end hooks' class catalog (O-271); null without one. */
+  solverQuery: SolverQuery | null;
 }
 
-export async function createSession(call: SessionCall, body: SessionCreateBody): Promise<Session> {
+/** The clock and APP_TIME_ZONE a create reads (S31: the holdout round's month, O-276, O-247). */
+export interface CreateClock {
+  now: Date;
+  timeZone: string;
+}
+
+export async function createSession(call: SessionCall, body: SessionCreateBody, clock: CreateClock): Promise<Session> {
   switch (body.mode) {
     case "drill":
       return createDrillSession(call, body);
     case "automated":
-      return createAutomatedSession(call, body);
+      return createAutomatedSession(call, body, clock.now);
     case "holdout":
-      return createHoldoutSession(call, body);
+      return createHoldoutSession(call, body, clock);
     default:
       throw new ProblemError(HTTP_STATUS.notImplemented, PROBLEM_SLUGS.notImplemented, {
         detail: `${body.mode} sessions are built by ${S27}; S23 serves drill sessions (O-249).`,
@@ -120,7 +128,14 @@ export async function endLockedSession(transaction: Database, end: SessionEnd): 
   if (locked === undefined) {
     throw sessionNotFound();
   }
-  const hookContext = { transaction, now: end.now, timeZone: end.timeZone, userId: end.userId, session: locked };
+  const hookContext = {
+    transaction,
+    now: end.now,
+    timeZone: end.timeZone,
+    userId: end.userId,
+    session: locked,
+    solverQuery: end.solverQuery,
+  };
   if (locked.state.phase === "ended") {
     const extras = await end.hooks.onSessionEnd({ ...hookContext, ended: locked, firstEnd: false });
     return { ...(await recapOf(transaction, locked)), ...extras };
@@ -148,6 +163,7 @@ export async function endSession(call: EndCall, sessionId: string): Promise<Reca
     sessionId,
     now: call.now,
     timeZone: call.timeZone,
+    solverQuery: call.app.solverQuery,
   };
   return idempotentWrite(call.app, call.request, HTTP_STATUS.ok, (transaction) => endLockedSession(transaction, end));
 }

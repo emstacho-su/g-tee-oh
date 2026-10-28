@@ -62,6 +62,12 @@ export const heroSpotSchema = z.strictObject({
   line: lineSchema.nullable(),
   hero_seat: positionSchema,
   history: z.array(historyEntrySchema),
+  /**
+   * S31 (R4.13, O-276): a spot pinned to one stored deal. A holdout session's spot carries its
+   * item's deal seed, and deal-hand.ts deals exactly that deal in a single attempt; absent for
+   * drill and automated spots, which deal from the session seed as before.
+   */
+  deal_seed: hex64Schema.optional(),
 });
 
 export const handStateSchema = z.strictObject({

@@ -1,18 +1,26 @@
 /**
  * Progress routes (R4.12, A5 section 3, O-271 to O-279): GET /progress/rating, /tracks, /leaks,
- * /heatmap, /holdout and /streak, each scoped to the session user (ADR 0001) and each a pure read
- * (nothing here writes; streaks and tiers are recomputed on read, O-252, O-278).
- *
- * S31's contract commit registers every route with its final request and response schemas; the
- * handlers answer a 501 problem naming S31 until the progress lane fills them (progress/*), so the
- * committed document is complete before the handlers exist (O-38). The lane replaces each handler
- * body and drops 501 from PROGRESS_PROBLEMS.
+ * /heatmap, /holdout and /streak, each scoped to the session user (ADR 0001; 401 without one) and
+ * each a pure read: nothing here writes, and streaks, tiers and effective weights are recomputed on
+ * every read (O-252, O-278). The handlers only read the request and call progress/service.ts, where
+ * the mechanism is described. The rating, tracks, leaks and heat map read solver-query's class
+ * catalog, so they also answer the upstream problems (502, 503); holdout and streak read only the
+ * database. Days and weeks are APP_TIME_ZONE's (O-247).
  */
 import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
-import { notImplemented, plannedDescription } from "../http/not-implemented.js";
-import { AUTHENTICATED, READ_PROBLEMS } from "../http/openapi.js";
-import { HTTP_STATUS, problemResponses } from "../http/problem.js";
+import { AUTHENTICATED, READ_PROBLEMS, UPSTREAM_READ_PROBLEMS } from "../http/openapi.js";
+import { problemResponses } from "../http/problem.js";
+import { requireSession } from "../plugins/authenticate.js";
+import {
+  heatmapProgress,
+  holdoutProgress,
+  leaksProgress,
+  ratingProgress,
+  streakProgress,
+  tracksProgress,
+  type ProgressCall,
+} from "../progress/service.js";
 import {
   heatmapSchema,
   holdoutQuerySchema,
@@ -24,105 +32,98 @@ import {
   tracksQuerySchema,
   tracksSchema,
 } from "../schemas/insights.js";
+import type { ConfiguredRouteOptions } from "./route-options.js";
 
 const TAG = "progress";
-/** The session that builds these handlers (O-38). */
-export const PROGRESS_OWNER = "S31";
-/** An authenticated read, plus 501 while the handler is a placeholder. */
-const PROGRESS_PROBLEMS = [...READ_PROBLEMS, HTTP_STATUS.notImplemented] as const;
 
-function describe(summary: string): { summary: string; description: string } {
-  return { summary, description: plannedDescription(PROGRESS_OWNER, summary) };
-}
-
-export const progressRoutes: FastifyPluginCallbackZod = (app, _options, done) => {
-  const config = { owner: PROGRESS_OWNER };
+export const progressRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (app, options, done) => {
+  const callOf = (request: Parameters<typeof requireSession>[0]): ProgressCall => ({
+    app,
+    userId: requireSession(request).userId,
+    now: new Date(),
+    timeZone: options.config.timeZone,
+  });
 
   app.get(
     "/progress/rating",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("The overall rank: weighted rating, deviation band and tier"),
+        summary: "The overall rank: weighted rating, deviation band and tier",
+        description: "Recomputed on every read from the track ratings with inactivity applied and the effective track weights (O-252, O-271).",
         security: AUTHENTICATED,
-        response: { 200: ratingSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: ratingSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => ratingProgress(callOf(request)),
   );
 
   app.get(
     "/progress/tracks",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("Per-track ratings with their effective weights"),
+        summary: "Per-track ratings with their effective weights",
         security: AUTHENTICATED,
         querystring: tracksQuerySchema,
-        response: { 200: tracksSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: tracksSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => tracksProgress(callOf(request), request.query),
   );
 
   app.get(
     "/progress/leaks",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("The top leaks by spot class with their weekly series"),
+        summary: "The top leaks by spot class with their weekly series",
         security: AUTHENTICATED,
         querystring: leaksQuerySchema,
-        response: { 200: leaksSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: leaksSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => leaksProgress(callOf(request), request.query.weeks),
   );
 
   app.get(
     "/progress/heatmap",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("Mastery heat map: family by pair against depth band by format"),
+        summary: "Mastery heat map: family by pair against depth band by format",
         security: AUTHENTICATED,
-        response: { 200: heatmapSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: heatmapSchema, ...problemResponses(UPSTREAM_READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => heatmapProgress(callOf(request)),
   );
 
   app.get(
     "/progress/holdout",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("Monthly holdout retest rounds, newest first, and the open round"),
+        summary: "Monthly holdout retest rounds, newest first, and the open round",
         security: AUTHENTICATED,
         querystring: holdoutQuerySchema,
-        response: { 200: holdoutSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: holdoutSchema, ...problemResponses(READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => holdoutProgress(callOf(request), request.query),
   );
 
   app.get(
     "/progress/streak",
     {
-      config,
       schema: {
         tags: [TAG],
-        ...describe("Streak state: days, freezes, the repair window and cosmetic unlocks"),
+        summary: "Streak state: days, freezes, the repair window and cosmetic unlocks",
         security: AUTHENTICATED,
-        response: { 200: streakSchema, ...problemResponses(PROGRESS_PROBLEMS) },
+        response: { 200: streakSchema, ...problemResponses(READ_PROBLEMS) },
       },
     },
-    (request) => notImplemented(request),
+    (request) => streakProgress(callOf(request)),
   );
 
   done();

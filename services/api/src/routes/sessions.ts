@@ -49,7 +49,8 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
       schema: {
         tags: [TAG],
         summary: "Start a practice session",
-        description: "Drill mode in S23; automated and holdout answer 501 until S31, prediction and range_paint until S27 (O-249).",
+        description:
+          "Drill (S23), automated and holdout (S31) sessions; prediction and range_paint answer 501 until S27 (O-249). A client seed makes an automated session unrated; holdout refuses a seed with 400.",
         security: AUTHENTICATED,
         headers: mutatingHeadersSchema,
         body: sessionCreateBodySchema,
@@ -58,7 +59,8 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
     },
     async (request, reply) => {
       const { userId } = requireSession(request);
-      const session = await createSession({ app, request, userId }, request.body);
+      const clock = { now: new Date(), timeZone: options.config.timeZone };
+      const session = await createSession({ app, request, userId }, request.body, clock);
       return reply.code(HTTP_STATUS.created).send(session);
     },
   );

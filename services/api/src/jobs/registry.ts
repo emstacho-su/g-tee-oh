@@ -17,6 +17,10 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Database } from "../db.js";
 import type { LearningHooks } from "../learning/effects.js";
 import type { SolverQuery } from "../solver-query/client.js";
+import { HOLDOUT_DRAW_JOB } from "./holdout-draw.js";
+import { HOLDOUT_ROUND_JOB } from "./holdout-round.js";
+import { IDLE_CLOSE_JOB } from "./idle-close.js";
+import { LEAK_HISTORY_JOB } from "./leak-history.js";
 import type { ClaimedJob } from "./repository.js";
 import type { JobSchedule } from "./schedule.js";
 
@@ -52,7 +56,12 @@ export interface JobDefinition extends JobSchedule {
   handler: JobHandler;
 }
 
-export const JOB_DEFINITIONS: readonly JobDefinition[] = [];
+export const JOB_DEFINITIONS: readonly JobDefinition[] = [
+  LEAK_HISTORY_JOB,
+  IDLE_CLOSE_JOB,
+  HOLDOUT_ROUND_JOB,
+  HOLDOUT_DRAW_JOB,
+];
 
 /** The handlers of `definitions`, by kind. */
 export function handlersOf(definitions: readonly JobDefinition[]): Readonly<Record<string, JobHandler>> {

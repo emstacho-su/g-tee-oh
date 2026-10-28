@@ -13,6 +13,9 @@
  */
 import "fastify";
 
+import { AUTOMATED_HOOK_PART } from "../automated/effects.js";
+import { HOLDOUT_HOOK_PART } from "../holdout/effects.js";
+import { SHARED_EFFECTS_PART } from "../learning-state/shared-effects.js";
 import { composeLearningHooks, type LearningHookPart, type LearningHooks } from "./effects.js";
 
 declare module "fastify" {
@@ -21,6 +24,10 @@ declare module "fastify" {
   }
 }
 
-export const LEARNING_HOOK_PARTS: readonly LearningHookPart[] = [];
+export const LEARNING_HOOK_PARTS: readonly LearningHookPart[] = [
+  SHARED_EFFECTS_PART,
+  AUTOMATED_HOOK_PART,
+  HOLDOUT_HOOK_PART,
+];
 
 export const DEFAULT_LEARNING_HOOKS: LearningHooks = composeLearningHooks(LEARNING_HOOK_PARTS);

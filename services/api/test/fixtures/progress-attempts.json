@@ -1,0 +1,89 @@
+{
+  "description": "Synthetic learning-state rows for the R4.12 aggregation tests: leak_stat and leak_history rows, the catalog's view of each class, and the mastery, retrievability and decision counts of practiced classes. Expected values are computed by hand: leak costs 12 down to 1 for c01 to c12 plus c13 tied with c08 at 5; c03 is no longer in the catalog, so the top 10 skips it and the tie orders by key.",
+  "today": "2026-10-21",
+  "weeks": 3,
+  "leakStats": [
+    { "spotClassKey": "c01", "freqPriorPer1k": 40, "n": 40, "missRate": 0.3, "evPerMissBb": 1, "leakCostBbPer1k": 12 },
+    { "spotClassKey": "c02", "freqPriorPer1k": 22, "n": 20, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 11 },
+    { "spotClassKey": "c03", "freqPriorPer1k": 20, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 10 },
+    { "spotClassKey": "c04", "freqPriorPer1k": 18, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 9 },
+    { "spotClassKey": "c05", "freqPriorPer1k": 16, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 8 },
+    { "spotClassKey": "c06", "freqPriorPer1k": 14, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 7 },
+    { "spotClassKey": "c07", "freqPriorPer1k": 12, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 6 },
+    { "spotClassKey": "c08", "freqPriorPer1k": 10, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 5 },
+    { "spotClassKey": "c09", "freqPriorPer1k": 8, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 4 },
+    { "spotClassKey": "c10", "freqPriorPer1k": 6, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 3 },
+    { "spotClassKey": "c11", "freqPriorPer1k": 4, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 2 },
+    { "spotClassKey": "c12", "freqPriorPer1k": 2, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 1 },
+    { "spotClassKey": "c13", "freqPriorPer1k": 10, "n": 10, "missRate": 0.5, "evPerMissBb": 1, "leakCostBbPer1k": 5 }
+  ],
+  "leakHistory": [
+    { "spotClassKey": "c01", "week": "2026-10-05", "leakCostBbPer1k": 14 },
+    { "spotClassKey": "c01", "week": "2026-10-12", "leakCostBbPer1k": 13 },
+    { "spotClassKey": "c02", "week": "2026-10-12", "leakCostBbPer1k": 10.5 },
+    { "spotClassKey": "c09", "week": "2026-10-05", "leakCostBbPer1k": null },
+    { "spotClassKey": "c12", "week": "2026-10-12", "leakCostBbPer1k": 1.5 }
+  ],
+  "leakClassInfo": {
+    "c01": { "family": "rfi", "trackKey": "opens" },
+    "c02": { "family": "facing-open", "trackKey": "blind-defense" },
+    "c04": { "family": "facing-open", "trackKey": "facing-open-ip" },
+    "c05": { "family": "facing-3bet", "trackKey": "facing-3bet" },
+    "c06": { "family": "rfi", "trackKey": "opens" },
+    "c07": { "family": "facing-4bet", "trackKey": "four-bet-plus" },
+    "c08": { "family": "blind-vs-blind", "trackKey": "blind-vs-blind" },
+    "c09": { "family": "rfi", "trackKey": "opens" },
+    "c10": { "family": "squeeze", "trackKey": "facing-open-ip" },
+    "c11": { "family": "rfi", "trackKey": "opens" },
+    "c12": { "family": "rfi", "trackKey": "opens" },
+    "c13": { "family": "limped-isolation", "trackKey": "live-limped-straddled" }
+  },
+  "expectedLeaks": {
+    "weeks": ["2026-10-05", "2026-10-12", "2026-10-19"],
+    "order": ["c01", "c02", "c04", "c05", "c06", "c07", "c08", "c13", "c09", "c10"],
+    "series": {
+      "c01": [14, 13, 12],
+      "c02": [null, 10.5, 11],
+      "c04": [null, null, 9],
+      "c05": [null, null, 8],
+      "c06": [null, null, 7],
+      "c07": [null, null, 6],
+      "c08": [null, null, 5],
+      "c13": [null, null, 5],
+      "c09": [null, null, 4],
+      "c10": [null, null, 3]
+    }
+  },
+  "heatmapClasses": [
+    { "spotClassKey": "class-a", "family": "facing-open", "pair": "BB-BTN", "depthBand": "100", "format": "online" },
+    { "spotClassKey": "class-b", "family": "rfi", "pair": "BB-BTN", "depthBand": "100", "format": "online" },
+    { "spotClassKey": "class-c", "family": "rfi", "pair": "BB-CO", "depthBand": "150", "format": "online" },
+    { "spotClassKey": "class-d", "family": "facing-3bet", "pair": "BB-BTN", "depthBand": "25", "format": "live" },
+    { "spotClassKey": "class-e", "family": "rfi", "pair": "BB-BTN", "depthBand": "200", "format": "online" }
+  ],
+  "memory": {
+    "class-a": { "pKnown": 0.96, "retrievability": 0.91, "n": 12 },
+    "class-b": { "pKnown": 0.5, "retrievability": 0.7, "n": 3 }
+  },
+  "expectedHeatmap": {
+    "rows": [
+      { "family": "rfi", "pair": "BB-BTN" },
+      { "family": "rfi", "pair": "BB-CO" },
+      { "family": "facing-open", "pair": "BB-BTN" },
+      { "family": "facing-3bet", "pair": "BB-BTN" }
+    ],
+    "columns": [
+      { "depth_band": "25", "format": "live" },
+      { "depth_band": "100", "format": "online" },
+      { "depth_band": "150", "format": "online" },
+      { "depth_band": "200", "format": "online" }
+    ],
+    "cells": [
+      { "spot_class_key": "class-a", "row": 2, "column": 1, "p_known": 0.96, "mastered": true, "retrievability": 0.91, "n": 12 },
+      { "spot_class_key": "class-b", "row": 0, "column": 1, "p_known": 0.5, "mastered": false, "retrievability": 0.7, "n": 3 },
+      { "spot_class_key": "class-c", "row": 1, "column": 2, "p_known": null, "mastered": false, "retrievability": null, "n": 0 },
+      { "spot_class_key": "class-d", "row": 3, "column": 0, "p_known": null, "mastered": false, "retrievability": null, "n": 0 },
+      { "spot_class_key": "class-e", "row": 0, "column": 3, "p_known": null, "mastered": false, "retrievability": null, "n": 0 }
+    ]
+  }
+}

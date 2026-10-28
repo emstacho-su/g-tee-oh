@@ -36,7 +36,7 @@ describe("R3.1 session harness", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/v1/progress/streak",
+      url: "/api/v1/prediction/0190f0e1-0000-7000-8000-000000000001/next",
       headers: readHeaders(session),
     });
 
@@ -45,7 +45,7 @@ describe("R3.1 session harness", () => {
     expect(response.json<{ type: string; status: number; detail: string }>()).toMatchObject({
       type: "urn:g-tee-oh:problem:not-implemented",
       status: 501,
-      detail: expect.stringContaining("S31") as unknown,
+      detail: expect.stringContaining("S27") as unknown,
     });
   });
 

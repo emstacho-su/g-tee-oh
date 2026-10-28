@@ -15,6 +15,8 @@
  *    row the hands filter refuses (close decisions), deals again;
  * 5. a hand the holdout guard holds back (S31, O-276: the hero's row at that node is a holdout item)
  *    deals again, so drills and automated sessions never serve a holdout item (holdout-guard.ts).
+ * A spot pinned to a stored deal (S31, O-276: a holdout session's item, HeroSpot.deal_seed) is dealt
+ * with that seed instead of the attempt's, and takes a single attempt when every spot is pinned.
  * The history before the hero is the spot's line, as the spot recorded it; nothing is sampled.
  *
  * Bounds: a hand takes at most MAX_DEAL_ATTEMPTS attempts, one deal call each when a manual list
@@ -64,7 +66,8 @@ interface DealContext {
 async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter, draws: HandDraws, context: DealContext): Promise<DealtHand | undefined> {
   const { port, guard } = context;
   const spot = pickSpot(state.spots, state.spot, handNo, draws.pick);
-  const deal = await port.deal(dealFilterOf(spot), draws.dealSeed);
+  const dealSeed = spot.deal_seed ?? draws.dealSeed;
+  const deal = await port.deal(dealFilterOf(spot), dealSeed);
   const solutionId = deal.solution_ids[0];
   if (solutionId === undefined) {
     throw upstreamInconsistent("solver-query dealt a spot with no solution.");
@@ -93,7 +96,7 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
     config_id: spot.config_id,
     pair: spot.pair,
     line: spot.line,
-    deal_seed: draws.dealSeed,
+    deal_seed: dealSeed,
     deal_id: deal.deal_id,
     solution_id: solutionId,
     hero_position: deal.hero_position,
@@ -112,10 +115,18 @@ async function tryDeal(state: PersistedState, handNo: number, hands: HandsFilter
   return { hand, node, handNo };
 }
 
+/** A pinned spot deals one stored deal, so a second attempt would only repeat it (S31, O-276). */
+const PINNED_DEAL_ATTEMPTS = 1;
+
+function attemptLimit(state: PersistedState): number {
+  return state.spots.every((spot) => spot.deal_seed !== undefined) ? PINNED_DEAL_ATTEMPTS : MAX_DEAL_ATTEMPTS;
+}
+
 async function dealOneHand(state: PersistedState, handNo: number, hands: HandsFilter, context: DealContext): Promise<DealtHand | undefined> {
   let attempts = 0;
+  const limit = attemptLimit(state);
   for (const draws of dealAttempts(handDraws(state.seed, handNo))) {
-    if (attempts === MAX_DEAL_ATTEMPTS) {
+    if (attempts === limit) {
       return undefined;
     }
     attempts += 1;
