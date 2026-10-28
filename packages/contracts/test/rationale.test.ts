@@ -26,6 +26,10 @@ const PROBES: ReadonlyArray<readonly [string, string, boolean]> = [
   ["a decomposed accent counts once", "éé", false],
   ["at the raw bound", "x".repeat(RATIONALE_MAX_CHARS), true],
   ["over the raw bound", "x".repeat(RATIONALE_MAX_CHARS + 1), false],
+  // PR #39 re-review MEDIUM: U+FB2C is one UTF-16 unit but three code points after NFC, so 1,000 of
+  // them pass the raw bound and would overflow the database's 1,000 character check.
+  ["NFC lengthens past the bound (U+FB2C x 1,000)", "שּׁ".repeat(RATIONALE_MAX_CHARS), false],
+  ["NFC lengthens but stays within the bound (U+FB2C x 333)", "שּׁ".repeat(333), true],
 ];
 
 describe("R3.16 the typed reason's rule", () => {
