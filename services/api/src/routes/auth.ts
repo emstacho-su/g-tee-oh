@@ -58,7 +58,12 @@ export interface AuthRouteOptions {
 
 function sessionInfo(session: Omit<SessionContext, "sessionId">): SessionInfo {
   return {
-    user: { id: session.userId, email: session.email, created_at: session.userCreatedAt.toISOString() },
+    user: {
+      id: session.userId,
+      email: session.email,
+      created_at: session.userCreatedAt.toISOString(),
+      is_admin: session.isAdmin,
+    },
     csrf_token: session.csrfToken,
     expires_at: session.expiresAt.toISOString(),
   };
@@ -139,6 +144,7 @@ export const authRoutes: FastifyPluginCallbackZod<AuthRouteOptions> = (app, opti
         userId: user.id,
         email: user.email,
         userCreatedAt: user.createdAt,
+        isAdmin: user.isAdmin,
         csrfToken: session.csrfToken,
         expiresAt: session.expiresAt,
       });
