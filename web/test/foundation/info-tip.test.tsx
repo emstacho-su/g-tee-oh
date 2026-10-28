@@ -53,6 +53,29 @@ describe("R3.12 InfoTip", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  it("R3.12 a press dragged off the button and released elsewhere does not stop keyboard focus opening it later (review round 1, 8)", async () => {
+    const user = userEvent.setup();
+    renderTip();
+    const button = screen.getByRole("button", { name: "About the strongest folding hand" });
+    fireEvent.pointerDown(button, { pointerType: "mouse" });
+    // Dragged off: released over the page, so no click reaches the button.
+    fireEvent.pointerUp(document.body, { pointerType: "mouse" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.tab();
+    expect(button).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(EXPLANATION);
+  });
+
+  it("R3.12 a cancelled press does not stop keyboard focus opening it later (review round 1, 8)", async () => {
+    const user = userEvent.setup();
+    renderTip();
+    const button = screen.getByRole("button", { name: "About the strongest folding hand" });
+    fireEvent.pointerDown(button, { pointerType: "touch" });
+    fireEvent.pointerCancel(button, { pointerType: "touch" });
+    await user.tab();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(EXPLANATION);
+  });
+
   it("R3.12 a tap outside closes it", () => {
     render(
       <div>

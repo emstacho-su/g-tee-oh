@@ -91,11 +91,24 @@ export function InfoTip({ subject, children, className }: InfoTipProps) {
           className={cn(TRIGGER_CLASSES, className)}
           onPointerDown={(event) => {
             pressing.current = true;
+            // A press that ends anywhere (released off the button, or cancelled) ends here too, so a
+            // later keyboard focus still opens the tip (review round 1, 8). Focus from the press
+            // itself comes before the release, so it is still held back.
+            const release = () => {
+              pressing.current = false;
+              window.removeEventListener("pointerup", release, true);
+              window.removeEventListener("pointercancel", release, true);
+            };
+            window.addEventListener("pointerup", release, true);
+            window.addEventListener("pointercancel", release, true);
             stopRadix(event);
           }}
           onFocus={(event) => {
             // A press toggles on click; focus from that same press must not open it first.
             if (pressing.current) stopRadix(event);
+          }}
+          onBlur={() => {
+            pressing.current = false;
           }}
           onClick={(event) => {
             pressing.current = false;
