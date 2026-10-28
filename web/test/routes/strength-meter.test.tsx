@@ -25,7 +25,8 @@ vi.mock("../../src/routes/onboarding/strength.js", async (importOriginal) => {
 import { jsonResponse, problemResponse } from "../api/fake-fetch.js";
 import { renderApp } from "../app/render-app.js";
 
-const TOKEN = "01890a5d-ac96-774b-bcce-b302099a8057.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+// Built from repeated characters: a synthetic token, low in entropy so no secret scanner mistakes it.
+const TOKEN = `01890a5d-ac96-774b-bcce-b302099a8057.${"a".repeat(43)}`;
 const PREVIEW = { email: "new.member@example.com", expires_at: "2026-11-04T12:00:00Z" };
 
 describe("R3.13 strength meter memo", () => {

@@ -195,7 +195,8 @@ describe("join page", () => {
   });
 
   it("R3.13 a second invite link opened in the same tab starts the flow over for the new invite (review round 1, H)", async () => {
-    const secondToken = "01890a5d-ac96-774b-bcce-b302099a8099.zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJ";
+    // Built from repeated characters: a synthetic token, low in entropy so no secret scanner mistakes it.
+    const secondToken = `01890a5d-ac96-774b-bcce-b302099a8099.${"z".repeat(43)}`;
     const secondPreview = { email: "second.member@example.com", expires_at: "2026-11-05T12:00:00Z" };
     const view = renderApp(`/join#${TOKEN}`, script([jsonResponse(200, PREVIEW), jsonResponse(200, secondPreview)]));
     expect(await screen.findByTestId("email-chip")).toHaveTextContent(INVITE_EMAIL);
