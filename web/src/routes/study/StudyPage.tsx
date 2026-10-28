@@ -32,6 +32,7 @@ import {
   draftFromSearch,
   draftPair,
   draftUncoveredPair,
+  fieldWaitText,
   searchFromDraft,
   settingChoices,
   settingsSignature,
@@ -71,9 +72,10 @@ interface SettingsAreaProps {
 }
 
 function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose }: SettingsAreaProps) {
-  const { catalog, draftReads } = entry;
+  const { catalog, draftReads, draftSeatsFailed } = entry;
   const choices = useMemo(() => (catalog === undefined ? undefined : settingChoices(catalog, draft)), [catalog, draft]);
-  const blocker = confirmBlocker(catalog, draft, choices);
+  const blocker = confirmBlocker(catalog, draft, choices, { seatsFailed: draftSeatsFailed });
+  const waitText = (key: SettingKey) => fieldWaitText(catalog, draft, key, draftSeatsFailed);
   const uncovered = catalog === undefined ? undefined : draftUncoveredPair(catalog, draft);
   const onConfirm = () => {
     if (catalog === undefined || blocker !== undefined) return;
@@ -92,6 +94,7 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
       choices={choices}
       draft={draft}
       blocker={blocker}
+      waitText={waitText}
       {...(uncovered === undefined ? {} : { notice: uncoveredNotice(uncovered) })}
       {...(draftReads.error === null ? {} : { seatsFailure: { onRetry: draftReads.retry } })}
       onChange={onChange}

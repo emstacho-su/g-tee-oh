@@ -193,7 +193,9 @@ describe("R3.12 study settings panel", () => {
     const panel = await screen.findByRole("region", { name: "Spot settings" });
     const depth = await waitFor(() => choice("Depth", "100bb"));
     await user.click(depth);
-    expect(await within(panel).findByText("Loading the seats for these settings.")).toBeInTheDocument();
+    // The seat fields and the Confirm reason all say so (S39 follow-up: no "Choose a depth first.").
+    expect(await within(panel).findAllByText("Loading the seats for these settings.")).toHaveLength(3);
+    expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Spot settings" })).toBe(panel);
     expect(choice("Depth", "100bb")).toHaveFocus();
 

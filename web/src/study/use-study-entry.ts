@@ -38,6 +38,11 @@ export interface StudyEntry {
   readonly catalogReads: CombinedReads;
   /** The draft configuration's pairs, for the panel. */
   readonly draftReads: CombinedReads;
+  /**
+   * Whether the read serving the draft configuration's seats failed: the draft's own pairs read,
+   * or the URL's when both name one configuration (S39 follow-up).
+   */
+  readonly draftSeatsFailed: boolean;
 }
 
 function useConfigs(api: AppApi) {
@@ -76,5 +81,6 @@ export function useStudyEntry(api: AppApi, search: StudySearch, draft: SettingsD
     urlSettled: catalog !== undefined && (configId === undefined || urlPairs.data !== undefined),
     catalogReads: combineReads([stakes, ...configReads, urlPairs]),
     draftReads: combineReads(draftConfigId === configId ? [] : [draftPairs]),
+    draftSeatsFailed: draftConfigId !== undefined && (draftConfigId === configId ? urlPairs.isError : draftPairs.isError),
   };
 }

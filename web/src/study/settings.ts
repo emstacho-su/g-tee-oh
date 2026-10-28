@@ -88,6 +88,8 @@ export const MISSING_TEXT: Readonly<Record<SettingKey, string>> = {
 export const BLOCKER_TEXT = {
   loadingCatalog: "Loading the catalog.",
   loadingSeats: "Loading the seats for these settings.",
+  seatsFailed: "The seats for these settings could not be loaded.",
+  noConfiguration: "Choose an available depth first.",
 } as const;
 
 /** Every seat in preflop action order; each table size seats a subsequence of it. */
@@ -279,9 +281,38 @@ function isSeat(key: SettingKey): boolean {
   return key === "first" || key === "against";
 }
 
+/** Whether the read behind the draft configuration's seats failed (the panel shows its Retry). */
+export interface SeatsReadState {
+  readonly seatsFailed?: boolean;
+}
+
+function seatsText(seatsFailed: boolean): string {
+  return seatsFailed ? BLOCKER_TEXT.seatsFailed : BLOCKER_TEXT.loadingSeats;
+}
+
+/**
+ * What a field shows in place of its choices (S39 follow-up): the prompt for the first upper field
+ * still missing, the catalog loading, or for the seats, why they are not there with every upper
+ * field chosen: the chosen depth names no configuration, or the seats are loading, or their read
+ * failed.
+ */
+export function fieldWaitText(catalog: SettingsCatalog | undefined, draft: SettingsDraft, key: SettingKey, seatsFailed: boolean): string {
+  const upperMissing = SETTING_KEYS.slice(0, SETTING_KEYS.indexOf(key)).some((upper) => draft[upper] === undefined);
+  if (upperMissing) return SETTING_PROMPTS[key];
+  if (catalog === undefined) return BLOCKER_TEXT.loadingCatalog;
+  if (!isSeat(key)) return SETTING_PROMPTS[key];
+  if (draftConfigId(catalog.configs, draft) === undefined) return BLOCKER_TEXT.noConfiguration;
+  return seatsText(seatsFailed);
+}
+
 /** Why one field blocks Confirm, or undefined when its choice is made and available. */
-function fieldBlocker(key: SettingKey, value: SettingsDraft[SettingKey], choices: readonly SettingChoice[] | undefined): string | undefined {
-  if (choices === undefined) return isSeat(key) ? BLOCKER_TEXT.loadingSeats : MISSING_TEXT[key];
+function fieldBlocker(
+  key: SettingKey,
+  value: SettingsDraft[SettingKey],
+  choices: readonly SettingChoice[] | undefined,
+  seatsFailed: boolean,
+): string | undefined {
+  if (choices === undefined) return isSeat(key) ? seatsText(seatsFailed) : MISSING_TEXT[key];
   if (value === undefined) return MISSING_TEXT[key];
   const chosen = choices.find((entry) => entry.value === String(value));
   if (chosen === undefined) return MISSING_TEXT[key];
@@ -291,18 +322,19 @@ function fieldBlocker(key: SettingKey, value: SettingsDraft[SettingKey], choices
 
 /**
  * Why Confirm is unavailable, in the field order: the catalog still loading, the first field left
- * empty, a seat list still loading, or a chosen value that is unavailable (named with its reason).
- * Undefined when the six choices name a covered pair. Pass the choices already computed for this
- * draft to avoid computing them again.
+ * empty, a seat list still loading or failed to load, or a chosen value that is unavailable (named
+ * with its reason). Undefined when the six choices name a covered pair. Pass the choices already
+ * computed for this draft to avoid computing them again.
  */
 export function confirmBlocker(
   catalog: SettingsCatalog | undefined,
   draft: SettingsDraft,
   choices: SettingChoices | undefined = catalog === undefined ? undefined : settingChoices(catalog, draft),
+  { seatsFailed = false }: SeatsReadState = {},
 ): string | undefined {
   if (catalog === undefined || choices === undefined) return BLOCKER_TEXT.loadingCatalog;
   for (const key of SETTING_KEYS) {
-    const blocker = fieldBlocker(key, draft[key], choices[key]);
+    const blocker = fieldBlocker(key, draft[key], choices[key], seatsFailed);
     if (blocker !== undefined) return blocker;
   }
   return draftPair(draftPairs(catalog, draft), draft)?.preflop_available === true ? undefined : REASONS.notInLibrary;

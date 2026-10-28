@@ -17,7 +17,6 @@ import { FailureAlert } from "./StudyNotices.js";
 import {
   SETTING_KEYS,
   SETTING_LABELS,
-  SETTING_PROMPTS,
   type SettingChoice,
   type SettingChoices,
   type SettingKey,
@@ -38,6 +37,8 @@ export interface StudySettingsPanelProps {
   draft: SettingsDraft;
   /** Why Confirm is unavailable; undefined when the choices name a covered spot. */
   blocker: string | undefined;
+  /** What a field shows while it has no choices (fieldWaitText). */
+  waitText: (key: SettingKey) => string;
   /** Shown above the fields, for example when the draft's seats name an uncovered pair. */
   notice?: string;
   /** A failed read of the draft's seats, retried in place. */
@@ -52,10 +53,11 @@ interface SettingFieldProps {
   name: SettingKey;
   choices: readonly SettingChoice[] | undefined;
   value: string | undefined;
+  waitText: string;
   onChange: (key: SettingKey, raw: string) => void;
 }
 
-function SettingField({ name, choices, value, onChange }: SettingFieldProps) {
+function SettingField({ name, choices, value, waitText, onChange }: SettingFieldProps) {
   const label = SETTING_LABELS[name];
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -63,7 +65,7 @@ function SettingField({ name, choices, value, onChange }: SettingFieldProps) {
         {label}
       </span>
       {choices === undefined ? (
-        <p className="text-sm text-muted">{SETTING_PROMPTS[name]}</p>
+        <p className="text-sm text-muted">{waitText}</p>
       ) : (
         <ToggleGroup label={label} value={value} options={choices} onValueChange={(next) => onChange(name, next)} wrap />
       )}
@@ -72,7 +74,7 @@ function SettingField({ name, choices, value, onChange }: SettingFieldProps) {
 }
 
 export function StudySettingsPanel(props: StudySettingsPanelProps) {
-  const { choices, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
+  const { choices, draft, blocker, waitText, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
   return (
     <Card title={PANEL_TEXT.title} description={PANEL_TEXT.description}>
       {notice === undefined ? null : (
@@ -88,6 +90,7 @@ export function StudySettingsPanel(props: StudySettingsPanelProps) {
             name={key}
             choices={choices?.[key]}
             value={draft[key] === undefined ? undefined : String(draft[key])}
+            waitText={waitText(key)}
             onChange={onChange}
           />
         ))}
