@@ -31,7 +31,7 @@ export interface SpotIo {
   prefetchPrompt: (sessionId: string, version: number) => void;
   submitDecision: (sessionId: string, decision: PendingDecision) => Promise<DecisionFeedback>;
   endSession: (sessionId: string, key: string) => Promise<SessionRecap>;
-  /** Called with each prompt before it is shown (the trainer-table store). */
+  /** Called with each prompt the machine shows, in the same task (the trainer-table store); never with an unplayed over-limit prompt. */
   onPrompt: (prompt: TrainerPrompt) => void;
   /** Called with each failure's problem before the machine sees it (a 401 signs out). */
   onProblem: (problem: SpotProblem) => void;
@@ -64,10 +64,13 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
     }
   }
 
-  function settle<T>(token: number, request: Promise<T>, toEvent: (value: T) => SpotEvent): void {
+  /** Sends the answer's event; after runs once the machine has taken it (the prompt shown, say). */
+  function settle<T>(token: number, request: Promise<T>, toEvent: (value: T) => SpotEvent, after?: (value: T) => void): void {
     request.then(
       (value) => {
-        if (token === generation) send(toEvent(value));
+        if (token !== generation) return;
+        send(toEvent(value));
+        after?.(value);
       },
       (error: unknown) => {
         if (token !== generation) return;
@@ -80,9 +83,17 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
   }
 
   function promptEvent(prompt: TrainerPrompt): SpotEvent {
-    io().onPrompt(prompt);
     // The end key is used only when the prompt opens a hand past the planned length (R3.31).
     return { type: "prompt_loaded", prompt, at: io().now(), endKey: io().newKey() };
+  }
+
+  /**
+   * Hands a prompt to the screen (the trainer-table store, /train's hand marks) only when the
+   * machine shows it: a prompt past the planned length ends the session unplayed and never reaches
+   * them (PR #45 review round 2, finding 4). Both run in the same task as the state change.
+   */
+  function promptShown(prompt: TrainerPrompt): void {
+    if (state.kind === "await_action" && state.prompt === prompt) io().onPrompt(prompt);
   }
 
   function enter(entered: SpotState, token: number): void {
@@ -91,10 +102,10 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
         settle(token, io().createSession(entered.rng, entered.key), (session) => ({ type: "session_started", session }));
         return;
       case "loading_prompt":
-        settle(token, io().loadPrompt(entered.context.session.session_id, entered.version), promptEvent);
+        settle(token, io().loadPrompt(entered.context.session.session_id, entered.version), promptEvent, promptShown);
         return;
       case "stale":
-        settle(token, io().loadPrompt(entered.context.session.session_id, null), promptEvent);
+        settle(token, io().loadPrompt(entered.context.session.session_id, null), promptEvent, promptShown);
         return;
       case "submitting":
         settle(token, io().submitDecision(entered.context.session.session_id, entered.decision), (feedback) => ({

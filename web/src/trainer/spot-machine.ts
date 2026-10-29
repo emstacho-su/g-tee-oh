@@ -184,8 +184,10 @@ function promptLoaded(state: SpotState, event: Extract<SpotEvent, { type: "promp
   const notice = state.kind === "stale" ? "stale" : null;
   const hand = advanceHand(state.context.hand ?? null, event.prompt);
   const context: SessionContext = { ...state.context, hand };
-  // A prompt that opens a hand past the planned length ends the session instead of showing it (R3.31).
-  if (event.endKey !== undefined && pastSessionLimit(context, hand.ordinal)) return { kind: "ending", context, key: event.endKey };
+  // A prompt that opens a hand past the planned length ends the session instead of showing it
+  // (R3.31), on the context of the last played hand, so the counter never reads "Hand 21 of 20"
+  // while the recap loads (PR #45 review round 2, finding 3).
+  if (event.endKey !== undefined && pastSessionLimit(context, hand.ordinal)) return { kind: "ending", context: state.context, key: event.endKey };
   return { kind: "await_action", context, prompt: event.prompt, timer: startTimer(event.at), notice };
 }
 
