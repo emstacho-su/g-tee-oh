@@ -141,6 +141,12 @@ bench-web:
 shots:
     pnpm --filter @g-tee-oh/web run shots
 
+# Review page from a screenshot folder (S44, R3.23): DIR holds manifest.json from `just shots` and,
+# when the critic ran, auto-verdicts.json from merge-auto-verdicts.mjs; the page lands in DIR/page.
+# scripts/screen-review/rubric/critic.md describes the whole loop (shoot, critique, merge, publish).
+shots-review DIR ROUND="3":
+    node scripts/screen-review/build-page.mjs --manifest "{{DIR}}/manifest.json" --out "{{DIR}}/page" --round {{ROUND}} --auto-if-present "{{DIR}}/auto-verdicts.json"
+
 # Apply migrations; dbmate reads DATABASE_URL from the environment or .env (R0.6)
 db-migrate:
     dbmate --wait --no-dump-schema up
