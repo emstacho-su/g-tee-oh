@@ -31,8 +31,8 @@ describe("R3.37 the configuration picker model", () => {
     expect(choices.stake.choices).toEqual([{ value: FIXTURE_ONLINE_STAKE_ID, label: "online", detail: "5% rake, cap $1.50", disabled: false }]);
     if (choices.depth.kind !== "choices") throw new Error("no depth choices");
     expect(choices.depth.choices.map((choice) => [choice.value, choice.label, choice.disabled])).toEqual([
-      ["10000", "100 bb", false],
-      ["20000", "200 bb", false],
+      ["10000", "100bb", false],
+      ["20000", "200bb", false],
     ]);
   });
 
