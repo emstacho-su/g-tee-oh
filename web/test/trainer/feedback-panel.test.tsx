@@ -52,7 +52,7 @@ describe("R3.13 FeedbackPanel summary", () => {
     render(<FeedbackPanel feedback={RATED} actions={fixtureActions} chosenIndex={1} />);
     const summary = screen.getByTestId("feedback-summary");
     expect(summary).toHaveTextContent("Your action: Call");
-    expect(summary).toHaveTextContent("Best: Raise 2.5bb");
+    expect(summary).toHaveTextContent("Best: Raise to 2.5bb");
     expect(summary).toHaveTextContent("Lost 0.01bb (0.73% of the pot)");
     expect(summary).toHaveTextContent("Roll 37");
     expect(summary).not.toHaveTextContent("Unrated");
@@ -61,14 +61,14 @@ describe("R3.13 FeedbackPanel summary", () => {
   it("R3.13 names only the lowest-loss members as best (ADR 0024, O-375)", () => {
     const feedback: DecisionFeedback = { ...RATED, best_action_indexes: [2, 3] };
     render(<FeedbackPanel feedback={feedback} actions={fixtureActions} chosenIndex={1} />);
-    expect(screen.getByTestId("feedback-summary")).toHaveTextContent("Best: Raise 2.5bb or All-in 100bb");
+    expect(screen.getByTestId("feedback-summary")).toHaveTextContent("Best: Raise to 2.5bb or All-in 100bb");
   });
 
   it("R3.13 says so when the choice is one of the best actions, and when no EV was lost", () => {
     const feedback: DecisionFeedback = { ...RATED, label: "best", ev_loss_bb: 0, ev_loss_pct_pot: 0 };
     render(<FeedbackPanel feedback={feedback} actions={fixtureActions} chosenIndex={2} />);
     const summary = screen.getByTestId("feedback-summary");
-    expect(summary).toHaveTextContent("Your action: Raise 2.5bb");
+    expect(summary).toHaveTextContent("Your action: Raise to 2.5bb");
     expect(summary).toHaveTextContent("You played the best action");
     expect(summary).not.toHaveTextContent("Best: ");
     expect(summary).toHaveTextContent("No EV lost");
@@ -106,7 +106,7 @@ describe("R3.13 FeedbackPanel summary", () => {
     render(<FeedbackPanel feedback={OFFSET_FEEDBACK} actions={OFFSET_ACTIONS} chosenIndex={11} />);
     const summary = screen.getByTestId("feedback-summary");
     expect(summary).toHaveTextContent("Your action: Call");
-    expect(summary).toHaveTextContent("Best: Raise 2.5bb");
+    expect(summary).toHaveTextContent("Best: Raise to 2.5bb");
   });
 
   it("R3.13 a chosen position that is not a NodeAction.index renders an alert, not a wrong action (O-198)", () => {
@@ -168,7 +168,7 @@ describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
     render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
     await openSection(FEEDBACK_SECTION_TITLES.strategy);
     const table = screen.getByRole("table", { name: "This hand's strategy" });
-    const raiseRow = within(table).getByRole("row", { name: /Raise 2.5bb/ });
+    const raiseRow = within(table).getByRole("row", { name: /Raise to 2.5bb/ });
     expect(raiseRow).toHaveTextContent("80.0%");
     expect(raiseRow).toHaveTextContent("0.62bb");
     expect(raiseRow).toHaveTextContent("Best");
@@ -179,7 +179,7 @@ describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
     render(<FeedbackPanel feedback={OFFSET_FEEDBACK} actions={OFFSET_ACTIONS} chosenIndex={11} />);
     await openSection(FEEDBACK_SECTION_TITLES.strategy);
     const table = screen.getByRole("table", { name: "This hand's strategy" });
-    expect(within(table).getByRole("row", { name: /Raise 2.5bb/ })).toHaveTextContent("Best");
+    expect(within(table).getByRole("row", { name: /Raise to 2.5bb/ })).toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /All-in 100bb/ })).not.toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /Call/ })).not.toHaveTextContent("Best");
   });

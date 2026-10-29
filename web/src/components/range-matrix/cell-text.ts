@@ -67,7 +67,7 @@ function frequencyText(cell: MatrixCell, actions: readonly NodeAction[]): string
   return parts.length === 0 ? "no action" : parts.join(", ");
 }
 
-/** "Raise 2.5bb is the best action" or "Raise 2.5bb is 1.20% of the pot behind the best". */
+/** "Raise to 2.5bb is the best action" or "Raise to 2.5bb is 1.20% of the pot behind the best". */
 function compareText(cell: MatrixCell, actions: readonly NodeAction[], lens: number | undefined): string {
   const position = lens ?? defaultLensPosition(actions);
   const action = position === null ? undefined : actions[position];

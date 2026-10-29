@@ -90,7 +90,7 @@ function useScaleByWeight(node: StudyNode): [boolean, (next: boolean) => void] {
   return [value, (next) => setOverride({ nodeKey: node.node_key, value: next })];
 }
 
-/** "Lens: compare to best, Raise 2.5bb against the best action". */
+/** "Lens: compare to best, Raise to 2.5bb against the best action, in percent of the pot". */
 function lensLine(node: StudyNode, mode: MatrixMode, lensPosition: number | null): string {
   const name = `${LENS_TEXT.lensLead}${MODE_NAMES[mode]}`;
   if (mode === "ev" || mode === "strategy_ev") return `${name}${LENS_TEXT.evUnit}`;

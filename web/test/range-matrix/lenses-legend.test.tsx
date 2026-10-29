@@ -39,7 +39,7 @@ describe("R3.24 lens legends", () => {
     expect(within(legend).getAllByRole("listitem")).toHaveLength(6);
     expect(legend).toHaveTextContent("best");
     expect(legend).toHaveTextContent(/more than [\d.]+% of the pot behind the best/);
-    expect(screen.getByText(/Raise 2\.5bb against the best action/)).toBeInTheDocument();
+    expect(screen.getByText(/Raise to 2.5bb against the best action/)).toBeInTheDocument();
   });
 
   it("R3.12 the weight legend speaks of the range, never of the class", () => {
@@ -71,7 +71,7 @@ describe("R3.24 table fallback in the lenses", () => {
     cells.forEach((element, index) => {
       const cell = model.cells[index] as MatrixCell;
       const loss = cell.lossPctPot[2] ?? 0;
-      expect(element.textContent.startsWith(`${cell.hand}: Raise 2.5bb`)).toBe(true);
+      expect(element.textContent.startsWith(`${cell.hand}: Raise to 2.5bb`)).toBe(true);
       if (loss >= 0.1) expect(element.textContent).toContain(`${loss.toFixed(2)}% of the pot behind the best`);
       else expect(element.textContent).toContain("is the best action");
     });

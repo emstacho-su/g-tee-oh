@@ -73,7 +73,7 @@ describe("R3.12 ThresholdCard", () => {
   it("R3.12 names each action from the node's actions by NodeAction.index, with its share and line (O-198)", () => {
     render(<ThresholdCard card={CARD} heroHand="AJo" actions={fixtureActions} />);
     const list = screen.getByRole("list", { name: "Actions" });
-    const raise = within(list).getByRole("listitem", { name: "Raise 2.5bb" });
+    const raise = within(list).getByRole("listitem", { name: "Raise to 2.5bb" });
     expect(raise).toHaveTextContent("Played by 52% of the range");
     expect(raise).toHaveTextContent("Weakest hand that plays it at least half the time: K9o");
     expect(raise).toHaveTextContent("Your hand is above this line");
@@ -82,9 +82,9 @@ describe("R3.12 ThresholdCard", () => {
 
   it("R3.12 names actions from their token when no actions are given, or when the index names none", () => {
     const { rerender } = render(<ThresholdCard card={CARD} />);
-    expect(screen.getByRole("listitem", { name: "Raise 2.5bb" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "Raise to 2.5bb" })).toBeInTheDocument();
     rerender(<ThresholdCard card={CARD} actions={OFFSET_ACTIONS} />);
-    expect(screen.getByRole("listitem", { name: "Raise 2.5bb" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "Raise to 2.5bb" })).toBeInTheDocument();
     const odd: Card = { ...CARD, actions: [{ index: 7, token: "zz", share_taking: 0.1, weakest_hand_taking_half: null }] };
     rerender(<ThresholdCard card={odd} />);
     expect(screen.getByRole("listitem", { name: "Unnamed action" })).toBeInTheDocument();

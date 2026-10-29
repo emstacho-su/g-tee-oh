@@ -67,10 +67,10 @@ describe("R3.24 lenses on the study screen", () => {
     expect(screen.getByRole("radio", { name: "Call" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("lens-line")).toHaveTextContent("Lens: compare to best, Call against the best action, in percent of the pot");
     const depth = router.history.length;
-    await user.click(screen.getByRole("radio", { name: "Raise 2.5bb" }));
+    await user.click(screen.getByRole("radio", { name: "Raise to 2.5bb" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ mode: "compare", lens: "2" }));
     expect(router.history.length).toBe(depth);
-    expect(screen.getByTestId("lens-line")).toHaveTextContent("Raise 2.5bb against the best action");
+    expect(screen.getByTestId("lens-line")).toHaveTextContent("Raise to 2.5bb against the best action");
     expect(screen.queryByRole("radio", { name: "Fold" })).toBeInTheDocument();
   });
 

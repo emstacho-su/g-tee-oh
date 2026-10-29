@@ -221,7 +221,7 @@ describe("R3.24 compare to best", () => {
     const implicit = draw(model, { mode: "compare" });
     expect(implicit).toEqual(explicit);
     const aa = cellOf(model, "AA");
-    expect(cellValueText(aa, model.actions, "compare", 2)).toMatch(/^Raise 2\.5bb (is the best action|is .* of the pot behind the best)$/);
+    expect(cellValueText(aa, model.actions, "compare", 2)).toMatch(/^Raise to 2.5bb (is the best action|is .* of the pot behind the best)$/);
     const text = cellValueText(aa, model.actions, "compare");
     expect(text.startsWith("Call ")).toBe(true);
   });

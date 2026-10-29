@@ -309,7 +309,7 @@ describe("R3.13 feedback, next and prefetch", () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await playToFeedback(view);
     expect(screen.getByRole("button", { name: RAISE_NAME })).toBeDisabled();
-    expect(screen.getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise 2.5bb");
+    expect(screen.getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise to 2.5bb");
   });
 
   it("R3.13 the table shows the hero's cards, the action log and the synthetic banner (O-57, O-281, O-383)", async () => {

@@ -52,7 +52,7 @@ describe("R3.12 study node view", () => {
     renderStudy(`${BASE}&hand=AKs`);
     const range = await screen.findByRole("table", { name: "Range by action at this node" });
     expect(within(range).getByRole("row", { name: /Fold/ })).toHaveTextContent("55.0%");
-    expect(within(range).getByRole("row", { name: /Raise 2.5bb/ })).toHaveTextContent("38.0%");
+    expect(within(range).getByRole("row", { name: /Raise to 2.5bb/ })).toHaveTextContent("38.0%");
     const hand = screen.getByRole("table", { name: "AKs at this node: strategy and EV" });
     expect(within(hand).getAllByRole("row")).toHaveLength(5);
     expect(hand).toHaveTextContent("bb");
