@@ -32,7 +32,8 @@ describe("R3.13 unrated reason", () => {
   });
 
   it("R3.13 an automated session started with a seed is never rated (O-288)", () => {
-    expect(unratedReason(CLEAN, PLAIN_PROMPT, { ...AUTOMATED, rated_eligible: false })).toBe(UNRATED_REASONS.seeded);
+    const block = { spot_class_key: "class", track_key: "opens", family: "rfi", served: 1, size: 3, worked_example: false } as const;
+    expect(unratedReason(CLEAN, PLAIN_PROMPT, { ...AUTOMATED, rated_eligible: false, automated: block })).toBe(UNRATED_REASONS.seeded);
   });
 
   it("R3.13 a worked example, then a revealing panel, then the rating rules (O-272, 06 section 3.6)", () => {
@@ -46,5 +47,17 @@ describe("R3.13 unrated reason", () => {
 
   it("R3.13 the revealing panels are the three the api names (grading/policy.ts ANSWER_REVEALING_PANELS)", () => {
     expect([...REVEALING_PANELS].sort()).toEqual(["action_frequency_table", "hero_strategy_matrix", "threshold_card"]);
+  });
+});
+
+describe("R3.13 PR #45 review round 1, finding 7: the seed sentence only for a seeded automated session", () => {
+  it("R3.13 a prediction session and an automated session without its block get the rating-rule sentence, not the seed one", () => {
+    expect(unratedReason(CLEAN, PLAIN_PROMPT, { ...AUTOMATED, mode: "prediction", rated_eligible: false, automated: null })).toBe(UNRATED_REASONS.rule);
+    expect(unratedReason(CLEAN, PLAIN_PROMPT, { ...AUTOMATED, rated_eligible: false, automated: null })).toBe(UNRATED_REASONS.rule);
+  });
+
+  it("R3.13 an automated session with its block and rated_eligible false is the seeded one (session-view.ts: rated_eligible is !seeded)", () => {
+    const block = { spot_class_key: "class", track_key: "opens", family: "rfi", served: 1, size: 3, worked_example: false } as const;
+    expect(unratedReason(CLEAN, PLAIN_PROMPT, { ...AUTOMATED, rated_eligible: false, automated: block })).toBe(UNRATED_REASONS.seeded);
   });
 });

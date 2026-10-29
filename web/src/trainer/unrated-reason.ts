@@ -27,14 +27,25 @@ export type UnratedReason = (typeof UNRATED_REASONS)[keyof typeof UNRATED_REASON
 
 type FeedbackFacts = Pick<DecisionFeedback, "rated" | "noise_flags">;
 type PromptFacts = Pick<TrainerPrompt, "worked_example" | "visible_panels">;
-type SessionFacts = Pick<PracticeSession, "mode" | "rated_eligible">;
+type SessionFacts = Pick<PracticeSession, "mode" | "rated_eligible" | "automated">;
+
+/**
+ * A seeded automated session: the api's session view gives an automated session with its learning
+ * data its block and rated_eligible = !seeded (services/api/src/sessions/session-view.ts), so only
+ * that shape says "seeded"; any other ineligible session (no block, another mode) falls to the
+ * generic rating-rule sentence (PR #45 review round 1, finding 7). The view carries no seed field.
+ */
+function isSeededAutomated(session: SessionFacts): boolean {
+  return session.mode === "automated" && session.automated !== null && !session.rated_eligible;
+}
 
 export function unratedReason(feedback: FeedbackFacts, prompt: PromptFacts, session: SessionFacts): UnratedReason | null {
   if (feedback.rated) return null;
   if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
   if (session.mode === "drill") return UNRATED_REASONS.drill;
   if (session.mode === "holdout") return UNRATED_REASONS.holdout;
-  if (!session.rated_eligible) return UNRATED_REASONS.seeded;
+  if (isSeededAutomated(session)) return UNRATED_REASONS.seeded;
+  if (!session.rated_eligible) return UNRATED_REASONS.rule;
   if (prompt.worked_example) return UNRATED_REASONS.workedExample;
   if (revealsAnswer(prompt.visible_panels)) return UNRATED_REASONS.revealed;
   return UNRATED_REASONS.rule;
