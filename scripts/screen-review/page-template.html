@@ -1,0 +1,294 @@
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* A review sheet: one section per screen, its four shots at true size, the criterion, the earlier verdict, the critic's verdict, then the owner's. Grouped by the lane that owns the fixes. */
+:root {
+  --bg: #f3f3f1; --panel: #ffffff; --well: #e6e6e3; --ink: #1b1b1a; --muted: #5f5f5b; --rule: #d4d4cf; --accent: #b3261e;
+  --yes: #1f6f43; --yes-soft: #dcefe3; --no: #a12a1d; --no-soft: #f6dedb; --critic: #2b4f81; --critic-soft: #e1e9f5; --focus: #1b1b1a;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615; --panel: #1f1f1e; --well: #0d0d0d; --ink: #ecece8; --muted: #a3a39d; --rule: #34342f; --accent: #e0574c;
+    --yes: #6fcf97; --yes-soft: #1d3326; --no: #f08a7e; --no-soft: #3a1f1c; --critic: #9dbbe8; --critic-soft: #1e2a3d; --focus: #ecece8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --panel: #1f1f1e; --well: #0d0d0d; --ink: #ecece8; --muted: #a3a39d; --rule: #34342f; --accent: #e0574c;
+  --yes: #6fcf97; --yes-soft: #1d3326; --no: #f08a7e; --no-soft: #3a1f1c; --critic: #9dbbe8; --critic-soft: #1e2a3d; --focus: #ecece8;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 64px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 28px; min-width: 0; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font-size: clamp(26px, 4vw, 34px); line-height: 1.15; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tally span { padding: 4px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--panel); }
+.tally .t-yes { color: var(--yes); } .tally .t-no { color: var(--no); } .tally .t-critic { color: var(--critic); }
+.notice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--panel); font-size: 14px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; color: var(--muted); }
+.tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+nav.jump { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 14px; }
+nav.jump a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+nav.jump a:hover { border-bottom-color: var(--ink); }
+nav.jump a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.group { display: grid; gap: 18px; }
+.group > h2 { margin: 8px 0 0; font-size: 22px; line-height: 1.25; text-wrap: balance; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.group > h2 .gid { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 500; }
+.group > h2 .gcount { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+section.state { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: grid; gap: 18px; min-width: 0; }
+section.state.is-yes { border-color: var(--yes); }
+section.state.is-no { border-color: var(--no); }
+.state-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 500; }
+h3.title { margin: 0; font-size: 20px; line-height: 1.25; text-wrap: balance; }
+.where { font-family: var(--font-mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.shots { display: grid; gap: 16px; min-width: 0; }
+.shots .pair { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; min-width: 0; }
+figure { margin: 0; display: grid; gap: 6px; max-width: 100%; min-width: 0; }
+figure .frame { background: var(--well); border-radius: 6px; padding: 10px; max-width: 100%; overflow-x: auto; }
+figure img { display: block; max-width: none; height: auto; }
+body.fit figure img { max-width: 100%; }
+figcaption { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+h4 { margin: 0 0 6px; font-size: 13px; font-family: var(--font-mono); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+p.criterion { margin: 0; max-width: 75ch; }
+.previous, .critic { border-left: 3px solid var(--rule); padding: 4px 0 4px 12px; max-width: 75ch; }
+.previous.was-no { border-left-color: var(--no); }
+.previous.was-yes { border-left-color: var(--yes); }
+.previous p, .critic p { margin: 0; }
+.previous .said { font-style: italic; }
+.critic { border-left-color: var(--critic); display: grid; gap: 6px; }
+.critic.said-no h4 { color: var(--no); }
+.critic.said-yes h4 { color: var(--yes); }
+.critic ul { margin: 0; padding-left: 18px; }
+.critic li { margin: 2px 0; }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--critic-soft); color: var(--critic); margin-right: 6px; vertical-align: middle; }
+.critic .hint { color: var(--muted); font-size: 14px; }
+.verdict { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.choices { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.choice { font: inherit; font-weight: 600; font-size: 15px; padding: 8px 18px; border-radius: 999px; border: 1.5px solid var(--rule); background: transparent; color: var(--ink); cursor: pointer; }
+.choice:hover { border-color: var(--muted); }
+.choice:focus-visible, textarea:focus-visible, .tools input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.choice[data-v="yes"][aria-pressed="true"] { background: var(--yes-soft); border-color: var(--yes); color: var(--yes); }
+.choice[data-v="no"][aria-pressed="true"] { background: var(--no-soft); border-color: var(--no); color: var(--no); }
+.choice.agree { border-style: dashed; color: var(--critic); }
+.saved { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+label.fb { font-size: 14px; color: var(--muted); }
+textarea { width: 100%; min-height: 72px; resize: vertical; font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; }
+footer { color: var(--muted); font-size: 14px; }
+body.open-only section.state.is-yes { display: none; }
+body.critic-no section.state:not(.critic-said-no) { display: none; }
+@media (prefers-reduced-motion: no-preference) { section.state { transition: border-color .2s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">g-tee-oh · sprint 1 · screen review round __ROUND__ · mocked api data</div>
+    <h1>Does each screen pass?</h1>
+    <p class="lede">Every screen on the merged branch, grouped by the lane that owns its fixes. Each is shown four ways: dark and light, at 1440 px and at phone width (390 px), at true size. Under each one: the acceptance criterion, what you said last round, and the critic's verdict with its reasons. Press Yes or No; on a No, say what to change. Answers save as you go.</p>
+    <p class="lede">__CRITIC__</p>
+    <div class="tally" aria-live="polite"><span class="t-yes" id="t-yes">0 yes</span><span class="t-no" id="t-no">0 no</span><span id="t-open">__TOTAL__ open</span><span class="t-critic" id="t-critic"></span></div>
+    <div class="tools">
+      <label for="fit"><input type="checkbox" id="fit"> Fit wide shots to the column</label>
+      <label for="open-only"><input type="checkbox" id="open-only"> Hide screens marked Yes</label>
+      <label for="critic-no"><input type="checkbox" id="critic-no"> Only screens the critic failed</label>
+    </div>
+    <nav class="jump" id="jump" aria-label="Jump to a lane"></nav>
+    <p class="notice" id="store-note" hidden>Answers can't be saved in this view, so they stay in this browser only. Tell the PM your verdicts in the terminal.</p>
+  </header>
+  <main id="groups" class="wrap"></main>
+  <footer>Pictures come from one full run on the merged sprint branch (generated __GENERATED__), against the mocked api with synthetic data. The real-stack flows ran in CI. Earlier verdicts and the critic's verdicts are read-only here; this page saves yours, one answer per screen name.</footer>
+</div>
+
+<script>
+const GROUPS = __GROUPS__;
+const ITEMS = GROUPS.flatMap((g) => g.items);
+const state = {};
+const writing = {};
+const noteTimers = {};
+let col = null;
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k) n.append(k);
+  return n;
+}
+
+function figureFor(item, theme, width) {
+  const file = item.files[theme + "-" + width];
+  const label = (theme === "dark" ? "Dark" : "Light") + " · " + width + " px";
+  if (!file) return el("figure", {}, el("figcaption", { text: label + " · no shot" }));
+  const img = el("img", { src: "shots/" + file, alt: item.title + ", " + theme + " theme, " + width + " px", loading: "lazy", decoding: "async" });
+  return el("figure", {}, el("div", { class: "frame" }, img), el("figcaption", { text: label }));
+}
+
+const PREVIOUS_LABEL = { yes: "Last round: Yes", no: "Last round: No", note: "Last round: a note, no verdict", unanswered: "Last round: not answered", new: "New screen in this round" };
+function previousBlock(p) {
+  const kind = p && p.kind ? p.kind : "new";
+  const box = el("div", { class: "previous" + (kind === "no" || kind === "note" ? " was-no" : kind === "yes" ? " was-yes" : "") }, el("h4", { text: PREVIOUS_LABEL[kind] || "Last round" }));
+  if (p && p.note) box.append(el("p", { class: "said", text: "You said: " + p.note }));
+  return box;
+}
+
+function criticBlock(a) {
+  if (!a) return el("div", { class: "critic" }, el("h4", { text: "Critic: not reviewed" }));
+  const box = el("div", { class: "critic said-" + a.verdict }, el("h4", { text: "Critic: " + (a.verdict === "no" ? "No" : "Yes") + " (" + (a.confidence || "medium") + " confidence" + (a.overturned ? ", the verifier overturned a No" : "") + ")" }));
+  if (a.reasons && a.reasons.length) {
+    const ul = el("ul", {});
+    for (const r of a.reasons) {
+      const li = el("li", {}, el("span", { class: "chip", text: r.rule }), document.createTextNode(r.text));
+      if (r.variants && r.variants.length) li.append(el("span", { class: "hint", text: " (" + r.variants.join(", ") + ")" }));
+      ul.append(li);
+    }
+    box.append(ul);
+  }
+  if (a.fix_hint) box.append(el("p", { class: "hint", text: "Fix: " + a.fix_hint }));
+  if (a.work_items && a.work_items.length) box.append(el("p", { class: "hint", text: "Comparison work items: " + a.work_items.join(", ") }));
+  if (a.verifier && a.verifier.note) box.append(el("p", { class: "hint", text: "Verifier: " + a.verifier.note }));
+  return box;
+}
+
+function render() {
+  const root = document.getElementById("groups");
+  const jump = document.getElementById("jump");
+  for (const g of GROUPS) {
+    const gid = "g-" + g.session.toLowerCase();
+    jump.append(el("a", { href: "#" + gid, text: g.session + " (" + g.items.length + ")" }));
+    const group = el("div", { class: "group", id: gid },
+      el("h2", {}, el("span", { class: "gid", text: g.session }), document.createTextNode(g.title), el("span", { class: "gcount", text: g.items.length + " screens" })));
+    for (const s of g.items) {
+      const shots = el("div", { class: "shots" },
+        el("div", { class: "pair" }, figureFor(s, "dark", 1440)),
+        el("div", { class: "pair" }, figureFor(s, "light", 1440)),
+        el("div", { class: "pair" }, figureFor(s, "dark", 390), figureFor(s, "light", 390)));
+      const yes = el("button", { class: "choice", type: "button", "data-v": "yes", "aria-pressed": "false", id: s.id + "-yes", text: "Yes, looks right" });
+      const no = el("button", { class: "choice", type: "button", "data-v": "no", "aria-pressed": "false", id: s.id + "-no", text: "No, needs changes" });
+      const saved = el("span", { class: "saved", id: s.id + "-saved" });
+      const ta = el("textarea", { id: s.id + "-note", placeholder: "What should change? (optional)" });
+      yes.addEventListener("click", () => choose(s.id, "yes"));
+      no.addEventListener("click", () => choose(s.id, "no"));
+      ta.addEventListener("input", () => { clearTimeout(noteTimers[s.id]); noteTimers[s.id] = setTimeout(() => saveNote(s.id), 900); });
+      ta.addEventListener("blur", () => { clearTimeout(noteTimers[s.id]); saveNote(s.id); });
+      const choices = el("div", { class: "choices" }, yes, no);
+      if (s.auto) {
+        const agree = el("button", { class: "choice agree", type: "button", id: s.id + "-agree", text: "Agree with the critic" });
+        agree.addEventListener("click", () => agreeWithCritic(s.id));
+        choices.append(agree);
+      }
+      choices.append(saved);
+      group.append(el("section", { class: "state" + (s.auto && s.auto.verdict === "no" ? " critic-said-no" : ""), id: s.id, "aria-labelledby": s.id + "-h" },
+        el("div", { class: "state-head" }, el("span", { class: "num", text: s.n }), el("h3", { class: "title", id: s.id + "-h", text: s.title }), el("span", { class: "where", text: s.screen })),
+        shots,
+        el("div", {}, el("h4", { text: "Acceptance criterion" }), el("p", { class: "criterion", text: s.criterion })),
+        previousBlock(s.previous),
+        criticBlock(s.auto),
+        el("div", { class: "verdict" }, choices, el("label", { class: "fb", for: s.id + "-note", text: "Feedback" }), ta)));
+    }
+    root.append(group);
+  }
+  const criticNo = ITEMS.filter((s) => s.auto && s.auto.verdict === "no").length;
+  document.getElementById("t-critic").textContent = ITEMS.some((s) => s.auto) ? "critic: " + criticNo + " no" : "";
+}
+
+function tally() {
+  const vals = ITEMS.map((s) => state[s.id] && state[s.id].verdict);
+  document.getElementById("t-yes").textContent = vals.filter((x) => x === "yes").length + " yes";
+  document.getElementById("t-no").textContent = vals.filter((x) => x === "no").length + " no";
+  document.getElementById("t-open").textContent = vals.filter((x) => !x).length + " open";
+}
+
+function paint(id) {
+  const v = (state[id] && state[id].verdict) || null;
+  const sec = document.getElementById(id);
+  if (!sec) return;
+  sec.classList.toggle("is-yes", v === "yes");
+  sec.classList.toggle("is-no", v === "no");
+  document.getElementById(id + "-yes").setAttribute("aria-pressed", String(v === "yes"));
+  document.getElementById(id + "-no").setAttribute("aria-pressed", String(v === "no"));
+  const ta = document.getElementById(id + "-note");
+  if (document.activeElement !== ta) ta.value = (state[id] && state[id].note) || "";
+}
+
+function local(op, id, body) {
+  try {
+    if (op === "get") return JSON.parse(localStorage.getItem("gto-review:" + id) || "null");
+    localStorage.setItem("gto-review:" + id, JSON.stringify(body));
+  } catch (e) { return null; }
+}
+
+function persist(id) {
+  const s = ITEMS.find((x) => x.id === id);
+  const body = { screen: s.screen, title: s.n + " " + s.title, verdict: (state[id] && state[id].verdict) || null, note: (state[id] && state[id].note) || "", updatedAt: new Date().toISOString() };
+  local("set", id, body);
+  const mark = document.getElementById(id + "-saved");
+  if (!col) { mark.textContent = "kept in this browser"; return; }
+  mark.textContent = "saving…";
+  writing[id] = (writing[id] || Promise.resolve()).then(() => col.doc(id).set(body)).then(
+    () => { mark.textContent = "saved"; },
+    (e) => { mark.textContent = e && e.code === "invalid_argument" ? "you can't save here" : "not saved, try again"; });
+}
+
+function choose(id, v) {
+  const current = state[id] && state[id].verdict;
+  state[id] = { ...(state[id] || {}), verdict: current === v ? null : v };
+  paint(id); tally(); persist(id);
+}
+
+function agreeWithCritic(id) {
+  const s = ITEMS.find((x) => x.id === id);
+  if (!s.auto) return;
+  clearTimeout(noteTimers[id]);
+  const typed = document.getElementById(id + "-note").value;
+  const reasons = (s.auto.reasons || []).map((r) => r.rule + ": " + r.text).join(" ");
+  const agreed = s.auto.verdict === "no" ? "Agreed with the critic: " + reasons : "Agreed with the critic.";
+  const note = typed.includes(agreed) ? typed : (typed.trim() ? typed.trimEnd() + "
+" + agreed : agreed);
+  state[id] = { verdict: s.auto.verdict, note: note.slice(0, 4000) };
+  paint(id); tally(); persist(id);
+}
+
+function saveNote(id) {
+  const text = document.getElementById(id + "-note").value.slice(0, 4000);
+  if (((state[id] && state[id].note) || "") === text) return;
+  state[id] = { ...(state[id] || {}), note: text };
+  persist(id);
+}
+
+function pref(key, fallback) { try { const v = localStorage.getItem("gto-review-pref:" + key); return v === null ? fallback : v === "1"; } catch (e) { return fallback; } }
+function setPref(key, on) { try { localStorage.setItem("gto-review-pref:" + key, on ? "1" : "0"); } catch (e) { /* convenience only */ } }
+
+render();
+for (const s of ITEMS) { const l = local("get", s.id); if (l) state[s.id] = { verdict: l.verdict, note: l.note }; paint(s.id); }
+tally();
+
+for (const [id, cls] of [["fit", "fit"], ["open-only", "open-only"], ["critic-no", "critic-no"]]) {
+  const box = document.getElementById(id);
+  box.checked = pref(id, false);
+  document.body.classList.toggle(cls, box.checked);
+  box.addEventListener("change", () => { document.body.classList.toggle(cls, box.checked); setPref(id, box.checked); });
+}
+
+(async () => {
+  const db = window.claude ? await window.claude.use("db") : null;
+  if (!db) { document.getElementById("store-note").hidden = false; return; }
+  col = db.collection("verdicts");
+  col.onSnapshot((snap) => {
+    for (const d of snap.docs) {
+      const b = d.data() || {};
+      state[d.id] = { verdict: b.verdict || null, note: typeof b.note === "string" ? b.note : "" };
+      paint(d.id);
+    }
+    tally();
+  }, () => { document.getElementById("store-note").hidden = false; });
+})();
+</script>
