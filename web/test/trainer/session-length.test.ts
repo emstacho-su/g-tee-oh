@@ -50,3 +50,20 @@ describe("R3.31 session length", () => {
     expect(atSessionLimit({ kind: "idle" })).toBe(false);
   });
 });
+
+describe("R3.31 PR #45 review round 1, finding 1: the limit at a reveal is for one-decision hands only", () => {
+  it.each(["end_of_street", "end_of_hand"] as const)("R3.31 a %s reveal on the last planned hand is not the limit; the next prompt decides", (stop_rule) => {
+    const reveal = feedbackAt(10, 10);
+    if (reveal.kind !== "feedback") throw new Error("not a reveal");
+    const street: SpotState = { ...reveal, context: { ...reveal.context, trainer: { stop_rule, pause: "every_action", speed: "normal", quick_result: false } } };
+    expect(atSessionLimit(street)).toBe(false);
+  });
+
+  it("R3.31 a spot-mode drill reveal (stop rule after_action) and an automated reveal (no run settings) are the limit", () => {
+    const reveal = feedbackAt(10, 10);
+    if (reveal.kind !== "feedback") throw new Error("not a reveal");
+    const spot: SpotState = { ...reveal, context: { ...reveal.context, trainer: { stop_rule: "after_action", pause: "every_action", speed: "normal", quick_result: false } } };
+    expect(atSessionLimit(spot)).toBe(true);
+    expect(atSessionLimit(reveal)).toBe(true);
+  });
+});

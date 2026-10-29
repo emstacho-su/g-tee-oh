@@ -308,3 +308,18 @@ describe("R3.31 session length in the machine", () => {
     expect(transition(last, { type: "next" })).toMatchObject({ kind: "loading_prompt" });
   });
 });
+
+describe("R3.31 PR #45 review round 1, finding 1: street and full-hand reveals never end the session mid-hand", () => {
+  const FEEDBACK = STATES.feedback as Extract<SpotState, { kind: "feedback" }>;
+  const LAST_HAND = { handNo: 9, ordinal: 10, decision: 1, stateVersion: PROMPT.state_version, heroPosition: "BB" } as const;
+
+  it.each(["end_of_street", "end_of_hand"] as const)("R3.31 Next and the automatic continue on a %s reveal of the last planned hand load the next prompt", (stop_rule) => {
+    const context: SessionContext = { ...CONTEXT, length: 10, hand: LAST_HAND, trainer: { stop_rule, pause: "never", speed: "fast", quick_result: false } };
+    const reveal: SpotState = { ...FEEDBACK, context, autoContinueMs: 250 };
+    expect(transition(reveal, { type: "next", endKey: "k" })).toMatchObject({ kind: "loading_prompt" });
+    expect(transition(reveal, { type: "auto_continue", endKey: "k" })).toMatchObject({ kind: "loading_prompt" });
+    // The prompt that then opens hand 11 is what ends the session.
+    const loading: SpotState = { kind: "loading_prompt", context, version: PROMPT.state_version };
+    expect(transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 10 }, at: SHOWN_AT, endKey: "k-over" })).toMatchObject({ kind: "ending", key: "k-over" });
+  });
+});

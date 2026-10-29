@@ -16,6 +16,9 @@ import type { SessionContext, SpotState } from "./spot-machine.js";
 
 export const SESSION_LENGTHS = [10, 20, 50] as const;
 
+/** The stop rule of one decision per hand (pause-rule.ts SPOT_MODE_SETTINGS). */
+const SPOT_STOP_RULE = "after_action";
+
 /** A planned length in hands, or null for no limit. */
 export type SessionLength = (typeof SESSION_LENGTHS)[number] | null;
 
@@ -39,9 +42,19 @@ export function sessionLengthOf(context: SessionContext): SessionLength {
   return context.length ?? null;
 }
 
-/** Spot mode: the reveal on screen is the last planned hand's. */
+/** One decision per hand: spot mode (stop rule after_action) and the automated and holdout sessions, which carry no run settings. */
+function oneDecisionPerHand(context: SessionContext): boolean {
+  return (context.trainer?.stop_rule ?? SPOT_STOP_RULE) === SPOT_STOP_RULE;
+}
+
+/**
+ * The reveal on screen is the last planned hand's, in a mode with one decision per hand. In street
+ * and full-hand modes a reveal is never the limit, since the hand may go on; there the prompt that
+ * opens the next hand decides (pastSessionLimit, PR #45 review round 1, finding 1). The machine
+ * and the Finish session label both read this one function.
+ */
 export function atSessionLimit(state: SpotState): boolean {
-  if (state.kind !== "feedback") return false;
+  if (state.kind !== "feedback" || !oneDecisionPerHand(state.context)) return false;
   const length = sessionLengthOf(state.context);
   const hand = state.context.hand;
   return length !== null && hand !== undefined && hand.ordinal >= length;

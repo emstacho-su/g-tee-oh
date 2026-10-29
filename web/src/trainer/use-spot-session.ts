@@ -31,7 +31,7 @@
  *
  * S46 (R3.31): the sessionLength option rides into Start; Next, the automatic continue and every
  * prompt load carry a fresh end key, which the machine uses only when the planned length is
- * reached (session-length.ts); atLimit tells the screen to offer Finish session.
+ * reached (session-length.ts); the screen reads the same atSessionLimit for its Finish session label.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -41,7 +41,7 @@ import type { TrainerPrompt } from "../contracts.js";
 import { invalidateProgress } from "../progress/queries.js";
 import { useTrainerTableStore } from "../store/index.js";
 import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision, type SessionStartSpec } from "./session-api.js";
-import { atSessionLimit, type SessionLength } from "./session-length.js";
+import type { SessionLength } from "./session-length.js";
 import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
 import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
@@ -97,8 +97,6 @@ export interface SpotSession {
   state: SpotState;
   /** The table's replay of the line before the decision; the timer is paused while it plays (O-381). */
   replay: ActionReplay;
-  /** True on the reveal of the last planned hand: Next finishes the session (S46, R3.31). */
-  atLimit: boolean;
   start: (rng: boolean) => void;
   /** Takes NodeAction.index (O-198); choosing submits the decision (O-345). */
   chooseAction: (actionIndex: number) => void;
@@ -173,7 +171,6 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   return {
     state,
     replay,
-    atLimit: atSessionLimit(state),
     start: (rng) =>
       send({
         type: "start",
