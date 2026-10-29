@@ -12,7 +12,7 @@
  * logLines turn the first n entries into what each seat shows and what the screen reader log
  * says. Every word is the api's own history label; nothing is computed from the amounts.
  */
-import type { Position, TrainerPrompt } from "../contracts.js";
+import type { Position, Street, TrainerPrompt } from "../contracts.js";
 
 export type HistoryEntry = TrainerPrompt["history"][number];
 export type ReplaySpeed = "slow" | "normal" | "fast";
@@ -42,6 +42,8 @@ export interface ReplayPlan {
   /** The index of the first entry that replays; the entries before it show at once. */
   readonly firstNew: number;
   readonly steps: readonly ReplayStep[];
+  /** The prompt's street, which clears the last street's chips once the replay ends (S40, item a). */
+  readonly street: Street;
 }
 
 export interface SeatAction {
@@ -96,6 +98,7 @@ export function planReplay(previous: TrainerPrompt | null, current: TrainerPromp
     history: current.history,
     firstNew,
     steps: fresh.map((entry, index) => ({ ...entry, durationMs: durations[index] ?? 0 })),
+    street: current.street,
   };
 }
 
@@ -106,8 +109,14 @@ export function planReplay(previous: TrainerPrompt | null, current: TrainerPromp
  * badge and chip clear. A fold folds the seat for the rest of the hand. Entries without a street
  * (stored before the field existed) count as the street of the entry before them, so an old history
  * stays one street; the web never infers a street from the actions.
+ *
+ * S40 (item a): when the hero acts first on a new street, every entry is from the street before, so
+ * no entry starts the new one. promptStreet, the prompt's street as the api wrote it, is passed once
+ * the replay has ended: when it differs from the last entry's street, the badges and chips clear
+ * the same way (folds stay). It is left out while the replay runs, so the shown entries' own
+ * streets rule until then.
  */
-export function seatActions(history: readonly HistoryEntry[], shown: number): ReadonlyMap<Position, SeatAction> {
+export function seatActions(history: readonly HistoryEntry[], shown: number, promptStreet?: Street): ReadonlyMap<Position, SeatAction> {
   const folds = new Map<Position, SeatAction>();
   let street: HistoryEntry["street"];
   let onStreet = new Map<Position, SeatAction>();
@@ -119,7 +128,8 @@ export function seatActions(history: readonly HistoryEntry[], shown: number): Re
     if (folded) folds.set(entry.position, action);
     onStreet.set(entry.position, action);
   }
-  return new Map([...folds, ...onStreet]);
+  const streetMoved = promptStreet !== undefined && street !== undefined && promptStreet !== street;
+  return new Map([...folds, ...(streetMoved ? [] : onStreet)]);
 }
 
 /** The log's lines after the first `shown` entries, with "Your turn" once the replay has ended (O-383). */

@@ -1,7 +1,7 @@
 /**
  * The drill run screen in street and full-hand modes (S26, R3.13, R3.14, O-312 to O-314), over the
  * scripted fake fetch with an injected timer: two hero decisions in one hand keep the hand number,
- * the next hand shows how the last one ended (with the flop in full-hand mode), a reveal that does
+ * the next hand starts with no summary of the last one (S40, O-352: the api logs it), a reveal that does
  * not pause shows the result chip and continues after its delay but never while a dialog is open,
  * and the covered-part notes show on a partly covered or a refused start.
  */
@@ -87,7 +87,7 @@ async function counterReads(text: string): Promise<void> {
 }
 
 describe("R3.13 street mode on the run screen", () => {
-  it("R3.13 two hero decisions stay one hand; the next hand shows how the street closed", async () => {
+  it("R3.13 two hero decisions stay one hand; the next hand starts with no summary of the last (S40, O-352)", async () => {
     const { timers, schedule } = fakeTimers();
     renderRun({ script: script(fixtureStreetDrill), schedule });
     await start(fixtureStreetDrill);
@@ -106,10 +106,10 @@ describe("R3.13 street mode on the run screen", () => {
     expect(timers).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: /Next hand/ }));
     await counterReads("Hand 2, decision 1");
-    const summary = screen.getByRole("region", { name: "How hand 1 ended" });
-    expect(summary).toHaveTextContent("Ended when the street closed");
-    expect(within(summary).getByRole("list", { name: "Closing actions" })).toHaveTextContent("BB Call");
-    expect(within(summary).queryByRole("group", { name: /flop/i })).not.toBeInTheDocument();
+    // The ended hand is logged by the api (hand_record), never shown (O-352).
+    expect(screen.queryByTestId("hand-summary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /ended/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ended when the street closed/)).not.toBeInTheDocument();
   });
 
   it("R3.13 the automatic continue waits while a dialog is open and is cancelled on unmount", async () => {
@@ -142,7 +142,7 @@ describe("R3.13 street mode on the run screen", () => {
 });
 
 describe("R3.13 full-hand mode on the run screen", () => {
-  it("R3.13 every reveal pauses, and the next hand shows it ended at the flop with the three cards", async () => {
+  it("R3.13 every reveal pauses, and the next hand starts with no summary or flop of the last (S40, O-352)", async () => {
     const { timers, schedule } = fakeTimers();
     renderRun({ script: script(fixtureFullHandDrill, HAND.flop), schedule });
     await start(fixtureFullHandDrill);
@@ -155,9 +155,9 @@ describe("R3.13 full-hand mode on the run screen", () => {
     await screen.findByTestId("feedback-panel");
     await userEvent.click(screen.getByRole("button", { name: /Next hand/ }));
     await counterReads("Hand 2, decision 1");
-    const summary = screen.getByRole("region", { name: "How hand 1 ended" });
-    expect(summary).toHaveTextContent("Ended at the flop");
-    expect(within(within(summary).getByRole("group", { name: "Hand 1 flop" })).getAllByRole("img")).toHaveLength(3);
+    expect(screen.queryByTestId("hand-summary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Hand 1 flop" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ended at the flop/)).not.toBeInTheDocument();
   });
 });
 

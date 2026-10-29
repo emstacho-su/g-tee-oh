@@ -2,7 +2,8 @@
  * The drill builder (S26, R3.14, O-311, O-317) over the mocked drill routes: creating a drill from
  * scratch (flow 2's RFI boundary hands), editing a stored drill as a patch of the changed fields,
  * client validation before any request, the api's 400 field errors next to their fields, the hand
- * picker by mouse and keyboard, the stake choices by format, and the v1 notes.
+ * picker by mouse and keyboard, the stake choices by format, and the v1 notes. Since S40 (O-405)
+ * each section is its own page of the builder container, reached through the "Drill sections" list.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent, type UserEvent } from "@testing-library/user-event";
@@ -13,7 +14,7 @@ import { V1_NOTES } from "../../src/drills/labels.js";
 import { nextCellIndex } from "../../src/routes/drills/HandPicker.js";
 import { FIXTURE_DRILL_ID, fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
-import { renderDrills } from "./render-drills.js";
+import { openSection, renderDrills } from "./render-drills.js";
 
 async function openNew(): Promise<UserEvent> {
   const user = userEvent.setup();
@@ -26,9 +27,12 @@ function group(name: string): HTMLElement {
 }
 
 async function fillRfiDrill(user: UserEvent): Promise<void> {
+  await openSection(user, "Name and tags");
   await user.click(screen.getByLabelText("Name"));
   await user.paste("RFI boundary hands");
+  await openSection(user, "Seats");
   await user.click(within(group("Hero positions")).getByRole("checkbox", { name: "BTN" }));
+  await openSection(user, "Hands");
   await user.click(within(group("Hands to train")).getByRole("radio", { name: /Close decisions/ }));
 }
 
@@ -42,7 +46,7 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     const user = await openNew();
     await fillRfiDrill(user);
     await user.click(screen.getByRole("button", { name: "Save drill" }));
-    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drills\/[0-9a-f-]{36}$/));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drills\/[0-9a-f-]{36}\/hands$/));
     expect(sent("POST", "/api/v1/drills")[0]?.body).toEqual({
       name: "RFI boundary hands",
       tags: [],
@@ -60,28 +64,31 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
       trainer: DEFAULT_TRAINER,
     });
     expect(sent("POST", "/api/v1/drills")[0]?.headers["idempotency-key"]).toBe("test-key-1");
-    expect(await screen.findByRole("heading", { level: 1, name: "Edit drill" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "RFI boundary hands" })).toBeInTheDocument();
     expect(await screen.findByTestId("builder-status")).toHaveTextContent("Drill saved.");
     expect(screen.getByTestId("spot-summary")).toHaveTextContent("hero BTN against any opponent; RFI; close decisions");
     expect(screen.getByRole("link", { name: "Run" })).toHaveAttribute("href", expect.stringMatching(/\/run$/));
   });
 
-  it("R3.14 client validation marks every bad field and sends nothing", async () => {
+  it("R3.14 client validation marks every bad field on its page and sends nothing", async () => {
     const { sent } = renderDrills("/drills/new");
     const user = await openNew();
+    await openSection(user, "Game");
     await user.clear(screen.getByLabelText("Depths (bb)"));
     await user.type(screen.getByLabelText("Depths (bb)"), "100, abc");
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     expect(screen.getByTestId("form-alert")).toHaveTextContent("Error: Fix the fields marked below.");
-    expect(screen.getByLabelText("Name")).toHaveAccessibleDescription("Error: Give the drill a name.");
     expect(screen.getByLabelText("Depths (bb)")).toHaveAttribute("aria-invalid", "true");
+    await openSection(user, "Seats");
     expect(group("Hero positions")).toHaveAccessibleDescription("Error: Choose at least one hero position.");
+    await openSection(user, "Name and tags");
+    expect(screen.getByLabelText("Name")).toHaveAccessibleDescription("Error: Give the drill a name.");
     expect(sent("POST", "/api/v1/drills")).toHaveLength(0);
     await user.type(screen.getByLabelText("Name"), "Fixed");
     expect(screen.getByLabelText("Name")).not.toHaveAttribute("aria-invalid", "true");
   });
 
-  it("R3.14 the api's 400 field errors show next to the field they name", async () => {
+  it("R3.14 the api's 400 field errors show next to the field they name, one link away", async () => {
     const problem = {
       type: "urn:g-tee-oh:problem:validation",
       title: "Request validation failed",
@@ -97,8 +104,11 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     const user = await openNew();
     await fillRfiDrill(user);
     await user.click(screen.getByRole("button", { name: "Save drill" }));
+    const alert = await screen.findByTestId("form-alert");
+    await user.click(await within(alert).findByRole("link", { name: "Game: 1 field to fix" }));
     expect(await screen.findByLabelText("Stake")).toHaveAccessibleDescription("Error: the server refuses this stake");
     expect(screen.getByTestId("form-alert")).toHaveTextContent("unrecognized key");
+    await openSection(user, "Name and tags");
     await user.type(screen.getByLabelText("Name"), " again");
     expect(screen.queryByTestId("form-alert")).not.toBeInTheDocument();
   });
@@ -117,16 +127,18 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
   it("R3.14 editing a stored drill shows its values and PATCHes only what changed", async () => {
     const { sent } = renderDrills(`/drills/${FIXTURE_DRILL_ID}`);
     const user = userEvent.setup();
-    await screen.findByRole("heading", { level: 1, name: "Edit drill" });
+    await screen.findByRole("heading", { level: 1, name: fixtureDrill.name });
     const name = await screen.findByLabelText("Name");
     expect(name).toHaveValue(fixtureDrill.name);
-    expect(within(group("Hero positions")).getByRole("checkbox", { name: "BTN" })).toBeChecked();
     expect(screen.getByLabelText("Tags")).toHaveValue("synthetic");
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     expect(screen.getByTestId("builder-status")).toHaveTextContent("Nothing changed, so nothing was saved.");
     await user.clear(name);
     await user.click(name);
     await user.paste("Renamed drill");
+    await openSection(user, "Seats");
+    expect(within(group("Hero positions")).getByRole("checkbox", { name: "BTN" })).toBeChecked();
+    await openSection(user, "Panels");
     await user.click(within(group("Panels shown after a decision")).getByRole("checkbox", { name: "Streak counter" }));
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     await waitFor(() => expect(screen.getByTestId("builder-status")).toHaveTextContent("Changes saved."));
@@ -192,13 +204,17 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
   it("R3.14 the stake choices follow the format, and the seats follow the table size", async () => {
     renderDrills("/drills/new");
     const user = await openNew();
+    await openSection(user, "Game");
     await user.click(within(group("Format")).getByRole("radio", { name: "Live" }));
     const stake = screen.getByLabelText("Stake");
     await waitFor(() => expect(within(stake).getAllByRole("option").map((option) => option.textContent)).toEqual(["Choose a stake", "1/3", "2/5"]));
     await user.selectOptions(stake, "2/5");
     expect(stake).toHaveValue("2/5");
+    await openSection(user, "Seats");
     expect(within(group("Hero positions")).queryByRole("checkbox", { name: "LJ" })).not.toBeInTheDocument();
+    await openSection(user, "Game");
     await user.selectOptions(screen.getByLabelText("Table size"), "9");
+    await openSection(user, "Seats");
     expect(within(group("Hero positions")).getByRole("checkbox", { name: "LJ" })).toBeInTheDocument();
     await user.click(within(group("Hero positions")).getByRole("checkbox", { name: "CO" }));
     expect(within(group("Villain positions")).queryByRole("checkbox", { name: "CO" })).not.toBeInTheDocument();
@@ -207,18 +223,22 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
   it("R3.14 O-317 fields v1 does not serve stay editable with a note", async () => {
     const { sent } = renderDrills("/drills/new");
     const user = await openNew();
+    await openSection(user, "Board");
     expect(screen.getByText(`Note: ${V1_NOTES.board}`)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("High card"), "K");
+    await user.type(screen.getByLabelText("Flops (optional)"), "Kh8d3c");
+    await openSection(user, "Seats");
     expect(screen.queryByText(`Note: ${V1_NOTES.street}`)).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Start street"), "flop");
     expect(screen.getByText(`Note: ${V1_NOTES.street}`)).toBeInTheDocument();
+    await openSection(user, "Trainer");
     await user.click(within(group("Input")).getByRole("radio", { name: "Frequencies" }));
     expect(screen.getByText(`Note: ${V1_NOTES.input}`)).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Tables"), "2");
     expect(screen.getByText(`Note: ${V1_NOTES.tables}`)).toBeInTheDocument();
     await user.click(within(group("Stop rule")).getByRole("radio", { name: /Full hand/ }));
     await user.selectOptions(screen.getByLabelText("Timebank"), "15");
-    await user.selectOptions(screen.getByLabelText("High card"), "K");
-    await user.type(screen.getByLabelText("Flops (optional)"), "Kh8d3c");
+    await openSection(user, "Game");
     await user.click(within(group("Sizing")).getByRole("radio", { name: "Fixed sizes" }));
     await user.type(screen.getByLabelText("Open size (bb)"), "2.5");
     await fillRfiDrill(user);

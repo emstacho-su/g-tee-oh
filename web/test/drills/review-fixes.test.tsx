@@ -27,7 +27,7 @@ function tagErrors(count: number): { path: string; message: string }[] {
 
 async function submitImport(code: string): Promise<HTMLElement> {
   const user = userEvent.setup();
-  await screen.findByRole("list", { name: "Drills" });
+  await screen.findByRole("table", { name: "Your drills" });
   await user.click(screen.getByRole("button", { name: "Import a drill" }));
   const dialog = screen.getByRole("dialog", { name: "Import a drill" });
   await user.click(within(dialog).getByLabelText("Export code"));
@@ -91,7 +91,8 @@ describe("R3.14 review MEDIUM 2: an export the api refuses shows why", () => {
           ? jsonBody(422, { type: VALIDATION_TYPE, title: "Request validation failed", status: 422, detail, errors: [{ path: "drill.spot_filter.stake", message: "An online drill uses the stake online." }] })
           : undefined,
     });
-    await screen.findByRole("list", { name: "Drills" });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("radio", { name: `Select ${fixtureDrill.name}` }));
     await user.click(screen.getByRole("button", { name: `Export ${fixtureDrill.name}` }));
     const dialog = screen.getByRole("dialog");
     const alert = await within(dialog).findByRole("alert");
@@ -110,7 +111,8 @@ describe("R3.14 review LOW 11: the builder drops ?saved=1 after the first render
     const { router } = renderDrills(`/drills/${fixtureDrill.id}?saved=1`);
     expect(await screen.findByTestId("builder-status")).toHaveTextContent("Drill saved.");
     await waitFor(() => expect(router.state.location.search).toEqual({}));
-    expect(router.state.location.pathname).toBe(`/drills/${fixtureDrill.id}`);
+    // S40 (O-405): the bare URL opens the builder's first page, keeping saved=1 until it is dropped.
+    expect(router.state.location.pathname).toBe(`/drills/${fixtureDrill.id}/details`);
     expect(router.history.length).toBe(1);
     expect(screen.getByTestId("builder-status")).toHaveTextContent("Drill saved.");
   });

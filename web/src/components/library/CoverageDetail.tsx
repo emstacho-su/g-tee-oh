@@ -4,7 +4,8 @@
  * position. A queued flop can be requested from its row, which raises it to the head of the queue
  * (O-240). When solver-query's database did not answer, the flop and queue blocks are empty by
  * contract, and a note says so instead of showing an empty library. A synthetic preflop solution
- * carries the shared synthetic banner.
+ * carries the shared synthetic banner. Since S40 (O-406) it is the body of the "Flops and queue"
+ * card, under an h3 naming the pair and configuration.
  */
 import { familyRows, type Coverage } from "../../library/texture-families.js";
 import { Button, SyntheticBanner } from "../ui/index.js";
@@ -25,7 +26,7 @@ export interface CoverageDetailProps {
 function FamilyTable({ coverage }: { coverage: Coverage }) {
   const rows = familyRows(coverage.flops);
   return (
-    <table className="w-full max-w-xl text-sm">
+    <table className="w-full text-sm">
       <caption className="text-left font-medium">Flops by texture family</caption>
       <thead>
         <tr className="text-left text-muted">
@@ -36,7 +37,7 @@ function FamilyTable({ coverage }: { coverage: Coverage }) {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.family} className="border-t border-border">
+          <tr key={row.family} className="border-t border-border/50">
             <th scope="row" className="py-1 text-left font-normal">
               {row.label}
             </th>
@@ -52,7 +53,7 @@ function FamilyTable({ coverage }: { coverage: Coverage }) {
 function QueueTable({ coverage, onRequestFlop, requestPending }: CoverageDetailProps) {
   if (coverage.queue.length === 0) return <p className="text-sm text-muted">No build is queued for this pair.</p>;
   return (
-    <table className="w-full max-w-xl text-sm">
+    <table className="w-full text-sm">
       <caption className="text-left font-medium">Build queue for this pair</caption>
       <thead>
         <tr className="text-left text-muted">
@@ -64,7 +65,7 @@ function QueueTable({ coverage, onRequestFlop, requestPending }: CoverageDetailP
       </thead>
       <tbody>
         {coverage.queue.map((entry) => (
-          <tr key={entry.job_id} className="border-t border-border">
+          <tr key={entry.job_id} className="border-t border-border/50">
             <td className="py-1">{entry.position}</td>
             <th scope="row" className="text-left font-mono font-normal">
               {entry.flop}
@@ -88,7 +89,7 @@ export function CoverageDetail({ coverage, onRequestFlop, requestPending }: Cove
   const note = DATABASE_NOTES[coverage.database];
   return (
     <section aria-labelledby="coverage-detail-heading" className="flex flex-col gap-3">
-      <h2 id="coverage-detail-heading" className="text-lg font-semibold">{`${coverage.pair} at ${coverage.config_id}`}</h2>
+      <h3 id="coverage-detail-heading" className="text-base font-semibold">{`${coverage.pair} at ${coverage.config_id}`}</h3>
       {coverage.synthetic ? <SyntheticBanner /> : null}
       <p className="text-sm">{coverage.preflop_available ? "The preflop solution is in the library." : "The preflop solution is not in the library."}</p>
       {note === null ? (

@@ -5,6 +5,8 @@
  * force, plus the build in progress when a build_progress event has arrived. Last backup (S34) and
  * LLM (large language model) spend this month (S27's Ask path) have no v1 data and show as
  * labeled placeholders. Pause and Resume send the admin write; the state shown is the answer's.
+ * S40 (O-406): the "Builder state" card of /library/builder, with Pause or Resume beside its
+ * heading and each health item a tile on the sunken surface.
  */
 import type { ReactNode } from "react";
 
@@ -12,7 +14,9 @@ import type { BuilderStatus } from "../../contracts.js";
 import { numericSetting } from "../../library/builder-settings.js";
 import type { BuildProgressEvent } from "../../library/events.js";
 import { BUILDER_STATE_TEXT, flopsPerDay, formatBytes, formatPercent } from "../../library/format.js";
-import { Button } from "../ui/index.js";
+import { Button, Card } from "../ui/index.js";
+
+export const BUILDER_STATE_TITLE = "Builder state";
 
 export interface BuilderHealthProps {
   status: BuilderStatus;
@@ -25,7 +29,7 @@ export interface BuilderHealthProps {
 
 function Item({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col rounded-md border border-border bg-surface-raised px-3 py-2">
+    <div className="flex flex-col gap-0.5 rounded-xl border border-border/50 bg-surface-sunken px-3 py-2">
       <dt className="text-xs text-muted">{term}</dt>
       <dd className="text-sm font-medium">{children}</dd>
     </div>
@@ -49,15 +53,15 @@ export function BuilderHealth({ status, progress, onSetPaused, pending, failure 
   const paused = status.state === "paused";
   const { queue } = status;
   return (
-    <section aria-labelledby="builder-health-heading" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 id="builder-health-heading" className="text-lg font-semibold">
-          Builder health
-        </h2>
+    <Card
+      title={BUILDER_STATE_TITLE}
+      description="The background builder's state, queue, throughput and storage."
+      actions={
         <Button variant={paused ? "primary" : "secondary"} disabled={pending} onClick={() => onSetPaused(!paused)}>
           {paused ? "Resume the builder" : "Pause the builder"}
         </Button>
-      </div>
+      }
+    >
       {failure === null ? null : (
         <p role="alert" className="text-sm text-danger">
           {failure}
@@ -74,7 +78,7 @@ export function BuilderHealth({ status, progress, onSetPaused, pending, failure 
         <Item term="Last backup">Not tracked yet: backups arrive with the Mac deploy (S34)</Item>
         <Item term="LLM spend this month">Not tracked yet: arrives with the Ask path (S27)</Item>
       </dl>
-      {progress === null ? null : <p className="text-sm">{`Current build: ${progressText(progress)}`}</p>}
-    </section>
+      {progress === null ? null : <p className="text-sm font-medium">{`Current build: ${progressText(progress)}`}</p>}
+    </Card>
   );
 }

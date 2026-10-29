@@ -212,6 +212,9 @@ describe("R3.3 trainer latency in process against the O-40 limits", () => {
         grade: nearestRankP95(grade),
         decisionFeedback: nearestRankP95(decisionFeedback),
       };
+      if (process.env["LATENCY_REPORT"] === "1") {
+        process.stdout.write(`spot mode p95 (ms): ${JSON.stringify(measured)}\n`);
+      }
       expect(study).toHaveLength(TIMED_SAMPLES);
       expect(grade).toHaveLength(TIMED_SAMPLES);
       expect(measured.studyNode, `study node read p95 ${measured.studyNode} ms`).toBeLessThanOrEqual(LIMIT_MS.studyNode);

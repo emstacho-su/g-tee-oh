@@ -133,7 +133,7 @@ function viewOf(track: Track, skip: () => void): ActionReplay {
     activePosition: activeStep?.position ?? null,
     stepMs: activeStep?.durationMs ?? null,
     replaying: !track.finished,
-    seats: seatActions(plan.history, shown),
+    seats: seatActions(plan.history, shown, track.finished ? plan.street : undefined),
     log: logOf(plan, shown, track.finished),
     skip,
   };

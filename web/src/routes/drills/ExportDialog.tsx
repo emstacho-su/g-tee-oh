@@ -6,17 +6,18 @@
  * reason with a retry. A stored drill that no longer passes the write rules is refused with a 422
  * (PR #30 review MEDIUM 2): the dialog shows the api's detail and the failing paths, bounded by
  * ErrorList, and no retry, since the same drill gets the same answer. The code is never cached
- * past the dialog (queries.ts).
+ * past the dialog (queries.ts). S40 (screen review row 39): the field is the shared FIELD_CLASS
+ * edge in mono text and a failure is the bordered refusal block (REFUSAL_CLASSES).
  */
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import type { AppApi } from "../../api/index.js";
-import { Button, Dialog, LoadingNote } from "../../components/ui/index.js";
+import { Button, cn, Dialog, FIELD_CLASS, LoadingNote } from "../../components/ui/index.js";
 import { exportFailureText, isExportRefused } from "../../drills/failure-text.js";
 import { fieldErrorsOfFailure, omittedErrorsOfFailure } from "../../drills/problem.js";
 import { drillExportQuery } from "../../drills/queries.js";
-import { ErrorList, fieldErrorLine } from "./ErrorList.js";
+import { ErrorList, fieldErrorLine, REFUSAL_CLASSES } from "./ErrorList.js";
 
 export const EXPORT_TEXT = {
   title: "Export code",
@@ -57,7 +58,7 @@ function CodeField({ code }: { code: string }) {
         value={code}
         rows={4}
         onFocus={(event) => event.target.select()}
-        className="rounded-md border border-border-strong bg-surface-sunken p-2 font-mono text-xs break-all"
+        className={cn(FIELD_CLASS, "p-3 font-mono text-xs break-all")}
       />
       <div className="flex items-center gap-3">
         <Button
@@ -83,8 +84,8 @@ function CodeField({ code }: { code: string }) {
 function ExportFailure({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const refused = isExportRefused(error);
   return (
-    <div role="alert" className="flex flex-col items-start gap-2 text-sm">
-      <p className="text-danger">{exportFailureText(error)}</p>
+    <div role="alert" className={REFUSAL_CLASSES}>
+      <p className="font-semibold text-danger">{`Error: ${exportFailureText(error)}`}</p>
       {refused ? (
         <ErrorList lines={fieldErrorsOfFailure(error).map((entry) => fieldErrorLine(entry))} omitted={omittedErrorsOfFailure(error)} />
       ) : (

@@ -7,7 +7,7 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useState, type FormEvent } from "react";
 
-import { Button } from "../../components/ui/index.js";
+import { Button, cn, FIELD_CLASS } from "../../components/ui/index.js";
 import { TAG_PATTERN } from "../../drills/limits.js";
 import { ErrorText } from "./form-parts.js";
 
@@ -45,7 +45,7 @@ export function TagFilter({ tag, onFilter }: TagFilterProps) {
             aria-invalid={invalid}
             aria-describedby={invalid ? `${id}-error` : undefined}
             onChange={(event) => setText(event.target.value)}
-            className="h-9 rounded-md border border-border-strong bg-surface-raised px-2"
+            className={cn(FIELD_CLASS, "h-9 px-2")}
           />
         </div>
         <Button type="submit">Filter</Button>

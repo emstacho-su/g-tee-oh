@@ -20,7 +20,7 @@ import { ActionSwatch } from "../trainer/ActionSwatch.js";
 import { InfoTip, RAISED_CLASS, cn } from "../ui/index.js";
 import type { NodeAction, ThresholdCardData } from "../../contracts.js";
 import { actionOfIndex } from "../../poker/action-index.js";
-import { exactActionLabel, formatShare } from "../../poker/format.js";
+import { exactActionLabel, formatWholePercent, wholePercent } from "../../poker/format.js";
 import { tokenActionLabel } from "../../poker/token-label.js";
 
 export interface ThresholdCardProps {
@@ -37,7 +37,6 @@ type Relative = ThresholdCardData["hand_position"]["relative"][number]["position
 
 const DEFAULT_TITLE = "Threshold card";
 const UNNAMED_ACTION = "Unnamed action";
-const WHOLE_PERCENT = 0;
 
 export const THRESHOLD_TIPS = {
   actions:
@@ -96,12 +95,26 @@ function Tile({ title, tipSubject, tip, headingId, className, children }: TilePr
  * below the hand's strength, the hand and its ties included, so the strongest hand reads 100% and
  * the weakest still counts itself; 0 means the api had no strength for the hand (it is outside the
  * range at this node), and its equity is then only a placeholder.
+ *
+ * S40 (item d, O-408): the rank is rounded to a whole percent before the wording is chosen, so a
+ * rank of 0.996 reads "every hand" (never "At or above 100%") and a ranked hand under half a
+ * percent reads "less than 1%" (never "0%").
  */
 export const RANK_TEXT = {
   top: "At or above every hand in this range by strength",
   share: (percent: string) => `At or above ${percent} of this range by strength`,
+  underOne: "less than 1%",
   none: "No strength rank here: the hand is outside this range at this node",
 } as const;
+
+const EVERY_HAND_PERCENT = 100;
+
+/** The words for a positive rank_in_range, chosen after rounding to a whole percent (poker/format.ts). */
+export function rankText(rank: number): string {
+  const percent = wholePercent(rank);
+  if (percent >= EVERY_HAND_PERCENT) return RANK_TEXT.top;
+  return RANK_TEXT.share(percent < 1 ? RANK_TEXT.underOne : `${percent}%`);
+}
 
 function HandPosition({ card, heroHand }: { card: ThresholdCardData; heroHand: string | undefined }) {
   const position = card.hand_position;
@@ -116,9 +129,9 @@ function HandPosition({ card, heroHand }: { card: ThresholdCardData; heroHand: s
           <HandText hand={position.hand} heroHand={heroHand} />
         </p>
       )}
-      <p>{!ranked ? RANK_TEXT.none : rank >= 1 ? RANK_TEXT.top : RANK_TEXT.share(formatShare(rank, WHOLE_PERCENT))}</p>
+      <p>{ranked ? rankText(rank) : RANK_TEXT.none}</p>
       {ranked ? (
-        <p className="text-muted">{`Equity against the opponent's range: ${formatShare(position.equity_vs_villain, WHOLE_PERCENT)}`}</p>
+        <p className="text-muted">{`Equity against the opponent's range: ${formatWholePercent(position.equity_vs_villain)}`}</p>
       ) : null}
     </Tile>
   );
@@ -144,7 +157,7 @@ function ActionRow({ entry, card, actions, heroHand }: ActionRowProps) {
         <span id={nameId} className="font-semibold">
           {name}
         </span>
-        <span className="text-muted">{`Played by ${formatShare(entry.share_taking, WHOLE_PERCENT)} of the range`}</span>
+        <span className="text-muted">{`Played by ${formatWholePercent(entry.share_taking)} of the range`}</span>
       </span>
       {weakest === null ? (
         <span className="text-muted">No hand plays it at least half the time</span>

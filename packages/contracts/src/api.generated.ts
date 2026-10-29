@@ -4741,6 +4741,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{id}/hands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The session's finished hands, by hand number (the hand log)
+         * @description One record per hand that ended, written with the decision that ended it (S40, O-400). Only the caller's own sessions: any other id answers 404.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The next_cursor of the previous page; absent for the first page */
+                    cursor?: string;
+                    /** @description Page size, 1 to 200 */
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["HandRecord"][];
+                            /** @description Pass as cursor for the next page; null on the last page */
+                            next_cursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem (400) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (401) */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (404) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (429) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem (500) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{id}/next": {
         parameters: {
             query?: never;
@@ -5805,6 +5900,76 @@ export interface components {
             solver_freq: number[];
             /** @description The share of your decisions that chose each action */
             your_freq: number[];
+        };
+        HandRecord: {
+            /**
+             * Format: uuid
+             * @description The decision that ended the hand
+             */
+            attempt_id: string;
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /**
+             * Format: date-time
+             * @description When the deciding attempt was stored
+             */
+            created_at: string;
+            /**
+             * @description fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)
+             * @enum {string}
+             */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            /** @description The hero's hole cards */
+            hero_hand: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
+                token: string;
+            }[];
+        };
+        HandRecordInput: {
+            /**
+             * Format: uuid
+             * @description The decision that ended the hand
+             */
+            attempt_id: string;
+            /** @description The board the hand reached; the flop when a full hand ended there */
+            board: string[];
+            /**
+             * Format: date-time
+             * @description When the deciding attempt was stored
+             */
+            created_at: string;
+            /**
+             * @description fold; street_closed (in full-hand mode the hand ends at the flop reveal and board holds the flop); off_range; stop_rule (spot mode, after the hero's one decision)
+             * @enum {string}
+             */
+            end: "fold" | "street_closed" | "off_range" | "stop_rule";
+            hand_no: number;
+            /** @description The hero's hole cards */
+            hero_hand: string[];
+            /** @enum {string} */
+            hero_position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+            history: {
+                label: string;
+                /** @enum {string} */
+                position: "UTG" | "UTG1" | "UTG2" | "LJ" | "HJ" | "CO" | "BTN" | "SB" | "BB";
+                /**
+                 * @description The street the action was taken on; absent on entries stored before S38
+                 * @enum {string}
+                 */
+                street?: "preflop" | "flop" | "turn" | "river";
+                token: string;
+            }[];
         };
         HoldoutProgress: {
             answered: number;

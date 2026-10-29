@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { checkDrillBody } from "../../src/drills/body-rules.js";
 import { copyName, draftFromDrill, draftToCreate, draftToPatch, newDrillDraft, type DrillDraft } from "../../src/drills/draft.js";
+import { deepEqual, draftsEqual } from "../../src/drills/draft-compare.js";
 import { toggleHand, toggleHero, togglePanel, toggleVillain, withFormat, withTableSize } from "../../src/drills/draft-edits.js";
 import { fieldKeyOf, groupFieldErrors } from "../../src/drills/field-errors.js";
 import { MAX_DRILL_NAME_LENGTH } from "../../src/drills/limits.js";
@@ -216,5 +217,23 @@ describe("R3.14 client validation mirrors SpotFilterWrite and the field limits",
       "spot_filter.stake": ["a live drill needs a live stake such as 1/3", "too long"],
       form: ["unrecognized key"],
     });
+  });
+});
+
+describe("R3.14 draftsEqual compares drafts by meaning (PR #42 review round 1, F)", () => {
+  it("R3.14 key order does not matter, values do", () => {
+    const draft = newDrillDraft();
+    const reordered = Object.fromEntries(Object.entries(draft).reverse()) as unknown as DrillDraft;
+    expect(draftsEqual(draft, reordered)).toBe(true);
+    expect(draftsEqual(draft, { ...draft, name: "x" })).toBe(false);
+    expect(deepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
+    expect(deepEqual({ a: [1, 2] }, { a: [2, 1] })).toBe(false);
+    expect(deepEqual({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it("R3.14 a panel turned on and off again equals the untouched draft", () => {
+    const draft = newDrillDraft();
+    expect(draftsEqual(draft, togglePanel(togglePanel(draft, "range_advantage"), "range_advantage"))).toBe(true);
+    expect(draftsEqual(draft, togglePanel(draft, "range_advantage"))).toBe(false);
   });
 });

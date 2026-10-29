@@ -1,7 +1,7 @@
 /**
- * The admin builder panel on /library and the builder schedule on /settings (S28, R3.5, O-290,
- * O-292, O-295, O-296, O-299, A9 section 4), against the mocked api of
- * e2e/support/mock-library.ts.
+ * The admin pages of /library (Builder state at /library/builder, Builder settings at
+ * /library/settings, S40 O-406) and the builder schedule on /settings (S28, R3.5, O-290, O-292,
+ * O-295, O-296, O-299, A9 section 4), against the mocked api of e2e/support/mock-library.ts.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -24,7 +24,7 @@ function item(term: string): HTMLElement {
 
 describe("R3.5 builder health", () => {
   it("R3.5 an admin sees state, queue depth, flops per day, storage against budget and the labeled placeholders", async () => {
-    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
 
     expect(await screen.findByTestId("builder-state")).toHaveTextContent("Running");
     expect(item("Queue depth")).toHaveTextContent("3 queued, 1 running, 0 failed, 1 waiting on budget");
@@ -35,17 +35,16 @@ describe("R3.5 builder health", () => {
   });
 
   it("R3.5 a member sees one line and the page never asks for the builder status (O-290)", async () => {
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), { admin: false });
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"), { admin: false });
 
     expect(await screen.findByText("Builder health and controls are for admins.")).toBeInTheDocument();
-    await screen.findByRole("list", { name: "Pairs" });
     expect(screen.queryByRole("button", { name: /Pause the builder/ })).not.toBeInTheDocument();
     expect(sent("GET", BUILDER_PATH)).toEqual([]);
   });
 
   it("R3.5 pause then resume: each sends the CSRF token and a key, and the state shown is the answer's", async () => {
     const user = userEvent.setup();
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     await screen.findByTestId("builder-state");
 
     await user.click(screen.getByRole("button", { name: "Pause the builder" }));
@@ -62,7 +61,7 @@ describe("R3.5 builder health", () => {
 
   it("R3.5 a builder_state event updates the state shown, but never over a stored pause (O-295)", async () => {
     const user = userEvent.setup();
-    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     await screen.findByTestId("builder-state");
 
     streams[0]?.emit("builder_state", { state: "throttled", reason: "memory above the cap" });
@@ -79,7 +78,7 @@ describe("R3.5 builder health", () => {
   });
 
   it("R3.5 a build_progress event shows the build in progress", async () => {
-    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"));
     await screen.findByTestId("builder-state");
 
     streams[0]?.emit("build_progress", { job_id: "j1", line: "r250.c", iteration: 120, exploitability: [0.41, 0.38] });
@@ -89,7 +88,7 @@ describe("R3.5 builder health", () => {
 
   it("R3.5 a refused pause shows a fixed message", async () => {
     const user = userEvent.setup();
-    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), {
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"), {
       override: (request) =>
         request.path === `${BUILDER_PATH}/pause` ? jsonBody(409, { status: 409, detail: "server detail text" }, "application/problem+json") : undefined,
     });
@@ -103,7 +102,7 @@ describe("R3.5 builder health", () => {
   it("R3.5 a failed status read shows an alert with a retry", async () => {
     const user = userEvent.setup();
     let fail = true;
-    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), {
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "builder"), {
       override: (request) => (request.path === BUILDER_PATH && fail ? jsonBody(500, { status: 500 }) : undefined),
     });
 
@@ -117,7 +116,7 @@ describe("R3.5 builder health", () => {
 describe("R3.5 builder settings round trip", () => {
   it("R3.5 a save sends only the changed keys and the fields then show the stored values", async () => {
     const user = userEvent.setup();
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "settings"));
     const share = await screen.findByRole("spinbutton", { name: "CPU share" });
     expect(share).toHaveValue(0.6);
     const budget = screen.getByRole("spinbutton", { name: "Storage budget (GB)" });
@@ -136,12 +135,15 @@ describe("R3.5 builder settings round trip", () => {
     expect(patch?.headers[CSRF_HEADER]).toBe(FIXTURE_CSRF_TOKEN);
     expect(screen.getByRole("spinbutton", { name: "CPU share" })).toHaveValue(0.75);
     expect(screen.getByText(/^Now 500\. Use a whole number of gigabytes/)).toBeInTheDocument();
+    // The builder state page reads the same cached status, so it shows the stored budget (S40, O-406).
+    await user.click(within(screen.getByRole("navigation", { name: "Library sections" })).getByRole("link", { name: "Builder state" }));
+    await screen.findByTestId("builder-state");
     expect(item("Storage against budget")).toHaveTextContent("150.0 GB of 500.0 GB, 30.0%");
   });
 
   it("R3.5 an out-of-range value is named and nothing is sent; an unchanged form sends nothing", async () => {
     const user = userEvent.setup();
-    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
+    const { sent } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "settings"));
     const runouts = await screen.findByRole("spinbutton", { name: "Runouts per flop" });
 
     await user.click(screen.getByRole("button", { name: "Save builder settings" }));
@@ -158,7 +160,7 @@ describe("R3.5 builder settings round trip", () => {
 
   it("R3.5 a refused save shows a fixed message and keeps the edit", async () => {
     const user = userEvent.setup();
-    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), {
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, undefined, "settings"), {
       override: (request) =>
         request.path === SETTINGS_PATH ? jsonBody(422, { status: 422, detail: "server detail text" }, "application/problem+json") : undefined,
     });

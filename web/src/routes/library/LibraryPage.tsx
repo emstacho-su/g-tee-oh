@@ -3,100 +3,68 @@
  * O-291, O-297, ADR 0018). Library-first serving made visible: what the library holds, what is
  * queued, and a way to ask for a gap that never waits on a solve.
  *
- * Mechanism: the URL's validated search (library/search.ts) is the screen state. The study
- * filters pick the configuration (format, table size, stake, depth; their pair select is hidden),
- * the catalog reads resolve its config_id and pairs (useStudyCatalog), and CoverageGrid picks the
- * pair, written to the URL. The selected pair's CoveragePanel reads its coverage and sends gap
- * requests. One event stream is open while the page is mounted (useLibraryEvents). The builder
- * panel follows for an admin (O-290).
+ * S40 (O-406, screen review rows 63 to 70): one container with a page per section, the /settings
+ * pattern. The URL names the open page (/library/<section>, library/sections.ts); a "Library
+ * sections" list beside the page on a wide screen, and as a scrolling row above it at phone width,
+ * moves between them, and every link carries the coverage search so a selected pair survives the
+ * move. Pages: Coverage (everyone), Builder state and Builder settings (admins; a member opening
+ * their URL reads the admin note, and the api's 403 stays the control, O-290).
+ *
+ * Mechanism: the URL's validated search (library/search.ts) is the coverage page's state. Each page
+ * reads only what it shows (PR #42 review round 1 H): the coverage page owns the catalog reads and
+ * the coverage event stream with its live line; the builder state page opens its own stream for the
+ * build in progress; the settings page reads the builder status only.
  */
-import { useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 
-import type { AppApi } from "../../api/index.js";
-import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
-import { CoverageGrid } from "../../components/library/CoverageGrid.js";
-import { LoadingNote } from "../../components/ui/index.js";
-import { withLibraryFilter, withPair, type LibrarySearch } from "../../library/search.js";
+import { NAV_PILL_LINK_PROPS, PageHeader, PillNav } from "../../components/ui/index.js";
+import type { LibrarySearch } from "../../library/search.js";
+import { visibleLibrarySections, type LibrarySectionSlug } from "../../library/sections.js";
 import { useIsAdmin } from "../../library/use-builder.js";
-import { FILTER_PROMPTS, missingFilter, type FilterKey } from "../../study/filters.js";
-import { catalogFailure } from "../../study/problem-text.js";
-import { useStudyCatalog, type StudyCatalog } from "../../study/use-study-catalog.js";
-import { FailureAlert } from "../study/StudyNotices.js";
-import { StudyFilters } from "../study/StudyFilters.js";
-import { BuilderPanel } from "./BuilderPanel.js";
-import { CoveragePanel } from "./CoveragePanel.js";
-import { LiveStatus } from "./LiveStatus.js";
-import { useLibraryEvents } from "./use-library-events.js";
+import { BuilderSettingsPage, BuilderStatePage } from "./BuilderPanel.js";
+import { CoveragePage } from "./CoveragePage.js";
+
+export const LIBRARY_PAGE_TEXT = {
+  title: "Library",
+  description: "What the library holds, what is queued for the builder, and how the builder runs.",
+  sections: "Library sections",
+} as const;
 
 export interface LibraryPageProps {
+  /** The open page of the library container (S40, O-406). */
+  section: LibrarySectionSlug;
   search: LibrarySearch;
 }
 
-function useLibraryNavigation(search: LibrarySearch) {
-  const navigate = useNavigate();
-  function replaceWith(next: LibrarySearch): void {
-    navigate({ to: "/library", search: next, replace: true }).catch((error: unknown) => {
-      console.error(`g-tee-oh: the library navigation failed (${describeFailureForLog(error)})`);
-    });
-  }
-  return {
-    setFilter: (key: FilterKey, raw: string) => replaceWith(withLibraryFilter(search, key, raw)),
-    setPair: (pair: string) => replaceWith(withPair(search, pair)),
-  };
-}
-
-interface CoverageAreaProps {
-  api: AppApi;
-  search: LibrarySearch;
-  catalog: StudyCatalog;
-  onSelectPair: (pair: string) => void;
-}
-
-function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps) {
-  const { configId, pairs } = catalog;
-  if (configId === undefined || pairs === undefined) {
-    if (catalog.error !== null) return null;
-    if (catalog.loading) return <LoadingNote text="Loading the catalog." />;
-    return <p className="text-muted">{FILTER_PROMPTS[missingFilter(search, configId) ?? "depth"]}</p>;
-  }
-  const selected = pairs.find((entry) => entry.pair === search.pair);
+function SectionNav({ isAdmin, search }: { isAdmin: boolean; search: LibrarySearch }) {
   return (
-    <>
-      <CoverageGrid pairs={pairs} selectedPair={selected?.pair} onSelectPair={onSelectPair} />
-      {selected === undefined ? (
-        <p className="text-muted">Choose a pair to see its flops and queue, or to request it.</p>
-      ) : (
-        // Keyed by the spot, so a new selection starts with an empty flop field, no earlier
-        // answer in the live region and no held Idempotency-Key (PR #28 review M2).
-        <CoveragePanel
-          key={`${configId}|${selected.pair}`}
-          api={api}
-          configId={configId}
-          pair={selected.pair}
-          preflopAvailable={selected.preflop_available}
-        />
-      )}
-    </>
+    <PillNav label={LIBRARY_PAGE_TEXT.sections} className="md:w-56 md:shrink-0">
+      {visibleLibrarySections(isAdmin).map((entry) => (
+        <li key={entry.slug} className="shrink-0">
+          <Link to="/library/$section" params={{ section: entry.slug }} search={search} {...NAV_PILL_LINK_PROPS}>
+            {entry.label}
+          </Link>
+        </li>
+      ))}
+    </PillNav>
   );
 }
 
-export function LibraryPage({ search }: LibraryPageProps) {
+export function LibraryPage({ section, search }: LibraryPageProps) {
   const api = useAppApi();
-  const catalog = useStudyCatalog(api, search);
-  const navigation = useLibraryNavigation(search);
   const isAdmin = useIsAdmin();
-  const events = useLibraryEvents(catalog.configId, search.pair);
   return (
     <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Coverage and builder health</h1>
-        <LiveStatus status={events.status} onReconnect={events.reconnect} latest={events.latestCoverage} />
+      <PageHeader title={LIBRARY_PAGE_TEXT.title} description={LIBRARY_PAGE_TEXT.description} />
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+        <SectionNav isAdmin={isAdmin} search={search} />
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {section === "coverage" ? <CoveragePage api={api} search={search} /> : null}
+          {section === "builder" ? <BuilderStatePage api={api} isAdmin={isAdmin} /> : null}
+          {section === "settings" ? <BuilderSettingsPage api={api} isAdmin={isAdmin} /> : null}
+        </div>
       </div>
-      <StudyFilters search={search} catalog={catalog} onFilterChange={navigation.setFilter} hidePair label="Library filters" />
-      {catalog.error === null ? null : <FailureAlert failure={catalogFailure()} onRetry={catalog.retry} />}
-      <CoverageArea api={api} search={search} catalog={catalog} onSelectPair={navigation.setPair} />
-      <BuilderPanel api={api} isAdmin={isAdmin} progress={events.progress} />
     </section>
   );
 }

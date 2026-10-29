@@ -47,8 +47,6 @@ export const SESSION_TEXT = {
   grouping: "Grouping",
   /** The builder's name for trainer.pause, so both screens call it the same. */
   pauseRule: "Pause",
-  closingActions: "Closing actions",
-  flop: "Flop",
   continuing: "Continuing by itself",
   openLibrary: "Open the library",
   /** The start panel's chip list (S38). */

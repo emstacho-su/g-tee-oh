@@ -43,13 +43,15 @@ test("R3.4 R3.5 mock flow 5: a gap request answers at once with its queue positi
   await settingsRoundTrip(page, "0.7");
 });
 
-test("R3.5 mock flow 5: a member sees the coverage view but no builder controls (O-290)", async ({ page }) => {
+test("R3.5 mock flow 5: a member sees the coverage view but no builder pages or controls (O-290, O-406)", async ({ page }) => {
   await installFakeEventSource(page);
   await installAppMockApi(page, { admin: false });
   await signIn(page, OWNER);
   await openLibrary(page);
 
   await chooseConfig(page, ONLINE_100);
+  await expect(page.getByRole("navigation", { name: "Library sections" }).getByRole("link")).toHaveText(["Coverage"]);
+  await page.goto("/library/builder");
   await expect(page.getByText("Builder health and controls are for admins.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Pause the builder" })).toHaveCount(0);
 });

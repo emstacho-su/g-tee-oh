@@ -18,6 +18,7 @@ import { App } from "../../src/app/index.js";
 import { createQueryClient } from "../../src/auth/index.js";
 import { fixtureMemberSession, fixtureSession } from "../../src/fixtures/index.js";
 import { LibraryDepsProvider, type EventSourceLike } from "../../src/library/library-deps.js";
+import type { LibrarySectionSlug } from "../../src/library/sections.js";
 import { EVENT_SOURCE_CLOSED } from "../../src/library/use-server-events.js";
 import { createAppRouter } from "../../src/router.js";
 import { TEST_ORIGIN } from "../app/render-app.js";
@@ -150,8 +151,11 @@ export function renderLibrary(path: string, options: RenderLibraryOptions = {}):
   return { ...view, requests, sent, streams, router };
 }
 
-/** The /library URL at the fixture online 6-max 100bb configuration, optionally with a pair. */
-export function libraryPath(onlineStakeId: string, pair?: string): string {
-  const base = `/library?format=online&table_size=6&stake=${onlineStakeId}&depth=10000`;
+/**
+ * A /library page URL at the fixture online 6-max 100bb configuration, optionally with a pair. The
+ * section is the open page (S40, O-406): coverage by default, builder or settings for the admin pages.
+ */
+export function libraryPath(onlineStakeId: string, pair?: string, section: LibrarySectionSlug = "coverage"): string {
+  const base = `/library/${section}?format=online&table_size=6&stake=${onlineStakeId}&depth=10000`;
   return pair === undefined ? base : `${base}&pair=${pair}`;
 }

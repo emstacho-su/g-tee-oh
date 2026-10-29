@@ -1,7 +1,8 @@
 /**
- * The actions an existing drill's builder offers besides Save (S26, R3.14, O-311): Run
- * (/drills/$id/run), Export (the export dialog) and Duplicate (a copy named "<name> (copy)",
- * announced with a link to its builder). They act on the drill as stored, not on unsaved edits.
+ * The actions an existing drill's builder offers besides Save (S26, R3.14, O-311; S40 on the S36
+ * buttons): Run (/drills/$id/run), Export (the export dialog) and Duplicate (a copy named
+ * "<name> (copy)", announced with a link to its builder). They act on the drill as stored, not on
+ * unsaved edits; Run is a navigation, so the leave guard asks first when the draft is dirty.
  */
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -18,8 +19,6 @@ export interface BuilderActionsProps {
   drill: Drill;
 }
 
-const LINK_CLASSES = "inline-flex h-10 items-center rounded-md border border-border bg-surface-raised px-3 text-sm font-medium hover:bg-surface-sunken";
-
 export function BuilderActions({ api, drill }: BuilderActionsProps) {
   const [exporting, setExporting] = useState(false);
   const duplicate = useDuplicateDrill(api);
@@ -27,9 +26,11 @@ export function BuilderActions({ api, drill }: BuilderActionsProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
-        <Link to="/drills/$id/run" params={{ id: drill.id }} className={LINK_CLASSES}>
-          Run
-        </Link>
+        <Button asChild variant="primary">
+          <Link to="/drills/$id/run" params={{ id: drill.id }}>
+            Run
+          </Link>
+        </Button>
         <Button onClick={() => setExporting(true)}>Export</Button>
         <Button disabled={duplicate.busy} onClick={() => duplicate.send(drill.id)}>
           Duplicate
@@ -39,7 +40,7 @@ export function BuilderActions({ api, drill }: BuilderActionsProps) {
         {copy === undefined ? null : (
           <p>
             {`Duplicated as ${copy.name}. `}
-            <Link to="/drills/$id" params={{ id: copy.id }} className="underline">
+            <Link to="/drills/$id/$section" params={{ id: copy.id, section: "details" }} className="underline">
               Open the copy
             </Link>
           </p>

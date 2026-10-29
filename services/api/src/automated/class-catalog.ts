@@ -42,7 +42,7 @@ import { HTTP_STATUS, PROBLEM_SLUGS, ProblemError } from "../http/problem.js";
 import { trackFor, type TrackKey } from "../learning/tracks.js";
 import { CBB_PER_BB } from "../sessions/candidates.js";
 import { mapBounded, MAX_CONCURRENT_SOLVER_CALLS } from "../sessions/concurrency.js";
-import { heroSpotSchema, MAX_HERO_SPOTS, type HeroSpot } from "../sessions/state.js";
+import { classLineEntry, heroSpotSchema, MAX_HERO_SPOTS, type HeroSpot } from "../sessions/state.js";
 import type { SolverQuery, SqClassSpot } from "../solver-query/client.js";
 import { askPair, failWhenServiceUnavailable, type PairAnswer, type ScopedConfig } from "./pair-coverage.js";
 
@@ -211,7 +211,7 @@ export function heroSpotsOf(cls: CatalogClass): HeroSpot[] {
           pair: option.pair,
           line: spot.line ?? null,
           hero_seat: spot.hero_position,
-          history: spot.history.map((entry) => ({ position: entry.position, token: entry.token, label: entry.label })),
+          history: spot.history.map(classLineEntry),
         }),
       ),
     )

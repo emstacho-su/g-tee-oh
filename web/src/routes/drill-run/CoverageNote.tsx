@@ -13,18 +13,26 @@
  * The link is the router Link (PR #30 review MEDIUM 4): following it is a client-side navigation,
  * so the app, its query cache and the session's state are kept, never thrown away by a full page
  * load. The screen's tests render the notes inside a router (test/trainer-screen/screen-router.tsx).
+ *
+ * S40 (screen review row 36): both notes are raised notes on the shared tokens with the warning
+ * edge on their start side; the words carry the meaning, never the colour. Text and logic are as
+ * S26 left them (row 35 waits on the real stack, O-355).
  */
 import { Link } from "@tanstack/react-router";
 
 import type { SessionCoverage } from "../../trainer/session-types.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
+import { cn, RAISED_CLASS } from "../../components/ui/index.js";
 import { LIBRARY_PATH, SESSION_TEXT } from "./labels.js";
 
-const NOTE_CLASSES = "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm";
+const NOTE_CLASSES = cn(
+  "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-border/50 border-l-4 border-l-warning bg-surface-raised px-4 py-3 text-sm",
+  RAISED_CLASS,
+);
 
 function LibraryLink() {
   return (
-    <Link to={LIBRARY_PATH} className="font-medium underline">
+    <Link to={LIBRARY_PATH} className="font-semibold text-accent underline underline-offset-2">
       {SESSION_TEXT.openLibrary}
     </Link>
   );

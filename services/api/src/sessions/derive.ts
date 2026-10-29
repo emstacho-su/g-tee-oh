@@ -229,16 +229,27 @@ async function finish(context: Context, rng: boolean, port: SolverPort): Promise
   return { state: context.state, hand, node, roll };
 }
 
+/** Where a drive stops: the hero's next decision, or also the edge into hand_end (S40, O-400). */
+type StopAt = "await_hero" | "hand_end";
+
+interface Driven {
+  phase: Phase;
+  context: Context;
+}
+
 /**
- * Runs the machine from the persisted state to the hero's next decision. Pure with respect to the
- * database: it reads solver-query only, and the same state always yields the same result.
+ * Drives the machine from the persisted state through every phase that needs no hero input. It
+ * stops at await_hero, or, with stopAt hand_end, on the edge into hand_end before that phase runs,
+ * so the next hand is never dealt. Pure with respect to the database: it reads solver-query only
+ * through the pure calls, and the same state always takes the same steps, the opponent's draws
+ * coming from the generator state stored in the hand.
  */
-export async function deriveAwaitHero(state: PersistedState, settings: DeriveSettings, port: SolverPort): Promise<DerivedPrompt> {
+async function drive(state: PersistedState, settings: DeriveSettings, port: SolverPort, stopAt: StopAt): Promise<Driven> {
   let machine: MachineState = { phase: state.phase, stopRule: settings.stopRule };
   let context: Context = { state, node: undefined };
   for (let step = 0; step <= MAX_DERIVATION_STEPS; step += 1) {
-    if (machine.phase === "await_hero") {
-      return finish(context, settings.rng, port);
+    if (machine.phase === "await_hero" || (stopAt === "hand_end" && machine.phase === "hand_end")) {
+      return { phase: machine.phase, context };
     }
     if (machine.phase === "ended") {
       throw sessionEndedProblem();
@@ -256,12 +267,60 @@ export async function deriveAwaitHero(state: PersistedState, settings: DeriveSet
 }
 
 /**
- * The state POST decisions persists: the hero's action applied to the derived hand, the roll state
- * advanced when a roll was drawn, and the phase moved to feedback.
+ * Runs the machine from the persisted state to the hero's next decision. Pure with respect to the
+ * database: it reads solver-query only, and the same state always yields the same result.
  */
-export function afterHeroDecision(derived: DerivedPrompt, action: SqAction, attemptId: string, stopRule: StopRule): PersistedState {
+export async function deriveAwaitHero(state: PersistedState, settings: DeriveSettings, port: SolverPort): Promise<DerivedPrompt> {
+  const driven = await drive(state, settings, port, "await_hero");
+  return finish(driven.context, settings.rng, port);
+}
+
+/** A hand that ended, as hand_record stores it (S40, O-400, O-401). */
+export interface FinishedHand {
+  /** Exactly the previous_hand the next prompt carries for this hand. */
+  previous: PreviousHand;
+  heroPosition: HandState["hero_position"];
+  heroHand: string;
+}
+
+/**
+ * The hand the state is in, when it ends before the hero acts again (S40, O-400). The machine runs
+ * from the state (POST decisions passes its decided state, phase feedback) through the steps GET
+ * /next will take from it and stops on the edge into hand_end, before the next hand is dealt; null
+ * when the hero acts again in the same hand. Nothing is written and no state comes back: the
+ * session keeps its decided state, and GET /next later takes these same steps from it with the
+ * same stored generator states, so the record equals the previous_hand that prompt carries.
+ */
+export async function deriveFinishedHand(state: PersistedState, settings: DeriveSettings, port: SolverPort): Promise<FinishedHand | null> {
+  const driven = await drive(state, settings, port, "hand_end");
+  if (driven.phase !== "hand_end") {
+    return null;
+  }
+  const { ended } = driven.context;
+  if (ended === undefined) {
+    throw new ProblemError(HTTP_STATUS.internal, PROBLEM_SLUGS.internal, { detail: "The hand ended with no recorded reason." });
+  }
+  const hand = requireHand(driven.context.state);
+  return {
+    previous: previousHandOf(driven.context.state.hand_no, hand, ended),
+    heroPosition: hand.hero_position,
+    heroHand: hand.hero_hand,
+  };
+}
+
+/**
+ * The state after the hero's action: the action applied to the derived hand, the roll state
+ * advanced when a roll was drawn, and the phase moved to feedback; last_attempt_id unchanged. The
+ * forward run (deriveFinishedHand) starts here, before the attempt exists.
+ */
+export function stateAfterHeroAction(derived: DerivedPrompt, action: SqAction, stopRule: StopRule): PersistedState {
   const phase = transition({ phase: derived.state.phase, stopRule }, { type: "hero_decided" }).phase;
   const acted = withAction(derived.hand, derived.hand.hero_position, action);
   const hand = derived.roll === null ? acted : { ...acted, roll_rng_state: derived.roll.state };
-  return { ...derived.state, phase, hand, last_attempt_id: attemptId };
+  return { ...derived.state, phase, hand };
+}
+
+/** The state POST decisions persists: stateAfterHeroAction with the decision's attempt. */
+export function afterHeroDecision(derived: DerivedPrompt, action: SqAction, attemptId: string, stopRule: StopRule): PersistedState {
+  return { ...stateAfterHeroAction(derived, action, stopRule), last_attempt_id: attemptId };
 }

@@ -1,10 +1,11 @@
 /**
- * Training session routes (R3.6, R3.7, A5 section 3, A6 section 2): POST /sessions,
+ * Training session routes (R3.6, R3.7, R3.13, A5 section 3, A6 section 2): POST /sessions,
  * GET /sessions/{id}/next, POST /sessions/{id}/decisions and POST /sessions/{id}/end, each scoped
  * to the session user (ADR 0001). The handlers only read the request and call sessions/service.ts
  * and grading/decide.ts, where the mechanism is described.
  *
- * GET /next is pure (the S23 binding rule): it derives the prompt and writes nothing. The three
+ * GET /next is pure (the S23 binding rule): it derives the prompt and writes nothing; GET
+ * /sessions/{id}/hands (S40, O-403) reads the hand log, owner scoped (hands/service.ts). The three
  * POST routes are the only writers; they take the CSRF token and an optional Idempotency-Key
  * (route-config.ts defaults) and write through idempotentWrite (O-232).
  */
@@ -12,15 +13,19 @@ import type { FastifyPluginCallbackZod } from "fastify-type-provider-zod";
 
 import { submitDecision } from "../grading/decide.js";
 import { mutatingHeadersSchema } from "../http/headers.js";
+import { listSessionHands } from "../hands/service.js";
 import {
   AUTHENTICATED,
   MUTATE_ONE_PROBLEMS,
+  READ_ONE_PROBLEMS,
   UPSTREAM_MUTATE_PROBLEMS,
   UPSTREAM_READ_PROBLEMS,
 } from "../http/openapi.js";
+import { pageQuerySchema, pageSchema } from "../http/pagination.js";
 import { HTTP_STATUS, problemResponses } from "../http/problem.js";
 import { requireSession } from "../plugins/authenticate.js";
 import { emptyBodySchema, sessionParamsSchema } from "../schemas/common.js";
+import { handRecordSchema } from "../schemas/hands.js";
 import {
   decisionBodySchema,
   feedbackSchema,
@@ -128,6 +133,26 @@ export const sessionRoutes: FastifyPluginCallbackZod<ConfiguredRouteOptions> = (
     async (request) => {
       const { userId } = requireSession(request);
       return endSession({ app, request, userId, now: new Date(), timeZone: options.config.timeZone }, request.params.id);
+    },
+  );
+
+  app.get(
+    "/sessions/:id/hands",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "The session's finished hands, by hand number (the hand log)",
+        description:
+          "One record per hand that ended, written with the decision that ended it (S40, O-400). Only the caller's own sessions: any other id answers 404.",
+        security: AUTHENTICATED,
+        params: sessionParamsSchema,
+        querystring: pageQuerySchema,
+        response: { 200: pageSchema(handRecordSchema), ...problemResponses(READ_ONE_PROBLEMS) },
+      },
+    },
+    async (request) => {
+      const { userId } = requireSession(request);
+      return listSessionHands({ app, request, userId }, request.params.id, request.query);
     },
   );
 

@@ -17,8 +17,9 @@
  *
  * S26 (R3.13, R3.14, O-312 to O-314): the drill's run settings (stop rule, pause, speed,
  * quick_result) go into the session, so street and full-hand modes run on the same screen; above
- * the table RunProgress shows the covered-part note, the hand and decision counter and how the last
- * hand ended, and a start refused with 422 no-coverage adds the queued count and a library link.
+ * the table RunProgress shows the covered-part note and the hand and decision counter (S40, O-352:
+ * how the last hand ended is logged by the api, not shown), and a start refused with 422
+ * no-coverage adds the queued count and a library link.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";

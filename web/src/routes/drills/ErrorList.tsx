@@ -13,6 +13,12 @@ import type { FieldError } from "../../drills/types.js";
  */
 const LOCATIONS: readonly string[] = ["body", "drill"];
 
+/**
+ * A refused import or export (S40, rows 39 and 40): a bordered block on the danger token whose first
+ * line starts "Error:", so the refusal is carried by words and the edge, never colour alone (O-366).
+ */
+export const REFUSAL_CLASSES = "flex flex-col items-start gap-2 rounded-xl border border-danger bg-surface-raised p-3 text-sm";
+
 export function moreErrorsText(omitted: number): string {
   return `and ${omitted} more`;
 }

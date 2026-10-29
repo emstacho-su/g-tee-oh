@@ -198,7 +198,8 @@ describe("two-step sign-in", () => {
     releaseLogin();
     expect(await screen.findByText("Signing you in")).toBeInTheDocument();
     await screen.findByRole("heading", { level: 1, name: "New drill" });
-    expect(router.state.location.pathname).toBe("/drills/new");
+    // /drills/new opens the builder's first page since S40 (O-405), so the redirect lands there.
+    expect(router.state.location.pathname).toBe("/drills/new/details");
     expect(api.tokens.get()).toBe("login-token");
     expect(await screen.findByText(fixtureSession.user.email)).toBeInTheDocument();
   });

@@ -244,6 +244,8 @@ describe("R3.6 upstream failures after POST /sessions", () => {
       fake: { opponentChoice: { [OPEN_KEY]: 2 }, lostNodes: [THREE_BET_KEY] },
     });
     const sessionId = await startSession(app, player, drillId);
+    // S40 review round 1 A (O-400 amended): the hand log never blocks a decision, so the decision
+    // commits even though the forward run meets the lost node; GET /next reports it as before.
     const answer = await decide(app, player, sessionId, 0, 1);
     expect(answer.statusCode, answer.body).toBe(200);
     const response = await getNext(app, player, sessionId);
