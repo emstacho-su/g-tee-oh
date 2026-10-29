@@ -34,7 +34,7 @@
 import { RNG_ROLL_MAX, RNG_ROLL_MIN, rngBands, rollSelectedAction, type RngBand } from "@g-tee-oh/learning";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { Button, VisuallyHidden, cn } from "../ui/index.js";
+import { Button, FOCUS_MARK_CLASS, VisuallyHidden, cn } from "../ui/index.js";
 import type { NodeAction } from "../../contracts.js";
 import { indexAtPosition } from "../../poker/action-index.js";
 import { toGradeActions } from "../../poker/grade-actions.js";
@@ -241,7 +241,7 @@ function BandStrip({ actions, bands, selectedPosition }: BandStripProps) {
             className={cn(
               "flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900",
               ACTION_FILL_CLASSES,
-              current && "outline outline-2 -outline-offset-2 outline-focus",
+              current && FOCUS_MARK_CLASS,
             )}
           >
             <span className="flex items-center gap-1 truncate rounded bg-white/80 px-1">

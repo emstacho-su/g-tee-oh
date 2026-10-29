@@ -2,7 +2,8 @@
 // the token parser on a synthetic stylesheet, and the committed web/src/styles.css, which must
 // carry the owner's five palette primitives, name the source hue of every checked colour and pass
 // every gating pair in both themes; and, since O-389 (S38), the solver surface colours (the action
-// colours, their size shades and every felt) as gating pairs too. node:test, run by
+// colours, their size shades and every felt) as gating pairs too. The neutral dark base and the
+// focus ring on the solver fills (S43, O-430, O-432) are in check-contrast-dark.test.mjs. node:test, run by
 // `pnpm run test:scripts` (just ts-test).
 
 import assert from "node:assert/strict";

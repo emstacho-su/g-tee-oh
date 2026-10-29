@@ -2,10 +2,12 @@
  * One seat card at the game-style table (S24, S38, R3.13, O-380, O-381). A raised card with the
  * position, the stack in big blinds, a "D" dealer button marker, an "STR" straddle marker, the
  * seat's last action as a badge, the current bet when given and, for the hero, the word You, an
- * accent ring and the hole cards. Markers carry a visually hidden spoken name ("Dealer button",
+ * accent mark and the hole cards. Markers carry a visually hidden spoken name ("Dealer button",
  * "Straddle"). A folded seat is dimmed and also says "Folded", so dimming is never the only
- * signal; the seat whose action is playing is marked active (a ring and a small lift, no lift
- * under reduced motion). The card carries both layouts' spots as custom properties and the
+ * signal; the seat whose action is playing is marked active (the focus mark and a small lift, no
+ * lift under reduced motion). The marks are outlines 2 px off the card (S43 review round 2): a
+ * Tailwind ring is a box-shadow, which the raised card's own shadow replaced, so it never painted.
+ * Seats never overlap the felt, so a mark always sits on the page ground. The card carries both layouts' spots as custom properties and the
  * container query in styles.css picks one (seat-layout.ts).
  */
 import type { CSSProperties } from "react";
@@ -15,6 +17,11 @@ import type { Position } from "../../contracts.js";
 import { formatCbb } from "../../poker/format.js";
 import { CardView } from "./CardView.js";
 import type { SeatSlot } from "./seat-layout.js";
+
+/** The hero's mark: the accent outline, 2 px off the card so the raised shadow stays (O-432). */
+export const HERO_MARK_CLASS = "outline-2 outline-offset-2 outline-accent";
+/** The acting seat's mark: the focus outline, apart from the hero's accent (O-432). */
+export const ACTING_MARK_CLASS = "outline-2 outline-offset-2 outline-focus";
 
 /** An action chip at the seat's bet spot; moving while its step plays. */
 export interface SeatChip {
@@ -103,8 +110,9 @@ export function Seat({ seat, slots, fourColor }: SeatProps) {
       className={cn(
         "table-seat flex flex-col items-center gap-0.5 rounded-xl border bg-surface-raised px-2 py-1.5 text-center text-sm",
         RAISED_CLASS,
-        seat.isHero ? "border-accent ring-2 ring-accent" : "border-border",
-        active && "table-seat-active ring-2 ring-focus",
+        seat.isHero ? "border-accent" : "border-border",
+        // One mark per seat: the acting seat's focus mark wins over the hero's accent mark (O-432).
+        active ? cn("table-seat-active", ACTING_MARK_CLASS) : seat.isHero && HERO_MARK_CLASS,
         seat.hasFolded && "opacity-50",
       )}
     >

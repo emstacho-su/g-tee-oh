@@ -13,5 +13,13 @@ export const FLAT_REST_CLASS = "[--tactile-rest:none]";
  * --border; a control never does, and a source scan test holds every field to this class.
  */
 export const CONTROL_EDGE_CLASS = "border border-border-strong";
+/**
+ * A focus mark drawn inside a fill (the marked roll band, S43, O-432): the focus outline on the
+ * fill's inner edge and, in both themes (O-433), a 4 px inset halo of --focus-halo under it. The
+ * ring (the text colour) and the halo (the raised ground) are 9:1 or more apart, which the contrast
+ * gate checks, so one of them reaches 3:1 on any fill (WCAG technique C40). The outline paints over
+ * the inset shadow, leaving a 2 px halo line inside the ring.
+ */
+export const FOCUS_MARK_CLASS = "outline outline-2 -outline-offset-2 outline-focus shadow-[inset_0_0_0_4px_var(--focus-halo)]";
 /** A text field, select or textarea: the control edge on the raised surface. */
 export const FIELD_CLASS = `${CONTROL_EDGE_CLASS} rounded-lg bg-surface-raised text-text`;

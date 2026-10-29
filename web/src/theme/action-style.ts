@@ -16,7 +16,8 @@
  * as before; only lightness moved. Sources, light theme (cream grounds, so each is a deep shade):
  * fold Tailwind blue-600, check and call green-700, limp lime-700, straddle violet-700, bet and
  * raise red-600 (also the first size shade), all-in fuchsia-800, its own hue so it never reads as
- * one more raise size. Dark theme (deep brown grounds, so each is a lifted shade): fold blue-500,
+ * one more raise size. Dark theme (neutral near-black grounds since O-430, at the luminance of
+ * the earlier brown ones, so each is a lifted shade): fold blue-500,
  * check and call green-500, limp lime-500, straddle violet-400, bet and raise red-500, all-in
  * fuchsia-400.
  *
@@ -82,12 +83,12 @@ export function hatchInkFor(fill: string): string {
 
 /**
  * The ink for text printed on an action fill (a roll band's label, a painted cell): white on the
- * deep light-theme fills, the deepened umber of the dark ground (from 735751 umber) on the lifted
+ * deep light-theme fills, the neutral near-black of the dark ground (O-430) on the lifted
  * dark-theme fills, whichever reads better, so every fill keeps its text at 4.5:1 (WCAG 1.4.3).
  */
 export const ACTION_INK = {
   onDark: "#ffffff",
-  onLight: "#1c1210",
+  onLight: "#141414",
 } as const;
 
 /** The text ink for one fill color (a hex value): the one of the two with the higher contrast. */
