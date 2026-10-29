@@ -22,3 +22,8 @@ fa2b8ef414e8fa4cfe2579ef427a02e23c4936e4:web/src/fixtures/progress.ts:generic-ap
 # (web/test/routes/join.test.tsx), a reversed alphabet that never named a real invite. The literal is
 # now built at run time from a repeated letter, and this entry only clears the history scan.
 953f175deac6755e6b05b14c6772c0fe70e7b4d0:web/test/routes/join.test.tsx:generic-api-key:198
+# e8dd833 (S47, R3.35, O-481): generic-api-key matched one bundled drill export code ("gteeoh1."
+# plus base64url of a deflated drill, the format of O-310) beside its entry's "key" field in the
+# starter pack. It is public drill data, not a secret; services/api/test/drills-starter-pack.test.ts
+# proves every code decodes to a drill. This entry names the one commit and line that added it.
+e8dd8333c2d35e64af2add0e0de3e844d026de07:web/src/drills/starter-pack.ts:generic-api-key:58
