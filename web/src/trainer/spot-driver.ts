@@ -18,6 +18,7 @@
  * once: the api answers POST end for an ended session with its recap, so the recap is not lost.
  */
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
+import { atSessionLimit } from "./session-length.js";
 import type { PracticeSession, SessionRecap } from "./session-types.js";
 import { INITIAL_SPOT_STATE, transition, type PendingDecision, type SpotEvent, type SpotState } from "./spot-machine.js";
 import { problemOf, type SpotProblem } from "./spot-problem.js";
@@ -80,7 +81,8 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
 
   function promptEvent(prompt: TrainerPrompt): SpotEvent {
     io().onPrompt(prompt);
-    return { type: "prompt_loaded", prompt, at: io().now() };
+    // The end key is used only when the prompt opens a hand past the planned length (R3.31).
+    return { type: "prompt_loaded", prompt, at: io().now(), endKey: io().newKey() };
   }
 
   function enter(entered: SpotState, token: number): void {
@@ -101,7 +103,8 @@ export function createSpotDriver(io: () => SpotIo, onChange: (state: SpotState) 
         }));
         return;
       case "feedback":
-        io().prefetchPrompt(entered.context.session.session_id, entered.feedback.state_version);
+        // The last planned hand's reveal leaves to the recap, so nothing is prefetched for it (R3.31).
+        if (!atSessionLimit(entered)) io().prefetchPrompt(entered.context.session.session_id, entered.feedback.state_version);
         return;
       case "ending":
         settle(token, io().endSession(entered.context.session.session_id, entered.key), (recap) => ({ type: "ended", recap }));

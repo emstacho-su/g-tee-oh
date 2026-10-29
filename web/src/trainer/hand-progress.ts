@@ -19,6 +19,7 @@
  * is not read here; the api logs each finished hand (hand_record) instead.
  */
 import type { Position, TrainerPrompt } from "../contracts.js";
+import type { SessionLength } from "./session-length.js";
 
 export interface HandProgress {
   /** The api's hand number (from 0); compared, never shown. */
@@ -42,7 +43,16 @@ export function advanceHand(previous: HandProgress | null, prompt: TrainerPrompt
   return { handNo: prompt.hand_no, ordinal: previous === null ? FIRST_ORDINAL : previous.ordinal + 1, ...shown };
 }
 
-/** "Hand 3, decision 2". */
-export function handCounterText(progress: HandProgress): string {
-  return `Hand ${progress.ordinal}, decision ${progress.decision}`;
+export interface HandCounterOptions {
+  /** The planned session length (S46, R3.31): "Hand 3 of 20" when set. */
+  readonly length?: SessionLength;
+  /** Whether the decision within the hand is named (street and full-hand modes); true by default. */
+  readonly decision?: boolean;
+}
+
+/** "Hand 3, decision 2"; with a length "Hand 3 of 20, decision 2"; without the decision "Hand 3 of 20". */
+export function handCounterText(progress: HandProgress, options: HandCounterOptions = {}): string {
+  const { length = null, decision = true } = options;
+  const hand = length === null ? `Hand ${progress.ordinal}` : `Hand ${progress.ordinal} of ${length}`;
+  return decision ? `${hand}, decision ${progress.decision}` : hand;
 }

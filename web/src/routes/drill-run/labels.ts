@@ -46,6 +46,8 @@ export const SESSION_TEXT = {
   rngHint:
     "Each decision shows a roll from 1 to 100 first, to practise mixing your actions. After the decision the bands show where it fell; Best is still the highest-EV action.",
   nextHand: "Next hand",
+  /** Next on the last planned hand's reveal (R3.31). */
+  finishSession: "Finish session",
   endSession: "End session",
   studySpot: "Study this spot",
   confirmTitle: "End this session?",

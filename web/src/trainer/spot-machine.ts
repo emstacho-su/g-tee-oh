@@ -36,11 +36,18 @@
  * state records autoContinueMs from pause-rule.ts: null when the reveal waits for Next, else the
  * delay after which the hook sends auto_continue, which leaves only such a reveal (a stray timer
  * cannot skip a paused one). Next leaves any reveal.
+ *
+ * Session length (S46, R3.31, session-length.ts): Start may carry a planned length, kept in the
+ * context. In spot mode the reveal of the last planned hand leaves to ending on Next or on the
+ * automatic continue, using the event's endKey as the end request's key; in street and full-hand
+ * modes a prompt that opens a hand past the length goes to ending at once with the prompt_loaded
+ * event's endKey. Without an endKey the machine behaves as before, so the pure tests of S25 hold.
  */
 import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
 import { advanceHand, type HandProgress } from "./hand-progress.js";
 import { autoContinueMs } from "./pause-rule.js";
 import { activeMs, pauseTimer, resumeTimer, startTimer, type ResponseTimer } from "./response-timer.js";
+import { atSessionLimit, pastSessionLimit, type SessionLength } from "./session-length.js";
 import type { PracticeSession, RunSettings, SessionRecap } from "./session-types.js";
 import { isRetryable, type SpotProblem } from "./spot-problem.js";
 
@@ -55,6 +62,8 @@ export interface SessionContext {
   readonly trainer?: RunSettings;
   /** Where the shown prompt sits in its hand; absent before the first prompt (O-313). */
   readonly hand?: HandProgress;
+  /** The planned length in hands (S46, R3.31); absent or null means no limit. */
+  readonly length?: SessionLength;
 }
 
 export interface PendingDecision {
@@ -69,6 +78,7 @@ export interface StartRequest {
   readonly key: string;
   readonly rng: boolean;
   readonly trainer?: RunSettings;
+  readonly length?: SessionLength;
 }
 
 export type RetryTarget = "start" | "next" | "decision" | "end";
@@ -113,15 +123,17 @@ export type SpotState =
 export type SpotStateKind = SpotState["kind"];
 
 export type SpotEvent =
-  | { readonly type: "start"; readonly key: string; readonly rng: boolean; readonly trainer?: RunSettings }
+  | { readonly type: "start"; readonly key: string; readonly rng: boolean; readonly trainer?: RunSettings; readonly length?: SessionLength }
   | { readonly type: "session_started"; readonly session: PracticeSession }
-  | { readonly type: "prompt_loaded"; readonly prompt: TrainerPrompt; readonly at: number }
+  /** endKey is the Idempotency-Key of the end request a prompt past the planned length sends (R3.31). */
+  | { readonly type: "prompt_loaded"; readonly prompt: TrainerPrompt; readonly at: number; readonly endKey?: string }
   /** Choosing an action sends it: key is the decision's Idempotency-Key (O-232, O-345). */
   | { readonly type: "choose_action"; readonly actionIndex: number; readonly at: number; readonly key: string }
   | { readonly type: "decision_succeeded"; readonly feedback: DecisionFeedback }
-  | { readonly type: "next" }
+  /** endKey is the Idempotency-Key of the end request the last planned hand's Next sends (R3.31). */
+  | { readonly type: "next"; readonly endKey?: string }
   /** Sent by the hook's timer when a reveal that does not pause has shown for its delay (O-314). */
-  | { readonly type: "auto_continue" }
+  | { readonly type: "auto_continue"; readonly endKey?: string }
   | { readonly type: "end"; readonly key: string }
   | { readonly type: "ended"; readonly recap: SessionRecap }
   | { readonly type: "failed"; readonly problem: SpotProblem }
@@ -170,19 +182,22 @@ function retime(state: SpotState, update: (timer: ResponseTimer) => ResponseTime
 function promptLoaded(state: SpotState, event: Extract<SpotEvent, { type: "prompt_loaded" }>): SpotState {
   if (state.kind !== "loading_prompt" && state.kind !== "stale") return state;
   const notice = state.kind === "stale" ? "stale" : null;
-  const context: SessionContext = { ...state.context, hand: advanceHand(state.context.hand ?? null, event.prompt) };
+  const hand = advanceHand(state.context.hand ?? null, event.prompt);
+  const context: SessionContext = { ...state.context, hand };
+  // A prompt that opens a hand past the planned length ends the session instead of showing it (R3.31).
+  if (event.endKey !== undefined && pastSessionLimit(context, hand.ordinal)) return { kind: "ending", context, key: event.endKey };
   return { kind: "await_action", context, prompt: event.prompt, timer: startTimer(event.at), notice };
 }
 
-/** A start request; the run settings are left out when absent, so spot mode states stay as in S25. */
-function startRequest(key: string, rng: boolean, trainer: RunSettings | undefined): StartRequest {
-  return trainer === undefined ? { key, rng } : { key, rng, trainer };
+/** A start request; the run settings and the length are left out when absent, so spot mode states stay as in S25. */
+function startRequest(key: string, rng: boolean, trainer: RunSettings | undefined, length: SessionLength | undefined): StartRequest {
+  return { key, rng, ...(trainer === undefined ? {} : { trainer }), ...(length === undefined ? {} : { length }) };
 }
 
 function sessionStarted(state: SpotState, session: PracticeSession): SpotState {
   if (state.kind !== "starting") return state;
-  const { rng, trainer } = state;
-  const context: SessionContext = trainer === undefined ? { session, rng } : { session, rng, trainer };
+  const { rng, trainer, length } = state;
+  const context: SessionContext = { session, rng, ...(trainer === undefined ? {} : { trainer }), ...(length === undefined ? {} : { length }) };
   return { kind: "loading_prompt", context, version: session.state_version };
 }
 
@@ -197,15 +212,17 @@ export function autoContinueDelay(state: SpotState): number | null {
   return state.kind === "feedback" ? (state.autoContinueMs ?? null) : null;
 }
 
-function leaveFeedback(state: SpotState, automatic: boolean): SpotState {
+function leaveFeedback(state: SpotState, automatic: boolean, endKey: string | undefined): SpotState {
   if (state.kind !== "feedback" || (automatic && autoContinueDelay(state) === null)) return state;
+  // The last planned hand's reveal leaves to the recap, never to another deal (R3.31).
+  if (endKey !== undefined && atSessionLimit(state)) return { kind: "ending", context: state.context, key: endKey };
   return { kind: "loading_prompt", context: state.context, version: state.feedback.state_version };
 }
 
 function failed(state: SpotState, problem: SpotProblem): SpotState {
   switch (state.kind) {
     case "starting":
-      return errorState(problem, "start", { start: startRequest(state.key, state.rng, state.trainer) });
+      return errorState(problem, "start", { start: startRequest(state.key, state.rng, state.trainer, state.length) });
     case "loading_prompt":
     case "stale":
       return errorState(problem, "next", { context: state.context });
@@ -233,11 +250,11 @@ function retry(state: SpotState): SpotState {
 
 /** Start from idle, or again from a failed start (the start panel is showing). */
 function start(state: SpotState, event: Extract<SpotEvent, { type: "start" }>): SpotState {
-  if (state.kind === "idle") return { kind: "starting", ...startRequest(event.key, event.rng, event.trainer) };
+  if (state.kind === "idle") return { kind: "starting", ...startRequest(event.key, event.rng, event.trainer, event.length) };
   if (state.kind !== "error" || state.context !== null) return state;
   const sameRequest = state.retry === "start" && state.start !== null && state.start.rng === event.rng;
   const key = sameRequest && state.start !== null ? state.start.key : event.key;
-  return { kind: "starting", ...startRequest(key, event.rng, event.trainer) };
+  return { kind: "starting", ...startRequest(key, event.rng, event.trainer, event.length) };
 }
 
 const ENDABLE: ReadonlySet<SpotStateKind> = new Set(["loading_prompt", "stale", "await_action", "feedback", "error"]);
@@ -272,9 +289,9 @@ export function transition(state: SpotState, event: SpotEvent): SpotState {
     case "decision_succeeded":
       return decisionSucceeded(state, event.feedback);
     case "next":
-      return leaveFeedback(state, false);
+      return leaveFeedback(state, false, event.endKey);
     case "auto_continue":
-      return leaveFeedback(state, true);
+      return leaveFeedback(state, true, event.endKey);
     case "end":
       return end(state, event.key);
     case "ended":

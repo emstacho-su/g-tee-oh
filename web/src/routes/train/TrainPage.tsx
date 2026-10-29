@@ -86,9 +86,12 @@ function TrainRun({ mode }: TrainPageProps) {
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under a dialog is not response time (O-284); the session pauses the timer for the table's
   // replay itself (O-381), at the normal speed (automated and holdout sessions have no run settings).
+  const setSessionLength = useSessionDefaultsStore((store) => store.setSessionLength);
   const session = useSpotSession({
     spec: startSpec(mode, defaults),
     paused: !interactive,
+    // The planned length applies to automated training; the holdout round has its own size (S46, R3.31).
+    sessionLength: mode === "automated" ? defaults.sessionLength : null,
     onPrompt: (prompt) => setMarks((current) => withMark(current, prompt)),
   });
   const { state } = session;
@@ -117,7 +120,9 @@ function TrainRun({ mode }: TrainPageProps) {
       {state.kind === "error" ? <TrainAlert mode={mode} problem={state.problem} onStart={startPanel} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} /> : null}
       {state.kind === "error" && startPanel && mode === "automated" ? <NoCoverageNote problem={state.problem} /> : null}
       {state.kind === "ended" ? <TrainingRecap recap={state.recap} onTrainAgain={trainAgain} {...(trackNames === undefined ? {} : { trackNames })} /> : null}
-      {startPanel && mode === "automated" ? <AutomatedStart defaults={defaults} starting={starting} onStart={() => session.start(rng)} /> : null}
+      {startPanel && mode === "automated" ? (
+        <AutomatedStart defaults={defaults} onSessionLengthChange={setSessionLength} starting={starting} onStart={() => session.start(rng)} />
+      ) : null}
       {startPanel && mode === "holdout" ? <HoldoutStart starting={starting} onStart={() => session.start(false)} /> : null}
       {state.kind !== "ended" && !startPanel ? (
         <AutomatedSession

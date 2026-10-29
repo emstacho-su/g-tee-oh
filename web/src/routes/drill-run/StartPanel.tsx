@@ -2,7 +2,8 @@
  * The drill run's start panel (S25, S38, R3.13, O-283, O-288, O-346, A7 section 3): the drill's name,
  * then its grouping, stop rule and pause rule (S26, O-314; spot mode shows its fixed pause after
  * every action) as chips, named from src/drills/labels.ts as the library and the builder name them
- * (PR #30 review LOW 10), the Mixed-frequency mode switch and Start, all in one raised S36 Card.
+ * (PR #30 review LOW 10), the session length chooser (S46, R3.31, SessionLengthField), the
+ * Mixed-frequency mode switch and Start, all in one raised S36 Card.
  *
  * The switch starts at the drill's trainer.rng and only overrides it for this session (POST
  * /sessions settings.rng); turning it on asks the explainer to open on first use (the caller's
@@ -15,8 +16,10 @@ import { useId } from "react";
 import { Button, Card, CONTROL_EDGE_CLASS, LoadingNote, TACTILE_CLASS, cn } from "../../components/ui/index.js";
 import { GROUPING_LABELS, PAUSE_LABELS, STOP_RULE_LABELS } from "../../drills/labels.js";
 import { SPOT_MODE_SETTINGS } from "../../trainer/pause-rule.js";
+import type { SessionLength } from "../../trainer/session-length.js";
 import type { Drill, PauseRule } from "../../trainer/session-types.js";
 import { SESSION_TEXT } from "./labels.js";
+import { SessionLengthField } from "./SessionLengthField.js";
 import { SettingChips } from "./SessionLook.js";
 
 /** Spot mode always pauses on the reveal (O-284); the other modes follow trainer.pause (O-314). */
@@ -28,6 +31,9 @@ export interface StartPanelProps {
   drill: Drill;
   rng: boolean;
   onRngChange: (rng: boolean) => void;
+  /** The planned session length from the session defaults, and the change that writes it back (S46, R3.31). */
+  sessionLength: SessionLength;
+  onSessionLengthChange: (length: SessionLength) => void;
   onStart: () => void;
   starting: boolean;
 }
@@ -64,7 +70,7 @@ function RngSwitch({ checked, onChange, hintId }: RngSwitchProps) {
   );
 }
 
-export function StartPanel({ drill, rng, onRngChange, onStart, starting }: StartPanelProps) {
+export function StartPanel({ drill, rng, onRngChange, sessionLength, onSessionLengthChange, onStart, starting }: StartPanelProps) {
   const hintId = useId();
   const chips = [
     { name: SESSION_TEXT.grouping, value: GROUPING_LABELS[drill.trainer.grouping] },
@@ -74,6 +80,7 @@ export function StartPanel({ drill, rng, onRngChange, onStart, starting }: Start
   return (
     <Card title={drill.name} testId="start-panel" className="max-w-xl">
       <SettingChips label={SESSION_TEXT.drillSettings} chips={chips} />
+      <SessionLengthField value={sessionLength} onChange={onSessionLengthChange} />
       <div className="flex flex-col gap-2">
         <RngSwitch checked={rng} onChange={onRngChange} hintId={hintId} />
         <p id={hintId} className="text-sm text-muted">

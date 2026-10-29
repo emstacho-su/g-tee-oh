@@ -1,8 +1,11 @@
 /**
- * Session defaults for automated training (S32, R4.10, O-323, O-325): the grouping, Mixed-frequency mode and
- * configuration scope the /train start screen offers first. These are the only fields an automated
- * session's body may set (services/api/src/automated/settings.ts plus config_ids); a seed is never
- * a default, since a client seed makes a session unrated.
+ * Session defaults for automated training (S32, S46, R4.10, R3.31, O-323, O-325): the grouping,
+ * Mixed-frequency mode and configuration scope the /train start screen offers first, and the
+ * planned session length (Off, 10, 20 or 50 hands) both start panels offer; the length stays in
+ * the web (the session ends itself at the limit, O-472) and never enters the start body. The
+ * other three are the only fields an automated session's body may set
+ * (services/api/src/automated/settings.ts plus config_ids); a seed is never a default, since a
+ * client seed makes a session unrated.
  *
  * Mechanism: a zustand store persisted under "gto-session-defaults" through guarded storage
  * (guarded-storage.ts), so a storage failure only means the defaults are not remembered. A stored
@@ -14,6 +17,7 @@
 import { create } from "zustand";
 
 import type { Grouping } from "../contracts.js";
+import { SESSION_LENGTHS, isSessionLength, type SessionLength } from "../trainer/session-length.js";
 import { defaultStorage, isRecord, readJson, writeJson } from "./guarded-storage.js";
 import { SESSION_DEFAULTS_STORAGE_KEY } from "./preference-keys.js";
 
@@ -37,9 +41,11 @@ export interface SessionDefaults {
   readonly grouping: Grouping;
   readonly rng: boolean;
   readonly configScope: ConfigScope;
+  /** The planned session length in hands, or null for no limit (S46, R3.31). */
+  readonly sessionLength: SessionLength;
 }
 
-export const DEFAULT_SESSION_DEFAULTS: SessionDefaults = { grouping: "standard", rng: false, configScope: ALL_CONFIGS };
+export const DEFAULT_SESSION_DEFAULTS: SessionDefaults = { grouping: "standard", rng: false, configScope: ALL_CONFIGS, sessionLength: null };
 
 export interface SessionDefaultsEnvironment {
   storage?: Storage | null;
@@ -50,6 +56,7 @@ export interface SessionDefaultsState {
   setGrouping: (grouping: Grouping) => void;
   setRng: (rng: boolean) => void;
   setConfigScope: (scope: ConfigScope) => void;
+  setSessionLength: (length: SessionLength) => void;
 }
 
 export function isGrouping(value: unknown): value is Grouping {
@@ -67,11 +74,12 @@ export function isConfigScope(value: unknown): value is ConfigScope {
 /** Validates a stored value field by field; a field that fails takes its default. */
 export function parseSessionDefaults(value: unknown): SessionDefaults {
   if (!isRecord(value)) return DEFAULT_SESSION_DEFAULTS;
-  const { grouping, rng, configScope } = value;
+  const { grouping, rng, configScope, sessionLength } = value;
   return {
     grouping: isGrouping(grouping) ? grouping : DEFAULT_SESSION_DEFAULTS.grouping,
     rng: typeof rng === "boolean" ? rng : DEFAULT_SESSION_DEFAULTS.rng,
     configScope: isConfigScope(configScope) ? (configScope === ALL_CONFIGS ? ALL_CONFIGS : [...configScope]) : DEFAULT_SESSION_DEFAULTS.configScope,
+    sessionLength: isSessionLength(sessionLength) ? sessionLength : DEFAULT_SESSION_DEFAULTS.sessionLength,
   };
 }
 
@@ -98,6 +106,10 @@ export function createSessionDefaultsStore(environment: SessionDefaultsEnvironme
       setConfigScope: (scope) => {
         if (!isConfigScope(scope)) throw new RangeError(`the configuration scope is "all" or 1 to ${MAX_SCOPE_CONFIGS} distinct config ids`);
         save({ configScope: scope === ALL_CONFIGS ? ALL_CONFIGS : [...scope] });
+      },
+      setSessionLength: (length) => {
+        if (!isSessionLength(length)) throw new RangeError(`the session length is null or one of ${SESSION_LENGTHS.join(", ")} hands`);
+        save({ sessionLength: length });
       },
     };
   });

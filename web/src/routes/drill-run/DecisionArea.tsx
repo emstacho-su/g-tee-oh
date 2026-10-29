@@ -34,6 +34,7 @@ import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js"
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
 import { unratedReason } from "../../trainer/unrated-reason.js";
@@ -84,9 +85,11 @@ function chosenIndexOf(state: SpotState): number | null {
 
 function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
+  // On the last planned hand's reveal Next finishes the session (S46, R3.31).
+  const nextLabel = atSessionLimit(state) ? SESSION_TEXT.finishSession : SESSION_TEXT.nextHand;
   // N and Enter both go on (S46, R3.30, design rule 9).
-  useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
-  useHotkey({ key: NEXT_HAND_ENTER_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  useHotkey({ key: NEXT_HAND_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  useHotkey({ key: NEXT_HAND_ENTER_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
   const { feedback, decision, context } = state;
   // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
@@ -110,7 +113,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
         <kbd aria-hidden="true" className="font-mono text-xs">
           {NEXT_HAND_KEY}
         </kbd>
-        {SESSION_TEXT.nextHand}
+        {nextLabel}
       </Button>
       {continuesByItself ? (
         <ResultChip feedback={feedback} actions={prompt.buttons} chosenIndex={decision.actionIndex} />

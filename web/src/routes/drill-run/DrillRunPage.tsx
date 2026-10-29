@@ -31,6 +31,7 @@ import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../compon
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
+import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
@@ -140,6 +141,9 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   // S27: More info and Ask dialogs pause the screen like the explainer and the end confirm.
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
+  // The planned length lives in the session defaults (S46, R3.31) and is read into the session at Start.
+  const sessionLength = useSessionDefaultsStore((store) => store.defaults.sessionLength);
+  const setSessionLength = useSessionDefaultsStore((store) => store.setSessionLength);
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284); the session pauses
@@ -148,6 +152,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
     spec: { mode: "drill", drillId: drill.id, seed },
     paused: !interactive,
     trainer: runSettingsOf(drill.trainer),
+    sessionLength,
   });
   const { state } = session;
   const startPanel = onStartPanel(state);
@@ -174,7 +179,15 @@ function DrillRun({ drill, seed }: DrillRunProps) {
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
       {startPanel ? (
-        <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />
+        <StartPanel
+          drill={drill}
+          rng={rng}
+          onRngChange={changeRng}
+          sessionLength={sessionLength}
+          onSessionLengthChange={setSessionLength}
+          onStart={() => session.start(rng)}
+          starting={state.kind === "starting"}
+        />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
         <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />
