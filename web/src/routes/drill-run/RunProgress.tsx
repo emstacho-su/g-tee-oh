@@ -3,7 +3,8 @@
  * the session context: the covered-part note when POST /sessions queued part of the drill (every
  * mode), and the hand counter: in street and full-hand modes the hand and decision counter, and in
  * every mode "Hand 7 of 20" once a session length is planned (S46). Spot mode without a length
- * shows no counter, as in S26.
+ * shows no counter, as in S26. SessionHandCounter holds that one rule; /train renders it too
+ * (PR #45 review round 2, cleanup 9).
  *
  * S40 (O-352): how the last hand ended is no longer shown; the api logs each finished hand under the
  * user's account (hand_record) instead.
@@ -17,15 +18,20 @@ export interface RunProgressProps {
   context: SessionContext;
 }
 
-export function RunProgress({ context }: RunProgressProps) {
+/** The hand counter by the one rule: street modes always, one-decision modes only with a length. */
+export function SessionHandCounter({ context }: RunProgressProps) {
   const spotMode = (context.trainer?.stop_rule ?? "after_action") === "after_action";
   const length = sessionLengthOf(context);
   const hand = context.hand;
-  const shown = hand !== undefined && (!spotMode || length !== null);
+  if (hand === undefined || (spotMode && length === null)) return null;
+  return <HandCounter progress={hand} length={length} decision={!spotMode} />;
+}
+
+export function RunProgress({ context }: RunProgressProps) {
   return (
     <>
       <CoverageNote coverage={context.session.coverage} />
-      {shown ? <HandCounter progress={hand} length={length} decision={!spotMode} /> : null}
+      <SessionHandCounter context={context} />
     </>
   );
 }

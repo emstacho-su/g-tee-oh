@@ -12,15 +12,14 @@
  * the start panel Start is the retry.
  */
 import { DecisionArea } from "../drill-run/DecisionArea.js";
-import { HandCounter } from "../drill-run/HandCounter.js";
 import { END_SESSION_BINDING, SESSION_TEXT } from "../drill-run/labels.js";
+import { SessionHandCounter } from "../drill-run/RunProgress.js";
 import { SpotTable } from "../drill-run/SpotTable.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { displayBinding } from "../../hotkeys/index.js";
 import type { TrackKey } from "../../progress/types.js";
 import { useFeedbackSections } from "../../components/trainer/index.js";
-import { sessionLengthOf } from "../../trainer/session-length.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
 import type { SpotSession } from "../../trainer/use-spot-session.js";
@@ -91,8 +90,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
       {context === null ? null : (
         <BlockBanner block={block} holdout={holdout} ratedEligible={context.session.rated_eligible} {...(trackNames === undefined ? {} : { trackNames })} />
       )}
-      {/* "Hand 7 of 20" once a session length is planned (S46, R3.31); one decision per hand here, so no decision number. */}
-      {context?.hand !== undefined && sessionLengthOf(context) !== null ? <HandCounter progress={context.hand} length={sessionLengthOf(context)} decision={false} /> : null}
+      {/* "Hand 7 of 20" once a session length is planned (S46, R3.31), by the drill run's one rule. */}
+      {context === null ? null : <SessionHandCounter context={context} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>

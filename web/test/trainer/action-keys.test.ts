@@ -8,9 +8,9 @@ import { describe, expect, it } from "vitest";
 import { KIND_KEYS, SIZE_KINDS, actionHotkeys } from "../../src/components/trainer/action-keys.js";
 import type { NodeAction } from "../../src/contracts.js";
 import { fixtureActions } from "../../src/fixtures/index.js";
-import { END_SESSION_KEY, NEXT_HAND_KEY, REPEAT_HAND_KEY } from "../../src/routes/drill-run/labels.js";
+import { END_SESSION_KEY, NEXT_HAND_KEY } from "../../src/routes/drill-run/labels.js";
 import { RNG_EXPLAINER_KEY } from "../../src/components/trainer/use-rng-explainer.js";
-import { SHORTCUTS_KEY } from "../../src/hotkeys/index.js";
+import { REPEAT_HAND_KEY, SHORTCUTS_KEY } from "../../src/hotkeys/index.js";
 
 function action(index: number, kind: NodeAction["kind"], size: number | null = null): NodeAction {
   return { index, token: `${kind}${index}`, kind, size_cbb: size, bucket: null, label: `${kind} ${index}`, next_node_key: null };

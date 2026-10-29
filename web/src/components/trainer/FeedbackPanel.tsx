@@ -109,7 +109,7 @@ export function FeedbackPanel(props: FeedbackPanelProps) {
       className={cn("flex w-full min-w-0 max-w-md flex-col gap-3 rounded-2xl border border-border/50 bg-surface-raised p-3 sm:p-4", RAISED_CLASS)}
     >
       <FeedbackSummary feedback={feedback} actions={actions} chosen={chosen} unratedReason={unratedReason} />
-      {explain === undefined ? null : explain}
+      {explain}
       <div className="flex flex-col gap-2">
         {FEEDBACK_SECTION_ORDER.map((key) => {
           const body = bodies[key];

@@ -8,14 +8,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { GRADE_DEFINITIONS, GRADE_ROLL_NOTE, GRADE_TIP_SUBJECT, GradeTip } from "../../src/components/trainer/grade-definitions.js";
-import { GRADE_DEFINITIONS as LABELS_DEFINITIONS } from "../../src/routes/drill-run/labels.js";
 
 const LABELS = ["best", "correct", "inaccuracy", "mistake", "blunder"] as const;
 
 describe("R3.8 grade definitions", () => {
-  it("R3.8 defines every label once, in words, and the drill run labels read the same map", () => {
+  it("R3.8 defines every label once, in words", () => {
     expect(Object.keys(GRADE_DEFINITIONS).sort()).toEqual([...LABELS].sort());
-    expect(LABELS_DEFINITIONS).toBe(GRADE_DEFINITIONS);
     for (const label of LABELS) expect(GRADE_DEFINITIONS[label].length).toBeGreaterThan(20);
   });
 
@@ -51,11 +49,10 @@ describe("R3.8 grade definitions", () => {
 });
 
 describe("R3.13 PR #45 review round 1, finding 9b: one source of label names and marks", () => {
-  it("R3.13 the result labels are the mark and the name from grade-definitions", async () => {
-    const { RESULT_LABELS } = await import("../../src/routes/drill-run/labels.js");
-    const { GRADE_NAMES, GRADE_SYMBOLS } = await import("../../src/components/trainer/grade-definitions.js");
-    for (const label of LABELS) expect(RESULT_LABELS[label]).toBe(`${GRADE_SYMBOLS[label]} ${GRADE_NAMES[label]}`);
-    expect(RESULT_LABELS.best).toBe("★ Best");
-    expect(RESULT_LABELS.blunder).toBe("?? Blunder");
+  it("R3.13 the label with its mark is built from the one map of names and marks", async () => {
+    const { GRADE_NAMES, GRADE_SYMBOLS, gradeWithMark } = await import("../../src/components/trainer/grade-definitions.js");
+    for (const label of LABELS) expect(gradeWithMark(label)).toBe(`${GRADE_SYMBOLS[label]} ${GRADE_NAMES[label]}`);
+    expect(gradeWithMark("best")).toBe("★ Best");
+    expect(gradeWithMark("blunder")).toBe("?? Blunder");
   });
 });
