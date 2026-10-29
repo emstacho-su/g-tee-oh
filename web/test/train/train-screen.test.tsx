@@ -276,3 +276,17 @@ describe("R3.31 session length on /train", () => {
     expect(screen.queryByTestId("hand-counter")).not.toBeInTheDocument();
   });
 });
+
+describe("R3.32 tally on /train", () => {
+  it("R3.32 the tally stands under the banner from the first prompt and ticks on the reveal", async () => {
+    await renderTrain("automated", automatedScript());
+    await userEvent.click(screen.getByRole("button", { name: "Start training" }));
+    await screen.findByRole("group", { name: "Actions" });
+    expect(screen.getByTestId("session-tally")).toHaveTextContent("Decisions0");
+    await decide();
+    const tally = screen.getByTestId("session-tally");
+    expect(tally).toHaveTextContent("Decisions1");
+    expect(tally).toHaveTextContent("Rated1");
+    expect(screen.getByTestId("session-history")).toHaveTextContent("1 decision");
+  });
+});

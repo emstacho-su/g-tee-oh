@@ -139,7 +139,7 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await openSection(user, "Seats");
     expect(within(group("Hero positions")).getByRole("checkbox", { name: "BTN" })).toBeChecked();
     await openSection(user, "Panels");
-    await user.click(within(group("Panels shown after a decision")).getByRole("checkbox", { name: "Streak counter" }));
+    await user.click(within(group("Panels shown after a decision")).getByRole("checkbox", { name: "Run counter" }));
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     await waitFor(() => expect(screen.getByTestId("builder-status")).toHaveTextContent("Changes saved."));
     const patch = sent("PATCH", `/api/v1/drills/${FIXTURE_DRILL_ID}`)[0]?.body;

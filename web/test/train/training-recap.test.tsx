@@ -60,6 +60,10 @@ describe("R4.10 training recap", () => {
     expect(within(summary).getByRole("button", { name: "About mean score" })).toBeInTheDocument();
     expect(within(summary).getByRole("button", { name: "About rated decisions" })).toBeInTheDocument();
     expect(within(summary).getByRole("button", { name: "About EV loss" })).toBeInTheDocument();
+    // S46 (R3.32): the five label counts from the session's own tally follow the api's tiles.
+    // This session ends before any decision, so every count is zero.
+    expect(within(recap).getByTestId("recap-label-counts")).toHaveTextContent("Inaccuracy0");
+    expect(within(recap).getByTestId("recap-label-counts")).toHaveTextContent("Best0");
   });
 
   it("R4.10 R3.13 the rating cards give each track before and after with RD, new for a first rating, and the change (S38: cards, not a table)", async () => {

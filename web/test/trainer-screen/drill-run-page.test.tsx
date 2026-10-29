@@ -514,3 +514,39 @@ describe("R3.30 PR #45 review round 1, finding 2: Enter on a focused control is 
     expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
   });
 });
+
+describe("R3.32 tally and history on the drill run", () => {
+  it("R3.32 the tally stands above the table from the first prompt and ticks on the reveal; a history row reopens the decision read-only", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    expect(screen.getByTestId("session-tally")).toHaveTextContent("Decisions0");
+    await chooseRaise(view);
+    await screen.findByTestId("feedback-panel");
+    const tally = screen.getByTestId("session-tally");
+    expect(tally).toHaveTextContent("Decisions1");
+    expect(tally).toHaveTextContent("Inaccuracy1");
+    expect(tally).toHaveTextContent("Rated0");
+    expect(tally).not.toHaveTextContent("Run");
+    expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();
+    const history = screen.getByTestId("session-history");
+    await userEvent.click(within(history).getByRole("button", { name: /This session/ }));
+    const [row] = within(history).getAllByTestId("history-row") as [HTMLElement];
+    expect(row).toHaveTextContent("Hand 1");
+    expect(row).toHaveTextContent("Inaccuracy");
+    await userEvent.click(within(row).getByRole("button", { name: /Hand 1/ }));
+    expect(within(row).getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise 2.5bb");
+    expect(screen.getAllByTestId("feedback-panel")).toHaveLength(2);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("R3.32 the recap carries the five label counts from the tally", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await playToFeedback(view);
+    await userEvent.click(screen.getByRole("button", { name: "End session" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
+    const recap = await screen.findByRole("region", { name: "Session recap" });
+    const counts = within(recap).getByTestId("recap-label-counts");
+    expect(counts).toHaveTextContent("Inaccuracy1");
+    expect(counts).toHaveTextContent("Best0");
+  });
+});

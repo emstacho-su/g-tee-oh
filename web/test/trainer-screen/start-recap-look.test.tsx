@@ -73,3 +73,19 @@ describe("R3.13 drill recap look (S38)", () => {
     expect(within(alert).getByRole("button", { name: "Try again" })).toBeEnabled();
   });
 });
+
+describe("R3.32 recap label counts", () => {
+  it("R3.32 the drill recap adds the five label counts from the session's tally, each with the grade tip", () => {
+    const tally = { decisions: 3, counts: { best: 1, correct: 1, inaccuracy: 1, mistake: 0, blunder: 0 }, rated: 3, evLossTotalBb: 0.19, evLossMeanBb: 0.0633, run: 0 };
+    render(<SessionRecapView recap={fixtureRecap} tally={tally} onStartAnother={vi.fn()} />);
+    const counts = within(screen.getByRole("region", { name: "Session recap" })).getByTestId("recap-label-counts");
+    const tiles = within(counts).getAllByTestId("stat-tile").map((tile) => `${within(tile).getByRole("term").textContent}${within(tile).getByRole("definition").textContent}`);
+    expect(tiles).toEqual(["Best1", "Correct1", "Inaccuracy1", "Mistake0", "Blunder0"]);
+    expect(within(counts).getAllByRole("button", { name: "About grade labels" })).toHaveLength(5);
+  });
+
+  it("R3.32 without a tally the recap shows the api's four tiles only", () => {
+    render(<SessionRecapView recap={fixtureRecap} onStartAnother={vi.fn()} />);
+    expect(screen.queryByTestId("recap-label-counts")).not.toBeInTheDocument();
+  });
+});
