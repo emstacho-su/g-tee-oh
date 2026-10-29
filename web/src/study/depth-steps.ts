@@ -11,7 +11,7 @@
  * until they arrive. A line the deeper tree does not hold reaches the node read's 404 path, which
  * offers LineEscape. No depth is computed: they are the catalog's values.
  */
-import { resolveConfigId } from "./filters.js";
+import { resolveConfigId, withoutNodeChoices } from "./filters.js";
 import type { GameConfig, PositionPairEntry } from "./queries.js";
 import { validateStudySearch, type StudySearch } from "./search.js";
 
@@ -64,7 +64,10 @@ export function depthNeighbours(depths: readonly number[], current: number | und
   };
 }
 
-/** The search at another depth, every other parameter kept (O-467). */
+/**
+ * The search at another depth: the line, hand and mode kept (O-467); the action filters and the lens
+ * dropped, since an action index names another action in another tree (code review).
+ */
 export function withDepth(search: StudySearch, depth: number): StudySearch {
-  return validateStudySearch({ ...search, depth });
+  return withoutNodeChoices(validateStudySearch({ ...search, depth }));
 }

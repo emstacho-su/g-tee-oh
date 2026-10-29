@@ -118,9 +118,21 @@ export function withFilter(search: StudySearch, key: FilterKey, raw: string): St
   return validateStudySearch(raw === "" ? base : { ...base, [key]: raw });
 }
 
-/** The search at another line of the same pair; "" is the root. The hand stays selected. */
+/**
+ * The choices that name a NodeAction.index (the action filters and the compared action), which
+ * belong to one node: at another node the same index names another action, so every change of node
+ * drops them (S45 code review, O-468). The mode and the hand stay.
+ */
+export const NODE_CHOICE_KEYS: readonly (keyof StudySearch)[] = ["filters", "lens"];
+
+/** The search without the node's own choices (NODE_CHOICE_KEYS). */
+export function withoutNodeChoices(search: StudySearch): StudySearch {
+  return validateStudySearch(without(search, NODE_CHOICE_KEYS));
+}
+
+/** The search at another line of the same pair; "" is the root. The hand stays; the filters and lens go. */
 export function withLine(search: StudySearch, line: string): StudySearch {
-  const base = without(search, ["line"]);
+  const base = without(search, ["line", ...NODE_CHOICE_KEYS]);
   return validateStudySearch(line === "" ? base : { ...base, line });
 }
 

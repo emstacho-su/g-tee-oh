@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { nextFilterState, parseFilters, withFilters } from "../../src/study/action-filters.js";
+import { withLine } from "../../src/study/filters.js";
 import { validateStudySearch } from "../../src/study/search.js";
 
 describe("R3.12 the filters parameter", () => {
@@ -28,6 +29,14 @@ describe("R3.12 the filters parameter", () => {
   it("R3.12 withFilters writes the sorted set and removes the parameter when the set is empty", () => {
     expect(withFilters({ pair: "BB-BTN", line: "r250" }, [2, 0])).toEqual({ pair: "BB-BTN", line: "r250", filters: "0,2" });
     expect(withFilters({ pair: "BB-BTN", filters: "0,2" }, [])).toEqual({ pair: "BB-BTN" });
+  });
+});
+
+describe("R3.12 filters belong to one node (O-468, code review)", () => {
+  it("R3.12 withLine drops the filters and the lens and keeps the mode and the hand", () => {
+    const search = { pair: "BB-BTN", mode: "compare" as const, lens: 2, filters: "0,2", hand: "AKs" };
+    expect(withLine(search, "r250")).toEqual({ pair: "BB-BTN", mode: "compare", hand: "AKs", line: "r250" });
+    expect(withLine({ ...search, line: "r250" }, "")).toEqual({ pair: "BB-BTN", mode: "compare", hand: "AKs" });
   });
 });
 

@@ -290,11 +290,15 @@ describe("R3.12 study settings and the URL", () => {
     });
   });
 
-  it("R3.12 Confirm with only the depth or the stake changed keeps the line, hand, mode, lens and filters (O-467)", () => {
+  it("R3.12 Confirm with only the depth or the stake changed keeps the line, hand and mode and drops the filters and lens (O-467, code review)", () => {
     const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "compare" as const, lens: 2, filters: "2" };
     expect(searchFromDraft(search, { ...ONLINE_100, depth: 20000, first: "BTN", against: "BB" }, "BB-BTN")).toEqual({
-      ...search,
+      ...ONLINE_100,
+      pair: "BB-BTN",
       depth: 20000,
+      line: "r250",
+      hand: "AKs",
+      mode: "compare",
     });
   });
 

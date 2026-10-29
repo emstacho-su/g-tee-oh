@@ -8,9 +8,11 @@
  * the click rule: a row toggles its own index; a second row clicked while exactly one is selected
  * opens Compare to Best on that row and keeps both, so "how does calling compare to raising here"
  * is two clicks; with two or more selected a click only adds or removes. The set travels with
- * replace and survives a line change (withLine keeps every other parameter), which is the
- * reference tool's keep-filters default without a buried preference. Indexes that name no action
- * at a node are ignored where they are read, never rewritten, so a stale link still opens.
+ * replace and stays through mode and hand changes, but it belongs to one node: a line, depth or
+ * stake change drops it with the lens (filters.ts withoutNodeChoices), because a NodeAction.index
+ * names another action at another node (code review; carrying a filter by action kind needs the
+ * next node's actions and is deferred, O-468). Indexes that name no action at a node are ignored
+ * where they are read (knownFilters), never rewritten, so a stale link still opens.
  */
 import { validateStudySearch, type StudySearch } from "./search.js";
 

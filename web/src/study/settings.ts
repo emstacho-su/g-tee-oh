@@ -10,7 +10,7 @@
  * pairs load. confirmBlocker names the first thing in field order that stops Confirm.
  */
 import { formatCbb } from "../poker/format.js";
-import { FORMAT_OPTIONS } from "./filters.js";
+import { FORMAT_OPTIONS, withoutNodeChoices } from "./filters.js";
 import { potTypeLabel } from "./pot-type.js";
 import type { Stake } from "./queries.js";
 import { validateStudySearch, type StudySearch } from "./search.js";
@@ -222,7 +222,7 @@ const SPOT_KEYS = ["format", "table_size", "pair"] as const;
 
 /**
  * The search Confirm writes. Unchanged settings keep the line, the hand and the mode. A change of
- * only the depth or the stake keeps the line, the hand, the mode, the lens and the filters too
+ * only the depth or the stake keeps the line, the hand and the mode too (not the action filters or the lens)
  * (S45, O-467): Confirm is only possible when the new configuration covers the pair, and a line the
  * new tree lacks reaches the node read's 404 path with its way back. Any other change starts at the
  * new pair's root with no hand, keeping only the matrix mode.
@@ -232,7 +232,8 @@ export function searchFromDraft(search: StudySearch, draft: SettingsDraft, pair:
     definedOnly({ format: draft.format, table_size: draft.table_size, stake: draft.stake, depth: draft.depth, pair }),
   );
   if (settingsSignature(settings) === settingsSignature(search)) return search;
-  if (SPOT_KEYS.every((key) => settings[key] === search[key])) return validateStudySearch({ ...search, ...settings });
+  // The filters and the lens name action indexes of the old tree, so they go (code review).
+  if (SPOT_KEYS.every((key) => settings[key] === search[key])) return withoutNodeChoices({ ...search, ...settings });
   return validateStudySearch({ ...settings, mode: search.mode });
 }
 

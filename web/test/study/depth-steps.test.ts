@@ -37,8 +37,8 @@ describe("R3.12 depth steps at the current line (O-467)", () => {
     expect(depthNeighbours([], undefined)).toEqual({ deeper: undefined, shallower: undefined });
   });
 
-  it("R3.12 withDepth keeps the line, hand, lens, mode and filters", () => {
+  it("R3.12 withDepth keeps the line, hand and mode and drops the filters and the lens (code review)", () => {
     const search = { ...SEARCH, line: "r250", hand: "AKs", mode: "compare" as const, lens: 2, filters: "0,2" };
-    expect(withDepth(search, 20000)).toEqual({ ...search, depth: 20000 });
+    expect(withDepth(search, 20000)).toEqual({ ...SEARCH, depth: 20000, line: "r250", hand: "AKs", mode: "compare" });
   });
 });

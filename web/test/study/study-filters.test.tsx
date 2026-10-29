@@ -64,13 +64,23 @@ describe("R3.12 action rows filter the matrix", () => {
     expect(screen.queryByRole("list", { name: "Active filters" })).not.toBeInTheDocument();
   });
 
-  it("R3.12 the set survives a line change", async () => {
+  it("R3.12 a line change drops the filters and the lens: an index names another action at the next node (code review)", async () => {
     const user = userEvent.setup();
-    const { router } = renderStudy(`${BASE}&filters=2`);
+    const { router } = renderStudy(`${BASE}&filters=2&mode=compare&lens=2`);
     await rangeTable();
     const actions = await screen.findByRole("region", { name: /'s actions$/ });
     await user.click(within(actions).getByRole("button", { name: /^Raise to 2.5bb/ }));
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ line: FIXTURE_CHILD_LINE, filters: "2" }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ line: FIXTURE_CHILD_LINE, mode: "compare" }));
+    expect(router.state.location.search).not.toHaveProperty("filters");
+    expect(router.state.location.search).not.toHaveProperty("lens");
+  });
+
+  it("R3.12 a mode or hand change keeps the filters and the lens", async () => {
+    const user = userEvent.setup();
+    const { router } = renderStudy(`${BASE}&filters=2&mode=compare&lens=2`);
+    await rangeTable();
+    await user.click(screen.getByRole("radio", { name: "Strategy with EV" }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ mode: "strategy_ev", filters: "2", lens: "2" }));
   });
 
   it("R3.12 a second row clicked while exactly one is selected opens Compare to Best on that row with both kept (O-468)", async () => {
