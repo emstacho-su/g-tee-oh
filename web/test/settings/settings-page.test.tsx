@@ -137,10 +137,14 @@ describe("R4.14 /settings cosmetics", () => {
     const backs = await within(cosmetics).findByRole("group", { name: "Card back" });
     expect(within(backs).getByRole("radio", { name: /^None/ })).toBeChecked();
     expect(within(backs).getByRole("radio", { name: /Fourteen-day streak card back/ })).toBeEnabled();
+    // Locked items fold behind "Show N locked" per slot and keep their unlock rule (S47 critic G3).
+    expect(within(backs).queryByRole("radio", { name: /Sixty-day streak card back/ })).not.toBeInTheDocument();
+    await userEvent.click(within(backs).getByRole("button", { name: /^Show \d+ locked/ }));
     const sixty = within(backs).getByRole("radio", { name: /Sixty-day streak card back/ });
     expect(sixty).toBeDisabled();
     expect(sixty).toHaveAccessibleDescription("Locked: Reach a 60-day streak");
     const felts = within(cosmetics).getByRole("group", { name: "Table felt" });
+    await userEvent.click(within(felts).getByRole("button", { name: /^Show \d+ locked/ }));
     expect(within(felts).getByRole("radio", { name: /Tier V felt/ })).toBeDisabled();
     expect(within(felts).getByText("Locked: Reach Tier V")).toBeInTheDocument();
     expect(within(cosmetics).getByRole("group", { name: "Badge" })).toBeInTheDocument();

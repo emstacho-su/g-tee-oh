@@ -5,6 +5,9 @@
  * are disabled and say "Locked" with a lock glyph and the rule that unlocks them. Every option has
  * a small preview: a face-down card for card backs, a felt swatch for felts, the pill for badges.
  *
+ * S47 critic G3: a slot lists None and its unlocked items; the locked ones fold behind "Show N
+ * locked", each still naming its rule.
+ *
  * Mechanism: the choice is written to the cosmetics store at once; CosmeticsRoot applies it across
  * the app. The previews set data-card-back or data-felt on their own wrapper, so styles.css paints
  * each one with its item whatever is equipped. Cosmetics change how the app looks and nothing else.
@@ -16,7 +19,7 @@ import { useAppApi } from "../../auth/index.js";
 import { BadgePill } from "../../cosmetics/BadgePill.js";
 import { cosmeticsOfKind, type CosmeticEntry, type CosmeticKind } from "../../cosmetics/catalog.js";
 import { CardView } from "../../components/table/index.js";
-import { LoadingNote, cn } from "../../components/ui/index.js";
+import { Disclosure, LoadingNote, cn } from "../../components/ui/index.js";
 import { streakQuery } from "../../progress/queries.js";
 import { COSMETIC_SLOTS, useCosmeticsStore } from "../../store/index.js";
 import { LoadError } from "../home-cards/LoadError.js";
@@ -94,27 +97,37 @@ function CosmeticOption({ kind, name, entry, unlocked, checked, onChoose }: Opti
   );
 }
 
+/** "Show 8 locked": the folded list of a slot's locked items, each still naming its unlock rule. */
+export function lockedFoldTitle(count: number): string {
+  return `Show ${count} locked`;
+}
+
 function CosmeticSlot({ kind, unlockedKeys }: { kind: CosmeticKind; unlockedKeys: ReadonlySet<string> }) {
   const choice = useCosmeticsStore((state) => state.choices[kind]);
   const equip = useCosmeticsStore((state) => state.equip);
   const name = useId();
+  const entries = cosmeticsOfKind(kind);
+  const open = entries.filter((entry) => unlockedKeys.has(entry.key));
+  const locked = entries.filter((entry) => !unlockedKeys.has(entry.key));
   return (
     <fieldset className="flex flex-col gap-1">
       <legend className="text-sm font-semibold">{COSMETIC_SLOT_TITLES[kind]}</legend>
       <ul className="flex flex-col gap-1">
         <CosmeticOption kind={kind} name={name} entry={null} unlocked checked={choice === null || !unlockedKeys.has(choice)} onChoose={() => equip(kind, null)} />
-        {cosmeticsOfKind(kind).map((entry) => (
-          <CosmeticOption
-            key={entry.key}
-            kind={kind}
-            name={name}
-            entry={entry}
-            unlocked={unlockedKeys.has(entry.key)}
-            checked={choice === entry.key && unlockedKeys.has(entry.key)}
-            onChoose={() => equip(kind, entry.key)}
-          />
+        {open.map((entry) => (
+          <CosmeticOption key={entry.key} kind={kind} name={name} entry={entry} unlocked checked={choice === entry.key} onChoose={() => equip(kind, entry.key)} />
         ))}
       </ul>
+      {/* Locked items fold away so the equipped choice stays near the top (S47 critic G3); each keeps its unlock rule. */}
+      {locked.length === 0 ? null : (
+        <Disclosure title={lockedFoldTitle(locked.length)} headingLevel={4} testId={`locked-${kind}`}>
+          <ul className="flex flex-col gap-1">
+            {locked.map((entry) => (
+              <CosmeticOption key={entry.key} kind={kind} name={name} entry={entry} unlocked={false} checked={false} onChoose={() => equip(kind, entry.key)} />
+            ))}
+          </ul>
+        </Disclosure>
+      )}
     </fieldset>
   );
 }
