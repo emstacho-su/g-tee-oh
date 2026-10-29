@@ -58,7 +58,7 @@ export interface StudyNodeAreaProps {
   onFiltersChange: (filters: readonly number[], compare?: number) => void;
   /** The S key: the spot settings panel (S45, O-466). */
   onOpenSettings: () => void;
-  /** The covered depths around this one, for the Up and Down keys (S45, O-467). */
+  /** The covered depths around this one, for the ] and [ keys (S45, O-467). */
   depths: DepthNeighbours;
   onDepthChange: (depth: number) => void;
 }
@@ -91,11 +91,11 @@ function LineCarousel({ api, configId, pair, seats, node, line, childStreets, on
   );
 }
 
-/** What the Up and Down keys do here, for screen readers. */
+/** What the ] and [ keys do here, for screen readers. */
 function depthStepText({ deeper, shallower }: DepthNeighbours): string {
   const up = deeper === undefined ? "no deeper depth covers this pair" : `opens ${formatCbb(deeper)}`;
   const down = shallower === undefined ? "no shallower depth covers this pair" : `opens ${formatCbb(shallower)}`;
-  return `Up arrow ${up}; Down arrow ${down}.`;
+  return `The ] key ${up}; the [ key ${down}.`;
 }
 
 /** A node with no actions, so the children's streets read nothing while the node loads or failed. */

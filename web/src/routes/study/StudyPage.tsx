@@ -147,7 +147,7 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   const confirmed = configId !== undefined && studyPair !== undefined && search.table_size !== undefined;
   const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
   useRecordSpot(search, confirmed);
-  // S45 (O-467): the covered depths around this one, for the Up and Down Study keys.
+  // S45 (O-467): the covered depths around this one, for the ] and [ Study keys.
   const depths = useDepthSteps(api, entry.catalog?.configs, search);
 
   const openSettings = () => {

@@ -1,5 +1,5 @@
 /**
- * Depth steps at the current line (S45, R3.12, O-467): the Up and Down Study keys move the same
+ * Depth steps at the current line (S45, R3.12, O-467): the ] and [ Study keys move the same
  * spot to the next deeper or shallower depth the library covers, keeping the line, the hand, the
  * lens and the filters, so one spot can be compared at two depths with one key.
  *

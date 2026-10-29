@@ -45,7 +45,7 @@ async function matrixShown(): Promise<void> {
 }
 
 describe("R3.12 Study keys move along the line", () => {
-  it("R3.12 Right follows the next likely action, Left steps back one decision, Home returns to the root", async () => {
+  it("R3.12 Right follows the next likely action, Left steps back one decision, R returns to the root", async () => {
     const { router } = renderStudy(BASE);
     await matrixShown();
     await screen.findByRole("region", { name: /'s actions$/ });
@@ -58,16 +58,16 @@ describe("R3.12 Study keys move along the line", () => {
     press("ArrowRight");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ line: FIXTURE_CHILD_LINE }));
     await matrixShown();
-    press("Home");
+    press("r");
     await waitFor(() => expect(router.state.location.search).not.toHaveProperty("line"));
   }, FLOW_TIMEOUT_MS);
 
-  it("R3.12 at the root Left and Home do nothing", async () => {
+  it("R3.12 at the root Left and R do nothing", async () => {
     const { router } = renderStudy(BASE);
     await matrixShown();
     const before = router.state.location.href;
     press("ArrowLeft");
-    press("Home");
+    press("r");
     expect(router.state.location.href).toBe(before);
   });
 
@@ -91,6 +91,18 @@ describe("R3.12 Study keys move along the line", () => {
     fireEvent.keyDown(grid, { key: "Escape" });
     expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
     expect(router.state.location.search).toMatchObject({ filters: "2" });
+  });
+
+  it("R3.12 a bare ArrowUp, ArrowDown or Home keeps scrolling the page: no Study key takes it (code review)", async () => {
+    const { router } = renderStudy(`${BASE}&line=${FIXTURE_CHILD_LINE}`);
+    await matrixShown();
+    await waitFor(() => expect(screen.getByTestId("depth-steps")).toHaveAttribute("data-deeper", "20000"));
+    const before = router.state.location.href;
+    for (const key of ["ArrowUp", "ArrowDown", "Home", "End", "PageDown"]) {
+      // fireEvent returns false when a listener called preventDefault.
+      expect(fireEvent.keyDown(document.body, { key }), key).toBe(true);
+    }
+    expect(router.state.location.href).toBe(before);
   });
 
   it("R3.12 dispatch leaves a keydown alone once a control prevented it", () => {
@@ -133,15 +145,15 @@ describe("R3.12 Study keys change the view", () => {
     expect(router.state.location.href).toBe(before);
   });
 
-  it("R3.12 Up steps to the deeper covered depth and Down back, keeping the mode and hand (O-467)", async () => {
+  it("R3.12 ] steps to the deeper covered depth and [ back, keeping the mode and hand (O-467)", async () => {
     const { router } = renderStudy(`${BASE}&mode=ev&hand=AKs`);
     await matrixShown();
     await waitFor(() => expect(screen.getByTestId("depth-steps")).toHaveAttribute("data-deeper", "20000"));
-    press("ArrowUp");
+    press("]");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ depth: "20000", mode: "ev", hand: "AKs" }));
     await matrixShown();
     await waitFor(() => expect(screen.getByTestId("depth-steps")).toHaveAttribute("data-shallower", "10000"));
-    press("ArrowDown");
+    press("[");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ depth: "10000", mode: "ev", hand: "AKs" }));
   });
 });
@@ -162,7 +174,7 @@ describe("R3.12 the Study rows are listed", () => {
 
   it("R3.12 the settings hotkey table lists every Study row", () => {
     for (const row of STUDY_HOTKEY_ROWS) expect(HOTKEY_ROWS).toContainEqual(row);
-    expect(STUDY_HOTKEY_ROWS.map((row) => row.key)).toEqual(["ArrowLeft", "ArrowRight", "Home", "ArrowUp", "ArrowDown", "M", "S", "Escape"]);
+    expect(STUDY_HOTKEY_ROWS.map((row) => row.key)).toEqual(["ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape"]);
   });
 });
 

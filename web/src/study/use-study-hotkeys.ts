@@ -1,8 +1,8 @@
 /**
  * Registers the Study keyboard scope while a confirmed spot is on screen (S45, R3.12, O-466,
  * O-467). Each binding is live only where it can act, so the ? overlay lists only keys that do
- * something here: Left and Home past the root, Right while the next likely action opens a preflop
- * node, M on a node with a matrix, Escape while action filters are set, Up and Down while a
+ * something here: Left and R past the root, Right while the next likely action opens a preflop
+ * node, M on a node with a matrix, Escape while action filters are set, ] and [ while a
  * neighbouring depth covers the pair. S is always live. The handlers are the screen's own
  * navigation (push for a line or depth change, replace for the mode and the filters), so a key does
  * exactly what the matching control does.

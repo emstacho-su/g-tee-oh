@@ -1,5 +1,5 @@
 /**
- * The covered depths around the address's depth, for the Up and Down Study keys (S45, R3.12,
+ * The covered depths around the address's depth, for the ] and [ Study keys (S45, R3.12,
  * O-467). Reads the pairs of every sibling configuration (the same format, table size and stake)
  * through pairsQuery, the query the settings panel already uses, so most reads are cache hits and the
  * rest are small catalog reads; depth-steps.ts does the rest, purely.

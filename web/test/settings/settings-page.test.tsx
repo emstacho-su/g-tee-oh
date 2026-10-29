@@ -186,7 +186,7 @@ describe("R4.12 /settings hotkeys and layout", () => {
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
     // S45 (O-466): the Study scope's rows follow the trainer and app rows.
     expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual([
-      "1 to 9", "N", "E", "I", "?", "ArrowLeft", "ArrowRight", "Home", "ArrowUp", "ArrowDown", "M", "S", "Escape",
+      "1 to 9", "N", "E", "I", "?", "ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape",
     ]);
     expect(rows[0]).toHaveTextContent("Choose an action and submit it");
     expect(rows[1]).toHaveTextContent("Next hand");

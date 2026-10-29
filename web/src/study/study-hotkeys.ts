@@ -3,10 +3,13 @@
  * use-study-hotkeys registers, the ? overlay (which lists whatever is registered) and the read-only
  * table on /settings (hotkey-table.ts spreads STUDY_HOTKEY_ROWS), so the three always agree.
  *
- * No global binding uses these keys (the trainer, quiz and drill scopes mount only on their own
- * routes). The arrows and Escape yield to a control that already handled the key: the range matrix
- * grid and the segmented controls prevent the arrows they use, and dispatch skips a prevented key.
- * Rebinding stays deferred (O-327).
+ * No binding in any scope uses these keys: the app-wide ? opens the overlay, and the trainer (1 to
+ * 9, N, E, I), quiz (Enter, N) and painter (digits) scopes mount only on their own routes. ArrowUp,
+ * ArrowDown and Home stay the browser's for scrolling (code review): depth steps are ] and [, and
+ * the root is R (O-466 as amended). ArrowLeft, ArrowRight and Escape yield to a control that
+ * already handled the key (the range matrix grid prevents its arrows and its pop-out's Escape, Radix
+ * segmented controls their arrows), because dispatch skips a prevented key. Rebinding stays
+ * deferred (O-327).
  */
 import { displayKey } from "../hotkeys/index.js";
 
@@ -15,9 +18,9 @@ export const STUDY_SCOPE = "Study";
 export const STUDY_KEYS = {
   back: "ArrowLeft",
   next: "ArrowRight",
-  root: "Home",
-  deeper: "ArrowUp",
-  shallower: "ArrowDown",
+  root: "r",
+  deeper: "]",
+  shallower: "[",
   mode: "m",
   settings: "s",
   clearFilters: "Escape",
