@@ -42,6 +42,8 @@ import {
 } from "../../study/settings.js";
 import { useStudyEntry, type StudyEntry } from "../../study/use-study-entry.js";
 import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-navigation.js";
+import { useDepthSteps } from "../../study/use-depth-steps.js";
+import { withDepth } from "../../study/depth-steps.js";
 import { StudyNodeArea } from "./StudyNodeArea.js";
 import { FailureAlert } from "./StudyNotices.js";
 import { SettingsSummary, StudySettingsPanel } from "./StudySettingsPanel.js";
@@ -115,6 +117,8 @@ function StudyScreen({ api, search }: StudyScreenProps) {
   const { configId, studyPair, catalogReads } = entry;
   const confirmed = configId !== undefined && studyPair !== undefined && search.table_size !== undefined;
   const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
+  // S45 (O-467): the covered depths around this one, for the Up and Down Study keys.
+  const depths = useDepthSteps(api, entry.catalog?.configs, search);
 
   const openSettings = () => {
     setDraft(draftFromSearch(search));
@@ -153,6 +157,9 @@ function StudyScreen({ api, search }: StudyScreenProps) {
           onOpenLine={navigation.openLine}
           onLensChange={navigation.setLens}
           onFiltersChange={navigation.setFilters}
+          onOpenSettings={openSettings}
+          depths={depths}
+          onDepthChange={(depth) => navigation.confirm(withDepth(search, depth))}
         />
       </>
     );

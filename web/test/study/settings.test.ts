@@ -273,13 +273,20 @@ describe("R3.12 study settings and the URL", () => {
     expect(draftFromSearch({})).toEqual({});
   });
 
-  it("R3.12 Confirm with changed settings clears the line and the hand and keeps the mode", () => {
-    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "ev" as const };
-    expect(searchFromDraft(search, { ...ONLINE_100, depth: 20000, first: "BTN", against: "BB" }, "BB-BTN")).toEqual({
+  it("R3.12 Confirm with a changed seat, size or format clears the line and the hand and keeps the mode", () => {
+    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "ev" as const, filters: "2" };
+    expect(searchFromDraft(search, { ...ONLINE_100, first: "SB", against: "BTN" }, "SB-BTN")).toEqual({
       ...ONLINE_100,
-      depth: 20000,
-      pair: "BB-BTN",
+      pair: "SB-BTN",
       mode: "ev",
+    });
+  });
+
+  it("R3.12 Confirm with only the depth or the stake changed keeps the line, hand, mode, lens and filters (O-467)", () => {
+    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "compare" as const, lens: 2, filters: "2" };
+    expect(searchFromDraft(search, { ...ONLINE_100, depth: 20000, first: "BTN", against: "BB" }, "BB-BTN")).toEqual({
+      ...search,
+      depth: 20000,
     });
   });
 

@@ -15,6 +15,8 @@ import { nodeJson, renderStudy } from "./render-study.js";
 
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
 const RANGE_TABLE = "Range by action at this node";
+/** Multi-step flows through the whole app; under a full parallel run they need more than the 5 s default. */
+const FLOW_TIMEOUT_MS = 15_000;
 
 let spies: { mockRestore: () => void }[] = [];
 
@@ -49,7 +51,7 @@ describe("R3.12 action rows filter the matrix", () => {
     expect(within(table).getByRole("button", { name: /Raise to 2.5bb/ })).toHaveAttribute("aria-pressed", "true");
     await user.click(within(table).getByRole("button", { name: /Raise to 2.5bb/ }));
     await waitFor(() => expect(router.state.location.search).not.toHaveProperty("filters"));
-  });
+  }, FLOW_TIMEOUT_MS);
 
   it("R3.12 the chip's x removes one filter and Clear empties the set", async () => {
     const user = userEvent.setup();

@@ -185,15 +185,22 @@ export function settingsSignature(search: StudySearch): string {
   return SEARCH_SETTING_KEYS.map((key) => String(search[key] ?? "")).join("|");
 }
 
+/** The settings whose change starts the spot afresh; a depth or stake change keeps the line (O-467). */
+const SPOT_KEYS = ["format", "table_size", "pair"] as const;
+
 /**
- * The search Confirm writes. Unchanged settings keep the line, the hand and the mode; changed
- * settings start at the new pair's root with no hand, keeping only the matrix mode.
+ * The search Confirm writes. Unchanged settings keep the line, the hand and the mode. A change of
+ * only the depth or the stake keeps the line, the hand, the mode, the lens and the filters too
+ * (S45, O-467): Confirm is only possible when the new configuration covers the pair, and a line the
+ * new tree lacks reaches the node read's 404 path with its way back. Any other change starts at the
+ * new pair's root with no hand, keeping only the matrix mode.
  */
 export function searchFromDraft(search: StudySearch, draft: SettingsDraft, pair: string): StudySearch {
   const settings = validateStudySearch(
     definedOnly({ format: draft.format, table_size: draft.table_size, stake: draft.stake, depth: draft.depth, pair }),
   );
   if (settingsSignature(settings) === settingsSignature(search)) return search;
+  if (SPOT_KEYS.every((key) => settings[key] === search[key])) return validateStudySearch({ ...search, ...settings });
   return validateStudySearch({ ...settings, mode: search.mode });
 }
 

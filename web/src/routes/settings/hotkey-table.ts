@@ -11,6 +11,7 @@ import { ACTION_SCOPE, MAX_HOTKEY_ACTIONS } from "../../components/trainer/index
 import { RNG_EXPLAINER_KEY, RNG_EXPLAINER_SCOPE, RNG_EXPLAINER_TITLE } from "../../components/trainer/use-rng-explainer.js";
 import { displayKey, GENERAL_SCOPE, SHORTCUTS_DESCRIPTION, SHORTCUTS_KEY } from "../../hotkeys/index.js";
 import { END_SESSION_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
+import { STUDY_HOTKEY_ROWS } from "../../study/study-hotkeys.js";
 
 const FIRST_ACTION_KEY = 1;
 
@@ -26,4 +27,5 @@ export const HOTKEY_ROWS: readonly HotkeyRow[] = [
   { key: END_SESSION_KEY, action: SESSION_TEXT.endSession, scope: SESSION_SCOPE },
   { key: displayKey(RNG_EXPLAINER_KEY), action: RNG_EXPLAINER_TITLE, scope: RNG_EXPLAINER_SCOPE },
   { key: SHORTCUTS_KEY, action: SHORTCUTS_DESCRIPTION, scope: GENERAL_SCOPE },
+  ...STUDY_HOTKEY_ROWS,
 ];
