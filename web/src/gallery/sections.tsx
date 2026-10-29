@@ -48,7 +48,7 @@ const SIX_MAX: readonly TableSeat[] = [
     chip: { label: "Raise 2.5bb", moving: false, durationMs: 0 },
   },
   { position: "CO", stackCbb: 10000, isHero: false, hasFolded: true, isButton: false, isStraddle: false },
-  { position: "BTN", stackCbb: 10000, isHero: true, hasFolded: false, isButton: true, isStraddle: false, cards: ["Ah", "Jd"] },
+  { position: "BTN", stackCbb: 10000, isHero: true, hasFolded: false, isButton: true, isStraddle: false, cards: ["Ah", "Jd"], active: true },
   { position: "SB", stackCbb: 9950, betCbb: 50, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
   { position: "BB", stackCbb: 9900, betCbb: 100, isHero: false, hasFolded: false, isButton: false, isStraddle: false },
 ];
@@ -97,14 +97,14 @@ export function TableSections() {
       <GallerySection
         name="poker-table-6"
         title="PokerTable, 6 seats"
-        note="Seat cards around the felt after the replay: the HJ open as a badge and a chip, hero on the button. Below 600 px of its own width the table turns portrait."
+        note="Seat cards around the felt after the replay: the HJ open as a badge and a chip, hero on the button and to act (the focus mark; the accent border stays). Below 600 px of its own width the table turns portrait."
       >
         <PokerTable seats={SIX_MAX} potCbb={fixturePrompt.pot_cbb} center={<BoardReveal cards={[]} />} />
       </GallerySection>
       <GallerySection
         name="poker-table-9"
         title="PokerTable, 9 seats with a straddle"
-        note="A straddled pot preflop after the replay: UTG straddle marker, HJ raise and BTN call chips; the chips clear when the flop's first action starts a new street."
+        note="A straddled pot preflop after the replay: UTG straddle marker, HJ raise and BTN call chips, hero in the cutoff (the accent mark); the chips clear when the flop's first action starts a new street."
       >
         <PokerTable seats={NINE_LIVE} potCbb={1150} center={<BoardReveal cards={[]} />} />
       </GallerySection>

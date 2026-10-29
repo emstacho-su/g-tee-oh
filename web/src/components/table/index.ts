@@ -1,6 +1,7 @@
 /** The poker table, its cards and the board (S24, S38, R3.13). */
 export { PokerTable, MAX_SEATS, MIN_SEATS } from "./PokerTable.js";
 export type { PokerTableProps } from "./PokerTable.js";
+export { ACTING_MARK_CLASS, HERO_MARK_CLASS } from "./Seat.js";
 export type { SeatChip, TableSeat } from "./Seat.js";
 export { CardView } from "./CardView.js";
 export type { CardSize, CardViewProps, SuitColor } from "./CardView.js";

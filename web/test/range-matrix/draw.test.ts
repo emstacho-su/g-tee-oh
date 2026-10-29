@@ -231,6 +231,21 @@ describe("R3.12 range matrix drawing", () => {
     expect(focused?.lineWidth).not.toBe(selected?.lineWidth);
   });
 
+  it("R3.13 O-434 the selected hand's outline has a halo of the ground inside it, as the focus ring does", () => {
+    for (const theme of ["light", "dark"] as const) {
+      const ops = draw(model, { selectedHand: "AKs", theme });
+      const strokes = ops.filter((op): op is Extract<RecordedOp, { op: "strokeRect" }> => op.op === "strokeRect");
+      const cell = cellRect(model.cells[1] as MatrixCell);
+      const selected = strokes.find((op) => op.style === MATRIX_PALETTES[theme].selected && inside(op, cell));
+      const halo = strokes.find((op) => op.style === MATRIX_PALETTES[theme].focusHalo && inside(op, cell));
+      expect(selected, theme).toBeDefined();
+      expect(halo, theme).toBeDefined();
+      // The halo sits inside the mark: a smaller rectangle drawn after it.
+      expect((halo?.w ?? Infinity) < (selected?.w ?? 0)).toBe(true);
+      expect(strokes.indexOf(halo as (typeof strokes)[number])).toBeGreaterThan(strokes.indexOf(selected as (typeof strokes)[number]));
+    }
+  });
+
   it("R3.12 draws no outline without focus or selection", () => {
     const ops = draw(model);
     const outlines = ops.filter(

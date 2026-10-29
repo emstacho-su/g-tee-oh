@@ -151,7 +151,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
         >
           <li
             aria-current="true"
-            class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)] outline outline-2 -outline-offset-2 outline-focus dark:shadow-[inset_0_0_0_4px_var(--focus-halo)]"
+            class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)] outline outline-2 -outline-offset-2 outline-focus shadow-[inset_0_0_0_4px_var(--focus-halo)]"
             data-action-index="0"
             data-range="1-40"
             style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px; width: 40%;"

@@ -1,7 +1,8 @@
-// Tests for the dark theme gates of scripts/check-contrast.mjs (S43, R3.13, O-430, O-432): the
-// neutral gray and black dark base, read colour by colour from every form CSS allows (failing
-// closed on a form it cannot read), and the dark focus ring, a neutral near-white with a halo of
-// the ground, against every solver fill it is drawn over. node:test, run by `pnpm run test:scripts`.
+// Tests for the S43 gates of scripts/check-contrast.mjs (R3.13, O-430, O-432 to O-434): the neutral
+// gray and black dark base, read colour by colour from every form CSS allows (failing closed on a
+// form it cannot read), and the marks drawn over solver fills in both themes: the focus ring (the
+// text colour with a halo of the raised ground) and the selection mark (--selected with the same
+// halo). node:test, run by `pnpm run test:scripts`.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,21 +10,22 @@ import { test } from "node:test";
 
 import {
   ACTION_STYLE_PATH,
+  EV_STEP_COUNT,
   GATING_PAIRS,
   MATRIX_THEME_PATH,
   NEUTRAL_DARK_TOKENS,
   NEUTRAL_MAX_SATURATION,
   STYLES_PATH,
   evaluate,
-  evaluateFocusRing,
   evaluateNeutral,
+  evaluateSelectionMark,
   hslSaturation,
   parseThemes,
   readActionColours,
   readEvSteps,
-  readFelts,
   readSizeShades,
   renderReport,
+  scanColours,
 } from "./check-contrast.mjs";
 
 const NEUTRAL_CSS = `
@@ -94,6 +96,23 @@ test("R3.13 O-430 review finding 3: percentage rgb() is read, and a colour form 
   assert.doesNotMatch(failures, /"transparent"/);
 });
 
+test("R3.13 O-430 review round 2 finding 7: none and the CSS-wide keywords are not colours and never fail the neutral gate", () => {
+  for (const value of ["none", "initial", "inherit", "unset", "revert", "revert-layer"]) {
+    const scan = scanColours(value);
+    assert.deepEqual([scan.colours, scan.unreadable], [[], []], value);
+  }
+  const css = ":root {\n  --shadow-raised: none;\n}\n\n.dark {\n  --shadow-press-rest: none, 0 1px 2px #000;\n}\n";
+  const result = evaluateNeutral(css, parseThemes(css), ["shadow-raised", "shadow-press-rest"]);
+  // A token that is only "none" holds no colour to check: it passes with an empty colour list.
+  assert.deepEqual(result.failures, []);
+  assert.deepEqual(result.rows.map((row) => `${row.name} ${row.colours.join(" ")}`), ["shadow-raised ", "shadow-press-rest #000"]);
+});
+
+test("R3.13 O-430 scanColours gives each colour as #rrggbb, so callers compare copies without their own parser", () => {
+  const scan = scanColours("0 1px 2px rgba(30, 30, 30, 0.8), inset 0 1px 0 #fff8, hsl(0 0% 50%)");
+  assert.deepEqual(scan.colours.map((colour) => colour.hex), ["#1e1e1e", "#ffffff", "#808080"]);
+});
+
 test("R3.13 O-430 review finding 8: a var() that resolves to no colour is a neutral failure, not a thrown error", () => {
   assert.match(neutralFailures(["border"]), /--border is var\(--gap\), which resolves to no colour/);
 });
@@ -135,8 +154,10 @@ test("R3.13 O-430 the dark grounds, edges, text, inks, focus ring, overlay and s
   assert.deepEqual(evaluateNeutral(css, parseThemes(css)).failures, []);
 });
 
-// The dark focus ring (O-432 rejected by the PM's ruling): a neutral near-white with a halo of the
-// ground inside it, so one of the two reaches 3:1 on any fill it is drawn over.
+// The marks drawn over solver fills (O-432, O-433, O-434; review round 2). The focus ring is the
+// text colour with a halo of the raised ground in both themes, gated by one 9:1 pair (WCAG technique
+// C40: one of the two then reaches 3:1 on any fill). The selection mark is the --selected red with
+// the same halo; its pair does not reach 9:1 in light, so every fill it is drawn over is gated.
 
 const MATRIX_SOURCE = `
 const LIGHT: MatrixPalette = {
@@ -153,27 +174,27 @@ const DARK: MatrixPalette = {
     "#593d3a", // a
     "#ffb0a9", // b
   ],
-  evNeutral: "#333333", // c
+  evNeutral: NEUTRAL, // a constant: not read
   evPositive: ["#37465a", "#a2caff"],
 };
 `;
 
-const FOCUS_CSS = `
+const MARK_CSS = `
 :root {
   --surface: #ffffff; /* from e7d7c1 cream, lifted */
   --surface-raised: #ffffff; /* from e7d7c1 cream, lifted */
-  --focus: #bf4342; /* from bf4342 brick */
+  --focus: #2b1a16; /* from 735751 umber, deepened */
   --focus-halo: var(--surface-raised);
-  --heat-1: #7e4739; /* from 735751 umber hue */
-  --felt: #166534;
+  --selected: #8c1c13; /* from 8c1c13 oxblood */
+  --heat-1: #d1a195; /* from 735751 umber hue */
 }
 
 .dark {
   --surface: #141414; /* from no palette hue */
   --surface-raised: #1e1e1e; /* from no palette hue */
-  --focus: #9a9a9a; /* from no palette hue: too dark for a two-colour ring */
+  --focus: #ececec; /* from no palette hue */
+  --selected: #9a9a9a; /* from no palette hue: too dark for a selection mark */
   --heat-1: #7e4739; /* from 735751 umber hue */
-  --felt: #15803d;
 }
 `;
 
@@ -187,82 +208,84 @@ const SIZE_SHADES = {
 };
 `;
 
-function sampleFocus(css = FOCUS_CSS) {
-  const themes = parseThemes(css);
-  return evaluateFocusRing(themes, {
+function sampleMarks() {
+  const themes = parseThemes(MARK_CSS);
+  return evaluateSelectionMark(themes, {
     actionColours: readActionColours(ACTIONS),
     sizeShades: readSizeShades(ACTIONS),
     evSteps: readEvSteps(MATRIX_SOURCE),
     heatSteps: ["heat-1"],
-    felts: readFelts(css, themes),
   });
 }
 
 test("R3.13 O-432 readEvSteps reads both themes' EV steps from matrix-theme.ts, negative, neutral, positive", () => {
   const steps = readEvSteps(MATRIX_SOURCE);
   assert.deepEqual(
-    steps.dark.map((step) => `${step.name} ${step.value}`),
-    ["EV step -1 #593d3a", "EV step -2 #ffb0a9", "EV neutral #333333", "EV step +1 #37465a", "EV step +2 #a2caff"],
+    steps.light.map((step) => `${step.name} ${step.value}`),
+    ["EV step -1 #f1cecb", "EV step -2 #940017", "EV neutral #f1eae3", "EV step +1 #c6d9f2", "EV step +2 #004b96"],
   );
-  assert.equal(steps.light.length, 5);
+  // The dark neutral is a constant, which the reader skips: the step count check below catches it.
+  assert.equal(steps.dark.length, 4);
   assert.deepEqual(readEvSteps("nothing here"), { light: [], dark: [] });
 });
 
-test("R3.13 O-432 the focus gate fails a fill where neither the ring nor its halo reaches 3:1, and a felt under 3:1 to the ring", () => {
-  const result = sampleFocus();
+test("R3.13 O-434 review round 2 finding 4: the selection gate fails when it reads other than the 11 EV steps per theme", () => {
+  assert.equal(EV_STEP_COUNT, 11);
+  const failures = sampleMarks().failures.join("\n");
+  assert.match(failures, /light: read 5 EV steps from web\/src\/components\/range-matrix\/matrix-theme\.ts, expected 11/);
+  assert.match(failures, /dark: read 4 EV steps from web\/src\/components\/range-matrix\/matrix-theme\.ts, expected 11/);
+});
+
+test("R3.13 O-434 the selection gate fails a fill where neither the mark nor its halo reaches 3:1, in either theme", () => {
+  const result = sampleMarks();
   const failures = result.failures.join("\n");
-  // A mid-dark fill: neither the #9a9a9a ring nor the #1e1e1e halo reaches 3:1 on heat step 1.
-  assert.match(failures, /dark: focus ring #9a9a9a with halo #1e1e1e on --heat-1 #7e4739 is \d\.\d\d:1, under 3:1/);
+  // A mid-dark fill: neither the #9a9a9a mark nor the #1e1e1e halo reaches 3:1 on heat step 1.
+  assert.match(failures, /dark: selection mark #9a9a9a with halo #1e1e1e on --heat-1 #7e4739 is \d\.\d\d:1, under 3:1/);
   assert.doesNotMatch(failures, /Fold \(action\)/);
-  assert.match(failures, /dark: focus ring #9a9a9a on felt #15803d is \d\.\d\d:1, under 3:1 \(the active seat ring\)/);
-  // The light pale size shade is not gated: the dark theme is the ruling's scope (O-432).
-  assert.ok(result.rows.every((row) => row.theme === "dark"));
-  assert.ok(result.rows.some((row) => row.name === "raise and bet size shade 1" && row.pass));
+  // Light is gated too (O-433): the oxblood mark with the white halo passes on the light fills here.
+  assert.doesNotMatch(failures, /light: selection mark/);
+  assert.deepEqual([...new Set(result.rows.map((row) => row.theme))], ["light", "dark"]);
 });
 
-test("R3.13 O-432 the focus gate fails loudly when it reads no EV steps", () => {
-  const themes = parseThemes(FOCUS_CSS);
-  const result = evaluateFocusRing(themes, {
-    actionColours: readActionColours(ACTIONS),
-    sizeShades: readSizeShades(ACTIONS),
-    evSteps: { light: [], dark: [] },
-    heatSteps: ["heat-1"],
-    felts: readFelts(FOCUS_CSS, themes),
-  });
-  assert.match(result.failures.join("\n"), /dark: no EV steps read from web\/src\/components\/range-matrix\/matrix-theme\.ts/);
+test("R3.13 O-432 O-434 the focus ring pair is gated at 9:1 in both themes, and the selection mark at 3:1 on every ground", () => {
+  const focusPair = GATING_PAIRS.find((pair) => pair.fg === "focus" && pair.bg === "focus-halo");
+  assert.equal(focusPair?.min, 9);
+  assert.deepEqual(
+    GATING_PAIRS.filter((pair) => pair.fg === "selected").map((pair) => `${pair.bg} ${pair.min}`),
+    ["surface 3", "surface-raised 3", "surface-sunken 3"],
+  );
+  const result = evaluate(parseThemes(MARK_CSS), [focusPair]);
+  assert.deepEqual(result.rows.map((row) => row.theme), ["light", "dark"]);
+  assert.deepEqual(result.failures, []);
 });
 
-test("R3.13 O-432 the two-colour ring pair is gated at 9:1 in dark only, and a pair limited to one theme is skipped in the other", () => {
-  const pair = GATING_PAIRS.find((candidate) => candidate.fg === "focus" && candidate.bg === "focus-halo");
-  assert.deepEqual(pair && { min: pair.min, themes: pair.themes }, { min: 9, themes: ["dark"] });
-  const result = evaluate(parseThemes(FOCUS_CSS), [pair]);
-  assert.deepEqual(result.rows.map((row) => row.theme), ["dark"]);
-  assert.match(result.failures.join("\n"), /dark: --focus on --focus-halo is \d\.\d\d:1, under 9:1/);
+test("R3.13 O-434 renderReport lists the selection mark rows", () => {
+  const themes = parseThemes(MARK_CSS);
+  const report = renderReport(evaluate(themes, []), undefined, [], undefined, sampleMarks());
+  assert.match(report, /## Selection mark on the solver fills \(gating, O-434\)/);
+  assert.match(report, /\| dark \| --heat-1 \| #7e4739 \| mark #9a9a9a, halo #1e1e1e \| \d\.\d\d \| 3 \| FAIL \|/);
+  assert.match(report, /\| light \| Fold \(action\) \| #2563eb \| mark #8c1c13, halo #ffffff \| \d\.\d\d \| 3 \| pass \|/);
+  // Review round 2 finding 5: the report no longer says focus is one of the reds left out.
+  assert.doesNotMatch(report, /accent, focus and danger/);
 });
 
-test("R3.13 O-432 renderReport lists the focus ring rows", () => {
-  const themes = parseThemes(FOCUS_CSS);
-  const report = renderReport(evaluate(themes, []), undefined, [], undefined, sampleFocus());
-  assert.match(report, /## Focus ring on the solver fills \(gating, O-432\)/);
-  assert.match(report, /\| dark \| --heat-1 \| #7e4739 \| ring #9a9a9a, halo #1e1e1e \| \d\.\d\d \| 3 \| FAIL \|/);
-  assert.match(report, /\| dark \| Fold \(action\) \| #3b82f6 \| ring #9a9a9a, halo #1e1e1e \| \d\.\d\d \| 3 \| pass \|/);
-});
-
-test("R3.13 O-432 the dark focus ring reaches 3:1 on every action fill, size shade, EV step, heat step and felt it is drawn over", () => {
+test("R3.13 O-434 the selection mark reaches 3:1 on every action fill, size shade, EV step and heat step in both themes", () => {
   const css = readFileSync(STYLES_PATH, "utf8");
   const actionSource = readFileSync(ACTION_STYLE_PATH, "utf8");
-  const themes = parseThemes(css);
   const evSteps = readEvSteps(readFileSync(MATRIX_THEME_PATH, "utf8"));
-  // Five negative steps, the neutral and five positive steps per theme.
-  assert.deepEqual([evSteps.light.length, evSteps.dark.length], [11, 11]);
-  const result = evaluateFocusRing(themes, {
+  assert.deepEqual([evSteps.light.length, evSteps.dark.length], [EV_STEP_COUNT, EV_STEP_COUNT]);
+  const result = evaluateSelectionMark(parseThemes(css), {
     actionColours: readActionColours(actionSource),
     sizeShades: readSizeShades(actionSource),
     evSteps,
     heatSteps: ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5"],
-    felts: readFelts(css, themes),
   });
   assert.deepEqual(result.failures, []);
-  // 8 actions, 4 size shades, 11 EV steps, 5 heat steps and 5 felts.
-  assert.equal(result.rows.length, 33);
+  // Per theme: 8 actions, 4 size shades, 11 EV steps and 5 heat steps.
+  assert.equal(result.rows.length, 2 * 28);
+});
+
+test("R3.13 O-432 O-434 the focus ring and the selection mark pass their pairs in styles.css in both themes", () => {
+  const pairs = GATING_PAIRS.filter((pair) => pair.fg === "focus" || pair.fg === "selected");
+  assert.deepEqual(evaluate(parseThemes(readFileSync(STYLES_PATH, "utf8")), pairs).failures, []);
 });

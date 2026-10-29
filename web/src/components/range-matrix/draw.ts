@@ -287,19 +287,24 @@ function outline(ctx: MatrixCanvasContext, rect: Rect | undefined, color: string
   ctx.strokeRect(rect.x + inset, rect.y + inset, rect.w - width, rect.h - width);
 }
 
+/**
+ * A mark over a cell: the ring on the cell's edge and a thin line of the ground inside it, so the
+ * ring or its halo reaches 3:1 on any fill (the contrast gate checks both marks, O-432 to O-434).
+ */
+function markCell(frame: FrameContext, rect: Rect | undefined, color: string, width: number, ratio: number): void {
+  outline(frame.ctx, rect, color, width);
+  const halo = rect === undefined ? undefined : { x: rect.x + width, y: rect.y + width, w: rect.w - 2 * width, h: rect.h - 2 * width };
+  outline(frame.ctx, halo, frame.palette.focusHalo, Math.max(1, Math.round(HALO_LINE_CSS_PX * ratio)));
+}
+
 function drawOutlines(frame: FrameContext, rects: readonly Rect[], options: DrawOptions): void {
   const ratio = options.pixelRatio;
   if (options.selectedHand !== null) {
     const index = frame.model.cells.findIndex((cell) => cell.hand === options.selectedHand);
-    outline(frame.ctx, rects[index], frame.palette.selected, Math.round(SELECTED_LINE_CSS_PX * ratio));
+    markCell(frame, rects[index], frame.palette.selected, Math.round(SELECTED_LINE_CSS_PX * ratio), ratio);
   }
   if (options.focusedIndex !== null) {
-    const rect = rects[options.focusedIndex];
-    const width = Math.round(FOCUS_LINE_CSS_PX * ratio);
-    outline(frame.ctx, rect, frame.palette.focus, width);
-    // A thin line of the ground inside the ring, so the ring shows on a fill of its own hue.
-    const halo = rect === undefined ? undefined : { x: rect.x + width, y: rect.y + width, w: rect.w - 2 * width, h: rect.h - 2 * width };
-    outline(frame.ctx, halo, frame.palette.focusHalo, Math.max(1, Math.round(HALO_LINE_CSS_PX * ratio)));
+    markCell(frame, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio), ratio);
   }
 }
 

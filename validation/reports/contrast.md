@@ -31,14 +31,18 @@ Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and 
 | light | border-strong | surface | 5.53 | 3 | pass | control edge | #735751 (--p-umber, the palette value) | #f3ebdf (e7d7c1 cream, lifted) |
 | light | border-strong | surface-raised | 6.13 | 3 | pass | control edge | #735751 (--p-umber, the palette value) | #fbf7f1 (e7d7c1 cream, lifted further) |
 | light | border-strong | surface-sunken | 4.64 | 3 | pass | control edge | #735751 (--p-umber, the palette value) | #e7d7c1 (--p-cream, the palette value) |
-| light | focus | surface | 4.34 | 3 | pass | focus ring | #bf4342 (--p-brick, the palette value) | #f3ebdf (e7d7c1 cream, lifted) |
-| light | focus | surface-raised | 4.80 | 3 | pass | focus ring | #bf4342 (--p-brick, the palette value) | #fbf7f1 (e7d7c1 cream, lifted further) |
-| light | focus | surface-sunken | 3.63 | 3 | pass | focus ring | #bf4342 (--p-brick, the palette value) | #e7d7c1 (--p-cream, the palette value) |
+| light | focus | surface | 14.07 | 3 | pass | focus ring and the acting seat mark | #2b1a16 (735751 umber, deepened: the text colour (O-433)) | #f3ebdf (e7d7c1 cream, lifted) |
+| light | focus | surface-raised | 15.59 | 3 | pass | focus ring and the acting seat mark | #2b1a16 (735751 umber, deepened: the text colour (O-433)) | #fbf7f1 (e7d7c1 cream, lifted further) |
+| light | focus | surface-sunken | 11.80 | 3 | pass | focus ring and the acting seat mark | #2b1a16 (735751 umber, deepened: the text colour (O-433)) | #e7d7c1 (--p-cream, the palette value) |
+| light | selected | surface | 7.75 | 3 | pass | selection mark | #8c1c13 (--p-oxblood, the palette value) | #f3ebdf (e7d7c1 cream, lifted) |
+| light | selected | surface-raised | 8.59 | 3 | pass | selection mark | #8c1c13 (--p-oxblood, the palette value) | #fbf7f1 (e7d7c1 cream, lifted further) |
+| light | selected | surface-sunken | 6.50 | 3 | pass | selection mark | #8c1c13 (--p-oxblood, the palette value) | #e7d7c1 (--p-cream, the palette value) |
 | light | heat-ink-low | heat-1 | 7.32 | 4.5 | pass | heat map cell label | #2b1a16 (735751 umber, deepened) | #d1a195 (735751 umber hue, OKLCH lightness 0.75) |
 | light | heat-ink-low | heat-2 | 5.00 | 4.5 | pass | heat map cell label | #2b1a16 (735751 umber, deepened) | #b87f70 (735751 umber hue, OKLCH lightness 0.65) |
 | light | heat-ink-high | heat-3 | 4.70 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #9d5f4f (735751 umber hue, OKLCH lightness 0.55) |
 | light | heat-ink-high | heat-4 | 7.29 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #7d4234 (735751 umber hue, OKLCH lightness 0.45) |
 | light | heat-ink-high | heat-5 | 10.96 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #5b2a1e (735751 umber hue, OKLCH lightness 0.35) |
+| light | focus | focus-halo | 15.59 | 9 | pass | two-colour focus ring over a fill (C40) | #2b1a16 (735751 umber, deepened: the text colour (O-433)) | #fbf7f1 (e7d7c1 cream, lifted further) |
 | dark | text | surface | 15.59 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
 | dark | text | surface-raised | 14.11 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
 | dark | text | surface-sunken | 16.34 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
@@ -62,15 +66,18 @@ Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and 
 | dark | border-strong | surface | 4.99 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
 | dark | border-strong | surface-raised | 4.52 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
 | dark | border-strong | surface-sunken | 5.23 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
-| dark | focus | surface | 15.59 | 3 | pass | focus ring | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
-| dark | focus | surface-raised | 14.11 | 3 | pass | focus ring | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
-| dark | focus | surface-sunken | 16.34 | 3 | pass | focus ring | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | focus | surface | 15.59 | 3 | pass | focus ring and the acting seat mark | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | focus | surface-raised | 14.11 | 3 | pass | focus ring and the acting seat mark | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | focus | surface-sunken | 16.34 | 3 | pass | focus ring and the acting seat mark | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | selected | surface | 10.78 | 3 | pass | selection mark | #ffb3ab (bf4342 brick, lifted past the accent so the mark or its halo reaches 3:1 on every fill (O-434)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | selected | surface-raised | 9.76 | 3 | pass | selection mark | #ffb3ab (bf4342 brick, lifted past the accent so the mark or its halo reaches 3:1 on every fill (O-434)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | selected | surface-sunken | 11.30 | 3 | pass | selection mark | #ffb3ab (bf4342 brick, lifted past the accent so the mark or its halo reaches 3:1 on every fill (O-434)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
 | dark | heat-ink-low | heat-1 | 7.07 | 4.5 | pass | heat map cell label | #fafafa (no palette hue: a neutral white (O-430)) | #7e4739 (735751 umber hue, OKLCH lightness 0.46) |
 | dark | heat-ink-low | heat-2 | 4.81 | 4.5 | pass | heat map cell label | #fafafa (no palette hue: a neutral white (O-430)) | #9d5f4f (735751 umber hue, OKLCH lightness 0.55) |
 | dark | heat-ink-high | heat-3 | 6.21 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #c48777 (735751 umber hue, OKLCH lightness 0.68) |
 | dark | heat-ink-high | heat-4 | 9.30 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #e1ac9f (735751 umber hue, OKLCH lightness 0.79) |
 | dark | heat-ink-high | heat-5 | 13.46 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #f7d5cc (735751 umber hue, OKLCH lightness 0.90) |
-| dark | focus | focus-halo | 14.11 | 9 | pass | two-colour focus ring (C40) | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | focus | focus-halo | 14.11 | 9 | pass | two-colour focus ring over a fill (C40) | #ececec (no palette hue: the neutral off-white of --text, apart from the red hero ring (O-432)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
 
 Failures: none.
 
@@ -163,7 +170,7 @@ Solver failures: none.
 
 ## Neutral dark base (gating, O-430)
 
-The dark grounds, edges, text, heat inks, overlay and every shadow layer are gray and black: each colour they hold, resolved, at 10% HSL saturation or less. The palette reds stay as accent, focus and danger and are not listed.
+The dark grounds, edges, text, focus ring and its halo, heat inks, overlay and every shadow layer are gray and black: each colour they hold, resolved, at 10% HSL saturation or less. The palette reds stay as the accent, danger and the selection mark and are not listed.
 
 | Token | Colours | Highest HSL saturation | Maximum | Result |
 |---|---|---|---|---|
@@ -187,44 +194,67 @@ The dark grounds, edges, text, heat inks, overlay and every shadow layer are gra
 
 Neutral failures: none.
 
-## Focus ring on the solver fills (gating, O-432)
+## Selection mark on the solver fills (gating, O-434)
 
-Dark only. Where the focus ring is drawn over a fill (a range matrix cell, the marked roll band), the ring or the halo of the ground inside it reaches 3:1 on the fill (1.4.11); on the felt, where the active seat ring has no halo, the ring itself does.
+Both themes. The range matrix's selected hand is outlined in --selected with a line of --focus-halo inside it: on every action fill, size shade, EV step and heat step, the mark or its halo reaches 3:1 (1.4.11). The focus ring has no rows here: its pair with the same halo is gated at 9:1 above, which covers every fill (WCAG technique C40). Seat marks sit on the ground, never on a felt, so the focus and accent pairs on the grounds cover them.
 
-| Theme | Fill | Value | Ring | Ratio | Minimum | Result |
+| Theme | Fill | Value | Mark | Ratio | Minimum | Result |
 |---|---|---|---|---|---|---|
-| dark | Fold (action) | #3b82f6 | ring #ececec, halo #1e1e1e | 4.53 | 3 | pass |
-| dark | Check (action) | #22c55e | ring #ececec, halo #1e1e1e | 7.32 | 3 | pass |
-| dark | Call (action) | #22c55e | ring #ececec, halo #1e1e1e | 7.32 | 3 | pass |
-| dark | Limp (action) | #84cc16 | ring #ececec, halo #1e1e1e | 8.44 | 3 | pass |
-| dark | Straddle (action) | #a78bfa | ring #ececec, halo #1e1e1e | 6.13 | 3 | pass |
-| dark | Bet (action) | #ef4444 | ring #ececec, halo #1e1e1e | 4.43 | 3 | pass |
-| dark | Raise (action) | #ef4444 | ring #ececec, halo #1e1e1e | 4.43 | 3 | pass |
-| dark | All-in (action) | #e879f9 | ring #ececec, halo #1e1e1e | 6.77 | 3 | pass |
-| dark | raise and bet size shade 1 | #ef4444 | ring #ececec, halo #1e1e1e | 4.43 | 3 | pass |
-| dark | raise and bet size shade 2 | #f87171 | ring #ececec, halo #1e1e1e | 6.03 | 3 | pass |
-| dark | raise and bet size shade 3 | #fca5a5 | ring #ececec, halo #1e1e1e | 8.78 | 3 | pass |
-| dark | raise and bet size shade 4 | #fecaca | ring #ececec, halo #1e1e1e | 11.52 | 3 | pass |
-| dark | EV step -1 | #593d3a | ring #ececec, halo #1e1e1e | 8.25 | 3 | pass |
-| dark | EV step -2 | #7c4744 | ring #ececec, halo #1e1e1e | 6.26 | 3 | pass |
-| dark | EV step -3 | #a0514d | ring #ececec, halo #1e1e1e | 4.70 | 3 | pass |
-| dark | EV step -4 | #f2827c | ring #ececec, halo #1e1e1e | 6.56 | 3 | pass |
-| dark | EV step -5 | #ffb0a9 | ring #ececec, halo #1e1e1e | 9.55 | 3 | pass |
-| dark | EV neutral | #333333 | ring #ececec, halo #1e1e1e | 10.69 | 3 | pass |
-| dark | EV step +1 | #37465a | ring #ececec, halo #1e1e1e | 8.13 | 3 | pass |
-| dark | EV step +2 | #3e5a7d | ring #ececec, halo #1e1e1e | 6.00 | 3 | pass |
-| dark | EV step +3 | #446da2 | ring #ececec, halo #1e1e1e | 4.49 | 3 | pass |
-| dark | EV step +4 | #71aaf3 | ring #ececec, halo #1e1e1e | 6.94 | 3 | pass |
-| dark | EV step +5 | #a2caff | ring #ececec, halo #1e1e1e | 9.87 | 3 | pass |
-| dark | --heat-1 | #7e4739 | ring #ececec, halo #1e1e1e | 6.24 | 3 | pass |
-| dark | --heat-2 | #9d5f4f | ring #ececec, halo #1e1e1e | 4.25 | 3 | pass |
-| dark | --heat-3 | #c48777 | ring #ececec, halo #1e1e1e | 5.62 | 3 | pass |
-| dark | --heat-4 | #e1ac9f | ring #ececec, halo #1e1e1e | 8.42 | 3 | pass |
-| dark | --heat-5 | #f7d5cc | ring #ececec, halo #1e1e1e | 12.18 | 3 | pass |
-| dark | felt | #15803d | ring #ececec (active seat) | 4.25 | 3 | pass |
-| dark | felt none | #15803d | ring #ececec (active seat) | 4.25 | 3 | pass |
-| dark | felt felt-tier-III | #2563eb | ring #ececec (active seat) | 4.38 | 3 | pass |
-| dark | felt felt-tier-V | #e11d48 | ring #ececec (active seat) | 3.98 | 3 | pass |
-| dark | felt felt-tier-VII | #8244f0 | ring #ececec (active seat) | 4.41 | 3 | pass |
+| light | Fold (action) | #2563eb | mark #8c1c13, halo #fbf7f1 | 4.84 | 3 | pass |
+| light | Check (action) | #15803d | mark #8c1c13, halo #fbf7f1 | 4.70 | 3 | pass |
+| light | Call (action) | #15803d | mark #8c1c13, halo #fbf7f1 | 4.70 | 3 | pass |
+| light | Limp (action) | #4d7c0f | mark #8c1c13, halo #fbf7f1 | 4.68 | 3 | pass |
+| light | Straddle (action) | #6d28d9 | mark #8c1c13, halo #fbf7f1 | 6.66 | 3 | pass |
+| light | Bet (action) | #dc2626 | mark #8c1c13, halo #fbf7f1 | 4.52 | 3 | pass |
+| light | Raise (action) | #dc2626 | mark #8c1c13, halo #fbf7f1 | 4.52 | 3 | pass |
+| light | All-in (action) | #86198f | mark #8c1c13, halo #fbf7f1 | 7.72 | 3 | pass |
+| light | raise and bet size shade 1 | #dc2626 | mark #8c1c13, halo #fbf7f1 | 4.52 | 3 | pass |
+| light | raise and bet size shade 2 | #b91c1c | mark #8c1c13, halo #fbf7f1 | 6.06 | 3 | pass |
+| light | raise and bet size shade 3 | #991b1b | mark #8c1c13, halo #fbf7f1 | 7.79 | 3 | pass |
+| light | raise and bet size shade 4 | #7f1d1d | mark #8c1c13, halo #fbf7f1 | 9.39 | 3 | pass |
+| light | EV step -1 | #f1cecb | mark #8c1c13, halo #fbf7f1 | 6.30 | 3 | pass |
+| light | EV step -2 | #e6a9a4 | mark #8c1c13, halo #fbf7f1 | 4.62 | 3 | pass |
+| light | EV step -3 | #d8847e | mark #8c1c13, halo #fbf7f1 | 3.28 | 3 | pass |
+| light | EV step -4 | #aa4240 | mark #8c1c13, halo #fbf7f1 | 5.52 | 3 | pass |
+| light | EV step -5 | #940017 | mark #8c1c13, halo #fbf7f1 | 8.66 | 3 | pass |
+| light | EV neutral | #f1eae3 | mark #8c1c13, halo #fbf7f1 | 7.69 | 3 | pass |
+| light | EV step +1 | #c6d9f2 | mark #8c1c13, halo #fbf7f1 | 6.38 | 3 | pass |
+| light | EV step +2 | #9ebde6 | mark #8c1c13, halo #fbf7f1 | 4.75 | 3 | pass |
+| light | EV step +3 | #76a1d9 | mark #8c1c13, halo #fbf7f1 | 3.44 | 3 | pass |
+| light | EV step +4 | #336aae | mark #8c1c13, halo #fbf7f1 | 5.16 | 3 | pass |
+| light | EV step +5 | #004b96 | mark #8c1c13, halo #fbf7f1 | 8.04 | 3 | pass |
+| light | --heat-1 | #d1a195 | mark #8c1c13, halo #fbf7f1 | 4.04 | 3 | pass |
+| light | --heat-2 | #b87f70 | mark #8c1c13, halo #fbf7f1 | 3.12 | 3 | pass |
+| light | --heat-3 | #9d5f4f | mark #8c1c13, halo #fbf7f1 | 4.70 | 3 | pass |
+| light | --heat-4 | #7d4234 | mark #8c1c13, halo #fbf7f1 | 7.29 | 3 | pass |
+| light | --heat-5 | #5b2a1e | mark #8c1c13, halo #fbf7f1 | 10.96 | 3 | pass |
+| dark | Fold (action) | #3b82f6 | mark #ffb3ab, halo #1e1e1e | 4.53 | 3 | pass |
+| dark | Check (action) | #22c55e | mark #ffb3ab, halo #1e1e1e | 7.32 | 3 | pass |
+| dark | Call (action) | #22c55e | mark #ffb3ab, halo #1e1e1e | 7.32 | 3 | pass |
+| dark | Limp (action) | #84cc16 | mark #ffb3ab, halo #1e1e1e | 8.44 | 3 | pass |
+| dark | Straddle (action) | #a78bfa | mark #ffb3ab, halo #1e1e1e | 6.13 | 3 | pass |
+| dark | Bet (action) | #ef4444 | mark #ffb3ab, halo #1e1e1e | 4.43 | 3 | pass |
+| dark | Raise (action) | #ef4444 | mark #ffb3ab, halo #1e1e1e | 4.43 | 3 | pass |
+| dark | All-in (action) | #e879f9 | mark #ffb3ab, halo #1e1e1e | 6.77 | 3 | pass |
+| dark | raise and bet size shade 1 | #ef4444 | mark #ffb3ab, halo #1e1e1e | 4.43 | 3 | pass |
+| dark | raise and bet size shade 2 | #f87171 | mark #ffb3ab, halo #1e1e1e | 6.03 | 3 | pass |
+| dark | raise and bet size shade 3 | #fca5a5 | mark #ffb3ab, halo #1e1e1e | 8.78 | 3 | pass |
+| dark | raise and bet size shade 4 | #fecaca | mark #ffb3ab, halo #1e1e1e | 11.52 | 3 | pass |
+| dark | EV step -1 | #593d3a | mark #ffb3ab, halo #1e1e1e | 5.71 | 3 | pass |
+| dark | EV step -2 | #7c4744 | mark #ffb3ab, halo #1e1e1e | 4.32 | 3 | pass |
+| dark | EV step -3 | #a0514d | mark #ffb3ab, halo #1e1e1e | 3.25 | 3 | pass |
+| dark | EV step -4 | #f2827c | mark #ffb3ab, halo #1e1e1e | 6.56 | 3 | pass |
+| dark | EV step -5 | #ffb0a9 | mark #ffb3ab, halo #1e1e1e | 9.55 | 3 | pass |
+| dark | EV neutral | #333333 | mark #ffb3ab, halo #1e1e1e | 7.39 | 3 | pass |
+| dark | EV step +1 | #37465a | mark #ffb3ab, halo #1e1e1e | 5.62 | 3 | pass |
+| dark | EV step +2 | #3e5a7d | mark #ffb3ab, halo #1e1e1e | 4.15 | 3 | pass |
+| dark | EV step +3 | #446da2 | mark #ffb3ab, halo #1e1e1e | 3.14 | 3 | pass |
+| dark | EV step +4 | #71aaf3 | mark #ffb3ab, halo #1e1e1e | 6.94 | 3 | pass |
+| dark | EV step +5 | #a2caff | mark #ffb3ab, halo #1e1e1e | 9.87 | 3 | pass |
+| dark | --heat-1 | #7e4739 | mark #ffb3ab, halo #1e1e1e | 4.32 | 3 | pass |
+| dark | --heat-2 | #9d5f4f | mark #ffb3ab, halo #1e1e1e | 3.32 | 3 | pass |
+| dark | --heat-3 | #c48777 | mark #ffb3ab, halo #1e1e1e | 5.62 | 3 | pass |
+| dark | --heat-4 | #e1ac9f | mark #ffb3ab, halo #1e1e1e | 8.42 | 3 | pass |
+| dark | --heat-5 | #f7d5cc | mark #ffb3ab, halo #1e1e1e | 12.18 | 3 | pass |
 
-Focus ring failures: none.
+Selection mark failures: none.

@@ -67,13 +67,14 @@ describe("R3.13 RngRoller", () => {
     expect(current[0]).toHaveAttribute("data-range", "16-95");
   });
 
-  it("R3.13 O-432 the marked band draws a two-colour ring: the focus outline and, in dark, a halo of the ground inside it", () => {
+  it("R3.13 O-432 O-433 the marked band draws a two-colour ring in both themes: the focus outline and a halo of the ground inside it", () => {
     render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={37} onExplain={vi.fn()} />);
     const items = within(screen.getByTestId("rng-roller")).getAllByRole("listitem");
     const marked = items.find((item) => item.getAttribute("aria-current") === "true");
     expect(marked?.className.split(" ")).toEqual(expect.arrayContaining(FOCUS_MARK_CLASS.split(" ")));
-    expect(FOCUS_MARK_CLASS).toContain("outline-focus");
-    expect(FOCUS_MARK_CLASS).toContain("dark:shadow-[inset_0_0_0_4px_var(--focus-halo)]");
+    expect(FOCUS_MARK_CLASS.split(" ")).toEqual(expect.arrayContaining(["outline-focus", "shadow-[inset_0_0_0_4px_var(--focus-halo)]"]));
+    // Review round 2 finding 2: the halo is not limited to dark; light needs it on the deep fills too.
+    expect(FOCUS_MARK_CLASS).not.toContain("dark:");
     for (const item of items.filter((candidate) => candidate !== marked)) expect(item.className).not.toContain("outline-focus");
   });
 

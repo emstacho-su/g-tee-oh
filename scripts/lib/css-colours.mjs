@@ -6,8 +6,8 @@
 // (#rgb, #rgba, #rrggbb, #rrggbbaa), rgb() and rgba() with numbers or percentages in comma or
 // space syntax, hsl() and hsla() (converted to sRGB channels), and the neutral named colours
 // (black, white, transparent and the CSS grays). It steps over numbers with their units, the
-// shadow keyword inset and the math functions calc(), min(), max() and clamp(), whose insides it
-// scans too. Anything else is unreadable and reported: another colour function (oklch(), lab(),
+// keywords that are not colours (inset, none and the CSS-wide ones) and the math functions calc(),
+// min(), max() and clamp(), whose insides it scans too. Anything else is unreadable and reported: another colour function (oklch(), lab(),
 // color-mix() and so on), any other word (a named colour such as sienna, or currentcolor), a hex
 // of the wrong length and an unclosed bracket. A var() is reported separately, since the caller
 // says why it cannot follow one. No npm packages.
@@ -29,8 +29,11 @@ const NEUTRAL_NAMES = new Map([
   ["dimgray", [105, 105, 105]],
   ["dimgrey", [105, 105, 105]],
 ]);
-/** Words in a shadow list that are not colours. */
-const KEYWORDS = new Set(["inset"]);
+/**
+ * Words that are not colours: the shadow keyword inset, none (no shadow at all) and the CSS-wide
+ * keywords (review round 2 finding 7). They never fail the neutral gate.
+ */
+const KEYWORDS = new Set(["inset", "none", "initial", "inherit", "unset", "revert", "revert-layer"]);
 /** Functions that hold lengths, not colours; their insides are scanned. */
 const MATH_FUNCTIONS = new Set(["calc", "min", "max", "clamp"]);
 const HEX_LENGTHS = new Set([3, 4, 6, 8]);
@@ -94,12 +97,14 @@ function closingBracket(text, open) {
   return -1;
 }
 
+/** One colour as found: how messages name it, its #rrggbb (alpha dropped) and its HSL saturation. */
 function colour(text, channels) {
-  return { text, saturation: saturationOf(channels) };
+  const hex = `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+  return { text, hex, saturation: saturationOf(channels) };
 }
 
 /**
- * The colours of one CSS value: { colours: [{ text, saturation }], unreadable: [what], usesVar }.
+ * The colours of one CSS value: { colours: [{ text, hex, saturation }], unreadable: [what], usesVar }.
  * A colour's text is how messages name it: hex as written, rgb() as its three channels, hsl() as written.
  */
 export function scanColours(value) {

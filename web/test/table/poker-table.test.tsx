@@ -9,9 +9,9 @@ import { readFileSync } from "node:fs";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { STYLES_PATH, contrastRatio, parseThemes } from "../../../scripts/check-contrast.mjs";
+import { NEUTRAL_MAX_SATURATION, STYLES_PATH, contrastRatio, hslSaturation, parseThemes } from "../../../scripts/check-contrast.mjs";
 
-import { PokerTable, seatLayout, type TableSeat } from "../../src/components/table/index.js";
+import { ACTING_MARK_CLASS, HERO_MARK_CLASS, PokerTable, seatLayout, type TableSeat } from "../../src/components/table/index.js";
 import { fixturePrompt } from "../../src/fixtures/index.js";
 
 const SIX_POSITIONS = ["UTG", "HJ", "CO", "BTN", "SB", "BB"] as const;
@@ -125,22 +125,27 @@ describe("R3.13 PokerTable", () => {
     expect(screen.getByTestId("seat-BB")).toHaveAttribute("data-active", "false");
   });
 
-  it("R3.13 O-432 the hero ring and the active-seat ring never share a colour, and an acting hero shows only the active ring", () => {
+  it("R3.13 O-432 the hero mark and the acting-seat mark are outlines that never share a colour, and an acting hero shows only the acting mark", () => {
+    // Review round 2 finding 1: a box-shadow ring loses to the raised shadow, so the marks are outlines.
+    // e2e/mock/seat-mark.e2e.ts proves the computed outline in a real browser.
+    expect(HERO_MARK_CLASS.split(" ")).toEqual(expect.arrayContaining(["outline-2", "outline-offset-2", "outline-accent"]));
+    expect(ACTING_MARK_CLASS.split(" ")).toEqual(expect.arrayContaining(["outline-2", "outline-offset-2", "outline-focus"]));
     const seats = sixSeats().map((seat) => (seat.position === "SB" ? { ...seat, active: true } : seat));
     const { unmount } = render(<PokerTable seats={seats} potCbb={150} />);
     const hero = screen.getByTestId(`seat-${fixturePrompt.hero_position}`).className.split(" ");
     const acting = screen.getByTestId("seat-SB").className.split(" ");
-    expect(hero).toContain("ring-accent");
-    expect(hero).not.toContain("ring-focus");
-    expect(acting).toContain("ring-focus");
-    expect(acting).not.toContain("ring-accent");
+    expect(hero).toContain("outline-accent");
+    expect(hero).not.toContain("outline-focus");
+    expect(acting).toContain("outline-focus");
+    expect(acting).not.toContain("outline-accent");
+    for (const classes of [hero, acting]) expect(classes.filter((name) => name.startsWith("ring-"))).toEqual([]);
     unmount();
-    // The hero is the acting seat: one ring only (two ring colours on one element would race on CSS order).
+    // The hero is the acting seat: one mark only (two outline colours on one element would race on CSS order).
     const heroActs = sixSeats().map((seat) => (seat.isHero ? { ...seat, active: true } : seat));
     render(<PokerTable seats={heroActs} potCbb={150} />);
     const both = screen.getByTestId(`seat-${fixturePrompt.hero_position}`).className.split(" ");
-    expect(both).toContain("ring-focus");
-    expect(both).not.toContain("ring-accent");
+    expect(both).toContain("outline-focus");
+    expect(both).not.toContain("outline-accent");
     expect(both).toContain("border-accent");
   });
 
@@ -148,8 +153,8 @@ describe("R3.13 PokerTable", () => {
     const { dark } = parseThemes(readFileSync(STYLES_PATH, "utf8"));
     const focus = dark.get("focus")?.value ?? "";
     const accent = dark.get("accent")?.value ?? "";
-    // A neutral: the three channels are equal.
-    expect(new Set([focus.slice(1, 3), focus.slice(3, 5), focus.slice(5, 7)]).size).toBe(1);
+    // A neutral, by the same measure the contrast gate uses (review round 2 finding 10).
+    expect(hslSaturation(focus)).toBeLessThanOrEqual(NEUTRAL_MAX_SATURATION);
     expect(focus).not.toBe(accent);
     // Apart in lightness too, so the two rings differ in grayscale (2.55:1 for #ececec on #e0766c).
     expect(contrastRatio(focus, accent)).toBeGreaterThanOrEqual(2.5);

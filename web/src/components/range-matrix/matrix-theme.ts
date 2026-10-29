@@ -55,12 +55,17 @@ export interface ResolvedPalette extends MatrixPalette {
   readonly weightInk: readonly string[];
 }
 
+/** --surface-raised (light): the matrix ground and the halo inside its focus and selection marks (--focus-halo). */
+const LIGHT_GROUND = "#fbf7f1";
+/** --text (light), which --focus aliases (O-433): the text and the focus ring share it. */
+const LIGHT_TEXT = "#2b1a16";
+
 const LIGHT: MatrixPalette = {
-  background: "#fbf7f1", // --surface-raised: e7d7c1 cream, lifted further
-  gridLine: "#fbf7f1", // the ground again, so cells read as tiles with a cream gutter
-  text: "#2b1a16", // --text: 735751 umber, deepened
+  background: LIGHT_GROUND, // --surface-raised: e7d7c1 cream, lifted further
+  gridLine: LIGHT_GROUND, // the ground again, so cells read as tiles with a cream gutter
+  text: LIGHT_TEXT, // --text: 735751 umber, deepened
   labelChip: "rgba(251, 247, 241, 0.85)", // --surface-raised, translucent
-  labelText: "#2b1a16", // --text
+  labelText: LIGHT_TEXT, // --text
   missingFill: "#e7d7c1", // --surface-sunken: the e7d7c1 cream palette value
   missingInk: "rgba(115, 87, 81, 0.5)", // --p-umber 735751, translucent
   hatchInkDark: "rgba(43, 26, 22, 0.45)", // --text, translucent
@@ -83,14 +88,14 @@ const LIGHT: MatrixPalette = {
   weightSteps: ["#d1a195", "#b87f70", "#9d5f4f", "#7d4234", "#5b2a1e"], // --heat-1 to --heat-5, light (O-362)
   inkDark: "#2b1a16", // --heat-ink-low: 735751 umber, deepened
   inkLight: "#fbf7f1", // --heat-ink-high: e7d7c1 cream, lifted
-  focus: "#bf4342", // --focus: the bf4342 brick palette value
-  focusHalo: "#fbf7f1", // --focus-halo: var(--surface-raised)
-  selected: "#2b1a16", // --text
+  focus: LIGHT_TEXT, // --focus: var(--text), with the ground halo inside (O-433)
+  focusHalo: LIGHT_GROUND, // --focus-halo: var(--surface-raised)
+  selected: "#8c1c13", // --selected: var(--accent), the 8c1c13 oxblood palette value (O-434)
 };
 
-/** --surface-raised (dark): the matrix ground and the halo inside its focus ring (--focus-halo, O-432). */
+/** --surface-raised (dark): the matrix ground and the halo inside its focus and selection marks (--focus-halo). */
 const DARK_GROUND = "#1e1e1e";
-/** --text (dark), which --focus aliases (O-432): the text, the selection and the focus ring share it. */
+/** --text (dark), which --focus aliases (O-432): the text and the focus ring share it. */
 const DARK_TEXT = "#ececec";
 
 const DARK: MatrixPalette = {
@@ -123,7 +128,7 @@ const DARK: MatrixPalette = {
   inkLight: "#fafafa", // --heat-ink-low (dark): a neutral white (O-430)
   focus: DARK_TEXT, // --focus (dark): var(--text), a neutral near-white apart from the red EV and raise fills (O-432)
   focusHalo: DARK_GROUND, // --focus-halo: var(--surface-raised)
-  selected: DARK_TEXT, // --text
+  selected: "#ffb3ab", // --selected (dark): bf4342 brick, lifted past the accent (O-434)
 };
 
 function resolve(palette: MatrixPalette): ResolvedPalette {

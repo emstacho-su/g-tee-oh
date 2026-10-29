@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { STYLES_PATH, parseThemes } from "../../../scripts/check-contrast.mjs";
+import { STYLES_PATH, parseThemes, scanColours } from "../../../scripts/check-contrast.mjs";
 import {
   MATRIX_PALETTES,
   evFill,
@@ -44,6 +44,8 @@ const ADJACENT_MIN = 0.06;
 /** The two first steps around neutral, and the two end steps, at least this far apart under simulation. */
 const FIRST_STEPS_MIN = 0.04;
 const END_STEPS_MIN = 0.1;
+/** The focus ring and the selection mark at least this far apart in OKLab (about five noticeable differences). */
+const FOCUS_SELECTED_MIN = 0.1;
 
 /**
  * The colour tokens of styles.css per theme, read once through the contrast gate's own parser
@@ -64,14 +66,14 @@ function heatRamp(theme: ThemeName): string[] {
   return [1, 2, 3, 4, 5].map((step) => token(theme, `heat-${step}`));
 }
 
-/** The #rrggbb of an rgba() copy, dropping its alpha (the canvas keeps translucent copies of tokens). */
-function rgbHex(rgba: string): string {
-  const channels = /^rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/.exec(rgba);
-  if (channels === null) return rgba.toLowerCase();
-  return `#${channels
-    .slice(1, 4)
-    .map((channel) => Number(channel).toString(16).padStart(2, "0"))
-    .join("")}`;
+/**
+ * The #rrggbb of a canvas copy (hex or a translucent rgba() of a token), read by the contrast gate's own
+ * colour scanner (review round 2 finding 10), alpha dropped.
+ */
+function copyHex(copy: string): string {
+  const [first] = scanColours(copy).colours;
+  if (first === undefined) throw new Error(`not a colour: ${copy}`);
+  return first.hex;
 }
 
 /** Which styles.css token each canvas colour copies, per theme (the heat inks swap ends in dark). */
@@ -87,7 +89,7 @@ const COPIES: Readonly<Record<ThemeName, readonly (readonly [keyof MatrixPalette
     ["hatchInkLight", "surface-raised"],
     ["text", "text"],
     ["labelText", "text"],
-    ["selected", "text"],
+    ["selected", "selected"],
     ["focus", "focus"],
     ["inkDark", "heat-ink-low"],
     ["inkLight", "heat-ink-high"],
@@ -103,7 +105,7 @@ const COPIES: Readonly<Record<ThemeName, readonly (readonly [keyof MatrixPalette
     ["hatchInkLight", "text"],
     ["text", "text"],
     ["labelText", "text"],
-    ["selected", "text"],
+    ["selected", "selected"],
     ["focus", "focus"],
     ["inkDark", "heat-ink-high"],
     ["inkLight", "heat-ink-low"],
@@ -189,10 +191,17 @@ describe("R3.12 range matrix palettes as colours", () => {
     it(`R3.13 O-430 ${theme}: every canvas copy of a token (ground, grid, halo, chip, missing cells, hatch inks, text, focus, inks) equals styles.css`, () => {
       const palette = MATRIX_PALETTES[theme];
       const drift = COPIES[theme]
-        .map(([key, name]) => ({ key, name, copy: rgbHex(String(palette[key])), want: token(theme, name) }))
+        .map(([key, name]) => ({ key, name, copy: copyHex(String(palette[key])), want: token(theme, name) }))
         .filter((entry) => entry.copy !== entry.want)
         .map((entry) => `${entry.key} ${entry.copy} != --${entry.name} ${entry.want}`);
       expect(drift).toEqual([]);
+    });
+
+    it(`R3.13 O-434 ${theme}: the selection mark differs from the focus ring by colour, not only by width`, () => {
+      const palette = MATRIX_PALETTES[theme];
+      // At least FOCUS_SELECTED_MIN apart in OKLab, so the two marks read as two colours on any cell.
+      expect(okDistance(palette.focus, palette.selected)).toBeGreaterThanOrEqual(FOCUS_SELECTED_MIN);
+      expect(okDistance(token(theme, "focus"), token(theme, "selected"))).toBeGreaterThanOrEqual(FOCUS_SELECTED_MIN);
     });
   }
 
