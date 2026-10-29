@@ -412,7 +412,7 @@ describe("R3.13 recap after end", () => {
     const recap = await screen.findByRole("region", { name: "Session recap" });
     expect(recap).toHaveTextContent("Decisions3");
     expect(recap).toHaveTextContent("Rated decisions3");
-    expect(recap).toHaveTextContent("Mean score0.75");
+    expect(recap, "the mean score is a percent on both recaps (S46 item 1)").toHaveTextContent("Mean score75%");
     expect(recap).toHaveTextContent("EV loss0.19bb");
     expect(view.sentTo(END_PATH)[0]?.body).toEqual({});
     await userEvent.click(screen.getByRole("button", { name: "Start another session" }));

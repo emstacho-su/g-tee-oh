@@ -58,7 +58,11 @@ describe("R3.13 drill recap look (S38)", () => {
     const recap = screen.getByRole("region", { name: "Session recap" });
     expect(classesOf(recap)).toContain(RAISED_CLASS);
     const tiles = within(recap).getAllByTestId("stat-tile");
-    expect(tiles.map((tile) => tile.textContent)).toEqual(["Decisions3", "Rated decisions3", "Mean score0.75", "EV loss0.19bb"]);
+    // S46 (item 1): the mean score is a percent, as /train's recap prints it; each statistic has a definition tip.
+    const text = (tile: HTMLElement) => `${within(tile).getByRole("term").textContent}${within(tile).getByRole("definition").textContent}`;
+    expect(tiles.map(text)).toEqual(["Decisions3", "Rated decisions3", "Mean score75%", "EV loss0.19bb"]);
+    expect(within(recap).getByRole("button", { name: "About mean score" })).toBeInTheDocument();
+    expect(within(recap).getByRole("button", { name: "About rated decisions" })).toBeInTheDocument();
     expect(within(recap).getByRole("button", { name: "Start another session" })).toBeEnabled();
   });
 
