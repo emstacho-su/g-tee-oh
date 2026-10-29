@@ -5,15 +5,18 @@
  * /drills/{id}) and its header names it, with its spot summary and its Run, Export and Duplicate
  * actions. The form is keyed by the drill id, so opening another drill starts from that drill's
  * stored values, while moving between pages of one drill keeps the draft. A missing drill (404) or
- * a failed read shows its sentence with a way back to the library.
+ * a failed read shows its sentence with a way back to the library. A drill just created while the
+ * player kept editing opens with those edits as unsaved changes (drills/draft-handoff.ts).
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { BuilderSectionSlug } from "../../drills/builder-sections.js";
 import { draftFromDrill, newDrillDraft } from "../../drills/draft.js";
+import { clearHandedDraft, peekHandedDraft } from "../../drills/draft-handoff.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { drillDetailQuery } from "../../drills/queries.js";
 import { spotSummary } from "../../drills/summary.js";
@@ -48,6 +51,9 @@ function BackLink() {
 function ExistingDrill({ drillId, section, justCreated }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean }) {
   const api = useAppApi();
   const drill = useQuery(drillDetailQuery(api, drillId));
+  // Edits made while this drill was being created come along as unsaved changes (review round 1 B).
+  const [carried] = useState(() => peekHandedDraft(drillId));
+  useEffect(() => clearHandedDraft(drillId), [drillId]);
   if (drill.data === undefined) {
     return (
       <>
@@ -76,7 +82,14 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
         </p>
       </div>
       <BuilderActions api={api} drill={stored} />
-      <DrillForm key={stored.id} initial={draftFromDrill(stored)} section={section} drill={stored} justCreated={justCreated} />
+      <DrillForm
+        key={stored.id}
+        initial={draftFromDrill(stored)}
+        {...(carried === undefined ? {} : { start: carried })}
+        section={section}
+        drill={stored}
+        justCreated={justCreated}
+      />
     </>
   );
 }

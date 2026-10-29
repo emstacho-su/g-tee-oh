@@ -4,7 +4,9 @@
  * stake, depth; their pair select is hidden); "Coverage" holds the pair grid of that configuration
  * (CoverageGrid), whose selection is written to the URL; for the selected pair, "Flops and queue"
  * and "Request a gap" sit side by side on a wide screen (CoveragePanel). Every change replaces the
- * URL on this page, so Back leaves the library instead of stepping through filter changes.
+ * URL on this page, so Back leaves the library instead of stepping through filter changes. The
+ * page owns the catalog reads and the coverage event stream (review round 1 H): its live line opens
+ * the page, and a coverage_added for the configuration on screen refreshes it (use-library-events).
  */
 import { useNavigate } from "@tanstack/react-router";
 
@@ -15,10 +17,12 @@ import { Card, LoadingNote } from "../../components/ui/index.js";
 import { withLibraryFilter, withPair, type LibrarySearch } from "../../library/search.js";
 import { FILTER_PROMPTS, missingFilter, type FilterKey } from "../../study/filters.js";
 import { catalogFailure } from "../../study/problem-text.js";
-import type { StudyCatalog } from "../../study/use-study-catalog.js";
+import { useStudyCatalog, type StudyCatalog } from "../../study/use-study-catalog.js";
 import { FailureAlert } from "../study/StudyNotices.js";
 import { StudyFilters } from "../study/StudyFilters.js";
 import { CoveragePanel } from "./CoveragePanel.js";
+import { LiveStatus } from "./LiveStatus.js";
+import { useLibraryEvents } from "./use-library-events.js";
 
 export const COVERAGE_PAGE_TEXT = {
   configuration: "Configuration",
@@ -87,13 +91,15 @@ function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps)
 export interface CoveragePageProps {
   api: AppApi;
   search: LibrarySearch;
-  catalog: StudyCatalog;
 }
 
-export function CoveragePage({ api, search, catalog }: CoveragePageProps) {
+export function CoveragePage({ api, search }: CoveragePageProps) {
+  const catalog = useStudyCatalog(api, search);
+  const events = useLibraryEvents(catalog.configId, search.pair);
   const navigation = useCoverageNavigation(search);
   return (
     <>
+      <LiveStatus status={events.status} onReconnect={events.reconnect} latest={events.latestCoverage} />
       <Card title={COVERAGE_PAGE_TEXT.configuration} description={COVERAGE_PAGE_TEXT.configurationDescription}>
         <StudyFilters search={search} catalog={catalog} onFilterChange={navigation.setFilter} hidePair label="Library filters" />
       </Card>

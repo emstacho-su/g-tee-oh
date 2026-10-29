@@ -7,7 +7,9 @@
  * the URL; a drill that leaves the list (deleted, filtered out) is no longer selected. A duplicate or
  * an import is announced in a polite live region; an imported drill appears at the top of the
  * table, and a tag filter it would not pass is cleared so it shows. With no drills there is an
- * empty state with a New drill link.
+ * empty state with a New drill link. The duplicate and delete requests belong to this page, so a
+ * change of selection while one runs never drops its result; a failure shows with the drill it
+ * acted on whenever that drill is selected (PR #42 review round 1 C).
  */
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -20,6 +22,8 @@ import { drillFailureText } from "../../drills/failure-text.js";
 import { drillListQuery } from "../../drills/queries.js";
 import type { DrillsSearch } from "../../drills/search.js";
 import type { Drill } from "../../drills/types.js";
+import { useDeleteDrill, useDuplicateDrill } from "../../drills/use-drill-writes.js";
+import type { IntentMutation } from "../../library/use-intent-mutation.js";
 import { DrillTable } from "./DrillTable.js";
 import { DrillToolbar } from "./DrillToolbar.js";
 import { IMPORT_TEXT, ImportDialog } from "./ImportDialog.js";
@@ -56,6 +60,11 @@ function useTagNavigation(): (tag: string | undefined) => void {
   };
 }
 
+/** The request's failure when its latest run acted on this drill (review round 1 C). */
+function failureOn<TResult>(request: IntentMutation<string, TResult>, drillId: string): unknown {
+  return request.input === drillId && !request.busy ? request.error : null;
+}
+
 function EmptyState({ tagged }: { tagged: boolean }) {
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border-strong p-6">
@@ -74,6 +83,10 @@ export function DrillsPage({ search }: DrillsPageProps) {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const drills = list.data?.pages.flatMap((page) => page.items) ?? [];
   const selected = drills.find((drill) => drill.id === selectedId);
+  // The requests live here, not in the toolbar, so a change of selection never drops their result.
+  const duplicate = useDuplicateDrill(api, (copy) => setAnnouncement(`Duplicated as ${copy.name}.`));
+  const remove = useDeleteDrill(api);
+  const failure = selected === undefined ? null : (failureOn(remove, selected.id) ?? failureOn(duplicate, selected.id));
 
   function imported(drill: Drill): void {
     setImporting(false);
@@ -110,7 +123,16 @@ export function DrillsPage({ search }: DrillsPageProps) {
         {list.isSuccess && drills.length === 0 ? <EmptyState tagged={search.tag !== undefined} /> : null}
         {drills.length === 0 ? null : (
           <>
-            <DrillToolbar key={selected?.id ?? ""} api={api} drill={selected} onDuplicated={(copy) => setAnnouncement(`Duplicated as ${copy.name}.`)} />
+            <DrillToolbar
+              key={selected?.id ?? ""}
+              api={api}
+              drill={selected}
+              duplicating={duplicate.busy}
+              deleting={remove.busy}
+              failure={failure}
+              onDuplicate={(drill) => duplicate.send(drill.id)}
+              onDelete={(drill) => remove.send(drill.id)}
+            />
             <DrillTable drills={drills} selectedId={selected?.id} onSelect={setSelectedId} />
           </>
         )}

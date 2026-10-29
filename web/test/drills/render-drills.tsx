@@ -3,7 +3,7 @@
  * path with a fetch that answers /me with the owner fixture and every catalog, drill and session
  * request from the mocked routes (e2e/support/mock-study.ts, mock-drills.ts, mock-sessions.ts), so
  * the screens meet the same synthetic api as the shots and the mocked flow 2. An override answers
- * first. Every request is kept with its method, path, query, headers and parsed body. The app is
+ * first, and may hold a request in flight. Every request is kept with its method, path, query, headers and parsed body. The app is
  * wrapped in a LibraryDepsProvider with a counting Idempotency-Key factory (the intent mutations
  * read their key factory from it).
  */
@@ -25,7 +25,12 @@ import { createAppRouter } from "../../src/router.js";
 import { TEST_ORIGIN } from "../app/render-app.js";
 import { jsonBody } from "../library/render-library.js";
 
-export type DrillOverride = (request: MockRequest) => Response | undefined;
+/**
+ * Answers a request before the mocked routes; undefined falls through to them. It may return a
+ * promise, so a test can hold a request in flight (S40 review round 1) and then answer it or let
+ * it fall through.
+ */
+export type DrillOverride = (request: MockRequest) => Response | undefined | Promise<Response | undefined>;
 
 const UNROUTED_STATUS = 599;
 
@@ -74,7 +79,7 @@ export function renderDrills(path: string, options: RenderDrillsOptions = {}): R
   const fetch = async (input: Request): Promise<Response> => {
     const request = await toMockRequest(input);
     requests.push(request);
-    const custom = options.override?.(request);
+    const custom = await options.override?.(request);
     if (custom !== undefined) return custom;
     if (request.path === "/api/v1/me") return jsonBody(200, fixtureSession);
     const context = { signedIn: true };

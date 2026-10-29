@@ -16,8 +16,13 @@ import { BuilderSettingsForm } from "../../components/library/BuilderSettingsFor
 import { Button, LoadingNote, Panel } from "../../components/ui/index.js";
 import type { BuilderStatus } from "../../contracts.js";
 import { adminFailureText } from "../../library/admin-text.js";
-import type { BuildProgressEvent } from "../../library/events.js";
-import { useBuilderStatus, usePauseControl, useSaveSettings } from "../../library/use-builder.js";
+import {
+  useBuilderStatus,
+  usePauseControl,
+  useSaveSettings,
+} from "../../library/use-builder.js";
+import { LiveStatus } from "./LiveStatus.js";
+import { useLibraryEvents } from "./use-library-events.js";
 
 export const MEMBER_NOTE = "Builder health and controls are for admins.";
 export const SCHEDULE_LINK_TEXT = "Set the overnight window in Settings";
@@ -28,10 +33,17 @@ interface AdminPageProps {
 }
 
 /** The builder status, or its loading note, or a failure with a retry. */
-function WithStatus({ api, children }: { api: AppApi; children: (status: BuilderStatus) => ReactNode }) {
+function WithStatus({
+  api,
+  children,
+}: {
+  api: AppApi;
+  children: (status: BuilderStatus) => ReactNode;
+}) {
   const status = useBuilderStatus(api, true);
   if (status.data !== undefined) return <>{children(status.data)}</>;
-  if (!status.isError) return <LoadingNote text="Loading the builder status." />;
+  if (!status.isError)
+    return <LoadingNote text="Loading the builder status." />;
   return (
     <div role="alert" className="flex flex-col items-start gap-2 text-sm">
       <p className="text-danger">The builder status could not be loaded.</p>
@@ -50,20 +62,32 @@ function MemberNote() {
   );
 }
 
-function AdminBuilderState({ api, progress }: { api: AppApi; progress: BuildProgressEvent | null }) {
+/** The admin's builder state, with its own event stream for builder_state and build_progress (review round 1 H). */
+function AdminBuilderState({ api }: { api: AppApi }) {
   const pause = usePauseControl(api);
+  const events = useLibraryEvents(undefined, undefined);
+  const progress = events.progress;
   return (
-    <WithStatus api={api}>
-      {(status) => (
-        <BuilderHealth
-          status={status}
-          progress={progress}
-          onSetPaused={pause.setPaused}
-          pending={pause.pending}
-          failure={pause.error === null ? null : adminFailureText(pause.error)}
-        />
-      )}
-    </WithStatus>
+    <>
+      <LiveStatus
+        status={events.status}
+        onReconnect={events.reconnect}
+        latest={null}
+      />
+      <WithStatus api={api}>
+        {(status) => (
+          <BuilderHealth
+            status={status}
+            progress={progress}
+            onSetPaused={pause.setPaused}
+            pending={pause.pending}
+            failure={
+              pause.error === null ? null : adminFailureText(pause.error)
+            }
+          />
+        )}
+      </WithStatus>
+    </>
   );
 }
 
@@ -71,20 +95,24 @@ function AdminBuilderSettings({ api }: { api: AppApi }) {
   const save = useSaveSettings(api);
   return (
     <Panel>
-      <WithStatus api={api}>{(status) => <BuilderSettingsForm settings={status.settings} save={save} />}</WithStatus>
-      <Link to="/settings/$section" params={{ section: "builder-schedule" }} className="self-start text-sm font-medium underline">
+      <WithStatus api={api}>
+        {(status) => (
+          <BuilderSettingsForm settings={status.settings} save={save} />
+        )}
+      </WithStatus>
+      <Link
+        to="/settings/$section"
+        params={{ section: "builder-schedule" }}
+        className="self-start text-sm font-medium underline"
+      >
         {SCHEDULE_LINK_TEXT}
       </Link>
     </Panel>
   );
 }
 
-export interface BuilderStatePageProps extends AdminPageProps {
-  progress: BuildProgressEvent | null;
-}
-
-export function BuilderStatePage({ api, isAdmin, progress }: BuilderStatePageProps) {
-  return isAdmin ? <AdminBuilderState api={api} progress={progress} /> : <MemberNote />;
+export function BuilderStatePage({ api, isAdmin }: AdminPageProps) {
+  return isAdmin ? <AdminBuilderState api={api} /> : <MemberNote />;
 }
 
 export function BuilderSettingsPage({ api, isAdmin }: AdminPageProps) {

@@ -139,6 +139,54 @@ describe("R3.14 drill library", () => {
     expect(toolbar()).toHaveTextContent("Choose a drill in the table.");
   });
 
+  it("R3.14 a delete's result belongs to the drill it acted on, whatever is selected when it lands (review round 1, C)", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const user = userEvent.setup();
+    renderDrills("/drills", {
+      override: async (request) => {
+        if (request.method === "DELETE") await held;
+        return undefined;
+      },
+    });
+    await rows();
+    await select(user, fixtureDrill.name);
+    await user.click(within(toolbar()).getByRole("button", { name: `Delete ${fixtureDrill.name}` }));
+    await user.click(within(screen.getByRole("dialog", { name: "Delete this drill?" })).getByRole("button", { name: "Delete" }));
+    await select(user, UNCOVERED_NAME);
+    release();
+    // The 409 lands while another drill is selected: kept for the drill it concerns.
+    await waitFor(async () => {
+      await select(user, fixtureDrill.name);
+      expect(within(toolbar()).getByRole("alert")).toHaveTextContent("A practice session still uses this drill, so it cannot be deleted.");
+    });
+    expect(within(toolbar()).getByRole("alert")).toHaveTextContent(fixtureDrill.name);
+    await select(user, UNCOVERED_NAME);
+    expect(within(toolbar()).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("R3.14 a duplicate that lands after the selection changed is still announced (review round 1, C)", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const user = userEvent.setup();
+    renderDrills("/drills", {
+      override: async (request) => {
+        if (request.method === "POST" && request.path === "/api/v1/drills") await held;
+        return undefined;
+      },
+    });
+    await rows();
+    await select(user, fixtureDrill.name);
+    await user.click(within(toolbar()).getByRole("button", { name: `Duplicate ${fixtureDrill.name}` }));
+    await select(user, UNCOVERED_NAME);
+    release();
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Duplicated as ${fixtureDrill.name} (copy).`));
+  });
+
   it("R3.14 O-310 Export shows the code in a read-only field and Copy puts it on the clipboard", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(() => Promise.resolve());

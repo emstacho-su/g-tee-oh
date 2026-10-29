@@ -10,6 +10,8 @@
  * from a ref at the moment of the navigation, so the caller can mark the draft clean right before
  * its own navigation after a save. A beforeunload listener is added only while the draft is
  * dirty, so a reload or a closed tab asks the browser's own question; it is removed once clean.
+ * Signing out goes to /login and is never blocked (security review L4): the unsaved edits go with
+ * the session. The builder's own move after a create skips the blocker (DrillForm, ignoreBlocker).
  */
 import { useBlocker } from "@tanstack/react-router";
 import { useEffect, type RefObject } from "react";
@@ -25,6 +27,8 @@ export const LEAVE_TEXT = {
 } as const;
 
 const SEPARATOR = "/";
+/** Signing out (or a lapsed session) goes here; it is never held back (security review L4). */
+const LOGIN_PATH = "/login";
 
 function parentOf(pathname: string): string {
   return pathname.slice(0, pathname.lastIndexOf(SEPARATOR));
@@ -56,7 +60,7 @@ export interface LeaveGuardProps {
 export function LeaveGuard({ dirtyRef, dirty }: LeaveGuardProps) {
   useBeforeUnload(dirty);
   const blocker = useBlocker({
-    shouldBlockFn: ({ current, next }) => dirtyRef.current && !isSameBuilder(current.pathname, next.pathname),
+    shouldBlockFn: ({ current, next }) => dirtyRef.current && next.pathname !== LOGIN_PATH && !isSameBuilder(current.pathname, next.pathname),
     enableBeforeUnload: false,
     withResolver: true,
   });

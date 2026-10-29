@@ -45,6 +45,14 @@ describe("R3.4 R3.5 the library sections (O-406)", () => {
     expect(within(main).getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
   });
 
+  it("R3.4 R3.5 the catalog and the coverage stream belong to the coverage page: the settings page reads neither (review round 1, H)", async () => {
+    const { requests, streams } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, FIXTURE_QUEUE_PAIR, "settings"));
+    await screen.findByRole("heading", { name: "Builder settings" });
+    await waitFor(() => expect(requests.some((request) => request.path === BUILDER_PATH)).toBe(true));
+    expect(requests.filter((request) => /^\/api\/v1\/(stakes|configs)/.test(request.path))).toEqual([]);
+    expect(streams).toHaveLength(0);
+  });
+
   it("R3.5 a member's section list shows Coverage only; an admin's shows all three pages", async () => {
     const member = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID), { admin: false });
     await screen.findByRole("list", { name: "Pairs" });

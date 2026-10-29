@@ -10,9 +10,10 @@
  * move. Pages: Coverage (everyone), Builder state and Builder settings (admins; a member opening
  * their URL reads the admin note, and the api's 403 stays the control, O-290).
  *
- * Mechanism: the URL's validated search (library/search.ts) is the coverage page's state. One
- * event stream is open while any library page is mounted (useLibraryEvents); its live line sits in
- * the page header and its build progress feeds the builder state page.
+ * Mechanism: the URL's validated search (library/search.ts) is the coverage page's state. Each page
+ * reads only what it shows (PR #42 review round 1 H): the coverage page owns the catalog reads and
+ * the coverage event stream with its live line; the builder state page opens its own stream for the
+ * build in progress; the settings page reads the builder status only.
  */
 import { Link } from "@tanstack/react-router";
 
@@ -21,11 +22,8 @@ import { NAV_PILL_LINK_PROPS, PageHeader, PillNav } from "../../components/ui/in
 import type { LibrarySearch } from "../../library/search.js";
 import { visibleLibrarySections, type LibrarySectionSlug } from "../../library/sections.js";
 import { useIsAdmin } from "../../library/use-builder.js";
-import { useStudyCatalog } from "../../study/use-study-catalog.js";
 import { BuilderSettingsPage, BuilderStatePage } from "./BuilderPanel.js";
 import { CoveragePage } from "./CoveragePage.js";
-import { LiveStatus } from "./LiveStatus.js";
-import { useLibraryEvents } from "./use-library-events.js";
 
 export const LIBRARY_PAGE_TEXT = {
   title: "Library",
@@ -55,21 +53,15 @@ function SectionNav({ isAdmin, search }: { isAdmin: boolean; search: LibrarySear
 
 export function LibraryPage({ section, search }: LibraryPageProps) {
   const api = useAppApi();
-  const catalog = useStudyCatalog(api, search);
   const isAdmin = useIsAdmin();
-  const events = useLibraryEvents(catalog.configId, search.pair);
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader
-        title={LIBRARY_PAGE_TEXT.title}
-        description={LIBRARY_PAGE_TEXT.description}
-        actions={<LiveStatus status={events.status} onReconnect={events.reconnect} latest={events.latestCoverage} />}
-      />
+      <PageHeader title={LIBRARY_PAGE_TEXT.title} description={LIBRARY_PAGE_TEXT.description} />
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
         <SectionNav isAdmin={isAdmin} search={search} />
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          {section === "coverage" ? <CoveragePage api={api} search={search} catalog={catalog} /> : null}
-          {section === "builder" ? <BuilderStatePage api={api} isAdmin={isAdmin} progress={events.progress} /> : null}
+          {section === "coverage" ? <CoveragePage api={api} search={search} /> : null}
+          {section === "builder" ? <BuilderStatePage api={api} isAdmin={isAdmin} /> : null}
           {section === "settings" ? <BuilderSettingsPage api={api} isAdmin={isAdmin} /> : null}
         </div>
       </div>

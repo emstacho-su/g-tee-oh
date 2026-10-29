@@ -2,10 +2,11 @@
  * The drill library's selection toolbar (S40, R3.14, O-311, O-404): it names the selected drill and
  * acts on it: Run (/drills/$id/run), Duplicate, Export (the export dialog) and Delete (after a
  * confirm dialog). With nothing selected it says to choose a drill and its actions are off. Each
- * action's accessible name carries the drill's name ("Run RFI boundary hands"). The toolbar owns
- * the duplicate and delete intents of the drill it shows; the page keys it by the selected drill,
- * so another selection starts with no earlier error. A delete a practice session blocks shows the
- * 409's in-use sentence here.
+ * action's accessible name carries the drill's name ("Run RFI boundary hands"). The duplicate and
+ * delete requests belong to the page, not to the toolbar (PR #42 review round 1 C): a request runs
+ * to its end whatever is selected meanwhile, and its failure is shown, naming the drill, whenever
+ * the drill it acted on is selected (the page passes it as `failure`). A delete a practice session
+ * blocks shows the 409's in-use sentence that way.
  */
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -14,7 +15,6 @@ import type { AppApi } from "../../api/index.js";
 import { Button, Dialog } from "../../components/ui/index.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import type { Drill } from "../../drills/types.js";
-import { useDeleteDrill, useDuplicateDrill } from "../../drills/use-drill-writes.js";
 import { ExportDialog } from "./ExportDialog.js";
 
 export const TOOLBAR_TEXT = {
@@ -30,7 +30,14 @@ export const TOOLBAR_TEXT = {
 export interface DrillToolbarProps {
   api: AppApi;
   drill: Drill | undefined;
-  onDuplicated: (copy: Drill) => void;
+  /** The page's duplicate request is running (for any drill). */
+  duplicating: boolean;
+  /** The page's delete request is running (for any drill). */
+  deleting: boolean;
+  /** The failure of the latest request that acted on this drill, or null. */
+  failure: unknown;
+  onDuplicate: (drill: Drill) => void;
+  onDelete: (drill: Drill) => void;
 }
 
 const TOOLBAR_CLASSES = "flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-surface-sunken px-3 py-2";
@@ -68,12 +75,9 @@ function EmptyToolbar() {
   );
 }
 
-function SelectedToolbar({ api, drill, onDuplicated }: DrillToolbarProps & { drill: Drill }) {
+function SelectedToolbar({ api, drill, duplicating, deleting, failure, onDuplicate, onDelete }: DrillToolbarProps & { drill: Drill }) {
   const [exporting, setExporting] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const duplicate = useDuplicateDrill(api, onDuplicated);
-  const remove = useDeleteDrill(api);
-  const failure = remove.error ?? duplicate.error;
   return (
     <div role="group" aria-label={TOOLBAR_TEXT.label} className={TOOLBAR_CLASSES}>
       <p className="mr-auto text-sm font-semibold">{TOOLBAR_TEXT.selected(drill.name)}</p>
@@ -82,18 +86,18 @@ function SelectedToolbar({ api, drill, onDuplicated }: DrillToolbarProps & { dri
           {TOOLBAR_TEXT.run}
         </Link>
       </Button>
-      <Button size="sm" aria-label={`Duplicate ${drill.name}`} disabled={duplicate.busy} onClick={() => duplicate.send(drill.id)}>
+      <Button size="sm" aria-label={`Duplicate ${drill.name}`} disabled={duplicating} onClick={() => onDuplicate(drill)}>
         {TOOLBAR_TEXT.duplicate}
       </Button>
       <Button size="sm" aria-label={`Export ${drill.name}`} onClick={() => setExporting(true)}>
         {TOOLBAR_TEXT.export}
       </Button>
-      <Button size="sm" variant="ghost" aria-label={`Delete ${drill.name}`} disabled={remove.busy} onClick={() => setConfirming(true)}>
+      <Button size="sm" variant="ghost" aria-label={`Delete ${drill.name}`} disabled={deleting} onClick={() => setConfirming(true)}>
         {TOOLBAR_TEXT.remove}
       </Button>
       {failure === null || failure === undefined ? null : (
         <p role="alert" className="basis-full text-sm font-medium text-danger">
-          {`Error: ${drillFailureText(failure)}`}
+          {`Error: ${drill.name}: ${drillFailureText(failure)}`}
         </p>
       )}
       <ExportDialog api={api} drillId={drill.id} drillName={drill.name} open={exporting} onOpenChange={setExporting} />
@@ -103,14 +107,14 @@ function SelectedToolbar({ api, drill, onDuplicated }: DrillToolbarProps & { dri
         onOpenChange={setConfirming}
         onConfirm={() => {
           setConfirming(false);
-          remove.send(drill.id);
+          onDelete(drill);
         }}
       />
     </div>
   );
 }
 
-export function DrillToolbar({ api, drill, onDuplicated }: DrillToolbarProps) {
-  if (drill === undefined) return <EmptyToolbar />;
-  return <SelectedToolbar api={api} drill={drill} onDuplicated={onDuplicated} />;
+export function DrillToolbar(props: DrillToolbarProps) {
+  if (props.drill === undefined) return <EmptyToolbar />;
+  return <SelectedToolbar {...props} drill={props.drill} />;
 }

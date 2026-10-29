@@ -15,8 +15,9 @@
  * that nothing changed when no field differs.
  *
  * Unsaved edits (PM note 3): the draft is dirty while it differs from the last saved (or loaded)
- * draft; LeaveGuard asks before leaving the builder then. A successful save makes the draft clean,
- * marking it before the create's own navigation so that navigation never asks.
+ * draft (compared by meaning, drills/draft-compare.ts); LeaveGuard asks before leaving the builder
+ * then. A successful save makes the draft clean; the create's own navigation skips the guard and
+ * carries any edit made while the create was in flight to the new drill (review round 1 B).
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -26,6 +27,8 @@ import { useAppApi } from "../../auth/index.js";
 import { Button } from "../../components/ui/index.js";
 import { errorCountsBySection, type BuilderSectionSlug } from "../../drills/builder-sections.js";
 import { draftToCreate, draftToPatch, type DraftResult, type DrillDraft } from "../../drills/draft.js";
+import { draftsEqual } from "../../drills/draft-compare.js";
+import { handOffDraft } from "../../drills/draft-handoff.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { groupFieldErrors } from "../../drills/field-errors.js";
 import { fieldErrorsOfFailure, omittedErrorsOfFailure } from "../../drills/problem.js";
@@ -52,7 +55,10 @@ export const FORM_TEXT = {
 } as const;
 
 export interface DrillFormProps {
+  /** The saved baseline: the stored drill as a draft, or the default draft for a new one. */
   initial: DrillDraft;
+  /** Where editing starts when it differs from the baseline: edits carried from the create (review round 1 B). */
+  start?: DrillDraft;
   /** The open page of the builder. */
   section: BuilderSectionSlug;
   /** The stored drill when editing; absent for a new drill. */
@@ -108,18 +114,21 @@ function errorsOf(result: DraftResult<SaveInput>): readonly FieldError[] {
   return result.ok ? [] : result.errors;
 }
 
-/** Drafts are plain data, so two with the same JSON hold the same edits. */
-function sameDraft(left: DrillDraft, right: DrillDraft): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
 interface AfterSave {
   setStatus: (status: string) => void;
   markClean: () => void;
+  /** The edits made since the save was sent, or undefined when there are none. */
+  unsentEdits: () => DrillDraft | undefined;
   section: BuilderSectionSlug;
 }
 
-function useAfterSave({ setStatus, markClean, section }: AfterSave) {
+/**
+ * After a save (review round 1 B): a patch says it saved; a create moves to the new drill's same
+ * page. That move is the builder's own, so it skips the leave guard, and any edit made while the
+ * create was in flight is handed to the new drill's builder (drills/draft-handoff.ts), where it
+ * stays an unsaved change and the next Save patches the new drill.
+ */
+function useAfterSave({ setStatus, markClean, unsentEdits, section }: AfterSave) {
   const navigate = useNavigate();
   return (saved: Drill, input: SaveInput) => {
     markClean();
@@ -127,7 +136,9 @@ function useAfterSave({ setStatus, markClean, section }: AfterSave) {
       setStatus(FORM_TEXT.changesSaved);
       return;
     }
-    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: "1" } }).catch((error: unknown) => {
+    const edits = unsentEdits();
+    if (edits !== undefined) handOffDraft(saved.id, edits);
+    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: "1" }, ignoreBlocker: true }).catch((error: unknown) => {
       console.error(`g-tee-oh: the builder navigation failed (${describeFailureForLog(error)})`);
     });
   };
@@ -154,28 +165,29 @@ function useDropSavedFlag(drillId: string | undefined, justCreated: boolean, sec
  * save the baseline is the draft that was sent (sentRef), so an edit made while the save was in
  * flight stays unsaved.
  */
-function useDraft(initial: DrillDraft) {
-  const [draft, setDraft] = useState(initial);
+function useDraft(initial: DrillDraft, start: DrillDraft = initial) {
+  const [draft, setDraft] = useState(start);
   const [baseline, setBaseline] = useState(initial);
-  const dirty = !sameDraft(draft, baseline);
+  const dirty = !draftsEqual(draft, baseline);
   const dirtyRef = useRef(dirty);
   const draftRef = useRef(draft);
   const sentRef = useRef(initial);
   dirtyRef.current = dirty;
   draftRef.current = draft;
   const markClean = () => {
-    dirtyRef.current = !sameDraft(draftRef.current, sentRef.current);
+    dirtyRef.current = !draftsEqual(draftRef.current, sentRef.current);
     setBaseline(sentRef.current);
   };
-  return { draft, setDraft, dirty, dirtyRef, sentRef, markClean };
+  const unsentEdits = () => (draftsEqual(draftRef.current, sentRef.current) ? undefined : draftRef.current);
+  return { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits };
 }
 
-export function DrillForm({ initial, section, drill, justCreated = false }: DrillFormProps) {
+export function DrillForm({ initial, start, section, drill, justCreated = false }: DrillFormProps) {
   const api = useAppApi();
-  const { draft, setDraft, dirty, dirtyRef, sentRef, markClean } = useDraft(initial);
+  const { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits } = useDraft(initial, start);
   const [checkedDraft, setCheckedDraft] = useState<DrillDraft | null>(null);
   const [status, setStatus] = useState(justCreated ? FORM_TEXT.saved : "");
-  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, section }));
+  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, unsentEdits, section }));
   useDropSavedFlag(drill?.id, justCreated, section);
 
   // Client errors show once Save was pressed, and then follow every edit.

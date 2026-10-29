@@ -162,6 +162,64 @@ describe("R3.14 the leave guard (PM note 3, O-405)", { timeout: PAGES_TEST_TIMEO
     await waitFor(() => expect(view.router.state.location.pathname).toBe("/drills"));
   });
 
+  it("R3.14 undoing an edit makes the draft clean, a panel toggled on and off included (review round 1, F)", async () => {
+    const { user } = await newBuilder();
+    await goTo(user, /^Panels/);
+    const group = screen.getByRole("group", { name: "Panels shown after a decision" });
+    const off = within(group)
+      .getAllByRole("checkbox")
+      .find((box) => !(box as HTMLInputElement).checked);
+    if (off === undefined) throw new Error("every panel is on by default");
+    await user.click(off);
+    expect(beforeUnloadBlocked()).toBe(true);
+    await user.click(off);
+    expect(beforeUnloadBlocked()).toBe(false);
+  });
+
+  it("R3.14 signing out with unsaved edits is never blocked (security review L4)", async () => {
+    const { user, view } = await newBuilder();
+    await user.type(screen.getByLabelText("Name"), "Unsaved at sign-out");
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(view.router.state.location.pathname.startsWith("/drills/new")).toBe(false));
+    expect(screen.queryByRole("dialog", { name: "Leave without saving?" })).not.toBeInTheDocument();
+  });
+
+  it("R3.14 an edit made while a create is in flight moves to the new drill as unsaved changes, and the next Save patches it (review round 1, B)", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = renderDrills("/drills/new", {
+      override: async (request) => {
+        if (request.method === "POST" && request.path === "/api/v1/drills") await held;
+        return undefined;
+      },
+    });
+    await screen.findByRole("heading", { level: 1, name: "New drill" });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Name"), "Created while typing");
+    await goTo(user, /^Seats/);
+    await user.click(within(screen.getByRole("group", { name: "Hero positions" })).getByRole("checkbox", { name: "BTN" }));
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await goTo(user, /^Name and tags/);
+    await user.type(screen.getByLabelText("Name"), " more");
+    release();
+    // The builder's own move to the new drill never asks, and the form is now the stored drill's.
+    await waitFor(() => expect(view.router.state.location.pathname).toMatch(UUID_PAGE));
+    expect(view.router.state.location.pathname.endsWith("/details")).toBe(true);
+    expect(screen.queryByRole("dialog", { name: "Leave without saving?" })).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("Name")).toHaveValue("Created while typing more");
+    // The carried edit is unsaved: leaving asks, and the next Save is a PATCH of the new drill.
+    await leaveByNav(user);
+    await user.click(within(await screen.findByRole("dialog", { name: "Leave without saving?" })).getByRole("button", { name: "Keep editing" }));
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await waitFor(() => expect(view.requests.filter((request) => request.method === "PATCH")).toHaveLength(1));
+    const patch = view.requests.find((request) => request.method === "PATCH");
+    expect(patch?.path).toBe(view.router.state.location.pathname.replace(/^\/drills\//, "/api/v1/drills/").replace(/\/details$/, ""));
+    expect(patch?.body).toEqual({ name: "Created while typing more" });
+    expect(view.sent("POST", "/api/v1/drills")).toHaveLength(1);
+  });
+
   it("R3.14 beforeunload is held only while the draft is dirty", async () => {
     const { user, view } = await newBuilder();
     expect(beforeUnloadBlocked()).toBe(false);

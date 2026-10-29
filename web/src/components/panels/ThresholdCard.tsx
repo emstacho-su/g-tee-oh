@@ -20,7 +20,7 @@ import { ActionSwatch } from "../trainer/ActionSwatch.js";
 import { InfoTip, RAISED_CLASS, cn } from "../ui/index.js";
 import type { NodeAction, ThresholdCardData } from "../../contracts.js";
 import { actionOfIndex } from "../../poker/action-index.js";
-import { exactActionLabel, formatShare } from "../../poker/format.js";
+import { exactActionLabel, formatWholePercent, wholePercent } from "../../poker/format.js";
 import { tokenActionLabel } from "../../poker/token-label.js";
 
 export interface ThresholdCardProps {
@@ -37,7 +37,6 @@ type Relative = ThresholdCardData["hand_position"]["relative"][number]["position
 
 const DEFAULT_TITLE = "Threshold card";
 const UNNAMED_ACTION = "Unnamed action";
-const WHOLE_PERCENT = 0;
 
 export const THRESHOLD_TIPS = {
   actions:
@@ -108,12 +107,12 @@ export const RANK_TEXT = {
   none: "No strength rank here: the hand is outside this range at this node",
 } as const;
 
-const WHOLE = 100;
+const EVERY_HAND_PERCENT = 100;
 
-/** The words for a positive rank_in_range, chosen after rounding to a whole percent. */
+/** The words for a positive rank_in_range, chosen after rounding to a whole percent (poker/format.ts). */
 export function rankText(rank: number): string {
-  const percent = Math.round(rank * WHOLE);
-  if (percent >= WHOLE) return RANK_TEXT.top;
+  const percent = wholePercent(rank);
+  if (percent >= EVERY_HAND_PERCENT) return RANK_TEXT.top;
   return RANK_TEXT.share(percent < 1 ? RANK_TEXT.underOne : `${percent}%`);
 }
 
@@ -132,7 +131,7 @@ function HandPosition({ card, heroHand }: { card: ThresholdCardData; heroHand: s
       )}
       <p>{ranked ? rankText(rank) : RANK_TEXT.none}</p>
       {ranked ? (
-        <p className="text-muted">{`Equity against the opponent's range: ${formatShare(position.equity_vs_villain, WHOLE_PERCENT)}`}</p>
+        <p className="text-muted">{`Equity against the opponent's range: ${formatWholePercent(position.equity_vs_villain)}`}</p>
       ) : null}
     </Tile>
   );
@@ -158,7 +157,7 @@ function ActionRow({ entry, card, actions, heroHand }: ActionRowProps) {
         <span id={nameId} className="font-semibold">
           {name}
         </span>
-        <span className="text-muted">{`Played by ${formatShare(entry.share_taking, WHOLE_PERCENT)} of the range`}</span>
+        <span className="text-muted">{`Played by ${formatWholePercent(entry.share_taking)} of the range`}</span>
       </span>
       {weakest === null ? (
         <span className="text-muted">No hand plays it at least half the time</span>
