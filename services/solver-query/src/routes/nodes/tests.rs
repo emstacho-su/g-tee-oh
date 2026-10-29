@@ -135,7 +135,8 @@ fn r3_12_action_shares_carry_their_reach_weighted_combos() {
     // (4 combos) and QQ at half (6 combos, 3 weighted). AKs raises, QQ calls half and raises
     // half, so the call share is 1.5 of 7 weighted combos and the raise share 5.5 of 7.
     let pair = PositionPair::new(Position::Bb, Position::Btn).expect("two seats");
-    let class = |name: &str| u16::from(name.parse::<gto_model::HandClass>().expect("a class").index());
+    let class =
+        |name: &str| u16::from(name.parse::<gto_model::HandClass>().expect("a class").index());
     let node = SolvedNode {
         key: NodeKey::preflop(ConfigId::new("cfg_6_online_100").expect("id"), pair, vec![]),
         to_act: Position::Bb,
@@ -148,8 +149,18 @@ fn r3_12_action_shares_carry_their_reach_weighted_combos() {
         ],
         hand_space: HandSpace::Preflop169,
         hands: vec![
-            SolvedHand { hand: class("AKs"), reach: Some([1.0, 1.0]), frequencies: vec![0.0, 0.0, 1.0], ev_bb: vec![0.0, 1.0, 2.0] },
-            SolvedHand { hand: class("QQ"), reach: Some([0.5, 1.0]), frequencies: vec![0.0, 0.5, 0.5], ev_bb: vec![0.0, 2.0, 2.0] },
+            SolvedHand {
+                hand: class("AKs"),
+                reach: Some([1.0, 1.0]),
+                frequencies: vec![0.0, 0.0, 1.0],
+                ev_bb: vec![0.0, 1.0, 2.0],
+            },
+            SolvedHand {
+                hand: class("QQ"),
+                reach: Some([0.5, 1.0]),
+                frequencies: vec![0.0, 0.5, 0.5],
+                ev_bb: vec![0.0, 2.0, 2.0],
+            },
         ],
         accuracy_pct_pot: None,
     };
