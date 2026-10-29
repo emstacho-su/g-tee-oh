@@ -323,3 +323,13 @@ describe("R3.31 PR #45 review round 1, finding 1: street and full-hand reveals n
     expect(transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 10 }, at: SHOWN_AT, endKey: "k-over" })).toMatchObject({ kind: "ending", key: "k-over" });
   });
 });
+
+describe("R3.31 PR #45 review round 2, finding 3: the session ends on the last played hand", () => {
+  it("R3.31 an over-limit prompt ends with the context of the last played hand, never the unplayed one", () => {
+    const LAST = { handNo: 4, ordinal: 10, decision: 2, stateVersion: PROMPT.state_version, heroPosition: "BB" } as const;
+    const context: SessionContext = { ...CONTEXT, length: 10, hand: LAST, trainer: { stop_rule: "end_of_street", pause: "never", speed: "fast", quick_result: false } };
+    const loading: SpotState = { kind: "loading_prompt", context, version: PROMPT.state_version };
+    const ended = transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 5, state_version: PROMPT.state_version + 1 }, at: SHOWN_AT, endKey: "k-over" });
+    expect(ended).toEqual({ kind: "ending", context, key: "k-over" });
+  });
+});

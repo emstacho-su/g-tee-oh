@@ -19,6 +19,7 @@ describe("R3.10 solver frequency of the chosen action", () => {
     expect(solverFrequency(fixtureFeedback, fixtureActions, CALL_INDEX)).toEqual({
       chosen: { label: "Call", share: 0.1 },
       top: { label: "Raise 2.5bb", share: 0.8 },
+      chosenIsTop: false,
     });
     expect(solverFrequencyText(fixtureFeedback, fixtureActions, CALL_INDEX)).toBe(
       "The solver takes Call 10.0% of the time; its most frequent action is Raise 2.5bb at 80.0%.",
@@ -49,5 +50,22 @@ describe("R3.10 solver frequency of the chosen action", () => {
     expect(solverFrequency(short, fixtureActions, RAISE_INDEX)).toBeNull();
     expect(solverFrequencyText(short, fixtureActions, RAISE_INDEX)).toBeNull();
     expect(solverFrequencyShort(short, fixtureActions, RAISE_INDEX)).toBeNull();
+  });
+});
+
+describe("R3.13 PR #45 review round 2, finding 5: a tie for the top share counts as most frequent", () => {
+  it("R3.13 a chosen action tied with an earlier one at the top share reads as the most frequent, not second to it", () => {
+    const tied: DecisionFeedback = { ...fixtureFeedback, freq_by_action: [0.4, 0.4, 0.2, 0] };
+    expect(solverFrequencyText(tied, fixtureActions, CALL_INDEX)).toBe("The solver takes Call 40.0% of the time, its most frequent action.");
+    expect(solverFrequencyText(tied, fixtureActions, 0)).toBe("The solver takes Fold 40.0% of the time, its most frequent action.");
+  });
+
+  it("R3.13 two actions with the same label are told apart by position", () => {
+    const actions = [
+      { index: 0, token: "r250", kind: "raise", size_cbb: 250, bucket: null, label: "Raise", next_node_key: null },
+      { index: 1, token: "r250b", kind: "raise", size_cbb: 250, bucket: null, label: "Raise", next_node_key: null },
+    ] as const;
+    const feedback: DecisionFeedback = { ...fixtureFeedback, freq_by_action: [0.7, 0.3] };
+    expect(solverFrequencyText(feedback, actions, 1)).toBe("The solver takes Raise 2.5bb 30.0% of the time; its most frequent action is Raise 2.5bb at 70.0%.");
   });
 });

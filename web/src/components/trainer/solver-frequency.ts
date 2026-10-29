@@ -4,7 +4,8 @@
  * The second self-grading number beside the EV lost: the chosen action's share of the hand's
  * strategy, read from the served freq_by_action by the action's position in the node's actions
  * (positional, as the contract defines it, O-198), and the most frequent action for comparison
- * (the largest served share, the first on a tie). Actions are named by exactActionLabel, the
+ * (the largest served share, the first on a tie; a chosen share equal to it counts as the most
+ * frequent, compared by position). Actions are named by exactActionLabel, the
  * summary's own naming. Nothing is computed beyond picking the largest share; a chosen index that
  * names no action, or a share the api did not send, gives null and the caller prints nothing.
  */
@@ -20,6 +21,12 @@ export interface SolverFrequencyEntry {
 export interface SolverFrequency {
   readonly chosen: SolverFrequencyEntry;
   readonly top: SolverFrequencyEntry;
+  /**
+   * True when no action has a larger share than the chosen one: it is the top action, or tied with
+   * it. Decided on the shares by position, never on labels, which two sizes can share (PR #45
+   * review round 2, finding 5).
+   */
+  readonly chosenIsTop: boolean;
 }
 
 type Frequencies = Pick<DecisionFeedback, "freq_by_action">;
@@ -47,6 +54,7 @@ export function solverFrequency(feedback: Frequencies, actions: readonly NodeAct
   return {
     chosen: { label: exactActionLabel(chosenAction), share },
     top: { label: exactActionLabel(topAction), share: topShare },
+    chosenIsTop: position === top || share >= topShare,
   };
 }
 
@@ -55,7 +63,7 @@ export function solverFrequencyText(feedback: Frequencies, actions: readonly Nod
   const frequency = solverFrequency(feedback, actions, chosenIndex);
   if (frequency === null) return null;
   const lead = `The solver takes ${frequency.chosen.label} ${formatShare(frequency.chosen.share)} of the time`;
-  if (frequency.top.label === frequency.chosen.label) return `${lead}, its most frequent action.`;
+  if (frequency.chosenIsTop) return `${lead}, its most frequent action.`;
   return `${lead}; its most frequent action is ${frequency.top.label} at ${formatShare(frequency.top.share)}.`;
 }
 

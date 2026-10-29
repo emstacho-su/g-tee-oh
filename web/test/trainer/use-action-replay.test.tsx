@@ -100,26 +100,30 @@ describe("R3.13 useActionReplay", () => {
     expect(result.current.shown).toBe(3);
   });
 
-  it("R3.30 Space typed into a field, on a button, inside a grid, or with a modifier does not finish the replay", () => {
+  it("R3.30 Space typed into a field, on a button or a tabindex widget, already handled, or with a modifier does not finish the replay", () => {
     const { result } = renderReplay(FIRST);
     const field = document.createElement("input");
     const button = document.createElement("button");
-    const grid = document.createElement("div");
-    grid.setAttribute("role", "grid");
-    const cell = document.createElement("span");
-    grid.append(cell);
-    document.body.append(field, button, grid);
+    const widget = document.createElement("div");
+    widget.tabIndex = 0;
+    const handled = document.createElement("div");
+    // A widget that handles Space itself prevents the default (PR #45 review round 2, finding 1).
+    handled.addEventListener("keydown", (event) => event.preventDefault());
+    document.body.append(field, button, widget, handled);
     act(() => void fireEvent.keyDown(field, { key: " " }));
     expect(result.current.replaying).toBe(true);
     act(() => void fireEvent.keyDown(button, { key: " " }));
     expect(result.current.replaying).toBe(true);
-    act(() => void fireEvent.keyDown(cell, { key: " " }));
+    act(() => void fireEvent.keyDown(widget, { key: " " }));
+    expect(result.current.replaying).toBe(true);
+    act(() => void fireEvent.keyDown(handled, { key: " " }));
     expect(result.current.replaying).toBe(true);
     act(() => void fireEvent.keyDown(window, { key: " ", ctrlKey: true }));
     expect(result.current.replaying).toBe(true);
     field.remove();
     button.remove();
-    grid.remove();
+    widget.remove();
+    handled.remove();
   });
 
   it("R3.13 while a dialog is open (keySkip off) Space does not finish the replay (review round 1, 6)", () => {

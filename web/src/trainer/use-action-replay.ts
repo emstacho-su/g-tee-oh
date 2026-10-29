@@ -70,25 +70,24 @@ export interface ActionReplay {
 
 /** The key that finishes a replay: the space bar (S46, R3.30, O-475; the digits were S38's). */
 const SKIP_KEY = " ";
-/** A focused matrix or table keeps Space for its own cell. */
-const GRID_SELECTOR = "[role='grid'], table";
-
 /** A field the user types into: Space there is text, never a skip (review round 1, 6). */
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || target.matches("input, textarea, select, [contenteditable='true']");
 }
 
-function isInsideGrid(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(GRID_SELECTOR) !== null;
-}
-
-/** Space with no modifier, pressed outside a field, a button or link, and a grid. */
+/**
+ * Space with no modifier, pressed outside a field and a focused control (dispatch.ts: a button,
+ * link, field or any tabindex widget such as the range matrix, never a disabled one), and not
+ * already handled by a widget (defaultPrevented: the matrix selects a cell on Space). This window
+ * listener runs in the bubble phase, after React's handlers (PR #45 review round 2, finding 1).
+ */
 function isSkipKey(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented) return false;
   if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
   if (event.key !== SKIP_KEY) return false;
   const { target } = event;
-  return !isEditable(target) && !isActivatableTarget(target) && !isInsideGrid(target);
+  return !isEditable(target) && !isActivatableTarget(target);
 }
 
 interface Track {

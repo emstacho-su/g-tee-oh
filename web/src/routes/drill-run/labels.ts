@@ -10,24 +10,8 @@
  * reserved for repeat hand (hotkeys/reserved.ts, O-473). The S and U keys of the confidence tap
  * left with it (O-345).
  */
-import { gradeWithMark } from "../../components/trainer/grade-definitions.js";
-import type { FeedbackLabel } from "../../contracts.js";
-
-export { REPEAT_HAND_KEY } from "../../hotkeys/index.js";
-/** The five label definitions and the roll note (S46, R3.8, ADR 0024), defined once beside the summary. */
-export { GRADE_DEFINITIONS, GRADE_ROLL_NOTE } from "../../components/trainer/grade-definitions.js";
-
-/**
- * The grade label in words with its chess-style mark, so color is never the only signal (S26),
- * built from the one source of names and marks (grade-definitions.tsx, PR #45 review round 1, 9b).
- */
-export const RESULT_LABELS: Readonly<Record<FeedbackLabel, string>> = {
-  best: gradeWithMark("best"),
-  correct: gradeWithMark("correct"),
-  inaccuracy: gradeWithMark("inaccuracy"),
-  mistake: gradeWithMark("mistake"),
-  blunder: gradeWithMark("blunder"),
-};
+// The grade names, marks and definitions live in components/trainer/grade-definitions.tsx (S46,
+// PR #45 review rounds 1 and 2), the reserved keys in hotkeys/reserved.ts; this file holds neither.
 
 export const LIBRARY_PATH = "/library";
 
