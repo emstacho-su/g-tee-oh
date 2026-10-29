@@ -270,4 +270,39 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     const code = await within(screen.getByRole("dialog")).findByLabelText<HTMLTextAreaElement>("Export code");
     expect(code.value).toMatch(/^gteeoh1\./);
   });
+
+  it("R3.14 Export and Duplicate are off while the draft is dirty: Save first: these act on the stored drill", async () => {
+    const user = userEvent.setup();
+    renderDrills(`/drills/${FIXTURE_DRILL_ID}`);
+    await screen.findByLabelText("Name");
+    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    await user.type(screen.getByLabelText("Name"), " edited");
+    expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeDisabled();
+    expect(screen.getByTestId("builder-actions-dirty")).toHaveTextContent("Save first: these act on the stored drill.");
+    expect(screen.getByRole("button", { name: "Export" })).toHaveAccessibleDescription("Save first: these act on the stored drill.");
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export" })).toBeEnabled());
+  });
+
+  it("R3.36 Save and run creates the drill and opens its run screen with autostart", async () => {
+    const { sent, router } = renderDrills("/drills/new");
+    const user = await openNew();
+    await fillRfiDrill(user);
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drills\/[0-9a-f-]{36}\/run$/));
+    expect(sent("POST", "/api/v1/drills")).toHaveLength(1);
+    // The run screen read the drill and started by itself, then dropped start=1 from the address (O-484).
+    await waitFor(() => expect(sent("POST", "/api/v1/sessions")).toHaveLength(1));
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("start"));
+  });
+
+  it("R3.36 Save and run on an unchanged stored drill opens the run screen without a write", async () => {
+    const user = userEvent.setup();
+    const { sent, router } = renderDrills(`/drills/${FIXTURE_DRILL_ID}`);
+    await screen.findByLabelText("Name");
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${FIXTURE_DRILL_ID}/run`));
+    expect(sent("PATCH", `/api/v1/drills/${FIXTURE_DRILL_ID}`)).toHaveLength(0);
+  });
 });

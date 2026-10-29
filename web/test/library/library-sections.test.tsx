@@ -120,4 +120,20 @@ describe("R3.4 R3.5 the library sections (O-406)", () => {
     expect(screen.getByRole("link", { name: "Set the overnight window in Settings" })).toHaveAttribute("href", "/settings/builder-schedule");
     expect(screen.queryByRole("region", { name: "Builder state" })).not.toBeInTheDocument();
   });
+
+  it.each(["coverage", "builder", "settings"] as const)("R3.4 the library nav marks the current section with a configuration in the address (%s)", async (section) => {
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, FIXTURE_QUEUE_PAIR, section));
+    const labels = { coverage: "Coverage", builder: "Builder state", settings: "Builder settings" } as const;
+    const nav = await screen.findByRole("navigation", { name: "Library sections" });
+    const link = await within(nav).findByRole("link", { name: labels[section] });
+    await waitFor(() => expect(link).toHaveAttribute("aria-current", "page"));
+    for (const other of within(sectionNav()).getAllByRole("link").filter((each) => each !== link)) expect(other).not.toHaveAttribute("aria-current");
+  });
+
+  it("R3.4 the main nav keeps its active pill with search params, and the phone row shows an end fade", async () => {
+    renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID, FIXTURE_QUEUE_PAIR));
+    const main = await screen.findByRole("navigation", { name: "Main" });
+    await waitFor(() => expect(within(main).getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page"));
+    expect(within(main).getByTestId("nav-end-fade")).toHaveAttribute("aria-hidden", "true");
+  });
 });
