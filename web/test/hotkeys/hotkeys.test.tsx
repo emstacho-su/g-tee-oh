@@ -12,6 +12,7 @@ import {
   SHORTCUTS_KEY,
   activeBindings,
   createHotkeyStore,
+  displayBinding,
   findBinding,
   handleKeydown,
   useHotkey,
@@ -28,6 +29,12 @@ interface ProbeProps {
 
 function Probe({ hotkey, description, scope = "Test", enabled = true, onPress }: ProbeProps) {
   useHotkey({ key: hotkey, description, scope, handler: onPress }, enabled);
+  return null;
+}
+
+/** A binding that needs Shift held (S46, R3.30, O-474). */
+function ShiftProbe({ hotkey, description, scope = "Test", enabled = true, onPress }: ProbeProps) {
+  useHotkey({ key: hotkey, shift: true, description, scope, handler: onPress }, enabled);
   return null;
 }
 
@@ -169,6 +176,64 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(onPress).toHaveBeenCalledOnce();
   });
 
+  it("R3.30 a shift binding answers only with Shift held, and a plain binding never answers with Shift held (O-474)", () => {
+    const plain = vi.fn();
+    const chord = vi.fn();
+    renderWithRoot(
+      <>
+        <Probe hotkey="e" description="Plain" onPress={plain} />
+        <ShiftProbe hotkey="e" description="Chord" onPress={chord} />
+      </>,
+    );
+    fireEvent.keyDown(window, { key: "E", shiftKey: true });
+    expect(chord).toHaveBeenCalledOnce();
+    expect(plain).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "e" });
+    expect(plain).toHaveBeenCalledOnce();
+    expect(chord).toHaveBeenCalledOnce();
+  });
+
+  it("R3.30 a plain binding and its shift chord are two bindings, both active", () => {
+    const store = createHotkeyStore();
+    store.getState().register({ key: "e", description: "Plain", scope: "S", handler: vi.fn() });
+    store.getState().register({ key: "e", shift: true, description: "Chord", scope: "S", handler: vi.fn() });
+    expect(findBinding(store.getState().bindings, "e")?.description).toBe("Plain");
+    expect(findBinding(store.getState().bindings, "E", true)?.description).toBe("Chord");
+    expect(activeBindings(store.getState().bindings).map((binding) => binding.description)).toEqual(["Plain", "Chord"]);
+  });
+
+  it("R3.30 a focused link or disclosure keeps Enter, every control keeps Space, a plain button yields Enter", () => {
+    const onEnter = vi.fn();
+    const onSpace = vi.fn();
+    renderWithRoot(
+      <>
+        <Probe hotkey="Enter" description="Next" onPress={onEnter} />
+        <Probe hotkey=" " description="Skip" onPress={onSpace} />
+        <button type="button" aria-expanded="false">
+          section
+        </button>
+        <button type="button" aria-pressed="true">
+          option
+        </button>
+        <a href="#x">link</a>
+        <p data-testid="text">text</p>
+      </>,
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "section" }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("link", { name: "link" }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "section" }), { key: " " });
+    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: " " });
+    expect(onEnter).not.toHaveBeenCalled();
+    expect(onSpace).not.toHaveBeenCalled();
+    // A plain button (a quiz option, aria-pressed) yields Enter to the binding, as before S46 (R3.16).
+    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
+    expect(onEnter).toHaveBeenCalledOnce();
+    fireEvent.keyDown(screen.getByTestId("text"), { key: "Enter" });
+    fireEvent.keyDown(window, { key: " " });
+    expect(onEnter).toHaveBeenCalledTimes(2);
+    expect(onSpace).toHaveBeenCalledOnce();
+  });
+
   it("R3.13 handleKeydown reports whether it handled the key", () => {
     const store = createHotkeyStore();
     store.getState().register({ key: "x", description: "X", scope: "S", handler: vi.fn() });
@@ -207,6 +272,24 @@ describe("R3.13 ShortcutsOverlay", () => {
     const general = within(overlay).getByRole("region", { name: "General" });
     expect(within(general).getByText("?")).toBeInTheDocument();
     expect(within(general).getByText("Show keyboard shortcuts")).toBeInTheDocument();
+  });
+
+  it("R3.30 lists the reserved keys under their scope with no handler behind them", async () => {
+    renderWithRoot(<Probe hotkey="n" description="Next hand" scope="Session" onPress={vi.fn()} />);
+    await userEvent.keyboard("?");
+    const overlay = within(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).getByTestId("shortcuts-overlay");
+    const session = within(overlay).getByRole("region", { name: "Session" });
+    expect(within(session).getByText("R")).toBeInTheDocument();
+    expect(within(session).getByText(/Repeat hand/)).toHaveTextContent("reserved");
+  });
+
+  it("R3.30 prints a shift binding as Shift+ the keycap", async () => {
+    renderWithRoot(<ShiftProbe hotkey="e" description="End session" scope="Session" onPress={vi.fn()} />);
+    await userEvent.keyboard("?");
+    const overlay = within(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).getByTestId("shortcuts-overlay");
+    expect(within(overlay).getByText("Shift+E")).toBeInTheDocument();
+    expect(displayBinding({ key: "e", shift: true })).toBe("Shift+E");
+    expect(displayBinding({ key: "Enter" })).toBe("Enter");
   });
 
   it("R3.13 does not dispatch other hotkeys while open, and Escape closes it", async () => {

@@ -35,7 +35,7 @@ function endScript(recap: SessionRecap) {
 async function startAndEnd(view: TrainView): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole("button", { name: "Start training" }));
   await screen.findByRole("group", { name: "Actions" });
-  await userEvent.keyboard("e");
+  await userEvent.keyboard("{Shift>}e{/Shift}");
   const dialog = await screen.findByRole("dialog", { name: "End this session?" });
   await userEvent.click(within(dialog).getByRole("button", { name: "End session" }));
   expect(view.sentTo(AUTOMATED_PATHS.end)).toHaveLength(1);
@@ -124,7 +124,7 @@ describe("R4.12 progress refresh on end (O-326)", () => {
     view.queryClient.setQueryData(progressKeys.rating, fixtureRating);
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     await screen.findByRole("group", { name: "Actions" });
-    await userEvent.keyboard("e");
+    await userEvent.keyboard("{Shift>}e{/Shift}");
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
     expect(await screen.findByText("Ending the session")).toBeInTheDocument();
     expect(view.queryClient.getQueryState(progressKeys.rating)?.isInvalidated).toBe(false);

@@ -58,10 +58,12 @@ describe("R3.13 the replay gates the drill run's action bar", () => {
     expect(screen.getByRole("log", { name: "Action this hand" })).toHaveTextContent("Your turn");
   });
 
-  it("R3.13 an action key during the replay finishes it without submitting a decision", async () => {
+  it("R3.30 Space during the replay finishes it without submitting; an action key does nothing (O-475)", async () => {
     const view = await startWithMotion();
     expect(actionButtons()[0]).toBeDisabled();
-    await userEvent.keyboard("1");
+    await userEvent.keyboard("1f");
+    expect(actionButtons()[0], "an action key neither skips nor submits during the replay").toBeDisabled();
+    await userEvent.keyboard(" ");
     for (const button of actionButtons()) expect(button).toBeEnabled();
     expect(view.sentTo(DECIDE_PATH)).toHaveLength(0);
     expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();

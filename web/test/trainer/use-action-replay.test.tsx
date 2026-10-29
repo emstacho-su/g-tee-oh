@@ -89,38 +89,45 @@ describe("R3.13 useActionReplay", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("R3.13 an action key (1 to 9) finishes the replay instantly; other keys do not (PM note b)", () => {
+  it("R3.30 Space finishes the replay instantly; action keys and letters do not (O-475)", () => {
     const { result } = renderReplay(FIRST);
     act(() => void fireEvent.keyDown(window, { key: "a" }));
-    expect(result.current.replaying).toBe(true);
     act(() => void fireEvent.keyDown(window, { key: "1" }));
+    act(() => void fireEvent.keyDown(window, { key: "f" }));
+    expect(result.current.replaying).toBe(true);
+    act(() => void fireEvent.keyDown(window, { key: " " }));
     expect(result.current.replaying).toBe(false);
     expect(result.current.shown).toBe(3);
   });
 
-  it("R3.13 a digit typed into a field, or pressed with a modifier, does not finish the replay (review round 1, 6)", () => {
+  it("R3.30 Space typed into a field, on a button, inside a grid, or with a modifier does not finish the replay", () => {
     const { result } = renderReplay(FIRST);
     const field = document.createElement("input");
-    document.body.append(field);
-    act(() => void fireEvent.keyDown(field, { key: "1" }));
+    const button = document.createElement("button");
+    const grid = document.createElement("div");
+    grid.setAttribute("role", "grid");
+    const cell = document.createElement("span");
+    grid.append(cell);
+    document.body.append(field, button, grid);
+    act(() => void fireEvent.keyDown(field, { key: " " }));
     expect(result.current.replaying).toBe(true);
-    const editable = document.createElement("div");
-    editable.setAttribute("contenteditable", "true");
-    document.body.append(editable);
-    act(() => void fireEvent.keyDown(editable, { key: "2" }));
+    act(() => void fireEvent.keyDown(button, { key: " " }));
     expect(result.current.replaying).toBe(true);
-    act(() => void fireEvent.keyDown(window, { key: "3", ctrlKey: true }));
+    act(() => void fireEvent.keyDown(cell, { key: " " }));
+    expect(result.current.replaying).toBe(true);
+    act(() => void fireEvent.keyDown(window, { key: " ", ctrlKey: true }));
     expect(result.current.replaying).toBe(true);
     field.remove();
-    editable.remove();
+    button.remove();
+    grid.remove();
   });
 
-  it("R3.13 while a dialog is open (keySkip off) an action key does not finish the replay (review round 1, 6)", () => {
+  it("R3.13 while a dialog is open (keySkip off) Space does not finish the replay (review round 1, 6)", () => {
     const { result, rerender } = renderReplay(FIRST, { reducedMotion: false, keySkip: false });
-    act(() => void fireEvent.keyDown(window, { key: "1" }));
+    act(() => void fireEvent.keyDown(window, { key: " " }));
     expect(result.current.replaying).toBe(true);
     rerender({ current: FIRST, opts: { reducedMotion: false, keySkip: true } });
-    act(() => void fireEvent.keyDown(window, { key: "1" }));
+    act(() => void fireEvent.keyDown(window, { key: " " }));
     expect(result.current.replaying).toBe(false);
   });
 

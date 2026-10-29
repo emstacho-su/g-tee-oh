@@ -345,26 +345,42 @@ describe("R3.13 feedback, next and prefetch", () => {
 });
 
 describe("R3.13 hotkeys drive the same transitions as clicks (O-285)", () => {
-  it("R3.13 1 to 9 choose and submit, N goes to the next hand, E then the confirm ends the session (O-345)", async () => {
+  it("R3.30 the size digit submits, Enter goes to the next hand, Shift+E then the confirm ends the session (O-345)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await startSession(view);
     view.clock.now = COMMITTED_AT;
-    await userEvent.keyboard("3");
+    // The raise is the first size at the node, so its key is 1 whatever stands before it (O-475).
+    await userEvent.keyboard("1");
     await screen.findByTestId("feedback-panel");
     expect(view.sentTo(DECIDE_PATH)[0]?.body).toEqual({
       state_version: fixturePlainPrompt.state_version,
       action_index: 2,
       response_ms: COMMITTED_AT - SHOWN_AT,
     });
-    await userEvent.keyboard("s");
-    expect(view.sentTo(DECIDE_PATH), "S is no longer a key").toHaveLength(1);
-    await userEvent.keyboard("n");
+    await userEvent.keyboard("r");
+    expect(screen.getByTestId("feedback-panel"), "R is reserved and does nothing").toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
     expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
     await userEvent.keyboard("e");
+    expect(screen.queryByRole("dialog", { name: "End this session?" }), "a bare E no longer ends").not.toBeInTheDocument();
+    await userEvent.keyboard("{Shift>}e{/Shift}");
     const dialog = await screen.findByRole("dialog", { name: "End this session?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "End session" }));
     expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
     expect(view.sentTo(END_PATH)).toHaveLength(1);
+  });
+
+  it("R3.30 the letter of the kind submits (F folds), the bar marks the chosen button, and N still goes on", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    view.clock.now = COMMITTED_AT;
+    await userEvent.keyboard("f");
+    await screen.findByTestId("feedback-panel");
+    expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ action_index: 0 });
+    expect(screen.getByRole("button", { name: "Fold" }), "the chosen action stays marked on the strip (critic G10)").toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: RAISE_NAME })).not.toHaveAttribute("aria-pressed");
+    await userEvent.keyboard("n");
+    expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
   });
 
   it("R3.13 N does nothing before the feedback", async () => {
