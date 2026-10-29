@@ -1,0 +1,26 @@
+{
+  "$comment": "Screen families for the automated screen review (S44). First matching family wins, so order from most to least specific. lane is the bridge-sprint session that owns fixes for the family; rules are the ids in rules.md the critic applies on top of the global checks (G*).",
+  "lanes": {
+    "S45": { "title": "Study browser" },
+    "S46": { "title": "Trainer loop and grading" },
+    "S47": { "title": "Drills, progress and shell" },
+    "S48": { "title": "Other screens (director)" }
+  },
+  "families": [
+    { "id": "design", "match": "^(design-|gallery-design)", "lane": "S48", "rules": [] },
+    { "id": "range-matrix", "match": "^gallery-range-matrix", "lane": "S45", "rules": ["R2", "R3", "R7", "R12"] },
+    { "id": "study", "match": "^study", "lane": "S45", "rules": ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R12"] },
+    { "id": "trainer-feedback", "match": "^(trainer-|feedback-|gallery-feedback)", "lane": "S46", "rules": ["R5", "R6", "R9", "R10", "R11"] },
+    { "id": "train", "match": "^train-", "lane": "S46", "rules": ["R6", "R9", "R10", "R11"] },
+    { "id": "street", "match": "^street-", "lane": "S46", "rules": ["R6", "R9", "R10"] },
+    { "id": "gallery-table", "match": "^(gallery-|shortcuts-overlay)", "lane": "S46", "rules": ["R7", "R9", "R11"] },
+    { "id": "drills", "match": "^drills-", "lane": "S47", "rules": ["R4", "R8", "R10"] },
+    { "id": "library", "match": "^(library-|coverage-|placeholder-library)", "lane": "S47", "rules": ["R4", "R8"] },
+    { "id": "progress", "match": "^progress-", "lane": "S47", "rules": ["R4", "R10", "R11"] },
+    { "id": "home-settings", "match": "^(home|settings)", "lane": "S47", "rules": ["R7", "R10", "R11"] },
+    { "id": "onboarding", "match": "^(login|join|redirecting)", "lane": "S47", "rules": [] },
+    { "id": "quiz", "match": "^quiz-", "lane": "S47", "rules": ["R11"] },
+    { "id": "paint", "match": "^paint-", "lane": "S47", "rules": ["R2", "R4", "R11"] },
+    { "id": "ask", "match": "^ask-", "lane": "S48", "rules": [] }
+  ]
+}
