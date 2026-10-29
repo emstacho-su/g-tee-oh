@@ -32,6 +32,8 @@ export interface MatrixLegendProps {
   evScaleBb: number;
   /** Compare to best: the compared action's position and the scale end for it; null when none can be compared. */
   lens?: { readonly position: number; readonly scalePctPot: number } | null;
+  /** Leaves the action rows out where an action table beside the matrix is the legend (S45, design rule 3). */
+  hideActions?: boolean;
 }
 
 export const LEGEND_TEXT = {
@@ -111,10 +113,12 @@ function CompareLegend({ actions, theme, lens }: Pick<MatrixLegendProps, "action
   );
 }
 
-export const MatrixLegend = memo(function MatrixLegend({ mode, actions, theme, evScaleBb, lens = null }: MatrixLegendProps) {
+export const MatrixLegend = memo(function MatrixLegend({ mode, actions, theme, evScaleBb, lens = null, hideActions = false }: MatrixLegendProps) {
   const palette = MATRIX_PALETTES[theme];
-  if (mode === "frequency") return <ActionLegend actions={actions} />;
-  if (mode === "strategy_ev") return <ActionLegend actions={actions} note={LEGEND_TEXT.strategyEv} />;
+  if (mode === "frequency") return hideActions ? null : <ActionLegend actions={actions} />;
+  if (mode === "strategy_ev") {
+    return hideActions ? <p className="text-xs text-muted">{LEGEND_TEXT.strategyEv}</p> : <ActionLegend actions={actions} note={LEGEND_TEXT.strategyEv} />;
+  }
   if (mode === "compare") return <CompareLegend actions={actions} theme={theme} lens={lens} />;
   if (mode === "ev") {
     return (

@@ -27,11 +27,16 @@ export interface StudySearch {
   hand?: string;
   /** Compare to best (S45, R3.24, O-462): the compared action's NodeAction.index. */
   lens?: number;
+  /** Action filters (S45, R3.12, O-468): a comma list of distinct NodeAction.index values, for example 0,2. */
+  filters?: string;
 }
 
 export const STUDY_MODES: readonly MatrixMode[] = ["frequency", "ev", "weight", "strategy_ev", "compare"];
 /** NodeAction.index is a byte in solver-query's record (ActionView.index: u8). */
 export const MAX_ACTION_INDEX = 255;
+/** Room for eight three-digit indexes: more actions than any node holds. */
+export const MAX_FILTERS_LENGTH = 32;
+const FILTERS_PATTERN = /^\d{1,3}(,\d{1,3})*$/;
 export const MIN_TABLE_SIZE = 2;
 export const MAX_TABLE_SIZE = 9;
 /** Upper bound on a depth in centi-big-blinds (1,000 bb, the drill schema's depth limit). */
@@ -57,6 +62,15 @@ function oneOf<T extends string>(value: unknown, options: readonly T[]): T | und
   return options.find((option) => option === value);
 }
 
+/** A comma list of distinct action indexes within the byte range, else undefined. */
+function filterList(value: unknown): string | undefined {
+  const text = matching(value, FILTERS_PATTERN, MAX_FILTERS_LENGTH);
+  if (text === undefined) return undefined;
+  const indexes = text.split(",").map(Number);
+  const distinct = new Set(indexes).size === indexes.length;
+  return distinct && indexes.every((index) => index <= MAX_ACTION_INDEX) ? text : undefined;
+}
+
 /** The valid parameters of a /study URL; anything else is dropped. */
 export function validateStudySearch(search: Record<string, unknown>): StudySearch {
   const entries: [keyof StudySearch, unknown][] = [
@@ -69,6 +83,7 @@ export function validateStudySearch(search: Record<string, unknown>): StudySearc
     ["mode", oneOf(search["mode"], STUDY_MODES)],
     ["hand", matching(search["hand"], HAND_CLASS_PATTERN, MAX_LINE_LENGTH)],
     ["lens", integerIn(search["lens"], 0, MAX_ACTION_INDEX)],
+    ["filters", filterList(search["filters"])],
   ];
   const kept: StudySearch = Object.fromEntries(entries.filter(([, value]) => value !== undefined));
   return kept;

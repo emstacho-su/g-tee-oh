@@ -37,6 +37,7 @@
  */
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
+import { exactActionLabel } from "../../poker/format.js";
 import { GRID_SIZE } from "../../poker/hands.js";
 import type { ThemeName } from "../../theme/action-style.js";
 import { MODE_NAMES, cellDetailText, cellText } from "./cell-text.js";
@@ -66,6 +67,10 @@ export interface RangeMatrixProps {
   scaleByWeight?: boolean;
   /** The hand under the pointer, or null when it leaves the canvas (R3.25); never written to the address here. */
   onHoverHand?: (hand: string | null) => void;
+  /** The action filters (R3.12, O-468): NodeAction.index values whose shares alone are painted; unknown ones are ignored. */
+  highlightIndexes?: readonly number[];
+  /** Whether the legend lists the actions; false where an action table beside the matrix is the legend (design rule 3). */
+  legendActions?: boolean;
 }
 
 export const DEFAULT_MATRIX_SIZE_PX = 520;
@@ -128,6 +133,8 @@ export function RangeMatrix({
   lensIndex = null,
   scaleByWeight = false,
   onHoverHand,
+  highlightIndexes,
+  legendActions = true,
 }: RangeMatrixProps) {
   const model = useMemo(() => buildMatrixModel(node), [node]);
   const tableId = useId();
@@ -139,6 +146,13 @@ export function RangeMatrix({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const popOutControl = usePopOut(popOut, indexOfHand(model.cells, initialPopOutHand), canvasRef);
   const lens = useMemo(() => lensOf(model, mode, lensIndex), [model, mode, lensIndex]);
+  // Keyed by the list's content, so a new array with the same indexes keeps the memoised set.
+  const highlightKey = (highlightIndexes ?? []).join(",");
+  const highlighted = useMemo(
+    () => (highlightKey === "" ? [] : model.actions.filter((action) => highlightKey.split(",").map(Number).includes(action.index))),
+    [model, highlightKey],
+  );
+  const highlight = useMemo(() => new Set(highlighted.map((action) => model.actions.indexOf(action))), [model, highlighted]);
 
   useMatrixCanvas(canvasRef, model, {
     mode,
@@ -150,6 +164,7 @@ export function RangeMatrix({
     scaleByWeight,
     lensPosition: lens?.position ?? null,
     hoveredIndex,
+    highlight,
   });
 
   function focusCell(index: number): void {
@@ -218,7 +233,8 @@ export function RangeMatrix({
   }
 
   const backing = Math.round(sizePx * pixelRatio);
-  const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands`;
+  const filtered = highlighted.length === 0 ? "" : `, filtered to ${highlighted.map(exactActionLabel).join(", ")}`;
+  const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands${filtered}`;
   // An open pop-out shows the hovered cell while the pointer is over the canvas (R3.25).
   const openIndex = popOutControl.index === null ? null : (hoveredIndex ?? popOutControl.index);
   const openCell = openIndex === null ? undefined : model.cells[openIndex];
@@ -258,7 +274,7 @@ export function RangeMatrix({
         {announcement}
       </p>
       <div className="mt-2">
-        <MatrixLegend mode={mode} actions={model.actions} theme={theme} evScaleBb={model.evScaleBb} lens={lens} />
+        <MatrixLegend mode={mode} actions={model.actions} theme={theme} evScaleBb={model.evScaleBb} lens={lens} hideActions={!legendActions} />
       </div>
       <div className="sr-only">
         <RangeMatrixTable model={model} mode={mode} id={tableId} {...(lens === null ? {} : { lens: lens.position })} />

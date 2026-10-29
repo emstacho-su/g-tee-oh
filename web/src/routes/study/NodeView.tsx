@@ -36,7 +36,9 @@ import { exactActionLabel, formatCbb } from "../../poker/format.js";
 import { useThemeStore } from "../../store/theme.js";
 import { lineLabel } from "../../study/line.js";
 import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
+import { nextFilterState, parseFilters } from "../../study/action-filters.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
+import { FilterChips } from "./FilterChips.js";
 import { HandInsights } from "./HandInsights.js";
 import { LineEscape } from "./LineEscape.js";
 import { NodeActionsPanel } from "./NodeActionsPanel.js";
@@ -72,6 +74,8 @@ export interface NodeViewProps {
   onOpenLine: (line: string) => void;
   /** Compare to best: another action to compare (R3.24). */
   onLensChange: (lens: number) => void;
+  /** The action filter set (R3.12, O-468); with `compare`, Compare to Best opens on that action. */
+  onFiltersChange: (filters: readonly number[], compare?: number) => void;
 }
 
 function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string | undefined): void {
@@ -133,7 +137,7 @@ function LensControls({ node, mode, lensPosition, scaleByWeight, onScaleByWeight
   );
 }
 
-export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange }: NodeViewProps) {
+export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange }: NodeViewProps) {
   const theme = useThemeStore((state) => state.theme);
   const sizePx = useMatrixSize();
   const preflop = node.street === "preflop";
@@ -142,6 +146,11 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
   const [scaleByWeight, setScaleByWeight] = useScaleByWeight(node);
   const [hovered, setHovered] = useState<string | null>(null);
   const rowHand = hovered ?? search.hand;
+  const filters = useMemo(() => parseFilters(search), [search]);
+  const toggleFilter = (index: number) => {
+    const next = nextFilterState(filters, index);
+    onFiltersChange(next.filters, next.compare ?? undefined);
+  };
   useCompleteNodeSwitch(node.node_key, preflop, search.line);
 
   return (
@@ -166,6 +175,12 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
               onScaleByWeight={setScaleByWeight}
               onLensChange={onLensChange}
             />
+            <FilterChips
+              actions={node.actions}
+              filters={filters}
+              onRemove={(index) => onFiltersChange(filters.filter((kept) => kept !== index))}
+              onClear={() => onFiltersChange([])}
+            />
             <RangeMatrix
               node={node}
               mode={mode}
@@ -176,10 +191,12 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
               lensIndex={search.lens ?? null}
               scaleByWeight={scaleByWeight}
               onHoverHand={setHovered}
+              highlightIndexes={filters}
+              legendActions={false}
             />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <NodeActionsPanel node={node} hand={rowHand} />
+            <NodeActionsPanel node={node} hand={rowHand} filters={filters} onToggleFilter={toggleFilter} />
             <HandInsights api={api} node={node} hand={search.hand} />
           </div>
         </div>

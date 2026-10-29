@@ -10,6 +10,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { describeFailureForLog } from "../api/http-status.js";
 import type { MatrixMode } from "../components/range-matrix/model.js";
+import { withFilters } from "./action-filters.js";
 import { withHand, withLens, withLine, withMode } from "./filters.js";
 import { useNodeSwitchMetrics } from "./node-switch-metrics.js";
 import type { StudySearch } from "./search.js";
@@ -23,6 +24,8 @@ export interface StudyNavigation {
   setHand: (hand: string) => void;
   /** Compares another action in the compare lens (a replace, S45, R3.24). */
   setLens: (lens: number) => void;
+  /** Writes the action filter set (a replace, S45, O-468); with `compare`, also opens Compare to Best on that action. */
+  setFilters: (filters: readonly number[], compare?: number) => void;
 }
 
 export function useStudyNavigation(search: StudySearch): StudyNavigation {
@@ -47,5 +50,9 @@ export function useStudyNavigation(search: StudySearch): StudyNavigation {
     setMode: (mode) => go(withMode(search, mode), true),
     setHand: (hand) => go(withHand(search, hand), true),
     setLens: (lens) => go(withLens(search, lens), true),
+    setFilters: (filters, compare) => {
+      const next = withFilters(search, filters);
+      go(compare === undefined ? next : withLens(withMode(next, "compare"), compare), true);
+    },
   };
 }

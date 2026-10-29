@@ -39,6 +39,12 @@ export function formatWholePercent(share: number): string {
   return `${wholePercent(share)}%`;
 }
 
+/** A reach-weighted combo count as whole combos with a thousands separator: formatCombos(503.9) is "504 combos" (S45, O-469). */
+export function formatCombos(combos: number): string {
+  const whole = Math.round(combos);
+  return `${whole.toLocaleString("en-US")} ${whole === 1 ? "combo" : "combos"}`;
+}
+
 /** A value already in percent: formatPercent(1.25) is "1.25%". */
 export function formatPercent(percent: number, decimals = 2): string {
   return `${percent.toFixed(decimals)}%`;

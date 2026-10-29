@@ -45,8 +45,8 @@ export const NOT_IN_LIBRARY = "Not in the library";
 
 /** Filters a depth change keeps; every other change clears all filters below it. */
 const KEPT_BELOW: Readonly<Partial<Record<FilterKey, readonly FilterKey[]>>> = { depth: ["pair"] };
-/** Parameters that belong to one node and go whenever a filter changes. */
-const NODE_KEYS: readonly (keyof StudySearch)[] = ["line", "hand"];
+/** Parameters that belong to one node and go whenever a filter changes (S45: the action filters and the lens too). */
+const NODE_KEYS: readonly (keyof StudySearch)[] = ["line", "hand", "filters", "lens"];
 
 /** The distinct values, ascending; shared with settings.ts (S39). */
 export function distinctSorted(values: readonly number[]): number[] {

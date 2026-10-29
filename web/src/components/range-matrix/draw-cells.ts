@@ -4,7 +4,9 @@
  * bars scaled to the cell's range weight when asked, O-465), the diverging expected value (EV) step,
  * the weight step filling the whole cell, and the compare-to-best step from the chosen action's
  * served loss (O-462, O-464). Missing hands, unknown weights (weight mode) and zero weights (scaled
- * bars) take the missing fill and hatch. Pure over the MatrixCanvasContext slice; the frame context
+ * bars) take the missing fill and hatch. With a highlight set (the action filters, O-468) the bar
+ * lenses paint only the highlighted actions' shares, in place, and every lens dims a hand that plays
+ * none of them under a translucent overlay, hatch and letters left showing. Pure over the MatrixCanvasContext slice; the frame context
  * holds everything resolved once per frame, so nothing is allocated per cell.
  */
 import type { NodeAction } from "../../contracts.js";
@@ -53,6 +55,8 @@ export interface FrameContext {
   readonly scaleByWeight: boolean;
   /** The compared action's position and scale end in compare mode; null outside it or with no action. */
   readonly lens: { readonly position: number; readonly scalePctPot: number } | null;
+  /** The highlighted action positions (O-468), or null when nothing is filtered. */
+  readonly highlight: ReadonlySet<number> | null;
 }
 
 /** What lastPlayedPosition returns when no action has a positive frequency. */
@@ -112,8 +116,11 @@ function drawFrequencyCell(frame: FrameContext, cell: MatrixCell, rect: Rect): v
     if (frequency <= 0 || paint === undefined) return;
     cumulative += frequency;
     const right = position === last ? band.x + band.w : band.x + Math.round(Math.min(1, cumulative) * band.w);
-    fillWith(ctx, paint.color, left, band.y, right - left, band.h);
-    if (paint.pattern !== null) fillWith(ctx, paint.pattern, left, band.y, right - left, band.h);
+    // A share the filters leave out keeps its place but stays the ground (O-468).
+    if (frame.highlight === null || frame.highlight.has(position)) {
+      fillWith(ctx, paint.color, left, band.y, right - left, band.h);
+      if (paint.pattern !== null) fillWith(ctx, paint.pattern, left, band.y, right - left, band.h);
+    }
     left = right;
   });
 }
@@ -146,6 +153,12 @@ export function drawCellFill(frame: FrameContext, cell: MatrixCell, rect: Rect):
     const fill = lens === null ? palette.missingFill : lossFill(palette, cell.lossPctPot[lens.position] ?? 0, lens.scalePctPot);
     fillWith(ctx, fill, rect.x, rect.y, rect.w, rect.h);
   } else fillWith(ctx, weightFill(palette, cell.weight) ?? palette.missingFill, rect.x, rect.y, rect.w, rect.h);
+}
+
+/** True when the filters leave the hand out: present, filtered, and playing none of the highlighted actions. */
+export function dimmed(frame: FrameContext, cell: MatrixCell): boolean {
+  if (frame.highlight === null || !cell.present) return false;
+  return [...frame.highlight].every((position) => (cell.frequencies[position] ?? 0) <= 0);
 }
 
 /** The ink of a cell's texts: the label colour on a chip, else the step's own ink. */

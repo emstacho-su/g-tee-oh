@@ -45,6 +45,8 @@ export interface StudyNodeAreaProps {
   onOpenLine: (line: string) => void;
   /** Compare to best: another action to compare (S45, R3.24). */
   onLensChange: (lens: number) => void;
+  /** The action filter set (S45, R3.12, O-468). */
+  onFiltersChange: (filters: readonly number[], compare?: number) => void;
 }
 
 interface LineCarouselProps {
@@ -75,7 +77,7 @@ function LineCarousel({ api, configId, pair, seats, node, line, onOpenLine }: Li
   );
 }
 
-export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine, onLensChange }: StudyNodeAreaProps) {
+export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange }: StudyNodeAreaProps) {
   const metrics = useNodeSwitchMetrics();
   const node = useQuery(studyNodeQuery(api, { configId, pair: pair.pair, line: search.line ?? "" }));
   usePrefetchNextLikely(api, node.data, configId, pair.pair);
@@ -114,6 +116,7 @@ export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange
       onSelectHand={onSelectHand}
       onOpenLine={onOpenLine}
       onLensChange={onLensChange}
+      onFiltersChange={onFiltersChange}
     />
   );
 }

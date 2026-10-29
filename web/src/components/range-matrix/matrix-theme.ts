@@ -45,6 +45,8 @@ export interface MatrixPalette {
   /** A thin line inside the focus ring, so the ring shows on any fill. */
   readonly focusHalo: string;
   readonly selected: string;
+  /** Over a hand the action filters leave out (S45, O-468): the ground, translucent, so the hatch and letters show through. */
+  readonly dimOverlay: string;
 }
 
 /** A palette with the ink per step resolved once. */
@@ -91,6 +93,7 @@ const LIGHT: MatrixPalette = {
   focus: LIGHT_TEXT, // --focus: var(--text), with the ground halo inside (O-433)
   focusHalo: LIGHT_GROUND, // --focus-halo: var(--surface-raised)
   selected: "#8c1c13", // --selected: var(--accent), the 8c1c13 oxblood palette value (O-434)
+  dimOverlay: "rgba(251, 247, 241, 0.65)", // --surface-raised, translucent
 };
 
 /** --surface-raised (dark): the matrix ground and the halo inside its focus and selection marks (--focus-halo). */
@@ -129,6 +132,7 @@ const DARK: MatrixPalette = {
   focus: DARK_TEXT, // --focus (dark): var(--text), a neutral near-white apart from the red EV and raise fills (O-432)
   focusHalo: DARK_GROUND, // --focus-halo: var(--surface-raised)
   selected: "#ffb3ab", // --selected (dark): bf4342 brick, lifted past the accent (O-434)
+  dimOverlay: "rgba(30, 30, 30, 0.65)", // --surface-raised (dark), translucent
 };
 
 function resolve(palette: MatrixPalette): ResolvedPalette {

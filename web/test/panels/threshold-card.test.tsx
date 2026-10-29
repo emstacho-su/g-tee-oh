@@ -31,7 +31,7 @@ describe("R3.12 ThresholdCard", () => {
     const position = screen.getByRole("group", { name: "Hand position" });
     expect(position).toHaveTextContent("At or above 18% of this range by strength");
     expect(position).not.toHaveTextContent("Stronger than");
-    expect(position).toHaveTextContent("Equity against the opponent's range: 61%");
+    expect(position).toHaveTextContent("Equity against the opponent's range: 61.0%");
   });
 
   it("R3.12 the strongest hand reads as at or above every hand, not as stronger than all of them (review round 1, 4)", () => {
@@ -74,7 +74,7 @@ describe("R3.12 ThresholdCard", () => {
     render(<ThresholdCard card={CARD} heroHand="AJo" actions={fixtureActions} />);
     const list = screen.getByRole("list", { name: "Actions" });
     const raise = within(list).getByRole("listitem", { name: "Raise to 2.5bb" });
-    expect(raise).toHaveTextContent("Played by 52% of the range");
+    expect(raise).toHaveTextContent("Played by 52.0% of the range");
     expect(raise).toHaveTextContent("Weakest hand that plays it at least half the time: K9o");
     expect(raise).toHaveTextContent("Your hand is above this line");
     expect(within(list).getByRole("listitem", { name: "Fold" })).toHaveTextContent("No hand plays it at least half the time");

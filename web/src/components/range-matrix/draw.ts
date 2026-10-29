@@ -22,6 +22,7 @@ import type { ThemeName } from "../../theme/action-style.js";
 import {
   actionPaints,
   cellInk,
+  dimmed,
   drawCellFill,
   fillWith,
   isBarMode,
@@ -55,6 +56,8 @@ export interface DrawOptions {
   readonly lensPosition?: number | null;
   /** The cell under the pointer (R3.25): a thin outline, no address write; absent or null, none. */
   readonly hoveredIndex?: number | null;
+  /** The action positions the filters keep (R3.12, O-468); absent, null or empty, nothing is filtered. */
+  readonly highlight?: ReadonlySet<number> | null;
 }
 
 interface TextLayout {
@@ -250,12 +253,20 @@ export function drawMatrix(ctx: MatrixCanvasContext, model: MatrixModel, options
     missingPattern: options.patterns.get(MISSING_PATTERN_KEY),
     scaleByWeight: options.scaleByWeight === true && isBarMode(options.mode),
     lens: lensOf(model, options),
+    highlight: options.highlight === undefined || options.highlight === null || options.highlight.size === 0 ? null : options.highlight,
   };
   const rects = cellRects(size);
   fillWith(ctx, palette.background, 0, 0, size, size);
   model.cells.forEach((cell, index) => {
     drawCellFill(frame, cell, rectAt(rects, index));
   });
+  if (frame.highlight !== null) {
+    model.cells.forEach((cell, index) => {
+      if (!dimmed(frame, cell)) return;
+      const rect = rectAt(rects, index);
+      fillWith(ctx, palette.dimOverlay, rect.x, rect.y, rect.w, rect.h);
+    });
+  }
   drawGridLines(ctx, size, options.pixelRatio, palette.gridLine);
   const marks = drawMarks(frame, rects, options);
   const layout = textLayout(edgeAt(1, size), options.pixelRatio);

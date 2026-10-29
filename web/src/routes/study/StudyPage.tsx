@@ -152,6 +152,7 @@ function StudyScreen({ api, search }: StudyScreenProps) {
           onSelectHand={navigation.setHand}
           onOpenLine={navigation.openLine}
           onLensChange={navigation.setLens}
+          onFiltersChange={navigation.setFilters}
         />
       </>
     );
