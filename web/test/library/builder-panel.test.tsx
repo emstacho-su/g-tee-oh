@@ -30,8 +30,9 @@ describe("R3.5 builder health", () => {
     expect(item("Queue depth")).toHaveTextContent("3 queued, 1 running, 0 failed, 1 waiting on budget");
     expect(item("Flops per day")).toHaveTextContent("12 (last 24 hours)");
     expect(item("Storage against budget")).toHaveTextContent("150.0 GB of 650.0 GB (builder default), 23.1%");
-    expect(item("Last backup")).toHaveTextContent("Not tracked yet: backups arrive with the Mac deploy (S34)");
-    expect(item("LLM spend this month")).toHaveTextContent("Not tracked yet: arrives with the Ask path (S27)");
+    // Placeholders in user words, no session ids or developer words (S47 critic G4).
+    expect(item("Last backup")).toHaveTextContent("Not tracked yet: backups start with the production deploy");
+    expect(item("Explanation spend this month")).toHaveTextContent("Not tracked yet: starts with written explanations");
   });
 
   it("R3.5 a member sees one line and the page never asks for the builder status (O-290)", async () => {
