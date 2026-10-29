@@ -118,7 +118,7 @@ describe("R3.13 street mode on the run screen", () => {
     await start(fixtureStreetDrill);
     await decide("Raise to 2.5bb");
     await screen.findByTestId("result-chip");
-    await userEvent.keyboard("e");
+    await userEvent.keyboard("{Shift>}e{/Shift}");
     await screen.findByRole("dialog", { name: "End this session?" });
     expect(timers[0]?.cancelled).toBe(true);
     expect(timers).toHaveLength(1);

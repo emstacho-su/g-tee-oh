@@ -258,3 +258,78 @@ describe("R3.13 spot machine rules", () => {
     expect(transition(STATES.ending, { type: "ended", recap: fixtureRecap })).toEqual({ kind: "ended", recap: fixtureRecap });
   });
 });
+
+describe("R3.31 session length in the machine", () => {
+  const FEEDBACK = STATES.feedback as Extract<SpotState, { kind: "feedback" }>;
+  const LAST_HAND = { handNo: 9, ordinal: 10, decision: 1, stateVersion: PROMPT.state_version, heroPosition: "BB" } as const;
+  const AT_LIMIT: SessionContext = { ...CONTEXT, length: 10, hand: LAST_HAND };
+  const BELOW: SessionContext = { ...AT_LIMIT, hand: { ...LAST_HAND, ordinal: 9 } };
+  const STREET: SessionContext = {
+    ...CONTEXT,
+    trainer: { stop_rule: "end_of_street", pause: "never", speed: "fast", quick_result: false },
+    length: 10,
+    hand: { ...LAST_HAND, handNo: 4 },
+  };
+
+  it("R3.31 start carries the length into the request and the session context", () => {
+    const starting = transition(INITIAL_SPOT_STATE, { type: "start", key: "k", rng: false, length: 20 });
+    expect(starting).toMatchObject({ kind: "starting", length: 20 });
+    expect(transition(starting, { type: "session_started", session: fixturePracticeSession })).toMatchObject({ kind: "loading_prompt", context: { length: 20 } });
+    expect(transition(INITIAL_SPOT_STATE, { type: "start", key: "k", rng: false })).not.toHaveProperty("length");
+  });
+
+  it("R3.31 in spot mode Next at the limit ends the session with the end key; below the limit it loads the next prompt", () => {
+    const last: SpotState = { ...FEEDBACK, context: AT_LIMIT };
+    expect(transition(last, { type: "next", endKey: "k-finish" })).toEqual({ kind: "ending", context: AT_LIMIT, key: "k-finish" });
+    const earlier: SpotState = { ...FEEDBACK, context: BELOW };
+    expect(transition(earlier, { type: "next", endKey: "k-finish" })).toMatchObject({ kind: "loading_prompt", context: BELOW });
+  });
+
+  it("R3.31 a reveal that continues by itself ends at the limit too", () => {
+    const last: SpotState = { ...FEEDBACK, context: AT_LIMIT, autoContinueMs: 500 };
+    expect(transition(last, { type: "auto_continue", endKey: "k-finish" })).toEqual({ kind: "ending", context: AT_LIMIT, key: "k-finish" });
+  });
+
+  it("R3.31 in street mode the prompt that opens a hand past the limit ends the session at once; the same hand goes on", () => {
+    const loading: SpotState = { kind: "loading_prompt", context: STREET, version: PROMPT.state_version };
+    const nextHand = { ...PROMPT, hand_no: 5, state_version: PROMPT.state_version + 1 };
+    const ended = transition(loading, { type: "prompt_loaded", prompt: nextHand, at: SHOWN_AT, endKey: "k-over" });
+    expect(ended).toMatchObject({ kind: "ending", key: "k-over" });
+    const sameHand = { ...PROMPT, hand_no: 4, state_version: PROMPT.state_version + 1, hand_decision_no: 2 };
+    expect(transition(loading, { type: "prompt_loaded", prompt: sameHand, at: SHOWN_AT, endKey: "k-over" })).toMatchObject({ kind: "await_action" });
+  });
+
+  it("R3.31 without a length nothing ends by itself, and without an end key the limit waits for Next", () => {
+    const unbounded: SpotState = { ...FEEDBACK, context: { ...AT_LIMIT, length: null } };
+    expect(transition(unbounded, { type: "next", endKey: "k" })).toMatchObject({ kind: "loading_prompt" });
+    const loading: SpotState = { kind: "loading_prompt", context: { ...STREET, length: null }, version: PROMPT.state_version };
+    expect(transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 5 }, at: SHOWN_AT, endKey: "k" })).toMatchObject({ kind: "await_action" });
+    const last: SpotState = { ...FEEDBACK, context: AT_LIMIT };
+    expect(transition(last, { type: "next" })).toMatchObject({ kind: "loading_prompt" });
+  });
+});
+
+describe("R3.31 PR #45 review round 1, finding 1: street and full-hand reveals never end the session mid-hand", () => {
+  const FEEDBACK = STATES.feedback as Extract<SpotState, { kind: "feedback" }>;
+  const LAST_HAND = { handNo: 9, ordinal: 10, decision: 1, stateVersion: PROMPT.state_version, heroPosition: "BB" } as const;
+
+  it.each(["end_of_street", "end_of_hand"] as const)("R3.31 Next and the automatic continue on a %s reveal of the last planned hand load the next prompt", (stop_rule) => {
+    const context: SessionContext = { ...CONTEXT, length: 10, hand: LAST_HAND, trainer: { stop_rule, pause: "never", speed: "fast", quick_result: false } };
+    const reveal: SpotState = { ...FEEDBACK, context, autoContinueMs: 250 };
+    expect(transition(reveal, { type: "next", endKey: "k" })).toMatchObject({ kind: "loading_prompt" });
+    expect(transition(reveal, { type: "auto_continue", endKey: "k" })).toMatchObject({ kind: "loading_prompt" });
+    // The prompt that then opens hand 11 is what ends the session.
+    const loading: SpotState = { kind: "loading_prompt", context, version: PROMPT.state_version };
+    expect(transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 10 }, at: SHOWN_AT, endKey: "k-over" })).toMatchObject({ kind: "ending", key: "k-over" });
+  });
+});
+
+describe("R3.31 PR #45 review round 2, finding 3: the session ends on the last played hand", () => {
+  it("R3.31 an over-limit prompt ends with the context of the last played hand, never the unplayed one", () => {
+    const LAST = { handNo: 4, ordinal: 10, decision: 2, stateVersion: PROMPT.state_version, heroPosition: "BB" } as const;
+    const context: SessionContext = { ...CONTEXT, length: 10, hand: LAST, trainer: { stop_rule: "end_of_street", pause: "never", speed: "fast", quick_result: false } };
+    const loading: SpotState = { kind: "loading_prompt", context, version: PROMPT.state_version };
+    const ended = transition(loading, { type: "prompt_loaded", prompt: { ...PROMPT, hand_no: 5, state_version: PROMPT.state_version + 1 }, at: SHOWN_AT, endKey: "k-over" });
+    expect(ended).toEqual({ kind: "ending", context, key: "k-over" });
+  });
+});

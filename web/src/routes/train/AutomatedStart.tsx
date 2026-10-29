@@ -3,7 +3,8 @@
  * does, then what the session will use, all from the session defaults (lane C's
  * store/session-defaults.ts): the configuration scope (all covered configurations, or the ones
  * chosen in /settings, named from GET /configs), the grouping and Mixed-frequency mode, with a link to
- * /settings to change them, and Start. No seed is ever offered (a client seed makes the session
+ * /settings to change them, the session length chooser written straight to the defaults (S46,
+ * R3.31), and Start. No seed is ever offered (a client seed makes the session
  * unrated). The names read has its own loading and error states with Try again; a failed read
  * still lets the session start, since the scope's ids are known. An id /configs does not list is
  * shown as the id.
@@ -18,14 +19,18 @@ import { Link } from "@tanstack/react-router";
 import { useAppApi } from "../../auth/index.js";
 import { Button, Card, LoadingNote } from "../../components/ui/index.js";
 import { GROUPING_LABELS } from "../../drills/labels.js";
+import { SessionLengthField } from "../drill-run/SessionLengthField.js";
 import { SettingChips } from "../drill-run/SessionLook.js";
 import type { GameConfig } from "../../progress/types.js";
 import { ALL_CONFIGS, type ConfigScope, type SessionDefaults } from "../../store/session-defaults.js";
+import type { SessionLength } from "../../trainer/session-length.js";
 import { allConfigsQuery, configLabel } from "../settings/configs-query.js";
 import { DEFAULTS_SETTINGS_SECTION, SCOPE_SETTINGS_SECTION, TRAIN_TEXT } from "./train-text.js";
 
 export interface AutomatedStartProps {
   defaults: SessionDefaults;
+  /** Writes the planned session length to the session defaults (S46, R3.31). */
+  onSessionLengthChange: (length: SessionLength) => void;
   onStart: () => void;
   starting: boolean;
 }
@@ -76,7 +81,7 @@ function StartRow({ label, starting, onStart }: { label: string; starting: boole
   );
 }
 
-export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartProps) {
+export function AutomatedStart({ defaults, onSessionLengthChange, onStart, starting }: AutomatedStartProps) {
   const chips = [
     { name: TRAIN_TEXT.grouping, value: GROUPING_LABELS[defaults.grouping], valueTestId: "start-grouping" },
     { name: TRAIN_TEXT.rng, value: defaults.rng ? TRAIN_TEXT.on : TRAIN_TEXT.off, valueTestId: "start-rng" },
@@ -88,6 +93,7 @@ export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartPr
         <Scope scope={defaults.configScope} />
       </div>
       <SettingChips label={TRAIN_TEXT.sessionSettings} chips={chips} />
+      <SessionLengthField value={defaults.sessionLength} onChange={onSessionLengthChange} />
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
         <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="text-accent underline underline-offset-2">
           {TRAIN_TEXT.changeScope}

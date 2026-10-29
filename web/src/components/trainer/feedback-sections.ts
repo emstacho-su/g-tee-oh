@@ -4,7 +4,8 @@
  * Mechanism: each section has a key, a title and a default. Everything starts collapsed except
  * Roll (open whenever the roller is given, since the roll scale and its followed-the-roll mark are
  * the point of Mixed-frequency mode, O-344, O-371) and Strategy on a worked-example prompt (the
- * block exists to show the answer, O-272). What the user opens or closes wins over the default
+ * block exists to show the answer, O-272) or after an inaccuracy, a mistake or a blunder (S46 item
+ * 1: the mistake meets the mix at once). What the user opens or closes wins over the default
  * and lasts for the rest of the session: useFeedbackSections keeps the choices in React state
  * (memory only, never stored) keyed by the session, so a new session starts from the defaults
  * again. A screen holds the control above the panel, because the panel itself unmounts between
@@ -12,7 +13,9 @@
  */
 import { useCallback, useMemo, useState } from "react";
 
+import type { FeedbackLabel } from "../../contracts.js";
 import { EXPLAIN_TEXT } from "../../explain/texts.js";
+import { MISTAKE_LABELS } from "../../trainer/pause-rule.js";
 
 export type FeedbackSectionKey = "strategy" | "roll" | "range" | "threshold" | "insights" | "explanation";
 
@@ -38,12 +41,14 @@ export const FEEDBACK_SECTION_ORDER: readonly FeedbackSectionKey[] = ["roll", "s
 
 export interface SectionDefaultsInput {
   readonly workedExample: boolean;
+  /** The decision's grade label; Strategy starts open on an inaccuracy, a mistake or a blunder (S46). */
+  readonly label?: FeedbackLabel;
 }
 
-/** The default open state of one section before the user chooses (O-387). */
-export function defaultSectionOpen(section: FeedbackSectionKey, { workedExample }: SectionDefaultsInput): boolean {
+/** The default open state of one section before the user chooses (O-387, S46 item 1). */
+export function defaultSectionOpen(section: FeedbackSectionKey, { workedExample, label }: SectionDefaultsInput): boolean {
   if (section === "roll") return true;
-  if (section === "strategy") return workedExample;
+  if (section === "strategy") return workedExample || (label !== undefined && MISTAKE_LABELS.has(label));
   return false;
 }
 

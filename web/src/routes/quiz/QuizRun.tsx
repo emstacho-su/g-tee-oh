@@ -71,7 +71,11 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
   const flavor = source.kind === "quiz" ? "quiz" : "drill";
   const difficulty = source.kind === "quiz" ? { difficulty: quizDifficultyName(source.choice.difficulty) } : {};
   const noQuestions = isNoQuizQuestions(run.error);
-  useHotkey({ key: SUBMIT_KEY, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit }, run.canSubmit && reviewing === null);
+  // fromControls: Enter right after choosing an option (focus on the option button) still submits (S46, R3.16).
+  useHotkey(
+    { key: SUBMIT_KEY, fromControls: true, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit },
+    run.canSubmit && reviewing === null,
+  );
   useHotkey({ key: NEXT_KEY, description: PREDICTION_TEXT.next, scope: PREDICTION_SCOPE, handler: run.next }, result !== undefined && reviewing === null);
   const reviewed = reviewing === null ? undefined : answered[reviewing];
 

@@ -184,11 +184,28 @@ describe("R4.12 /settings hotkeys and layout", () => {
 
     const hotkeys = await screen.findByRole("region", { name: "Hotkeys" });
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
-    expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual(["1 to 9", "N", "E", "I", "?"]);
-    expect(rows[0]).toHaveTextContent("Choose an action and submit it");
-    expect(rows[1]).toHaveTextContent("Next hand");
-    expect(rows[2]).toHaveTextContent("End session");
-    expect(rows[3]).toHaveTextContent("How Mixed-frequency mode works");
+    // S46 (R3.30, R3.34): letters by action kind, digits for the sizes, Enter, Shift chords, R reserved.
+    expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual([
+      "F",
+      "C",
+      "X",
+      "A",
+      "L",
+      "1 to 9",
+      "N or Enter",
+      "Shift+E",
+      "R",
+      "I",
+      "?",
+    ]);
+    expect(rows[0]).toHaveTextContent("Fold");
+    expect(rows[5]).toHaveTextContent("bet or raise size");
+    expect(rows[6]).toHaveTextContent("Next hand");
+    expect(rows[7]).toHaveTextContent("End session");
+    // Study this spot (Shift+S) arrives with its control in the follow-up (PR #45 review round 1, finding 3).
+    expect(hotkeys).not.toHaveTextContent("Study this spot");
+    expect(rows[8]).toHaveTextContent("Reserved");
+    expect(rows[9]).toHaveTextContent("How Mixed-frequency mode works");
     expect(hotkeys).not.toHaveTextContent("Unsure");
     expect(hotkeys).toHaveTextContent("Rebinding keys comes in a later version.");
     expect(within(hotkeys).queryByRole("button")).toBeNull();

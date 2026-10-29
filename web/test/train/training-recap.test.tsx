@@ -35,7 +35,7 @@ function endScript(recap: SessionRecap) {
 async function startAndEnd(view: TrainView): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole("button", { name: "Start training" }));
   await screen.findByRole("group", { name: "Actions" });
-  await userEvent.keyboard("e");
+  await userEvent.keyboard("{Shift>}e{/Shift}");
   const dialog = await screen.findByRole("dialog", { name: "End this session?" });
   await userEvent.click(within(dialog).getByRole("button", { name: "End session" }));
   expect(view.sentTo(AUTOMATED_PATHS.end)).toHaveLength(1);
@@ -56,6 +56,10 @@ describe("R4.10 training recap", () => {
     expect(summary).toHaveTextContent("Mean score81%");
     expect(summary).toHaveTextContent("EV loss0.42bb");
     expect(within(recap).queryByTestId("nothing-rated")).not.toBeInTheDocument();
+    // S46 (critic round 3 G8): the statistics carry a one-line definition each.
+    expect(within(summary).getByRole("button", { name: "About mean score" })).toBeInTheDocument();
+    expect(within(summary).getByRole("button", { name: "About rated decisions" })).toBeInTheDocument();
+    expect(within(summary).getByRole("button", { name: "About EV loss" })).toBeInTheDocument();
   });
 
   it("R4.10 R3.13 the rating cards give each track before and after with RD, new for a first rating, and the change (S38: cards, not a table)", async () => {
@@ -124,7 +128,7 @@ describe("R4.12 progress refresh on end (O-326)", () => {
     view.queryClient.setQueryData(progressKeys.rating, fixtureRating);
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     await screen.findByRole("group", { name: "Actions" });
-    await userEvent.keyboard("e");
+    await userEvent.keyboard("{Shift>}e{/Shift}");
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "End session" }));
     expect(await screen.findByText("Ending the session")).toBeInTheDocument();
     expect(view.queryClient.getQueryState(progressKeys.rating)?.isInvalidated).toBe(false);

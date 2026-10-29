@@ -28,6 +28,10 @@
  * automated screen counts the hands of its block from them). When a session ends and its recap
  * arrives, every progress read is invalidated (invalidateProgress), so the home and /progress
  * cards refetch the rating, streak and the rest (O-326).
+ *
+ * S46 (R3.31): the sessionLength option rides into Start; Next, the automatic continue and every
+ * prompt load carry a fresh end key, which the machine uses only when the planned length is
+ * reached (session-length.ts); the screen reads the same atSessionLimit for its Finish session label.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -37,6 +41,7 @@ import type { TrainerPrompt } from "../contracts.js";
 import { invalidateProgress } from "../progress/queries.js";
 import { useTrainerTableStore } from "../store/index.js";
 import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision, type SessionStartSpec } from "./session-api.js";
+import type { SessionLength } from "./session-length.js";
 import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
 import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
@@ -54,6 +59,8 @@ export interface SpotSessionOptions {
   paused: boolean;
   /** The drill's run settings (S26, O-314); absent means spot mode. */
   trainer?: RunSettings;
+  /** The planned length in hands (S46, R3.31); absent or null means no limit. */
+  sessionLength?: SessionLength;
   /** Sees each prompt as it is shown, after the trainer-table store (S32). */
   onPrompt?: (prompt: TrainerPrompt) => void;
 }
@@ -75,14 +82,15 @@ function promptOnScreen(state: SpotState): TrainerPrompt | null {
 }
 
 /** Schedules auto_continue for a reveal that does not pause, and cancels it as the screen moves on. */
-function useAutoContinue(state: SpotState, paused: boolean, schedule: Scheduler, send: (event: SpotEvent) => void): void {
+function useAutoContinue(state: SpotState, paused: boolean, schedule: Scheduler, send: (event: SpotEvent) => void, newKey: () => string): void {
   const delay = autoContinueDelay(state);
   // One reveal is one decision; its key tells two reveals in a row apart.
   const reveal = state.kind === "feedback" ? state.decision.idempotencyKey : null;
   useEffect(() => {
     if (delay === null || reveal === null || paused) return undefined;
-    return schedule(() => send({ type: "auto_continue" }), delay);
-  }, [delay, reveal, paused, schedule, send]);
+    // The end key is used only when this reveal is the last planned hand's (R3.31).
+    return schedule(() => send({ type: "auto_continue", endKey: newKey() }), delay);
+  }, [delay, reveal, paused, schedule, send, newKey]);
 }
 
 export interface SpotSession {
@@ -148,7 +156,7 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
     };
   }, [driver, clearTable]);
   const { send } = driver;
-  const { paused: dialogOpen, trainer } = options;
+  const { paused: dialogOpen, trainer, sessionLength = null } = options;
   // The table's replay of the line before the decision (S38, O-381) lives here, beside the timer,
   // so the render that shows a prompt with a line to replay already counts as paused: the timer
   // gets a pause, never a resume first (review round 1, finding 10).
@@ -159,13 +167,21 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
   useEffect(() => {
     send(paused ? { type: "pause", at: now() } : { type: "resume", at: now() });
   }, [paused, shownPrompt, send, now]);
-  useAutoContinue(state, paused, schedule, send);
+  useAutoContinue(state, paused, schedule, send, newKey);
   return {
     state,
     replay,
-    start: (rng) => send(trainer === undefined ? { type: "start", key: newKey(), rng } : { type: "start", key: newKey(), rng, trainer }),
+    start: (rng) =>
+      send({
+        type: "start",
+        key: newKey(),
+        rng,
+        ...(trainer === undefined ? {} : { trainer }),
+        ...(sessionLength === null ? {} : { length: sessionLength }),
+      }),
     chooseAction: (actionIndex) => send({ type: "choose_action", actionIndex, at: now(), key: newKey() }),
-    next: () => send({ type: "next" }),
+    // The end key is used only on the last planned hand's reveal (R3.31).
+    next: () => send({ type: "next", endKey: newKey() }),
     end: () => send({ type: "end", key: newKey() }),
     retry: () => send({ type: "retry" }),
     reset: () => send({ type: "reset" }),

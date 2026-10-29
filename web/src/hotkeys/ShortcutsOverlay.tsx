@@ -1,8 +1,11 @@
 /**
- * The keyboard shortcuts overlay (S24, A7 section 4, R3.13). A Dialog titled "Keyboard
- * shortcuts" that lists the active bindings grouped by scope, with "?" itself under General.
- * Its open state lives in the hotkey store, so the "?" key in dispatch.ts opens it; Radix closes
- * it on Escape or the close button and the change is written back to the store.
+ * The keyboard shortcuts overlay (S24, S46, A7 section 4, R3.13, R3.30). A Dialog titled "Keyboard
+ * shortcuts" that lists the active bindings grouped by scope, with "?" itself under General and
+ * the reserved keys (reserved.ts) after the live ones of their scope, only when that scope has
+ * live keys on the page. A shift chord prints
+ * as "Shift+" and the keycap; Space prints as "Space". Its open state lives in the hotkey store,
+ * so the "?" key in dispatch.ts opens it; Radix closes it on Escape or the close button and the
+ * change is written back to the store.
  */
 import { useMemo } from "react";
 import { useStore } from "zustand";
@@ -14,8 +17,10 @@ import {
   SHORTCUTS_DESCRIPTION,
   SHORTCUTS_KEY,
   activeBindings,
+  type HotkeyBinding,
   type RegisteredBinding,
 } from "./registry.js";
+import { RESERVED_KEYS } from "./reserved.js";
 
 interface ShortcutRow {
   readonly key: string;
@@ -27,21 +32,41 @@ interface ShortcutGroup {
   readonly rows: readonly ShortcutRow[];
 }
 
-/** Single letters print upper case, as on the keycap. */
+const SPACE_KEY = " ";
+const SPACE_NAME = "Space";
+const SHIFT_PREFIX = "Shift+";
+
+/** Single letters print upper case, as on the keycap; the space bar prints its name. */
 export function displayKey(key: string): string {
+  if (key === SPACE_KEY) return SPACE_NAME;
   return key.length === 1 ? key.toUpperCase() : key;
+}
+
+/** The keycap text of a binding: "Shift+E", "Enter", "F". */
+export function displayBinding(binding: Pick<HotkeyBinding, "key" | "shift">): string {
+  return `${binding.shift === true ? SHIFT_PREFIX : ""}${displayKey(binding.key)}`;
+}
+
+function addRow(groups: readonly ShortcutGroup[], scope: string, row: ShortcutRow): ShortcutGroup[] {
+  const existing = groups.find((group) => group.scope === scope);
+  if (existing === undefined) return [...groups, { scope, rows: [row] }];
+  return groups.map((group) => (group === existing ? { ...group, rows: [...group.rows, row] } : group));
 }
 
 function groupByScope(bindings: readonly RegisteredBinding[]): ShortcutGroup[] {
   const general: ShortcutGroup = { scope: GENERAL_SCOPE, rows: [{ key: SHORTCUTS_KEY, description: SHORTCUTS_DESCRIPTION }] };
-  return bindings.reduce<ShortcutGroup[]>(
-    (groups, binding) => {
-      const row: ShortcutRow = { key: displayKey(binding.key), description: binding.description };
-      const existing = groups.find((group) => group.scope === binding.scope);
-      if (existing === undefined) return [...groups, { scope: binding.scope, rows: [row] }];
-      return groups.map((group) => (group === existing ? { ...group, rows: [...group.rows, row] } : group));
-    },
+  const live = bindings.reduce<ShortcutGroup[]>(
+    (groups, binding) => addRow(groups, binding.scope, { key: displayBinding(binding), description: binding.description }),
     [general],
+  );
+  // A reserved key shows only beside its scope's live keys, so a page without a trainer session
+  // has no lone Session group (PR #45 review round 2, finding 6).
+  return RESERVED_KEYS.reduce<ShortcutGroup[]>(
+    (groups, reserved) =>
+      groups.some((group) => group.scope === reserved.scope)
+        ? addRow(groups, reserved.scope, { key: displayKey(reserved.key), description: reserved.description })
+        : groups,
+    live,
   );
 }
 

@@ -3,6 +3,14 @@
  * hundredths of a big blind: size_cbb, pot_cbb, stacks_cbb), and losses arrive in big blinds and
  * in percent of the pot at the node (O-22). These helpers only format what the api sends; they
  * never recompute a loss or a frequency (ADR 0004).
+ *
+ * Precision rule (S46, critic round 3 gallery-threshold-card): every share and frequency in one
+ * panel prints at one decimal through formatShare (the strategy table, the threshold card's
+ * share_taking and equity, range drift, the solver's frequency of the chosen action), so one number
+ * never reads two ways beside another. The threshold card's rank sentence keeps its whole percent
+ * (wholePercent, O-408: its words are chosen from the rounded number), and the EV loss keeps its
+ * own two decimals (formatPercent), a different quantity. Only the precision changed; the numbers
+ * are the api's.
  */
 import type { NodeAction } from "../contracts.js";
 import { actionStyle } from "../theme/action-style.js";

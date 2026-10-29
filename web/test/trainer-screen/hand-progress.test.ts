@@ -76,3 +76,14 @@ describe("R3.13 hand progress", () => {
     expect(handCounterText(progress)).toBe("Hand 1, decision 2");
   });
 });
+
+describe("R3.31 hand counter with a session length", () => {
+  it("R3.31 spot mode counts hands against the length; street modes add the decision; no length keeps the S26 text", () => {
+    const progress = play(FIRST);
+    expect(handCounterText(progress, { length: 20, decision: false })).toBe("Hand 1 of 20");
+    expect(handCounterText(progress, { length: 20 })).toBe("Hand 1 of 20, decision 1");
+    expect(handCounterText(progress, { length: null })).toBe("Hand 1, decision 1");
+    expect(handCounterText(progress, { length: null, decision: false })).toBe("Hand 1");
+    expect(handCounterText(progress)).toBe("Hand 1, decision 1");
+  });
+});

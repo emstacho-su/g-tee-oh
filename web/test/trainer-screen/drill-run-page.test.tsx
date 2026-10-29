@@ -6,7 +6,7 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ME_QUERY_KEY } from "../../src/auth/index.js";
 import { SYNTHETIC_TEXT } from "../../src/components/ui/index.js";
@@ -22,7 +22,7 @@ import {
   fixtureRngPrompt,
   fixtureTrainerHands,
 } from "../../src/fixtures/trainer.js";
-import { useTrainerTableStore } from "../../src/store/index.js";
+import { DEFAULT_SESSION_DEFAULTS, useSessionDefaultsStore, useTrainerTableStore } from "../../src/store/index.js";
 import { drillQuery } from "../../src/trainer/session-api.js";
 import { jsonResponse, networkFailure, problemResponse } from "../api/fake-fetch.js";
 import { DECIDE_PATH, DRILL_PATH, END_PATH, NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
@@ -345,26 +345,42 @@ describe("R3.13 feedback, next and prefetch", () => {
 });
 
 describe("R3.13 hotkeys drive the same transitions as clicks (O-285)", () => {
-  it("R3.13 1 to 9 choose and submit, N goes to the next hand, E then the confirm ends the session (O-345)", async () => {
+  it("R3.30 the size digit submits, Enter goes to the next hand, Shift+E then the confirm ends the session (O-345)", async () => {
     const view = renderRun({ script: PLAY_SCRIPT });
     await startSession(view);
     view.clock.now = COMMITTED_AT;
-    await userEvent.keyboard("3");
+    // The raise is the first size at the node, so its key is 1 whatever stands before it (O-475).
+    await userEvent.keyboard("1");
     await screen.findByTestId("feedback-panel");
     expect(view.sentTo(DECIDE_PATH)[0]?.body).toEqual({
       state_version: fixturePlainPrompt.state_version,
       action_index: 2,
       response_ms: COMMITTED_AT - SHOWN_AT,
     });
-    await userEvent.keyboard("s");
-    expect(view.sentTo(DECIDE_PATH), "S is no longer a key").toHaveLength(1);
-    await userEvent.keyboard("n");
+    await userEvent.keyboard("r");
+    expect(screen.getByTestId("feedback-panel"), "R is reserved and does nothing").toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
     expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
     await userEvent.keyboard("e");
+    expect(screen.queryByRole("dialog", { name: "End this session?" }), "a bare E no longer ends").not.toBeInTheDocument();
+    await userEvent.keyboard("{Shift>}e{/Shift}");
     const dialog = await screen.findByRole("dialog", { name: "End this session?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "End session" }));
     expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
     expect(view.sentTo(END_PATH)).toHaveLength(1);
+  });
+
+  it("R3.30 the letter of the kind submits (F folds), the bar marks the chosen button, and N still goes on", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    view.clock.now = COMMITTED_AT;
+    await userEvent.keyboard("f");
+    await screen.findByTestId("feedback-panel");
+    expect(view.sentTo(DECIDE_PATH)[0]?.body).toMatchObject({ action_index: 0 });
+    expect(screen.getByRole("button", { name: "Fold" }), "the chosen action stays marked on the strip (critic G10)").toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: RAISE_NAME })).not.toHaveAttribute("aria-pressed");
+    await userEvent.keyboard("n");
+    expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
   });
 
   it("R3.13 N does nothing before the feedback", async () => {
@@ -396,7 +412,7 @@ describe("R3.13 recap after end", () => {
     const recap = await screen.findByRole("region", { name: "Session recap" });
     expect(recap).toHaveTextContent("Decisions3");
     expect(recap).toHaveTextContent("Rated decisions3");
-    expect(recap).toHaveTextContent("Mean score0.75");
+    expect(recap, "the mean score is a percent on both recaps (S46 item 1)").toHaveTextContent("Mean score75%");
     expect(recap).toHaveTextContent("EV loss0.19bb");
     expect(view.sentTo(END_PATH)[0]?.body).toEqual({});
     await userEvent.click(screen.getByRole("button", { name: "Start another session" }));
@@ -426,5 +442,75 @@ describe("R3.13 recap after end", () => {
     await screen.findByRole("heading", { name: "Session recap" });
     const [first, second] = view.sentTo(END_PATH);
     expect(second?.idempotencyKey).toBe(first?.idempotencyKey);
+  });
+});
+
+/** Ten decisions through the real screen take longer than the default five seconds. */
+const TEN_HANDS_TIMEOUT_MS = 30_000;
+
+describe("R3.31 session length on the drill run", () => {
+  afterEach(() => {
+    useSessionDefaultsStore.setState({ defaults: DEFAULT_SESSION_DEFAULTS });
+  });
+
+  it("R3.31 the start panel offers Off, 10, 20 and 50 hands and remembers the choice", async () => {
+    renderRun({ script: {} });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    const group = screen.getByRole("group", { name: "Session length" });
+    expect(within(group).getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["off", "10", "20", "50"]);
+    expect(within(group).getByRole("radio", { name: "Off" })).toBeChecked();
+    await userEvent.click(within(group).getByRole("radio", { name: "10 hands" }));
+    expect(useSessionDefaultsStore.getState().defaults.sessionLength).toBe(10);
+    expect(within(group).getByRole("radio", { name: "10 hands" })).toBeChecked();
+  });
+
+  it("R3.31 with 10 hands the counter reads Hand n of 10, the tenth reveal offers Finish session, and Enter ends with no extra deal", async () => {
+    useSessionDefaultsStore.getState().setSessionLength(10);
+    const prompts = Array.from({ length: 10 }, (_, hand) => ({ ...fixturePlainPrompt, hand_no: hand, state_version: 3 + 2 * hand }));
+    const feedbacks = prompts.map((prompt) => ({ ...fixturePlainFeedback, state_version: prompt.state_version + 1 }));
+    const view = renderRun({
+      script: {
+        [NEXT_PATH]: prompts.map((prompt) => jsonResponse(200, prompt)),
+        [DECIDE_PATH]: feedbacks.map((feedback) => jsonResponse(200, feedback)),
+        [END_PATH]: [jsonResponse(200, fixtureRecap)],
+      },
+    });
+    await startSession(view);
+    expect(screen.getByTestId("hand-counter")).toHaveTextContent("Hand 1 of 10");
+    for (let hand = 1; hand <= 10; hand += 1) {
+      await userEvent.keyboard("1");
+      await screen.findByTestId("feedback-panel");
+      if (hand < 10) {
+        expect(screen.getByRole("button", { name: /Next hand/ })).toBeInTheDocument();
+        await userEvent.keyboard("n");
+        await waitFor(() => expect(screen.getByTestId("hand-counter")).toHaveTextContent(`Hand ${hand + 1} of 10`));
+      }
+    }
+    expect(screen.getByRole("button", { name: /Finish session/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Next hand/ })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
+    expect(view.sentTo(END_PATH)).toHaveLength(1);
+    expect(view.sentTo(NEXT_PATH), "no deal past the limit and no prefetch at it").toHaveLength(10);
+  }, TEN_HANDS_TIMEOUT_MS);
+});
+
+describe("R3.30 PR #45 review round 1, finding 2: Enter on a focused control is that control's", () => {
+  it("R3.30 Enter on the focused End session button opens the confirm and deals no next hand; Enter on the page goes on", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    await userEvent.keyboard("1");
+    await screen.findByTestId("feedback-panel");
+    const end = screen.getByRole("button", { name: /End session/ });
+    end.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "End this session?" })).toBeInTheDocument();
+    // The reveal prefetches the next prompt (GET /next), so the proof is the screen: still this hand's reveal.
+    expect(screen.getByTestId("feedback-panel"), "Enter on End session never deals the next hand").toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "King of spades" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Keep playing" }));
+    (document.activeElement as HTMLElement | null)?.blur();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
   });
 });

@@ -34,9 +34,11 @@ import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js"
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
-import { NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { unratedReason } from "../../trainer/unrated-reason.js";
+import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
 
 export interface DecisionAreaProps {
@@ -68,9 +70,26 @@ export interface DecisionAreaProps {
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
 
+/** The chosen action's index once a decision is made, so the bar marks it (S46, critic G10). */
+function chosenIndexOf(state: SpotState): number | null {
+  switch (state.kind) {
+    case "submitting":
+    case "feedback":
+      return state.decision.actionIndex;
+    case "error":
+      return state.decision?.actionIndex ?? null;
+    default:
+      return null;
+  }
+}
+
 function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
-  useHotkey({ key: NEXT_HAND_KEY, description: SESSION_TEXT.nextHand, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  // On the last planned hand's reveal Next finishes the session (S46, R3.31).
+  const nextLabel = atSessionLimit(state) ? SESSION_TEXT.finishSession : SESSION_TEXT.nextHand;
+  // N and Enter both go on (S46, R3.30, design rule 9).
+  useHotkey({ key: NEXT_HAND_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  useHotkey({ key: NEXT_HAND_ENTER_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   if (state.kind !== "feedback") return null;
   const { feedback, decision, context } = state;
   // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
@@ -86,15 +105,24 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
       onExplain={onExplain}
     />
   ) : undefined;
+  // Next hand stands above the panel, so it is reached without scrolling past the open sections
+  // (S46, critic round 3 R10); the row inside the panel holds Ask.
   return (
     <div className="flex flex-col gap-3">
+      <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
+        <kbd aria-hidden="true" className="font-mono text-xs">
+          {NEXT_HAND_KEY}
+        </kbd>
+        {nextLabel}
+      </Button>
       {continuesByItself ? (
-        <ResultChip feedback={feedback} />
+        <ResultChip feedback={feedback} actions={prompt.buttons} chosenIndex={decision.actionIndex} />
       ) : (
         <FeedbackPanel
           feedback={feedback}
           actions={prompt.buttons}
           chosenIndex={decision.actionIndex}
+          unratedReason={unratedReason(feedback, prompt, context.session)}
           rangeView={<FeedbackRangeView feedback={feedback} />}
           thresholdCard={<FeedbackThreshold feedback={feedback} actions={prompt.buttons} />}
           roller={roller}
@@ -105,12 +133,6 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}
         />
       )}
-      <Button variant="primary" size="lg" aria-keyshortcuts={NEXT_HAND_KEY} disabled={!interactive} onClick={onNext} className="self-start">
-        <kbd aria-hidden="true" className="font-mono text-xs">
-          {NEXT_HAND_KEY}
-        </kbd>
-        {SESSION_TEXT.nextHand}
-      </Button>
     </div>
   );
 }
@@ -131,7 +153,14 @@ export function DecisionArea(props: DecisionAreaProps) {
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
-      <ActionBar actions={prompt.buttons} grouping={grouping} street={prompt.street} disabled={!choosing || !interactive} onAction={onChoose} />
+      <ActionBar
+        actions={prompt.buttons}
+        grouping={grouping}
+        street={prompt.street}
+        disabled={!choosing || !interactive}
+        chosenIndex={chosenIndexOf(state)}
+        onAction={onChoose}
+      />
       {state.kind === "submitting" ? <LoadingNote text={SESSION_TEXT.grading} /> : null}
       <Feedback {...props} />
     </div>

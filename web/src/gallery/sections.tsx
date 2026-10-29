@@ -158,12 +158,13 @@ export function TrainerSections() {
       <GallerySection
         name="feedback-panel"
         title="FeedbackPanel"
-        note="As a decision first shows it: the summary (label, your action against the best, the loss, Unrated, the roll), every other section collapsed (O-387)."
+        note="As a decision first shows it: the summary (label with its definitions tip, your action against the best, the loss and the solver's frequency, Unrated, the roll), every other section collapsed (O-387). In the trainer Strategy opens by itself after an inaccuracy, a mistake or a blunder (S46); this entry keeps the collapsed shape."
       >
         <FeedbackPanel
           feedback={fixtureFeedback}
           actions={fixtureActions}
           chosenIndex={1}
+          defaultOpen={{ strategy: false }}
           rangeView={<GalleryRangeBody />}
           thresholdCard={<ThresholdCard card={fixtureInsights.threshold_card} heroHand="AJo" />}
           insights={<GalleryInsightsBody />}

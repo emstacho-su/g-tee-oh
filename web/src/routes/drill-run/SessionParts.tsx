@@ -11,24 +11,24 @@
  */
 import { Button, Card, Dialog, RAISED_CLASS, cn } from "../../components/ui/index.js";
 import { formatBb } from "../../poker/format.js";
+import { formatPercent } from "../../progress/format.js";
 import type { SessionRecap } from "../../trainer/session-types.js";
 import { problemMessage, type SpotProblem } from "../../trainer/spot-problem.js";
 import { SESSION_TEXT } from "./labels.js";
-import { StatTiles, type StatTile } from "./SessionLook.js";
-
-const SCORE_DECIMALS = 2;
+import { RECAP_TIPS, StatTiles, type StatTile } from "./SessionLook.js";
 
 export interface SessionRecapViewProps {
   recap: SessionRecap;
   onStartAnother: () => void;
 }
 
+/** The api's four figures; the mean score prints as a percent, as /train's recap does (S46 item 1). */
 function recapTiles(recap: SessionRecap): StatTile[] {
   return [
     { term: "Decisions", value: String(recap.decisions) },
-    { term: "Rated decisions", value: String(recap.rated_decisions) },
-    { term: "Mean score", value: recap.mean_score === null ? "None rated" : recap.mean_score.toFixed(SCORE_DECIMALS) },
-    { term: "EV loss", value: formatBb(recap.ev_loss_bb_total) },
+    { term: "Rated decisions", value: String(recap.rated_decisions), tip: RECAP_TIPS.ratedDecisions },
+    { term: "Mean score", value: recap.mean_score === null ? "None rated" : formatPercent(recap.mean_score), tip: RECAP_TIPS.meanScore },
+    { term: "EV loss", value: formatBb(recap.ev_loss_bb_total), tip: RECAP_TIPS.evLoss },
   ];
 }
 

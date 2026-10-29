@@ -80,7 +80,7 @@ async function trainScreens(page: Page, theme: Theme, viewport: Viewport): Promi
   await expect(page.getByTestId("block-rating")).toHaveText("Worked example: panels visible, not rated");
   await shot("train-worked-example", CRITERIA.worked);
 
-  await page.keyboard.press("e");
+  await page.keyboard.press("Shift+E");
   const confirm = page.getByRole("dialog", { name: "End this session?" });
   await expect(confirm).toBeVisible();
   await shot("train-end-confirm", CRITERIA.confirm);

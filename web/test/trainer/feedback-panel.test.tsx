@@ -6,7 +6,7 @@
  */
 import { act, render, renderHook, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { FEEDBACK_SECTION_TITLES, FeedbackPanel, useFeedbackSections } from "../../src/components/trainer/index.js";
 import type { DecisionFeedback, NodeAction } from "../../src/contracts.js";
@@ -82,24 +82,46 @@ describe("R3.13 FeedbackPanel summary", () => {
     expect(panel).not.toHaveTextContent("Roll");
   });
 
-  it("R3.13 More info and Ask are disabled with an S27 note when their handlers are absent", () => {
-    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
-    const more = screen.getByRole("button", { name: "More info" });
-    const ask = screen.getByRole("button", { name: "Ask" });
-    expect(more).toBeDisabled();
-    expect(ask).toBeDisabled();
-    expect(more).toHaveAttribute("title", expect.stringContaining("S27"));
-    expect(ask).toHaveAttribute("title", expect.stringContaining("S27"));
+  it("R3.13 offers no More info button: the Explanation disclosure is the only way in (critic round 3 G6)", () => {
+    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} explanation={<p>explanation slot</p>} />);
+    expect(screen.queryByRole("button", { name: "More info" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Explanation/ })).toBeInTheDocument();
   });
 
-  it("R3.13 More info and Ask call their handlers when given", async () => {
-    const onMoreInfo = vi.fn();
-    const onAsk = vi.fn();
-    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} onMoreInfo={onMoreInfo} onAsk={onAsk} />);
-    await userEvent.click(screen.getByRole("button", { name: "More info" }));
-    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
-    expect(onMoreInfo).toHaveBeenCalledOnce();
-    expect(onAsk).toHaveBeenCalledOnce();
+  it("R3.13 the controls row sits under the summary and above the sections (critic round 3 R10)", () => {
+    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} explain={<p data-testid="controls-row">controls</p>} />);
+    const panel = screen.getByTestId("feedback-panel");
+    const summary = screen.getByTestId("feedback-summary");
+    const controls = screen.getByTestId("controls-row");
+    const strategy = sectionButton(FEEDBACK_SECTION_TITLES.strategy);
+    expect(summary.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(controls.compareDocumentPosition(strategy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(panel).toContainElement(controls);
+  });
+
+  it("R3.10 says how often the solver takes your action, beside the loss, with the most frequent action (design rule 11)", () => {
+    render(<FeedbackPanel feedback={RATED} actions={fixtureActions} chosenIndex={1} />);
+    const summary = screen.getByTestId("feedback-summary");
+    expect(summary).toHaveTextContent("The solver takes Call 10.0% of the time; its most frequent action is Raise 2.5bb at 80.0%.");
+  });
+
+  it("R3.8 the label carries the grade definitions tip (design rule 11)", () => {
+    render(<FeedbackPanel feedback={RATED} actions={fixtureActions} chosenIndex={1} />);
+    const summary = screen.getByTestId("feedback-summary");
+    expect(within(summary).getByRole("button", { name: "About grade labels" })).toBeInTheDocument();
+  });
+
+  it("R3.13 the reason a decision is unrated reads beside the Unrated chip", () => {
+    render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} unratedReason="Drill sessions are never rated." />);
+    const summary = screen.getByTestId("feedback-summary");
+    expect(summary).toHaveTextContent("Unrated");
+    expect(within(summary).getByTestId("unrated-reason")).toHaveTextContent("Drill sessions are never rated.");
+  });
+
+  it("R3.13 a rated decision shows no reason even when one is passed", () => {
+    render(<FeedbackPanel feedback={RATED} actions={fixtureActions} chosenIndex={1} unratedReason="Drill sessions are never rated." />);
+    expect(screen.queryByTestId("unrated-reason")).not.toBeInTheDocument();
   });
 
   it("R3.13 names the chosen and the best actions by NodeAction.index when indexes are not positions (O-198)", () => {
@@ -117,8 +139,9 @@ describe("R3.13 FeedbackPanel summary", () => {
 
   it("R3.13 a best action index that names no action renders an alert in the summary, never a wrong Best (O-198)", () => {
     render(<FeedbackPanel feedback={fixtureFeedback} actions={OFFSET_ACTIONS} chosenIndex={11} />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Best action 2 is not one of the 4 actions");
-    expect(screen.getByTestId("feedback-summary")).not.toHaveTextContent("Best: ");
+    const summary = screen.getByTestId("feedback-summary");
+    expect(within(summary).getByRole("alert")).toHaveTextContent("Best action 2 is not one of the 4 actions");
+    expect(summary).not.toHaveTextContent("Best: ");
   });
 
   it("R3.13 a chosen index outside the actions renders an error", () => {
@@ -128,12 +151,12 @@ describe("R3.13 FeedbackPanel summary", () => {
 });
 
 describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
-  it("R3.13 every given section starts collapsed, as an inline disclosure and never a dialog", () => {
+  it("R3.13 every given section starts collapsed on a Best decision, as an inline disclosure and never a dialog", () => {
     render(
       <FeedbackPanel
-        feedback={fixtureFeedback}
+        feedback={{ ...fixtureFeedback, label: "best" }}
         actions={fixtureActions}
-        chosenIndex={1}
+        chosenIndex={2}
         rangeView={<p>range slot</p>}
         thresholdCard={<p>threshold slot</p>}
         insights={<p>insights slot</p>}
@@ -182,6 +205,16 @@ describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
     expect(within(table).getByRole("row", { name: /Raise 2.5bb/ })).toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /All-in 100bb/ })).not.toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /Call/ })).not.toHaveTextContent("Best");
+  });
+
+  it.each(["inaccuracy", "mistake", "blunder"] as const)("R3.13 Strategy starts open on a %s, so the mistake meets the mix at once (S46 item 1)", (label) => {
+    render(<FeedbackPanel feedback={{ ...fixtureFeedback, label }} actions={fixtureActions} chosenIndex={1} />);
+    expect(sectionButton(FEEDBACK_SECTION_TITLES.strategy)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it.each(["best", "correct"] as const)("R3.13 Strategy starts closed on a %s decision (O-387)", (label) => {
+    render(<FeedbackPanel feedback={{ ...fixtureFeedback, label }} actions={fixtureActions} chosenIndex={2} />);
+    expect(sectionButton(FEEDBACK_SECTION_TITLES.strategy)).toHaveAttribute("aria-expanded", "false");
   });
 
   it("R3.13 Strategy starts open on a worked-example prompt (O-387)", () => {
@@ -235,13 +268,13 @@ describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
   });
 
   it("R3.13 a section's open or closed choice carries to the next decision through the session's control (O-387)", async () => {
+    // A Best decision starts with Strategy closed (S46: a mistake opens it by itself), so the open is a choice.
+    const best: DecisionFeedback = { ...fixtureFeedback, label: "best" };
     const { result } = renderHook(() => useFeedbackSections("session-1"));
-    const { rerender } = render(
-      <FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} sections={result.current} />,
-    );
+    const { rerender } = render(<FeedbackPanel feedback={best} actions={fixtureActions} chosenIndex={2} sections={result.current} />);
     await openSection(FEEDBACK_SECTION_TITLES.strategy);
     expect(result.current.open.strategy).toBe(true);
-    const next: DecisionFeedback = { ...fixtureFeedback, attempt_id: "00000000-0000-4000-8000-0000000000ff" };
+    const next: DecisionFeedback = { ...best, attempt_id: "00000000-0000-4000-8000-0000000000ff" };
     rerender(<FeedbackPanel key="next" feedback={next} actions={fixtureActions} chosenIndex={2} sections={result.current} />);
     expect(sectionButton(FEEDBACK_SECTION_TITLES.strategy)).toHaveAttribute("aria-expanded", "true");
   });

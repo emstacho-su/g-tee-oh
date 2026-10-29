@@ -253,7 +253,7 @@ async function flow4(page: Page, theme: Theme): Promise<void> {
   const prompts = trackPrompts(page);
   await openRunWithRng(page, drillId, shot);
   await playToMixedHand(page, prompts, shot);
-  await page.keyboard.press("e");
+  await page.keyboard.press("Shift+E");
   await page.getByRole("dialog", { name: "End this session?" }).getByRole("button", { name: "End session" }).click();
   await expect(page.getByRole("heading", { name: "Session recap" })).toBeVisible();
   await shot("flow4-recap", CRITERIA.recap);

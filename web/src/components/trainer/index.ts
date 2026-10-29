@@ -7,14 +7,19 @@
 export { ActionBar, ACTION_SCOPE, MAX_HOTKEY_ACTIONS } from "./ActionBar.js";
 export type { ActionBarProps } from "./ActionBar.js";
 export { actionAccessibleName, actionButtonLabel } from "./action-labels.js";
+export { KIND_KEYS, KIND_KEY_NAMES, MAX_SIZE_HOTKEYS, SIZE_KINDS, actionHotkeys } from "./action-keys.js";
 export type { ActionButtonLabel } from "./action-labels.js";
 export { ActionSwatch, ACTION_FILL_CLASSES, ACTION_INK_CLASSES, actionFillStyle } from "./ActionSwatch.js";
 export type { ActionSwatchProps } from "./ActionSwatch.js";
 export { RngRoller, ROLLER_TEXT, SCALE_TICKS } from "./RngRoller.js";
 export type { HiddenRollerProps, RevealedRollerProps, RngRollerProps } from "./RngRoller.js";
-export { FeedbackPanel, LATER_SESSION_NOTE } from "./FeedbackPanel.js";
+export { FeedbackPanel } from "./FeedbackPanel.js";
+export { GRADE_DEFINITIONS, GRADE_NAMES, GRADE_ORDER, GRADE_ROLL_NOTE, GRADE_SYMBOLS, GRADE_TIP_SUBJECT, GradeTip, gradeWithMark } from "./grade-definitions.js";
+export type { GradeTipProps } from "./grade-definitions.js";
+export { solverFrequency, solverFrequencyShort, solverFrequencyText } from "./solver-frequency.js";
+export type { SolverFrequency, SolverFrequencyEntry } from "./solver-frequency.js";
 export type { FeedbackPanelProps } from "./FeedbackPanel.js";
-export { FeedbackSummary, SUMMARY_TEXT } from "./FeedbackSummary.js";
+export { FeedbackSummary, SUMMARY_TEXT, lossText } from "./FeedbackSummary.js";
 export type { FeedbackSummaryProps } from "./FeedbackSummary.js";
 export {
   FEEDBACK_SECTION_ORDER,

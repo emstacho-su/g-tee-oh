@@ -1,11 +1,15 @@
 /**
- * The session's progress strip above the table (S26, R3.13, R3.14, O-312, O-313). From the session
- * context: the covered-part note when POST /sessions queued part of the drill (every mode), and in
- * street and full-hand modes the hand and decision counter. Spot mode shows no counter.
+ * The session's progress strip above the table (S26, S46, R3.13, R3.14, R3.31, O-312, O-313). From
+ * the session context: the covered-part note when POST /sessions queued part of the drill (every
+ * mode), and the hand counter: in street and full-hand modes the hand and decision counter, and in
+ * every mode "Hand 7 of 20" once a session length is planned (S46). Spot mode without a length
+ * shows no counter, as in S26. SessionHandCounter holds that one rule; /train renders it too
+ * (PR #45 review round 2, cleanup 9).
  *
  * S40 (O-352): how the last hand ended is no longer shown; the api logs each finished hand under the
  * user's account (hand_record) instead.
  */
+import { sessionLengthOf } from "../../trainer/session-length.js";
 import type { SessionContext } from "../../trainer/spot-machine.js";
 import { CoverageNote } from "./CoverageNote.js";
 import { HandCounter } from "./HandCounter.js";
@@ -14,13 +18,20 @@ export interface RunProgressProps {
   context: SessionContext;
 }
 
+/** The hand counter by the one rule: street modes always, one-decision modes only with a length. */
+export function SessionHandCounter({ context }: RunProgressProps) {
+  const spotMode = (context.trainer?.stop_rule ?? "after_action") === "after_action";
+  const length = sessionLengthOf(context);
+  const hand = context.hand;
+  if (hand === undefined || (spotMode && length === null)) return null;
+  return <HandCounter progress={hand} length={length} decision={!spotMode} />;
+}
+
 export function RunProgress({ context }: RunProgressProps) {
-  const stopRule = context.trainer?.stop_rule ?? "after_action";
-  const hand = stopRule === "after_action" ? undefined : context.hand;
   return (
     <>
       <CoverageNote coverage={context.session.coverage} />
-      {hand === undefined ? null : <HandCounter progress={hand} />}
+      <SessionHandCounter context={context} />
     </>
   );
 }

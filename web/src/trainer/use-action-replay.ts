@@ -8,8 +8,9 @@
  * rendering (React's derived-state pattern), so the first frame of a new prompt already shows the
  * first step. One timer at a time moves to the next step after the active step's duration; the
  * last step's end finishes the replay and the log adds "Your turn". skip() finishes at once and
- * so does any action key (1 to 9), so a user who has seen enough never waits; the page wires
- * `replaying` into the action bar and the paused response timer. Reduced motion (the system
+ * so does the space bar (S46, R3.30: the action keys no longer do, so a key pressed as the replay
+ * ends never submits), so a user who has seen enough never waits; the page wires `replaying`
+ * into the action bar and the paused response timer. Reduced motion (the system
  * setting, or the reducedMotion option) shows the end state at once with no timer, and turning it
  * on mid-replay finishes the replay. A null prompt is an idle replay and keeps the last prompt, so
  * the next one is still compared with it.
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { usePrefersReducedMotion } from "../components/table/reduced-motion.js";
 import type { Position, TrainerPrompt } from "../contracts.js";
+import { isActivatableTarget } from "../hotkeys/index.js";
 import {
   LOG_TEXT,
   logLines,
@@ -36,8 +38,8 @@ export interface ReplayOptions {
   /** Overrides the prefers-reduced-motion media query when given. */
   reducedMotion?: boolean;
   /**
-   * Whether an action key (1 to 9) finishes the replay: true by default; the session turns it off
-   * while a dialog covers the screen, so a key meant for the dialog never touches the table.
+   * Whether the space bar finishes the replay: true by default; the session turns it off while a
+   * dialog covers the screen, so a key meant for the dialog never touches the table.
    */
   keySkip?: boolean;
 }
@@ -66,19 +68,26 @@ export interface ActionReplay {
   readonly skip: () => void;
 }
 
-/** The action keys that finish a replay (the action bar's 1 to 9). */
-const SKIP_KEY = /^[1-9]$/;
-
-/** A field the user types into: a digit there is text, never an action key (review round 1, 6). */
+/** The key that finishes a replay: the space bar (S46, R3.30, O-475; the digits were S38's). */
+const SKIP_KEY = " ";
+/** A field the user types into: Space there is text, never a skip (review round 1, 6). */
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || target.matches("input, textarea, select, [contenteditable='true']");
 }
 
-/** An action key with no modifier, pressed outside a field. */
+/**
+ * Space with no modifier, pressed outside a field and a focused control (dispatch.ts: a button,
+ * link, field or any tabindex widget such as the range matrix, never a disabled one), and not
+ * already handled by a widget (defaultPrevented: the matrix selects a cell on Space). This window
+ * listener runs in the bubble phase, after React's handlers (PR #45 review round 2, finding 1).
+ */
 function isSkipKey(event: KeyboardEvent): boolean {
-  if (event.ctrlKey || event.metaKey || event.altKey) return false;
-  return SKIP_KEY.test(event.key) && !isEditable(event.target);
+  if (event.defaultPrevented) return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
+  if (event.key !== SKIP_KEY) return false;
+  const { target } = event;
+  return !isEditable(target) && !isActivatableTarget(target);
 }
 
 interface Track {
@@ -166,7 +175,10 @@ export function useActionReplay(prompt: TrainerPrompt | null, options: ReplayOpt
   useEffect(() => {
     if (!replaying || !keySkip) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isSkipKey(event)) skip();
+      if (!isSkipKey(event)) return;
+      // Space on the page would scroll it; the skip takes the key.
+      event.preventDefault();
+      skip();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
