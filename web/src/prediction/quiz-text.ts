@@ -14,7 +14,12 @@ export const QUIZ_START_TEXT = {
   spotTypes: "Spot types",
   kinds: "Question kinds",
   difficulty: "Difficulty",
-  levels: "Easy: over or under a share, and the highest-EV action. Medium: the share, and a frequency band. Hard: which regions mix, and the raise size played most.",
+  /** One line per level (S47 critic G8), rendered as a list. */
+  levels: [
+    "Easy: over or under a share, and the highest-EV action.",
+    "Medium: the share, and a frequency band.",
+    "Hard: which regions mix, and the raise size played most.",
+  ],
   start: "Start quiz",
   loadingTables: "Loading the tables",
   loadingSeats: "Loading the seats",
