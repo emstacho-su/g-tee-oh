@@ -17,6 +17,20 @@ import { BUILDER_SECTIONS, type BuilderSectionSlug } from "../../drills/builder-
 import type { SectionErrorCounts } from "./BuilderNav.js";
 
 const INVALID_CONTROL = '[aria-invalid="true"]';
+/** A page's error-carrying group when no control is marked invalid: a fieldset (tabIndex -1) or the form alert. */
+const ERROR_GROUP = "fieldset, [data-testid=\"form-alert\"]";
+
+/**
+ * Where the focus goes on the open page (PR #48 review MEDIUM 7): its first invalid control, else
+ * its first fieldset or the form alert, made focusable; null only when the page holds none.
+ */
+export function firstErrorTarget(root: ParentNode): HTMLElement | null {
+  const control = root.querySelector<HTMLElement>(INVALID_CONTROL);
+  if (control !== null) return control;
+  const group = root.querySelector<HTMLElement>(ERROR_GROUP);
+  if (group !== null && !group.hasAttribute("tabindex")) group.tabIndex = -1;
+  return group;
+}
 
 export function useFocusFirstError(section: BuilderSectionSlug, drillId: string | undefined, form: RefObject<HTMLFormElement | null>): (counts: SectionErrorCounts) => void {
   const navigate = useNavigate();
@@ -26,10 +40,10 @@ export function useFocusFirstError(section: BuilderSectionSlug, drillId: string 
   useEffect(() => {
     // Wait until the pending page is the open one: the page left behind may hold an invalid field too.
     if (pending === null || pending !== section) return;
-    const target = form.current?.querySelector<HTMLElement>(INVALID_CONTROL);
-    if (target === null || target === undefined) return;
-    target.focus();
+    // One try per request: the request is cleared whatever is found, so it never fires later.
     setPending(null);
+    const root = form.current;
+    if (root !== null) firstErrorTarget(root)?.focus();
   }, [pending, section, form]);
 
   return (counts) => {
