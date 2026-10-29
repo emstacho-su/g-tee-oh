@@ -40,7 +40,7 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
 
   it("R3.35 a double click sends nothing twice: the second click lands on the write in flight", async () => {
     const user = userEvent.setup();
-    let release: (() => void) | null = null;
+    let release: () => void = () => undefined;
     const held = new Promise<undefined>((resolve) => {
       release = () => resolve(undefined);
     });
@@ -52,7 +52,7 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     await user.dblClick(screen.getByRole("button", { name: BUTTON }));
     await waitFor(() => expect(sent("POST", IMPORT_PATH)).toHaveLength(1));
     expect(screen.getByRole("button", { name: "Adding the starter drills" })).toBeDisabled();
-    release?.();
+    release();
     await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
     expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
   });

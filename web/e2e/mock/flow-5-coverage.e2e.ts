@@ -36,7 +36,7 @@ test("R3.4 R3.5 mock flow 5: a gap request answers at once with its queue positi
     build_id: "synthetic-build",
     scenario_count: 20,
   });
-  await expect(page.getByTestId("live-coverage")).toHaveText("New coverage: BB-BTN on Kd8s3h, 20 scenarios.");
+  await expect(page.getByTestId("live-coverage")).toHaveText("New coverage: Big blind versus button on Kd8s3h, 20 scenarios (pre-dealt runouts).");
 
   await pauseThenResume(page);
   await expect(page.getByTestId("builder-state")).toHaveText("Running");

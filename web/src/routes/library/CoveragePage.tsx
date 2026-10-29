@@ -17,6 +17,7 @@ import { Card, LoadingNote } from "../../components/ui/index.js";
 import { withLibraryFilter, withPair, type LibrarySearch } from "../../library/search.js";
 import { FILTER_PROMPTS, missingFilter, type FilterKey } from "../../study/filters.js";
 import { catalogFailure } from "../../study/problem-text.js";
+import { configurationWords } from "../../progress/spot-words.js";
 import { useStudyCatalog, type StudyCatalog } from "../../study/use-study-catalog.js";
 import { FailureAlert } from "../study/StudyNotices.js";
 import { StudyFilters } from "../study/StudyFilters.js";
@@ -80,6 +81,7 @@ function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps)
           key={`${configId}|${selected.pair}`}
           api={api}
           configId={configId}
+          configurationLabel={configurationWords(catalog.configs?.find((config) => config.config_id === configId), configId)}
           pair={selected.pair}
           preflopAvailable={selected.preflop_available}
         />

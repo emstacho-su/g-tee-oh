@@ -19,11 +19,13 @@ export const FLOPS_CARD_TITLE = "Flops and queue";
 export interface CoveragePanelProps {
   api: AppApi;
   configId: string;
+  /** The configuration in words, from the catalog the page already read (S47). */
+  configurationLabel: string;
   pair: string;
   preflopAvailable: boolean;
 }
 
-export function CoveragePanel({ api, configId, pair, preflopAvailable }: CoveragePanelProps) {
+export function CoveragePanel({ api, configId, configurationLabel, pair, preflopAvailable }: CoveragePanelProps) {
   const coverage = useQuery(coverageQuery(api, configId, pair));
   const request = useGapRequest(api, configId, pair);
   return (
@@ -39,7 +41,7 @@ export function CoveragePanel({ api, configId, pair, preflopAvailable }: Coverag
         ) : null}
         {coverage.data === undefined && !coverage.isError ? <LoadingNote text="Loading the coverage." /> : null}
         {coverage.data === undefined ? null : (
-          <CoverageDetail coverage={coverage.data} requestPending={request.pending} onRequestFlop={(flop) => request.send({ flop })} />
+          <CoverageDetail coverage={coverage.data} configurationLabel={configurationLabel} requestPending={request.pending} onRequestFlop={(flop) => request.send({ flop })} />
         )}
       </Card>
       <GapRequest pair={pair} preflopAvailable={preflopAvailable} request={request} />

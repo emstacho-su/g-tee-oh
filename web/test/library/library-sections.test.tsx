@@ -87,7 +87,7 @@ describe("R3.4 R3.5 the library sections (O-406)", () => {
     expect(router.state.location.pathname).toBe("/library/builder");
     await user.click(within(sectionNav()).getByRole("link", { name: "Coverage" }));
 
-    expect(await screen.findByRole("button", { name: new RegExp(`^${FIXTURE_QUEUE_PAIR}`) })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: /^Big blind versus button/ })).toHaveAttribute("aria-pressed", "true");
     expect(router.state.location.search).toMatchObject({ pair: FIXTURE_QUEUE_PAIR });
   });
 

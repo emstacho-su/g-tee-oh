@@ -19,7 +19,7 @@ import { draftFromDrill, newDrillDraft } from "../../drills/draft.js";
 import { clearHandedDraft, peekHandedDraft } from "../../drills/draft-handoff.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { drillDetailQuery } from "../../drills/queries.js";
-import { spotSummary } from "../../drills/summary.js";
+import { spotSummary, spotWords } from "../../drills/summary.js";
 import { BuilderActions } from "./BuilderActions.js";
 import { DrillForm } from "./DrillForm.js";
 
@@ -53,6 +53,8 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
   const drill = useQuery(drillDetailQuery(api, drillId));
   // Edits made while this drill was being created come along as unsaved changes (review round 1 B).
   const [carried] = useState(() => peekHandedDraft(drillId));
+  // Whether the form's draft differs from the stored drill (S47, R3.14): the header actions follow it.
+  const [dirty, setDirty] = useState(false);
   useEffect(() => clearHandedDraft(drillId), [drillId]);
   if (drill.data === undefined) {
     return (
@@ -77,11 +79,11 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
     <>
       <div className="flex flex-col gap-2">
         <PageHeader title={stored.name} actions={<BackLink />} />
-        <p data-testid="spot-summary" className="text-sm text-muted md:text-base">
-          {spotSummary(stored.spot_filter)}
+        <p data-testid="spot-summary" className="text-sm text-muted md:text-base" title={spotSummary(stored.spot_filter)}>
+          {spotWords(stored.spot_filter)}
         </p>
       </div>
-      <BuilderActions api={api} drill={stored} />
+      <BuilderActions api={api} drill={stored} dirty={dirty} />
       <DrillForm
         key={stored.id}
         initial={draftFromDrill(stored)}
@@ -89,6 +91,7 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
         section={section}
         drill={stored}
         justCreated={justCreated}
+        onDirtyChange={setDirty}
       />
     </>
   );

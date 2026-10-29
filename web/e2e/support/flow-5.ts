@@ -12,6 +12,8 @@
  */
 import { expect, type Page } from "@playwright/test";
 
+import { capitalize, pairWords } from "../../src/progress/spot-words.js";
+
 /** The four filters that name a configuration, by the labels the selects show. */
 export interface ConfigFilters {
   readonly format: "online" | "live";
@@ -62,21 +64,23 @@ async function timedAnswer(page: Page, send: () => Promise<void>): Promise<strin
 /** Selects the first pair the library does not hold and requests its preflop; returns the pair. */
 export async function requestUncoveredPreflop(page: Page): Promise<string> {
   const cell = page.getByRole("list", { name: "Pairs" }).getByRole("button").filter({ hasText: "Not in the library" }).first();
-  const pair = ((await cell.locator("span").first().textContent()) ?? "").trim();
+  // The cell reads in words since S47 ("Cutoff versus button"); the token is its title.
+  const words = ((await cell.locator("span").first().textContent()) ?? "").trim();
+  const pair = (await cell.getAttribute("title")) ?? words;
   await cell.click();
   await expect(page.getByText("The preflop solution is not in the library.")).toBeVisible();
-  const text = await timedAnswer(page, () => page.getByRole("button", { name: `Request ${pair} preflop` }).click());
-  expect(text).toBe(`${pair} preflop: Recorded for the planner. There is no build job for this spot yet, so it has no queue position.`);
+  const text = await timedAnswer(page, () => page.getByRole("button", { name: `Request ${pairWords(pair)} preflop` }).click());
+  expect(text).toBe(`${words} preflop: Recorded for the planner. There is no build job for this spot yet, so it has no queue position.`);
   return pair;
 }
 
 /** Selects a covered pair, requests one of its queued flops and expects queue position 1. */
 export async function requestQueuedFlop(page: Page, pair: string, flop: string): Promise<void> {
-  await page.getByRole("list", { name: "Pairs" }).getByRole("button", { name: new RegExp(`^${pair}`) }).click();
+  await page.getByRole("list", { name: "Pairs" }).getByRole("button", { name: new RegExp(`^${capitalize(pairWords(pair))}`) }).click();
   const queue = page.getByRole("table", { name: "Build queue for this pair" });
   await expect(queue.getByRole("rowheader", { name: flop })).toBeVisible();
   const text = await timedAnswer(page, () => queue.getByRole("button", { name: `Request ${flop}` }).click());
-  expect(text).toBe(`${pair} on ${flop}: Queued for the builder at position 1.`);
+  expect(text).toBe(`${capitalize(pairWords(pair))} on ${flop}: Queued for the builder at position 1.`);
   await expect(queue.getByRole("row").nth(1).getByRole("rowheader")).toHaveText(flop);
 }
 

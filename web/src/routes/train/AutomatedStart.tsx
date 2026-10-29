@@ -9,20 +9,21 @@
  * shown as the id.
  *
  * S38 (R3.13, O-346, O-348; screen review rows 90 and 93): both start panels are raised S36 Cards
- * with a heading and the intro as their description; the grouping and Mixed-frequency mode read as
- * chips (SessionLook.tsx), the scope as a sunken block above them.
+ * with a heading and the intro as their description, the scope as a sunken block.
+ * S47 (R4.10, O-487): the grouping ToggleGroup and the Mixed-frequency switch sit inline
+ * (SessionDefaultsFields, writing the session defaults store) instead of a link to Settings, so
+ * the roll is turned on where the session starts; the scope keeps its link.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
 import { Button, Card, LoadingNote } from "../../components/ui/index.js";
-import { GROUPING_LABELS } from "../../drills/labels.js";
-import { SettingChips } from "../drill-run/SessionLook.js";
 import type { GameConfig } from "../../progress/types.js";
 import { ALL_CONFIGS, type ConfigScope, type SessionDefaults } from "../../store/session-defaults.js";
 import { allConfigsQuery, configLabel } from "../settings/configs-query.js";
-import { DEFAULTS_SETTINGS_SECTION, SCOPE_SETTINGS_SECTION, TRAIN_TEXT } from "./train-text.js";
+import { SessionDefaultsFields } from "../settings/SessionDefaultsFields.js";
+import { SCOPE_SETTINGS_SECTION, TRAIN_TEXT } from "./train-text.js";
 
 export interface AutomatedStartProps {
   defaults: SessionDefaults;
@@ -77,24 +78,18 @@ function StartRow({ label, starting, onStart }: { label: string; starting: boole
 }
 
 export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartProps) {
-  const chips = [
-    { name: TRAIN_TEXT.grouping, value: GROUPING_LABELS[defaults.grouping], valueTestId: "start-grouping" },
-    { name: TRAIN_TEXT.rng, value: defaults.rng ? TRAIN_TEXT.on : TRAIN_TEXT.off, valueTestId: "start-rng" },
-  ];
   return (
     <Card title={TRAIN_TEXT.automatedCardTitle} description={TRAIN_TEXT.automatedIntro} testId="automated-start" className="max-w-xl">
       <div className="flex flex-col gap-1 rounded-xl bg-surface-sunken px-3 py-2 text-sm">
         <span className="font-medium text-muted">{TRAIN_TEXT.scope}</span>
         <Scope scope={defaults.configScope} />
-      </div>
-      <SettingChips label={TRAIN_TEXT.sessionSettings} chips={chips} />
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
-        <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="text-accent underline underline-offset-2">
+        <Link to="/settings/$section" params={{ section: SCOPE_SETTINGS_SECTION }} className="self-start font-medium text-accent underline underline-offset-2">
           {TRAIN_TEXT.changeScope}
         </Link>
-        <Link to="/settings/$section" params={{ section: DEFAULTS_SETTINGS_SECTION }} className="text-accent underline underline-offset-2">
-          {TRAIN_TEXT.changeDefaults}
-        </Link>
+      </div>
+      {/* The grouping and the roll are set here, where the session starts (S47, R4.10); they write the session defaults store. */}
+      <div className="flex flex-col gap-3" role="group" aria-label={TRAIN_TEXT.sessionSettings} data-testid="start-defaults">
+        <SessionDefaultsFields idPrefix="automated-start" />
       </div>
       <StartRow label={TRAIN_TEXT.startAutomated} starting={starting} onStart={onStart} />
     </Card>

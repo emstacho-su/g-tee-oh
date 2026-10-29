@@ -59,16 +59,18 @@ afterEach(() => {
 });
 
 describe("R4.10 automated start", () => {
-  it("R4.10 the start panel names every covered configuration, the grouping and RNG from the defaults, with a Settings link", async () => {
+  it("R4.10 the start panel names every covered configuration and shows the grouping and RNG controls set from the defaults, with the scope link", async () => {
     setDefaults({ grouping: "grouped", rng: true });
     await renderTrain("automated", {});
     expect(screen.getByRole("heading", { level: 1, name: "Automated training" })).toBeInTheDocument();
     expect(await screen.findByTestId("scope-all")).toHaveTextContent("All covered configurations");
-    expect(screen.getByTestId("start-grouping")).toHaveTextContent("Grouped");
-    expect(screen.getByTestId("start-rng")).toHaveTextContent("On");
-    // S36: each link opens the settings page that holds what it changes (O-360).
+    // S47 (R4.10): the grouping and the roll are set here, not two screens away in Settings.
+    const controls = screen.getByRole("group", { name: "Session settings" });
+    expect(within(controls).getByRole("radio", { name: "Grouped" })).toHaveAttribute("aria-checked", "true");
+    expect(within(controls).getByRole("checkbox", { name: "Mixed-frequency mode" })).toBeChecked();
+    // S36: the scope link opens the settings page that holds it (O-360).
     expect(screen.getByRole("link", { name: "Change the configurations" })).toHaveAttribute("href", "/settings/configurations");
-    expect(screen.getByRole("link", { name: "Change the session defaults" })).toHaveAttribute("href", "/settings/session-defaults");
+    expect(screen.queryByRole("link", { name: "Change the session defaults" })).not.toBeInTheDocument();
   });
 
   it("R4.10 Start sends mode automated with grouping and rng, no config_ids and never a seed (O-325)", async () => {

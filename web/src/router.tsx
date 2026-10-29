@@ -205,8 +205,8 @@ export const drillRunRoute = createRoute({
   validateSearch: validateDrillRunSearch,
   component: function DrillRunRouteScreen() {
     const { id } = drillRunRoute.useParams();
-    const { seed } = validateDrillRunSearch(drillRunRoute.useSearch());
-    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} />;
+    const { seed, start } = validateDrillRunSearch(drillRunRoute.useSearch());
+    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} {...(start === undefined ? {} : { autostart: true })} />;
   },
 });
 export const studyRoute = createRoute({

@@ -17,6 +17,9 @@ import { jsonBody, libraryPath, renderLibrary } from "./render-library.js";
 const REQUESTS_PATH = "/api/v1/coverage/requests";
 const COVERAGE_PATH = "/api/v1/coverage";
 const UNCOVERED_PAIR = "CO-BTN";
+/** The pairs read in words since S47 (spot-words.ts); the tokens stay in the requests. */
+const UNCOVERED_WORDS = "cutoff versus button";
+const QUEUE_WORDS = "Big blind versus button";
 
 /** Each queue row as [position, flop]. */
 function queuePositions(): string[][] {
@@ -36,10 +39,10 @@ describe("R3.4 coverage view", () => {
     const pairs = await screen.findByRole("list", { name: "Pairs" });
     const cells = within(pairs).getAllByRole("button");
     expect(cells.map((cell) => cell.textContent)).toEqual([
-      "BB-BTNIn the library",
-      "SB-BTNIn the library",
-      "CO-BTNNot in the library",
-      "UTG-HJNot in the library",
+      "Big blind versus buttonIn the library",
+      "Small blind versus buttonIn the library",
+      "Cutoff versus buttonNot in the library",
+      "Under the gun versus hijackNot in the library",
     ]);
     expect(screen.getByText("2 of 4 pairs are in the library at this configuration.")).toBeInTheDocument();
     expect(screen.getByText("Choose a pair to see its flops and queue, or to request it.")).toBeInTheDocument();
@@ -49,11 +52,11 @@ describe("R3.4 coverage view", () => {
     const user = userEvent.setup();
     const { router } = renderLibrary(libraryPath(FIXTURE_ONLINE_STAKE_ID));
 
-    await user.click(await screen.findByRole("button", { name: /^BB-BTN/ }));
+    await user.click(await screen.findByRole("button", { name: new RegExp(`^${QUEUE_WORDS}`) }));
 
     await screen.findByRole("table", { name: "Build queue for this pair" });
     expect(router.state.location.search).toMatchObject({ pair: "BB-BTN" });
-    expect(screen.getByRole("button", { name: /^BB-BTN/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: new RegExp(`^${QUEUE_WORDS}`) })).toHaveAttribute("aria-pressed", "true");
     expect(queuePositions()).toEqual([
       ["1", "Kd8s3h"],
       ["2", "Qc9h4d"],
@@ -73,7 +76,7 @@ describe("R3.4 coverage view", () => {
     await user.click(await screen.findByRole("button", { name: `Request ${FIXTURE_REQUESTED_FLOP}` }));
 
     expect(await screen.findByTestId("gap-request-result")).toHaveTextContent(
-      `${FIXTURE_QUEUE_PAIR} on ${FIXTURE_REQUESTED_FLOP}: Queued for the builder at position 1.`,
+      `${QUEUE_WORDS} on ${FIXTURE_REQUESTED_FLOP}: Queued for the builder at position 1.`,
     );
     const [request] = sent("POST", REQUESTS_PATH);
     expect(request?.body).toEqual({ config_id: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_QUEUE_PAIR, flop: FIXTURE_REQUESTED_FLOP });
@@ -89,10 +92,10 @@ describe("R3.4 coverage view", () => {
 
     expect(await screen.findByText("The preflop solution is not in the library.")).toBeInTheDocument();
     expect(screen.getByText("No build is queued for this pair.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: `Request ${UNCOVERED_PAIR} preflop` }));
+    await user.click(screen.getByRole("button", { name: `Request ${UNCOVERED_WORDS} preflop` }));
 
     expect(await screen.findByTestId("gap-request-result")).toHaveTextContent(
-      `${UNCOVERED_PAIR} preflop: Recorded for the planner. There is no build job for this spot yet, so it has no queue position.`,
+      `Cutoff versus button preflop: Recorded for the planner. There is no build job for this spot yet, so it has no queue position.`,
     );
     expect(sent("POST", REQUESTS_PATH)[0]?.body).toEqual({ config_id: FIXTURE_STUDY_CONFIG_ID, pair: UNCOVERED_PAIR });
   });
@@ -106,7 +109,7 @@ describe("R3.4 coverage view", () => {
     await user.type(screen.getByRole("textbox", { name: "Flop" }), "ah 7D 2c");
     await user.click(screen.getByRole("button", { name: "Request this flop" }));
 
-    expect(await screen.findByTestId("gap-request-result")).toHaveTextContent("BB-BTN on Ah7d2c: Already in the library. Nothing was queued.");
+    expect(await screen.findByTestId("gap-request-result")).toHaveTextContent(`${QUEUE_WORDS} on Ah7d2c: Already in the library. Nothing was queued.`);
   });
 
   it("R3.4 a blocked_budget answer says it waits on the storage budget with no position", async () => {
@@ -122,7 +125,7 @@ describe("R3.4 coverage view", () => {
     await user.click(screen.getByRole("button", { name: "Request this flop" }));
 
     expect(await screen.findByTestId("gap-request-result")).toHaveTextContent(
-      "BB-BTN on 9h8h7c: Waiting on the storage budget, so it has no queue position yet. The request is recorded.",
+      `${QUEUE_WORDS} on 9h8h7c: Waiting on the storage budget, so it has no queue position yet. The request is recorded.`,
     );
   });
 
@@ -207,7 +210,7 @@ describe("R3.4 live updates", () => {
       scenario_count: 20,
     });
 
-    expect(screen.getByTestId("live-coverage")).toHaveTextContent("New coverage: BB-BTN on Kd8s3h, 20 scenarios.");
+    expect(screen.getByTestId("live-coverage")).toHaveTextContent(`New coverage: ${QUEUE_WORDS} on Kd8s3h, 20 scenarios (pre-dealt runouts).`);
     await waitFor(() => expect(sent("GET", COVERAGE_PATH).length).toBe(coverageReads + 1));
     await waitFor(() => expect(sent("GET", `/api/v1/configs/${FIXTURE_STUDY_CONFIG_ID}/pairs`).length).toBe(pairsReads + 1));
   });

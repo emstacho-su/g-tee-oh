@@ -11,7 +11,7 @@ import { userEvent, type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { encodeMockExportCode, SEEDED_DRILLS } from "../../e2e/support/mock-drills.js";
-import { spotSummary } from "../../src/drills/summary.js";
+import { spotSummary, spotWords } from "../../src/drills/summary.js";
 import { FIXTURE_DRILL_ID, fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
 import { renderDrills } from "./render-drills.js";
@@ -48,9 +48,10 @@ describe("R3.14 drill library", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Drill library" })).toBeInTheDocument();
     expect((await rows()).map(nameOf)).toEqual([...SEEDED_DRILLS].reverse().map((drill) => drill.name));
     const table = screen.getByRole("table", { name: "Your drills" });
-    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Select", "Name", "Spot", "Stop rule", "Tags", "Settings"]);
+    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Select", "Name", "Spot", "Stop rule", "Tags", "Start", "Settings"]);
     const row = await rowOf(fixtureDrill.name);
-    expect(within(row).getByTestId("spot-summary")).toHaveTextContent(spotSummary(fixtureDrill.spot_filter));
+    expect(within(row).getByTestId("spot-summary")).toHaveTextContent(spotWords(fixtureDrill.spot_filter));
+    expect(within(row).getByTestId("spot-summary")).toHaveAttribute("title", spotSummary(fixtureDrill.spot_filter));
     expect(within(row).getByTestId("stop-rule")).toHaveTextContent("Spot");
     expect(within(row).getByRole("link", { name: `Settings for ${fixtureDrill.name}` })).toHaveAttribute("href", `/drills/${FIXTURE_DRILL_ID}/details`);
     expect(within(row).getByRole("link", { name: "Show drills tagged synthetic" })).toHaveAttribute("href", "/drills?tag=synthetic");

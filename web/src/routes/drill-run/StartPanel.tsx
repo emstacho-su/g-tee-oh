@@ -9,10 +9,13 @@
  * onRngChange). It is a button with role switch and aria-checked, its state also printed as On or
  * Off, so it never relies on colour; it takes the shared tactile press and the checked control edge
  * (CONTROL_EDGE_CLASS, WCAG 1.4.11). components/ui has no switch primitive yet, so it stays here.
+ * S47 (R3.36, O-487): optional slots, an Options disclosure for session-only overrides, a note line
+ * and an Edit drill link; the switch stays where it is.
  */
-import { useId } from "react";
+import { Link } from "@tanstack/react-router";
+import { useId, type ReactNode } from "react";
 
-import { Button, Card, CONTROL_EDGE_CLASS, LoadingNote, TACTILE_CLASS, cn } from "../../components/ui/index.js";
+import { Button, Card, CONTROL_EDGE_CLASS, Disclosure, LoadingNote, TACTILE_CLASS, cn } from "../../components/ui/index.js";
 import { GROUPING_LABELS, PAUSE_LABELS, STOP_RULE_LABELS } from "../../drills/labels.js";
 import { SPOT_MODE_SETTINGS } from "../../trainer/pause-rule.js";
 import type { Drill, PauseRule } from "../../trainer/session-types.js";
@@ -30,7 +33,18 @@ export interface StartPanelProps {
   onRngChange: (rng: boolean) => void;
   onStart: () => void;
   starting: boolean;
+  /** Session-only controls shown behind an Options disclosure (S47, O-487: SessionOverrides). */
+  options?: ReactNode;
+  /** Offer "Edit drill", a link to the drill's builder (S47, R3.36). */
+  editLink?: boolean;
+  /** A line above Start, for example that the library just added a spot (CoverageWatch). */
+  note?: string | null;
 }
+
+export const START_PANEL_TEXT = {
+  options: "Options",
+  editDrill: "Edit drill",
+} as const;
 
 interface RngSwitchProps {
   checked: boolean;
@@ -64,7 +78,7 @@ function RngSwitch({ checked, onChange, hintId }: RngSwitchProps) {
   );
 }
 
-export function StartPanel({ drill, rng, onRngChange, onStart, starting }: StartPanelProps) {
+export function StartPanel({ drill, rng, onRngChange, onStart, starting, options, editLink = false, note = null }: StartPanelProps) {
   const hintId = useId();
   const chips = [
     { name: SESSION_TEXT.grouping, value: GROUPING_LABELS[drill.trainer.grouping] },
@@ -80,11 +94,26 @@ export function StartPanel({ drill, rng, onRngChange, onStart, starting }: Start
           {SESSION_TEXT.rngHint}
         </p>
       </div>
+      {options === undefined ? null : (
+        <Disclosure title={START_PANEL_TEXT.options} headingLevel={3} testId="start-options">
+          {options}
+        </Disclosure>
+      )}
+      {note === null ? null : (
+        <p role="status" data-testid="start-note" className="text-sm font-medium">
+          {note}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" size="lg" disabled={starting} onClick={onStart}>
           {SESSION_TEXT.start}
         </Button>
         {starting ? <LoadingNote text={SESSION_TEXT.starting} /> : null}
+        {editLink ? (
+          <Link to="/drills/$id/$section" params={{ id: drill.id, section: "details" }} className="text-sm font-medium text-accent underline underline-offset-2">
+            {START_PANEL_TEXT.editDrill}
+          </Link>
+        ) : null}
       </div>
     </Card>
   );

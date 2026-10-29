@@ -13,9 +13,9 @@ import { fixtureDrill } from "../../src/fixtures/trainer.js";
 
 describe("R3.14 drill screen units", () => {
   it("R3.14 the spot summary names the game, seats, actions and hands in words", () => {
-    expect(spotSummary(fixtureDrill.spot_filter)).toBe("Online 6-handed, 100 bb, stake online; hero BTN against BB; RFI; all hands");
+    expect(spotSummary(fixtureDrill.spot_filter)).toBe("Online 6-handed, 100bb, stake Online; hero BTN against BB; RFI; all hands");
     const manual = { ...fixtureDrill.spot_filter, start_street: "flop" as const, villain_positions: [], hands: { mode: "manual" as const, hands: ["AKs"] } };
-    expect(spotSummary(manual)).toBe("Online 6-handed, 100 bb, stake online; hero BTN against any opponent; RFI, from the flop; 1 chosen hand");
+    expect(spotSummary(manual)).toBe("Online 6-handed, 100bb, stake Online; hero BTN against any opponent; RFI, from the flop; 1 chosen hand");
     expect(spotSummary({ ...manual, hands: { mode: "manual", hands: ["AKs", "77"] } })).toMatch(/2 chosen hands$/);
   });
 
