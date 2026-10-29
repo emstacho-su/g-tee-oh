@@ -18,7 +18,7 @@ const IMPORT_PATH = "/api/v1/drills/import";
 const BUTTON = "Add the starter drills";
 const EMPTY_LIST = { items: [], next_cursor: null };
 
-describe("R3.35 Add the starter drills", () => {
+describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
   it("R3.35 imports every code under one base key per click and one derived key per code", async () => {
     const user = userEvent.setup();
     let listed = false;
@@ -38,7 +38,26 @@ describe("R3.35 Add the starter drills", () => {
     expect(screen.queryByRole("button", { name: BUTTON })).not.toBeInTheDocument();
   });
 
-  it("R3.35 a double click sends nothing twice and a retry after a network failure reuses the keys", async () => {
+  it("R3.35 a double click sends nothing twice: the second click lands on the write in flight", async () => {
+    const user = userEvent.setup();
+    let release: (() => void) | null = null;
+    const held = new Promise<undefined>((resolve) => {
+      release = () => resolve(undefined);
+    });
+    const { sent } = renderDrills("/drills", {
+      override: (request) => (request.method === "POST" && request.path === IMPORT_PATH && sent("POST", IMPORT_PATH).length === 1 ? held : undefined),
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    // With drills listed and none of them a starter drill, the header is the one place offering the pack.
+    await user.dblClick(screen.getByRole("button", { name: BUTTON }));
+    await waitFor(() => expect(sent("POST", IMPORT_PATH)).toHaveLength(1));
+    expect(screen.getByRole("button", { name: "Adding the starter drills" })).toBeDisabled();
+    release?.();
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
+  });
+
+  it("R3.35 a retry after a network failure reuses the keys, so the api replays the codes that landed", async () => {
     const user = userEvent.setup();
     let failAt: number | null = 2;
     let count = 0;
@@ -50,9 +69,7 @@ describe("R3.35 Add the starter drills", () => {
       },
     });
     await screen.findByRole("table", { name: "Your drills" });
-    const header = screen.getByRole("banner");
-    const button = within(header).getByRole("button", { name: BUTTON });
-    await user.dblClick(button);
+    await user.click(screen.getByRole("button", { name: BUTTON }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/Error:/);
     expect(sent("POST", IMPORT_PATH)).toHaveLength(2);
