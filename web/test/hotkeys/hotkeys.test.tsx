@@ -202,7 +202,7 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(activeBindings(store.getState().bindings).map((binding) => binding.description)).toEqual(["Plain", "Chord"]);
   });
 
-  it("R3.30 a focused link or disclosure keeps Enter, every control keeps Space, a plain button yields Enter", () => {
+  it("R3.30 Enter and Space on any focused control are left to it; on the page or plain text they reach the binding (PR #45 review round 1, finding 2)", () => {
     const onEnter = vi.fn();
     const onSpace = vi.fn();
     renderWithRoot(
@@ -212,26 +212,62 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
         <button type="button" aria-expanded="false">
           section
         </button>
-        <button type="button" aria-pressed="true">
-          option
-        </button>
+        <button type="button">End session</button>
         <a href="#x">link</a>
+        <div role="tab" tabIndex={0}>
+          tab
+        </div>
+        <div role="menuitem" tabIndex={0}>
+          item
+        </div>
         <p data-testid="text">text</p>
       </>,
     );
-    fireEvent.keyDown(screen.getByRole("button", { name: "section" }), { key: "Enter" });
-    fireEvent.keyDown(screen.getByRole("link", { name: "link" }), { key: "Enter" });
-    fireEvent.keyDown(screen.getByRole("button", { name: "section" }), { key: " " });
-    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: " " });
+    for (const control of [
+      screen.getByRole("button", { name: "section" }),
+      screen.getByRole("button", { name: "End session" }),
+      screen.getByRole("link", { name: "link" }),
+      screen.getByRole("tab", { name: "tab" }),
+      screen.getByRole("menuitem", { name: "item" }),
+    ]) {
+      fireEvent.keyDown(control, { key: "Enter" });
+      fireEvent.keyDown(control, { key: " " });
+    }
     expect(onEnter).not.toHaveBeenCalled();
     expect(onSpace).not.toHaveBeenCalled();
-    // A plain button (a quiz option, aria-pressed) yields Enter to the binding, as before S46 (R3.16).
-    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
-    expect(onEnter).toHaveBeenCalledOnce();
     fireEvent.keyDown(screen.getByTestId("text"), { key: "Enter" });
+    fireEvent.keyDown(document.body, { key: "Enter" });
     fireEvent.keyDown(window, { key: " " });
     expect(onEnter).toHaveBeenCalledTimes(2);
     expect(onSpace).toHaveBeenCalledOnce();
+  });
+
+  it("R3.16 a binding that asks for it still answers Enter from a focused control (the quiz's submit after choosing an option)", () => {
+    const onSubmit = vi.fn();
+    function Submit() {
+      useHotkey({ key: "Enter", fromControls: true, description: "Submit", scope: "Quiz", handler: onSubmit });
+      return null;
+    }
+    renderWithRoot(
+      <>
+        <Submit />
+        <button type="button" aria-pressed="true">
+          option
+        </button>
+      </>,
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("R3.30 a plain digit or symbol binding answers with Shift held (AZERTY digits), a plain letter does not (PR #45 review round 1, finding 6)", () => {
+    const store = createHotkeyStore();
+    store.getState().register({ key: "1", description: "Size 1", scope: "S", handler: vi.fn() });
+    store.getState().register({ key: "e", description: "Plain e", scope: "S", handler: vi.fn() });
+    expect(findBinding(store.getState().bindings, "1", true)?.description).toBe("Size 1");
+    expect(findBinding(store.getState().bindings, "1", false)?.description).toBe("Size 1");
+    expect(findBinding(store.getState().bindings, "E", true)).toBeUndefined();
+    expect(findBinding(store.getState().bindings, "e", false)?.description).toBe("Plain e");
   });
 
   it("R3.13 handleKeydown reports whether it handled the key", () => {

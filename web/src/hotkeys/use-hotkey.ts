@@ -19,9 +19,10 @@ export function useHotkey(binding: HotkeyBinding, enabled = true): void {
   });
   const { key, description, scope } = binding;
   const shift = binding.shift ?? false;
+  const fromControls = binding.fromControls ?? false;
   useEffect(() => {
     if (!enabled) return undefined;
-    const id = store.getState().register({ key, shift, description, scope, handler: () => handlerRef.current() });
+    const id = store.getState().register({ key, shift, fromControls, description, scope, handler: () => handlerRef.current() });
     return () => store.getState().unregister(id);
-  }, [store, key, shift, description, scope, enabled]);
+  }, [store, key, shift, fromControls, description, scope, enabled]);
 }

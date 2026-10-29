@@ -494,3 +494,23 @@ describe("R3.31 session length on the drill run", () => {
     expect(view.sentTo(NEXT_PATH), "no deal past the limit and no prefetch at it").toHaveLength(10);
   }, TEN_HANDS_TIMEOUT_MS);
 });
+
+describe("R3.30 PR #45 review round 1, finding 2: Enter on a focused control is that control's", () => {
+  it("R3.30 Enter on the focused End session button opens the confirm and deals no next hand; Enter on the page goes on", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    await userEvent.keyboard("1");
+    await screen.findByTestId("feedback-panel");
+    const end = screen.getByRole("button", { name: /End session/ });
+    end.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog", { name: "End this session?" })).toBeInTheDocument();
+    // The reveal prefetches the next prompt (GET /next), so the proof is the screen: still this hand's reveal.
+    expect(screen.getByTestId("feedback-panel"), "Enter on End session never deals the next hand").toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "King of spades" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Keep playing" }));
+    (document.activeElement as HTMLElement | null)?.blur();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
+  });
+});
