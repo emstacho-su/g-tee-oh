@@ -46,6 +46,11 @@ export const actionShareSchema = z
   .object({
     index: z.number().int().min(0),
     share: z.number().min(0).max(1),
+    combos: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("The reach-weighted combos taking the action, from solver-query (S45, O-469, ADR 0004); absent until the solver answers it"),
   })
   .meta({ id: "ActionShare" });
 
@@ -95,6 +100,10 @@ export const studyNodeSchema = z
     range_by_action: z
       .array(actionShareSchema)
       .describe("Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"),
+    range_combos: z
+      .object({ combos: z.number().int().min(0), reach_weighted_combos: z.number().min(0) })
+      .optional()
+      .describe("The acting seat's range at this node: its combos and reach-weighted combos, from solver-query's range summary (S45, O-469, ADR 0004)"),
   })
   .meta({ id: "StudyNode" });
 

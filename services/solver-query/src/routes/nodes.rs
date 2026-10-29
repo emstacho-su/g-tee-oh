@@ -367,12 +367,15 @@ fn range_summary(view: &NodeView) -> RangeSummary {
         let (combos, weighted) = grade::seat_totals(view, seat);
         SeatRange { combos, reach_weighted_combos: narrow_f32(weighted) }
     };
-    let by_action = grade::action_shares(view)
+    // One pass gives the combos per action and their total; the share is the quotient (O-469).
+    let (combos, total) = grade::action_combos(view);
+    let by_action = combos
         .into_iter()
         .enumerate()
-        .map(|(index, share)| ActionShare {
+        .map(|(index, taken)| ActionShare {
             index: u8::try_from(index).unwrap_or(u8::MAX),
-            share: narrow_f32(share),
+            share: narrow_f32(if total > 0.0 { taken / total } else { taken }),
+            combos: narrow_f32(taken),
         })
         .collect();
     RangeSummary { oop: seat_range(0), ip: seat_range(1), by_action }

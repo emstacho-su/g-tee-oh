@@ -128,3 +128,39 @@ fn r3_16_rows_flag_a_mix_and_a_class_row_reads_it_from_the_aggregated_strategy()
         classes.iter().map(|row| (row.hand.as_str(), row.mixed)).collect();
     assert_eq!(mixed, [("QQ", false), ("AKs", true)], "class index order: {classes:?}");
 }
+
+#[test]
+fn r3_12_action_shares_carry_their_reach_weighted_combos() {
+    // Two classes of the big blind's range at a BB-BTN node where BB acts: AKs reaches fully
+    // (4 combos) and QQ at half (6 combos, 3 weighted). AKs raises, QQ calls half and raises
+    // half, so the call share is 1.5 of 7 weighted combos and the raise share 5.5 of 7.
+    let pair = PositionPair::new(Position::Bb, Position::Btn).expect("two seats");
+    let class = |name: &str| u16::from(name.parse::<gto_model::HandClass>().expect("a class").index());
+    let node = SolvedNode {
+        key: NodeKey::preflop(ConfigId::new("cfg_6_online_100").expect("id"), pair, vec![]),
+        to_act: Position::Bb,
+        pot: Cbb(1_000),
+        stacks: [Cbb(10_000), Cbb(10_000)],
+        actions: vec![
+            (ActionToken::Fold, Cbb::ZERO),
+            (ActionToken::Call, Cbb(250)),
+            (ActionToken::Raise(Cbb(800)), Cbb(800)),
+        ],
+        hand_space: HandSpace::Preflop169,
+        hands: vec![
+            SolvedHand { hand: class("AKs"), reach: Some([1.0, 1.0]), frequencies: vec![0.0, 0.0, 1.0], ev_bb: vec![0.0, 1.0, 2.0] },
+            SolvedHand { hand: class("QQ"), reach: Some([0.5, 1.0]), frequencies: vec![0.0, 0.5, 0.5], ev_bb: vec![0.0, 2.0, 2.0] },
+        ],
+        accuracy_pct_pot: None,
+    };
+    let view = NodeView::from(NodeRecord::from_solved(&node, pair).expect("quantizes"));
+    let summary = super::range_summary(&view);
+    let combos: Vec<f32> = summary.by_action.iter().map(|share| share.combos).collect();
+    let total: f32 = combos.iter().sum();
+    assert!((total - summary.oop.reach_weighted_combos).abs() < 1e-2, "{summary:?}");
+    assert!((combos[1] - 1.5).abs() < 1e-2 && (combos[2] - 5.5).abs() < 1e-2, "{summary:?}");
+    for share in &summary.by_action {
+        // Each combo count is the share times the acting seat's weighted total, never a web product.
+        assert!((share.share * total - share.combos).abs() < 1e-2, "{share:?}");
+    }
+}

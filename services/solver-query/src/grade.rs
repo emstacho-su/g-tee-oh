@@ -278,11 +278,13 @@ pub fn reach_weighted_combos(view: &NodeView, seat: usize, hand: u16) -> f64 {
     combos * view.reach(hand).map_or(1.0, |reach| f64::from(reach[seat]))
 }
 
-/// The reach-weighted share of the acting seat's range taking each action, in record
-/// order; the shares sum to 1 because every hand's frequencies do. Every share is 0 when the
-/// seat holds no reach-weighted combo.
+/// The reach-weighted combos of the acting seat's range taking each action, in record
+/// order, and the seat's reach-weighted total (S45, R3.12, O-469): each entry is the sum over
+/// the held hands of the hand's reach-weighted combos times its frequency for that action, so
+/// the entries sum to the total and `/v1/nodes` can print a combo count beside each share
+/// without the web multiplying anything (ADR 0004).
 #[must_use]
-pub fn action_shares(view: &NodeView) -> Vec<f64> {
+pub fn action_combos(view: &NodeView) -> (Vec<f64>, f64) {
     let actions = view.actions().len();
     let seat = acting_seat(view).unwrap_or_default();
     let mut taken = vec![0.0; actions];
@@ -293,11 +295,20 @@ pub fn action_shares(view: &NodeView) -> Vec<f64> {
         };
         let weight = reach_weighted_combos(view, seat, hand);
         total += weight;
-        for (share, frequency) in taken.iter_mut().zip(frequencies) {
-            *share += weight * f64::from(frequency);
+        for (combos, frequency) in taken.iter_mut().zip(frequencies) {
+            *combos += weight * f64::from(frequency);
         }
     }
-    if total > 0.0 { taken.into_iter().map(|share| share / total).collect() } else { taken }
+    (taken, total)
+}
+
+/// The reach-weighted share of the acting seat's range taking each action, in record
+/// order; the shares sum to 1 because every hand's frequencies do. Every share is 0 when the
+/// seat holds no reach-weighted combo.
+#[must_use]
+pub fn action_shares(view: &NodeView) -> Vec<f64> {
+    let (taken, total) = action_combos(view);
+    if total > 0.0 { taken.into_iter().map(|combos| combos / total).collect() } else { taken }
 }
 
 /// True when two or more actions are played at `MIX_EPSILON` or more (O-153, O-301): the

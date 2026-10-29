@@ -58,9 +58,25 @@ export function toStudyNode(node: Readonly<SqNode>, next: NextLikely): StudyNode
     next_likely_line: next.line,
     next_likely_node_key: next.nodeKey,
     synthetic: node.synthetic,
-    // O-281: copied from solver-query's range summary, never summed here (ADR 0004).
-    range_by_action: node.range_summary.by_action.map((entry) => ({ index: entry.index, share: entry.share })),
+    // O-281, O-469: copied from solver-query's range summary, never summed here (ADR 0004).
+    range_by_action: node.range_summary.by_action.map((entry) => ({
+      index: entry.index,
+      share: entry.share,
+      ...(typeof entry.combos === "number" ? { combos: entry.combos } : {}),
+    })),
+    range_combos: actingSeatRange(node),
   };
+}
+
+/**
+ * The acting seat's range (O-469): the pair names the out-of-position seat first, so the seat to
+ * act is `oop` when it is the pair's first position and `ip` otherwise. A name comparison only; the
+ * numbers are solver-query's.
+ */
+function actingSeatRange(node: Readonly<SqNode>): StudyNode["range_combos"] {
+  const [outOfPosition] = node.pair.split("-");
+  const seat = node.to_act === outOfPosition ? node.range_summary.oop : node.range_summary.ip;
+  return { combos: seat.combos, reach_weighted_combos: seat.reach_weighted_combos };
 }
 
 export function toStudyInsights(insights: SqInsights): StudyInsights {
