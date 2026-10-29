@@ -305,4 +305,25 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${FIXTURE_DRILL_ID}/run`));
     expect(sent("PATCH", `/api/v1/drills/${FIXTURE_DRILL_ID}`)).toHaveLength(0);
   });
+
+  it("R3.37 an error opens Advanced: custom game and it stays open once the error is fixed (PR #48 review MEDIUM 5)", async () => {
+    renderDrills("/drills/new");
+    const user = await openNew();
+    await openSection(user, "Game");
+    const picker = await screen.findByTestId("config-picker");
+    // Live with no stake chosen: Save marks the stake, which lives in the typed fields.
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Live" }));
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await openSection(user, "Game");
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Custom stake")).toHaveAttribute("aria-invalid", "true");
+    await user.selectOptions(screen.getByLabelText("Custom table size"), "9");
+    await user.selectOptions(screen.getByLabelText("Custom stake"), "1/3");
+    // The error is gone and the disclosure stays open: only the user closes it.
+    expect(screen.getByLabelText("Custom stake")).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Advanced: custom game" }));
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
+  });
 });

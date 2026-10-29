@@ -10,6 +10,7 @@
  * and three-bet sizes in big blinds.
  */
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { Disclosure } from "../../components/ui/index.js";
@@ -114,11 +115,14 @@ function CustomGameFields({ draft, onChange, errors }: SectionProps) {
 export function GameSection({ draft, onChange, errors }: SectionProps) {
   const gameErrors = ["spot_filter.game_config.format", "spot_filter.game_config.table_size", "spot_filter.game_config.depths_bb", "spot_filter.stake"] as const;
   const hasGameError = gameErrors.some((key) => (errors[key]?.length ?? 0) > 0);
+  // Local open state (PR #48 review MEDIUM 5): an error opens the typed fields, and only the user
+  // closes them, so the disclosure never snaps shut while a field is being fixed.
+  const [advancedOpen, setAdvancedOpen] = useState(hasGameError);
+  if (hasGameError && !advancedOpen) setAdvancedOpen(true);
   return (
     <FormSection title={GAME_TEXT.title}>
       <ConfigPicker draft={draft} onChange={onChange} />
-      {/* Open when a typed field holds an error, so the error is never behind a closed disclosure. */}
-      <Disclosure title={GAME_TEXT.advanced} headingLevel={3} testId="custom-game" {...(hasGameError ? { open: true } : {})}>
+      <Disclosure title={GAME_TEXT.advanced} headingLevel={3} testId="custom-game" open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CustomGameFields draft={draft} onChange={onChange} errors={errors} />
       </Disclosure>
       <RadioField
