@@ -36,6 +36,7 @@ import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
+import { unratedReason } from "../../trainer/unrated-reason.js";
 import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
 
@@ -101,15 +102,24 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
       onExplain={onExplain}
     />
   ) : undefined;
+  // Next hand stands above the panel, so it is reached without scrolling past the open sections
+  // (S46, critic round 3 R10); the row inside the panel holds Ask and Study this spot.
   return (
     <div className="flex flex-col gap-3">
+      <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
+        <kbd aria-hidden="true" className="font-mono text-xs">
+          {NEXT_HAND_KEY}
+        </kbd>
+        {SESSION_TEXT.nextHand}
+      </Button>
       {continuesByItself ? (
-        <ResultChip feedback={feedback} />
+        <ResultChip feedback={feedback} actions={prompt.buttons} chosenIndex={decision.actionIndex} />
       ) : (
         <FeedbackPanel
           feedback={feedback}
           actions={prompt.buttons}
           chosenIndex={decision.actionIndex}
+          unratedReason={unratedReason(feedback, prompt, context.session)}
           rangeView={<FeedbackRangeView feedback={feedback} />}
           thresholdCard={<FeedbackThreshold feedback={feedback} actions={prompt.buttons} />}
           roller={roller}
@@ -120,12 +130,6 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}
         />
       )}
-      <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
-        <kbd aria-hidden="true" className="font-mono text-xs">
-          {NEXT_HAND_KEY}
-        </kbd>
-        {SESSION_TEXT.nextHand}
-      </Button>
     </div>
   );
 }

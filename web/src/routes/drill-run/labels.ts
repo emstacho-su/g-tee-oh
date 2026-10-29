@@ -13,6 +13,8 @@
 import type { FeedbackLabel } from "../../contracts.js";
 
 export { REPEAT_HAND_KEY } from "../../hotkeys/index.js";
+/** The five label definitions and the roll note (S46, R3.8, ADR 0024), defined once beside the summary. */
+export { GRADE_DEFINITIONS, GRADE_ROLL_NOTE } from "../../components/trainer/grade-definitions.js";
 
 /** The grade label in words with its chess-style mark, so color is never the only signal (S26). */
 export const RESULT_LABELS: Readonly<Record<FeedbackLabel, string>> = {
@@ -47,7 +49,7 @@ export const SESSION_TEXT = {
   endSession: "End session",
   studySpot: "Study this spot",
   confirmTitle: "End this session?",
-  confirmDescription: "The recap shows how the session went. A decision you have not tapped is not graded.",
+  confirmDescription: "The recap shows how the session went. A decision you have not made yet is not graded.",
   keepPlaying: "Keep playing",
   grading: "Grading your decision",
   loadingPrompt: "Dealing the next hand",

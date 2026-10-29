@@ -3,6 +3,6 @@ export { DriftCard, DRIFT_INSIGHT_NOTE } from "./DriftCard.js";
 export type { DriftCardProps } from "./DriftCard.js";
 export { FeedbackInsights } from "./FeedbackInsights.js";
 export type { FeedbackInsightsProps } from "./FeedbackInsights.js";
-export { NoiseFlagsCard, NOISE_FLAGS_SENTENCE } from "./NoiseFlagsCard.js";
+export { NoiseFlagsCard } from "./NoiseFlagsCard.js";
 export type { NoiseFlagsCardProps } from "./NoiseFlagsCard.js";
 export { DRIFT_STALE_MS, driftQuery, driftQueryKey, INSIGHTS_QUERY_ROOT } from "./queries.js";
