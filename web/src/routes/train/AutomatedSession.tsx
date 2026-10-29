@@ -12,10 +12,11 @@
  * the start panel Start is the retry.
  */
 import { DecisionArea } from "../drill-run/DecisionArea.js";
-import { END_SESSION_KEY, SESSION_TEXT } from "../drill-run/labels.js";
+import { END_SESSION_BINDING, SESSION_TEXT } from "../drill-run/labels.js";
 import { SpotTable } from "../drill-run/SpotTable.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
+import { displayBinding } from "../../hotkeys/index.js";
 import type { TrackKey } from "../../progress/types.js";
 import { useFeedbackSections } from "../../components/trainer/index.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
@@ -107,9 +108,9 @@ export function AutomatedSession(props: AutomatedSessionProps) {
         </>
       )}
       {canEnd(state) ? (
-        <Button variant="secondary" aria-keyshortcuts={END_SESSION_KEY} disabled={!interactive} onClick={onAskEnd} className="self-start">
+        <Button variant="secondary" aria-keyshortcuts={displayBinding(END_SESSION_BINDING)} disabled={!interactive} onClick={onAskEnd} className="self-start">
           <kbd aria-hidden="true" className="font-mono text-xs">
-            {END_SESSION_KEY}
+            {displayBinding(END_SESSION_BINDING)}
           </kbd>
           {SESSION_TEXT.endSession}
         </Button>

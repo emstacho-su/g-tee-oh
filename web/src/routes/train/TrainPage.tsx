@@ -16,8 +16,8 @@
  * Ending a session invalidates every progress read (in useSpotSession, O-326), so the home and
  * /progress cards refetch. A 401 from any request signs out (the hook sets me to null and the
  * authenticated layout goes to /login). As on the drill run, the Mixed-frequency mode explainer opens at the first
- * rolled prompt on first use, E opens the end confirm, and the screen's buttons, hotkeys and
- * response timer pause while a dialog is open (O-284, O-285).
+ * rolled prompt on first use, Shift+E opens the end confirm (S46, R3.30), and the screen's
+ * buttons, hotkeys and response timer pause while a dialog is open (O-284, O-285).
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -34,7 +34,7 @@ import type { SessionStartSpec } from "../../trainer/session-api.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "../drill-run/CoverageNote.js";
-import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
+import { END_SESSION_BINDING, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
 import { EndSessionDialog } from "../drill-run/SessionParts.js";
 import { AutomatedStart, HoldoutStart } from "./AutomatedStart.js";
 import { AutomatedSession, onStartPanel, promptOf, TrainAlert } from "./AutomatedSession.js";
@@ -100,7 +100,7 @@ function TrainRun({ mode }: TrainPageProps) {
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(
-    { key: END_SESSION_KEY, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
+    { ...END_SESSION_BINDING, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
     canEnd(state) && interactive,
   );
   const confirmEnd = () => {

@@ -85,7 +85,7 @@ async function trainerScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   await page.waitForLoadState("networkidle");
   await shot("trainer-feedback", CRITERIA.feedback);
 
-  await page.keyboard.press("e");
+  await page.keyboard.press("Shift+E");
   const confirm = page.getByRole("dialog", { name: "End this session?" });
   await confirm.getByRole("button", { name: "End session" }).click();
   await expect(page.getByRole("heading", { name: "Session recap" })).toBeVisible();

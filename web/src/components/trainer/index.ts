@@ -7,6 +7,7 @@
 export { ActionBar, ACTION_SCOPE, MAX_HOTKEY_ACTIONS } from "./ActionBar.js";
 export type { ActionBarProps } from "./ActionBar.js";
 export { actionAccessibleName, actionButtonLabel } from "./action-labels.js";
+export { KIND_KEYS, KIND_KEY_NAMES, MAX_SIZE_HOTKEYS, SIZE_KINDS, actionHotkeys } from "./action-keys.js";
 export type { ActionButtonLabel } from "./action-labels.js";
 export { ActionSwatch, ACTION_FILL_CLASSES, ACTION_INK_CLASSES, actionFillStyle } from "./ActionSwatch.js";
 export type { ActionSwatchProps } from "./ActionSwatch.js";
