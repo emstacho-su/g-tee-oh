@@ -32,6 +32,5 @@ export function useAutostart({ enabled, ready, start }: AutostartOptions): void 
 }
 
 function withoutStart(search: Record<string, unknown>): Record<string, unknown> {
-  const { start: _start, ...rest } = search;
-  return rest;
+  return Object.fromEntries(Object.entries(search).filter(([key]) => key !== "start"));
 }

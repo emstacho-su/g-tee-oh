@@ -81,7 +81,7 @@ function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps)
           key={`${configId}|${selected.pair}`}
           api={api}
           configId={configId}
-          configurationLabel={configurationWords(catalog.configs?.find((config) => config.config_id === configId), configId)}
+          configurationLabel={configurationWords(catalog.configs?.find((config) => config.config_id === configId))}
           pair={selected.pair}
           preflopAvailable={selected.preflop_available}
         />

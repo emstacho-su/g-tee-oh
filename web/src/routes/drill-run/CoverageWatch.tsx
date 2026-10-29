@@ -23,8 +23,8 @@ import type { Drill } from "../../trainer/session-types.js";
 
 export const COVERAGE_WATCH_TEXT = {
   waiting: "Watching the library: Start is offered again as soon as the builder adds one of this drill's spots.",
-  added: (pair: string, config: GameConfig | undefined, configId: string) =>
-    `The library just added ${capitalize(pairWords(pair))} at ${configurationWords(config, configId)}. Start again.`,
+  added: (pair: string, config: GameConfig | undefined) =>
+    `The library just added ${capitalize(pairWords(pair))} at ${configurationWords(config)}. Start again.`,
 } as const;
 
 export interface CoverageWatchProps {
@@ -46,7 +46,7 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
       if (config === undefined) return;
       void queryClient.invalidateQueries({ queryKey: [PRACTICE_PAIRS_KEY_ROOT, "pairs", event.config_id] });
       setSeen(event);
-      onCoverage(COVERAGE_WATCH_TEXT.added(event.pair, config, event.config_id));
+      onCoverage(COVERAGE_WATCH_TEXT.added(event.pair, config));
     },
   });
   return (

@@ -111,6 +111,6 @@ export function classWords(row: Pick<HeatmapRow, "family" | "pair">, column: Pic
 }
 
 /** The catalog's label for a configuration, or a plain sentence when the catalog does not list it; never the key. */
-export function configurationWords(config: GameConfig | undefined, _id: string): string {
+export function configurationWords(config: GameConfig | undefined): string {
   return config === undefined ? UNLISTED_CONFIGURATION : configLabel(config);
 }

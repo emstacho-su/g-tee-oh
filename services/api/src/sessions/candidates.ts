@@ -36,6 +36,32 @@ export interface CandidateSplit {
 
 type DrillSpotFilter = Pick<SpotFilter, "game_config" | "stake" | "hero_positions" | "villain_positions">;
 
+/** A catalog configuration as the matching rule reads it: the game_config row joined to its stake's label. */
+export interface CatalogConfigRow {
+  config_id: string;
+  format: SpotFilter["game_config"]["format"];
+  table_size: number;
+  stake_label: string;
+  depth_cbb: number;
+  ante_cbb: number;
+}
+
+/**
+ * The rule configIdsFor's query applies, as a predicate over one row (S47, R3.37, O-485). The shared
+ * cases of validation/fixtures/drills/candidate-rule-cases.json hold it, and the web's reach model
+ * (web/src/drills/reach-model.ts) runs the same cases, so the two cannot drift apart unnoticed.
+ */
+export function configRowMatches(filter: DrillSpotFilter, row: CatalogConfigRow): boolean {
+  const { format, table_size: tableSize, depths_bb: depths } = filter.game_config;
+  return (
+    row.format === format &&
+    row.table_size === tableSize &&
+    row.stake_label === filter.stake &&
+    depths.some((depth) => depth * CBB_PER_BB === row.depth_cbb) &&
+    row.ante_cbb === NO_ANTE_CBB
+  );
+}
+
 export async function configIdsFor(database: Database, filter: DrillSpotFilter): Promise<string[]> {
   const depths = filter.game_config.depths_bb.map((depth) => depth * CBB_PER_BB);
   const rows = await database

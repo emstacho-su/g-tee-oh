@@ -20,16 +20,19 @@ const MAX_LABEL_LENGTH = 120;
 export function parseConfigLabels(value: unknown): ConfigLabels {
   if (!isRecord(value)) return {};
   const entries = Object.entries(value).filter(
-    ([id, label]) => CONFIG_ID_PATTERN.test(id) && typeof label === "string" && label !== "" && label.length <= MAX_LABEL_LENGTH,
+    (entry): entry is [string, string] => {
+      const [id, label] = entry;
+      return CONFIG_ID_PATTERN.test(id) && typeof label === "string" && label !== "" && label.length <= MAX_LABEL_LENGTH;
+    },
   );
-  return Object.fromEntries(entries.slice(0, MAX_SCOPE_CONFIGS)) as ConfigLabels;
+  return Object.fromEntries(entries.slice(0, MAX_SCOPE_CONFIGS));
 }
 
 /** The map with these labels remembered, newest kept when the cap is reached. */
 export function withConfigLabels(labels: ConfigLabels, next: ConfigLabels): ConfigLabels {
   const merged = { ...labels, ...next };
   const entries = Object.entries(merged);
-  return Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_SCOPE_CONFIGS))) as ConfigLabels;
+  return Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_SCOPE_CONFIGS)));
 }
 
 export function readConfigLabels(storage: Storage | null = defaultStorage()): ConfigLabels {

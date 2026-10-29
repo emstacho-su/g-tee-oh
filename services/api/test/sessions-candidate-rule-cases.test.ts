@@ -34,7 +34,12 @@ const file = JSON.parse(readFileSync(FILE, "utf8")) as RuleFile;
 
 describe("R3.37 the candidate rule cases hold the api's functions", () => {
   it.each(file.cases.map((entry) => [entry.name, entry] as const))("R3.37 %s", (_name, entry) => {
-    const filter = { ...entry.filter, game_config: { ...entry.filter.game_config, depths_bb: [...entry.filter.game_config.depths_bb] } };
+    const filter = {
+      ...entry.filter,
+      game_config: { ...entry.filter.game_config, depths_bb: [...entry.filter.game_config.depths_bb] },
+      hero_positions: [...entry.filter.hero_positions],
+      villain_positions: [...entry.filter.villain_positions],
+    };
     expect(pairsFor(filter)).toEqual(entry.expected.pairs);
     expect(file.configs.filter((row) => configRowMatches(filter, row)).map((row) => row.config_id)).toEqual(entry.expected.config_ids);
   });

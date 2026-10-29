@@ -36,7 +36,7 @@ export { familyWords };
 
 function spotName(spot: SpotFrequency, configs: readonly GameConfig[] | undefined): string {
   const config = configs?.find((entry) => entry.config_id === spot.config_id);
-  const table = configurationWords(config, spot.config_id);
+  const table = configurationWords(config);
   return `${capitalize(familyWords(spot.action_family))} as ${positionWords(spot.hero_position)} (${pairWords(spot.pair)}), ${table}`;
 }
 

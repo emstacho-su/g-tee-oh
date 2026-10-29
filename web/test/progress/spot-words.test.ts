@@ -84,8 +84,8 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
 
   it("R4.12 a configuration reads by its catalog label, and by a plain sentence when the catalog does not list it", () => {
     const config = fixtureConfigs[0] as GameConfig;
-    expect(configurationWords(config, config.config_id)).toBe("Online, 6 players, 100bb deep");
-    expect(configurationWords(undefined, "cfg_6_online_999")).toBe("a configuration the catalog does not list");
-    expect(configurationWords(undefined, "cfg_6_online_999")).not.toMatch(RAW_TOKEN);
+    expect(configurationWords(config)).toBe("Online, 6 players, 100bb deep");
+    expect(configurationWords(undefined)).toBe("a configuration the catalog does not list");
+    expect(configurationWords(undefined)).not.toMatch(RAW_TOKEN);
   });
 });
