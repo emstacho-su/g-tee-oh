@@ -43,6 +43,8 @@ export interface StudyNodeAreaProps {
   onModeChange: (mode: MatrixMode) => void;
   onSelectHand: (hand: string) => void;
   onOpenLine: (line: string) => void;
+  /** Compare to best: another action to compare (S45, R3.24). */
+  onLensChange: (lens: number) => void;
 }
 
 interface LineCarouselProps {
@@ -73,7 +75,7 @@ function LineCarousel({ api, configId, pair, seats, node, line, onOpenLine }: Li
   );
 }
 
-export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine }: StudyNodeAreaProps) {
+export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine, onLensChange }: StudyNodeAreaProps) {
   const metrics = useNodeSwitchMetrics();
   const node = useQuery(studyNodeQuery(api, { configId, pair: pair.pair, line: search.line ?? "" }));
   usePrefetchNextLikely(api, node.data, configId, pair.pair);
@@ -111,6 +113,7 @@ export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange
       onModeChange={onModeChange}
       onSelectHand={onSelectHand}
       onOpenLine={onOpenLine}
+      onLensChange={onLensChange}
     />
   );
 }

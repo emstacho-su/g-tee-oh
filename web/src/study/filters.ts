@@ -131,3 +131,8 @@ export function withMode(search: StudySearch, mode: MatrixMode): StudySearch {
 export function withHand(search: StudySearch, hand: string): StudySearch {
   return validateStudySearch({ ...search, hand });
 }
+
+/** The search comparing another action (S45, R3.24): the lens is a NodeAction.index. */
+export function withLens(search: StudySearch, lens: number): StudySearch {
+  return validateStudySearch({ ...search, lens });
+}

@@ -16,7 +16,7 @@
  */
 import type { ThemeName } from "../../theme/action-style.js";
 import { inkFor } from "../../theme/color-contrast.js";
-import { EV_STEPS, evStep, weightStep } from "./scales.js";
+import { EV_STEPS, evStep, lossStep, weightStep } from "./scales.js";
 
 export interface MatrixPalette {
   readonly background: string;
@@ -172,4 +172,16 @@ export function weightInk(palette: ResolvedPalette, weight: number | null): stri
   const step = weightStep(weight);
   if (step === null || step === 0) return palette.text;
   return palette.weightInk[step - 1] ?? palette.text;
+}
+
+/** The fill of a compare-to-best loss (S45, O-464): the neutral for the best, else the EV palette's negative step. */
+export function lossFill(palette: MatrixPalette, lossPctPot: number, scalePctPot: number): string {
+  const step = lossStep(lossPctPot, scalePctPot);
+  return step === 0 ? palette.evNeutral : (palette.evNegative[step - 1] ?? palette.evNeutral);
+}
+
+/** The ink printed on a compare-to-best loss's fill. */
+export function lossInk(palette: ResolvedPalette, lossPctPot: number, scalePctPot: number): string {
+  const step = lossStep(lossPctPot, scalePctPot);
+  return step === 0 ? palette.evNeutralInk : (palette.evNegativeInk[step - 1] ?? palette.evNeutralInk);
 }

@@ -1,45 +1,42 @@
 /**
- * Draws the range matrix onto a 2D canvas context (S24, R3.12, A7 section 4).
+ * Draws the range matrix onto a 2D canvas context (S24, S45, R3.12, R3.24, A7 section 4).
  *
  * Mechanism: drawMatrix is pure over a minimal context interface (MatrixCanvasContext), so the
  * tests pass a recording fake and the browser passes a real CanvasRenderingContext2D. It works
  * in device pixels: the backing store is sizePx times the pixel ratio, cut into 13 integer cell
  * edges, so every rectangle lands on whole pixels and nothing blurs. One frame paints in passes
- * to keep context state changes few: the background, every cell's fill (stacked frequency bars
- * with their hatch overlay, the diverging expected value (EV) step, or the weight step filling
- * the whole cell; missing hands and unknown weights take the missing fill and hatch), the grid
- * lines, the label chips (frequency bars and missing cells only: EV and weight print straight on
- * their step in its own ink, S38), the texts, then the selection and focus outlines. Color is
- * never the only signal: every bar carries its action's pattern (fold is the one plain fill),
- * with light hatch lines over a dark fill and dark ones over a light fill, every cell prints its
- * hand, EV and weight print their numbers, missing hands print a dash. Speed (the 16 ms frame
- * budget, O-260): patterns come from a cache built once per theme and ratio (patterns.ts), EV
- * and weight colours and their inks from quantized, pre-resolved palettes (matrix-theme.ts),
- * label chips have a fixed width from a monospace font so no text is measured, and a frame
- * allocates only a handful of small objects per action, none per cell.
+ * to keep context state changes few: the background, every cell's fill (draw-cells.ts: the bars,
+ * the EV, weight or compare step, or the missing hatch), the grid lines, the selection and focus
+ * marks, then the label chips (bar modes and missing cells only: EV, weight and compare print
+ * straight on their step in its own ink, S38) and the texts. A marked cell's chip and label move
+ * inside its ring (the mark's width plus the halo), so the hand stays readable over the selection
+ * (S45, screen critic). Color is never the only signal: every bar carries its action's pattern
+ * (fold is the one plain fill), with light hatch lines over a dark fill and dark ones over a light
+ * fill, every cell prints its hand, EV, weight and compare print their numbers, missing hands
+ * print a dash. Speed (the 16 ms frame budget, O-260): patterns come from a cache built once per
+ * theme and ratio (patterns.ts), colours and inks from quantized, pre-resolved palettes
+ * (matrix-theme.ts), label chips have a fixed width from a monospace font so no text is measured,
+ * and a frame allocates only a handful of small objects per action, none per cell.
  */
-import type { NodeAction } from "../../contracts.js";
-import { actionColor, actionStyle, sizeRank, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
-import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatWeightShort } from "./cell-text.js";
-import { isDarkFill } from "../../theme/color-contrast.js";
-import { MATRIX_PALETTES, evFill, evInk, weightFill, weightInk, type ResolvedPalette } from "./matrix-theme.js";
+import type { ThemeName } from "../../theme/action-style.js";
+import {
+  actionPaints,
+  cellInk,
+  drawCellFill,
+  fillWith,
+  isBarMode,
+  usesChip,
+  valueText,
+  type FrameContext,
+  type MatrixCanvasContext,
+  type Rect,
+} from "./draw-cells.js";
+import { MATRIX_PALETTES } from "./matrix-theme.js";
 import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
-import type { MatrixCell, MatrixMode, MatrixModel } from "./model.js";
-import { MISSING_PATTERN_KEY, patternKey, type PatternSource } from "./patterns.js";
+import { defaultLensPosition, type MatrixMode, type MatrixModel } from "./model.js";
+import { MISSING_PATTERN_KEY, type PatternSource } from "./patterns.js";
 
-/** The slice of CanvasRenderingContext2D the matrix draws with. */
-export interface MatrixCanvasContext {
-  fillStyle: string | CanvasGradient | CanvasPattern;
-  strokeStyle: string | CanvasGradient | CanvasPattern;
-  lineWidth: number;
-  font: string;
-  textAlign: CanvasTextAlign;
-  textBaseline: CanvasTextBaseline;
-  fillRect(x: number, y: number, width: number, height: number): void;
-  strokeRect(x: number, y: number, width: number, height: number): void;
-  clearRect(x: number, y: number, width: number, height: number): void;
-  fillText(text: string, x: number, y: number): void;
-}
+export type { MatrixCanvasContext } from "./draw-cells.js";
 
 export interface DrawOptions {
   readonly mode: MatrixMode;
@@ -52,18 +49,10 @@ export interface DrawOptions {
   readonly focusedIndex: number | null;
   readonly selectedHand: string | null;
   readonly patterns: PatternSource;
-}
-
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface ActionPaint {
-  readonly color: string;
-  readonly pattern: CanvasPattern | null;
+  /** Bars take the cell's range weight as their height (R3.24, O-465); off by default. */
+  readonly scaleByWeight?: boolean;
+  /** The compared action's position in compare mode; absent or null, the first action that is not a fold. */
+  readonly lensPosition?: number | null;
 }
 
 interface TextLayout {
@@ -89,8 +78,6 @@ const GRID_LINE_CSS_PX = 1;
 const FOCUS_LINE_CSS_PX = 2;
 const SELECTED_LINE_CSS_PX = 4;
 const HALO_LINE_CSS_PX = 1;
-/** What lastPlayedPosition returns when no action has a positive frequency. */
-const NONE_PLAYED = -1;
 
 /** The 14 integer edges that cut a backing store of sizeDevicePx into 13 cells. */
 export function cellEdges(sizeDevicePx: number): number[] {
@@ -100,18 +87,6 @@ export function cellEdges(sizeDevicePx: number): number[] {
 /** The integer position of cell edge index (0 to 13) in a backing store of sizeDevicePx. */
 function edgeAt(index: number, sizeDevicePx: number): number {
   return Math.round((index * sizeDevicePx) / GRID_SIZE);
-}
-
-function patternOf(style: ActionStyle, variant: number, color: string, patterns: PatternSource): CanvasPattern | null {
-  if (style.pattern === "none") return null;
-  return patterns.get(patternKey(style.pattern, variant, isDarkFill(color) ? "light" : "dark"));
-}
-
-function actionPaints(actions: readonly NodeAction[], theme: ThemeName, patterns: PatternSource): ActionPaint[] {
-  return actions.map((action) => {
-    const color = actionColor(action, actions, theme);
-    return { color, pattern: patternOf(actionStyle(action.kind), sizeRank(action, actions), color, patterns) };
-  });
 }
 
 function textLayout(cellPx: number, pixelRatio: number): TextLayout {
@@ -151,77 +126,6 @@ function rectAt(rects: readonly Rect[], index: number): Rect {
   return rect;
 }
 
-function fillWith(ctx: MatrixCanvasContext, style: string | CanvasPattern, x: number, y: number, w: number, h: number): void {
-  ctx.fillStyle = style;
-  ctx.fillRect(x, y, w, h);
-}
-
-/** The position of the last action with a positive frequency and a paint, or NONE_PLAYED. */
-function lastPlayedPosition(frequencies: readonly number[], paints: readonly ActionPaint[]): number {
-  for (let position = frequencies.length - 1; position >= 0; position -= 1) {
-    if ((frequencies[position] ?? 0) > 0 && paints[position] !== undefined) return position;
-  }
-  return NONE_PLAYED;
-}
-
-/**
- * Lays the played actions' bars left to right. The last played bar always runs to the cell's
- * right edge, so frequencies that sum slightly under 1 (the api rounds them) leave no unpainted
- * sliver of background at the right.
- */
-function drawFrequencyCell(ctx: MatrixCanvasContext, cell: MatrixCell, rect: Rect, paints: readonly ActionPaint[]): void {
-  const last = lastPlayedPosition(cell.frequencies, paints);
-  let cumulative = 0;
-  let left = rect.x;
-  cell.frequencies.forEach((frequency, position) => {
-    const paint = paints[position];
-    if (frequency <= 0 || paint === undefined) return;
-    cumulative += frequency;
-    const right = position === last ? rect.x + rect.w : rect.x + Math.round(Math.min(1, cumulative) * rect.w);
-    fillWith(ctx, paint.color, left, rect.y, right - left, rect.h);
-    if (paint.pattern !== null) fillWith(ctx, paint.pattern, left, rect.y, right - left, rect.h);
-    left = right;
-  });
-}
-
-interface FrameContext {
-  readonly ctx: MatrixCanvasContext;
-  readonly model: MatrixModel;
-  readonly mode: MatrixMode;
-  readonly palette: ResolvedPalette;
-  readonly paints: readonly ActionPaint[];
-  readonly missingPattern: CanvasPattern | null;
-}
-
-/** True when the cell is drawn as missing: no row, or (weight mode) an unknown weight. */
-function drawnMissing(cell: MatrixCell, mode: MatrixMode): boolean {
-  return !cell.present || (mode === "weight" && cell.weight === null);
-}
-
-/** Frequency bars and missing cells keep the label chip; EV and weight print on their own fill. */
-function usesChip(cell: MatrixCell, mode: MatrixMode): boolean {
-  return mode === "frequency" || drawnMissing(cell, mode);
-}
-
-function drawCellFill(frame: FrameContext, cell: MatrixCell, rect: Rect): void {
-  const { ctx, palette } = frame;
-  if (drawnMissing(cell, frame.mode)) {
-    fillWith(ctx, palette.missingFill, rect.x, rect.y, rect.w, rect.h);
-    if (frame.missingPattern !== null) fillWith(ctx, frame.missingPattern, rect.x, rect.y, rect.w, rect.h);
-    return;
-  }
-  if (frame.mode === "frequency") drawFrequencyCell(ctx, cell, rect, frame.paints);
-  else if (frame.mode === "ev") fillWith(ctx, evFill(palette, cell.evBestBb ?? 0, frame.model.evScaleBb), rect.x, rect.y, rect.w, rect.h);
-  else fillWith(ctx, weightFill(palette, cell.weight) ?? palette.missingFill, rect.x, rect.y, rect.w, rect.h);
-}
-
-/** The ink of a cell's texts: the label colour on a chip, else the step's own ink. */
-function cellInk(frame: FrameContext, cell: MatrixCell): string {
-  if (usesChip(cell, frame.mode)) return frame.palette.labelText;
-  if (frame.mode === "ev") return evInk(frame.palette, cell.evBestBb ?? 0, frame.model.evScaleBb);
-  return weightInk(frame.palette, cell.weight);
-}
-
 function drawGridLines(ctx: MatrixCanvasContext, size: number, pixelRatio: number, color: string): void {
   const width = Math.max(1, Math.round(GRID_LINE_CSS_PX * pixelRatio));
   ctx.fillStyle = color;
@@ -232,38 +136,40 @@ function drawGridLines(ctx: MatrixCanvasContext, size: number, pixelRatio: numbe
   }
 }
 
-/** The printed value of a cell in a mode; null when the mode prints none (frequency). */
-function valueText(cell: MatrixCell, mode: MatrixMode): string | null {
-  if (!cell.present) return MISSING_MARK;
-  if (mode === "ev") return formatEvShort(cell.evBestBb ?? 0);
-  if (mode === "weight") return cell.weight === null ? UNKNOWN_WEIGHT_MARK : formatWeightShort(cell.weight);
-  return null;
+/** The marks on cells this frame: each marked index with the inset its chip and label keep from the cell edge. */
+type Marks = ReadonlyMap<number, number>;
+
+/** A cell's rectangle shrunk by its mark's inset, so chips and texts sit inside the ring. */
+function textRect(rect: Rect, marks: Marks, index: number): Rect {
+  const inset = marks.get(index);
+  if (inset === undefined) return rect;
+  return { x: rect.x + inset, y: rect.y + inset, w: Math.max(0, rect.w - 2 * inset), h: Math.max(0, rect.h - 2 * inset) };
 }
 
-function drawChips(frame: FrameContext, rects: readonly Rect[], layout: TextLayout): void {
+function drawChips(frame: FrameContext, rects: readonly Rect[], layout: TextLayout, marks: Marks): void {
   const { ctx } = frame;
   ctx.fillStyle = frame.palette.labelChip;
   frame.model.cells.forEach((cell, index) => {
-    if (!usesChip(cell, frame.mode)) return;
-    const rect = rectAt(rects, index);
+    if (!usesChip(frame, cell)) return;
+    const rect = textRect(rectAt(rects, index), marks, index);
     ctx.fillRect(rect.x, rect.y, Math.min(rect.w, layout.labelChipW), Math.min(rect.h, layout.labelChipH));
-    if (valueText(cell, frame.mode) === null) return;
+    if (valueText(frame, cell) === null) return;
     const x = rect.x + Math.floor((rect.w - layout.valueChipW) / 2);
     ctx.fillRect(x, rect.y + rect.h - layout.valueChipH, layout.valueChipW, layout.valueChipH);
   });
 }
 
 /**
- * Prints every hand label, then every value. The ink changes per cell only in EV and weight
- * modes, and it is a string from the resolved palette, so no colour is allocated per cell.
+ * Prints every hand label, then every value. The ink changes per cell only on a filled step, and
+ * it is a string from the resolved palette, so no colour is allocated per cell.
  */
-function drawTexts(frame: FrameContext, rects: readonly Rect[], layout: TextLayout): void {
+function drawTexts(frame: FrameContext, rects: readonly Rect[], layout: TextLayout, marks: Marks): void {
   const { ctx } = frame;
   ctx.font = layout.labelFont;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   frame.model.cells.forEach((cell, index) => {
-    const rect = rectAt(rects, index);
+    const rect = textRect(rectAt(rects, index), marks, index);
     ctx.fillStyle = cellInk(frame, cell);
     ctx.fillText(cell.hand, rect.x + layout.pad, rect.y + layout.pad);
   });
@@ -271,9 +177,9 @@ function drawTexts(frame: FrameContext, rects: readonly Rect[], layout: TextLayo
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   frame.model.cells.forEach((cell, index) => {
-    const text = valueText(cell, frame.mode);
+    const text = valueText(frame, cell);
     if (text === null) return;
-    const rect = rectAt(rects, index);
+    const rect = textRect(rectAt(rects, index), marks, index);
     ctx.fillStyle = cellInk(frame, cell);
     ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h - layout.pad);
   });
@@ -290,22 +196,37 @@ function outline(ctx: MatrixCanvasContext, rect: Rect | undefined, color: string
 /**
  * A mark over a cell: the ring on the cell's edge and a thin line of the ground inside it, so the
  * ring or its halo reaches 3:1 on any fill (the contrast gate checks both marks, O-432 to O-434).
+ * Returns the inset the cell's texts keep: the ring plus the halo.
  */
-function markCell(frame: FrameContext, rect: Rect | undefined, color: string, width: number, ratio: number): void {
+function markCell(frame: FrameContext, rect: Rect | undefined, color: string, width: number, ratio: number): number {
+  const haloWidth = Math.max(1, Math.round(HALO_LINE_CSS_PX * ratio));
   outline(frame.ctx, rect, color, width);
   const halo = rect === undefined ? undefined : { x: rect.x + width, y: rect.y + width, w: rect.w - 2 * width, h: rect.h - 2 * width };
-  outline(frame.ctx, halo, frame.palette.focusHalo, Math.max(1, Math.round(HALO_LINE_CSS_PX * ratio)));
+  outline(frame.ctx, halo, frame.palette.focusHalo, haloWidth);
+  return width + haloWidth;
 }
 
-function drawOutlines(frame: FrameContext, rects: readonly Rect[], options: DrawOptions): void {
+/** Draws the selection and focus marks and returns each marked cell's text inset. */
+function drawMarks(frame: FrameContext, rects: readonly Rect[], options: DrawOptions): Marks {
   const ratio = options.pixelRatio;
+  const marks = new Map<number, number>();
   if (options.selectedHand !== null) {
     const index = frame.model.cells.findIndex((cell) => cell.hand === options.selectedHand);
-    markCell(frame, rects[index], frame.palette.selected, Math.round(SELECTED_LINE_CSS_PX * ratio), ratio);
+    if (index >= 0) marks.set(index, markCell(frame, rects[index], frame.palette.selected, Math.round(SELECTED_LINE_CSS_PX * ratio), ratio));
   }
-  if (options.focusedIndex !== null) {
-    markCell(frame, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio), ratio);
+  if (options.focusedIndex !== null && rects[options.focusedIndex] !== undefined) {
+    const inset = markCell(frame, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio), ratio);
+    marks.set(options.focusedIndex, Math.max(inset, marks.get(options.focusedIndex) ?? 0));
   }
+  return marks;
+}
+
+/** The compared action and its scale end, or null outside compare mode or when no action can be compared. */
+function lensOf(model: MatrixModel, options: DrawOptions): FrameContext["lens"] {
+  if (options.mode !== "compare") return null;
+  const position = options.lensPosition ?? defaultLensPosition(model.actions);
+  if (position === null || model.actions[position] === undefined) return null;
+  return { position, scalePctPot: model.lossScalePctPot[position] ?? 0 };
 }
 
 export function drawMatrix(ctx: MatrixCanvasContext, model: MatrixModel, options: DrawOptions): void {
@@ -318,6 +239,8 @@ export function drawMatrix(ctx: MatrixCanvasContext, model: MatrixModel, options
     palette,
     paints: actionPaints(model.actions, options.theme, options.patterns),
     missingPattern: options.patterns.get(MISSING_PATTERN_KEY),
+    scaleByWeight: options.scaleByWeight === true && isBarMode(options.mode),
+    lens: lensOf(model, options),
   };
   const rects = cellRects(size);
   fillWith(ctx, palette.background, 0, 0, size, size);
@@ -325,8 +248,8 @@ export function drawMatrix(ctx: MatrixCanvasContext, model: MatrixModel, options
     drawCellFill(frame, cell, rectAt(rects, index));
   });
   drawGridLines(ctx, size, options.pixelRatio, palette.gridLine);
+  const marks = drawMarks(frame, rects, options);
   const layout = textLayout(edgeAt(1, size), options.pixelRatio);
-  drawChips(frame, rects, layout);
-  drawTexts(frame, rects, layout);
-  drawOutlines(frame, rects, options);
+  drawChips(frame, rects, layout, marks);
+  drawTexts(frame, rects, layout, marks);
 }

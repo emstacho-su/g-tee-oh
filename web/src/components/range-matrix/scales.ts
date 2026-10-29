@@ -20,6 +20,15 @@ export const EV_SCALE_PERCENTILE = 0.9;
 /** The smallest scale end, so a node of near-zero EVs is not painted at full strength. */
 export const MIN_EV_SCALE_BB = 0.5;
 export const WEIGHT_STEPS = 5;
+/**
+ * Compare to Best (S45, R3.24, O-464): the chosen action's served loss against the best action in
+ * percent of the pot, on the EV palette's negative steps. A loss under COMPARE_NEUTRAL_PCT_POT is
+ * step 0 (the action is the best there, or as good); beyond it five steps by share of the scale
+ * end, which the model sets per action (lossScaleOf) and never below MIN_COMPARE_SCALE_PCT_POT.
+ */
+export const COMPARE_STEPS = 5;
+export const COMPARE_NEUTRAL_PCT_POT = 0.1;
+export const MIN_COMPARE_SCALE_PCT_POT = 1;
 
 const PERCENT = 100;
 const BOUNDARY_DECIMALS = 2;
@@ -32,6 +41,13 @@ export function evStep(evBb: number, scaleBb: number): number {
   const share = Math.min(1, size / scaleBb);
   const step = Math.min(EV_STEPS, Math.max(1, Math.ceil(share * EV_STEPS)));
   return evBb > 0 ? step : -step;
+}
+
+/** The compare step of a served loss in percent of the pot: 0 at or near the best, 1 to 5 behind it (O-464). */
+export function lossStep(lossPctPot: number, scalePctPot: number): number {
+  if (!(lossPctPot >= COMPARE_NEUTRAL_PCT_POT)) return 0;
+  const share = Math.min(1, lossPctPot / scalePctPot);
+  return Math.min(COMPARE_STEPS, Math.max(1, Math.ceil(share * COMPARE_STEPS)));
 }
 
 /** The weight step: null when unknown, 0 for none, 1 to 5 by quintile (above 1 holds at 5). */
@@ -82,7 +98,8 @@ function evSideStep(step: number, scaleBb: number): LegendStep {
 export function evLegend(scaleBb: number): readonly LegendStep[] {
   return Array.from({ length: 2 * EV_STEPS + 1 }, (_, index) => {
     const step = index - EV_STEPS;
-    if (step === 0) return { step, short: "near 0", long: `near 0: within ${EV_NEUTRAL_BB}bb either way` };
+    // The tick is one short token so the eleven ticks fit a 390 px phone (S45, screen critic).
+    if (step === 0) return { step, short: "0", long: `near 0: within ${EV_NEUTRAL_BB}bb either way` };
     return evSideStep(step, scaleBb);
   });
 }
@@ -112,5 +129,22 @@ export function weightLegend(): readonly LegendStep[] {
     if (step === 0) return { step, short: "0%", long: "0%: not in the range" };
     const { above, upTo } = weightBounds(step);
     return { step, short: percentOf(upTo), long: `more than ${percentOf(above)} up to ${percentOf(upTo)}` };
+  });
+}
+
+/** A percent-of-pot boundary with at most two decimals and no trailing zeros. */
+function pctPot(value: number): string {
+  return `${boundary(value)}%`;
+}
+
+/** The six compare steps: the best (step 0) and five loss ranges in percent of the pot behind it (O-464). */
+export function compareLegend(scalePctPot: number): readonly LegendStep[] {
+  return Array.from({ length: COMPARE_STEPS + 1 }, (_, step) => {
+    if (step === 0) return { step, short: "best", long: `best, or within ${pctPot(COMPARE_NEUTRAL_PCT_POT)} of the pot of it` };
+    const lower = step === 1 ? COMPARE_NEUTRAL_PCT_POT : ((step - 1) * scalePctPot) / COMPARE_STEPS;
+    const upper = (step * scalePctPot) / COMPARE_STEPS;
+    const short = `-${upper.toFixed(SHORT_DECIMALS)}`;
+    if (step === COMPARE_STEPS) return { step, short, long: `more than ${pctPot(lower)} of the pot behind the best` };
+    return { step, short, long: `${pctPot(lower)} to ${pctPot(upper)} of the pot behind the best` };
   });
 }

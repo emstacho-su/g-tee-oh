@@ -25,9 +25,13 @@ export interface StudySearch {
   mode?: MatrixMode;
   /** The selected hand class, for example AKs. */
   hand?: string;
+  /** Compare to best (S45, R3.24, O-462): the compared action's NodeAction.index. */
+  lens?: number;
 }
 
-export const STUDY_MODES: readonly MatrixMode[] = ["frequency", "ev", "weight"];
+export const STUDY_MODES: readonly MatrixMode[] = ["frequency", "ev", "weight", "strategy_ev", "compare"];
+/** NodeAction.index is a byte in solver-query's record (ActionView.index: u8). */
+export const MAX_ACTION_INDEX = 255;
 export const MIN_TABLE_SIZE = 2;
 export const MAX_TABLE_SIZE = 9;
 /** Upper bound on a depth in centi-big-blinds (1,000 bb, the drill schema's depth limit). */
@@ -64,6 +68,7 @@ export function validateStudySearch(search: Record<string, unknown>): StudySearc
     ["line", matching(search["line"], LINE_PATTERN, MAX_LINE_LENGTH)],
     ["mode", oneOf(search["mode"], STUDY_MODES)],
     ["hand", matching(search["hand"], HAND_CLASS_PATTERN, MAX_LINE_LENGTH)],
+    ["lens", integerIn(search["lens"], 0, MAX_ACTION_INDEX)],
   ];
   const kept: StudySearch = Object.fromEntries(entries.filter(([, value]) => value !== undefined));
   return kept;

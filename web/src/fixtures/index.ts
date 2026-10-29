@@ -83,7 +83,8 @@ export function fixtureHandRow(hand: string, row: number, col: number): NodeHand
     ev_bb: ev,
     ev_best_bb: best,
     loss_pct_pot: ev.map((value) => round(((best - value) / 1.5) * 100, 2)),
-    reach: [round(0.2 + strength * 0.8)],
+    // Per seat in pair order, out of position first (O-463); the fixture root has the in-position seat acting.
+    reach: [round(0.3 + strength * 0.7), round(0.2 + strength * 0.8)],
     // Synthetic test data only: the flag solver-query computes in Rust (O-301), imitated for the fixture.
     mixed: strategy.filter((frequency) => frequency >= FIXTURE_MIX_EPSILON).length >= 2,
   };

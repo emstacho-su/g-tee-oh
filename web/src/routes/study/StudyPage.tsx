@@ -151,6 +151,7 @@ function StudyScreen({ api, search }: StudyScreenProps) {
           onModeChange={navigation.setMode}
           onSelectHand={navigation.setHand}
           onOpenLine={navigation.openLine}
+          onLensChange={navigation.setLens}
         />
       </>
     );

@@ -10,7 +10,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { describeFailureForLog } from "../api/http-status.js";
 import type { MatrixMode } from "../components/range-matrix/model.js";
-import { withHand, withLine, withMode } from "./filters.js";
+import { withHand, withLens, withLine, withMode } from "./filters.js";
 import { useNodeSwitchMetrics } from "./node-switch-metrics.js";
 import type { StudySearch } from "./search.js";
 
@@ -21,6 +21,8 @@ export interface StudyNavigation {
   openLine: (line: string) => void;
   setMode: (mode: MatrixMode) => void;
   setHand: (hand: string) => void;
+  /** Compares another action in the compare lens (a replace, S45, R3.24). */
+  setLens: (lens: number) => void;
 }
 
 export function useStudyNavigation(search: StudySearch): StudyNavigation {
@@ -44,5 +46,6 @@ export function useStudyNavigation(search: StudySearch): StudyNavigation {
     },
     setMode: (mode) => go(withMode(search, mode), true),
     setHand: (hand) => go(withHand(search, hand), true),
+    setLens: (lens) => go(withLens(search, lens), true),
   };
 }

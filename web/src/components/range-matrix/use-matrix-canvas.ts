@@ -1,8 +1,8 @@
 /**
  * Redraws the range matrix canvas when its inputs change (S24, R3.12, O-260).
  *
- * Mechanism: one effect per change of the model, mode, size, pixel ratio, theme, focus or
- * selection schedules exactly one requestAnimationFrame that draws the whole matrix, and the
+ * Mechanism: one effect per change of the model, mode, size, pixel ratio, theme, focus, selection,
+ * lens or scaling schedules exactly one requestAnimationFrame that draws the whole matrix, and the
  * cleanup cancels a frame that has not run yet, so a burst of changes inside one frame costs one
  * draw. The 2D context is asked for once per canvas; when the browser has none (jsdom, or a
  * locked-down browser) the frame is skipped and the table fallback is still there. The hatch
@@ -43,7 +43,7 @@ export function useMatrixCanvas(
 ): void {
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const patternRef = useRef<PatternCacheEntry | null>(null);
-  const { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand } = settings;
+  const { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight = false, lensPosition = null } = settings;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,8 +53,8 @@ export function useMatrixCanvas(
       const ctx = contextRef.current;
       if (ctx === null) return;
       const patterns = patternsFor(patternRef, ctx, theme, pixelRatio);
-      drawMatrix(ctx, model, { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, patterns });
+      drawMatrix(ctx, model, { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition, patterns });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [canvasRef, model, mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand]);
+  }, [canvasRef, model, mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition]);
 }

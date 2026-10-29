@@ -40,6 +40,8 @@ const CRITERIA = {
   matrix: "RangeMatrix canvas with per-cell action frequency bars and a swatch legend; color never the only signal (R3.12, A7 section 4)",
   matrixEv: "R3.12 RangeMatrix EV mode: brick red to blue diverging scale with a neutral middle and a legend in bb (O-384)",
   matrixWeight: "R3.12 RangeMatrix range-weight mode: single-hue brown scale with a 0 to 100 percent legend (O-385)",
+  matrixStrategyEv: "R3.24 RangeMatrix strategy with EV: frequency bars scaled by range weight with the best EV printed in the corner (O-465)",
+  matrixCompare: "R3.24 RangeMatrix compare to best: the chosen action's served loss against the best in percent of the pot on the EV scale's red side (O-462, O-464)",
   matrixPopOut: "R3.12 a clicked cell pops out enlarged with the exact percentage per action beneath it (O-386); no visible table (O-347)",
   explainer: "R3.10 Mixed-frequency mode explainer: what earns Best (the highest EV), how the roll works on the hidden then revealed scale, why practise mixing (05 section 7, ADR 0024, O-283)",
   rollScale: "R3.10 before the decision the roll on the 1 to 100 scale, never the bands (ADR 0024 rule 3, O-344)",
@@ -63,6 +65,8 @@ const GALLERY_SECTIONS: readonly (readonly [string, string])[] = [
   ["range-matrix-frequency", CRITERIA.matrix],
   ["range-matrix-ev", CRITERIA.matrixEv],
   ["range-matrix-weight", CRITERIA.matrixWeight],
+  ["range-matrix-strategy-ev", CRITERIA.matrixStrategyEv],
+  ["range-matrix-compare", CRITERIA.matrixCompare],
   ["range-matrix-popout", CRITERIA.matrixPopOut],
 ];
 

@@ -26,7 +26,7 @@ describe("R3.12 range matrix model", () => {
     expect(model.cells[168]).toMatchObject({ hand: "22", row: 12, col: 12 });
   });
 
-  it("R3.12 copies strategy, ev_bb, ev_best_bb and reach[0] from the node rows", () => {
+  it("R3.12 copies strategy, ev_bb, ev_best_bb and the acting seat's reach from the node rows (O-463)", () => {
     const model = buildMatrixModel(fixtureStudyNode);
     for (const row of fixtureStudyNode.hands) {
       const cell = model.cells.find((candidate) => candidate.hand === row.hand);
@@ -35,7 +35,7 @@ describe("R3.12 range matrix model", () => {
       expect(cell?.frequencies).toEqual(row.strategy);
       expect(cell?.evBb).toEqual(row.ev_bb);
       expect(cell?.evBestBb).toBe(row.ev_best_bb);
-      expect(cell?.weight).toBe(row.reach?.[0] ?? null);
+      expect(cell?.weight).toBe(row.reach?.[model.actingSeat] ?? null);
     }
     expect(model.actions).toEqual(fixtureStudyNode.actions);
   });
