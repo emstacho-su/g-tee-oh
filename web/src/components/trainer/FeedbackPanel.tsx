@@ -6,7 +6,7 @@
  * down", with sections that "just expand and collapse" rather than a pop-out to exit. So the panel
  * is a short summary (FeedbackSummary: the label with its definitions tip, your action against the
  * best, the loss and the solver's frequency, Unrated with its reason, the roll), then the controls
- * row the caller gives (Ask, Study this spot) directly under it so the controls are reached
+ * row the caller gives (Ask) directly under it so the controls are reached
  * without scrolling past the open sections (S46, critic round 3 R10), and under that one Disclosure
  * per section the caller gives: Roll (the roll scale with its followed-the-roll mark, S37),
  * Strategy (the hand's frequency and EV per action, best actions marked Best), Range, Where your
@@ -55,7 +55,7 @@ export interface FeedbackPanelProps {
   insights?: ReactNode;
   /** The Explanation section's body: More info's template sections (S27, R3.19, O-388). */
   explanation?: ReactNode;
-  /** The controls row under the summary (S27: Ask with its dialog; S46: Study this spot). */
+  /** The controls row under the summary (S27: Ask with its dialog). */
   explain?: ReactNode;
   /** The prompt was a worked example: Strategy starts open (O-387, O-272). */
   workedExample?: boolean;

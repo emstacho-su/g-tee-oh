@@ -6,9 +6,9 @@
  * Keys go through useHotkey, so the ? overlay lists them under SESSION_SCOPE; the action keys
  * (components/trainer/action-keys.ts) and I (the Mixed-frequency mode explainer hook) are
  * registered by their own components. S46 (R3.30, design rule 9): Enter means the same as N, End
- * session moved from the bare E to Shift+E so a reflex press never breaks the flow, Shift+S opens
- * Study (R3.34) and R is reserved for repeat hand (hotkeys/reserved.ts, O-473). The S and U keys
- * of the confidence tap left with it (O-345).
+ * session moved from the bare E to Shift+E so a reflex press never breaks the flow, and R is
+ * reserved for repeat hand (hotkeys/reserved.ts, O-473). The S and U keys of the confidence tap
+ * left with it (O-345).
  */
 import { gradeWithMark } from "../../components/trainer/grade-definitions.js";
 import type { FeedbackLabel } from "../../contracts.js";
@@ -38,9 +38,6 @@ export const NEXT_HAND_ENTER_KEY = "Enter";
 /** End session is the chord Shift+E (R3.30, O-474). */
 export const END_SESSION_KEY = "E";
 export const END_SESSION_BINDING = { key: END_SESSION_KEY, shift: true } as const;
-/** Study this spot is the chord Shift+S, in the feedback scope (R3.34). */
-export const STUDY_SPOT_KEY = "S";
-export const STUDY_SPOT_BINDING = { key: STUDY_SPOT_KEY, shift: true } as const;
 
 export const SESSION_TEXT = {
   heading: "Drill session",
@@ -53,7 +50,6 @@ export const SESSION_TEXT = {
   /** Next on the last planned hand's reveal (R3.31). */
   finishSession: "Finish session",
   endSession: "End session",
-  studySpot: "Study this spot",
   confirmTitle: "End this session?",
   confirmDescription: "The recap shows how the session went. A decision you have not made yet is not graded.",
   keepPlaying: "Keep playing",

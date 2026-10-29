@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { KIND_KEYS, SIZE_KINDS, actionHotkeys } from "../../src/components/trainer/action-keys.js";
 import type { NodeAction } from "../../src/contracts.js";
 import { fixtureActions } from "../../src/fixtures/index.js";
-import { END_SESSION_KEY, NEXT_HAND_KEY, REPEAT_HAND_KEY, STUDY_SPOT_KEY } from "../../src/routes/drill-run/labels.js";
+import { END_SESSION_KEY, NEXT_HAND_KEY, REPEAT_HAND_KEY } from "../../src/routes/drill-run/labels.js";
 import { RNG_EXPLAINER_KEY } from "../../src/components/trainer/use-rng-explainer.js";
 import { SHORTCUTS_KEY } from "../../src/hotkeys/index.js";
 
@@ -23,7 +23,8 @@ describe("R3.30 action keys by kind", () => {
   });
 
   it("R3.30 no letter collides with the session, explainer, overlay, study or reserved keys", () => {
-    const taken = new Set([NEXT_HAND_KEY, END_SESSION_KEY, REPEAT_HAND_KEY, STUDY_SPOT_KEY, RNG_EXPLAINER_KEY, SHORTCUTS_KEY].map((key) => key.toLowerCase()));
+    // S stays free for Study this spot, which the follow-up adds (PR #45 review round 1, finding 3).
+    const taken = new Set([NEXT_HAND_KEY, END_SESSION_KEY, REPEAT_HAND_KEY, "S", RNG_EXPLAINER_KEY, SHORTCUTS_KEY].map((key) => key.toLowerCase()));
     for (const letter of Object.values(KIND_KEYS)) expect(taken.has(letter)).toBe(false);
   });
 

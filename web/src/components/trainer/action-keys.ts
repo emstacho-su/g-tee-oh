@@ -5,7 +5,7 @@
  * a check), A all-in, L limp; a straddle has no key. The bet and raise sizes take the digits 1 to
  * 9 in bar order, so 1 is always the smallest size at the node whatever stands before it, and no
  * key moves with the number of buttons. The letters avoid N and Enter (next hand), Shift+E (end),
- * Shift+S (study), I (the explainer), R (reserved for repeat hand) and ? (the overlay).
+ * S (kept for Study this spot), I (the explainer), R (reserved for repeat hand) and ? (the overlay).
  */
 import type { ActionKind, NodeAction } from "../../contracts.js";
 

@@ -194,7 +194,6 @@ describe("R4.12 /settings hotkeys and layout", () => {
       "1 to 9",
       "N or Enter",
       "Shift+E",
-      "Shift+S",
       "R",
       "I",
       "?",
@@ -203,9 +202,10 @@ describe("R4.12 /settings hotkeys and layout", () => {
     expect(rows[5]).toHaveTextContent("bet or raise size");
     expect(rows[6]).toHaveTextContent("Next hand");
     expect(rows[7]).toHaveTextContent("End session");
-    expect(rows[8]).toHaveTextContent("Study this spot");
-    expect(rows[9]).toHaveTextContent("Reserved");
-    expect(rows[10]).toHaveTextContent("How Mixed-frequency mode works");
+    // Study this spot (Shift+S) arrives with its control in the follow-up (PR #45 review round 1, finding 3).
+    expect(hotkeys).not.toHaveTextContent("Study this spot");
+    expect(rows[8]).toHaveTextContent("Reserved");
+    expect(rows[9]).toHaveTextContent("How Mixed-frequency mode works");
     expect(hotkeys).not.toHaveTextContent("Unsure");
     expect(hotkeys).toHaveTextContent("Rebinding keys comes in a later version.");
     expect(within(hotkeys).queryByRole("button")).toBeNull();

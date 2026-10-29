@@ -106,7 +106,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
     />
   ) : undefined;
   // Next hand stands above the panel, so it is reached without scrolling past the open sections
-  // (S46, critic round 3 R10); the row inside the panel holds Ask and Study this spot.
+  // (S46, critic round 3 R10); the row inside the panel holds Ask.
   return (
     <div className="flex flex-col gap-3">
       <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
