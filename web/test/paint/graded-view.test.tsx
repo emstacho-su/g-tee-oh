@@ -19,11 +19,16 @@ function setup() {
 }
 
 describe("R3.17 PaintGradedView", () => {
-  it("R3.17 shows the total weighted EV loss from the response and the unrated note", () => {
+  it("R3.17 shows the total weighted EV loss from the response at the screen's one precision and the unrated note (S47 critic G6)", () => {
     setup();
     const total = screen.getByTestId("paint-total");
-    expect(total).toHaveTextContent(formatBb(fixturePaintGraded.total_weighted_loss_bb, 4));
+    expect(total).toHaveTextContent(formatBb(fixturePaintGraded.total_weighted_loss_bb, 2));
     expect(screen.getByText(/unrated/i)).toBeInTheDocument();
+  });
+
+  it("R3.17 the legend keys the painted/solver letter codes (S47 critic G4)", () => {
+    setup();
+    expect(screen.getByTestId("paint-code-key")).toHaveTextContent("your action / the solver's action (F fold, C call, X check, B bet, R raise, A all-in)");
   });
 
   it("R3.17 lists the costliest classes, at most ten, costliest first, with the response's numbers", () => {
@@ -35,15 +40,17 @@ describe("R3.17 PaintGradedView", () => {
     const first = expected[0];
     if (first === undefined) throw new Error("the fixture grade has no loss");
     expect(rows[0]).toHaveTextContent(first.hand);
-    expect(rows[0]).toHaveTextContent(formatBb(first.weighted_loss_bb, 4));
+    expect(rows[0]).toHaveTextContent(formatBb(first.weighted_loss_bb, 2));
     expect(rows[0]).toHaveTextContent(formatBb(first.loss_bb, 2));
+    // Each figure carries its column name for the phone layout, where the header row is hidden (S47 critic G2).
+    expect(within(rows[0] as HTMLElement).getByText("Weighted loss:")).toHaveClass("sm:sr-only");
   });
 
   it("R3.17 each graded cell names its painted and the solver's action and its weighted loss as text", () => {
     setup();
     const grid = screen.getByRole("grid", { name: /graded range/i });
     const kk = within(grid).getByTitle(/^QQ:/);
-    expect(kk.getAttribute("title")).toMatch(/painted Call, solver Raise to 10bb, weighted loss \d+\.\d{4}bb/);
+    expect(kk.getAttribute("title")).toMatch(/painted Call, solver Raise to 10bb, weighted loss \d+\.\d{2}bb$/);
     expect(kk).toHaveAttribute("data-shade");
     expect(within(grid).getByTitle(/^72o:/).getAttribute("title")).toBe("72o: not in range");
     expect(within(grid).getAllByRole("gridcell")).toHaveLength(169);

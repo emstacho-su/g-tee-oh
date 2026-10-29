@@ -20,6 +20,8 @@ import { useAppApi } from "../../auth/index.js";
 import { PaintGradedView } from "../../components/painter/PaintGradedView.js";
 import { RangePainter } from "../../components/painter/RangePainter.js";
 import { Button, LoadingNote, SyntheticBanner } from "../../components/ui/index.js";
+import { MAX_TABLE_SIZE, seatedPositions } from "../../drills/limits.js";
+import { capitalize, positionWords } from "../../progress/spot-words.js";
 import type { RangePaintPrompt, RangePaintResult } from "../../contracts.js";
 import { isStalePaint, paintFailureText, paintPromptQuery, submitPaint } from "./paint-api.js";
 import { usePaintKeys } from "./use-paint-keys.js";
@@ -40,23 +42,30 @@ interface PromptHeaderProps {
   prompt: RangePaintPrompt;
 }
 
+/**
+ * The spot as the picker named it (S47 critic R4): the seats in words, in preflop action order (a
+ * label order, drills/limits.ts), and whose range is painted; the line before the node stays as the
+ * paragraph's tooltip. The counter is "Range N": the session's length is not in the prompt.
+ */
 function PromptHeader({ prompt }: PromptHeaderProps) {
+  const line = prompt.history.map((entry) => `${entry.position} ${entry.label}`).join(", ");
   return (
     <div className="flex flex-col gap-1">
       <h2 className="text-xl font-semibold">Range {prompt.prompt_no + 1}</h2>
-      <p className="text-sm">
-        <span className="text-muted">Paint the range of </span>
-        <span className="font-semibold">{prompt.hero_position}</span>
-        {prompt.history.length === 0 ? <span className="text-muted"> first to act.</span> : <span className="text-muted"> after </span>}
-        {prompt.history.map((entry, index) => (
-          <span key={`${entry.position}-${entry.token}-${index}`} className="font-medium">
-            {index > 0 ? ", " : ""}
-            {entry.position} {entry.label}
-          </span>
-        ))}
+      <p className="text-sm" data-testid="paint-spot" {...(line === "" ? {} : { title: line })}>
+        <span className="font-semibold">{capitalize(seatsInWords(prompt))}</span>
+        <span className="text-muted">{prompt.history.length === 0 ? `: paint the ${positionWords(prompt.hero_position)}'s range, first to act.` : `: paint the ${positionWords(prompt.hero_position)}'s range.`}</span>
       </p>
     </div>
   );
+}
+
+const SEAT_ORDER = seatedPositions(MAX_TABLE_SIZE);
+
+/** The hero and the seats that acted before it, each once, in preflop order, in words. */
+function seatsInWords(prompt: RangePaintPrompt): string {
+  const seats = new Set([prompt.hero_position, ...prompt.history.map((entry) => entry.position)]);
+  return SEAT_ORDER.filter((seat) => seats.has(seat)).map(positionWords).join(" versus ");
 }
 
 interface FailureProps {

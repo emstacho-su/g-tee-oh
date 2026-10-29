@@ -18,12 +18,15 @@ import { Button, VisuallyHidden, cn } from "../ui/index.js";
 import { NOT_IN_RANGE } from "./PaintGrid.js";
 import { LOSS_SHADE_BB, costliest, lossShade, type HandGrade, type LossShade } from "./paint-model.js";
 
-const TOTAL_DECIMALS = 4;
+/** One precision for every big-blind figure on the screen (S47 critic G6): the total, the loss and the weighted loss. */
+const TOTAL_DECIMALS = 2;
 const LOSS_DECIMALS = 2;
 const WEIGHT_DECIMALS = 2;
 
 export const GRADED_TEXT = {
   heading: "Graded range",
+  /** The cell codes' key (S47 critic G4): the painted letter, then the solver's. */
+  codeKey: "Each cell: your action / the solver's action (F fold, C call, X check, B bet, R raise, A all-in), then the loss marker.",
   total: "Total weighted EV loss",
   totalUnit: "per hand dealt to this spot",
   unrated: "Range painting is unrated practice: it writes no attempt and never changes your rating.",
@@ -102,6 +105,10 @@ function GradedCell({ hand, grade, actions }: GradedCellProps) {
 
 function ShadeLegend() {
   return (
+    <>
+    <p data-testid="paint-code-key" className="text-sm text-muted">
+      {GRADED_TEXT.codeKey}
+    </p>
     <ul aria-label="Loss shading" className="flex flex-wrap gap-3 text-sm">
       {SHADE_ORDER.map((shade) => (
         <li key={shade} className="inline-flex items-center gap-1">
@@ -112,6 +119,20 @@ function ShadeLegend() {
         </li>
       ))}
     </ul>
+    </>
+  );
+}
+
+const COSTLIEST_HEADERS = ["Class", "Painted", "Solver", "Loss", "Weight", "Weighted loss"] as const;
+const COSTLIEST_CELL = "px-2 py-1 align-top";
+
+/** A figure cell: its column name shows beside it at phone width, where the header row is hidden. */
+function CostliestCell({ label, children }: { label: string; children: string }) {
+  return (
+    <td className={cn(COSTLIEST_CELL, "tabular-nums")}>
+      <span className="text-muted sm:sr-only">{`${label}: `}</span>
+      {children}
+    </td>
   );
 }
 
@@ -123,29 +144,29 @@ interface CostliestTableProps {
 function CostliestTable({ rows, actions }: CostliestTableProps) {
   if (rows.length === 0) return <p className="text-sm">{GRADED_TEXT.noLoss}</p>;
   return (
-    <table className="w-full max-w-2xl text-left text-sm">
-      <caption className="text-left font-semibold">{GRADED_TEXT.costliest}</caption>
-      <thead>
+    // Padded cells, and at phone width each row stacks its figures under the class (S47 critic G2).
+    <table className="w-full max-w-2xl text-left text-sm max-sm:block" data-testid="paint-costliest">
+      <caption className="pb-1 text-left font-semibold max-sm:block">{GRADED_TEXT.costliest}</caption>
+      <thead className="max-sm:sr-only">
         <tr className="text-muted">
-          <th scope="col">Class</th>
-          <th scope="col">Painted</th>
-          <th scope="col">Solver</th>
-          <th scope="col">Loss</th>
-          <th scope="col">Weight</th>
-          <th scope="col">Weighted loss</th>
+          {COSTLIEST_HEADERS.map((header) => (
+            <th key={header} scope="col" className={COSTLIEST_CELL}>
+              {header}
+            </th>
+          ))}
         </tr>
       </thead>
-      <tbody>
+      <tbody className="max-sm:flex max-sm:flex-col max-sm:gap-2">
         {rows.map((row) => (
-          <tr key={row.hand} className="border-t border-border">
-            <th scope="row" className="font-mono">
+          <tr key={row.hand} className="border-t border-border max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-3 max-sm:py-1">
+            <th scope="row" className={cn(COSTLIEST_CELL, "font-mono max-sm:col-span-2")}>
               {row.hand}
             </th>
-            <td>{labelOf(actions, row.action_index)}</td>
-            <td>{labelOf(actions, row.best_action_index)}</td>
-            <td>{formatBb(row.loss_bb, LOSS_DECIMALS)}</td>
-            <td>{formatShare(row.weight, WEIGHT_DECIMALS)}</td>
-            <td>{formatBb(row.weighted_loss_bb, TOTAL_DECIMALS)}</td>
+            <CostliestCell label="Painted">{labelOf(actions, row.action_index)}</CostliestCell>
+            <CostliestCell label="Solver">{labelOf(actions, row.best_action_index)}</CostliestCell>
+            <CostliestCell label="Loss">{formatBb(row.loss_bb, LOSS_DECIMALS)}</CostliestCell>
+            <CostliestCell label="Weight">{formatShare(row.weight, WEIGHT_DECIMALS)}</CostliestCell>
+            <CostliestCell label="Weighted loss">{formatBb(row.weighted_loss_bb, TOTAL_DECIMALS)}</CostliestCell>
           </tr>
         ))}
       </tbody>
@@ -159,7 +180,7 @@ export function PaintGradedView({ prompt, result, onNext }: PaintGradedViewProps
     <section aria-label={GRADED_TEXT.heading} className="flex flex-col gap-4" data-testid="paint-graded">
       <p data-testid="paint-total" className="text-lg">
         <span className="font-semibold">{GRADED_TEXT.total}: </span>
-        <span className="font-mono">{formatBb(result.total_weighted_loss_bb, TOTAL_DECIMALS)}</span> {GRADED_TEXT.totalUnit}
+        <span className="tabular-nums">{formatBb(result.total_weighted_loss_bb, TOTAL_DECIMALS)}</span> {GRADED_TEXT.totalUnit}
       </p>
       <p role="note" className="text-sm text-muted">
         {GRADED_TEXT.unrated}
