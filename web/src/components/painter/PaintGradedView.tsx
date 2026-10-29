@@ -18,10 +18,18 @@ import { Button, VisuallyHidden, cn } from "../ui/index.js";
 import { NOT_IN_RANGE } from "./PaintGrid.js";
 import { LOSS_SHADE_BB, costliest, lossShade, type HandGrade, type LossShade } from "./paint-model.js";
 
-/** One precision for every big-blind figure on the screen (S47 critic G6): the total, the loss and the weighted loss. */
-const TOTAL_DECIMALS = 2;
-const LOSS_DECIMALS = 2;
+/**
+ * One precision for every big-blind figure on the screen (S47 critic G6; PR #48 review HIGH 1):
+ * the total, the loss and the weighted loss all go through bbText at four decimals, because a
+ * weighted loss is often a few thousandths of a big blind (a 6/1326 weight times 0.5bb is about
+ * 0.0023bb), which two decimals would print as 0.00bb.
+ */
+const BB_DECIMALS = 4;
 const WEIGHT_DECIMALS = 2;
+
+function bbText(value: number): string {
+  return formatBb(value, BB_DECIMALS);
+}
 
 export const GRADED_TEXT = {
   heading: "Graded range",
@@ -71,7 +79,7 @@ function shortOf(actions: readonly NodeAction[], index: number): string {
 }
 
 function describeGrade(actions: readonly NodeAction[], grade: HandGrade): string {
-  return `${grade.hand}: painted ${labelOf(actions, grade.action_index)}, solver ${labelOf(actions, grade.best_action_index)}, weighted loss ${formatBb(grade.weighted_loss_bb, TOTAL_DECIMALS)}`;
+  return `${grade.hand}: painted ${labelOf(actions, grade.action_index)}, solver ${labelOf(actions, grade.best_action_index)}, weighted loss ${bbText(grade.weighted_loss_bb)}`;
 }
 
 interface GradedCellProps {
@@ -164,9 +172,9 @@ function CostliestTable({ rows, actions }: CostliestTableProps) {
             </th>
             <CostliestCell label="Painted">{labelOf(actions, row.action_index)}</CostliestCell>
             <CostliestCell label="Solver">{labelOf(actions, row.best_action_index)}</CostliestCell>
-            <CostliestCell label="Loss">{formatBb(row.loss_bb, LOSS_DECIMALS)}</CostliestCell>
+            <CostliestCell label="Loss">{bbText(row.loss_bb)}</CostliestCell>
             <CostliestCell label="Weight">{formatShare(row.weight, WEIGHT_DECIMALS)}</CostliestCell>
-            <CostliestCell label="Weighted loss">{formatBb(row.weighted_loss_bb, TOTAL_DECIMALS)}</CostliestCell>
+            <CostliestCell label="Weighted loss">{bbText(row.weighted_loss_bb)}</CostliestCell>
           </tr>
         ))}
       </tbody>
@@ -180,7 +188,7 @@ export function PaintGradedView({ prompt, result, onNext }: PaintGradedViewProps
     <section aria-label={GRADED_TEXT.heading} className="flex flex-col gap-4" data-testid="paint-graded">
       <p data-testid="paint-total" className="text-lg">
         <span className="font-semibold">{GRADED_TEXT.total}: </span>
-        <span className="tabular-nums">{formatBb(result.total_weighted_loss_bb, TOTAL_DECIMALS)}</span> {GRADED_TEXT.totalUnit}
+        <span className="tabular-nums">{bbText(result.total_weighted_loss_bb)}</span> {GRADED_TEXT.totalUnit}
       </p>
       <p role="note" className="text-sm text-muted">
         {GRADED_TEXT.unrated}
