@@ -29,6 +29,7 @@
 import { DEFAULT_TRAINER } from "../drills/draft.js";
 import { MAX_DEPTHS, seatedPositions } from "../drills/limits.js";
 import type { DrillCreate, Position, PreflopAction, SpotFilter } from "../drills/types.js";
+import { classWords } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
 /** gto-model's action family (ActionFamily::as_str) to the drill family that trains it. */
@@ -125,8 +126,10 @@ export function spotFilterFor(spot: DrillSpot, configs: readonly GameConfig[]): 
   };
 }
 
+/** "Leak drill: open or fold, big blind versus button, live 100 bb" (spot-words.ts, S47). */
 export function leakDrillName(spot: DrillSpot): string {
-  return `Leak drill: ${spot.family} ${spot.pair} ${spot.format} ${spot.depthBand}`;
+  const words = classWords({ family: spot.family, pair: spot.pair }, { format: spot.format, depth_band: spot.depthBand });
+  return `Leak drill: ${words.charAt(0).toLowerCase()}${words.slice(1)}`;
 }
 
 /** The whole create body for a class's auto drill, or null when no config matches. */

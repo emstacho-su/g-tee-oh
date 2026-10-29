@@ -47,7 +47,7 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(pairWords("BB-BTN")).toBe("big blind versus button");
     expect(pairWords("UTG-HJ")).toBe("under the gun versus hijack");
     expect(pairWords("not-a-pair-at-all")).toBe("not-a-pair-at-all");
-    expect(depthBandLabel("100")).toBe("100 bb");
+    expect(depthBandLabel("100")).toBe("100bb");
     expect(depthBandLabel("deep")).toBe("deep");
     expect(capitalize("facing an open")).toBe("Facing an open");
     expect(capitalize("")).toBe("");
@@ -60,31 +60,31 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
   it("R4.12 a class reads family, pair, format and depth in words, and the model labels are that one formatter", () => {
     const row = { family: "rfi", pair: "BB-UTG" };
     const column = { format: "live", depth_band: "100" };
-    expect(classWords(row, column)).toBe("Open or fold, big blind versus under the gun, live 100 bb");
+    expect(classWords(row, column)).toBe("Open or fold, big blind versus under the gun, live 100bb");
     expect(classLabel(row, column)).toBe(classWords(row, column));
     expect(rowLabel(row)).toBe("Open or fold, big blind versus under the gun");
-    expect(columnLabel(column)).toBe("Live 100 bb");
+    expect(columnLabel(column)).toBe("Live 100bb");
     expect(classWords({ family: "facing-3bet", pair: "SB-BTN" }, { format: "online", depth_band: "short" })).toBe("Facing a 3-bet, small blind versus button, online short");
   });
 
   it("R4.12 leak rows, the queue card and the auto drill's name print no raw token", () => {
     const rows = joinLeaksToCells(fixtureLeaks, fixtureHeatmap);
     for (const row of rows) expect(row.label).not.toMatch(RAW_TOKEN);
-    expect(rows[0]?.label).toBe("Open or fold, big blind versus under the gun, live 100 bb");
+    expect(rows[0]?.label).toBe("Open or fold, big blind versus under the gun, live 100bb");
     const queue = buildHomeQueue(fixtureHeatmap, fixtureLeaks);
     for (const leak of queue.leaks) {
       expect(leak.family).not.toMatch(RAW_TOKEN);
       expect(leak.where).not.toMatch(RAW_TOKEN);
     }
-    expect(queue.leaks[0]).toMatchObject({ family: "Open or fold", where: "big blind versus under the gun, live 100 bb" });
-    expect(leakDrillName({ family: "rfi", pair: "BB-UTG", format: "live", depthBand: "100" })).toBe("Leak drill: open or fold, big blind versus under the gun, live 100 bb");
+    expect(queue.leaks[0]).toMatchObject({ family: "Open or fold", where: "big blind versus under the gun, live 100bb" });
+    expect(leakDrillName({ family: "rfi", pair: "BB-UTG", format: "live", depthBand: "100" })).toBe("Leak drill: open or fold, big blind versus under the gun, live 100bb");
     // The frequency card's family words are the same map, re-exported.
     expect(frequencyFamilyWords).toBe(familyWords);
   });
 
   it("R4.12 a configuration reads by its catalog label, and by a plain sentence when the catalog does not list it", () => {
     const config = fixtureConfigs[0] as GameConfig;
-    expect(configurationWords(config, config.config_id)).toBe("Online, 6 players, 100 bb deep, stakes online");
+    expect(configurationWords(config, config.config_id)).toBe("Online, 6 players, 100bb deep");
     expect(configurationWords(undefined, "cfg_6_online_999")).toBe("a configuration the catalog does not list");
     expect(configurationWords(undefined, "cfg_6_online_999")).not.toMatch(RAW_TOKEN);
   });

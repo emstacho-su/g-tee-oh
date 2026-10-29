@@ -85,7 +85,7 @@ describe("R4.10 automated start", () => {
     setDefaults({ configScope: [CONFIG.config_id, UNLISTED_ID] });
     const view = await renderTrain("automated", { ...automatedScript(), [CONFIGS_PATH]: [jsonResponse(200, { items: [CONFIG], next_cursor: null })] });
     const list = await screen.findByTestId("scope-list");
-    expect(list).toHaveTextContent("Online, 6 players, 100 bb deep, stakes online");
+    expect(list).toHaveTextContent("Online, 6 players, 100bb deep");
     expect(list).toHaveTextContent(UNLISTED_ID);
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     await screen.findByRole("group", { name: "Actions" });
@@ -129,7 +129,7 @@ describe("R4.10 automated session", () => {
     await renderTrain("automated", automatedScript());
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     const banner = await screen.findByTestId("block-banner");
-    await waitFor(() => expect(within(banner).getByTestId("block-class")).toHaveTextContent("rfi, Opens"));
+    await waitFor(() => expect(within(banner).getByTestId("block-class")).toHaveTextContent("Open or fold, Opens"));
     expect(within(banner).getByTestId("block-hand")).toHaveTextContent("Hand 1 of 3 in this block");
     expect(within(banner).getByTestId("block-rating")).toHaveTextContent("Rated block: first attempts count toward your rating");
     await decide();
@@ -141,7 +141,7 @@ describe("R4.10 automated session", () => {
     await renderTrain("automated", automatedScript(fixtureWorkedBlock));
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     expect(await screen.findByTestId("block-rating")).toHaveTextContent("Worked example: panels visible, not rated");
-    await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("facing-open, Facing an open in position"));
+    await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("Facing an open, Facing an open in position"));
   });
 
   it("R3.13 R4.10 nothing is sent or revealed before the choice, and the choice submits without a confidence field (O-345, O-373)", async () => {

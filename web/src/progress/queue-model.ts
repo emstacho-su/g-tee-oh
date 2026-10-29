@@ -8,10 +8,12 @@
  * learning schedules it at (O-253); a class with p_known null was never practiced. The leaks come from the leak read, ranked by current
  * cost (a copy is sorted; the read is never changed), and each is joined to its heat map cell by
  * spot_class_key for the position pair and the format and depth: values from the api only, the
- * key itself is never parsed (ADR 0004). A server queue preview can replace this later (O-322).
+ * key itself is never parsed (ADR 0004), and the family, pair and depth read in words
+ * (spot-words.ts, S47). A server queue preview can replace this later (O-322).
  */
 import { formatLeak } from "./format.js";
 import { isDue, isPracticed } from "./heatmap-model.js";
+import { capitalize, depthBandLabel, familyWords, pairWords } from "./spot-words.js";
 import type { HeatmapCell, LeakItem, ProgressHeatmap, ProgressLeaks } from "./types.js";
 
 export const TOP_LEAK_COUNT = 3;
@@ -37,14 +39,14 @@ function whereOf(heatmap: ProgressHeatmap, cell: HeatmapCell | undefined): strin
   const row = heatmap.rows[cell.row];
   const column = heatmap.columns[cell.column];
   if (row === undefined || column === undefined) return null;
-  return `${row.pair}, ${column.format}, ${column.depth_band} bb`;
+  return `${pairWords(row.pair)}, ${column.format} ${depthBandLabel(column.depth_band)}`;
 }
 
 function queueLeak(heatmap: ProgressHeatmap, item: LeakItem): QueueLeak {
   const cell = heatmap.cells.find((each) => each.spot_class_key === item.spot_class_key);
   return {
     spotClassKey: item.spot_class_key,
-    family: item.family,
+    family: capitalize(familyWords(item.family)),
     where: whereOf(heatmap, cell),
     costText: `${formatLeak(item.leak_cost_bb_per_1k)} bb per 1,000 hands`,
   };

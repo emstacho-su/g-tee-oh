@@ -9,6 +9,7 @@
  */
 import { RAISED_CLASS, cn } from "../../components/ui/index.js";
 import { trackName } from "../../progress/format.js";
+import { capitalize, familyWords } from "../../progress/spot-words.js";
 import type { TrackKey } from "../../progress/types.js";
 import type { BlockView, HoldoutView } from "./block-progress.js";
 import { TRAIN_TEXT } from "./train-text.js";
@@ -31,7 +32,7 @@ export interface BlockBannerProps {
 
 function classText(block: BlockView, trackNames: BlockBannerProps["trackNames"]): string {
   const track = block.trackKey === null ? TRAIN_TEXT.noTrack : trackName(block.trackKey, trackNames);
-  return block.family === null ? track : `${block.family}, ${track}`;
+  return block.family === null ? track : `${capitalize(familyWords(block.family))}, ${track}`;
 }
 
 function ratingText(block: BlockView, ratedEligible: boolean): string {

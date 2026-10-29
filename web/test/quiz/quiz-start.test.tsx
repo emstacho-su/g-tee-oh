@@ -30,7 +30,7 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
     const view = renderQuiz("/quiz", {});
     const table = await startScreen();
     await waitFor(() => expect(within(table).getAllByRole("option")).toHaveLength(3));
-    expect(within(table).getByRole("option", { name: "Online, 6 players, 100 bb deep, stakes online" })).toBeInTheDocument();
+    expect(within(table).getByRole("option", { name: "Online, 6 players, 100bb deep" })).toBeInTheDocument();
     expect(table).toHaveValue("cfg_6_online_100");
     expect(view.sentTo(START_PATH)).toHaveLength(0);
   });

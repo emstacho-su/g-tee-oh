@@ -65,7 +65,7 @@ describe("R4.12 the frequency model", () => {
   });
 
   it("R4.12 names action families in words, never by key", () => {
-    expect(familyWords("rfi")).toBe("open");
+    expect(familyWords("rfi")).toBe("open or fold");
     expect(familyWords("facing-open")).toBe("facing an open");
     expect(familyWords("facing-3bet")).toBe("facing a 3-bet");
     expect(familyWords("facing-4bet")).toBe("facing a 4-bet");
@@ -76,18 +76,18 @@ describe("R4.12 the frequency model", () => {
 
   it("R4.12 names each spot from the response fields, with the configuration's label when the list is loaded", () => {
     expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.label)).toEqual([
-      "BB facing an open (BB-BTN), cfg_6_online_100",
-      "BTN open (BB-BTN), cfg_6_online_100",
+      "Facing an open as big blind (big blind versus button), a configuration the catalog does not list",
+      "Open or fold as button (big blind versus button), a configuration the catalog does not list",
     ]);
-    expect(spotOptions(fixtureFrequencies.spots, fixtureConfigs)[0]?.label).toBe("BB facing an open (BB-BTN), Online, 6 players, 100 bb deep, stakes online");
+    expect(spotOptions(fixtureFrequencies.spots, fixtureConfigs)[0]?.label).toBe("Facing an open as big blind (big blind versus button), Online, 6 players, 100bb deep");
     expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.value)).toEqual([spotKey(ABOVE), spotKey(BELOW)]);
   });
 
   it("R4.12 numbers two spots that would share a name", () => {
     const twin = { ...ABOVE, node_key: `${ABOVE.node_key}.c` };
     expect(spotOptions([ABOVE, twin], undefined).map((option) => option.label)).toEqual([
-      "BB facing an open (BB-BTN), cfg_6_online_100",
-      "BB facing an open (BB-BTN), cfg_6_online_100 (2)",
+      "Facing an open as big blind (big blind versus button), a configuration the catalog does not list",
+      "Facing an open as big blind (big blind versus button), a configuration the catalog does not list (2)",
     ]);
   });
 

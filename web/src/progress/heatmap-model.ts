@@ -11,11 +11,13 @@
  * @g-tee-oh/learning (O-262), so the rule cannot drift from the scheduler. Rows are grouped by
  * family in the order the api lists them, each row keeping its api index, and cells are found by
  * (row, column) through one lookup map. Every figure shown comes from the api response; nothing
- * here reads a spot_class_key (ADR 0004).
+ * here reads a spot_class_key (ADR 0004). Since S47 the row, column and class labels are the
+ * shared spot vocabulary (spot-words.ts): words, never the api's tokens.
  */
 import { retentionFor } from "@g-tee-oh/learning";
 
 import { formatPercent } from "./format.js";
+import { classWords, columnWords, depthBandLabel, rowWords } from "./spot-words.js";
 import type { HeatmapCell, HeatmapColumn, HeatmapRow, ProgressHeatmap } from "./types.js";
 
 export type HeatBin = 1 | 2 | 3 | 4 | 5;
@@ -66,23 +68,21 @@ export function isDue(cell: HeatmapCell): boolean {
   return isPracticed(cell) && cell.retrievability !== null && cell.retrievability <= retentionFor(cell.mastered);
 }
 
-const BAND_IN_BB = /^\d+$/;
+export { depthBandLabel };
 
-/** "100 bb" for a numeric band, the band itself ("short", "deep") otherwise. */
-export function depthBandLabel(band: string): string {
-  return BAND_IN_BB.test(band) ? `${band} bb` : band;
+/** "Online 100 bb" (spot-words.ts, S47). */
+export function columnLabel(column: Pick<HeatmapColumn, "format" | "depth_band">): string {
+  return columnWords(column);
 }
 
-export function columnLabel(column: HeatmapColumn): string {
-  return `${column.format} ${depthBandLabel(column.depth_band)}`;
+/** "Open or fold, big blind versus button" (spot-words.ts, S47). */
+export function rowLabel(row: Pick<HeatmapRow, "family" | "pair">): string {
+  return rowWords(row);
 }
 
-export function rowLabel(row: HeatmapRow): string {
-  return `${row.family} ${row.pair}`;
-}
-
-export function classLabel(row: HeatmapRow, column: HeatmapColumn): string {
-  return `${rowLabel(row)}, ${columnLabel(column)}`;
+/** "Open or fold, big blind versus button, online 100 bb": the one class name every screen uses. */
+export function classLabel(row: Pick<HeatmapRow, "family" | "pair">, column: Pick<HeatmapColumn, "format" | "depth_band">): string {
+  return classWords(row, column);
 }
 
 export interface HeatRowEntry {

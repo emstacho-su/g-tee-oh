@@ -47,8 +47,8 @@ describe("R4.12 home queue model", () => {
     const column = fixtureHeatmap.columns[firstCell?.column ?? -1];
     expect(queue.leaks[0]).toEqual({
       spotClassKey: first?.spot_class_key,
-      family: first?.family,
-      where: `${row?.pair}, ${column?.format}, ${column?.depth_band} bb`,
+      family: "Open or fold",
+      where: `big blind versus under the gun, ${column?.format} ${column?.depth_band}bb`,
       costText: "42.0 bb per 1,000 hands",
     });
   });

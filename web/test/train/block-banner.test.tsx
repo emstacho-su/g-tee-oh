@@ -10,7 +10,7 @@ import { BlockBanner } from "../../src/routes/train/BlockBanner.js";
 import type { BlockView } from "../../src/routes/train/block-progress.js";
 import { TRAIN_TEXT } from "../../src/routes/train/train-text.js";
 
-const BLOCK: BlockView = { classKey: "class-a", trackKey: "opens", family: "Open", hand: 2, size: 3, workedExample: false };
+const BLOCK: BlockView = { classKey: "class-a", trackKey: "opens", family: "rfi", hand: 2, size: 3, workedExample: false };
 
 describe("R4.10 BlockBanner (O-325)", () => {
   it("R4.10 shows the holdout retest banner with answered of total, even beside a block (O-328)", () => {
@@ -27,7 +27,7 @@ describe("R4.10 BlockBanner (O-325)", () => {
 
   it("R4.10 names the family and the track by its loaded name in a rated block", () => {
     render(<BlockBanner block={BLOCK} holdout={null} ratedEligible trackNames={{ opens: "Opens" }} />);
-    expect(screen.getByTestId("block-class")).toHaveTextContent("Open, Opens");
+    expect(screen.getByTestId("block-class")).toHaveTextContent("Open or fold, Opens");
     expect(screen.getByTestId("block-hand")).toHaveTextContent("Hand 2 of 3 in this block");
     expect(screen.getByTestId("block-rating")).toHaveTextContent(TRAIN_TEXT.ratedBlock);
   });
@@ -39,7 +39,7 @@ describe("R4.10 BlockBanner (O-325)", () => {
 
   it("R4.10 says no rating track when the class has none", () => {
     render(<BlockBanner block={{ ...BLOCK, trackKey: null }} holdout={null} ratedEligible={false} />);
-    expect(screen.getByTestId("block-class")).toHaveTextContent(`Open, ${TRAIN_TEXT.noTrack}`);
+    expect(screen.getByTestId("block-class")).toHaveTextContent(`Open or fold, ${TRAIN_TEXT.noTrack}`);
     expect(screen.getByTestId("block-rating")).toHaveTextContent(TRAIN_TEXT.unratedSession);
   });
 

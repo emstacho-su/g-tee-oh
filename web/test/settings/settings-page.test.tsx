@@ -80,15 +80,15 @@ describe("R4.12 /settings session defaults", () => {
     expect(within(defaults).getByText(/Choose at least one configuration/)).toBeInTheDocument();
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
 
-    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100 bb deep, stakes 1/3" }));
-    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100 bb deep, stakes online" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100bb deep, stakes 1/3" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100bb deep" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toEqual([FIRST_CONFIG.config_id, THIRD_CONFIG.config_id]);
 
-    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100 bb deep, stakes online" }));
-    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100 bb deep, stakes 1/3" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100bb deep" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100bb deep, stakes 1/3" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
 
-    await user.click(within(list).getByRole("checkbox", { name: /200 bb deep/ }));
+    await user.click(within(list).getByRole("checkbox", { name: /200bb deep/ }));
     await user.click(within(defaults).getByRole("radio", { name: "All covered configurations" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
     expect(within(defaults).queryByRole("list", { name: "Configurations to train" })).toBeNull();
@@ -112,8 +112,8 @@ describe("R4.12 /settings session defaults", () => {
 
     const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(defaults).findByText("At most 32 configurations can be chosen.")).toBeInTheDocument();
-    expect(within(defaults).getByRole("checkbox", { name: /, 33 bb deep/ })).toBeDisabled();
-    expect(within(defaults).getByRole("checkbox", { name: /, 32 bb deep/ })).toBeEnabled();
+    expect(within(defaults).getByRole("checkbox", { name: /, 33bb deep/ })).toBeDisabled();
+    expect(within(defaults).getByRole("checkbox", { name: /, 32bb deep/ })).toBeEnabled();
   });
 
   it("R4.12 a failed or empty configuration read says so, and Try again reloads it", async () => {

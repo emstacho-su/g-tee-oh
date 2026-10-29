@@ -39,13 +39,17 @@ export function allConfigsQuery(api: AppApi) {
 const CBB_PER_BB = 100;
 const FORMAT_NAMES: Readonly<Record<GameConfig["format"], string>> = { online: "Online", live: "Live" };
 
-/** "Online, 6 players, 100 bb deep, stakes online", from the api's fields only. */
+/**
+ * "Online, 6 players, 100bb deep" or "Live, 9 players, 100bb deep, stakes 1/3", from the api's fields
+ * only; amounts write as "10bb" (O-500) and the stakes clause is left out when the stake's label is
+ * the format's own name (the one online stake, S47 critic).
+ */
 export function configLabel(config: GameConfig): string {
   const parts = [
     FORMAT_NAMES[config.format],
     `${config.table_size} players`,
-    `${config.depth_cbb / CBB_PER_BB} bb deep`,
-    `stakes ${config.stake_label}`,
+    `${config.depth_cbb / CBB_PER_BB}bb deep`,
+    ...(config.stake_label === config.format ? [] : [`stakes ${config.stake_label}`]),
   ];
   return config.straddle ? [...parts, "straddle"].join(", ") : parts.join(", ");
 }
