@@ -47,9 +47,11 @@ export interface CatalogConfigRow {
 }
 
 /**
- * The rule configIdsFor's query applies, as a predicate over one row (S47, R3.37, O-485). The shared
- * cases of validation/fixtures/drills/candidate-rule-cases.json hold it, and the web's reach model
- * (web/src/drills/reach-model.ts) runs the same cases, so the two cannot drift apart unnoticed.
+ * The configuration rule of a drill (S47, R3.37, O-485): format, table size, the stake by label,
+ * a depth the drill names (big blinds times CBB_PER_BB) and no ante. It is the one source of the
+ * rule: configIdsFor applies it to the rows its query reads, and the shared cases of
+ * validation/fixtures/drills/candidate-rule-cases.json hold it here and in the web's reach model
+ * (web/src/drills/reach-model.ts), so what sessions run and what the web counts cannot drift apart.
  */
 export function configRowMatches(filter: DrillSpotFilter, row: CatalogConfigRow): boolean {
   const { format, table_size: tableSize, depths_bb: depths } = filter.game_config;
@@ -62,20 +64,30 @@ export function configRowMatches(filter: DrillSpotFilter, row: CatalogConfigRow)
   );
 }
 
+/**
+ * The configurations a drill reaches, in id order (PR #48 review MEDIUM 8). The query reads the
+ * catalog rows of the drill's format and table size with parameterised values and configRowMatches
+ * decides the rest, so the drift cases cover what a session start runs. The catalog is small (a
+ * few dozen configurations, seeded per format, table size, stake and depth), so filtering the
+ * format's rows in process costs nothing a start would notice.
+ */
 export async function configIdsFor(database: Database, filter: DrillSpotFilter): Promise<string[]> {
-  const depths = filter.game_config.depths_bb.map((depth) => depth * CBB_PER_BB);
   const rows = await database
     .selectFrom("game_config")
     .innerJoin("stake", "stake.id", "game_config.stake_id")
-    .select("game_config.id")
+    .select([
+      "game_config.id as config_id",
+      "game_config.format",
+      "game_config.table_size",
+      "stake.label as stake_label",
+      "game_config.depth_cbb",
+      "game_config.ante_cbb",
+    ])
     .where("game_config.format", "=", filter.game_config.format)
     .where("game_config.table_size", "=", filter.game_config.table_size)
-    .where("stake.label", "=", filter.stake)
-    .where("game_config.depth_cbb", "in", depths)
-    .where("game_config.ante_cbb", "=", NO_ANTE_CBB)
     .orderBy("game_config.id")
     .execute();
-  return rows.map((row) => row.id);
+  return rows.filter((row) => configRowMatches(filter, row)).map((row) => row.config_id);
 }
 
 /** Every hero and villain seat pairing, out of position first, sorted and without repeats. */
