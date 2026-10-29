@@ -84,16 +84,21 @@ const LIGHT: MatrixPalette = {
   inkDark: "#2b1a16", // --heat-ink-low: 735751 umber, deepened
   inkLight: "#fbf7f1", // --heat-ink-high: e7d7c1 cream, lifted
   focus: "#bf4342", // --focus: the bf4342 brick palette value
-  focusHalo: "#fbf7f1", // --surface-raised
+  focusHalo: "#fbf7f1", // --focus-halo: var(--surface-raised)
   selected: "#2b1a16", // --text
 };
 
+/** --surface-raised (dark): the matrix ground and the halo inside its focus ring (--focus-halo, O-432). */
+const DARK_GROUND = "#1e1e1e";
+/** --text (dark), which --focus aliases (O-432): the text, the selection and the focus ring share it. */
+const DARK_TEXT = "#ececec";
+
 const DARK: MatrixPalette = {
-  background: "#1e1e1e", // --surface-raised: a neutral gray (O-430)
-  gridLine: "#1e1e1e", // the ground again
-  text: "#ececec", // --text: a neutral off-white (O-430)
+  background: DARK_GROUND, // --surface-raised: a neutral gray (O-430)
+  gridLine: DARK_GROUND, // the ground again
+  text: DARK_TEXT, // --text: a neutral off-white (O-430)
   labelChip: "rgba(30, 30, 30, 0.8)", // --surface-raised, translucent
-  labelText: "#ececec", // --text
+  labelText: DARK_TEXT, // --text
   missingFill: "#0e0e0e", // --surface-sunken: a neutral near-black (O-430)
   missingInk: "rgba(133, 133, 133, 0.45)", // --border-strong (dark): a neutral gray, translucent
   hatchInkDark: "rgba(20, 20, 20, 0.5)", // --surface: the neutral near-black, translucent
@@ -116,9 +121,9 @@ const DARK: MatrixPalette = {
   weightSteps: ["#7e4739", "#9d5f4f", "#c48777", "#e1ac9f", "#f7d5cc"], // --heat-1 to --heat-5, dark (O-362)
   inkDark: "#141414", // --heat-ink-high (dark): the neutral near-black (O-430)
   inkLight: "#fafafa", // --heat-ink-low (dark): a neutral white (O-430)
-  focus: "#e0766c", // --focus (dark): bf4342 brick, lifted (the accent, O-430)
-  focusHalo: "#1e1e1e", // --surface-raised
-  selected: "#ececec", // --text
+  focus: DARK_TEXT, // --focus (dark): var(--text), a neutral near-white apart from the red EV and raise fills (O-432)
+  focusHalo: DARK_GROUND, // --focus-halo: var(--surface-raised)
+  selected: DARK_TEXT, // --text
 };
 
 function resolve(palette: MatrixPalette): ResolvedPalette {

@@ -103,8 +103,9 @@ export function Seat({ seat, slots, fourColor }: SeatProps) {
       className={cn(
         "table-seat flex flex-col items-center gap-0.5 rounded-xl border bg-surface-raised px-2 py-1.5 text-center text-sm",
         RAISED_CLASS,
-        seat.isHero ? "border-accent ring-2 ring-accent" : "border-border",
-        active && "table-seat-active ring-2 ring-focus",
+        seat.isHero ? "border-accent" : "border-border",
+        // One ring per seat: the acting seat's neutral focus ring wins over the hero's accent ring (O-432).
+        active ? "table-seat-active ring-2 ring-focus" : seat.isHero && "ring-2 ring-accent",
         seat.hasFolded && "opacity-50",
       )}
     >

@@ -85,7 +85,7 @@ function Swatch({ name, caption }: { name: string; caption: string }) {
 
 function TokenSection() {
   return (
-    <GallerySection name="design-tokens" title="Palette and tokens" note="The owner's five colours as primitives, and the semantic tokens of this theme: built from them in light (O-346), a neutral gray and black base with the palette reds as accent, focus and danger in dark (O-430).">
+    <GallerySection name="design-tokens" title="Palette and tokens" note="The owner's five colours as primitives, and the semantic tokens of this theme: built from them in light (O-346), a neutral gray and black base with the palette reds as accent and danger and a neutral focus ring in dark (O-430, O-432).">
       <div className="flex flex-col gap-4">
         <ul aria-label="Palette" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {paletteNames().map((name) => (

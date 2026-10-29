@@ -4,8 +4,12 @@
  * both orientations' spots on every seat as custom properties for the container query, and action
  * chips at the bet spots.
  */
+import { readFileSync } from "node:fs";
+
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
+import { STYLES_PATH, contrastRatio, parseThemes } from "../../../scripts/check-contrast.mjs";
 
 import { PokerTable, seatLayout, type TableSeat } from "../../src/components/table/index.js";
 import { fixturePrompt } from "../../src/fixtures/index.js";
@@ -119,6 +123,36 @@ describe("R3.13 PokerTable", () => {
     expect(within(smallBlind).getByTestId("seat-action")).toHaveTextContent("Raise 3bb");
     expect(smallBlind).toHaveAttribute("data-active", "true");
     expect(screen.getByTestId("seat-BB")).toHaveAttribute("data-active", "false");
+  });
+
+  it("R3.13 O-432 the hero ring and the active-seat ring never share a colour, and an acting hero shows only the active ring", () => {
+    const seats = sixSeats().map((seat) => (seat.position === "SB" ? { ...seat, active: true } : seat));
+    const { unmount } = render(<PokerTable seats={seats} potCbb={150} />);
+    const hero = screen.getByTestId(`seat-${fixturePrompt.hero_position}`).className.split(" ");
+    const acting = screen.getByTestId("seat-SB").className.split(" ");
+    expect(hero).toContain("ring-accent");
+    expect(hero).not.toContain("ring-focus");
+    expect(acting).toContain("ring-focus");
+    expect(acting).not.toContain("ring-accent");
+    unmount();
+    // The hero is the acting seat: one ring only (two ring colours on one element would race on CSS order).
+    const heroActs = sixSeats().map((seat) => (seat.isHero ? { ...seat, active: true } : seat));
+    render(<PokerTable seats={heroActs} potCbb={150} />);
+    const both = screen.getByTestId(`seat-${fixturePrompt.hero_position}`).className.split(" ");
+    expect(both).toContain("ring-focus");
+    expect(both).not.toContain("ring-accent");
+    expect(both).toContain("border-accent");
+  });
+
+  it("R3.13 O-432 in dark the active ring is the neutral focus and the hero ring the red accent, apart in hue and in lightness", () => {
+    const { dark } = parseThemes(readFileSync(STYLES_PATH, "utf8"));
+    const focus = dark.get("focus")?.value ?? "";
+    const accent = dark.get("accent")?.value ?? "";
+    // A neutral: the three channels are equal.
+    expect(new Set([focus.slice(1, 3), focus.slice(3, 5), focus.slice(5, 7)]).size).toBe(1);
+    expect(focus).not.toBe(accent);
+    // Apart in lightness too, so the two rings differ in grayscale (2.55:1 for #ececec on #e0766c).
+    expect(contrastRatio(focus, accent)).toBeGreaterThanOrEqual(2.5);
   });
 
   it("R3.13 an action chip sits at the seat's bet spot with the api label, and a moving chip slides there (O-381)", () => {

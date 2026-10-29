@@ -35,9 +35,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { saturationOf, scanColours } from "./lib/css-colours.mjs";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const STYLES_PATH = join(ROOT, "web", "src", "styles.css");
 export const ACTION_STYLE_PATH = join(ROOT, "web", "src", "theme", "action-style.ts");
+export const MATRIX_THEME_PATH = join(ROOT, "web", "src", "components", "range-matrix", "matrix-theme.ts");
 export const REPORT_PATH = join(ROOT, "validation", "reports", "contrast.md");
 
 /**
@@ -48,6 +51,8 @@ export const PRIMITIVE_PREFIX = "p-";
 
 const TEXT_AA = 4.5;
 const NON_TEXT_AA = 3;
+/** Two colours this far apart guarantee one of them 3:1 on any ground (WCAG technique C40). */
+const TWO_COLOUR_RING = 9;
 const GROUNDS = ["surface", "surface-raised", "surface-sunken"];
 /** The grounds the solver surfaces (table, matrix, action bars and swatches) are painted on. */
 const SOLVER_GROUNDS = ["surface", "surface-raised"];
@@ -62,7 +67,7 @@ const TEXT_ROLES = [
   ["warning", "warning text"],
 ];
 
-/** Every pair the app paints, with the WCAG minimum it must meet in both themes. */
+/** Every pair the app paints, with the WCAG minimum it must meet in both themes (or in the themes a pair lists). */
 export const GATING_PAIRS = Object.freeze([
   ...TEXT_ROLES.flatMap(([fg, use]) => GROUNDS.map((bg) => ({ fg, bg, min: TEXT_AA, use }))),
   { fg: "accent-text", bg: "accent", min: TEXT_AA, use: "primary button label" },
@@ -72,6 +77,9 @@ export const GATING_PAIRS = Object.freeze([
   ...GROUNDS.map((bg) => ({ fg: "focus", bg, min: NON_TEXT_AA, use: "focus ring" })),
   ...["heat-1", "heat-2"].map((bg) => ({ fg: "heat-ink-low", bg, min: TEXT_AA, use: "heat map cell label" })),
   ...["heat-3", "heat-4", "heat-5"].map((bg) => ({ fg: "heat-ink-high", bg, min: TEXT_AA, use: "heat map cell label" })),
+  // The dark focus ring is two colours, the ring and a halo of the ground inside it (O-432). At 9:1
+  // apart, one of the two reaches 3:1 on any fill (WCAG technique C40). Dark only: the ruling's scope.
+  { fg: "focus", bg: "focus-halo", min: TWO_COLOUR_RING, use: "two-colour focus ring (C40)", themes: ["dark"] },
 ]);
 
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -223,7 +231,7 @@ export function evaluate(themes, pairs) {
   const rows = [];
   const failures = [];
   for (const theme of ["light", "dark"]) {
-    for (const pair of pairs) {
+    for (const pair of pairs.filter((candidate) => candidate.themes === undefined || candidate.themes.includes(theme))) {
       const fg = themes[theme].get(pair.fg);
       const bg = themes[theme].get(pair.bg);
       if (fg === undefined || bg === undefined) {
@@ -244,9 +252,9 @@ export function evaluate(themes, pairs) {
 
 /**
  * The neutral dark base (S43, O-430): the owner's call that the dark theme is a traditional gray and
- * black, not the palette's reddish brown. These dark tokens (the grounds, the edges, the text and
- * the inks printed on the heat steps, the overlay and every shadow layer of the tactile depth) must
- * be neutral; the palette reds stay as accent, focus and danger, which are not listed.
+ * black, not the palette's reddish brown. These dark tokens (the grounds, the edges, the text, the
+ * focus ring and its halo (O-432), the inks printed on the heat steps, the overlay and every shadow
+ * layer of the tactile depth) must be neutral; the palette reds stay as accent and danger.
  */
 export const NEUTRAL_DARK_TOKENS = Object.freeze([
   "surface",
@@ -257,6 +265,8 @@ export const NEUTRAL_DARK_TOKENS = Object.freeze([
   "text",
   "text-muted",
   "accent-text",
+  "focus",
+  "focus-halo",
   "heat-ink-low",
   "heat-ink-high",
   "overlay",
@@ -281,34 +291,29 @@ export function hslSaturation(hex) {
   return saturationOf([1, 3, 5].map((start) => Number.parseInt(full.slice(start, start + 2), 16)));
 }
 
-function saturationOf(channels) {
-  const [max, min] = [Math.max(...channels) / 255, Math.min(...channels) / 255];
-  const lightness = (max + min) / 2;
-  const span = 1 - Math.abs(2 * lightness - 1);
-  return span === 0 ? 0 : (max - min) / span;
-}
-
-/** Every colour written in a CSS value: hex literals and rgb()/rgba() channels (comma or space syntax). */
-const VALUE_COLOUR = /#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\(\s*(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)/gi;
-
-function coloursIn(value) {
-  return [...value.matchAll(VALUE_COLOUR)].map(([text, red, green, blue]) =>
-    red === undefined
-      ? { text: expandHex(text), saturation: hslSaturation(text) }
-      : { text: `rgb(${red} ${green} ${blue})`, saturation: saturationOf([red, green, blue].map(Number)) },
-  );
+/** The colours of one neutral token in the dark theme, or the failure that stops the check reading them. */
+function neutralColours(name, entry, resolved) {
+  if (resolved !== undefined) return { colours: [{ text: resolved.value, saturation: hslSaturation(resolved.value) }] };
+  if (WHOLE_VAR.test(entry.raw)) return { fault: `dark: --${name} is ${entry.raw}, which resolves to no colour the neutral check can read` };
+  const scan = scanColours(entry.raw);
+  if (scan.usesVar) return { fault: `dark: --${name} uses var() inside its value, which the neutral check cannot follow` };
+  if (scan.unreadable.length > 0) {
+    return { fault: `dark: --${name} holds ${scan.unreadable.join(", ")}, which the neutral check cannot read (write hex, rgb() or hsl())` };
+  }
+  if (scan.colours.length === 0) return { fault: `dark: --${name} holds no colour the neutral check can read` };
+  return { colours: scan.colours };
 }
 
 /**
  * The neutral check of the dark theme: each token's effective dark value (the .dark block's, else
  * the light block's it inherits) and every colour in it at NEUTRAL_MAX_SATURATION or less. A colour
- * token (hex or a whole-value var()) is checked resolved; a larger value (a shadow list, an rgb()
- * overlay) colour by colour. A token that is not declared, holds no colour, or uses var() inside a
- * larger value (which the check cannot follow) fails.
+ * token (hex or a whole-value var()) is checked as `themes` resolved it; a larger value (a shadow
+ * list, an rgb() overlay) colour by colour through scanColours, failing closed: a token that is not
+ * declared, resolves to no colour, holds no colour, holds a colour form the scanner cannot read, or
+ * uses var() inside a larger value fails, each as a neutral failure line.
  */
-export function evaluateNeutral(css, tokens = NEUTRAL_DARK_TOKENS) {
+export function evaluateNeutral(css, themes, tokens = NEUTRAL_DARK_TOKENS) {
   const raws = { light: rawTokens(blockBody(css, ":root")), dark: rawTokens(blockBody(css, ".dark")) };
-  const themes = parseThemes(css);
   const rows = [];
   const failures = [];
   for (const name of tokens) {
@@ -317,15 +322,9 @@ export function evaluateNeutral(css, tokens = NEUTRAL_DARK_TOKENS) {
       failures.push(`dark: --${name} is not declared`);
       continue;
     }
-    const resolved = themes.dark.get(name);
-    if (resolved === undefined && /var\(/i.test(entry.raw)) {
-      failures.push(`dark: --${name} uses var() inside its value, which the neutral check cannot follow`);
-      continue;
-    }
-    const value = resolved?.value ?? entry.raw;
-    const colours = resolved === undefined ? coloursIn(entry.raw) : [{ text: resolved.value, saturation: hslSaturation(resolved.value) }];
-    if (colours.length === 0) {
-      failures.push(`dark: --${name} holds no colour the neutral check can read`);
+    const { colours, fault } = neutralColours(name, entry, themes.dark.get(name));
+    if (fault !== undefined) {
+      failures.push(fault);
       continue;
     }
     const tinted = colours.filter((colour) => colour.saturation > NEUTRAL_MAX_SATURATION);
@@ -333,7 +332,7 @@ export function evaluateNeutral(css, tokens = NEUTRAL_DARK_TOKENS) {
       failures.push(`dark: --${name} ${colour.text} is not neutral: HSL saturation ${(colour.saturation * 100).toFixed(1)}%, over ${NEUTRAL_MAX_SATURATION * 100}% (O-430)`);
     }
     const highest = Math.max(...colours.map((colour) => colour.saturation));
-    rows.push({ name, value, colours: colours.map((colour) => colour.text), saturation: highest, pass: tinted.length === 0 });
+    rows.push({ name, colours: colours.map((colour) => colour.text), saturation: highest, pass: tinted.length === 0 });
   }
   return { rows, failures };
 }
@@ -427,15 +426,98 @@ export function evaluateSolver(themes, actionColours, sizeShades, felts) {
   return { rows, failures: [...new Set(failures)] };
 }
 
+/** The themes the focus ring gate covers: dark, the scope of the ruling on O-432. */
+export const FOCUS_RING_THEMES = Object.freeze(["dark"]);
+
+/**
+ * The range matrix's expected value (EV) steps per theme, from the LIGHT and DARK palettes of
+ * matrix-theme.ts: the negative steps, the neutral middle, then the positive steps, each named.
+ */
+export function readEvSteps(source) {
+  const steps = { light: [], dark: [] };
+  for (const theme of ["light", "dark"]) {
+    const block = new RegExp(`const ${theme.toUpperCase()}: MatrixPalette = \\{([\\s\\S]*?)\\n\\};`).exec(source);
+    if (block === null) continue;
+    const list = (key) => {
+      const match = new RegExp(`${key}:\\s*\\[([^\\]]*)\\]`).exec(block[1]);
+      return match === null ? [] : [...match[1].matchAll(HEX_LIST)].map(([hex]) => hex.toLowerCase());
+    };
+    const neutral = /evNeutral:\s*"(#[0-9a-f]{6})"/i.exec(block[1]);
+    steps[theme] = [
+      ...list("evNegative").map((value, rank) => ({ name: `EV step -${rank + 1}`, value })),
+      ...(neutral === null ? [] : [{ name: "EV neutral", value: neutral[1].toLowerCase() }]),
+      ...list("evPositive").map((value, rank) => ({ name: `EV step +${rank + 1}`, value })),
+    ];
+  }
+  return steps;
+}
+
+/** The fills a focus ring is drawn over in one theme: action colours, size shades, EV steps and heat steps. */
+function ringFills(themes, theme, fills) {
+  const heat = fills.heatSteps.flatMap((name) => {
+    const token = themes[theme].get(name);
+    return token === undefined ? [] : [{ name: `--${name}`, value: token.value }];
+  });
+  return [
+    ...fills.actionColours.map((colour) => ({ name: `${colour.name} (action)`, value: colour[theme] })),
+    ...(fills.sizeShades[theme] ?? []).map((value, rank) => ({ name: `raise and bet size shade ${rank + 1}`, value })),
+    ...(fills.evSteps[theme] ?? []),
+    ...heat,
+  ];
+}
+
+/**
+ * The focus ring on the solver fills (O-432): where the ring is drawn over a fill (the range matrix
+ * cell, the marked roll band), the ring or the halo of the ground inside it must reach 3:1 on the
+ * fill; where it is drawn on the felt with no halo (the active seat ring), the ring itself must.
+ * Dark only (FOCUS_RING_THEMES). An empty read of the EV steps fails, as the solver gate does.
+ */
+export function evaluateFocusRing(themes, fills) {
+  const rows = [];
+  const failures = [];
+  for (const theme of FOCUS_RING_THEMES) {
+    const focus = themes[theme].get("focus");
+    const halo = themes[theme].get("focus-halo");
+    if (focus === undefined || halo === undefined) {
+      failures.push(`${theme}: --focus and --focus-halo must both be colour tokens`);
+      continue;
+    }
+    if ((fills.evSteps[theme] ?? []).length === 0) {
+      failures.push(`${theme}: no EV steps read from web/src/components/range-matrix/matrix-theme.ts (evNegative, evNeutral, evPositive)`);
+    }
+    for (const fill of ringFills(themes, theme, fills)) {
+      const ratio = Math.max(contrastRatio(focus.value, fill.value), contrastRatio(halo.value, fill.value));
+      const pass = ratio >= NON_TEXT_AA;
+      if (!pass) {
+        failures.push(`${theme}: focus ring ${focus.value} with halo ${halo.value} on ${fill.name} ${fill.value} is ${ratio.toFixed(2)}:1, under ${NON_TEXT_AA}:1`);
+      }
+      rows.push({ theme, ...fill, ring: `ring ${focus.value}, halo ${halo.value}`, ratio, min: NON_TEXT_AA, pass });
+    }
+    for (const felt of fills.felts.filter((candidate) => candidate.theme === theme)) {
+      const ratio = contrastRatio(focus.value, felt.value);
+      const pass = ratio >= NON_TEXT_AA;
+      if (!pass) {
+        failures.push(`${theme}: focus ring ${focus.value} on ${felt.name} ${felt.value} is ${ratio.toFixed(2)}:1, under ${NON_TEXT_AA}:1 (the active seat ring)`);
+      }
+      rows.push({ theme, name: felt.name, value: felt.value, ring: `ring ${focus.value} (active seat)`, ratio, min: NON_TEXT_AA, pass });
+    }
+  }
+  return { rows, failures: [...new Set(failures)] };
+}
+
 function sourceText(token) {
   return token.source ?? "none";
 }
 
 const NO_SOLVER = Object.freeze({ rows: [], failures: [] });
 const NO_NEUTRAL = Object.freeze({ rows: [], failures: [] });
+const NO_FOCUS = Object.freeze({ rows: [], failures: [] });
 
-/** The Markdown report: gating pairs, the solver surface colours (O-389), then the neutral dark base (O-430). */
-export function renderReport(result, solver = NO_SOLVER, palette = [], neutral = NO_NEUTRAL) {
+/**
+ * The Markdown report: gating pairs, the solver surface colours (O-389), the neutral dark base
+ * (O-430), then the focus ring on the solver fills (O-432).
+ */
+export function renderReport(result, solver = NO_SOLVER, palette = [], neutral = NO_NEUTRAL, focus = NO_FOCUS) {
   const lines = [
     "# Colour contrast report (R3.13, O-346, O-365)",
     "",
@@ -485,6 +567,21 @@ export function renderReport(result, solver = NO_SOLVER, palette = [], neutral =
     }
     lines.push("", `Neutral failures: ${neutral.failures.length === 0 ? "none" : neutral.failures.length}.`);
   }
+  if (focus.rows.length > 0 || focus.failures.length > 0) {
+    lines.push(
+      "",
+      "## Focus ring on the solver fills (gating, O-432)",
+      "",
+      "Dark only. Where the focus ring is drawn over a fill (a range matrix cell, the marked roll band), the ring or the halo of the ground inside it reaches 3:1 on the fill (1.4.11); on the felt, where the active seat ring has no halo, the ring itself does.",
+      "",
+      "| Theme | Fill | Value | Ring | Ratio | Minimum | Result |",
+      "|---|---|---|---|---|---|---|",
+    );
+    for (const row of focus.rows) {
+      lines.push(`| ${row.theme} | ${row.name} | ${row.value} | ${row.ring} | ${row.ratio.toFixed(2)} | ${row.min} | ${row.pass ? "pass" : "FAIL"} |`);
+    }
+    lines.push("", `Focus ring failures: ${focus.failures.length === 0 ? "none" : focus.failures.length}.`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -503,9 +600,17 @@ function main(argv) {
   const css = readFileSync(STYLES_PATH, "utf8");
   const actionSource = readFileSync(ACTION_STYLE_PATH, "utf8");
   const solver = evaluateSolver(themes, readActionColours(actionSource), readSizeShades(actionSource), readFelts(css, themes));
-  const neutral = evaluateNeutral(css);
-  const report = renderReport(result, solver, paletteOf(themes), neutral);
-  for (const failure of [...result.failures, ...solver.failures, ...neutral.failures]) console.error(`check-contrast: ${failure}`);
+  const neutral = evaluateNeutral(css, themes);
+  const focus = evaluateFocusRing(themes, {
+    actionColours: readActionColours(actionSource),
+    sizeShades: readSizeShades(actionSource),
+    evSteps: readEvSteps(readFileSync(MATRIX_THEME_PATH, "utf8")),
+    heatSteps: ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5"],
+    felts: readFelts(css, themes),
+  });
+  const report = renderReport(result, solver, paletteOf(themes), neutral, focus);
+  const failures = [...result.failures, ...solver.failures, ...neutral.failures, ...focus.failures];
+  for (const failure of failures) console.error(`check-contrast: ${failure}`);
   if (write) {
     writeFileSync(REPORT_PATH, report);
     console.log(`check-contrast: wrote ${REPORT_PATH}`);
@@ -521,9 +626,9 @@ function main(argv) {
       return 1;
     }
   }
-  if (result.failures.length > 0 || solver.failures.length > 0 || neutral.failures.length > 0) return 1;
+  if (failures.length > 0) return 1;
   console.log(
-    `check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks, ${solver.rows.length} solver surface checks and ${neutral.rows.length} neutral dark tokens (R3.13, O-365, O-389, O-430)`,
+    `check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks, ${solver.rows.length} solver surface checks, ${neutral.rows.length} neutral dark tokens and ${focus.rows.length} focus ring checks (R3.13, O-365, O-389, O-430, O-432)`,
   );
   return 0;
 }

@@ -16,7 +16,8 @@
  * as before; only lightness moved. Sources, light theme (cream grounds, so each is a deep shade):
  * fold Tailwind blue-600, check and call green-700, limp lime-700, straddle violet-700, bet and
  * raise red-600 (also the first size shade), all-in fuchsia-800, its own hue so it never reads as
- * one more raise size. Dark theme (deep brown grounds, so each is a lifted shade): fold blue-500,
+ * one more raise size. Dark theme (neutral near-black grounds since O-430, at the luminance of
+ * the earlier brown ones, so each is a lifted shade): fold blue-500,
  * check and call green-500, limp lime-500, straddle violet-400, bet and raise red-500, all-in
  * fuchsia-400.
  *

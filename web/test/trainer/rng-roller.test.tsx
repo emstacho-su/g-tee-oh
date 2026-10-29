@@ -9,6 +9,7 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { RngRoller } from "../../src/components/trainer/index.js";
+import { FOCUS_MARK_CLASS } from "../../src/components/ui/index.js";
 import type { NodeAction } from "../../src/contracts.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
 import { toGradeActions } from "../../src/poker/grade-actions.js";
@@ -64,6 +65,16 @@ describe("R3.13 RngRoller", () => {
     const current = within(roller).getAllByRole("listitem").filter((item) => item.getAttribute("aria-current") === "true");
     expect(current).toHaveLength(1);
     expect(current[0]).toHaveAttribute("data-range", "16-95");
+  });
+
+  it("R3.13 O-432 the marked band draws a two-colour ring: the focus outline and, in dark, a halo of the ground inside it", () => {
+    render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={37} onExplain={vi.fn()} />);
+    const items = within(screen.getByTestId("rng-roller")).getAllByRole("listitem");
+    const marked = items.find((item) => item.getAttribute("aria-current") === "true");
+    expect(marked?.className.split(" ")).toEqual(expect.arrayContaining(FOCUS_MARK_CLASS.split(" ")));
+    expect(FOCUS_MARK_CLASS).toContain("outline-focus");
+    expect(FOCUS_MARK_CLASS).toContain("dark:shadow-[inset_0_0_0_4px_var(--focus-halo)]");
+    for (const item of items.filter((candidate) => candidate !== marked)) expect(item.className).not.toContain("outline-focus");
   });
 
   it.each([1, 5, 6, 15, 16, 37, 95, 96, 100])(
