@@ -116,6 +116,15 @@ describe("R3.13 GET /sessions/{id}/hands (O-403)", () => {
     }
   });
 
+  it("R3.13 a cursor whose hand number passes the int range is a 400, never a database error (security review L1)", async () => {
+    const cursor = Buffer.from(JSON.stringify({ hand_no: 2_147_483_648 })).toString("base64url");
+    const response = await hands(owner, sessionId, `?cursor=${cursor}`);
+    expect(response.statusCode).toBe(400);
+    expect(contractErrors("get", CONTRACT_PATH, 400, response.json<unknown>())).toEqual([]);
+    const largest = Buffer.from(JSON.stringify({ hand_no: 2_147_483_647 })).toString("base64url");
+    expect((await hands(owner, sessionId, `?cursor=${largest}`)).json<HandsPage>()).toEqual({ items: [], next_cursor: null });
+  });
+
   it("R3.13 needs a signed-in user (401)", async () => {
     const response = await hands(null, sessionId);
     expect(response.statusCode).toBe(401);

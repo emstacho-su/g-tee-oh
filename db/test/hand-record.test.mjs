@@ -98,6 +98,23 @@ describe('R3.13 hand_record (S40, O-352, O-400 to O-402)', () => {
     });
   });
 
+  test("R3.13 a record cannot name another user's attempt (the composite attempt key, security review L2)", async () => {
+    await withRollback(pool, async (client) => {
+      const fixture = await handFixture(client);
+      const theirs = await client.query(
+        `insert into practice_session (user_id, mode, settings, state) values ($1, 'drill', '{}', '{}') returning id`,
+        [fixture.otherId],
+      );
+      const theirAttempt = await insertAttempt(client, fixture.otherId, theirs.rows[0].id, fixture.solutionId);
+      await expectCode(client, INSERT_RECORD, recordParams(fixture, { attemptId: theirAttempt }), FOREIGN_KEY_VIOLATION);
+    });
+  });
+
+  test('R3.13 hand_record keeps only the indexes its reads and keys use (review round 1 G)', async () => {
+    const { rows } = await pool.query(`select indexname from pg_indexes where tablename = 'hand_record' order by indexname`);
+    assert.ok(!rows.some((row) => row.indexname === 'hand_record_user_timeline_idx'), 'the unused timeline index is gone');
+  });
+
   test('R3.13 one record per session hand and per ending attempt', async () => {
     await withRollback(pool, async (client) => {
       const fixture = await handFixture(client);
@@ -137,6 +154,10 @@ describe('R3.13 hand_record (S40, O-352, O-400 to O-402)', () => {
         `select 1 from pg_constraint where conname = 'practice_session_id_user_key' and conrelid = 'practice_session'::regclass`,
       );
       assert.equal(key.rows.length, 0);
+      const attemptKey = await client.query(
+        `select 1 from pg_constraint where conname = 'attempt_id_user_key' and conrelid = 'attempt'::regclass`,
+      );
+      assert.equal(attemptKey.rows.length, 0);
     });
   });
 });

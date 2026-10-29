@@ -186,14 +186,21 @@ describe("R3.13 the forward run to the hand's end (O-400)", () => {
     const solver = port(1);
     const finished = await deriveFinishedHand(await decided(FULL, "r250"), settings(FULL), solver);
     expect(finished?.previous).toMatchObject({ end: "street_closed", board: ["3c", "Kh", "4c"] });
-    expect(solver.paths).toContain("reveal");
-    expect(solver.paths).not.toContain(`node:${ROOT_KEY}`);
+    // Review round 1 E: exactly the reads the hand's end needs, one sample, and the reveal for its
+    // board; nothing of the next hand (no root node, no second deal).
+    expect(solver.paths).toEqual([`node:${OPEN_KEY}`, "sample", "deal", "reveal"]);
   });
 
-  it("R3.13 the hero acts again in the same hand (facing a 3-bet): null, and the next hand is never dealt", async () => {
+  it("R3.13 the hero acts again in the same hand (facing a 3-bet): null after one sample and the hero's node, no deal", async () => {
     const solver = port(2);
     expect(await deriveFinishedHand(await decided(FULL, "r250"), settings(FULL), solver)).toBeNull();
-    expect(solver.paths).not.toContain("deal");
+    expect(solver.paths).toEqual([`node:${OPEN_KEY}`, "sample", `node:${THREE_BET_KEY}`]);
+  });
+
+  it("R3.13 street mode: the opponent's call ends the hand after one read and one sample (review round 1 E)", async () => {
+    const solver = port(1);
+    await deriveFinishedHand(await decided(STREET, "r250"), settings(STREET), solver);
+    expect(solver.paths).toEqual([`node:${OPEN_KEY}`, "sample"]);
   });
 
   it("R3.13 the run changes nothing: the decided state keeps its generator states and phase", async () => {

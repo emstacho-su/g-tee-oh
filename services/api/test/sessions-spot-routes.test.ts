@@ -238,21 +238,19 @@ describe("R3.6 coverage requests and coverage reads (PR #25 review MEDIUM 3 and 
 });
 
 describe("R3.6 upstream failures after POST /sessions", () => {
-  it("R3.6 R3.13 a node the library lost is a 502, never an off-range hand played on silently (MEDIUM 5)", async () => {
+  it("R3.6 a node the library lost is a 502 at GET /next, never an off-range hand played on silently (MEDIUM 5)", async () => {
     const { app, player, drillId } = await setUp({
       trainer: { stop_rule: "end_of_hand" },
       fake: { opponentChoice: { [OPEN_KEY]: 2 }, lostNodes: [THREE_BET_KEY] },
     });
     const sessionId = await startSession(app, player, drillId);
-    const prompt = await next(app, player, sessionId);
-    const before = await rowsOf(pool, sessionId);
-    // S40 (O-400): the decision runs the hand forward to see whether it ends, so it meets the lost
-    // node itself: the same upstream 502 GET /next gave before, now with nothing written.
+    // S40 review round 1 A (O-400 amended): the hand log never blocks a decision, so the decision
+    // commits even though the forward run meets the lost node; GET /next reports it as before.
     const answer = await decide(app, player, sessionId, 0, 1);
-    expect(answer.statusCode, answer.body).toBe(502);
-    expect(answer.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:upstream");
-    expect(await rowsOf(pool, sessionId)).toEqual(before);
-    expect(await next(app, player, sessionId)).toEqual(prompt);
+    expect(answer.statusCode, answer.body).toBe(200);
+    const response = await getNext(app, player, sessionId);
+    expect(response.statusCode).toBe(502);
+    expect(response.json<{ type: string }>().type).toBe("urn:g-tee-oh:problem:upstream");
     await app.close();
   });
 

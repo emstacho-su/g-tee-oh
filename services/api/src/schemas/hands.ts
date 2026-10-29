@@ -24,5 +24,7 @@ export const handRecordSchema = z
 
 export type HandRecordView = z.infer<typeof handRecordSchema>;
 
-/** The cursor of the hands list: the last hand number on the page. */
-export const handCursorSchema = z.strictObject({ hand_no: z.number().int().min(0) });
+/** The cursor of the hands list: the last hand number on the page, inside the int column (security review L1). */
+/** The largest value of a Postgres int (hand_record.hand_no). */
+const PG_INT_MAX = 2_147_483_647;
+export const handCursorSchema = z.strictObject({ hand_no: z.number().int().min(0).max(PG_INT_MAX) });

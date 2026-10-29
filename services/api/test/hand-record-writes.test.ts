@@ -8,8 +8,12 @@
  * - over the fake solver-query: spot mode records every decision with stop_rule and the attempt it
  *   ended with; a failure later in the transaction leaves neither the attempt nor the record; and an
  *   Idempotency-Key replay inserts nothing more.
+ * - review round 1 A (O-400 amended): a forward run that fails upstream never blocks the decision;
+ *   it commits without a record and a warning names the session and the cause only;
+ * - security review L3: a record is validated (board, hole cards) before it is written.
  */
 import { randomUUID } from "node:crypto";
+import { Writable } from "node:stream";
 
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,14 +21,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ApiApp } from "../src/app.js";
 import { buildApp } from "../src/app.js";
 import type { Database } from "../src/db.js";
+import { handRecordValues } from "../src/hands/repository.js";
 import { IDEMPOTENCY_HEADER } from "../src/http/headers.js";
 import { composeLearningHooks, type LearningHookPart } from "../src/learning/effects.js";
 import type { TrainerSettings } from "../src/schemas/drills.js";
 import { promptSchema } from "../src/schemas/training.js";
+import type { FinishedHand } from "../src/sessions/derive.js";
 import { TEST_CONFIG } from "./support/app.js";
 import { adminPool, appDatabase } from "./support/database.js";
 import { buildTrainerApp } from "./support/solver-query.js";
-import { FAKE_CONFIG, FAKE_PAIR, fakeSolverQuery } from "./sessions-fake-solver-query.js";
+import { FAKE_CONFIG, FAKE_PAIR, OPEN_KEY, THREE_BET_KEY, fakeSolverQuery } from "./sessions-fake-solver-query.js";
 import { createDrill, drillBody, insertSolution, newPlayer, startSession, type Player } from "./sessions-test-kit.js";
 
 type Prompt = ReturnType<typeof promptSchema.parse>;
@@ -36,6 +42,8 @@ const SEEDS = ["00000000000051e1", "00000000000051e2", "00000000000051e3"] as co
 const DECISIONS_PER_SESSION = 10;
 const LONG_TEST_MS = 120_000;
 const OPEN = 1;
+/** The opponent's 3-bet at the open node of the fake tree. */
+const THREE_BET = 2;
 
 interface StoredRecord {
   hand_no: number;
@@ -201,5 +209,56 @@ describe("R3.13 the record commits with the decision (fake solver-query)", () =>
     expect(replay.json()).toEqual(first.json());
     expect(await records(sessionId)).toHaveLength(1);
     await app.close();
+  });
+});
+
+describe("R3.13 the hand log is best effort: it never blocks a decision (review round 1 A, O-400 amended)", () => {
+  it("R3.13 a forward run that fails upstream commits the decision without a record and logs a warning with no user data", async () => {
+    const solutionId = await insertSolution(pool, FAKE_CONFIG, FAKE_PAIR);
+    const lines: string[] = [];
+    const sink = new Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        lines.push(chunk.toString("utf8"));
+        callback();
+      },
+    });
+    // BB 3-bets, and the node where the hero answers is gone from the library.
+    const fake = fakeSolverQuery({ solutionId, opponentChoice: { [OPEN_KEY]: THREE_BET }, lostNodes: [THREE_BET_KEY] });
+    const app = buildApp({ database, config: TEST_CONFIG, solverQuery: fake.client, logger: true, logStream: sink });
+    await app.ready();
+    const player = await newPlayer(database);
+    const sessionId = await startSession(app, player, await createDrill(app, player, drillBody({ stop_rule: "end_of_hand" })));
+    const prompt = await nextPrompt(app, player, sessionId);
+    const decided = await app.inject(decisionRequest(player, sessionId, prompt, OPEN));
+    expect(decided.statusCode, decided.body).toBe(OK);
+    expect(await attemptIds(sessionId)).toHaveLength(1);
+    expect(await records(sessionId)).toEqual([]);
+    const warning = lines.find((line) => line.includes("hand log"));
+    expect(warning, lines.join("")).toBeDefined();
+    expect(warning).toContain(sessionId);
+    expect(warning).toContain("502 upstream");
+    for (const secret of [player.userId, prompt.hero_hand.join(""), player.session.token]) expect(warning).not.toContain(secret);
+    await app.close();
+  });
+});
+
+describe("R3.13 a hand record is validated before it is written (security review L3)", () => {
+  const FINISHED: FinishedHand = {
+    previous: { hand_no: 0, history: [{ position: "BTN", token: "r250", label: "Raise to 2.5bb", street: "preflop" }], board: ["3c", "Kh", "4c"], end: "street_closed" },
+    heroPosition: "BTN",
+    heroHand: "AhKd",
+  };
+
+  it("R3.13 a valid finished hand becomes its row values", () => {
+    expect(handRecordValues(FINISHED)).toMatchObject({ hand_no: 0, hero_position: "BTN", hero_hand: "AhKd", board: ["3c", "Kh", "4c"], end_reason: "street_closed" });
+  });
+
+  it.each([
+    ["a board of six cards", { ...FINISHED, previous: { ...FINISHED.previous, board: ["3c", "Kh", "4c", "5d", "6s", "7h"] } }],
+    ["a board card that is not a card", { ...FINISHED, previous: { ...FINISHED.previous, board: ["3x"] } }],
+    ["hole cards that are not a pair of cards", { ...FINISHED, heroHand: "AhK" }],
+    ["hole cards holding one card twice", { ...FINISHED, heroHand: "AhAh" }],
+  ])("R3.13 %s is refused", (_name, hand) => {
+    expect(() => handRecordValues(hand)).toThrow();
   });
 });

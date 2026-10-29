@@ -31,11 +31,13 @@
  *    loaded outside the lock (null when it cannot load) and reaches every hook as context.prepared.
  *    An automated session whose closed block waits for its next pick is 409 stale-state: the
  *    client fetches GET /next, which picks the block (automated/resume-block.ts).
- * 6. S40 (R3.13, O-400): after the preview grade and before the transaction, the machine runs
- *    forward from the decided state to the hand's end (deriveFinishedHand: the steps GET /next will
- *    take, never dealing the next hand, writing nothing). When the decision ends the hand, its
- *    hand_record is inserted right after the attempt, so it commits or rolls back with it; a replay
- *    under the same Idempotency-Key returns the stored response and inserts nothing.
+ * 6. S40 (R3.13, O-400 as amended in PR #42 review round 1): after the preview grade and before the
+ *    transaction, alongside the learning prepare, the machine runs forward from the decided state to
+ *    the hand's end (hands/log-step.ts: the steps GET /next will take, never dealing the next hand,
+ *    writing nothing). When the decision ends the hand, its hand_record is inserted right after the
+ *    attempt, so it commits or rolls back with it; a replay under the same Idempotency-Key returns
+ *    the stored response and inserts nothing. The log is best effort: a failed forward run is a
+ *    logged warning and the decision commits without a record.
  */
 import {
   DIFFICULTY_BASE,
@@ -57,17 +59,9 @@ import type { decisionBodySchema } from "../schemas/training.js";
 import { pendingPickOf } from "../automated/block.js";
 import type { DecisionContext, GradeOverrides } from "../learning/effects.js";
 import { prepareLearning } from "../learning/prepare.js";
+import { handToLog } from "../hands/log-step.js";
 import { insertHandRecord } from "../hands/repository.js";
-import {
-  actionAt,
-  afterHeroDecision,
-  deriveAwaitHero,
-  deriveFinishedHand,
-  stateAfterHeroAction,
-  type DerivedPrompt,
-  type DeriveSettings,
-  type FinishedHand,
-} from "../sessions/derive.js";
+import { actionAt, afterHeroDecision, deriveAwaitHero, type DerivedPrompt, type DeriveSettings } from "../sessions/derive.js";
 import { deriveSettingsFor } from "../sessions/derive-settings.js";
 import { findSession, lockSession, writeState, type SessionRow } from "../sessions/repository.js";
 import { solverPort, type GradeCall, type SolverPort } from "../sessions/solver-port.js";
@@ -209,17 +203,6 @@ async function gradeWithSolverQuery(session: SessionRow, decision: DecisionReque
   return { graded: await settleMember(partial, previewIndex, gradeAt), gradeAt, settings };
 }
 
-/**
- * S40 (O-400): the hand this decision ends, if it does, found before the transaction opens by
- * running the machine forward from the decided state (sessions/derive.ts deriveFinishedHand). The
- * hero's action and the derived prompt are the ones the transaction persists (settleMember only
- * changes the graded member), and the run writes nothing, so the persisted state is unchanged.
- */
-function finishedHandOf(session: SessionRow, preview: Preview, port: SolverPort): Promise<FinishedHand | null> {
-  const decided = stateAfterHeroAction(preview.graded.derived, preview.graded.action, session.settings.stop_rule);
-  return deriveFinishedHand(decided, preview.settings, port);
-}
-
 function attemptValues(
   session: SessionRow,
   decision: DecisionRequest,
@@ -291,16 +274,28 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
   const session = await readForDecision(decision);
   const port = solverPort(requireSolverQuery(decision.app), decision.request);
   const preview = await gradeWithSolverQuery(session, decision, port);
-  const finished = await finishedHandOf(session, preview, port);
-  const prepared = await prepareLearning(decision.app.learningHooks, {
-    database: requireDatabase(decision.app),
-    solverQuery: decision.app.solverQuery,
-    userId: decision.userId,
-    session,
-    now: decision.now,
-    log: decision.request.log,
-    purpose: "decision",
-  });
+  // The hand log's forward run and the learning prepare read different services: run them
+  // together (review round 1 D). handToLog never rejects; a failure there only skips the log (A).
+  const [finished, prepared] = await Promise.all([
+    handToLog({
+      sessionId: session.id,
+      derived: preview.graded.derived,
+      action: preview.graded.action,
+      stopRule: session.settings.stop_rule,
+      settings: preview.settings,
+      port,
+      log: decision.request.log,
+    }),
+    prepareLearning(decision.app.learningHooks, {
+      database: requireDatabase(decision.app),
+      solverQuery: decision.app.solverQuery,
+      userId: decision.userId,
+      session,
+      now: decision.now,
+      log: decision.request.log,
+      purpose: "decision",
+    }),
+  ]);
   return idempotentWrite(decision.app, decision.request, HTTP_STATUS.ok, async (transaction) => {
     const locked = await lockSession(transaction, decision.userId, session.id);
     if (locked === undefined) {
@@ -330,10 +325,10 @@ export async function submitDecision(decision: DecisionRequest): Promise<Feedbac
     const graded = await settleMember(preview.graded, outcome.gradedActionIndex, preview.gradeAt);
     const row = await insertAttempt(transaction, attemptValues(session, decision, graded, outcome, overrides));
     if (finished !== null) {
-      // S40 (O-400): the hand this decision ended is logged with it, all or nothing.
-      await insertHandRecord(transaction, { userId: decision.userId, sessionId: session.id, attemptId: row.id, hand: finished });
+      // S40 (O-400): the hand this decision ended is logged with it; the insert never fails on a held key.
+      await insertHandRecord(transaction, { userId: decision.userId, sessionId: session.id, attemptId: row.id, values: finished });
     }
-    const next =afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
+    const next = afterHeroDecision(graded.derived, graded.action, row.id, session.settings.stop_rule);
     const effects = await hooks.afterInsert({ ...context, attempt: row, outcome, overrides, next });
     const written = await writeState(transaction, {
       userId: decision.userId,

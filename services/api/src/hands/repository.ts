@@ -7,8 +7,14 @@
  * and the hero's seat and cards. The table is append-only for the app role. Reads are scoped by
  * user_id as well as the session id, so another user's session reads as empty (the route answers
  * 404 for it before reading); the schema also refuses a row whose user does not own the session
- * (the composite key on practice_session (id, user_id)). history is jsonb, written as JSON text
- * cast to jsonb and parsed with its Zod schema on every read, so a malformed row is a loud 500.
+ * or the attempt (the composite keys on practice_session and attempt (id, user_id)). history is
+ * jsonb, written as JSON text cast to jsonb and parsed with its Zod schema on every read, so a
+ * malformed row is a loud 500.
+ *
+ * Writes (security review L3, review round 1 A): handRecordValues validates the row before the
+ * decision's transaction opens (history, a board of at most five cards, the hero's two distinct
+ * hole cards), so a bad hand is skipped with a warning instead of failing the decision; the insert
+ * does nothing on a key it already holds, so the log can never roll a decision back.
  */
 import { sql, type RawBuilder, type Selectable } from "kysely";
 import { z } from "zod";
@@ -25,11 +31,34 @@ type Json = Selectable<DB["hand_record"]>["history"];
 
 const historySchema = z.array(historyEntrySchema);
 
+/** The most board cards a hand can reach (the river). */
+const MAX_BOARD_CARDS = 5;
+const CARD_TEXT_LENGTH = 2;
+
+/** The hero's hole cards as stored ("AhKd"): two cards, never the same one twice. */
+const heroHandSchema = z
+  .string()
+  .length(CARD_TEXT_LENGTH * 2)
+  .refine((text) => cardSchema.safeParse(text.slice(0, CARD_TEXT_LENGTH)).success && cardSchema.safeParse(text.slice(CARD_TEXT_LENGTH)).success, "two cards")
+  .refine((text) => text.slice(0, CARD_TEXT_LENGTH) !== text.slice(CARD_TEXT_LENGTH), "two different cards");
+
+const handRecordValuesSchema = z.strictObject({
+  hand_no: z.number().int().min(0),
+  hero_position: positionSchema,
+  hero_hand: heroHandSchema,
+  history: historySchema,
+  board: z.array(cardSchema).max(MAX_BOARD_CARDS),
+  end_reason: previousHandEndSchema,
+});
+
+/** A finished hand's row values, validated (throws a ZodError on a malformed hand). */
+export type HandRecordValues = z.infer<typeof handRecordValuesSchema>;
+
 export interface HandRecordWrite {
   userId: string;
   sessionId: string;
   attemptId: string;
-  hand: FinishedHand;
+  values: HandRecordValues;
 }
 
 export interface HandRecord {
@@ -76,25 +105,40 @@ function toRecord(row: RawRecord): HandRecord {
   };
 }
 
-/** Inserts the finished hand's row inside the decision's transaction. */
-export async function insertHandRecord(transaction: Database, write: HandRecordWrite): Promise<HandRecord> {
-  const { previous } = write.hand;
+export function handRecordValues(hand: FinishedHand): HandRecordValues {
+  return handRecordValuesSchema.parse({
+    hand_no: hand.previous.hand_no,
+    hero_position: hand.heroPosition,
+    hero_hand: hand.heroHand,
+    history: hand.previous.history,
+    board: hand.previous.board,
+    end_reason: hand.previous.end,
+  });
+}
+
+/**
+ * Inserts the finished hand's row inside the decision's transaction; a row whose session hand or
+ * attempt is already logged is left as it is (undefined comes back), never an error.
+ */
+export async function insertHandRecord(transaction: Database, write: HandRecordWrite): Promise<HandRecord | undefined> {
+  const { values } = write;
   const row = await transaction
     .insertInto("hand_record")
     .values({
       user_id: write.userId,
       session_id: write.sessionId,
       attempt_id: write.attemptId,
-      hand_no: previous.hand_no,
-      hero_position: write.hand.heroPosition,
-      hero_hand: write.hand.heroHand,
-      history: toJsonb(historySchema.parse(previous.history)),
-      board: [...previous.board],
-      end_reason: previous.end,
+      hand_no: values.hand_no,
+      hero_position: values.hero_position,
+      hero_hand: values.hero_hand,
+      history: toJsonb(values.history),
+      board: [...values.board],
+      end_reason: values.end_reason,
     })
+    .onConflict((conflict) => conflict.doNothing())
     .returning(COLUMNS)
-    .executeTakeFirstOrThrow();
-  return toRecord(row);
+    .executeTakeFirst();
+  return row === undefined ? undefined : toRecord(row);
 }
 
 /** One page of the user's hands in one session, by hand number; owner scoped. */
