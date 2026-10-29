@@ -67,11 +67,11 @@ describe("R3.12 study node view", () => {
     );
   });
 
-  it("R3.12 the threshold card loads only for a selected hand", async () => {
+  it("R3.12 the threshold card shows only for a selected hand; before one, insights read with the stand-in (O-461)", async () => {
     const user = userEvent.setup();
     const { requests, router } = renderStudy(BASE);
-    expect(await screen.findByText("Pick a cell in the matrix to see that hand's threshold card.")).toBeInTheDocument();
-    expect(requests.some((request) => request.path === "/api/v1/study/insights")).toBe(false);
+    expect(await screen.findByText("Pick a cell in the matrix to see that hand's threshold card, blockers and role.")).toBeInTheDocument();
+    expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
 
     const grid = screen.getByRole("group", { name: /range matrix cells/i });
     grid.focus();
