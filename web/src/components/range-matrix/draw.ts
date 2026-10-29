@@ -53,6 +53,8 @@ export interface DrawOptions {
   readonly scaleByWeight?: boolean;
   /** The compared action's position in compare mode; absent or null, the first action that is not a fold. */
   readonly lensPosition?: number | null;
+  /** The cell under the pointer (R3.25): a thin outline, no address write; absent or null, none. */
+  readonly hoveredIndex?: number | null;
 }
 
 interface TextLayout {
@@ -78,6 +80,8 @@ const GRID_LINE_CSS_PX = 1;
 const FOCUS_LINE_CSS_PX = 2;
 const SELECTED_LINE_CSS_PX = 4;
 const HALO_LINE_CSS_PX = 1;
+/** The hover outline is the thinnest mark: it names the cell being read, not a choice (R3.25). */
+const HOVER_LINE_CSS_PX = 1;
 
 /** The 14 integer edges that cut a backing store of sizeDevicePx into 13 cells. */
 export function cellEdges(sizeDevicePx: number): number[] {
@@ -217,6 +221,11 @@ function drawMarks(frame: FrameContext, rects: readonly Rect[], options: DrawOpt
   if (options.focusedIndex !== null && rects[options.focusedIndex] !== undefined) {
     const inset = markCell(frame, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio), ratio);
     marks.set(options.focusedIndex, Math.max(inset, marks.get(options.focusedIndex) ?? 0));
+  }
+  const hovered = options.hoveredIndex ?? null;
+  // The hover outline is drawn only where no heavier mark already names the cell; it moves no text.
+  if (hovered !== null && !marks.has(hovered) && rects[hovered] !== undefined) {
+    outline(frame.ctx, rects[hovered], frame.palette.focus, Math.max(1, Math.round(HOVER_LINE_CSS_PX * ratio)));
   }
   return marks;
 }

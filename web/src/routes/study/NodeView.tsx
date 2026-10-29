@@ -10,7 +10,8 @@
  * a NodeAction.index in the URL with replace; a lens naming no action here falls back to the
  * default without rewriting the URL, O-462) and the bar lenses a checkbox that scales the bars
  * by range weight, starting from the node's rule (O-465) and kept for this page only. Selecting a
- * matrix cell writes the hand to the URL. A node on a later street renders the v1.5 note, a way
+ * matrix cell writes the hand to the URL; hovering one (R3.25) only swaps the hand row beside the
+ * matrix to the hovered hand, in component state, while the insights stay on the selected hand. A node on a later street renders the v1.5 note, a way
  * back (LineEscape) and no carousel or matrix, so RangeMatrix never meets exact-combination rows
  * (O-196) and no button walks further into a postflop subtree (review round 1). After each new
  * node renders, an effect completes the pending node switch timing: React runs the matrix's draw
@@ -139,6 +140,8 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
   const mode = studyModeOf(search);
   const lensPosition = lensPositionOf(node.actions, search.lens) ?? defaultLensPosition(node.actions);
   const [scaleByWeight, setScaleByWeight] = useScaleByWeight(node);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const rowHand = hovered ?? search.hand;
   useCompleteNodeSwitch(node.node_key, preflop, search.line);
 
   return (
@@ -172,10 +175,11 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
               onSelectHand={onSelectHand}
               lensIndex={search.lens ?? null}
               scaleByWeight={scaleByWeight}
+              onHoverHand={setHovered}
             />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <NodeActionsPanel node={node} hand={search.hand} />
+            <NodeActionsPanel node={node} hand={rowHand} />
             <HandInsights api={api} node={node} hand={search.hand} />
           </div>
         </div>

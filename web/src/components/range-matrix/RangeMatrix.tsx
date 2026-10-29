@@ -22,6 +22,11 @@
  * Escape, an arrow key or leaving the grid (Tab) closes it. It is non-modal and never takes focus.
  * popOut={false} turns it off; initialPopOutHand opens it on a hand at mount (the gallery).
  *
+ * Hover (S45, R3.25): moving the pointer over the canvas keeps the hovered index in component state,
+ * draws a thin outline there and reports the hand through onHoverHand (null on leave), with no address
+ * write; a click still selects and pins. While the pointer is over the canvas an open pop-out shows the
+ * hovered cell and returns to the pinned cell when the pointer leaves. Touch pointers are left alone.
+ *
  * Lenses (S45, R3.24): mode names the lens; lensIndex is the compared action (a NodeAction.index)
  * in compare mode, resolved to its position here and falling back to the default lens when it names
  * no action; scaleByWeight makes the bars' height the cell's range weight (O-465).
@@ -30,7 +35,7 @@
  * and the legend (MatrixLegend.tsx) names each action, EV step, weight step or loss step in words.
  * The component computes no poker math (ADR 0004); it displays the api numbers.
  */
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
 import { GRID_SIZE } from "../../poker/hands.js";
 import type { ThemeName } from "../../theme/action-style.js";
@@ -59,6 +64,8 @@ export interface RangeMatrixProps {
   lensIndex?: number | null;
   /** Bars take the cell's range weight as their height (R3.24, O-465). */
   scaleByWeight?: boolean;
+  /** The hand under the pointer, or null when it leaves the canvas (R3.25); never written to the address here. */
+  onHoverHand?: (hand: string | null) => void;
 }
 
 export const DEFAULT_MATRIX_SIZE_PX = 520;
@@ -72,6 +79,7 @@ const MOVES: Readonly<Record<string, readonly [number, number]>> = {
 const SELECT_KEYS: ReadonlySet<string> = new Set(["Enter", " "]);
 const CLOSE_KEY = "Escape";
 const KEY_SHORTCUTS = "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space Escape";
+const TOUCH_POINTER = "touch";
 
 function clampToGrid(value: number): number {
   return Math.min(GRID_SIZE - 1, Math.max(0, value));
@@ -119,6 +127,7 @@ export function RangeMatrix({
   initialPopOutHand,
   lensIndex = null,
   scaleByWeight = false,
+  onHoverHand,
 }: RangeMatrixProps) {
   const model = useMemo(() => buildMatrixModel(node), [node]);
   const tableId = useId();
@@ -127,6 +136,7 @@ export function RangeMatrix({
   const [focusedIndex, setFocusedIndex] = useState(() => indexOfHand(model.cells, selectedHand) ?? 0);
   const [hasFocus, setHasFocus] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const popOutControl = usePopOut(popOut, indexOfHand(model.cells, initialPopOutHand), canvasRef);
   const lens = useMemo(() => lensOf(model, mode, lensIndex), [model, mode, lensIndex]);
 
@@ -139,6 +149,7 @@ export function RangeMatrix({
     selectedHand,
     scaleByWeight,
     lensPosition: lens?.position ?? null,
+    hoveredIndex,
   });
 
   function focusCell(index: number): void {
@@ -185,6 +196,22 @@ export function RangeMatrix({
     popOutControl.clickCell(index);
   }
 
+  function hoverIndex(next: number | null): void {
+    if (next === hoveredIndex) return;
+    setHoveredIndex(next);
+    onHoverHand?.(next === null ? null : (model.cells[next]?.hand ?? null));
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLCanvasElement>): void {
+    if (event.pointerType === TOUCH_POINTER) return;
+    hoverIndex(indexAtPointer(event));
+  }
+
+  function onPointerLeave(event: PointerEvent<HTMLCanvasElement>): void {
+    if (event.pointerType === TOUCH_POINTER) return;
+    hoverIndex(null);
+  }
+
   function onBlur(): void {
     setHasFocus(false);
     popOutControl.close();
@@ -192,7 +219,9 @@ export function RangeMatrix({
 
   const backing = Math.round(sizePx * pixelRatio);
   const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands`;
-  const openCell = popOutControl.index === null ? undefined : model.cells[popOutControl.index];
+  // An open pop-out shows the hovered cell while the pointer is over the canvas (R3.25).
+  const openIndex = popOutControl.index === null ? null : (hoveredIndex ?? popOutControl.index);
+  const openCell = openIndex === null ? undefined : model.cells[openIndex];
 
   return (
     <div className="inline-block max-w-full">
@@ -216,6 +245,8 @@ export function RangeMatrix({
             height={backing}
             style={{ width: `${sizePx}px`, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1" }}
             onClick={onClick}
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
             className="block cursor-pointer"
           />
         </div>

@@ -43,7 +43,7 @@ export function useMatrixCanvas(
 ): void {
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const patternRef = useRef<PatternCacheEntry | null>(null);
-  const { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight = false, lensPosition = null } = settings;
+  const { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight = false, lensPosition = null, hoveredIndex = null } = settings;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,8 +53,8 @@ export function useMatrixCanvas(
       const ctx = contextRef.current;
       if (ctx === null) return;
       const patterns = patternsFor(patternRef, ctx, theme, pixelRatio);
-      drawMatrix(ctx, model, { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition, patterns });
+      drawMatrix(ctx, model, { mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition, hoveredIndex, patterns });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [canvasRef, model, mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition]);
+  }, [canvasRef, model, mode, sizePx, pixelRatio, theme, focusedIndex, selectedHand, scaleByWeight, lensPosition, hoveredIndex]);
 }
