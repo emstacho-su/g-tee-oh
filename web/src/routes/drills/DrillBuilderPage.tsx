@@ -36,8 +36,10 @@ export interface DrillBuilderPageProps {
   section: BuilderSectionSlug;
   /** The drill to edit; absent on /drills/new. */
   drillId?: string;
-  /** True right after this drill was created (?saved=1). */
+  /** True right after this drill was created (?saved=1 or ?saved=rerun). */
   justCreated?: boolean;
+  /** True when a Save and run landed after the draft changed again (?saved=rerun, S47). */
+  editedSinceRun?: boolean;
 }
 
 function BackLink() {
@@ -48,7 +50,7 @@ function BackLink() {
   );
 }
 
-function ExistingDrill({ drillId, section, justCreated }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean }) {
+function ExistingDrill({ drillId, section, justCreated, editedSinceRun }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean; editedSinceRun: boolean }) {
   const api = useAppApi();
   const drill = useQuery(drillDetailQuery(api, drillId));
   // Edits made while this drill was being created come along as unsaved changes (review round 1 B).
@@ -91,13 +93,14 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
         section={section}
         drill={stored}
         justCreated={justCreated}
+        editedSinceRun={editedSinceRun}
         onDirtyChange={setDirty}
       />
     </>
   );
 }
 
-export function DrillBuilderPage({ section, drillId, justCreated = false }: DrillBuilderPageProps) {
+export function DrillBuilderPage({ section, drillId, justCreated = false, editedSinceRun = false }: DrillBuilderPageProps) {
   return (
     <section className="flex flex-col gap-6">
       {drillId === undefined ? (
@@ -106,7 +109,7 @@ export function DrillBuilderPage({ section, drillId, justCreated = false }: Dril
           <DrillForm initial={newDrillDraft()} section={section} />
         </>
       ) : (
-        <ExistingDrill drillId={drillId} section={section} justCreated={justCreated} />
+        <ExistingDrill drillId={drillId} section={section} justCreated={justCreated} editedSinceRun={editedSinceRun} />
       )}
     </section>
   );

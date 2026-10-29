@@ -220,6 +220,56 @@ describe("R3.14 the leave guard (PM note 3, O-405)", { timeout: PAGES_TEST_TIMEO
     expect(view.sent("POST", "/api/v1/drills")).toHaveLength(1);
   });
 
+  it("R3.36 Save and run with an edit made while the create was in flight stays in the builder, keeps the edit and says to save again (PR #48 review MEDIUM 6)", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = renderDrills("/drills/new", {
+      override: async (request) => {
+        if (request.method === "POST" && request.path === "/api/v1/drills") await held;
+        return undefined;
+      },
+    });
+    await screen.findByRole("heading", { level: 1, name: "New drill" });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Name"), "Run while typing");
+    await goTo(user, /^Seats/);
+    await user.click(within(screen.getByRole("group", { name: "Hero positions" })).getByRole("checkbox", { name: "BTN" }));
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await goTo(user, /^Name and tags/);
+    await user.type(screen.getByLabelText("Name"), " more");
+    release();
+    await waitFor(() => expect(view.router.state.location.pathname).toMatch(UUID_PAGE));
+    // No run screen and no session: the builder keeps the edit as an unsaved change and says why.
+    expect(view.router.state.location.pathname.endsWith("/details")).toBe(true);
+    expect(await screen.findByTestId("builder-status")).toHaveTextContent("Saved; you changed it since, save again to run.");
+    expect(await screen.findByLabelText("Name")).toHaveValue("Run while typing more");
+    expect(view.sent("POST", "/api/v1/sessions")).toHaveLength(0);
+  });
+
+  it("R3.36 Save and run on a stored drill edited while the patch was in flight stays and says to save again", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = renderDrills(`/drills/${FIXTURE_DRILL_ID}/details`, {
+      override: async (request) => {
+        if (request.method === "PATCH") await held;
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    const name = await screen.findByLabelText("Name");
+    await user.type(name, " v2");
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await user.type(screen.getByLabelText("Name"), " v3");
+    release();
+    expect(await screen.findByTestId("builder-status")).toHaveTextContent("Saved; you changed it since, save again to run.");
+    expect(view.router.state.location.pathname).toBe(`/drills/${FIXTURE_DRILL_ID}/details`);
+    expect(view.sent("POST", "/api/v1/sessions")).toHaveLength(0);
+  });
+
   it("R3.14 beforeunload is held only while the draft is dirty", async () => {
     const { user, view } = await newBuilder();
     expect(beforeUnloadBlocked()).toBe(false);

@@ -60,6 +60,8 @@ export const FORM_TEXT = {
   saved: "Drill saved.",
   changesSaved: "Changes saved.",
   unchanged: "Nothing changed, so nothing was saved.",
+  /** Save and run landed after the draft changed again (S47, PR #48 review MEDIUM 6). */
+  editedSince: "Saved; you changed it since, save again to run.",
 } as const;
 
 export interface DrillFormProps {
@@ -73,6 +75,8 @@ export interface DrillFormProps {
   drill?: Drill;
   /** True right after the create that led here (?saved=1). */
   justCreated?: boolean;
+  /** The create was a Save and run with edits made while it was in flight (?saved=rerun). */
+  editedSinceRun?: boolean;
   /** Told whenever the draft becomes dirty or clean, so the page can hold actions that act on the stored drill (S47, R3.14). */
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -147,17 +151,20 @@ function useAfterSave({ setStatus, markClean, unsentEdits, section, runAfter }: 
   };
   return (saved: Drill, input: SaveInput) => {
     markClean();
-    if (runAfter()) {
+    const edits = unsentEdits();
+    // Save and run runs only what was saved: an edit made while the save was in flight would be
+    // lost behind the run screen, so the builder stays and says so (PR #48 review MEDIUM 6).
+    const run = runAfter();
+    if (run && edits === undefined) {
       navigate({ to: "/drills/$id/run", params: { id: saved.id }, search: { start: "1" }, ignoreBlocker: true }).catch(logFailure);
       return;
     }
     if (input.kind === "patch") {
-      setStatus(FORM_TEXT.changesSaved);
+      setStatus(run ? FORM_TEXT.editedSince : FORM_TEXT.changesSaved);
       return;
     }
-    const edits = unsentEdits();
     if (edits !== undefined) handOffDraft(saved.id, edits);
-    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: "1" }, ignoreBlocker: true }).catch(logFailure);
+    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: run ? "rerun" : "1" }, ignoreBlocker: true }).catch(logFailure);
   };
 }
 
@@ -199,11 +206,11 @@ function useDraft(initial: DrillDraft, start: DrillDraft = initial) {
   return { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits };
 }
 
-export function DrillForm({ initial, start, section, drill, justCreated = false, onDirtyChange }: DrillFormProps) {
+export function DrillForm({ initial, start, section, drill, justCreated = false, editedSinceRun = false, onDirtyChange }: DrillFormProps) {
   const api = useAppApi();
   const { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits } = useDraft(initial, start);
   const [checkedDraft, setCheckedDraft] = useState<DrillDraft | null>(null);
-  const [status, setStatus] = useState(justCreated ? FORM_TEXT.saved : "");
+  const [status, setStatus] = useState(justCreated ? (editedSinceRun ? FORM_TEXT.editedSince : FORM_TEXT.saved) : "");
   // Set by the Save and run button's click, which lands before the form's submit event (S47, R3.36).
   const runIntent = useRef(false);
   const navigate = useNavigate();
