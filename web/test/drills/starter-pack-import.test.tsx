@@ -92,4 +92,46 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     await screen.findByRole("table", { name: "Your drills" });
     expect(screen.queryByRole("button", { name: BUTTON })).not.toBeInTheDocument();
   });
+
+  it("R3.35 the empty state's and the header's buttons share one intent: a click on each while the first import is in flight sends one key set (PR #48 review HIGH 2)", async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => undefined;
+    const held = new Promise<undefined>((resolve) => {
+      release = () => resolve(undefined);
+    });
+    let listed = false;
+    const { sent } = renderDrills("/drills", {
+      override: (request) => {
+        if (!listed && request.method === "GET" && request.path === "/api/v1/drills") return jsonBody(200, EMPTY_LIST);
+        return request.method === "POST" && request.path === IMPORT_PATH && sent("POST", IMPORT_PATH).length === 1 ? held : undefined;
+      },
+    });
+    await screen.findByText(/You have no drills yet/);
+    const buttons = await screen.findAllByRole("button", { name: BUTTON });
+    expect(buttons).toHaveLength(2);
+    listed = true;
+    await user.click(buttons[0] as HTMLElement);
+    await waitFor(() => expect(sent("POST", IMPORT_PATH)).toHaveLength(1));
+    // The other button is the same intent: it is busy too and a click sends nothing.
+    for (const button of screen.getAllByRole("button", { name: "Adding the starter drills" })) expect(button).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
+  });
+
+  it("R3.35 the header decides from its own read, not the filtered page: a starter drill outside the filter still hides it (PR #48 review HIGH 3)", async () => {
+    const starter = { ...fixtureDrill, id: "00000000-0000-4000-8000-0000000000f1", name: "A starter drill", tags: [STARTER_TAG] };
+    const { sent } = renderDrills("/drills?tag=synthetic", {
+      override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === STARTER_TAG ? jsonBody(200, { items: [starter], next_cursor: null }) : undefined),
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await waitFor(() => expect(sent("GET", "/api/v1/drills").some((request) => request.query["tag"] === STARTER_TAG && request.query["limit"] === "1")).toBe(true));
+    expect(screen.queryByRole("button", { name: BUTTON })).not.toBeInTheDocument();
+  });
+
+  it("R3.35 with no starter drill anywhere the header offers the pack under a tag filter", async () => {
+    renderDrills("/drills?tag=synthetic");
+    await screen.findByRole("table", { name: "Your drills" });
+    expect(await screen.findByRole("button", { name: BUTTON })).toBeInTheDocument();
+  });
 });

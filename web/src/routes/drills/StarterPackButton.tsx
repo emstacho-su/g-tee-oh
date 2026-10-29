@@ -1,16 +1,17 @@
 /**
- * "Add the starter drills" (S47, R3.35, O-481): one button that imports the bundled starter pack
- * through the existing import write, one Idempotency-Key per code minted once per click
- * (drills/use-drill-writes.ts useImportStarterPack), so a double click imports once and Try again
- * after a failure replays the codes that landed. The library page announces the result in its
- * live region; the failure shows here beside the button.
+ * "Add the starter drills" (S47, R3.35, O-481): a button over the page's one starter-pack intent
+ * (drills/use-drill-writes.ts useImportStarterPack), one Idempotency-Key per code minted once per
+ * click, so a double click imports once and Try again after a failure replays the codes that
+ * landed. The page owns the intent (PR #48 review HIGH 2): with the library empty, the empty state
+ * and the header both show a button over that same intent, so one click on each still sends one
+ * key set. The library page announces the result in its live region; the failure shows beside the
+ * button that owns it (showFailure), never twice.
  */
-import type { AppApi } from "../../api/index.js";
 import { Button } from "../../components/ui/index.js";
 import { drillFailureText } from "../../drills/failure-text.js";
-import { STARTER_PACK } from "../../drills/starter-pack.js";
+import { STARTER_PACK, type StarterDrill } from "../../drills/starter-pack.js";
 import type { Drill } from "../../drills/types.js";
-import { useImportStarterPack } from "../../drills/use-drill-writes.js";
+import type { IntentMutation } from "../../library/use-intent-mutation.js";
 
 export const STARTER_TEXT = {
   add: "Add the starter drills",
@@ -20,16 +21,18 @@ export const STARTER_TEXT = {
   added: (count: number) => `Added ${count} starter drills.`,
 } as const;
 
+export type StarterPackIntent = IntentMutation<readonly StarterDrill[], Drill[]>;
+
 export interface StarterPackButtonProps {
-  api: AppApi;
-  onAdded: (drills: readonly Drill[]) => void;
+  pack: StarterPackIntent;
   /** Show the one-line hint under the button (the empty state does). */
   withHint?: boolean;
+  /** Show the pack's failure and Try again here (one button on the page does). */
+  showFailure?: boolean;
 }
 
-export function StarterPackButton({ api, onAdded, withHint = false }: StarterPackButtonProps) {
-  const pack = useImportStarterPack(api, onAdded);
-  const failed = pack.error !== null && pack.error !== undefined && !pack.busy;
+export function StarterPackButton({ pack, withHint = false, showFailure = true }: StarterPackButtonProps) {
+  const failed = showFailure && pack.error !== null && pack.error !== undefined && !pack.busy;
   return (
     <div className="flex flex-col gap-2">
       <Button variant={withHint ? "primary" : "secondary"} disabled={pack.busy} onClick={() => pack.send(STARTER_PACK)}>
