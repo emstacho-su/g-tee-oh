@@ -11,6 +11,7 @@
  */
 import { formatCbb } from "../poker/format.js";
 import { FORMAT_OPTIONS } from "./filters.js";
+import { potTypeLabel } from "./pot-type.js";
 import type { Stake } from "./queries.js";
 import { validateStudySearch, type StudySearch } from "./search.js";
 import {
@@ -101,17 +102,48 @@ function keepsLower(catalog: SettingsCatalog, draft: SettingsDraft, lower: Setti
 }
 
 /**
+ * The draft with each empty field below `key` that offers exactly one available choice filled with
+ * it, in field order, so a chain of single choices (Live has one table size, one stake, one depth
+ * here) is one click (S45, R3.27). A field with two or more choices, or still waiting, stops nothing:
+ * the fields below it simply wait for it.
+ */
+function withSingleChoices(catalog: SettingsCatalog, draft: SettingsDraft, key: SettingKey): SettingsDraft {
+  return SETTING_KEYS.slice(SETTING_KEYS.indexOf(key) + 1).reduce<SettingsDraft>((next, lower) => {
+    if (next[lower] !== undefined) return next;
+    const state = fieldStates(catalog, next)[lower];
+    if (state.kind !== "choices") return next;
+    const available = state.choices.filter((entry) => !entry.disabled);
+    const only = available.length === 1 ? available[0] : undefined;
+    const value = only === undefined ? undefined : parseSetting(lower, only.value);
+    return value === undefined ? next : { ...next, [lower]: value };
+  }, draft);
+}
+
+/**
  * The draft after a field changes to raw. Every lower choice that is still available stays; one
  * that became unavailable, or whose upper field is gone, is dropped. Seats wait (stay) while the
- * new configuration's pairs load, and are checked once they arrive (confirmBlocker).
+ * new configuration's pairs load, and are checked once they arrive (confirmBlocker). Then every
+ * empty lower field with exactly one available choice takes it (S45).
  */
 export function withSetting(catalog: SettingsCatalog, draft: SettingsDraft, key: SettingKey, raw: string): SettingsDraft {
   const value = parseSetting(key, raw);
   if (value === undefined) return draft;
-  return SETTING_KEYS.slice(SETTING_KEYS.indexOf(key) + 1).reduce<SettingsDraft>(
+  const kept = SETTING_KEYS.slice(SETTING_KEYS.indexOf(key) + 1).reduce<SettingsDraft>(
     (next, lower) => (keepsLower(catalog, next, lower) ? next : withoutKey(next, lower)),
     { ...draft, [key]: value },
   );
+  return withSingleChoices(catalog, kept, key);
+}
+
+/** How many pairs the library covers at the draft's configuration, once its pairs have loaded (S45). */
+export function coveredPairCount(catalog: SettingsCatalog | undefined, draft: SettingsDraft): number | undefined {
+  const pairs = catalog === undefined ? undefined : draftPairs(catalog, draft);
+  return pairs?.filter((entry) => entry.preflop_available).length;
+}
+
+/** "2 covered pairs at these settings". */
+export function coveredPairsText(count: number): string {
+  return `${count} covered ${count === 1 ? "pair" : "pairs"} at these settings`;
 }
 
 /** Why one field blocks Confirm, or undefined when its choice is made and available. */
@@ -204,7 +236,7 @@ export function searchFromDraft(search: StudySearch, draft: SettingsDraft, pair:
   return validateStudySearch({ ...settings, mode: search.mode });
 }
 
-/** "Online, 6 players, online (5% rake, cap $1.50), 100bb, BTN against BB". */
+/** "Online, 6 players, online (5% rake, cap $1.50), 100bb, BTN against BB", then the pot type past the root (S45). */
 export function settingsSummary(stakes: readonly Stake[], search: StudySearch): string {
   const stake = stakes.find((entry) => entry.id === search.stake);
   const { first, against } = pairSeats(search.pair);
@@ -214,6 +246,7 @@ export function settingsSummary(stakes: readonly Stake[], search: StudySearch): 
     stake === undefined ? "" : `${stake.label} (${stakeRakeText(stake)})`,
     search.depth === undefined ? "" : formatCbb(search.depth),
     first === undefined || against === undefined ? "" : `${first} against ${against}`,
+    potTypeLabel(search.line) ?? "",
   ]
     .filter((part) => part !== "")
     .join(", ");

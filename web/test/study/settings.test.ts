@@ -154,9 +154,17 @@ describe("R3.12 study settings changes", () => {
     expect(deeper).toEqual({ ...draft, depth: 20000 });
   });
 
-  it("R3.12 a change drops the lower choices that became unavailable", () => {
+  it("R3.12 R3.27 a change drops the lower choices that became unavailable, then fills each field with one choice", () => {
     const draft: SettingsDraft = { ...ONLINE_100, first: "BTN", against: "BB" };
-    expect(withSetting(CATALOG, draft, "format", "live")).toEqual({ format: "live" });
+    // Live has one table size, one stake, one depth and one covered pair in the catalog: each is filled (S45).
+    expect(withSetting(CATALOG, draft, "format", "live")).toEqual({
+      format: "live",
+      table_size: 9,
+      stake: FIXTURE_LIVE_STAKE_ID,
+      depth: 10000,
+      first: "BTN",
+      against: "BB",
+    });
     const live: SettingsDraft = { format: "live", table_size: 9, stake: FIXTURE_LIVE_STAKE_ID, depth: 10000 };
     expect(withSetting(CATALOG, live, "table_size", "6")).toEqual({ format: "live", table_size: 6 });
   });

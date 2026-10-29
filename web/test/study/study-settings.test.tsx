@@ -161,7 +161,7 @@ describe("R3.12 study settings panel", () => {
         mode: "ev",
       }),
     );
-    expect(await screen.findByText("Online, 6 players, online (5% rake, cap $1.50), 200bb, BTN against BB")).toBeInTheDocument();
+    expect(await screen.findByText("Online, 6 players, online (5% rake, cap $1.50), 200bb, BTN against BB, single-raised pot")).toBeInTheDocument();
   });
 
   it("R3.12 Cancel closes the panel and leaves the URL as it was", async () => {
@@ -171,7 +171,8 @@ describe("R3.12 study settings panel", () => {
     await user.click(await screen.findByRole("button", { name: "Change settings" }));
     await user.click(choice("Depth", "200bb"));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+    // S45: past the root the summary ends with the pot type.
+    expect(screen.getByText(`${SUMMARY}, single-raised pot`)).toBeInTheDocument();
     expect(validateStudySearch(router.state.location.search)).toMatchObject({ depth: 10000, line: "r250" });
   });
 

@@ -16,8 +16,14 @@
  * the draft's seats shows inside the panel. The page owns one node switch metrics instance per
  * mount and hands it down through context, so Confirm and the carousel mark their requests on the
  * same clock.
+ *
+ * S45 (R3.27, O-460): every confirmed spot on screen is remembered per browser (the last spot and
+ * the recent list); a bare /study replaces to the last spot, with Start over on its summary to forget
+ * it. The address stays the source of truth: storage only seeds a /study that names no setting.
  */
-import { useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useStore } from "zustand";
 
 import type { AppApi } from "../../api/index.js";
 import { useAppApi } from "../../auth/index.js";
@@ -28,6 +34,8 @@ import { catalogFailure } from "../../study/problem-text.js";
 import type { StudySearch } from "../../study/search.js";
 import {
   confirmBlocker,
+  coveredPairCount,
+  coveredPairsText,
   draftConfigId,
   draftFromSearch,
   draftPair,
@@ -44,6 +52,9 @@ import { useStudyEntry, type StudyEntry } from "../../study/use-study-entry.js";
 import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-navigation.js";
 import { useDepthSteps } from "../../study/use-depth-steps.js";
 import { withDepth } from "../../study/depth-steps.js";
+import { useStudySpotsStore } from "../../store/study-spots.js";
+import { describeFailureForLog } from "../../api/http-status.js";
+import { SpotShortcuts, StarButton } from "./SpotShortcuts.js";
 import { StudyNodeArea } from "./StudyNodeArea.js";
 import { FailureAlert } from "./StudyNotices.js";
 import { SettingsSummary, StudySettingsPanel } from "./StudySettingsPanel.js";
@@ -57,6 +68,10 @@ const PAGE_DESCRIPTION = "Pick a spot, then follow the hand seat by seat.";
 
 function uncoveredNotice(pair: string): string {
   return `${pair} is not in the library at this configuration.`;
+}
+
+function hasNoSettings(search: StudySearch): boolean {
+  return [search.format, search.table_size, search.stake, search.depth, search.pair].every((value) => value === undefined);
 }
 
 function hasAllSettings(search: StudySearch): boolean {
@@ -78,6 +93,7 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
   const fields = useMemo(() => fieldStates(catalog, draft, { seatsFailed }), [catalog, draft, seatsFailed]);
   const blocker = confirmBlocker(catalog, draft, { states: fields, seatsFailed });
   const uncovered = catalog === undefined ? undefined : draftUncoveredPair(catalog, draft);
+  const covered = coveredPairCount(catalog, draft);
   const onConfirm = () => {
     if (catalog === undefined || blocker !== undefined) return;
     const configId = draftConfigId(catalog.configs, draft);
@@ -100,6 +116,8 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
       onChange={onChange}
       onConfirm={onConfirm}
       {...(onClose === undefined ? {} : { onCancel: onClose })}
+      {...(covered === undefined ? {} : { coveredText: coveredPairsText(covered) })}
+      shortcuts={<SpotShortcuts stakes={entry.stakes ?? []} />}
     />
   );
 }
@@ -107,9 +125,20 @@ function SettingsArea({ entry, search, draft, onDraftChange, navigation, onClose
 interface StudyScreenProps {
   api: AppApi;
   search: StudySearch;
+  /** The spot came from the browser's memory, so its summary offers Start over (S45, R3.27). */
+  reopened: boolean;
+  onStartOver: () => void;
 }
 
-function StudyScreen({ api, search }: StudyScreenProps) {
+/** Remembers every confirmed spot on screen, however it was reached (confirm, a line step, a link, back). */
+function useRecordSpot(search: StudySearch, confirmed: boolean): void {
+  const record = useStore(useStudySpotsStore, (state) => state.recordConfirmed);
+  useEffect(() => {
+    if (confirmed) record(search);
+  }, [confirmed, record, search]);
+}
+
+function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   const navigation = useStudyNavigation(search);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SettingsDraft>(() => draftFromSearch(search));
@@ -117,6 +146,7 @@ function StudyScreen({ api, search }: StudyScreenProps) {
   const { configId, studyPair, catalogReads } = entry;
   const confirmed = configId !== undefined && studyPair !== undefined && search.table_size !== undefined;
   const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
+  useRecordSpot(search, confirmed);
   // S45 (O-467): the covered depths around this one, for the Up and Down Study keys.
   const depths = useDepthSteps(api, entry.catalog?.configs, search);
 
@@ -145,7 +175,12 @@ function StudyScreen({ api, search }: StudyScreenProps) {
     }
     return (
       <>
-        <SettingsSummary summary={settingsSummary(entry.stakes ?? [], search)} onChange={openSettings} />
+        <SettingsSummary
+          summary={settingsSummary(entry.stakes ?? [], search)}
+          onChange={openSettings}
+          star={<StarButton spot={search} />}
+          {...(reopened ? { onStartOver } : {})}
+        />
         <StudyNodeArea
           api={api}
           configId={configId}
@@ -174,12 +209,38 @@ function StudyScreen({ api, search }: StudyScreenProps) {
   );
 }
 
+/**
+ * A bare /study replaces to the browser's last spot (S45, R3.27): read once, at the first render, so
+ * Start over (which forgets it and opens a bare /study) does not bounce straight back.
+ */
+function useReopenLastSpot(search: StudySearch): { reopened: boolean; startOver: () => void } {
+  const navigate = useNavigate();
+  const [seed] = useState(() => (hasNoSettings(search) ? useStudySpotsStore.getState().last : null));
+  const [reopened, setReopened] = useState(seed !== null);
+  useEffect(() => {
+    if (seed === null) return;
+    navigate({ to: "/study", search: seed, replace: true }).catch((error: unknown) => {
+      console.error(`g-tee-oh: reopening the last study spot failed (${describeFailureForLog(error)})`);
+    });
+  }, [navigate, seed]);
+  const startOver = () => {
+    useStudySpotsStore.getState().clearLast();
+    setReopened(false);
+    navigate({ to: "/study", search: {} }).catch((error: unknown) => {
+      console.error(`g-tee-oh: starting over on study failed (${describeFailureForLog(error)})`);
+    });
+  };
+  return { reopened, startOver };
+}
+
 export function StudyPage({ search }: StudyPageProps) {
   const api = useAppApi();
   const [metrics] = useState(createNodeSwitchMetrics);
+  const { reopened, startOver } = useReopenLastSpot(search);
+  if (reopened && hasNoSettings(search)) return <LoadingNote text="Opening your last spot." />;
   return (
     <NodeSwitchMetricsContext.Provider value={metrics}>
-      <StudyScreen key={settingsSignature(search)} api={api} search={search} />
+      <StudyScreen key={settingsSignature(search)} api={api} search={search} reopened={reopened} onStartOver={startOver} />
     </NodeSwitchMetricsContext.Provider>
   );
 }
