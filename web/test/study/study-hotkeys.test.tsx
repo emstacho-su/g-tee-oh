@@ -81,6 +81,18 @@ describe("R3.12 Study keys move along the line", () => {
     expect(router.state.location.search).not.toHaveProperty("line");
   });
 
+  it("R3.12 Escape with the matrix pop-out open closes the pop-out and keeps the action filters", async () => {
+    const { router } = renderStudy(`${BASE}&filters=2`);
+    await matrixShown();
+    const grid = screen.getByRole("group", { name: /range matrix cells/i });
+    grid.focus();
+    fireEvent.keyDown(grid, { key: "Enter" });
+    expect(await screen.findByTestId("matrix-popout")).toBeInTheDocument();
+    fireEvent.keyDown(grid, { key: "Escape" });
+    expect(screen.queryByTestId("matrix-popout")).not.toBeInTheDocument();
+    expect(router.state.location.search).toMatchObject({ filters: "2" });
+  });
+
   it("R3.12 dispatch leaves a keydown alone once a control prevented it", () => {
     const store = createHotkeyStore();
     const handler = vi.fn();
