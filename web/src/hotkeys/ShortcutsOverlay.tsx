@@ -1,7 +1,8 @@
 /**
  * The keyboard shortcuts overlay (S24, S46, A7 section 4, R3.13, R3.30). A Dialog titled "Keyboard
  * shortcuts" that lists the active bindings grouped by scope, with "?" itself under General and
- * the reserved keys (reserved.ts) under their own scope after the live ones. A shift chord prints
+ * the reserved keys (reserved.ts) after the live ones of their scope, only when that scope has
+ * live keys on the page. A shift chord prints
  * as "Shift+" and the keycap; Space prints as "Space". Its open state lives in the hotkey store,
  * so the "?" key in dispatch.ts opens it; Radix closes it on Escape or the close button and the
  * change is written back to the store.
@@ -58,8 +59,13 @@ function groupByScope(bindings: readonly RegisteredBinding[]): ShortcutGroup[] {
     (groups, binding) => addRow(groups, binding.scope, { key: displayBinding(binding), description: binding.description }),
     [general],
   );
+  // A reserved key shows only beside its scope's live keys, so a page without a trainer session
+  // has no lone Session group (PR #45 review round 2, finding 6).
   return RESERVED_KEYS.reduce<ShortcutGroup[]>(
-    (groups, reserved) => addRow(groups, reserved.scope, { key: displayKey(reserved.key), description: reserved.description }),
+    (groups, reserved) =>
+      groups.some((group) => group.scope === reserved.scope)
+        ? addRow(groups, reserved.scope, { key: displayKey(reserved.key), description: reserved.description })
+        : groups,
     live,
   );
 }

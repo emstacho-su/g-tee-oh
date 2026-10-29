@@ -340,3 +340,14 @@ describe("R3.13 ShortcutsOverlay", () => {
     expect(store.getState().overlayOpen).toBe(false);
   });
 });
+
+describe("R3.30 PR #45 review round 2, finding 6: reserved keys only beside their scope's live keys", () => {
+  it("R3.30 a page with no session keys shows no Session group, only General", async () => {
+    renderWithRoot(<Probe hotkey="b" description="Brush" scope="Painter" onPress={vi.fn()} />);
+    await userEvent.keyboard("?");
+    const overlay = within(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).getByTestId("shortcuts-overlay");
+    expect(within(overlay).queryByRole("region", { name: "Session" })).not.toBeInTheDocument();
+    expect(within(overlay).queryByText(/Repeat hand/)).not.toBeInTheDocument();
+    expect(within(overlay).getByRole("region", { name: "Painter" })).toBeInTheDocument();
+  });
+});
