@@ -18,7 +18,8 @@
  * Visual system (S36, O-346): Tactile Digital on the owner's palette. The five palette colours are
  * primitives (--p-*); the semantic tokens below keep the names every component already uses and
  * take their values from those hues. Light is a cream ground with brown text and red accents; dark
- * is a deep brown ground built from the same hues, with lifted text and accent. Every colour a
+ * is a neutral gray and near-black ground (O-430 amends O-346) with the palette reds lifted for the
+ * accent, focus and danger. Every colour a
  * text or control pair uses carries a "from" note naming its source hue, which
  * scripts/check-contrast.mjs reads: `just contrast` holds every pair at WCAG AA in both themes and
  * keeps validation/reports/contrast.md current (O-365). Success and warning have no hue in the
@@ -95,42 +96,54 @@
   color-scheme: light;
 }
 
+/*
+ * Dark (S43, O-430): a traditional neutral gray and near-black base, not the palette's brown. The
+ * grounds, edges, text, the inks on the heat steps, the overlay and every shadow layer carry no hue
+ * (scripts/check-contrast.mjs fails any of them over 10 percent HSL saturation); the grays sit at
+ * the luminance of the brown steps they replace, so every contrast pair keeps its margin. The
+ * palette reds stay as the accent, the focus ring, danger and the accent-soft highlight.
+ */
 .dark {
-  --surface: #1c1210; /* from 735751 umber, deepened */
-  --surface-raised: #281a17; /* from 735751 umber, deepened less */
-  --surface-sunken: #140c0a; /* from 735751 umber, deepened most */
-  --border: #5a423c; /* from 735751 umber, darkened; decorative edges */
-  --border-strong: var(--p-taupe); /* control edges (CONTROL_EDGE_CLASS), checked at 3:1 */
-  --text: #efe4d6; /* from e7d7c1 cream, lifted */
-  --text-muted: #b9a196; /* from a78a7f taupe, lifted */
+  --surface: #141414; /* from no palette hue: a neutral near-black ground (O-430) */
+  --surface-raised: #1e1e1e; /* from no palette hue: a neutral gray, one step above the ground (O-430) */
+  --surface-sunken: #0e0e0e; /* from no palette hue: a neutral near-black, below the ground (O-430) */
+  --border: #444444; /* from no palette hue: a neutral gray (O-430); decorative edges */
+  --border-strong: #858585; /* from no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1 */
+  --text: #ececec; /* from no palette hue: a neutral off-white (O-430) */
+  --text-muted: #a8a8a8; /* from no palette hue: a neutral light gray (O-430) */
   --accent: #e0766c; /* from bf4342 brick, lifted */
   --accent-soft: var(--p-brick); /* highlights, never text */
-  --accent-text: #1c1210; /* from 735751 umber, deepened */
+  --accent-text: #141414; /* from no palette hue: the neutral near-black ground (O-430) */
   --danger: #f08a7e; /* from bf4342 brick, lifted further */
   --success: #9cc48f; /* from no palette hue: the olive, lifted (O-363) */
   --warning: #e4b066; /* from no palette hue: the ochre, lifted (O-363) */
   --felt: #15803d;
   --felt-edge: #166534;
-  --focus: var(--p-cream);
+  --focus: #e0766c; /* from bf4342 brick, lifted (the accent, O-430) */
+  /* Depth on a neutral base: black shadows and a faint white top highlight for the tactile edge. */
   --shadow-raised:
-    inset 0 1px 0 rgb(231 215 193 / 0.07), 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 14px -4px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 14px -4px rgb(0 0 0 / 0.55),
     0 16px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-press-rest:
-    inset 0 1px 0 rgb(231 215 193 / 0.14), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.12), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.55),
     0 6px 14px -4px rgb(0 0 0 / 0.6);
   --shadow-press-hover:
-    inset 0 1px 0 rgb(231 215 193 / 0.16), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 -2px 0 rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.55),
     0 10px 20px -6px rgb(0 0 0 / 0.65);
-  --shadow-press-down: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(231 215 193 / 0.08), 0 1px 1px rgb(0 0 0 / 0.4);
+  --shadow-press-down: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(255 255 255 / 0.07), 0 1px 1px rgb(0 0 0 / 0.4);
   --overlay: rgb(0 0 0 / 0.65);
-  /* Dark steps run from dark (low mastery) to light (high), validated against #281a17. */
+  /*
+   * Dark steps run from dark (low mastery) to light (high). The ramp keeps the umber hue of the
+   * light theme (O-362) so a step means the same colour in both themes; it is data, not the base,
+   * and was validated against #281a17, whose luminance the neutral --surface-raised #1e1e1e matches.
+   */
   --heat-1: #7e4739; /* from 735751 umber hue, OKLCH lightness 0.46 */
   --heat-2: #9d5f4f; /* from 735751 umber hue, OKLCH lightness 0.55 */
   --heat-3: #c48777; /* from 735751 umber hue, OKLCH lightness 0.68 */
   --heat-4: #e1ac9f; /* from 735751 umber hue, OKLCH lightness 0.79 */
   --heat-5: #f7d5cc; /* from 735751 umber hue, OKLCH lightness 0.90 */
-  --heat-ink-low: #fbf7f1; /* from e7d7c1 cream, lifted */
-  --heat-ink-high: #1c1210; /* from 735751 umber, deepened */
+  --heat-ink-low: #fafafa; /* from no palette hue: a neutral white (O-430) */
+  --heat-ink-high: #141414; /* from no palette hue: the neutral near-black ground (O-430) */
   color-scheme: dark;
 }
 
@@ -282,7 +295,8 @@ meter::-moz-meter-bar {
  * #5b21b6 8.98:1, dark #8244f0 5.21:1. All are 4.5:1 or more. Against the grounds every light felt
  * is 6:1 or more; the dark felts are lifted from the old deep shades, which sat near 2:1 on the
  * deep brown grounds, to 3.2:1 or more on surface-raised, the narrow band where white text still
- * holds 4.5:1. Each cosmetic keeps its hue.
+ * holds 4.5:1. The neutral dark grounds of O-430 keep the luminance of the brown ones, so those
+ * ratios hold unchanged (3.20:1 at the least, Tier VII on surface-raised). Each cosmetic keeps its hue.
  *
  * Card backs are three custom properties CardView's face-down card reads. The defaults reproduce
  * the earlier fixed classes exactly (Tailwind's blue-800 fill, blue-900 border and the light

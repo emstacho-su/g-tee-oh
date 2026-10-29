@@ -1,7 +1,8 @@
 /**
  * The design system in the harness gallery (S36, R3.13, O-346): the owner's five palette colours,
- * the semantic tokens built from them, every Button variant and size, the segmented control, the
- * native controls on the accent and a Card, so the shots show the system itself in both themes.
+ * the semantic tokens (built from them in light, a neutral gray base in dark, O-430), every Button
+ * variant and size, the segmented control, the native controls on the accent and a Card, so the
+ * shots show the system itself in both themes.
  * The press row has a target between two neighbours; the design-system shots hold the pointer down
  * on it and measure that the neighbours do not move (the squish is transform only, O-364).
  */
@@ -84,7 +85,7 @@ function Swatch({ name, caption }: { name: string; caption: string }) {
 
 function TokenSection() {
   return (
-    <GallerySection name="design-tokens" title="Palette and tokens" note="The owner's five colours as primitives, and the semantic tokens of this theme built from them (O-346).">
+    <GallerySection name="design-tokens" title="Palette and tokens" note="The owner's five colours as primitives, and the semantic tokens of this theme: built from them in light (O-346), a neutral gray and black base with the palette reds as accent, focus and danger in dark (O-430).">
       <div className="flex flex-col gap-4">
         <ul aria-label="Palette" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {paletteNames().map((name) => (

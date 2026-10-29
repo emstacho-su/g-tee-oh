@@ -39,37 +39,37 @@ Minimums are WCAG 2 level AA: 4.5:1 for text (1.4.3), 3:1 for control edges and 
 | light | heat-ink-high | heat-3 | 4.70 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #9d5f4f (735751 umber hue, OKLCH lightness 0.55) |
 | light | heat-ink-high | heat-4 | 7.29 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #7d4234 (735751 umber hue, OKLCH lightness 0.45) |
 | light | heat-ink-high | heat-5 | 10.96 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #5b2a1e (735751 umber hue, OKLCH lightness 0.35) |
-| dark | text | surface | 14.64 | 4.5 | pass | body text | #efe4d6 (e7d7c1 cream, lifted) | #1c1210 (735751 umber, deepened) |
-| dark | text | surface-raised | 13.39 | 4.5 | pass | body text | #efe4d6 (e7d7c1 cream, lifted) | #281a17 (735751 umber, deepened less) |
-| dark | text | surface-sunken | 15.40 | 4.5 | pass | body text | #efe4d6 (e7d7c1 cream, lifted) | #140c0a (735751 umber, deepened most) |
-| dark | text-muted | surface | 7.52 | 4.5 | pass | secondary text | #b9a196 (a78a7f taupe, lifted) | #1c1210 (735751 umber, deepened) |
-| dark | text-muted | surface-raised | 6.88 | 4.5 | pass | secondary text | #b9a196 (a78a7f taupe, lifted) | #281a17 (735751 umber, deepened less) |
-| dark | text-muted | surface-sunken | 7.91 | 4.5 | pass | secondary text | #b9a196 (a78a7f taupe, lifted) | #140c0a (735751 umber, deepened most) |
-| dark | accent | surface | 6.10 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #1c1210 (735751 umber, deepened) |
-| dark | accent | surface-raised | 5.58 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #281a17 (735751 umber, deepened less) |
-| dark | accent | surface-sunken | 6.42 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #140c0a (735751 umber, deepened most) |
-| dark | danger | surface | 7.56 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #1c1210 (735751 umber, deepened) |
-| dark | danger | surface-raised | 6.91 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #281a17 (735751 umber, deepened less) |
-| dark | danger | surface-sunken | 7.95 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #140c0a (735751 umber, deepened most) |
-| dark | success | surface | 9.36 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #1c1210 (735751 umber, deepened) |
-| dark | success | surface-raised | 8.56 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #281a17 (735751 umber, deepened less) |
-| dark | success | surface-sunken | 9.85 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #140c0a (735751 umber, deepened most) |
-| dark | warning | surface | 9.36 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #1c1210 (735751 umber, deepened) |
-| dark | warning | surface-raised | 8.56 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #281a17 (735751 umber, deepened less) |
-| dark | warning | surface-sunken | 9.85 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #140c0a (735751 umber, deepened most) |
-| dark | accent-text | accent | 6.10 | 4.5 | pass | primary button label | #1c1210 (735751 umber, deepened) | #e0766c (bf4342 brick, lifted) |
-| dark | accent-text | danger | 7.56 | 4.5 | pass | danger button label | #1c1210 (735751 umber, deepened) | #f08a7e (bf4342 brick, lifted further) |
-| dark | border-strong | surface | 5.76 | 3 | pass | control edge | #a78a7f (--p-taupe, the palette value) | #1c1210 (735751 umber, deepened) |
-| dark | border-strong | surface-raised | 5.27 | 3 | pass | control edge | #a78a7f (--p-taupe, the palette value) | #281a17 (735751 umber, deepened less) |
-| dark | border-strong | surface-sunken | 6.06 | 3 | pass | control edge | #a78a7f (--p-taupe, the palette value) | #140c0a (735751 umber, deepened most) |
-| dark | focus | surface | 13.02 | 3 | pass | focus ring | #e7d7c1 (--p-cream, the palette value) | #1c1210 (735751 umber, deepened) |
-| dark | focus | surface-raised | 11.91 | 3 | pass | focus ring | #e7d7c1 (--p-cream, the palette value) | #281a17 (735751 umber, deepened less) |
-| dark | focus | surface-sunken | 13.70 | 3 | pass | focus ring | #e7d7c1 (--p-cream, the palette value) | #140c0a (735751 umber, deepened most) |
-| dark | heat-ink-low | heat-1 | 6.91 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #7e4739 (735751 umber hue, OKLCH lightness 0.46) |
-| dark | heat-ink-low | heat-2 | 4.70 | 4.5 | pass | heat map cell label | #fbf7f1 (e7d7c1 cream, lifted) | #9d5f4f (735751 umber hue, OKLCH lightness 0.55) |
-| dark | heat-ink-high | heat-3 | 6.19 | 4.5 | pass | heat map cell label | #1c1210 (735751 umber, deepened) | #c48777 (735751 umber hue, OKLCH lightness 0.68) |
-| dark | heat-ink-high | heat-4 | 9.27 | 4.5 | pass | heat map cell label | #1c1210 (735751 umber, deepened) | #e1ac9f (735751 umber hue, OKLCH lightness 0.79) |
-| dark | heat-ink-high | heat-5 | 13.42 | 4.5 | pass | heat map cell label | #1c1210 (735751 umber, deepened) | #f7d5cc (735751 umber hue, OKLCH lightness 0.90) |
+| dark | text | surface | 15.59 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | text | surface-raised | 14.11 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | text | surface-sunken | 16.34 | 4.5 | pass | body text | #ececec (no palette hue: a neutral off-white (O-430)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | text-muted | surface | 7.75 | 4.5 | pass | secondary text | #a8a8a8 (no palette hue: a neutral light gray (O-430)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | text-muted | surface-raised | 7.01 | 4.5 | pass | secondary text | #a8a8a8 (no palette hue: a neutral light gray (O-430)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | text-muted | surface-sunken | 8.12 | 4.5 | pass | secondary text | #a8a8a8 (no palette hue: a neutral light gray (O-430)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | accent | surface | 6.12 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | accent | surface-raised | 5.54 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | accent | surface-sunken | 6.41 | 4.5 | pass | links and accent text | #e0766c (bf4342 brick, lifted) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | danger | surface | 7.58 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | danger | surface-raised | 6.86 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | danger | surface-sunken | 7.94 | 4.5 | pass | error text | #f08a7e (bf4342 brick, lifted further) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | success | surface | 9.39 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | success | surface-raised | 8.50 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | success | surface-sunken | 9.84 | 4.5 | pass | success text | #9cc48f (no palette hue: the olive, lifted (O-363)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | warning | surface | 9.39 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | warning | surface-raised | 8.49 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | warning | surface-sunken | 9.84 | 4.5 | pass | warning text | #e4b066 (no palette hue: the ochre, lifted (O-363)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | accent-text | accent | 6.12 | 4.5 | pass | primary button label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #e0766c (bf4342 brick, lifted) |
+| dark | accent-text | danger | 7.58 | 4.5 | pass | danger button label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #f08a7e (bf4342 brick, lifted further) |
+| dark | border-strong | surface | 4.99 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | border-strong | surface-raised | 4.52 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | border-strong | surface-sunken | 5.23 | 3 | pass | control edge | #858585 (no palette hue: a neutral gray (O-430); control edges (CONTROL_EDGE_CLASS), checked at 3:1) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | focus | surface | 6.12 | 3 | pass | focus ring | #e0766c (bf4342 brick, lifted (the accent, O-430)) | #141414 (no palette hue: a neutral near-black ground (O-430)) |
+| dark | focus | surface-raised | 5.54 | 3 | pass | focus ring | #e0766c (bf4342 brick, lifted (the accent, O-430)) | #1e1e1e (no palette hue: a neutral gray, one step above the ground (O-430)) |
+| dark | focus | surface-sunken | 6.41 | 3 | pass | focus ring | #e0766c (bf4342 brick, lifted (the accent, O-430)) | #0e0e0e (no palette hue: a neutral near-black, below the ground (O-430)) |
+| dark | heat-ink-low | heat-1 | 7.07 | 4.5 | pass | heat map cell label | #fafafa (no palette hue: a neutral white (O-430)) | #7e4739 (735751 umber hue, OKLCH lightness 0.46) |
+| dark | heat-ink-low | heat-2 | 4.81 | 4.5 | pass | heat map cell label | #fafafa (no palette hue: a neutral white (O-430)) | #9d5f4f (735751 umber hue, OKLCH lightness 0.55) |
+| dark | heat-ink-high | heat-3 | 6.21 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #c48777 (735751 umber hue, OKLCH lightness 0.68) |
+| dark | heat-ink-high | heat-4 | 9.30 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #e1ac9f (735751 umber hue, OKLCH lightness 0.79) |
+| dark | heat-ink-high | heat-5 | 13.46 | 4.5 | pass | heat map cell label | #141414 (no palette hue: the neutral near-black ground (O-430)) | #f7d5cc (735751 umber hue, OKLCH lightness 0.90) |
 
 Failures: none.
 
@@ -118,40 +118,40 @@ Action colours and the bet and raise size shades (web/src/theme/action-style.ts)
 | light | table ink | #ffffff | felt felt-tier-III #1e40af | 8.72 | 4.5 | pass |
 | light | table ink | #ffffff | felt felt-tier-V #9f1239 | 8.02 | 4.5 | pass |
 | light | table ink | #ffffff | felt felt-tier-VII #5b21b6 | 8.98 | 4.5 | pass |
-| dark | Fold (action) | #3b82f6 | surface | 4.99 | 3 | pass |
-| dark | Fold (action) | #3b82f6 | surface-raised | 4.57 | 3 | pass |
-| dark | Check (action) | #22c55e | surface | 8.06 | 3 | pass |
-| dark | Check (action) | #22c55e | surface-raised | 7.37 | 3 | pass |
-| dark | Call (action) | #22c55e | surface | 8.06 | 3 | pass |
-| dark | Call (action) | #22c55e | surface-raised | 7.37 | 3 | pass |
-| dark | Limp (action) | #84cc16 | surface | 9.30 | 3 | pass |
-| dark | Limp (action) | #84cc16 | surface-raised | 8.50 | 3 | pass |
-| dark | Straddle (action) | #a78bfa | surface | 6.75 | 3 | pass |
-| dark | Straddle (action) | #a78bfa | surface-raised | 6.17 | 3 | pass |
-| dark | Bet (action) | #ef4444 | surface | 4.88 | 3 | pass |
-| dark | Bet (action) | #ef4444 | surface-raised | 4.46 | 3 | pass |
-| dark | Raise (action) | #ef4444 | surface | 4.88 | 3 | pass |
-| dark | Raise (action) | #ef4444 | surface-raised | 4.46 | 3 | pass |
-| dark | All-in (action) | #e879f9 | surface | 7.46 | 3 | pass |
-| dark | All-in (action) | #e879f9 | surface-raised | 6.83 | 3 | pass |
-| dark | raise and bet size shade 1 | #ef4444 | surface | 4.88 | 3 | pass |
-| dark | raise and bet size shade 1 | #ef4444 | surface-raised | 4.46 | 3 | pass |
-| dark | raise and bet size shade 2 | #f87171 | surface | 6.64 | 3 | pass |
-| dark | raise and bet size shade 2 | #f87171 | surface-raised | 6.07 | 3 | pass |
-| dark | raise and bet size shade 3 | #fca5a5 | surface | 9.68 | 3 | pass |
-| dark | raise and bet size shade 3 | #fca5a5 | surface-raised | 8.85 | 3 | pass |
-| dark | raise and bet size shade 4 | #fecaca | surface | 12.70 | 3 | pass |
-| dark | raise and bet size shade 4 | #fecaca | surface-raised | 11.61 | 3 | pass |
-| dark | felt | #15803d | surface | 3.66 | 3 | pass |
-| dark | felt | #15803d | surface-raised | 3.35 | 3 | pass |
-| dark | felt none | #15803d | surface | 3.66 | 3 | pass |
-| dark | felt none | #15803d | surface-raised | 3.35 | 3 | pass |
-| dark | felt felt-tier-III | #2563eb | surface | 3.55 | 3 | pass |
-| dark | felt felt-tier-III | #2563eb | surface-raised | 3.25 | 3 | pass |
-| dark | felt felt-tier-V | #e11d48 | surface | 3.91 | 3 | pass |
-| dark | felt felt-tier-V | #e11d48 | surface-raised | 3.58 | 3 | pass |
-| dark | felt felt-tier-VII | #8244f0 | surface | 3.53 | 3 | pass |
-| dark | felt felt-tier-VII | #8244f0 | surface-raised | 3.23 | 3 | pass |
+| dark | Fold (action) | #3b82f6 | surface | 5.01 | 3 | pass |
+| dark | Fold (action) | #3b82f6 | surface-raised | 4.53 | 3 | pass |
+| dark | Check (action) | #22c55e | surface | 8.08 | 3 | pass |
+| dark | Check (action) | #22c55e | surface-raised | 7.32 | 3 | pass |
+| dark | Call (action) | #22c55e | surface | 8.08 | 3 | pass |
+| dark | Call (action) | #22c55e | surface-raised | 7.32 | 3 | pass |
+| dark | Limp (action) | #84cc16 | surface | 9.33 | 3 | pass |
+| dark | Limp (action) | #84cc16 | surface-raised | 8.44 | 3 | pass |
+| dark | Straddle (action) | #a78bfa | surface | 6.77 | 3 | pass |
+| dark | Straddle (action) | #a78bfa | surface-raised | 6.13 | 3 | pass |
+| dark | Bet (action) | #ef4444 | surface | 4.90 | 3 | pass |
+| dark | Bet (action) | #ef4444 | surface-raised | 4.43 | 3 | pass |
+| dark | Raise (action) | #ef4444 | surface | 4.90 | 3 | pass |
+| dark | Raise (action) | #ef4444 | surface-raised | 4.43 | 3 | pass |
+| dark | All-in (action) | #e879f9 | surface | 7.49 | 3 | pass |
+| dark | All-in (action) | #e879f9 | surface-raised | 6.77 | 3 | pass |
+| dark | raise and bet size shade 1 | #ef4444 | surface | 4.90 | 3 | pass |
+| dark | raise and bet size shade 1 | #ef4444 | surface-raised | 4.43 | 3 | pass |
+| dark | raise and bet size shade 2 | #f87171 | surface | 6.66 | 3 | pass |
+| dark | raise and bet size shade 2 | #f87171 | surface-raised | 6.03 | 3 | pass |
+| dark | raise and bet size shade 3 | #fca5a5 | surface | 9.71 | 3 | pass |
+| dark | raise and bet size shade 3 | #fca5a5 | surface-raised | 8.78 | 3 | pass |
+| dark | raise and bet size shade 4 | #fecaca | surface | 12.73 | 3 | pass |
+| dark | raise and bet size shade 4 | #fecaca | surface-raised | 11.52 | 3 | pass |
+| dark | felt | #15803d | surface | 3.67 | 3 | pass |
+| dark | felt | #15803d | surface-raised | 3.32 | 3 | pass |
+| dark | felt none | #15803d | surface | 3.67 | 3 | pass |
+| dark | felt none | #15803d | surface-raised | 3.32 | 3 | pass |
+| dark | felt felt-tier-III | #2563eb | surface | 3.56 | 3 | pass |
+| dark | felt felt-tier-III | #2563eb | surface-raised | 3.23 | 3 | pass |
+| dark | felt felt-tier-V | #e11d48 | surface | 3.92 | 3 | pass |
+| dark | felt felt-tier-V | #e11d48 | surface-raised | 3.55 | 3 | pass |
+| dark | felt felt-tier-VII | #8244f0 | surface | 3.54 | 3 | pass |
+| dark | felt felt-tier-VII | #8244f0 | surface-raised | 3.20 | 3 | pass |
 | dark | table ink | #ffffff | felt #15803d | 5.02 | 4.5 | pass |
 | dark | table ink | #ffffff | felt none #15803d | 5.02 | 4.5 | pass |
 | dark | table ink | #ffffff | felt felt-tier-III #2563eb | 5.17 | 4.5 | pass |
@@ -159,3 +159,27 @@ Action colours and the bet and raise size shades (web/src/theme/action-style.ts)
 | dark | table ink | #ffffff | felt felt-tier-VII #8244f0 | 5.21 | 4.5 | pass |
 
 Solver failures: none.
+
+## Neutral dark base (gating, O-430)
+
+The dark grounds, edges, text, heat inks, overlay and every shadow layer are gray and black: each colour they hold, resolved, at 10% HSL saturation or less. The palette reds stay as accent, focus and danger and are not listed.
+
+| Token | Colours | Highest HSL saturation | Maximum | Result |
+|---|---|---|---|---|
+| surface | #141414 | 0.0% | 10% | pass |
+| surface-raised | #1e1e1e | 0.0% | 10% | pass |
+| surface-sunken | #0e0e0e | 0.0% | 10% | pass |
+| border | #444444 | 0.0% | 10% | pass |
+| border-strong | #858585 | 0.0% | 10% | pass |
+| text | #ececec | 0.0% | 10% | pass |
+| text-muted | #a8a8a8 | 0.0% | 10% | pass |
+| accent-text | #141414 | 0.0% | 10% | pass |
+| heat-ink-low | #fafafa | 0.0% | 10% | pass |
+| heat-ink-high | #141414 | 0.0% | 10% | pass |
+| overlay | rgb(0 0 0) | 0.0% | 10% | pass |
+| shadow-raised | rgb(255 255 255), rgb(0 0 0), rgb(0 0 0), rgb(0 0 0) | 0.0% | 10% | pass |
+| shadow-press-rest | rgb(255 255 255), rgb(0 0 0), rgb(0 0 0), rgb(0 0 0) | 0.0% | 10% | pass |
+| shadow-press-hover | rgb(255 255 255), rgb(0 0 0), rgb(0 0 0), rgb(0 0 0) | 0.0% | 10% | pass |
+| shadow-press-down | rgb(0 0 0), rgb(255 255 255), rgb(0 0 0) | 0.0% | 10% | pass |
+
+Neutral failures: none.

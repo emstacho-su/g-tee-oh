@@ -22,7 +22,9 @@
 // raise size shade of web/src/theme/action-style.ts, the theme felt and every cosmetic felt
 // ([data-felt] blocks, light and .dark) at 3:1 against surface and surface-raised (1.4.11, the
 // table and the matrix sit on those grounds), and the table's white text (TABLE_INK, PokerTable's
-// text-white) at 4.5:1 on every felt (1.4.3).
+// text-white) at 4.5:1 on every felt (1.4.3). The dark base is neutral (S43, O-430): every colour in
+// the dark grounds, edges, text, heat inks, overlay and shadow layers (NEUTRAL_DARK_TOKENS) sits at
+// NEUTRAL_MAX_SATURATION or less, so the old brown base cannot come back unnoticed.
 //
 // Command line:
 //   node scripts/check-contrast.mjs           check: exit 1 on a failing pair or a stale report
@@ -240,6 +242,102 @@ export function evaluate(themes, pairs) {
   return { rows, failures: [...new Set(failures)] };
 }
 
+/**
+ * The neutral dark base (S43, O-430): the owner's call that the dark theme is a traditional gray and
+ * black, not the palette's reddish brown. These dark tokens (the grounds, the edges, the text and
+ * the inks printed on the heat steps, the overlay and every shadow layer of the tactile depth) must
+ * be neutral; the palette reds stay as accent, focus and danger, which are not listed.
+ */
+export const NEUTRAL_DARK_TOKENS = Object.freeze([
+  "surface",
+  "surface-raised",
+  "surface-sunken",
+  "border",
+  "border-strong",
+  "text",
+  "text-muted",
+  "accent-text",
+  "heat-ink-low",
+  "heat-ink-high",
+  "overlay",
+  "shadow-raised",
+  "shadow-press-rest",
+  "shadow-press-hover",
+  "shadow-press-down",
+]);
+
+/**
+ * The most HSL saturation a neutral colour may carry: 10 percent. A pure gray is 0; every brown of
+ * the old dark base was 18 percent or more (the taupe edge 18.5, the grounds 27 to 33, the cream
+ * text and highlight 44). HSL inflates saturation near black and white, so the margin also lets a
+ * one-step rounding tint through there without letting a visible hue back in.
+ */
+export const NEUTRAL_MAX_SATURATION = 0.1;
+
+/** HSL saturation, 0 to 1, of a #rgb or #rrggbb colour. */
+export function hslSaturation(hex) {
+  if (!HEX.test(hex)) throw new Error(`not a hex colour: ${hex}`);
+  const full = expandHex(hex);
+  return saturationOf([1, 3, 5].map((start) => Number.parseInt(full.slice(start, start + 2), 16)));
+}
+
+function saturationOf(channels) {
+  const [max, min] = [Math.max(...channels) / 255, Math.min(...channels) / 255];
+  const lightness = (max + min) / 2;
+  const span = 1 - Math.abs(2 * lightness - 1);
+  return span === 0 ? 0 : (max - min) / span;
+}
+
+/** Every colour written in a CSS value: hex literals and rgb()/rgba() channels (comma or space syntax). */
+const VALUE_COLOUR = /#[0-9a-f]{6}\b|#[0-9a-f]{3}\b|rgba?\(\s*(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)/gi;
+
+function coloursIn(value) {
+  return [...value.matchAll(VALUE_COLOUR)].map(([text, red, green, blue]) =>
+    red === undefined
+      ? { text: expandHex(text), saturation: hslSaturation(text) }
+      : { text: `rgb(${red} ${green} ${blue})`, saturation: saturationOf([red, green, blue].map(Number)) },
+  );
+}
+
+/**
+ * The neutral check of the dark theme: each token's effective dark value (the .dark block's, else
+ * the light block's it inherits) and every colour in it at NEUTRAL_MAX_SATURATION or less. A colour
+ * token (hex or a whole-value var()) is checked resolved; a larger value (a shadow list, an rgb()
+ * overlay) colour by colour. A token that is not declared, holds no colour, or uses var() inside a
+ * larger value (which the check cannot follow) fails.
+ */
+export function evaluateNeutral(css, tokens = NEUTRAL_DARK_TOKENS) {
+  const raws = { light: rawTokens(blockBody(css, ":root")), dark: rawTokens(blockBody(css, ".dark")) };
+  const themes = parseThemes(css);
+  const rows = [];
+  const failures = [];
+  for (const name of tokens) {
+    const entry = raws.dark.get(name) ?? raws.light.get(name);
+    if (entry === undefined) {
+      failures.push(`dark: --${name} is not declared`);
+      continue;
+    }
+    const resolved = themes.dark.get(name);
+    if (resolved === undefined && /var\(/i.test(entry.raw)) {
+      failures.push(`dark: --${name} uses var() inside its value, which the neutral check cannot follow`);
+      continue;
+    }
+    const value = resolved?.value ?? entry.raw;
+    const colours = resolved === undefined ? coloursIn(entry.raw) : [{ text: resolved.value, saturation: hslSaturation(resolved.value) }];
+    if (colours.length === 0) {
+      failures.push(`dark: --${name} holds no colour the neutral check can read`);
+      continue;
+    }
+    const tinted = colours.filter((colour) => colour.saturation > NEUTRAL_MAX_SATURATION);
+    for (const colour of tinted) {
+      failures.push(`dark: --${name} ${colour.text} is not neutral: HSL saturation ${(colour.saturation * 100).toFixed(1)}%, over ${NEUTRAL_MAX_SATURATION * 100}% (O-430)`);
+    }
+    const highest = Math.max(...colours.map((colour) => colour.saturation));
+    rows.push({ name, value, colours: colours.map((colour) => colour.text), saturation: highest, pass: tinted.length === 0 });
+  }
+  return { rows, failures };
+}
+
 /** The solver surface colours from action-style.ts, light and dark, for the information table. */
 export function readActionColours(source) {
   const colours = [];
@@ -334,9 +432,10 @@ function sourceText(token) {
 }
 
 const NO_SOLVER = Object.freeze({ rows: [], failures: [] });
+const NO_NEUTRAL = Object.freeze({ rows: [], failures: [] });
 
-/** The Markdown report: gating pairs, then the solver surface colours (gating since O-389). */
-export function renderReport(result, solver = NO_SOLVER, palette = []) {
+/** The Markdown report: gating pairs, the solver surface colours (O-389), then the neutral dark base (O-430). */
+export function renderReport(result, solver = NO_SOLVER, palette = [], neutral = NO_NEUTRAL) {
   const lines = [
     "# Colour contrast report (R3.13, O-346, O-365)",
     "",
@@ -370,6 +469,22 @@ export function renderReport(result, solver = NO_SOLVER, palette = []) {
     }
     lines.push("", `Solver failures: ${solver.failures.length === 0 ? "none" : solver.failures.length}.`);
   }
+  if (neutral.rows.length > 0 || neutral.failures.length > 0) {
+    const maximum = `${NEUTRAL_MAX_SATURATION * 100}%`;
+    lines.push(
+      "",
+      "## Neutral dark base (gating, O-430)",
+      "",
+      `The dark grounds, edges, text, heat inks, overlay and every shadow layer are gray and black: each colour they hold, resolved, at ${maximum} HSL saturation or less. The palette reds stay as accent, focus and danger and are not listed.`,
+      "",
+      "| Token | Colours | Highest HSL saturation | Maximum | Result |",
+      "|---|---|---|---|---|",
+    );
+    for (const row of neutral.rows) {
+      lines.push(`| ${row.name} | ${row.colours.join(", ")} | ${(row.saturation * 100).toFixed(1)}% | ${maximum} | ${row.pass ? "pass" : "FAIL"} |`);
+    }
+    lines.push("", `Neutral failures: ${neutral.failures.length === 0 ? "none" : neutral.failures.length}.`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -388,8 +503,9 @@ function main(argv) {
   const css = readFileSync(STYLES_PATH, "utf8");
   const actionSource = readFileSync(ACTION_STYLE_PATH, "utf8");
   const solver = evaluateSolver(themes, readActionColours(actionSource), readSizeShades(actionSource), readFelts(css, themes));
-  const report = renderReport(result, solver, paletteOf(themes));
-  for (const failure of [...result.failures, ...solver.failures]) console.error(`check-contrast: ${failure}`);
+  const neutral = evaluateNeutral(css);
+  const report = renderReport(result, solver, paletteOf(themes), neutral);
+  for (const failure of [...result.failures, ...solver.failures, ...neutral.failures]) console.error(`check-contrast: ${failure}`);
   if (write) {
     writeFileSync(REPORT_PATH, report);
     console.log(`check-contrast: wrote ${REPORT_PATH}`);
@@ -405,9 +521,9 @@ function main(argv) {
       return 1;
     }
   }
-  if (result.failures.length > 0 || solver.failures.length > 0) return 1;
+  if (result.failures.length > 0 || solver.failures.length > 0 || neutral.failures.length > 0) return 1;
   console.log(
-    `check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks, and ${solver.rows.length} solver surface checks (R3.13, O-365, O-389)`,
+    `check-contrast: ${GATING_PAIRS.length} pairs pass WCAG AA in both themes, ${result.rows.length} checks, ${solver.rows.length} solver surface checks and ${neutral.rows.length} neutral dark tokens (R3.13, O-365, O-389, O-430)`,
   );
   return 0;
 }

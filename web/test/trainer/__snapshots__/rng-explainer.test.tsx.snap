@@ -154,7 +154,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
             class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)] outline outline-2 -outline-offset-2 outline-focus"
             data-action-index="0"
             data-range="1-40"
-            style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px; width: 40%;"
+            style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px; width: 40%;"
             title="1-40 Call"
           >
             <span
@@ -168,7 +168,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
                   class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]"
                   data-pattern="dots"
                   data-testid="action-swatch"
-                  style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px;"
+                  style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px;"
                 />
                 <span
                   aria-hidden="true"
@@ -188,7 +188,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
             class="flex min-w-0 items-center justify-center gap-1 overflow-hidden border-r border-black/20 px-1 text-xs text-slate-900 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]"
             data-action-index="1"
             data-range="41-100"
-            style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px); width: 60%;"
+            style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px); width: 60%;"
             title="41-100 Raise to 2.5bb"
           >
             <span
@@ -202,7 +202,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
                   class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]"
                   data-pattern="diagonal"
                   data-testid="action-swatch"
-                  style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px);"
+                  style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px);"
                 />
                 <span
                   aria-hidden="true"
@@ -241,7 +241,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
               class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]"
               data-pattern="dots"
               data-testid="action-swatch"
-              style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px;"
+              style="--action-light: #15803d; --action-dark: #22c55e; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: radial-gradient(var(--hatch) 1px, transparent 1.5px); background-size: 5px 5px;"
             />
             <span
               aria-hidden="true"
@@ -265,7 +265,7 @@ exports[`R3.10 RngExplainer > R3.10 the explainer's content matches its snapshot
               class="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-black/20 bg-(--action-light) [--hatch:var(--hatch-light)] dark:bg-(--action-dark) dark:[--hatch:var(--hatch-dark)]"
               data-pattern="diagonal"
               data-testid="action-swatch"
-              style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #1c1210; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px);"
+              style="--action-light: #dc2626; --action-dark: #ef4444; --hatch-light: rgba(255, 255, 255, 0.5); --hatch-dark: rgba(0, 0, 0, 0.35); --ink-light: #ffffff; --ink-dark: #141414; background-image: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 6px);"
             />
             <span
               aria-hidden="true"

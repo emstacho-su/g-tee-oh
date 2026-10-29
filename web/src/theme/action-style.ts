@@ -82,12 +82,12 @@ export function hatchInkFor(fill: string): string {
 
 /**
  * The ink for text printed on an action fill (a roll band's label, a painted cell): white on the
- * deep light-theme fills, the deepened umber of the dark ground (from 735751 umber) on the lifted
+ * deep light-theme fills, the neutral near-black of the dark ground (O-430) on the lifted
  * dark-theme fills, whichever reads better, so every fill keeps its text at 4.5:1 (WCAG 1.4.3).
  */
 export const ACTION_INK = {
   onDark: "#ffffff",
-  onLight: "#1c1210",
+  onLight: "#141414",
 } as const;
 
 /** The text ink for one fill color (a hex value): the one of the two with the higher contrast. */

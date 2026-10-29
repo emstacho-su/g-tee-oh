@@ -54,6 +54,16 @@ function heatRamp(theme: ThemeName): string[] {
   });
 }
 
+/** The hex value of one token in the .dark block of styles.css. */
+function darkToken(name: string): string {
+  const css = readFileSync(STYLES_PATH, "utf8");
+  const start = css.indexOf(".dark {");
+  const body = css.slice(start, css.indexOf("}", start));
+  const match = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "i").exec(body);
+  if (match?.[1] === undefined) throw new Error(`styles.css dark has no hex --${name}`);
+  return match[1].toLowerCase();
+}
+
 /** One side of the EV scale, neutral first, then steps 1 to 5. */
 function side(theme: ThemeName, sign: 1 | -1): string[] {
   const palette = MATRIX_PALETTES[theme];
@@ -129,6 +139,24 @@ describe("R3.12 range matrix EV and weight steps", () => {
 });
 
 describe("R3.12 range matrix palettes as colours", () => {
+  it("R3.13 O-430 dark: the canvas ground, text, missing cells, inks and focus equal the neutral dark tokens in styles.css", () => {
+    const dark = MATRIX_PALETTES.dark;
+    const copies: readonly (readonly [string, string, string])[] = [
+      ["background", dark.background, "surface-raised"],
+      ["gridLine", dark.gridLine, "surface-raised"],
+      ["focusHalo", dark.focusHalo, "surface-raised"],
+      ["missingFill", dark.missingFill, "surface-sunken"],
+      ["text", dark.text, "text"],
+      ["labelText", dark.labelText, "text"],
+      ["selected", dark.selected, "text"],
+      ["focus", dark.focus, "focus"],
+      ["inkDark", dark.inkDark, "heat-ink-high"],
+      ["inkLight", dark.inkLight, "heat-ink-low"],
+    ];
+    const drift = copies.filter(([, value, token]) => value.toLowerCase() !== darkToken(token)).map(([key, value, token]) => `${key} ${value} != --${token}`);
+    expect(drift).toEqual([]);
+  });
+
   for (const theme of THEMES) {
     const palette = MATRIX_PALETTES[theme];
 

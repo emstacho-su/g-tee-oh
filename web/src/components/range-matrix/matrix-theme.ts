@@ -89,15 +89,15 @@ const LIGHT: MatrixPalette = {
 };
 
 const DARK: MatrixPalette = {
-  background: "#281a17", // --surface-raised: 735751 umber, deepened less
-  gridLine: "#281a17", // the ground again
-  text: "#efe4d6", // --text: e7d7c1 cream, lifted
-  labelChip: "rgba(40, 26, 23, 0.8)", // --surface-raised, translucent
-  labelText: "#efe4d6", // --text
-  missingFill: "#140c0a", // --surface-sunken: 735751 umber, deepened most
-  missingInk: "rgba(167, 138, 127, 0.45)", // --p-taupe a78a7f, translucent
-  hatchInkDark: "rgba(28, 18, 16, 0.5)", // --surface: 735751 umber deepened, translucent
-  hatchInkLight: "rgba(239, 228, 214, 0.5)", // --text, translucent
+  background: "#1e1e1e", // --surface-raised: a neutral gray (O-430)
+  gridLine: "#1e1e1e", // the ground again
+  text: "#ececec", // --text: a neutral off-white (O-430)
+  labelChip: "rgba(30, 30, 30, 0.8)", // --surface-raised, translucent
+  labelText: "#ececec", // --text
+  missingFill: "#0e0e0e", // --surface-sunken: a neutral near-black (O-430)
+  missingInk: "rgba(133, 133, 133, 0.45)", // --border-strong (dark): a neutral gray, translucent
+  hatchInkDark: "rgba(20, 20, 20, 0.5)", // --surface: the neutral near-black, translucent
+  hatchInkLight: "rgba(236, 236, 236, 0.5)", // --text, translucent
   evNegative: [
     "#593d3a", // bf4342 brick hue, OKLCH lightness 0.39
     "#7c4744", // bf4342 brick hue, OKLCH lightness 0.46
@@ -105,7 +105,7 @@ const DARK: MatrixPalette = {
     "#f2827c", // bf4342 brick hue, OKLCH lightness 0.73
     "#ffb0a9", // bf4342 brick hue, OKLCH lightness 0.83
   ],
-  evNeutral: "#37322c", // e7d7c1 cream hue, OKLCH lightness 0.32, nearly grey
+  evNeutral: "#333333", // a neutral gray, OKLCH lightness 0.32, on the neutral dark base (O-430)
   evPositive: [
     "#37465a", // blue, OKLCH hue 255, lightness 0.39
     "#3e5a7d", // blue, OKLCH hue 255, lightness 0.46
@@ -114,11 +114,11 @@ const DARK: MatrixPalette = {
     "#a2caff", // blue, OKLCH hue 255, lightness 0.83
   ],
   weightSteps: ["#7e4739", "#9d5f4f", "#c48777", "#e1ac9f", "#f7d5cc"], // --heat-1 to --heat-5, dark (O-362)
-  inkDark: "#1c1210", // --heat-ink-high (dark): 735751 umber, deepened
-  inkLight: "#fbf7f1", // --heat-ink-low (dark): e7d7c1 cream, lifted
-  focus: "#e7d7c1", // --focus (dark): the e7d7c1 cream palette value
-  focusHalo: "#281a17", // --surface-raised
-  selected: "#efe4d6", // --text
+  inkDark: "#141414", // --heat-ink-high (dark): the neutral near-black (O-430)
+  inkLight: "#fafafa", // --heat-ink-low (dark): a neutral white (O-430)
+  focus: "#e0766c", // --focus (dark): bf4342 brick, lifted (the accent, O-430)
+  focusHalo: "#1e1e1e", // --surface-raised
+  selected: "#ececec", // --text
 };
 
 function resolve(palette: MatrixPalette): ResolvedPalette {

@@ -2,7 +2,8 @@
 // the token parser on a synthetic stylesheet, and the committed web/src/styles.css, which must
 // carry the owner's five palette primitives, name the source hue of every checked colour and pass
 // every gating pair in both themes; and, since O-389 (S38), the solver surface colours (the action
-// colours, their size shades and every felt) as gating pairs too. node:test, run by
+// colours, their size shades and every felt) as gating pairs too; and, since O-430 (S43), a neutral
+// gray and black dark base. node:test, run by
 // `pnpm run test:scripts` (just ts-test).
 
 import assert from "node:assert/strict";
@@ -13,12 +14,16 @@ import {
   ACTION_STYLE_PATH,
   ContrastError,
   GATING_PAIRS,
+  NEUTRAL_DARK_TOKENS,
+  NEUTRAL_MAX_SATURATION,
   PRIMITIVE_PREFIX,
   STYLES_PATH,
   TABLE_INK,
   contrastRatio,
   evaluate,
+  evaluateNeutral,
   evaluateSolver,
+  hslSaturation,
   parseThemes,
   readActionColours,
   readFelts,
@@ -271,4 +276,85 @@ test("R3.13 O-389 the solver gate fails loudly when it reads no action colours, 
   assert.doesNotMatch(failures, /dark: no bet and raise size shades read/);
   assert.match(failures, /dark: no felt read/);
   assert.doesNotMatch(failures, /light: no felt read/);
+});
+
+// The neutral dark base (S43, O-430): the owner asked for a traditional gray and black dark theme
+// instead of the deep brown, so the dark grounds, edges, text, inks, overlay and depth must stay
+// neutral. A brown that comes back fails the gate (NEUTRAL_MAX_SATURATION, HSL saturation).
+
+const NEUTRAL_CSS = `
+:root {
+  --surface: #ffffff; /* from e7d7c1 cream, lifted */
+  --overlay: rgb(28 18 16 / 0.55);
+  --shadow-raised: 0 1px 2px rgb(115 87 81 / 0.16);
+}
+
+.dark {
+  --surface: #1c1210; /* from 735751 umber, deepened */
+  --text: #ececec; /* from no palette hue: a neutral off-white */
+  --shadow-raised: inset 0 1px 0 rgb(231 215 193 / 0.07), 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-press-rest: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px #000;
+  --shadow-press-down: inset 0 2px 5px var(--surface);
+}
+`;
+
+test("R3.13 O-430 hslSaturation is 0 for grays and high for the old browns", () => {
+  assert.equal(hslSaturation("#000000"), 0);
+  assert.equal(hslSaturation("#ffffff"), 0);
+  assert.equal(hslSaturation("#1e1e1e"), 0);
+  assert.equal(hslSaturation("#ff0000"), 1);
+  // The old dark ground and the taupe control edge sit well over the threshold.
+  assert.ok(hslSaturation("#1c1210") > 0.25, String(hslSaturation("#1c1210")));
+  assert.ok(hslSaturation("#a78a7f") > 0.18, String(hslSaturation("#a78a7f")));
+  assert.ok(NEUTRAL_MAX_SATURATION > 0 && NEUTRAL_MAX_SATURATION < 0.18);
+});
+
+test("R3.13 O-430 evaluateNeutral fails a tinted dark token, a tinted shadow layer, an inherited light value and a var() it cannot follow", () => {
+  const tokens = ["surface", "text", "overlay", "shadow-raised", "shadow-press-rest", "shadow-press-down", "border"];
+  const result = evaluateNeutral(NEUTRAL_CSS, tokens);
+  const failures = result.failures.join("\n");
+  assert.match(failures, /--surface #1c1210 is not neutral: HSL saturation 2\d\.\d%/);
+  assert.match(failures, /--shadow-raised rgb\(231 215 193\) is not neutral/);
+  // The dark theme inherits the light overlay, which is tinted: the effective dark value is checked.
+  assert.match(failures, /--overlay rgb\(28 18 16\) is not neutral/);
+  assert.match(failures, /--shadow-press-down uses var\(\) inside its value/);
+  assert.match(failures, /--border is not declared/);
+  assert.doesNotMatch(failures, /--text/);
+  assert.doesNotMatch(failures, /--shadow-press-rest/);
+  assert.ok(result.rows.some((row) => row.name === "text" && row.pass));
+});
+
+test("R3.13 O-430 renderReport lists the neutral dark base as gating rows", () => {
+  const themes = parseThemes(SAMPLE_CSS);
+  const neutral = evaluateNeutral(NEUTRAL_CSS, ["surface", "text"]);
+  const report = renderReport(evaluate(themes, []), undefined, [], neutral);
+  assert.match(report, /## Neutral dark base \(gating, O-430\)/);
+  assert.match(report, /\| surface \| #1c1210 \| 2\d\.\d% \| 10% \| FAIL \|/);
+  assert.match(report, /\| text \| #ececec \| 0\.0% \| 10% \| pass \|/);
+  assert.match(report, new RegExp(`Neutral failures: ${neutral.failures.length}\\.`));
+});
+
+test("R3.13 O-430 the dark grounds, edges, text, inks, overlay and shadows of styles.css are neutral gray and black", () => {
+  assert.deepEqual(
+    [...NEUTRAL_DARK_TOKENS],
+    [
+      "surface",
+      "surface-raised",
+      "surface-sunken",
+      "border",
+      "border-strong",
+      "text",
+      "text-muted",
+      "accent-text",
+      "heat-ink-low",
+      "heat-ink-high",
+      "overlay",
+      "shadow-raised",
+      "shadow-press-rest",
+      "shadow-press-hover",
+      "shadow-press-down",
+    ],
+  );
+  const result = evaluateNeutral(readFileSync(STYLES_PATH, "utf8"));
+  assert.deepEqual(result.failures, []);
 });

@@ -26,7 +26,7 @@ const SOURCE = "mock";
 const PRESS_SETTLE_MS = 300;
 
 const CRITERIA = {
-  tokens: "R3.13 O-346 the owner's palette (8c1c13, bf4342, e7d7c1, a78a7f, 735751) and the semantic tokens built from it in this theme",
+  tokens: "R3.13 O-346 the owner's palette (8c1c13, bf4342, e7d7c1, a78a7f, 735751) and the semantic tokens of this theme: built from it in light, neutral gray and black with the palette reds as accents in dark (O-430)",
   buttons: "R3.13 O-346 every Button variant and size, disabled included, on the shared tactile press with soft layered depth",
   controls: "R3.13 O-346 segmented control, native checkbox and radio on the accent, and a raised Card with every text colour",
   pressed: "R3.13 O-364 a held primary button squishes wider and shorter and sinks, and its neighbours do not move (transform only)",
