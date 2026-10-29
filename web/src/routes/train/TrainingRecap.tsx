@@ -22,12 +22,17 @@ import type { TrackKey } from "../../progress/types.js";
 import { formatBb } from "../../poker/format.js";
 import type { RatingChange, SessionRecap } from "../../trainer/session-types.js";
 import { RECAP_TIPS, StatTiles, type StatTile } from "../drill-run/SessionLook.js";
+import { RECAP_COUNTS_LABEL } from "../drill-run/SessionParts.js";
+import { labelCountTiles } from "../drill-run/SessionTally.js";
+import type { SessionTally } from "../../trainer/session-log.js";
 import { PROGRESS_PATH, TRAIN_TEXT } from "./train-text.js";
 
 type TrackNames = Readonly<Partial<Record<TrackKey, string>>>;
 
 export interface TrainingRecapProps {
   recap: SessionRecap;
+  /** The session's own tally (S46, R3.32): its five label counts follow the api's figures. */
+  tally?: SessionTally;
   trackNames?: TrackNames;
   onTrainAgain: () => void;
 }
@@ -139,10 +144,11 @@ function Unlocks({ keys }: { keys: readonly string[] }) {
   );
 }
 
-export function TrainingRecap({ recap, trackNames, onTrainAgain }: TrainingRecapProps) {
+export function TrainingRecap({ recap, tally, trackNames, onTrainAgain }: TrainingRecapProps) {
   return (
     <Card title={TRAIN_TEXT.recapHeading} testId="training-recap" className="max-w-2xl">
       <StatTiles tiles={summaryTiles(recap)} testId="recap-summary" />
+      {tally === undefined ? null : <StatTiles tiles={labelCountTiles(tally)} testId="recap-label-counts" label={RECAP_COUNTS_LABEL} />}
       {recap.rated_decisions === 0 ? (
         <p role="note" data-testid="nothing-rated" className={cn("text-sm", SUNKEN_BLOCK)}>
           {TRAIN_TEXT.nothingRated}

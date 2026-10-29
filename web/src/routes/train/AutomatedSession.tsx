@@ -13,6 +13,7 @@
  */
 import { DecisionArea } from "../drill-run/DecisionArea.js";
 import { HandCounter } from "../drill-run/HandCounter.js";
+import { SessionHistoryList, SessionTallyRow } from "../drill-run/SessionRecord.js";
 import { END_SESSION_BINDING, SESSION_TEXT } from "../drill-run/labels.js";
 import { SpotTable } from "../drill-run/SpotTable.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
@@ -93,6 +94,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
       )}
       {/* "Hand 7 of 20" once a session length is planned (S46, R3.31); one decision per hand here, so no decision number. */}
       {context?.hand !== undefined && sessionLengthOf(context) !== null ? <HandCounter progress={context.hand} length={sessionLengthOf(context)} decision={false} /> : null}
+      {/* The running tally above the table, from the first prompt (S46, R3.32). */}
+      {context === null ? null : <SessionTallyRow log={session.log} prompt={prompt} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
@@ -119,6 +122,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
           {SESSION_TEXT.endSession}
         </Button>
       ) : null}
+      {/* Every decision of the session, reopened in place (S46, R3.32); one decision per hand here. */}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={false} onExplain={onExplain} />}
     </div>
   );
 }

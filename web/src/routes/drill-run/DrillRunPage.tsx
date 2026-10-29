@@ -33,6 +33,7 @@ import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
 import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
+import { tallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
@@ -43,6 +44,7 @@ import { DecisionArea } from "./DecisionArea.js";
 import { END_SESSION_BINDING, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { RunProgress } from "./RunProgress.js";
 import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts.js";
+import { SessionHistoryList, SessionTallyRow } from "./SessionRecord.js";
 import { SpotTable } from "./SpotTable.js";
 import { StartPanel } from "./StartPanel.js";
 
@@ -98,9 +100,12 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
   const context = "context" in state ? state.context : null;
   // The feedback sections the user opened or closed stay that way for the session (O-387).
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
+  const streetModes = (drill.trainer.stop_rule ?? "after_action") !== "after_action";
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : <RunProgress context={context} />}
+      {/* The running tally above the table, from the first prompt (S46, R3.32). */}
+      {context === null ? null : <SessionTallyRow log={session.log} prompt={prompt} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
@@ -127,6 +132,8 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
           {SESSION_TEXT.endSession}
         </Button>
       ) : null}
+      {/* Every decision of the session, reopened in place (S46, R3.32). */}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={streetModes} onExplain={onExplain} />}
     </div>
   );
 }
@@ -177,7 +184,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
         <SessionAlert problem={state.problem} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} />
       ) : null}
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
-      {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
+      {state.kind === "ended" ? <SessionRecapView recap={state.recap} tally={tallyOf(session.log.entries)} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel
           drill={drill}

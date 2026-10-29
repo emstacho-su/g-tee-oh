@@ -19,18 +19,8 @@
  */
 import type { ReactNode } from "react";
 
-import {
-  ActionBar,
-  FeedbackPanel,
-  FeedbackRangeView,
-  FeedbackRoller,
-  FeedbackThreshold,
-  RngRoller,
-  type FeedbackSectionsControl,
-} from "../../components/trainer/index.js";
+import { ActionBar, FeedbackPanel, RngRoller, type FeedbackSectionsControl } from "../../components/trainer/index.js";
 import { ExplainControls } from "../../components/explain/ExplainControls.js";
-import { MoreInfoSection } from "../../components/explain/MoreInfoSection.js";
-import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
@@ -38,6 +28,7 @@ import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
 import { unratedReason } from "../../trainer/unrated-reason.js";
+import { feedbackSlots } from "./feedback-slots.js";
 import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
 
@@ -94,17 +85,17 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
   const { feedback, decision, context } = state;
   // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
   const continuesByItself = autoContinueDelay(state) !== null;
-  const roller = context.rng ? (
-    <FeedbackRoller
-      feedback={feedback}
-      actions={prompt.buttons}
-      chosenIndex={decision.actionIndex}
-      // The grouping the session was started and graded with, never a setting changed since (PR #33 review round 1).
-      grouping={context.session.grouping}
-      street={prompt.street}
-      onExplain={onExplain}
-    />
-  ) : undefined;
+  // The same section bodies the session history reopens the decision with (S46, R3.32). The
+  // grouping is the session's, never a setting changed since (PR #33 review round 1).
+  const slots = feedbackSlots({
+    feedback,
+    actions: prompt.buttons,
+    chosenIndex: decision.actionIndex,
+    grouping: context.session.grouping,
+    street: prompt.street,
+    rng: context.rng,
+    onExplain,
+  });
   // Next hand stands above the panel, so it is reached without scrolling past the open sections
   // (S46, critic round 3 R10); the row inside the panel holds Ask.
   return (
@@ -123,11 +114,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           actions={prompt.buttons}
           chosenIndex={decision.actionIndex}
           unratedReason={unratedReason(feedback, prompt, context.session)}
-          rangeView={<FeedbackRangeView feedback={feedback} />}
-          thresholdCard={<FeedbackThreshold feedback={feedback} actions={prompt.buttons} />}
-          roller={roller}
-          insights={<FeedbackInsights feedback={feedback} />}
-          explanation={<MoreInfoSection key={`more-info-${feedback.attempt_id}`} attemptId={feedback.attempt_id} />}
+          {...slots}
           explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
           workedExample={prompt.worked_example}
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}

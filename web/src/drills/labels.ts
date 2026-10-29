@@ -110,7 +110,7 @@ export const PANEL_LABELS: Readonly<Record<PanelKey, string>> = {
   threshold_card: "Threshold card",
   hero_strategy_matrix: "Your strategy",
   rng_roller: "Mixed-frequency roll",
-  streak_counter: "Streak counter",
+  streak_counter: "Run counter",
 };
 
 /** What v1 serves, said next to a stored setting it does not serve yet (O-317). */
