@@ -74,6 +74,8 @@ async function libraryScreens(page: Page, shot: ReturnType<typeof shooter>): Pro
   await page.getByRole("radio", { name: `Select ${fixtureDrill.name}` }).check();
   const toolbar = page.getByRole("group", { name: "Selected drill" });
   await expect(toolbar).toContainText(`Selected: ${fixtureDrill.name}`);
+  // The radio's check scrolled the row into view; a full-page capture then paints the sticky header mid-page (S47 critic).
+  await page.evaluate(() => window.scrollTo(0, 0));
   await shot("drills-library-selected", CRITERIA.selected);
 
   await toolbar.getByRole("button", { name: `Export ${fixtureDrill.name}` }).click();

@@ -1,8 +1,9 @@
 /**
  * The 13 by 13 hand picker for a manual hand list (S26, R3.14, A7 section 4). Each of the 169
  * hand classes is a toggle button whose accessible name is the class ("AKs", "77", "T9o") and
- * whose state is aria-pressed; a chosen cell is filled, bold and ticked, so color is never the
- * only signal. The grid is one Tab stop with a roving tabindex: the arrow keys move between cells
+ * whose state is aria-pressed; a chosen cell is filled, bold, thick-edged and ticked in its corner,
+ * so color is never the only signal. Cells keep a readable minimum size and the grid scrolls in its
+ * own frame at phone width (S47 critic). The grid is one Tab stop with a roving tabindex: the arrow keys move between cells
  * (Home and End jump within a row), and Space or Enter toggles the focused cell, as a native
  * button does. The layout is hands.ts's chart layout: pairs on the diagonal, suited above it,
  * offsuit below.
@@ -20,6 +21,8 @@ export interface HandPickerProps {
 }
 
 const ALL_HANDS: readonly string[] = HAND_GRID.map((cell) => cell.hand);
+/** The smallest cell, in rem: room for a three-character hand at text-xs (about 28px). */
+const MIN_CELL_REM = 1.75;
 const LAST = GRID_SIZE - 1;
 
 /** The index a key moves the focus to, or undefined for a key the grid does not handle. */
@@ -61,12 +64,14 @@ export function HandPicker({ selected, onToggle, onSetAll, describedBy }: HandPi
           Clear
         </Button>
       </div>
+      {/* A readable minimum cell that scrolls inside its own frame at phone width (S47 critic G10, G2). */}
+      <div className="max-w-full overflow-x-auto" data-testid="hand-picker-frame">
       <div
         role="group"
         aria-label="Hand picker"
         aria-describedby={describedBy}
-        className="grid w-full max-w-xl gap-px"
-        style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))` }}
+        className="grid w-max min-w-full max-w-xl gap-px"
+        style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(${MIN_CELL_REM}rem, 1fr))` }}
       >
         {HAND_GRID.map((cell, index) => {
           const on = selected.includes(cell.hand);
@@ -83,15 +88,21 @@ export function HandPicker({ selected, onToggle, onSetAll, describedBy }: HandPi
               onKeyDown={(event) => onKeyDown(event, index)}
               onClick={() => onToggle(cell.hand)}
               className={cn(
-                "aspect-square min-w-0 rounded-sm border text-[10px] leading-none sm:text-xs",
-                on ? "border-text bg-accent font-bold text-accent-text" : "border-border bg-surface-sunken text-muted",
+                "relative aspect-square min-w-0 rounded-sm text-xs leading-none",
+                on ? "border-2 border-text bg-accent font-bold text-accent-text" : "border border-border bg-surface-sunken text-muted",
               )}
             >
               {cell.hand}
-              {on ? <span aria-hidden="true">{"✓"}</span> : null}
+              {/* The chosen mark sits in the corner, so it never crowds a three-character hand off its cell. */}
+              {on ? (
+                <span aria-hidden="true" data-testid="hand-chosen-mark" className="absolute right-0.5 top-0 text-[0.55rem] leading-none">
+                  {"✓"}
+                </span>
+              ) : null}
             </button>
           );
         })}
+      </div>
       </div>
     </div>
   );
