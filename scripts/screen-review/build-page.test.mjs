@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { Script } from "node:vm";
 
 import { buildGroups, earlierName, main, previousOf, readAuto, renderHtml, scriptJson, titleOf } from "./build-page.mjs";
 import { readFamilies } from "./merge-auto-verdicts.mjs";
@@ -103,4 +104,10 @@ test("R3.23 main: writes index.html and files.json, validates the manifest and w
   main(["--manifest", join(dir, "manifest.json"), "--out", join(dir, "out3"), "--auto-if-present", join(dir, "missing.json")], (line) => warnings.push(line));
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /no critic verdicts at/);
+});
+
+test("R3.23 renderHtml: the page script parses (a literal line break inside a string once blanked the whole page)", () => {
+  const html = renderHtml(template, buildGroups(manifest, { families }), { round: "3", generated: manifest.generated, title: "Screen Review Three" });
+  const script = html.slice(html.indexOf("<script>") + 8, html.lastIndexOf("</script>"));
+  assert.doesNotThrow(() => new Script(script, { filename: "page-template.html" }));
 });

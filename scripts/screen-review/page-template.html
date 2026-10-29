@@ -251,8 +251,7 @@ function agreeWithCritic(id) {
   const typed = document.getElementById(id + "-note").value;
   const reasons = (s.auto.reasons || []).map((r) => r.rule + ": " + r.text).join(" ");
   const agreed = s.auto.verdict === "no" ? "Agreed with the critic: " + reasons : "Agreed with the critic.";
-  const note = typed.includes(agreed) ? typed : (typed.trim() ? typed.trimEnd() + "
-" + agreed : agreed);
+  const note = typed.includes(agreed) ? typed : (typed.trim() ? typed.trimEnd() + String.fromCharCode(10) + agreed : agreed);
   state[id] = { verdict: s.auto.verdict, note: note.slice(0, 4000) };
   paint(id); tally(); persist(id);
 }
