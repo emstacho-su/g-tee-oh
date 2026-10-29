@@ -1,14 +1,16 @@
 /**
  * The compact result a reveal shows when it does not pause (S26, S46, R3.13, R3.10, O-314, design
- * rule 11): the grade label in words with its mark and the definitions tip, the loss worded as the
- * summary words it (FeedbackSummary lossText, ADR 0004: the api's numbers, only formatted), and the
- * solver's frequency of the chosen action in short form when the caller names the actions, in
- * place of the full feedback panel while the screen continues by itself. A polite status, so the
- * grade is announced; Next stays available beside it.
+ * rule 11): the grade label in words with its mark, the loss worded as the summary words it
+ * (FeedbackSummary lossText, ADR 0004: the api's numbers, only formatted), and the solver's
+ * frequency of the chosen action in short form when the caller names the actions, in place of
+ * the full feedback panel while the screen continues by itself. The label, loss and frequency sit
+ * in a polite status, so the grade is announced; the grade definitions tip stands beside the
+ * status, outside the live region, so an automatic reveal never reads all five definitions (PR #45
+ * review round 1, finding 4). Next stays available beside it.
  */
-import { GradeTip, lossText, solverFrequencyShort } from "../../components/trainer/index.js";
+import { GradeTip, gradeWithMark, lossText, solverFrequencyShort } from "../../components/trainer/index.js";
 import type { DecisionFeedback, NodeAction } from "../../contracts.js";
-import { RESULT_LABELS, SESSION_TEXT } from "./labels.js";
+import { SESSION_TEXT } from "./labels.js";
 
 export interface ResultChipProps {
   feedback: DecisionFeedback;
@@ -20,19 +22,19 @@ export interface ResultChipProps {
 export function ResultChip({ feedback, actions, chosenIndex }: ResultChipProps) {
   const frequency = actions === undefined || chosenIndex === undefined ? null : solverFrequencyShort(feedback, actions, chosenIndex);
   return (
-    <p
-      role="status"
+    <div
       data-testid="result-chip"
       data-label={feedback.label}
       className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 self-start rounded-full border border-border bg-surface-raised px-4 py-1.5 text-sm"
     >
-      <span className="flex items-center gap-1 font-semibold">
-        {RESULT_LABELS[feedback.label]}
-        <GradeTip />
+      {/* A real box, not display: contents, which some browsers strip of its role. */}
+      <span role="status" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-semibold">{gradeWithMark(feedback.label)}</span>
+        <span className="tabular-nums">{lossText(feedback)}</span>
+        {frequency === null ? null : <span className="tabular-nums">{frequency}</span>}
+        <span className="text-muted">{SESSION_TEXT.continuing}</span>
       </span>
-      <span className="tabular-nums">{lossText(feedback)}</span>
-      {frequency === null ? null : <span className="tabular-nums">{frequency}</span>}
-      <span className="text-muted">{SESSION_TEXT.continuing}</span>
-    </p>
+      <GradeTip />
+    </div>
   );
 }

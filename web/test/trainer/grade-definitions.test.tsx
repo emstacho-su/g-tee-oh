@@ -49,3 +49,13 @@ describe("R3.8 grade definitions", () => {
     expect(text).toMatch(/Blunder/);
   });
 });
+
+describe("R3.13 PR #45 review round 1, finding 9b: one source of label names and marks", () => {
+  it("R3.13 the result labels are the mark and the name from grade-definitions", async () => {
+    const { RESULT_LABELS } = await import("../../src/routes/drill-run/labels.js");
+    const { GRADE_NAMES, GRADE_SYMBOLS } = await import("../../src/components/trainer/grade-definitions.js");
+    for (const label of LABELS) expect(RESULT_LABELS[label]).toBe(`${GRADE_SYMBOLS[label]} ${GRADE_NAMES[label]}`);
+    expect(RESULT_LABELS.best).toBe("★ Best");
+    expect(RESULT_LABELS.blunder).toBe("?? Blunder");
+  });
+});

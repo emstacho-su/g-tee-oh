@@ -20,20 +20,16 @@ import { cn } from "../ui/index.js";
 import type { DecisionFeedback, FeedbackLabel, NodeAction } from "../../contracts.js";
 import { actionOfIndex, unknownIndexes } from "../../poker/action-index.js";
 import { exactActionLabel, formatBb, formatPercent } from "../../poker/format.js";
-import { GRADE_NAMES, GradeTip } from "./grade-definitions.js";
+import { GRADE_NAMES, GRADE_SYMBOLS, GradeTip } from "./grade-definitions.js";
 import { solverFrequencyText } from "./solver-frequency.js";
 
-interface LabelLook {
-  readonly symbol: string;
-  readonly className: string;
-}
-
-const LABEL_LOOKS: Readonly<Record<FeedbackLabel, LabelLook>> = {
-  best: { symbol: "★", className: "text-success" },
-  correct: { symbol: "✓", className: "text-success" },
-  inaccuracy: { symbol: "?!", className: "text-warning" },
-  mistake: { symbol: "?", className: "text-danger" },
-  blunder: { symbol: "??", className: "text-danger" },
+/** The label's colour; the name and the mark come from grade-definitions.tsx, the one source. */
+const LABEL_CLASSES: Readonly<Record<FeedbackLabel, string>> = {
+  best: "text-success",
+  correct: "text-success",
+  inaccuracy: "text-warning",
+  mistake: "text-danger",
+  blunder: "text-danger",
 };
 
 export const SUMMARY_TEXT = {
@@ -76,18 +72,18 @@ export function lossText(feedback: Pick<DecisionFeedback, "ev_loss_bb" | "ev_los
 }
 
 export function FeedbackSummary({ feedback, actions, chosen, unratedReason = null }: FeedbackSummaryProps) {
-  const look = LABEL_LOOKS[feedback.label];
   const frequency = solverFrequencyText(feedback, actions, chosen.index);
   return (
     <div data-testid="feedback-summary" className="flex flex-col gap-1">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p data-testid="feedback-label" data-label={feedback.label} className={cn("flex items-center gap-1 text-xl font-bold", look.className)}>
+        {/* A div, not a paragraph: the grade tip inside it holds block content (PR #45 review round 1, finding 5). */}
+        <div data-testid="feedback-label" data-label={feedback.label} className={cn("flex items-center gap-1 text-xl font-bold", LABEL_CLASSES[feedback.label])}>
           <span aria-hidden="true" className="mr-1 font-mono">
-            {look.symbol}
+            {GRADE_SYMBOLS[feedback.label]}
           </span>
           {GRADE_NAMES[feedback.label]}
           <GradeTip className="ml-1" />
-        </p>
+        </div>
         {feedback.rated ? null : <span className="rounded-md bg-surface-sunken px-2 text-sm text-muted">{SUMMARY_TEXT.unrated}</span>}
         {feedback.rng_roll === null ? null : <span className="text-sm text-muted tabular-nums">{`Roll ${feedback.rng_roll}`}</span>}
       </div>

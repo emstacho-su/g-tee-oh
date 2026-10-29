@@ -24,6 +24,20 @@ export const GRADE_NAMES: Readonly<Record<FeedbackLabel, string>> = {
   blunder: "Blunder",
 };
 
+/** The chess-style mark beside each label, so colour is never the only signal (S26). */
+export const GRADE_SYMBOLS: Readonly<Record<FeedbackLabel, string>> = {
+  best: "★",
+  correct: "✓",
+  inaccuracy: "?!",
+  mistake: "?",
+  blunder: "??",
+};
+
+/** "★ Best": the mark and the name, the one wording the chip, the history and the tally use. */
+export function gradeWithMark(label: FeedbackLabel): string {
+  return `${GRADE_SYMBOLS[label]} ${GRADE_NAMES[label]}`;
+}
+
 /** The order the definitions are listed in, best to worst. */
 export const GRADE_ORDER: readonly FeedbackLabel[] = ["best", "correct", "inaccuracy", "mistake", "blunder"];
 
@@ -43,20 +57,23 @@ export interface GradeTipProps {
   className?: string;
 }
 
-/** The info button that explains the five labels and the roll, placed beside a label or a count. */
+/**
+ * The info button that explains the five labels and the roll, placed beside a label or a count.
+ * Its content is phrasing elements only (spans shown as blocks), because InfoTip keeps the text in
+ * a visually hidden span and its callers may sit inside a paragraph (PR #45 review round 1,
+ * finding 5); the hidden text reads "Best The highest..." with no "Best:" of its own.
+ */
 export function GradeTip({ className }: GradeTipProps) {
   return (
     <InfoTip subject={GRADE_TIP_SUBJECT} {...(className === undefined ? {} : { className })}>
-      {/* A definition list, so the hidden text reads "Best The highest..." and never a "Best:" line of its own. */}
-      <dl className="flex flex-col gap-1">
+      <span className="flex flex-col gap-1">
         {GRADE_ORDER.map((label) => (
-          <div key={label} className="flex gap-1">
-            <dt className="shrink-0 font-semibold">{GRADE_NAMES[label]}</dt>
-            <dd>{GRADE_DEFINITIONS[label]}</dd>
-          </div>
+          <span key={label} className="block">
+            <span className="font-semibold">{GRADE_NAMES[label]}</span> {GRADE_DEFINITIONS[label]}
+          </span>
         ))}
-      </dl>
-      <p className="mt-1">{GRADE_ROLL_NOTE}</p>
+        <span className="mt-1 block">{GRADE_ROLL_NOTE}</span>
+      </span>
     </InfoTip>
   );
 }

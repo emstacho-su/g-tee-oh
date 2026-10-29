@@ -7,6 +7,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { FeedbackPanel } from "../../src/components/trainer/index.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
 import { HandCounter } from "../../src/routes/drill-run/HandCounter.js";
 import { ResultChip } from "../../src/routes/drill-run/ResultChip.js";
@@ -25,7 +26,25 @@ describe("R3.13 result chip", () => {
     const chip = screen.getByTestId("result-chip");
     expect(chip).toHaveTextContent("Best");
     expect(chip).toHaveTextContent("No EV lost");
-    expect(chip).toHaveAttribute("role", "status");
+    expect(within(chip).getByRole("status")).toHaveTextContent("Best");
+  });
+
+  it("R3.13 the live region announces the label and the loss only, never the five definitions (PR #45 review round 1, finding 4)", () => {
+    render(<ResultChip feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
+    const status = within(screen.getByTestId("result-chip")).getByRole("status");
+    expect(status).toHaveTextContent("Inaccuracy");
+    expect(status).toHaveTextContent("Lost 0.01bb (0.73% of the pot)");
+    expect(status).not.toHaveTextContent("solver's floor");
+    expect(within(status).queryByRole("button", { name: "About grade labels" })).not.toBeInTheDocument();
+  });
+
+  it("R3.13 no paragraph in the chip or the feedback summary holds a block element (PR #45 review round 1, finding 5)", () => {
+    // React logs a nesting warning once per process, so the structure is checked directly.
+    const BLOCK_IN_PARAGRAPH = "p div, p dl, p dt, p dd, p ul, p ol, p li, p p, p section";
+    const chip = render(<ResultChip feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
+    expect(chip.container.querySelectorAll(BLOCK_IN_PARAGRAPH)).toHaveLength(0);
+    const panel = render(<FeedbackPanel feedback={fixtureFeedback} actions={fixtureActions} chosenIndex={1} />);
+    expect(panel.container.querySelectorAll(BLOCK_IN_PARAGRAPH)).toHaveLength(0);
   });
 
   it("R3.13 an inaccuracy shows its own label and the loss as the summary words it", () => {

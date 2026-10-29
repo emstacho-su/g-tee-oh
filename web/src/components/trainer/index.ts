@@ -14,7 +14,7 @@ export type { ActionSwatchProps } from "./ActionSwatch.js";
 export { RngRoller, ROLLER_TEXT, SCALE_TICKS } from "./RngRoller.js";
 export type { HiddenRollerProps, RevealedRollerProps, RngRollerProps } from "./RngRoller.js";
 export { FeedbackPanel } from "./FeedbackPanel.js";
-export { GRADE_DEFINITIONS, GRADE_NAMES, GRADE_ORDER, GRADE_ROLL_NOTE, GRADE_TIP_SUBJECT, GradeTip } from "./grade-definitions.js";
+export { GRADE_DEFINITIONS, GRADE_NAMES, GRADE_ORDER, GRADE_ROLL_NOTE, GRADE_SYMBOLS, GRADE_TIP_SUBJECT, GradeTip, gradeWithMark } from "./grade-definitions.js";
 export type { GradeTipProps } from "./grade-definitions.js";
 export { solverFrequency, solverFrequencyShort, solverFrequencyText } from "./solver-frequency.js";
 export type { SolverFrequency, SolverFrequencyEntry } from "./solver-frequency.js";
