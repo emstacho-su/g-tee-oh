@@ -20,7 +20,7 @@ function classesOf(element: HTMLElement): string[] {
 
 describe("R3.13 drill start panel look (S38)", () => {
   it("R3.13 the start panel is a raised card whose drill settings are chips, not a definition list", () => {
-    render(<StartPanel drill={fixtureDrill} rng={false} onRngChange={vi.fn()} onStart={vi.fn()} starting={false} />);
+    render(<StartPanel drill={fixtureDrill} rng={false} onRngChange={vi.fn()} onStart={vi.fn()} starting={false} sessionLength={null} onSessionLengthChange={vi.fn()} />);
     const panel = screen.getByTestId("start-panel");
     expect(classesOf(panel)).toContain(RAISED_CLASS);
     expect(within(panel).queryByRole("term")).not.toBeInTheDocument();
@@ -31,12 +31,12 @@ describe("R3.13 drill start panel look (S38)", () => {
   });
 
   it("R3.13 the Mixed-frequency switch takes the tactile press and the checked control edge, and still says On or Off", () => {
-    const { rerender } = render(<StartPanel drill={fixtureDrill} rng={false} onRngChange={vi.fn()} onStart={vi.fn()} starting={false} />);
+    const { rerender } = render(<StartPanel drill={fixtureDrill} rng={false} onRngChange={vi.fn()} onStart={vi.fn()} starting={false} sessionLength={null} onSessionLengthChange={vi.fn()} />);
     const toggle = screen.getByRole("switch", { name: "Mixed-frequency mode" });
     expect(classesOf(toggle)).toContain(TACTILE_CLASS);
     for (const part of CONTROL_EDGE_CLASS.split(" ")) expect(classesOf(toggle)).toContain(part);
     expect(toggle).toHaveTextContent("Off");
-    rerender(<StartPanel drill={fixtureDrill} rng onRngChange={vi.fn()} onStart={vi.fn()} starting={false} />);
+    rerender(<StartPanel drill={fixtureDrill} rng onRngChange={vi.fn()} onStart={vi.fn()} starting={false} sessionLength={null} onSessionLengthChange={vi.fn()} />);
     expect(screen.getByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: "Mixed-frequency mode" })).toHaveTextContent("On");
   });

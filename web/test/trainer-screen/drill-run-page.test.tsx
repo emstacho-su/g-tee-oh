@@ -6,7 +6,7 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ME_QUERY_KEY } from "../../src/auth/index.js";
 import { SYNTHETIC_TEXT } from "../../src/components/ui/index.js";
@@ -22,7 +22,7 @@ import {
   fixtureRngPrompt,
   fixtureTrainerHands,
 } from "../../src/fixtures/trainer.js";
-import { useTrainerTableStore } from "../../src/store/index.js";
+import { DEFAULT_SESSION_DEFAULTS, useSessionDefaultsStore, useTrainerTableStore } from "../../src/store/index.js";
 import { drillQuery } from "../../src/trainer/session-api.js";
 import { jsonResponse, networkFailure, problemResponse } from "../api/fake-fetch.js";
 import { DECIDE_PATH, DRILL_PATH, END_PATH, NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
@@ -443,4 +443,54 @@ describe("R3.13 recap after end", () => {
     const [first, second] = view.sentTo(END_PATH);
     expect(second?.idempotencyKey).toBe(first?.idempotencyKey);
   });
+});
+
+/** Ten decisions through the real screen take longer than the default five seconds. */
+const TEN_HANDS_TIMEOUT_MS = 30_000;
+
+describe("R3.31 session length on the drill run", () => {
+  afterEach(() => {
+    useSessionDefaultsStore.setState({ defaults: DEFAULT_SESSION_DEFAULTS });
+  });
+
+  it("R3.31 the start panel offers Off, 10, 20 and 50 hands and remembers the choice", async () => {
+    renderRun({ script: {} });
+    await screen.findByRole("heading", { name: fixtureDrill.name });
+    const group = screen.getByRole("group", { name: "Session length" });
+    expect(within(group).getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["off", "10", "20", "50"]);
+    expect(within(group).getByRole("radio", { name: "Off" })).toBeChecked();
+    await userEvent.click(within(group).getByRole("radio", { name: "10 hands" }));
+    expect(useSessionDefaultsStore.getState().defaults.sessionLength).toBe(10);
+    expect(within(group).getByRole("radio", { name: "10 hands" })).toBeChecked();
+  });
+
+  it("R3.31 with 10 hands the counter reads Hand n of 10, the tenth reveal offers Finish session, and Enter ends with no extra deal", async () => {
+    useSessionDefaultsStore.getState().setSessionLength(10);
+    const prompts = Array.from({ length: 10 }, (_, hand) => ({ ...fixturePlainPrompt, hand_no: hand, state_version: 3 + 2 * hand }));
+    const feedbacks = prompts.map((prompt) => ({ ...fixturePlainFeedback, state_version: prompt.state_version + 1 }));
+    const view = renderRun({
+      script: {
+        [NEXT_PATH]: prompts.map((prompt) => jsonResponse(200, prompt)),
+        [DECIDE_PATH]: feedbacks.map((feedback) => jsonResponse(200, feedback)),
+        [END_PATH]: [jsonResponse(200, fixtureRecap)],
+      },
+    });
+    await startSession(view);
+    expect(screen.getByTestId("hand-counter")).toHaveTextContent("Hand 1 of 10");
+    for (let hand = 1; hand <= 10; hand += 1) {
+      await userEvent.keyboard("1");
+      await screen.findByTestId("feedback-panel");
+      if (hand < 10) {
+        expect(screen.getByRole("button", { name: /Next hand/ })).toBeInTheDocument();
+        await userEvent.keyboard("n");
+        await waitFor(() => expect(screen.getByTestId("hand-counter")).toHaveTextContent(`Hand ${hand + 1} of 10`));
+      }
+    }
+    expect(screen.getByRole("button", { name: /Finish session/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Next hand/ })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "Session recap" })).toBeInTheDocument();
+    expect(view.sentTo(END_PATH)).toHaveLength(1);
+    expect(view.sentTo(NEXT_PATH), "no deal past the limit and no prefetch at it").toHaveLength(10);
+  }, TEN_HANDS_TIMEOUT_MS);
 });
