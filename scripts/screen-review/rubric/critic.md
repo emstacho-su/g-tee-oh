@@ -26,7 +26,7 @@ For every screen in the family: read all four pictures, the criterion, the famil
 }
 ```
 
-`rule` is a G or R id from rules.md or `OWNER` for an earlier note that is still unmet; `variants` lists the pictures where it shows (`theme-width`); `work_items` are the comparison's ranked item numbers the fix belongs to, when any. A `yes` has an empty `reasons` list. The family file is `<out>/analyst/<family>.json`:
+`rule` is a G or R id from rules.md or `OWNER` for an earlier note that is still unmet; `variants` lists the pictures where it shows (`theme-width`); `work_items` are the comparison's ranked item numbers the fix belongs to, when any. A `yes` has an empty `reasons` list. The family file is `<critic>/analyst/<family>.json`:
 
 ```json
 { "family": "study", "lane": "S45", "screens": [ ...records... ] }
@@ -36,7 +36,7 @@ Rules for the analyst: judge what is visible, not what the code might do; one re
 
 ## Pass 2: verifier (one agent per family)
 
-Reads the analyst file and, for every `no`, re-reads the pictures and the component source under `web/src` to check the reason is real on the merged head (not a stale picture, not a mock artefact, not a check the criterion overrides). Writes `<out>/verifier/<family>.json`:
+Reads the analyst file and, for every `no`, re-reads the pictures and the component source under `web/src` to check the reason is real on the merged head (not a stale picture, not a mock artefact, not a check the criterion overrides). Writes `<critic>/verifier/<family>.json`:
 
 ```json
 { "family": "study", "checks": [ { "screen": "study-ev", "upheld": true, "note": "NodeView.tsx renders the mode toggle but no heading text names the lens." } ] }
@@ -47,15 +47,15 @@ Reads the analyst file and, for every `no`, re-reads the pictures and the compon
 ## Merge
 
 ```
-node scripts/screen-review/merge-auto-verdicts.mjs --manifest <shots>/manifest.json --analyst <out>/analyst --verifier <out>/verifier --out <out>
+node scripts/screen-review/merge-auto-verdicts.mjs --manifest <shots>/manifest.json --analyst <critic>/analyst --verifier <critic>/verifier --out <shots>
 ```
 
-Writes `<out>/auto-verdicts.json` (one record per screen with the final verdict), `<out>/digest.md` (per-lane tables with a tally) and `<out>/db/<screen>.json` (one document per screen for the review page's `auto_verdicts` collection, uploaded in batches of fifty with the artifact database tool). Every manifest screen must have an analyst record, or the merge fails and names the missing ones.
+Writes `<shots>/auto-verdicts.json` (one record per screen with the final verdict, beside the manifest so `just shots-review` finds it), `<shots>/digest.md` (per-lane tables with a tally) and `<shots>/db/<screen>.json` (one document per screen for the review page's `auto_verdicts` collection, uploaded in batches of fifty with the artifact database tool). Every manifest screen must have an analyst record, or the merge fails and names the missing ones.
 
 ## Page
 
 ```
-node scripts/screen-review/build-page.mjs --manifest <shots>/manifest.json --out <page> --auto <out>/auto-verdicts.json --round 3 [--previous-verdicts <dir>] [--previous-index <index.html>]
+node scripts/screen-review/build-page.mjs --manifest <shots>/manifest.json --out <shots>/page --auto <shots>/auto-verdicts.json --round 3 [--previous-verdicts <dir>] [--previous-index <index.html>]
 ```
 
 The page shows each screen's four pictures, its criterion, the earlier verdict, the critic's verdict with reasons, and the owner's Yes and No. "Agree with the critic" copies the critic's verdict into the owner's `verdicts` collection. The `just shots-review` recipe runs this with the defaults.

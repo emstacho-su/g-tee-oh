@@ -104,7 +104,7 @@ body.critic-no section.state:not(.critic-said-no) { display: none; }
     <p class="notice" id="store-note" hidden>Answers can't be saved in this view, so they stay in this browser only. Tell the PM your verdicts in the terminal.</p>
   </header>
   <main id="groups" class="wrap"></main>
-  <footer>Pictures come from one full run on the merged sprint branch (generated __GENERATED__), against the mocked api with synthetic data. The real-stack flows ran in CI. Earlier verdicts and the critic's verdicts are read-only here; this page saves yours.</footer>
+  <footer>Pictures come from one full run on the merged sprint branch (generated __GENERATED__), against the mocked api with synthetic data. The real-stack flows ran in CI. Earlier verdicts and the critic's verdicts are read-only here; this page saves yours, one answer per screen name.</footer>
 </div>
 
 <script>
@@ -247,8 +247,13 @@ function choose(id, v) {
 function agreeWithCritic(id) {
   const s = ITEMS.find((x) => x.id === id);
   if (!s.auto) return;
+  clearTimeout(noteTimers[id]);
+  const typed = document.getElementById(id + "-note").value;
   const reasons = (s.auto.reasons || []).map((r) => r.rule + ": " + r.text).join(" ");
-  state[id] = { verdict: s.auto.verdict, note: s.auto.verdict === "no" ? ("Agreed with the critic. " + reasons).slice(0, 4000) : "Agreed with the critic." };
+  const agreed = s.auto.verdict === "no" ? "Agreed with the critic: " + reasons : "Agreed with the critic.";
+  const note = typed.includes(agreed) ? typed : (typed.trim() ? typed.trimEnd() + "
+" + agreed : agreed);
+  state[id] = { verdict: s.auto.verdict, note: note.slice(0, 4000) };
   paint(id); tally(); persist(id);
 }
 

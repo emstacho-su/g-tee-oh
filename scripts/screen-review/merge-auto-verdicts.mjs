@@ -1,22 +1,54 @@
 // Merges the critic's analyst and verifier output into one verdict per screen (S44, O-450).
 // Usage: node merge-auto-verdicts.mjs --manifest <manifest.json> --analyst <dir> --verifier <dir> --out <dir> [--families <families.json>]
-// Writes <out>/auto-verdicts.json, <out>/digest.md and <out>/db/<screen>.json. Fails, naming the
-// screens, when a manifest screen has no analyst record or a record names an unknown screen.
-// The rubric and the passes are described in rubric/critic.md.
+// Writes <out>/auto-verdicts.json, <out>/digest.md and <out>/db/<screen>.json. Pass the shots folder
+// as --out so `just shots-review` finds auto-verdicts.json beside the manifest. Fails, naming the
+// screens, when a manifest screen has no analyst record, a record names an unknown screen, or a
+// verifier check is malformed. The rubric and the passes are described in rubric/critic.md.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 export const VERDICTS = new Set(["yes", "no"]);
 export const CONFIDENCES = new Set(["high", "medium", "low"]);
+const SCREEN_NAME = /^[a-z0-9][a-z0-9-]*$/;
 const DEFAULT_FAMILIES = fileURLToPath(new URL("./rubric/families.json", import.meta.url));
 
 export class MergeError extends Error {}
 
+/** The file name of a shot path written on Windows or Linux (win32.basename splits on both separators). */
+export const shotFileName = (file) => win32.basename(file);
+
+/** The shot manifest `just shots` writes, validated at the boundary: a shots list with screen and file strings. */
+export function readManifest(path) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new MergeError(`manifest ${path} is not readable JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!Array.isArray(parsed?.shots) || parsed.shots.length === 0) throw new MergeError(`manifest ${path} has no shots list`);
+  parsed.shots.forEach((shot, index) => {
+    if (typeof shot?.screen !== "string" || !SCREEN_NAME.test(shot.screen)) throw new MergeError(`manifest shot ${index} has no valid screen name`);
+    if (typeof shot?.file !== "string" || shot.file === "") throw new MergeError(`manifest shot ${shot.screen} has no file`);
+  });
+  return { sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [], generated: String(parsed.generated ?? ""), directory: String(parsed.directory ?? ""), shots: parsed.shots };
+}
+
+/** families.json, validated: lanes and families with a match pattern and a known lane. */
+export function readFamilies(path) {
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  if (!parsed?.lanes || typeof parsed.lanes !== "object" || !Array.isArray(parsed.families)) throw new MergeError(`${path} needs lanes and families`);
+  const families = parsed.families.map((f) => {
+    if (typeof f?.id !== "string" || typeof f?.match !== "string" || !parsed.lanes[f.lane]) throw new MergeError(`family ${f?.id ?? "?"} needs id, match and a lane listed under lanes`);
+    return { ...f, pattern: new RegExp(f.match) };
+  });
+  return { lanes: parsed.lanes, families };
+}
+
 /** The family and lane of a screen; first matching family wins, else the last lane in the file. */
 export function familyOf(screen, families) {
-  const hit = families.families.find((f) => new RegExp(f.match).test(screen));
+  const hit = families.families.find((f) => (f.pattern ?? new RegExp(f.match)).test(screen));
   if (hit) return { family: hit.id, lane: hit.lane };
   const lanes = Object.keys(families.lanes);
   return { family: "other", lane: lanes[lanes.length - 1] };
@@ -39,14 +71,12 @@ function checkRecord(record, index) {
     if (typeof reason?.rule !== "string" || typeof reason?.text !== "string") throw new MergeError(`${where}: each reason needs rule and text`);
   }
   if (record.verdict === "no" && record.reasons.length === 0) throw new MergeError(`${where}: a no needs at least one reason`);
+  if (record.work_items !== undefined && !(Array.isArray(record.work_items) && record.work_items.every((n) => Number.isInteger(n) && n >= 1 && n <= 30))) {
+    throw new MergeError(`${where}: work_items must be whole numbers from 1 to 30`);
+  }
 }
 
-/**
- * Pure merge. manifestScreens: the screen names of the shot manifest. analystFiles and
- * verifierFiles: the parsed family files. Returns the records in manifest order.
- */
-export function mergeVerdicts({ manifestScreens, analystFiles, verifierFiles, families }) {
-  const known = new Set(manifestScreens);
+function indexAnalysts(analystFiles, known) {
   const byScreen = new Map();
   let index = 0;
   for (const file of analystFiles) {
@@ -58,16 +88,33 @@ export function mergeVerdicts({ manifestScreens, analystFiles, verifierFiles, fa
       byScreen.set(record.screen, { ...record, family: file.family });
     }
   }
-  const missing = manifestScreens.filter((s) => !byScreen.has(s));
-  if (missing.length) throw new MergeError(`no analyst record for ${missing.length} screen(s): ${missing.join(", ")}`);
+  return byScreen;
+}
 
+function indexVerifiers(verifierFiles, known) {
   const checks = new Map();
   for (const file of verifierFiles) {
     for (const check of file.checks ?? []) {
       if (typeof check?.screen !== "string" || typeof check?.upheld !== "boolean") throw new MergeError(`verifier check for ${check?.screen ?? "?"} needs screen and upheld`);
+      if (!known.has(check.screen)) throw new MergeError(`verifier names a screen the manifest lacks: ${check.screen}`);
+      if (checks.has(check.screen)) throw new MergeError(`verifier checks a screen twice: ${check.screen}`);
       checks.set(check.screen, check);
     }
   }
+  return checks;
+}
+
+/**
+ * Pure merge. manifestScreens: the screen names of the shot manifest. analystFiles and
+ * verifierFiles: the parsed family files. Returns the records in manifest order. A verifier
+ * check only acts on an analyst "no"; on a "yes" it is kept as a note and changes nothing.
+ */
+export function mergeVerdicts({ manifestScreens, analystFiles, verifierFiles, families }) {
+  const known = new Set(manifestScreens);
+  const byScreen = indexAnalysts(analystFiles, known);
+  const missing = manifestScreens.filter((s) => !byScreen.has(s));
+  if (missing.length) throw new MergeError(`no analyst record for ${missing.length} screen(s): ${missing.join(", ")}`);
+  const checks = indexVerifiers(verifierFiles, known);
 
   return manifestScreens.map((screen) => {
     const analyst = byScreen.get(screen);
@@ -82,25 +129,33 @@ export function mergeVerdicts({ manifestScreens, analystFiles, verifierFiles, fa
       analyst_verdict: analyst.verdict,
       confidence: analyst.confidence ?? "medium",
       reasons: analyst.reasons,
-      work_items: Array.isArray(analyst.work_items) ? analyst.work_items : [],
+      work_items: analyst.work_items ?? [],
       fix_hint: typeof analyst.fix_hint === "string" ? analyst.fix_hint : "",
       verifier: check ? { upheld: check.upheld, note: typeof check.note === "string" ? check.note : "" } : null,
     };
   });
 }
 
+export const isOverturned = (record) => record.analyst_verdict === "no" && record.verdict === "yes";
+
 export function tally(records) {
   const perLane = {};
   for (const r of records) {
     const t = (perLane[r.lane] ??= { yes: 0, no: 0, overturned: 0 });
     t[r.verdict] += 1;
-    if (r.analyst_verdict === "no" && r.verdict === "yes") t.overturned += 1;
+    if (isOverturned(r)) t.overturned += 1;
   }
   return { yes: records.filter((r) => r.verdict === "yes").length, no: records.filter((r) => r.verdict === "no").length, perLane };
 }
 
 function cell(text) {
   return String(text).replace(/\|/g, "\\|").replace(/\n+/g, " ");
+}
+
+function verifierCell(record) {
+  if (!record.verifier) return "";
+  const outcome = record.analyst_verdict !== "no" ? "noted" : record.verifier.upheld ? "upheld" : "overturned";
+  return record.verifier.note ? `${outcome}: ${record.verifier.note}` : outcome;
 }
 
 /** The digest in the format of the owner's round-1 verdict file: one table per lane, a tally first. */
@@ -116,8 +171,7 @@ export function renderDigest(records, families, { round = "3", generated = "" } 
     lines.push("| # | Screen | Verdict | Reasons | Work items | Verifier |", "|---|---|---|---|---|---|");
     rows.forEach((r, i) => {
       const reasons = r.reasons.map((x) => `${x.rule}: ${x.text}`).join(" ");
-      const verifier = r.verifier ? `${r.verifier.upheld ? "upheld" : "overturned"}${r.verifier.note ? `: ${r.verifier.note}` : ""}` : "";
-      lines.push(`| ${String(i + 1).padStart(2, "0")} | ${r.screen} | ${r.verdict === "no" ? "No" : "Yes"} | ${cell(reasons)} | ${r.work_items.join(", ")} | ${cell(verifier)} |`);
+      lines.push(`| ${String(i + 1).padStart(2, "0")} | ${cell(r.screen)} | ${r.verdict === "no" ? "No" : "Yes"} | ${cell(reasons)} | ${cell(r.work_items.join(", "))} | ${cell(verifierCell(r))} |`);
     });
     lines.push("");
   }
@@ -135,7 +189,7 @@ export function dbDocument(record, generated) {
     work_items: record.work_items,
     fix_hint: record.fix_hint,
     verifier_note: record.verifier?.note ?? "",
-    overturned: record.analyst_verdict === "no" && record.verdict === "yes",
+    overturned: isOverturned(record),
     generated,
   };
 }
@@ -148,11 +202,11 @@ export function main(argv) {
   for (const key of ["manifest", "analyst", "verifier", "out"]) {
     if (!values[key]) throw new MergeError(`--${key} is required`);
   }
-  const manifest = JSON.parse(readFileSync(values.manifest, "utf8"));
-  const families = JSON.parse(readFileSync(values.families, "utf8"));
+  const manifest = readManifest(values.manifest);
+  const families = readFamilies(values.families);
   const manifestScreens = [...new Set(manifest.shots.map((s) => s.screen))].sort();
   const records = mergeVerdicts({ manifestScreens, analystFiles: readJsonDir(values.analyst), verifierFiles: readJsonDir(values.verifier), families });
-  const generated = String(manifest.generated ?? "");
+  const generated = manifest.generated;
   mkdirSync(join(values.out, "db"), { recursive: true });
   writeFileSync(join(values.out, "auto-verdicts.json"), JSON.stringify({ generated, round: values.round, records }, null, 2));
   writeFileSync(join(values.out, "digest.md"), renderDigest(records, families, { round: values.round, generated }));

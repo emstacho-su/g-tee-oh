@@ -2,13 +2,15 @@
 // mapping, the analyst plus verifier merge, the digest, the database documents and the failures
 // that name their cause. node:test, synthetic data only, run by `pnpm run test:scripts`.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { MergeError, dbDocument, familyOf, mergeVerdicts, renderDigest, tally } from "./merge-auto-verdicts.mjs";
+import { MergeError, dbDocument, familyOf, mergeVerdicts, readFamilies, readManifest, renderDigest, tally } from "./merge-auto-verdicts.mjs";
 
-const families = JSON.parse(readFileSync(fileURLToPath(new URL("./rubric/families.json", import.meta.url)), "utf8"));
+const families = readFamilies(fileURLToPath(new URL("./rubric/families.json", import.meta.url)));
 
 const analyst = (screen, verdict, extra = {}) => ({ screen, verdict, confidence: "high", reasons: verdict === "no" ? [{ rule: "G3", text: "wall of text", variants: ["dark-390"] }] : [], ...extra });
 
@@ -55,6 +57,29 @@ test("R3.23 mergeVerdicts: failures name the screen", () => {
   assert.throws(() => mergeVerdicts({ ...base, analystFiles: [{ family: "study", screens: [analyst("study-ev", "maybe"), analyst("study-weight", "yes")] }] }), /verdict must be yes or no/);
   assert.throws(() => mergeVerdicts({ ...base, analystFiles: [{ family: "study", screens: [{ screen: "study-ev", verdict: "no", reasons: [] }, analyst("study-weight", "yes")] }] }), /a no needs at least one reason/);
   assert.throws(() => mergeVerdicts({ ...base, analystFiles: [{ family: "study", screens: [analyst("study-ev", "yes"), analyst("study-ev", "yes")] }] }), /twice/);
+  assert.throws(() => mergeVerdicts({ ...base, analystFiles: [{ family: "study", screens: [analyst("study-ev", "yes", { work_items: ["6 | matrix"] }), analyst("study-weight", "yes")] }] }), /work_items must be whole numbers/);
+  const both = [{ family: "study", screens: [analyst("study-ev", "no"), analyst("study-weight", "yes")] }];
+  assert.throws(() => mergeVerdicts({ ...base, analystFiles: both, verifierFiles: [{ checks: [{ screen: "study-ev", upheld: true }] }, { checks: [{ screen: "study-ev", upheld: false }] }] }), /verifier checks a screen twice/);
+  assert.throws(() => mergeVerdicts({ ...base, analystFiles: both, verifierFiles: [{ checks: [{ screen: "study-evv", upheld: false }] }] }), /verifier names a screen the manifest lacks/);
+  const noted = mergeVerdicts({ ...base, analystFiles: both, verifierFiles: [{ checks: [{ screen: "study-weight", upheld: false, note: "nothing to overturn" }] }] });
+  assert.equal(noted[1].verdict, "yes");
+  assert.equal(noted[1].analyst_verdict, "yes");
+  assert.match(renderDigest(noted, families), /| noted: nothing to overturn |/);
+});
+
+test("R3.23 readManifest and readFamilies: boundary files are validated with named errors", () => {
+  const dir = mkdtempSync(join(tmpdir(), "screen-review-"));
+  writeFileSync(join(dir, "empty.json"), JSON.stringify({ shots: [] }));
+  writeFileSync(join(dir, "bad-shot.json"), JSON.stringify({ shots: [{ screen: "Study EV", file: "x.png" }] }));
+  writeFileSync(join(dir, "no-file.json"), JSON.stringify({ shots: [{ screen: "study-ev" }] }));
+  writeFileSync(join(dir, "ok.json"), JSON.stringify({ generated: "2026-10-29T10:00:00.000Z", shots: [{ screen: "study-ev", file: "C:\\s\\study-ev-dark-desktop.png" }] }));
+  writeFileSync(join(dir, "fam.json"), JSON.stringify({ lanes: { S1: { title: "one" } }, families: [{ id: "a", match: "^a", lane: "S9" }] }));
+  assert.throws(() => readManifest(join(dir, "empty.json")), (e) => e instanceof MergeError && /no shots list/.test(e.message));
+  assert.throws(() => readManifest(join(dir, "bad-shot.json")), /no valid screen name/);
+  assert.throws(() => readManifest(join(dir, "no-file.json")), /has no file/);
+  assert.throws(() => readManifest(join(dir, "nope.json")), /not readable JSON/);
+  assert.equal(readManifest(join(dir, "ok.json")).generated, "2026-10-29T10:00:00.000Z");
+  assert.throws(() => readFamilies(join(dir, "fam.json")), /a lane listed under lanes/);
 });
 
 test("R3.23 renderDigest and dbDocument: a table per lane with a tally, and one document per screen", () => {
