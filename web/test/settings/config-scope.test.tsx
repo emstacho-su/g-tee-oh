@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { fixtureMemberSession } from "../../src/fixtures/index.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
 import type { GameConfig } from "../../src/progress/types.js";
-import { ALL_CONFIGS, CONFIG_LABELS_STORAGE_KEY, rememberConfigLabels, useSessionDefaultsStore } from "../../src/store/index.js";
+import { ALL_CONFIGS, CONFIG_LABELS_STORAGE_KEY, readConfigLabels, rememberConfigLabels, useSessionDefaultsStore } from "../../src/store/index.js";
 import { jsonResponse, sessionResponse, type FetchScript } from "../api/fake-fetch.js";
 import { renderApp } from "../app/render-app.js";
 
@@ -48,5 +48,18 @@ describe("R4.12 the configuration scope keeps its mode and its labels (O-486)", 
     renderApp("/settings/configurations", member);
     const scope = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(scope).findByText("Saved configurations no longer offered: Online, 6 players, 999bb deep.")).toBeInTheDocument();
+  });
+
+  it("R4.12 a chosen id the catalog lists is remembered as the list renders, so it is named after the catalog drops it (PR #48 review round 2 MEDIUM 5)", async () => {
+    // Chosen elsewhere (another screen or an older build): never ticked in this list.
+    useSessionDefaultsStore.getState().setConfigScope([FIRST.config_id]);
+    const first = renderApp("/settings/configurations", member);
+    const scope = await screen.findByRole("region", { name: "Configuration scope" });
+    await within(scope).findByRole("list", { name: "Configurations to train" });
+    expect(readConfigLabels()[FIRST.config_id]).toBe("Online, 6 players, 100bb deep");
+    first.unmount();
+    renderApp("/settings/configurations", { ...member, [CONFIGS]: [jsonResponse(200, { items: fixtureConfigs.slice(1), next_cursor: null })] });
+    const again = await screen.findByRole("region", { name: "Configuration scope" });
+    expect(await within(again).findByText("Saved configurations no longer offered: Online, 6 players, 100bb deep.")).toBeInTheDocument();
   });
 });

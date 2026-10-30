@@ -12,7 +12,7 @@
  * on its own.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
@@ -38,6 +38,16 @@ function ConfigList({ configs, chosen, onChange }: ConfigListProps) {
   const atCap = chosen.length >= MAX_SCOPE_CONFIGS;
   // The labels the catalog gives now are remembered, so a stale id can still be named later (O-486).
   const [labels, setLabels] = useState<ConfigLabels>(() => readConfigLabels());
+  // Every chosen id the catalog lists now has its label remembered as the list renders, not only
+  // when ticked here, so a scope chosen elsewhere is named too once the catalog drops it (PR #48
+  // review round 2 MEDIUM 5). Only labels that changed are written.
+  useEffect(() => {
+    const listed = Object.fromEntries(
+      configs.filter((config) => chosen.includes(config.config_id)).map((config) => [config.config_id, configLabel(config)] as const),
+    );
+    const changed = Object.entries(listed).some(([id, label]) => labels[id] !== label);
+    if (changed) setLabels(rememberConfigLabels(listed));
+  }, [configs, chosen, labels]);
   const toggle = (id: string, on: boolean): void => {
     const picked = new Set(on ? [...chosen, id] : chosen.filter((each) => each !== id));
     if (on) {
