@@ -8,7 +8,8 @@
  * selected hand is the stand-in the two reads share one query key, so nothing is fetched twice; a
  * hover never changes either read (R3.25). The threshold card gets the node's actions, so its rows
  * carry the exact labels and swatches (O-198). A selected hand that left the range (404
- * hand-not-in-range) says so while the advantage card stays; other failures show the fixed message
+ * hand-not-in-range) says so while the advantage card stays; a failed stand-in read names no hand
+ * (advantageFailure, code review), and the stand-in read is keyed per node, so a revisit is a cache hit; other failures show the fixed message
  * from problem-text.ts with a retry when it can help. A hand-less api variant is O-461.
  */
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { AppApi } from "../../api/index.js";
 import { BlockersCard, HandRoleChip, RangeAdvantageCard, ThresholdCard } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
-import { insightsFailure } from "../../study/problem-text.js";
+import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { LoadingNote } from "../../components/ui/index.js";
 import { FailureAlert } from "./StudyNotices.js";
@@ -49,8 +50,8 @@ function insightsParams(node: InsightsNode, hand: string) {
 function AdvantageArea({ api, node, hand }: { api: AppApi; node: InsightsNode; hand: string }) {
   const insights = useQuery(studyInsightsQuery(api, insightsParams(node, hand)));
   if (insights.isPending) return <LoadingNote text="Loading the range advantage." />;
-  // A failure here is the stand-in's; the selected hand's own read reports its own failure.
-  if (insights.isError) return <FailureAlert failure={insightsFailure(insights.error, hand)} onRetry={() => void insights.refetch()} />;
+  // A failure here is the stand-in's, a hand the user never picked, so the message names none (code review).
+  if (insights.isError) return <FailureAlert failure={advantageFailure(insights.error)} onRetry={() => void insights.refetch()} />;
   return (
     <RangeAdvantageCard
       rangeAdvantage={insights.data.range_advantage}

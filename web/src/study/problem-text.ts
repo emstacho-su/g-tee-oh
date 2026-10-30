@@ -47,6 +47,21 @@ export function insightsFailure(error: unknown, hand: string): StudyFailure {
   };
 }
 
+const ADVANTAGE_LEAD = "The range advantage could not be loaded";
+
+/**
+ * A failed read of the range advantage (S45 code review, O-461). The read uses a stand-in hand the
+ * user never picked, so the message names no hand: a 404 says the library holds none at this node,
+ * a 502 or 503 adds the upstream cause, anything else is a generic retryable failure.
+ */
+export function advantageFailure(error: unknown): StudyFailure {
+  const status = statusOf(error);
+  if (status === HTTP_STATUS.notFound) return { message: "The library holds no range advantage at this node.", retryable: false };
+  const upstream = status === undefined ? undefined : UPSTREAM_FAILURES[status];
+  if (upstream === undefined) return { message: `${ADVANTAGE_LEAD}.`, retryable: true };
+  return { message: `${ADVANTAGE_LEAD}: ${upstream.message.charAt(0).toLowerCase()}${upstream.message.slice(1)}`, retryable: upstream.retryable };
+}
+
 /** Every catalog failure reads the same: the catalog is small and one retry refetches it all. */
 export function catalogFailure(): StudyFailure {
   return { message: "The game catalog could not be loaded.", retryable: true };
