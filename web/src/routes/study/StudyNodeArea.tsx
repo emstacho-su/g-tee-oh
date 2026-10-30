@@ -33,7 +33,7 @@ import { nodeFailure } from "../../study/problem-text.js";
 import { studyNodeQuery } from "../../study/queries.js";
 import type { StudySearch } from "../../study/search.js";
 import { useChildStreets, useLineNodes, type ChildStreets } from "../../study/use-line-nodes.js";
-import { parseFilters } from "../../study/action-filters.js";
+import { knownFilters, parseFilters } from "../../study/action-filters.js";
 import type { DepthNeighbours } from "../../study/depth-steps.js";
 import { studyModeOf } from "../../study/search.js";
 import { useStudyHotkeys } from "../../study/use-study-hotkeys.js";
@@ -107,7 +107,8 @@ export function StudyNodeArea(props: StudyNodeAreaProps) {
   const node = useQuery(studyNodeQuery(api, { configId, pair: pair.pair, line: search.line ?? "" }));
   usePrefetchNextLikely(api, node.data, configId, pair.pair);
   const childStreets = useChildStreets(api, configId, pair.pair, search.line, node.data ?? NO_ACTIONS);
-  const filters = parseFilters(search);
+  // Escape is live only while a filter names an action at this node (code review).
+  const filters = knownFilters(parseFilters(search), node.data?.actions ?? []);
   useStudyHotkeys({
     line: search.line,
     nextLikelyLine: node.data?.next_likely_line,

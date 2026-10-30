@@ -12,6 +12,7 @@
 import { ActionFrequencyTable } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { formatCombos } from "../../poker/format.js";
+import { knownFilters } from "../../study/action-filters.js";
 import { combosByPosition, sharesByPosition } from "../../study/range-shares.js";
 
 export const RANGE_TABLE_CAPTION = "Range by action at this node";
@@ -34,7 +35,7 @@ interface HandRowProps {
 function HandRow({ node, hand, filters }: HandRowProps) {
   const row = node.hands.find((candidate) => candidate.hand === hand);
   if (row === undefined) return <p className="text-sm text-muted">{`${hand} is not in the range at this node.`}</p>;
-  const known = filters.filter((index) => node.actions.some((action) => action.index === index));
+  const known = knownFilters(filters, node.actions);
   return (
     <ActionFrequencyTable
       actions={node.actions}

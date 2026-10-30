@@ -36,7 +36,7 @@ import { exactActionLabel, formatCbb } from "../../poker/format.js";
 import { useThemeStore } from "../../store/theme.js";
 import { lineLabel } from "../../study/line.js";
 import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
-import { nextFilterState, parseFilters } from "../../study/action-filters.js";
+import { knownFilters, nextFilterState, parseFilters } from "../../study/action-filters.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { FilterChips } from "./FilterChips.js";
 import { HandInsights } from "./HandInsights.js";
@@ -146,7 +146,8 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
   const [scaleByWeight, setScaleByWeight] = useScaleByWeight(node);
   const [hovered, setHovered] = useState<string | null>(null);
   const rowHand = hovered ?? search.hand;
-  const filters = useMemo(() => parseFilters(search), [search]);
+  // Only the indexes that name an action here count (code review): a stale one is ignored, never rewritten.
+  const filters = useMemo(() => knownFilters(parseFilters(search), node.actions), [search, node.actions]);
   const toggleFilter = (index: number) => {
     const next = nextFilterState(filters, index);
     onFiltersChange(next.filters, next.compare ?? undefined);

@@ -6,7 +6,7 @@
  * rewritten, the hand row marks the filtered actions, combos print when served and the action
  * legend under the matrix is hidden because the table is the legend (design rule 3).
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -99,6 +99,18 @@ describe("R3.12 action rows filter the matrix", () => {
     expect(within(chips).getAllByRole("listitem")).toHaveLength(1);
     expect(router.state.location.search).toMatchObject({ filters: "2,9" });
     expect(screen.getByRole("img", { name: /^Range matrix, frequency mode, 169 hands, filtered to Raise to 2.5bb$/ })).toBeInTheDocument();
+  });
+
+  it("R3.12 a stale index alone neither turns the next row click into Compare nor binds Escape (code review)", async () => {
+    const user = userEvent.setup();
+    const { router } = renderStudy(`${BASE}&filters=9`);
+    const table = await rangeTable();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(router.state.location.search).toMatchObject({ filters: "9" });
+    await user.click(within(table).getByRole("button", { name: /Raise to 2.5bb/ }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ filters: "2" }));
+    expect(router.state.location.search).not.toHaveProperty("mode");
+    expect(router.state.location.search).not.toHaveProperty("lens");
   });
 
   it("R3.12 the hand row marks the filtered actions", async () => {
