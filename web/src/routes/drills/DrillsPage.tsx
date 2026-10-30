@@ -8,8 +8,8 @@
  * an import is announced in a polite live region; an imported drill appears at the top of the
  * table, and a tag filter it would not pass is cleared so it shows. With no drills there is an
  * empty state offering the starter pack (S47, R3.35, O-481) and a New drill link; the header offers
- * the pack too until the user has a drill carrying the starter tag (its own read, tagInUseQuery).
- * Both buttons share the page's one starter-pack intent. The duplicate and delete requests belong to this page, so a
+ * the starter drills the user does not have yet (its own read of the starter tag, taggedNamesQuery),
+ * so a pack that landed partway offers only the rest. Both buttons share the page's one intent. The duplicate and delete requests belong to this page, so a
  * change of selection while one runs never drops its result; a failure shows with the drill it
  * acted on whenever that drill is selected (PR #42 review round 1 C).
  */
@@ -21,9 +21,9 @@ import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
 import { Button, LoadingNote, PageHeader, Panel } from "../../components/ui/index.js";
 import { drillFailureText } from "../../drills/failure-text.js";
-import { drillListQuery, tagInUseQuery } from "../../drills/queries.js";
+import { drillListQuery, taggedNamesQuery } from "../../drills/queries.js";
 import type { DrillsSearch } from "../../drills/search.js";
-import { STARTER_TAG } from "../../drills/starter-pack.js";
+import { missingStarterDrills, STARTER_PACK, STARTER_TAG, type StarterDrill } from "../../drills/starter-pack.js";
 import type { Drill } from "../../drills/types.js";
 import { useDeleteDrill, useDuplicateDrill, useImportStarterPack } from "../../drills/use-drill-writes.js";
 import type { IntentMutation } from "../../library/use-intent-mutation.js";
@@ -72,14 +72,15 @@ function failureOn<TResult>(request: IntentMutation<string, TResult>, drillId: s
 interface EmptyStateProps {
   tagged: boolean;
   pack: StarterPackIntent;
+  missing: readonly StarterDrill[];
 }
 
 /** No drills yet: the starter pack first (S47, R3.35, O-481), then New drill. */
-function EmptyState({ tagged, pack }: EmptyStateProps) {
+function EmptyState({ tagged, pack, missing }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border-strong p-6">
       <p>{tagged ? LIBRARY_TEXT.emptyTagged : LIBRARY_TEXT.empty}</p>
-      {tagged ? null : <StarterPackButton pack={pack} withHint />}
+      {tagged || missing.length === 0 ? null : <StarterPackButton pack={pack} missing={missing} withHint />}
       <NewDrillLink />
     </div>
   );
@@ -100,7 +101,9 @@ export function DrillsPage({ search }: DrillsPageProps) {
   const failure = selected === undefined ? null : (failureOn(remove, selected.id) ?? failureOn(duplicate, selected.id));
   // The header offers the pack until the user has a starter drill, read on its own so a tag filter
   // or a later page never decides it (O-481, PR #48 review HIGH 3); the empty state always offers it.
-  const starterInUse = useQuery(tagInUseQuery(api, STARTER_TAG));
+  const starterNames = useQuery(taggedNamesQuery(api, STARTER_TAG));
+  // The pack entries the user does not have yet (round 2 MEDIUM 3); the whole pack until the read lands.
+  const missing = starterNames.data === undefined ? STARTER_PACK : missingStarterDrills(starterNames.data);
   const starterAdded = (added: readonly Drill[]): void => {
     setAnnouncement(STARTER_TEXT.added(added.length));
     if (search.tag !== undefined) setTag(undefined);
@@ -108,7 +111,7 @@ export function DrillsPage({ search }: DrillsPageProps) {
   // One intent for the page (review HIGH 2): every button over it shares one key set.
   const pack = useImportStarterPack(api, starterAdded);
   const emptyUntagged = list.isSuccess && drills.length === 0 && search.tag === undefined;
-  const offerInHeader = starterInUse.data === false;
+  const offerInHeader = starterNames.data !== undefined && missing.length > 0;
 
   function imported(drill: Drill): void {
     setImporting(false);
@@ -125,7 +128,7 @@ export function DrillsPage({ search }: DrillsPageProps) {
           <>
             <NewDrillLink />
             <Button onClick={() => setImporting(true)}>{IMPORT_TEXT.open}</Button>
-            {offerInHeader ? <StarterPackButton pack={pack} showFailure={!emptyUntagged} /> : null}
+            {offerInHeader ? <StarterPackButton pack={pack} missing={missing} showFailure={!emptyUntagged} /> : null}
           </>
         }
       />
@@ -143,7 +146,7 @@ export function DrillsPage({ search }: DrillsPageProps) {
           </div>
         ) : null}
         {list.isPending ? <LoadingNote text={LIBRARY_TEXT.loading} /> : null}
-        {list.isSuccess && drills.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} /> : null}
+        {list.isSuccess && drills.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} missing={missing} /> : null}
         {drills.length === 0 ? null : (
           <>
             <DrillToolbar

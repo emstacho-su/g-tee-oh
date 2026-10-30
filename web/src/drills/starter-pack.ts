@@ -11,6 +11,16 @@
  */
 export const STARTER_TAG = "starter";
 
+/**
+ * The starter drills the user does not have yet, in pack order (PR #48 review round 2 MEDIUM 3): a
+ * pack entry counts as present when a drill carrying STARTER_TAG has its name, so a pack that
+ * landed partway offers only the rest.
+ */
+export function missingStarterDrills(starterNames: readonly string[]): readonly StarterDrill[] {
+  const present = new Set(starterNames);
+  return STARTER_PACK.filter((entry) => !present.has(entry.name));
+}
+
 export interface StarterDrill {
   /** A stable key for lists and tests. */
   readonly key: string;

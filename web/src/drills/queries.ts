@@ -59,21 +59,24 @@ export async function fetchDrillPage(api: AppApi, tag: string | undefined, curso
   return data;
 }
 
-/** One drill is enough to know a tag is in use. */
-const PRESENCE_LIMIT = 1;
-
 /**
- * Whether any drill of the user's carries this tag, from its own read (S47, PR #48 review HIGH 3):
- * GET /drills?tag=<tag>&limit=1, independent of the visible list's filter and pages. It sits under
- * the drills root, so invalidateDrills refreshes it after every write.
+ * The names of the drills carrying one tag, from their own read (S47, PR #48 review HIGH 3 and round
+ * 2 MEDIUM 3): GET /drills?tag=<tag>, every page, independent of the visible list's filter and
+ * pages. The starter pack compares its entries against it. It sits under the drills root, so
+ * invalidateDrills refreshes it after every write.
  */
-export function tagInUseQuery(api: AppApi, tag: string) {
+export function taggedNamesQuery(api: AppApi, tag: string) {
   return queryOptions({
-    queryKey: [DRILLS_QUERY_ROOT, "tag-in-use", tag] as const,
-    queryFn: async (): Promise<boolean> => {
-      const { data, error, response } = await api.client.GET("/api/v1/drills", { params: { query: { limit: PRESENCE_LIMIT, tag } } });
-      if (data === undefined) throw drillProblemFromBody(response.status, error);
-      return data.items.length > 0;
+    queryKey: [DRILLS_QUERY_ROOT, "tagged-names", tag] as const,
+    queryFn: async (): Promise<string[]> => {
+      const names: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await fetchDrillPage(api, tag, cursor);
+        names.push(...page.items.map((drill) => drill.name));
+        cursor = page.next_cursor ?? undefined;
+      } while (cursor !== undefined);
+      return names;
     },
     staleTime: DRILL_STALE_MS,
     retry: false,

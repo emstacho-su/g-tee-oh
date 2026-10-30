@@ -74,19 +74,23 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(alert).toHaveTextContent(/Error:/);
     expect(sent("POST", IMPORT_PATH)).toHaveLength(2);
     failAt = null;
+    // The code that landed shows (the reads were invalidated on failure), so the retry sends only the rest.
+    await screen.findByRole("button", { name: `Add the ${STARTER_PACK.length - 1} missing starter drills` });
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length - 1} starter drills.`));
     const keys = sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"]);
-    // The first code was imported before the failure; its retry carries the same key, so the api replays it.
     expect(keys.slice(0, 2)).toEqual(["test-key-1-0", "test-key-1-1"]);
-    expect(keys.slice(2)).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
+    // The code whose answer was lost keeps its key, so a request that did land would be replayed.
+    expect(keys[2]).toBe("test-key-1-1");
+    expect(sent("POST", IMPORT_PATH).slice(2).map((request) => request.body)).toEqual(STARTER_PACK.slice(1).map((entry) => ({ export_code: entry.code })));
   });
 
-  it("R3.35 the header hides the button once a starter drill is listed", async () => {
+  it("R3.35 the header hides the button once every starter drill is in the library", async () => {
+    const all = STARTER_PACK.map((entry, index) => ({ ...fixtureDrill, id: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`, name: entry.name, tags: [STARTER_TAG] }));
     renderDrills("/drills", {
       override: (request) =>
         request.method === "GET" && request.path === "/api/v1/drills"
-          ? jsonBody(200, { items: [{ ...fixtureDrill, tags: [STARTER_TAG, "rfi"] }], next_cursor: null })
+          ? jsonBody(200, { items: all, next_cursor: null })
           : undefined,
     });
     await screen.findByRole("table", { name: "Your drills" });
@@ -119,13 +123,13 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
   });
 
-  it("R3.35 the header decides from its own read, not the filtered page: a starter drill outside the filter still hides it (PR #48 review HIGH 3)", async () => {
-    const starter = { ...fixtureDrill, id: "00000000-0000-4000-8000-0000000000f1", name: "A starter drill", tags: [STARTER_TAG] };
+  it("R3.35 the header decides from its own read, not the filtered page: starter drills outside the filter still count (PR #48 review HIGH 3)", async () => {
+    const all = STARTER_PACK.map((entry, index) => ({ ...fixtureDrill, id: `00000000-0000-4000-8000-0000000002${String(index).padStart(2, "0")}`, name: entry.name, tags: [STARTER_TAG] }));
     const { sent } = renderDrills("/drills?tag=synthetic", {
-      override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === STARTER_TAG ? jsonBody(200, { items: [starter], next_cursor: null }) : undefined),
+      override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === STARTER_TAG ? jsonBody(200, { items: all, next_cursor: null }) : undefined),
     });
     await screen.findByRole("table", { name: "Your drills" });
-    await waitFor(() => expect(sent("GET", "/api/v1/drills").some((request) => request.query["tag"] === STARTER_TAG && request.query["limit"] === "1")).toBe(true));
+    await waitFor(() => expect(sent("GET", "/api/v1/drills").some((request) => request.query["tag"] === STARTER_TAG)).toBe(true));
     expect(screen.queryByRole("button", { name: BUTTON })).not.toBeInTheDocument();
   });
 
@@ -133,5 +137,32 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     renderDrills("/drills?tag=synthetic");
     await screen.findByRole("table", { name: "Your drills" });
     expect(await screen.findByRole("button", { name: BUTTON })).toBeInTheDocument();
+  });
+
+  it("R3.35 codes 0 to 3 land and 4 fails; after a remount the button offers the remaining six and imports only those (PR #48 review round 2 MEDIUM 3)", async () => {
+    const user = userEvent.setup();
+    let failAt: number | null = 5;
+    let count = 0;
+    const view = renderDrills("/drills", {
+      override: (request) => {
+        if (request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        count += 1;
+        return count === failAt ? Promise.reject(new TypeError("Failed to fetch")) : undefined;
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    expect(view.sent("POST", IMPORT_PATH)).toHaveLength(5);
+    // The four that landed are in the library at once.
+    await waitFor(() => expect(screen.getAllByTestId("drill-name").map((cell) => cell.textContent)).toContain(STARTER_PACK[3]?.name));
+    failAt = null;
+    await view.router.navigate({ to: "/settings/$section", params: { section: "hotkeys" } });
+    await view.router.navigate({ to: "/drills" });
+    const button = await screen.findByRole("button", { name: "Add the 6 missing starter drills" });
+    await user.click(button);
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent("Added 6 starter drills."));
+    expect(view.sent("POST", IMPORT_PATH).slice(5).map((request) => request.body)).toEqual(STARTER_PACK.slice(4).map((entry) => ({ export_code: entry.code })));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /starter drills?$/ })).not.toBeInTheDocument());
   });
 });

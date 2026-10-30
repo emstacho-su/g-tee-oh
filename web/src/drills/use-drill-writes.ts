@@ -8,12 +8,13 @@
  * delete mutations, so one row's request never blocks another's.
  */
 import { useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import type { AppApi } from "../api/index.js";
 import { useIntentMutation, type IntentMutation } from "../library/use-intent-mutation.js";
 import { drillQuery } from "../trainer/session-api.js";
 import { createDrill, deleteDrill, duplicateDrill, importDrill, invalidateDrills, patchDrill } from "./queries.js";
-import type { StarterDrill } from "./starter-pack.js";
+import { STARTER_PACK, type StarterDrill } from "./starter-pack.js";
 import type { Drill, DrillCreate, DrillPatch } from "./types.js";
 
 export type SaveInput = { readonly kind: "create"; readonly body: DrillCreate } | { readonly kind: "patch"; readonly id: string; readonly body: DrillPatch };
@@ -68,30 +69,45 @@ export function useImportDrill(api: AppApi, onImported: (drill: Drill) => void):
   });
 }
 
-/** The Idempotency-Key of one code of a pack: the click's base key and the code's place in the pack. */
-export function starterImportKey(baseKey: string, index: number): string {
-  return `${baseKey}-${index}`;
+/** The Idempotency-Key of one starter code: a base key and the code's place in the whole pack. */
+export function starterImportKey(baseKey: string, packIndex: number): string {
+  return `${baseKey}-${packIndex}`;
 }
 
 /**
- * The starter pack as one intent (S47, R3.35, O-481): one base key per click, one derived key per
- * code, so a double click sends nothing twice and a retry after a failure resends the same keys,
- * which the api replays for the codes that landed. The codes import one after another, so a
- * failure stops the run where it is and Try again picks the whole pack up again under the same keys.
+ * The starter pack as one intent (S47, R3.35, O-481): one derived key per code, so a double click
+ * sends nothing twice and a retry resends the same key for the same code, which the api replays
+ * for a code that landed. The input is the codes still missing (missingStarterDrills): after a
+ * failure partway, the drill reads are invalidated so the codes that landed show, and the next
+ * click sends only what is still missing (PR #48 review round 2 MEDIUM 3). A code keeps the key it
+ * was first sent under for as long as the page is mounted, whatever the input around it, so a
+ * retry of a code whose answer was lost replays instead of importing it twice.
  */
 export function useImportStarterPack(api: AppApi, onImported: (drills: readonly Drill[]) => void): IntentMutation<readonly StarterDrill[], Drill[]> {
   const invalidate = useInvalidate();
+  const codeKeys = useRef<ReadonlyMap<string, string>>(new Map());
+  const keyFor = (entry: StarterDrill, baseKey: string): string => {
+    const known = codeKeys.current.get(entry.key);
+    if (known !== undefined) return known;
+    const key = starterImportKey(baseKey, STARTER_PACK.findIndex((each) => each.key === entry.key));
+    codeKeys.current = new Map([...codeKeys.current, [entry.key, key]]);
+    return key;
+  };
   return useIntentMutation<readonly StarterDrill[], Drill[]>({
     run: async (pack, key) => {
       const imported: Drill[] = [];
-      for (const [index, entry] of pack.entries()) {
-        imported.push(await importDrill(api, entry.code, starterImportKey(key, index)));
+      for (const entry of pack) {
+        imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
       }
       return imported;
     },
     onSuccess: async (drills) => {
       await invalidate();
       onImported(drills);
+    },
+    // The codes that landed before the failure are in the library: show them (review MEDIUM 3).
+    onError: () => {
+      void invalidate();
     },
   });
 }
