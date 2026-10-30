@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { AppApi } from "../api/index.js";
 import { useIntentMutation, type IntentMutation } from "../library/use-intent-mutation.js";
+import { drillQuery } from "../trainer/session-api.js";
 import { createDrill, deleteDrill, duplicateDrill, importDrill, invalidateDrills, patchDrill } from "./queries.js";
 import type { StarterDrill } from "./starter-pack.js";
 import type { Drill, DrillCreate, DrillPatch } from "./types.js";
@@ -24,10 +25,14 @@ function useInvalidate(): () => Promise<void> {
 
 export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInput) => void): IntentMutation<SaveInput, Drill> {
   const invalidate = useInvalidate();
+  const queryClient = useQueryClient();
   return useIntentMutation<SaveInput, Drill>({
     run: (input, key) => (input.kind === "create" ? createDrill(api, input.body, key) : patchDrill(api, input.id, input.body, key)),
     onSuccess: async (drill, input) => {
       await invalidate();
+      // The run screen reads the drill under its own key; the saved answer is that drill now, so a
+      // Save and run never starts on the cached copy (PR #48 review round 2 HIGH 1).
+      queryClient.setQueryData(drillQuery(api, drill.id).queryKey, drill);
       onSaved(drill, input);
     },
   });

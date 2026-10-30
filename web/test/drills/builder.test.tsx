@@ -326,4 +326,16 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await user.click(screen.getByRole("button", { name: "Advanced: custom game" }));
     expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("R3.36 Save and run after an edit starts with the saved settings, not the run screen's cached drill (PR #48 review round 2 HIGH 1)", async () => {
+    const user = userEvent.setup();
+    const { sent, router } = renderDrills(`/drills/${FIXTURE_DRILL_ID}/run`);
+    // The run screen caches the stored drill: Mixed-frequency mode off.
+    expect(await screen.findByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "false");
+    await router.navigate({ to: "/drills/$id/$section", params: { id: FIXTURE_DRILL_ID, section: "trainer" } });
+    await user.click(await screen.findByRole("checkbox", { name: /^Mixed-frequency mode/ }));
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await waitFor(() => expect(sent("POST", "/api/v1/sessions")).toHaveLength(1));
+    expect(sent("POST", "/api/v1/sessions")[0]?.body).toMatchObject({ mode: "drill", drill_id: FIXTURE_DRILL_ID, settings: { rng: true } });
+  });
 });

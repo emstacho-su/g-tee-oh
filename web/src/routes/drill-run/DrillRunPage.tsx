@@ -142,10 +142,15 @@ interface DrillRunProps {
   drill: Drill;
   seed: string | undefined;
   autostart: boolean;
+  /** The drill read is settled: not fetching, so the drill on screen is the one the api holds. */
+  drillSettled: boolean;
 }
 
-function DrillRun({ drill, seed, autostart }: DrillRunProps) {
-  const [rng, setRng] = useState(drill.trainer.rng);
+function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
+  // The switch follows the drill until the user touches it, so a refetched drill's setting is the
+  // one shown and started (PR #48 review round 2 HIGH 1); a touched switch overrides this session.
+  const [rngChoice, setRngChoice] = useState<boolean | null>(null);
+  const rng = rngChoice ?? drill.trainer.rng;
   // Session-only pause and speed (S47, O-487) and the line CoverageWatch leaves when the library caught up.
   const [overrides, setOverrides] = useState<SessionOverrideValues>({});
   const [coverageNote, setCoverageNote] = useState<string | null>(null);
@@ -163,7 +168,7 @@ function DrillRun({ drill, seed, autostart }: DrillRunProps) {
   });
   const { state } = session;
   const startPanel = onStartPanel(state);
-  useAutostart({ enabled: autostart, ready: state.kind === "idle", start: () => session.start(rng) });
+  useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
   const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
   const coverageArrived = (text: string): void => {
     setCoverageNote(text);
@@ -175,7 +180,7 @@ function DrillRun({ drill, seed, autostart }: DrillRunProps) {
     canEnd(state) && interactive,
   );
   const changeRng = (next: boolean) => {
-    setRng(next);
+    setRngChoice(next);
     if (next) explainer.showIfFirstUse();
   };
   const confirmEnd = () => {
@@ -229,7 +234,7 @@ export function DrillRunPage({ drillId, seed: rawSeed, autostart = false }: Dril
       {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
       {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
       {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}
-      {drill.data === undefined ? null : <DrillRun drill={drill.data} seed={seed} autostart={autostart} />}
+      {drill.data === undefined ? null : <DrillRun drill={drill.data} seed={seed} autostart={autostart} drillSettled={!drill.isFetching} />}
     </section>
   );
 }

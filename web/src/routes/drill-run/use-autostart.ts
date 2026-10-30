@@ -13,7 +13,10 @@ import { describeFailureForLog } from "../../api/http-status.js";
 export interface AutostartOptions {
   /** The address carried start=1. */
   enabled: boolean;
-  /** The drill is read and the machine is idle, so a start is what Start would do. */
+  /**
+   * The drill read is settled (not fetching: a stale cached copy is never started, PR #48 review
+   * round 2 HIGH 1) and the machine is idle, so a start is what Start would do.
+   */
   ready: boolean;
   start: () => void;
 }

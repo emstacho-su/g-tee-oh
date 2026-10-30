@@ -7,6 +7,7 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { FIXTURE_DRILL_ID, FIXTURE_SEED, fixtureDrill, fixturePlainPrompt, fixturePracticeSession } from "../../src/fixtures/trainer.js";
+import { drillQuery } from "../../src/trainer/session-api.js";
 import { jsonResponse } from "../api/fake-fetch.js";
 import { SIGNED_IN, renderApp } from "../app/render-app.js";
 
@@ -49,5 +50,20 @@ describe("R3.13 drill run route", () => {
     const app = renderApp(`/drills/${FIXTURE_DRILL_ID}/run?start=yes`, SCRIPT);
     await screen.findByRole("button", { name: "Start session" });
     expect(app.fake.calls.filter((call) => call.method === "POST" && call.path === "/api/v1/sessions")).toHaveLength(0);
+  });
+
+  it("R3.36 autostart waits for a stale cached drill's refetch and starts with the refetched settings (PR #48 review round 2 HIGH 1)", async () => {
+    const changed = { ...fixtureDrill, trainer: { ...fixtureDrill.trainer, rng: true } };
+    const app = renderApp(`/drills/${FIXTURE_DRILL_ID}/run`, {
+      ...SCRIPT,
+      [`GET /api/v1/drills/${FIXTURE_DRILL_ID}`]: [jsonResponse(200, fixtureDrill), jsonResponse(200, changed)],
+    });
+    expect(await screen.findByRole("switch", { name: "Mixed-frequency mode" })).toHaveAttribute("aria-checked", "false");
+    await app.router.navigate({ to: "/settings/$section", params: { section: "hotkeys" } });
+    await app.queryClient.invalidateQueries({ queryKey: drillQuery(app.api, FIXTURE_DRILL_ID).queryKey });
+    await app.router.navigate({ to: "/drills/$id/run", params: { id: FIXTURE_DRILL_ID }, search: { start: "1" } });
+    await screen.findByRole("group", { name: "Actions" });
+    const start = app.fake.calls.find((call) => call.method === "POST" && call.path === "/api/v1/sessions");
+    expect(JSON.parse(start?.body ?? "{}")).toMatchObject({ settings: { rng: true } });
   });
 });
