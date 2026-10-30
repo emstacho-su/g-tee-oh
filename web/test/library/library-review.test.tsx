@@ -89,9 +89,9 @@ describe("R3.4 nothing leaks across a selection change (O-297)", () => {
     await user.click(screen.getByRole("button", { name: "Request this flop" }));
     await screen.findByTestId("gap-request-result");
 
-    await user.click(screen.getByRole("button", { name: /^SB-BTN/ }));
+    await user.click(screen.getByRole("button", { name: /^Small blind versus button/ }));
 
-    await screen.findByRole("heading", { name: `SB-BTN at ${FIXTURE_STUDY_CONFIG_ID}` });
+    await screen.findByRole("heading", { name: "Small blind versus button at Online, 6 players, 100bb deep" });
     expect(screen.queryByTestId("gap-request-result")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Flop" })).toHaveValue("");
   });

@@ -78,7 +78,7 @@ describe("R4.12 home queue card", () => {
     expect(within(queue).getByTestId("queue-new")).toHaveTextContent("8 classes not practiced yet.");
     const leaks = within(within(queue).getByRole("list", { name: "Top leaks" })).getAllByRole("listitem");
     expect(leaks).toHaveLength(3);
-    expect(leaks[0]).toHaveTextContent(fixtureLeaks.items[0]?.family ?? "missing");
+    expect(leaks[0]).toHaveTextContent("Open or fold");
     expect(leaks[0]).toHaveTextContent("42.0 bb per 1,000 hands");
     expect(within(queue).getByRole("link", { name: "Start training" })).toHaveAttribute("href", "/train");
   });

@@ -14,6 +14,11 @@
  * sentence. A create goes on to the new drill's same page with saved=1; a patch says it saved, or
  * that nothing changed when no field differs.
  *
+ * S47 (R3.36, R3.37, O-483): a second submit, Save and run, saves and opens the run screen with the
+ * autostart flag; a failed Save moves to the first page with an error and focuses its first invalid
+ * control (use-focus-first-error.ts); the reach status line under the page counts the spots the
+ * draft reaches (ReachStatus); the page is told when the draft is dirty (onDirtyChange).
+ *
  * Unsaved edits (PM note 3): the draft is dirty while it differs from the last saved (or loaded)
  * draft (compared by meaning, drills/draft-compare.ts); LeaveGuard asks before leaving the builder
  * then. A successful save makes the draft clean; the create's own navigation skips the guard and
@@ -42,16 +47,21 @@ import { GameSection, type SectionProps } from "./GameSection.js";
 import { HandsSection } from "./HandsSection.js";
 import { LeaveGuard } from "./LeaveGuard.js";
 import { SeatsSection } from "./SeatsSection.js";
+import { ReachStatus } from "./ReachStatus.js";
 import { PanelsSection, TrainerSection } from "./TrainerSection.js";
+import { useFocusFirstError } from "./use-focus-first-error.js";
 
 export const FORM_TEXT = {
   save: "Save drill",
+  saveAndRun: "Save and run",
   saving: "Saving",
   cancel: "Cancel",
   saveCovers: "Save drill saves every page.",
   saved: "Drill saved.",
   changesSaved: "Changes saved.",
   unchanged: "Nothing changed, so nothing was saved.",
+  /** Save and run landed after the draft changed again (S47, PR #48 review MEDIUM 6). */
+  editedSince: "Saved; you changed it since, save again to run.",
 } as const;
 
 export interface DrillFormProps {
@@ -65,6 +75,10 @@ export interface DrillFormProps {
   drill?: Drill;
   /** True right after the create that led here (?saved=1). */
   justCreated?: boolean;
+  /** The create was a Save and run with edits made while it was in flight (?saved=rerun). */
+  editedSinceRun?: boolean;
+  /** Told whenever the draft becomes dirty or clean, so the page can hold actions that act on the stored drill (S47, R3.14). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function NameSection({ draft, onChange, errors }: SectionProps) {
@@ -120,6 +134,8 @@ interface AfterSave {
   /** The edits made since the save was sent, or undefined when there are none. */
   unsentEdits: () => DrillDraft | undefined;
   section: BuilderSectionSlug;
+  /** Whether the save that is landing was "Save and run" (S47, R3.36): the run screen opens with autostart. */
+  runAfter: () => boolean;
 }
 
 /**
@@ -128,19 +144,27 @@ interface AfterSave {
  * create was in flight is handed to the new drill's builder (drills/draft-handoff.ts), where it
  * stays an unsaved change and the next Save patches the new drill.
  */
-function useAfterSave({ setStatus, markClean, unsentEdits, section }: AfterSave) {
+function useAfterSave({ setStatus, markClean, unsentEdits, section, runAfter }: AfterSave) {
   const navigate = useNavigate();
+  const logFailure = (error: unknown): void => {
+    console.error(`g-tee-oh: the builder navigation failed (${describeFailureForLog(error)})`);
+  };
   return (saved: Drill, input: SaveInput) => {
     markClean();
-    if (input.kind === "patch") {
-      setStatus(FORM_TEXT.changesSaved);
+    const edits = unsentEdits();
+    // Save and run runs only what was saved: an edit made while the save was in flight would be
+    // lost behind the run screen, so the builder stays and says so (PR #48 review MEDIUM 6).
+    const run = runAfter();
+    if (run && edits === undefined) {
+      navigate({ to: "/drills/$id/run", params: { id: saved.id }, search: { start: "1" }, ignoreBlocker: true }).catch(logFailure);
       return;
     }
-    const edits = unsentEdits();
+    if (input.kind === "patch") {
+      setStatus(run ? FORM_TEXT.editedSince : FORM_TEXT.changesSaved);
+      return;
+    }
     if (edits !== undefined) handOffDraft(saved.id, edits);
-    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: "1" }, ignoreBlocker: true }).catch((error: unknown) => {
-      console.error(`g-tee-oh: the builder navigation failed (${describeFailureForLog(error)})`);
-    });
+    navigate({ to: "/drills/$id/$section", params: { id: saved.id, section }, search: { saved: run ? "rerun" : "1" }, ignoreBlocker: true }).catch(logFailure);
   };
 }
 
@@ -182,13 +206,19 @@ function useDraft(initial: DrillDraft, start: DrillDraft = initial) {
   return { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits };
 }
 
-export function DrillForm({ initial, start, section, drill, justCreated = false }: DrillFormProps) {
+export function DrillForm({ initial, start, section, drill, justCreated = false, editedSinceRun = false, onDirtyChange }: DrillFormProps) {
   const api = useAppApi();
   const { draft, setDraft, dirty, dirtyRef, sentRef, markClean, unsentEdits } = useDraft(initial, start);
   const [checkedDraft, setCheckedDraft] = useState<DrillDraft | null>(null);
-  const [status, setStatus] = useState(justCreated ? FORM_TEXT.saved : "");
-  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, unsentEdits, section }));
+  const [status, setStatus] = useState(justCreated ? (editedSinceRun ? FORM_TEXT.editedSince : FORM_TEXT.saved) : "");
+  // Set by the Save and run button's click, which lands before the form's submit event (S47, R3.36).
+  const runIntent = useRef(false);
+  const navigate = useNavigate();
+  const formRef = useRef<HTMLFormElement>(null);
+  const focusFirstError = useFocusFirstError(section, drill?.id, formRef);
+  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, unsentEdits, section, runAfter: () => runIntent.current }));
   useDropSavedFlag(drill?.id, justCreated, section);
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   // Client errors show once Save was pressed, and then follow every edit.
   const clientErrors = checkedDraft === null ? [] : errorsOf(resultOf(draft, drill));
@@ -207,8 +237,19 @@ export function DrillForm({ initial, start, section, drill, justCreated = false 
     event.preventDefault();
     setCheckedDraft(draft);
     const result = resultOf(draft, drill);
-    if (!result.ok) return;
+    if (!result.ok) {
+      runIntent.current = false;
+      focusFirstError(errorCountsBySection(groupFieldErrors(result.errors)));
+      return;
+    }
     if (result.body.kind === "patch" && Object.keys(result.body.body).length === 0) {
+      if (runIntent.current && drill !== undefined) {
+        runIntent.current = false;
+        navigate({ to: "/drills/$id/run", params: { id: drill.id }, search: { start: "1" } }).catch((error: unknown) => {
+          console.error(`g-tee-oh: opening the run screen failed (${describeFailureForLog(error)})`);
+        });
+        return;
+      }
       setStatus(FORM_TEXT.unchanged);
       return;
     }
@@ -217,15 +258,19 @@ export function DrillForm({ initial, start, section, drill, justCreated = false 
   }
 
   return (
-    <form aria-label="Drill builder" onSubmit={submit} noValidate className="flex flex-col gap-4">
+    <form ref={formRef} aria-label="Drill builder" onSubmit={submit} noValidate className="flex flex-col gap-4">
       <FormAlert errors={errors} counts={counts} failure={failure} omitted={sentThisDraft ? omittedErrorsOfFailure(save.error) : 0} drillId={drill?.id} />
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
         <BuilderNav drillId={drill?.id} counts={counts} />
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <SectionPage section={section} draft={draft} onChange={change} errors={errors} />
+          <ReachStatus draft={draft} />
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border/50 bg-surface-sunken px-4 py-3">
-            <Button type="submit" variant="primary" disabled={save.busy}>
+            <Button type="submit" variant="primary" disabled={save.busy} onClick={() => (runIntent.current = false)}>
               {save.busy ? FORM_TEXT.saving : FORM_TEXT.save}
+            </Button>
+            <Button type="submit" disabled={save.busy} onClick={() => (runIntent.current = true)}>
+              {FORM_TEXT.saveAndRun}
             </Button>
             <Button asChild>
               <Link to="/drills">{FORM_TEXT.cancel}</Link>

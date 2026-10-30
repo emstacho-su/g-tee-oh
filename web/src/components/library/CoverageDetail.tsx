@@ -5,9 +5,11 @@
  * (O-240). When solver-query's database did not answer, the flop and queue blocks are empty by
  * contract, and a note says so instead of showing an empty library. A synthetic preflop solution
  * carries the shared synthetic banner. Since S40 (O-406) it is the body of the "Flops and queue"
- * card, under an h3 naming the pair and configuration.
+ * card, under an h3 naming the pair and configuration in words (S47 critic: never the key), with
+ * the Scenarios and Priority columns defined once under the tables.
  */
 import { familyRows, type Coverage } from "../../library/texture-families.js";
+import { capitalize, pairWords } from "../../progress/spot-words.js";
 import { Button, SyntheticBanner } from "../ui/index.js";
 
 const DATABASE_NOTES: Readonly<Record<Coverage["database"], string | null>> = {
@@ -18,10 +20,18 @@ const DATABASE_NOTES: Readonly<Record<Coverage["database"], string | null>> = {
 
 export interface CoverageDetailProps {
   coverage: Coverage;
+  /** The configuration in words (settings' configLabel), never its key (S47 critic, R3.4). */
+  configurationLabel: string;
   /** Requests a queued flop; undefined hides the row buttons. */
   onRequestFlop?: (flop: string) => void;
   requestPending: boolean;
 }
+
+/** One-line definitions of the two statistics the tables carry (S47 critic, G8). */
+export const COLUMN_HELP = {
+  scenarios: "Scenarios: the pre-dealt turn and river runouts solved for the flop (ADR 0023).",
+  priority: "Priority: the builder's order; a higher number is built sooner, and a request raises it.",
+} as const;
 
 function FamilyTable({ coverage }: { coverage: Coverage }) {
   const rows = familyRows(coverage.flops);
@@ -32,7 +42,9 @@ function FamilyTable({ coverage }: { coverage: Coverage }) {
         <tr className="text-left text-muted">
           <th scope="col">Family</th>
           <th scope="col">Covered flops</th>
-          <th scope="col">Scenarios</th>
+          <th scope="col" title={COLUMN_HELP.scenarios}>
+            Scenarios
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -59,7 +71,9 @@ function QueueTable({ coverage, onRequestFlop, requestPending }: CoverageDetailP
         <tr className="text-left text-muted">
           <th scope="col">Position</th>
           <th scope="col">Flop</th>
-          <th scope="col">Priority</th>
+          <th scope="col" title={COLUMN_HELP.priority}>
+            Priority
+          </th>
           {onRequestFlop === undefined ? null : <th scope="col">Request</th>}
         </tr>
       </thead>
@@ -85,17 +99,18 @@ function QueueTable({ coverage, onRequestFlop, requestPending }: CoverageDetailP
   );
 }
 
-export function CoverageDetail({ coverage, onRequestFlop, requestPending }: CoverageDetailProps) {
+export function CoverageDetail({ coverage, configurationLabel, onRequestFlop, requestPending }: CoverageDetailProps) {
   const note = DATABASE_NOTES[coverage.database];
   return (
     <section aria-labelledby="coverage-detail-heading" className="flex flex-col gap-3">
-      <h3 id="coverage-detail-heading" className="text-base font-semibold">{`${coverage.pair} at ${coverage.config_id}`}</h3>
+      <h3 id="coverage-detail-heading" className="text-base font-semibold" title={coverage.pair}>{`${capitalize(pairWords(coverage.pair))} at ${configurationLabel}`}</h3>
       {coverage.synthetic ? <SyntheticBanner /> : null}
       <p className="text-sm">{coverage.preflop_available ? "The preflop solution is in the library." : "The preflop solution is not in the library."}</p>
       {note === null ? (
         <>
           <FamilyTable coverage={coverage} />
-          <QueueTable coverage={coverage} requestPending={requestPending} {...(onRequestFlop === undefined ? {} : { onRequestFlop })} />
+          <QueueTable coverage={coverage} configurationLabel={configurationLabel} requestPending={requestPending} {...(onRequestFlop === undefined ? {} : { onRequestFlop })} />
+          <p className="text-xs text-muted">{`${COLUMN_HELP.scenarios} ${COLUMN_HELP.priority}`}</p>
         </>
       ) : (
         <p role="note" className="text-sm text-muted">

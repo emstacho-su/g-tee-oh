@@ -41,7 +41,7 @@ const CONFIG_B = "cfg_9_live_13_150";
 describe("R4.12 session defaults store", () => {
   it("R4.12 starts at standard grouping, RNG off and every covered configuration", () => {
     const store = createSessionDefaultsStore({ storage: memoryStorage() });
-    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: false, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: false, configScope: ALL_CONFIGS, scopeMode: "all" });
   });
 
   it("R4.12 each change is written and a fresh store reads it back", () => {
@@ -50,7 +50,7 @@ describe("R4.12 session defaults store", () => {
     store.getState().setGrouping("simple");
     store.getState().setRng(true);
     store.getState().setConfigScope([CONFIG_A, CONFIG_B]);
-    expect(createSessionDefaultsStore({ storage }).getState().defaults).toEqual({ grouping: "simple", rng: true, configScope: [CONFIG_A, CONFIG_B] });
+    expect(createSessionDefaultsStore({ storage }).getState().defaults).toEqual({ grouping: "simple", rng: true, configScope: [CONFIG_A, CONFIG_B], scopeMode: "chosen" });
     store.getState().setConfigScope(ALL_CONFIGS);
     expect(createSessionDefaultsStore({ storage }).getState().defaults.configScope).toBe(ALL_CONFIGS);
   });
@@ -58,7 +58,7 @@ describe("R4.12 session defaults store", () => {
   it("R4.12 a tampered field falls back to its default and the other fields are kept", () => {
     const stored = JSON.stringify({ grouping: "fancy", rng: true, configScope: [CONFIG_A, "drop table"] });
     const store = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: stored }) });
-    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: true, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: true, configScope: ALL_CONFIGS, scopeMode: "all" });
     expect(parseSessionDefaults({ grouping: "grouped", rng: "yes", configScope: [] })).toEqual({ ...DEFAULT_SESSION_DEFAULTS, grouping: "grouped" });
     expect(parseSessionDefaults("standard")).toEqual(DEFAULT_SESSION_DEFAULTS);
     const broken = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: "{" }) });
@@ -83,7 +83,7 @@ describe("R4.12 session defaults store", () => {
     const storedOver = JSON.stringify({ grouping: "grouped", rng: false, configScope: over });
     const store = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: storedOver }) });
     expect(MAX_SCOPE_CONFIGS).toBe(32);
-    expect(store.getState().defaults).toEqual({ grouping: "grouped", rng: false, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "grouped", rng: false, configScope: ALL_CONFIGS, scopeMode: "all" });
     const storedAtCap = JSON.stringify({ configScope: atCap });
     expect(createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: storedAtCap }) }).getState().defaults.configScope).toEqual(atCap);
   });

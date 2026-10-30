@@ -11,7 +11,7 @@ import { userEvent, type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { encodeMockExportCode, SEEDED_DRILLS } from "../../e2e/support/mock-drills.js";
-import { spotSummary } from "../../src/drills/summary.js";
+import { spotSummary, spotWords } from "../../src/drills/summary.js";
 import { FIXTURE_DRILL_ID, fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
 import { renderDrills } from "./render-drills.js";
@@ -48,9 +48,10 @@ describe("R3.14 drill library", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Drill library" })).toBeInTheDocument();
     expect((await rows()).map(nameOf)).toEqual([...SEEDED_DRILLS].reverse().map((drill) => drill.name));
     const table = screen.getByRole("table", { name: "Your drills" });
-    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Select", "Name", "Spot", "Stop rule", "Tags", "Settings"]);
+    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent)).toEqual(["Select", "Name", "Spot", "Stop rule", "Tags", "Start", "Settings"]);
     const row = await rowOf(fixtureDrill.name);
-    expect(within(row).getByTestId("spot-summary")).toHaveTextContent(spotSummary(fixtureDrill.spot_filter));
+    expect(within(row).getByTestId("spot-summary")).toHaveTextContent(spotWords(fixtureDrill.spot_filter));
+    expect(within(row).getByTestId("spot-summary")).toHaveAttribute("title", spotSummary(fixtureDrill.spot_filter));
     expect(within(row).getByTestId("stop-rule")).toHaveTextContent("Spot");
     expect(within(row).getByRole("link", { name: `Settings for ${fixtureDrill.name}` })).toHaveAttribute("href", `/drills/${FIXTURE_DRILL_ID}/details`);
     expect(within(row).getByRole("link", { name: "Show drills tagged synthetic" })).toHaveAttribute("href", "/drills?tag=synthetic");
@@ -319,5 +320,43 @@ describe("R3.14 drill library", () => {
     const [imported, source] = await rows();
     expect(nameOf(imported as HTMLElement)).toBe(UNCOVERED_NAME);
     expect(within(imported as HTMLElement).getByTestId("spot-summary").textContent).toBe(within(source as HTMLElement).getByTestId("spot-summary").textContent);
+  });
+
+  it("R3.36 Start on a row links to /drills/$id/run?start=1", async () => {
+    renderDrills("/drills");
+    const row = await rowOf(fixtureDrill.name);
+    expect(within(row).getByRole("link", { name: `Start ${fixtureDrill.name}` })).toHaveAttribute("href", `/drills/${FIXTURE_DRILL_ID}/run?start=1`);
+  });
+
+  it("R3.4 a row says Covered or Partly covered from the catalog, and a covered row offers Start first (O-482)", async () => {
+    renderDrills("/drills");
+    // The fixture drill: hero BTN against BB at online 6-max 100bb, the mock catalog's covered BB-BTN pair.
+    const covered = await rowOf(fixtureDrill.name);
+    await waitFor(() => expect(within(covered).getByTestId("coverage-badge")).toHaveTextContent("Covered"));
+    await waitFor(() => {
+      const kinds = screen.getAllByTestId("coverage-badge").map((badge) => badge.dataset["kind"]);
+      expect(kinds).not.toContain("loading");
+      expect(kinds).toContain("partly");
+    });
+    expect(within(covered).queryByRole("link", { name: /^Open the library/ })).not.toBeInTheDocument();
+  });
+
+  it("R3.4 a drill whose game the catalog lacks reads Not in the catalog and offers Open the library first", async () => {
+    const lost = { ...fixtureDrill, id: "00000000-0000-4000-8000-0000000000e9", name: "A 137bb drill", spot_filter: { ...fixtureDrill.spot_filter, game_config: { ...fixtureDrill.spot_filter.game_config, depths_bb: [137] } } };
+    renderDrills("/drills", { override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" ? jsonBody(200, { items: [lost], next_cursor: null }) : undefined) });
+    const row = await rowOf(lost.name);
+    await waitFor(() => expect(within(row).getByTestId("coverage-badge")).toHaveTextContent("Not in the catalog"));
+    expect(within(row).getByRole("link", { name: `Open the library for ${lost.name}` })).toHaveAttribute("href", "/library");
+    expect(within(row).getByRole("link", { name: `Start ${lost.name}` })).toHaveAttribute("aria-describedby", `badge-${lost.id}`);
+  });
+
+  it("R3.14 the Spot column prints words with the tokens in a tooltip, and the stop rule keeps its label on a phone", async () => {
+    renderDrills("/drills");
+    const row = await rowOf(fixtureDrill.name);
+    const spot = within(row).getByTestId("spot-summary");
+    expect(spot).toHaveTextContent("hero button against big blind; open or fold; all hands");
+    expect(spot.textContent).not.toMatch(/\bRFI\b/);
+    expect(spot.getAttribute("title")).toContain("RFI");
+    expect(within(row).getByText("Stop rule:")).not.toHaveClass("sr-only");
   });
 });

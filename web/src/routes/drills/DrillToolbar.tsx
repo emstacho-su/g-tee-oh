@@ -92,7 +92,8 @@ function SelectedToolbar({ api, drill, duplicating, deleting, failure, onDuplica
       <Button size="sm" aria-label={`Export ${drill.name}`} onClick={() => setExporting(true)}>
         {TOOLBAR_TEXT.export}
       </Button>
-      <Button size="sm" variant="ghost" aria-label={`Delete ${drill.name}`} disabled={deleting} onClick={() => setConfirming(true)}>
+      {/* A pressable surface like its neighbours (S47 critic G7); the confirm dialog carries the danger colour. */}
+      <Button size="sm" variant="secondary" aria-label={`Delete ${drill.name}`} disabled={deleting} onClick={() => setConfirming(true)}>
         {TOOLBAR_TEXT.remove}
       </Button>
       {failure === null || failure === undefined ? null : (

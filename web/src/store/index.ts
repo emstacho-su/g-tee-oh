@@ -27,7 +27,12 @@ export {
   MAX_SCOPE_CONFIGS,
   MIN_SCOPE_CONFIGS,
   parseSessionDefaults,
+  SCOPE_MODES,
   SESSION_DEFAULTS_STORAGE_KEY,
   useSessionDefaultsStore,
 } from "./session-defaults.js";
-export type { ConfigScope, SessionDefaults, SessionDefaultsEnvironment, SessionDefaultsState } from "./session-defaults.js";
+export type { ConfigScope, ScopeMode, SessionDefaults, SessionDefaultsEnvironment, SessionDefaultsState } from "./session-defaults.js";
+// S47 (O-486): the last label of each chosen configuration, for a scope the catalog no longer lists.
+export { CONFIG_LABELS_STORAGE_KEY } from "./preference-keys.js";
+export { parseConfigLabels, readConfigLabels, rememberConfigLabels, withConfigLabels } from "./config-labels.js";
+export type { ConfigLabels } from "./config-labels.js";

@@ -18,6 +18,13 @@ import { GRID_SIZE, HAND_GRID } from "../../poker/hands.js";
 import { actionStyle } from "../../theme/action-style.js";
 import { ACTION_FILL_CLASSES, ACTION_INK_CLASSES, actionFillStyle } from "../trainer/ActionSwatch.js";
 import { cn } from "../ui/index.js";
+
+/**
+ * The action letter on a solid chip of the cell's own fill with no hatch (S47 critic G1): the ink is
+ * the one picked for that fill (4.5:1, ACTION_INK_CLASSES), and the hatch can no longer sit under the
+ * glyph, so the letter never shares the pattern's polarity.
+ */
+const LETTER_CHIP_CLASSES = "rounded-sm bg-(--action-light) px-0.5 ring-1 ring-current/40 dark:bg-(--action-dark)";
 import type { Paint } from "./paint-model.js";
 
 export const NOT_IN_RANGE = "not in range";
@@ -132,7 +139,8 @@ export function PaintGrid({ paint, actions, enabled, onBegin, onExtend, onEnd, o
                   )}
                 >
                   <span aria-hidden="true">{cell.hand}</span>
-                  <span aria-hidden="true" className="font-bold">
+                  {/* The letter sits on a solid chip of the surface, so it never shares the hatch's polarity (S47 critic G1). */}
+                  <span aria-hidden="true" data-testid="paint-letter" className={cn("font-bold", action === undefined ? "" : LETTER_CHIP_CLASSES)}>
                     {action === undefined ? "·" : actionStyle(action.kind).short}
                   </span>
                 </button>

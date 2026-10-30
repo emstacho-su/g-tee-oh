@@ -9,6 +9,7 @@
 import { useId, useState, type FormEvent } from "react";
 
 import { normalizeFlop, requestFailureText, requestResultText } from "../../library/request-text.js";
+import { capitalize, pairWords } from "../../progress/spot-words.js";
 import type { GapRequestState } from "../../library/use-gap-request.js";
 import { Button, Card, cn, FIELD_CLASS } from "../ui/index.js";
 
@@ -21,7 +22,8 @@ export interface GapRequestProps {
 }
 
 function targetText(flop: string | undefined, pair: string): string {
-  return flop === undefined ? `${pair} preflop` : `${pair} on ${flop}`;
+  const words = capitalize(pairWords(pair));
+  return flop === undefined ? `${words} preflop` : `${words} on ${flop}`;
 }
 
 function Outcome({ request, pair }: { request: GapRequestState; pair: string }) {
@@ -66,7 +68,7 @@ export function GapRequest({ pair, preflopAvailable, request }: GapRequestProps)
     >
       {preflopAvailable ? null : (
         <Button variant="primary" className="self-start" disabled={request.pending} onClick={() => request.send({})}>
-          {`Request ${pair} preflop`}
+          {`Request ${pairWords(pair)} preflop`}
         </Button>
       )}
       <form onSubmit={submitFlop} className="flex flex-wrap items-end gap-2" noValidate>

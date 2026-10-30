@@ -8,14 +8,19 @@
  * Phone width (under md): the header row is kept for screen readers only and each row becomes a
  * small grid (radio, then the name with the spot, stop rule and tags under it, then the gear), so
  * the page never scrolls sideways. Every value is rendered once, so a reader meets each cell once.
+ *
+ * S47 (R3.36, R3.4, O-482, O-484): a Start column opens the run screen with autostart, with the
+ * coverage badge under it (DrillRowStart); the Spot column reads in words with the token line as
+ * its tooltip; the stop rule keeps its prefix visible below md.
  */
 import { Link } from "@tanstack/react-router";
 import { useId } from "react";
 
 import { cn, FLAT_REST_CLASS, GearIcon, RAISED_CLASS, TACTILE_CLASS } from "../../components/ui/index.js";
 import { STOP_RULE_LABELS } from "../../drills/labels.js";
-import { spotSummary } from "../../drills/summary.js";
+import { spotSummary, spotWords } from "../../drills/summary.js";
 import type { Drill } from "../../drills/types.js";
+import { DrillRowStart } from "./DrillRowStart.js";
 
 export const TABLE_TEXT = {
   caption: "Your drills",
@@ -25,6 +30,7 @@ export const TABLE_TEXT = {
   stopRule: "Stop rule",
   tags: "Tags",
   settings: "Settings",
+  start: "Start",
   noTags: "No tags",
 } as const;
 
@@ -70,16 +76,20 @@ function DrillRowCells({ drill, group, selected, onSelect }: { drill: Drill; gro
         <span data-testid="drill-name">{drill.name}</span>
       </th>
       <td className={cn(FOLDED_CELL_CLASSES, "text-muted md:max-w-md")}>
-        <span data-testid="spot-summary" className="break-words">
-          {spotSummary(drill.spot_filter)}
+        {/* Words on the screen, the compact token line as the tooltip (S47 critic, R3.14). */}
+        <span data-testid="spot-summary" className="break-words" title={spotSummary(drill.spot_filter)}>
+          {spotWords(drill.spot_filter)}
         </span>
       </td>
       <td className={cn(FOLDED_CELL_CLASSES, "whitespace-nowrap")}>
-        <span className="sr-only md:hidden">{`${TABLE_TEXT.stopRule}: `}</span>
+        <span className="text-muted md:sr-only">{`${TABLE_TEXT.stopRule}: `}</span>
         <span data-testid="stop-rule">{STOP_RULE_LABELS[drill.trainer.stop_rule]}</span>
       </td>
       <td className={FOLDED_CELL_CLASSES}>
         <TagLinks tags={drill.tags} />
+      </td>
+      <td className={cn(FOLDED_CELL_CLASSES, "md:text-right")} onClick={(event) => event.stopPropagation()}>
+        <DrillRowStart drill={drill} />
       </td>
       <td className={cn(CELL_CLASSES, "text-right max-md:col-start-3 max-md:row-start-1")}>
         <Link to="/drills/$id/$section" params={{ id: drill.id, section: "details" }} aria-label={`Settings for ${drill.name}`} className={GEAR_CLASSES}>
@@ -111,6 +121,9 @@ export function DrillTable({ drills, selectedId, onSelect }: DrillTableProps) {
           </th>
           <th scope="col" className={HEADER_CLASSES}>
             {TABLE_TEXT.tags}
+          </th>
+          <th scope="col" className={HEADER_CLASSES}>
+            {TABLE_TEXT.start}
           </th>
           <th scope="col" className={HEADER_CLASSES}>
             <span className="sr-only">{TABLE_TEXT.settings}</span>

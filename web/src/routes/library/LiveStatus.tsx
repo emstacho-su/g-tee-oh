@@ -5,6 +5,7 @@
  */
 import { Button } from "../../components/ui/index.js";
 import type { CoverageAddedEvent } from "../../library/events.js";
+import { capitalize, pairWords } from "../../progress/spot-words.js";
 import type { StreamStatus } from "../../library/use-server-events.js";
 
 const STATUS_TEXT: Readonly<Record<StreamStatus, string>> = {
@@ -33,7 +34,7 @@ export function LiveStatus({ status, onReconnect, latest }: LiveStatusProps) {
         ) : null}
       </div>
       <p aria-live="polite" data-testid="live-coverage" className="font-medium">
-        {latest === null ? "" : `New coverage: ${latest.pair} on ${latest.flop}, ${latest.scenario_count} scenarios.`}
+        {latest === null ? "" : `New coverage: ${capitalize(pairWords(latest.pair))} on ${latest.flop}, ${latest.scenario_count} scenarios (pre-dealt runouts).`}
       </p>
     </div>
   );

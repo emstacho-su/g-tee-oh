@@ -22,6 +22,7 @@ import { NEXT_KEY, PREDICTION_SCOPE, PREDICTION_TEXT, SUBMIT_KEY, isNoQuizQuesti
 import { noQuestionsText, quizDifficultyName } from "../../prediction/quiz-text.js";
 import { useEndQuiz } from "../../prediction/use-end-quiz.js";
 import { usePredictionRun } from "../../prediction/use-prediction-run.js";
+import { AnsweredFold } from "./AnsweredFold.js";
 import { PromptCard } from "./PromptCard.js";
 import { ResultCard } from "./ResultCard.js";
 import { ReviewCard } from "./ReviewCard.js";
@@ -96,6 +97,7 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
           {run.staleNotice ? <p role="status">{PREDICTION_TEXT.stale}</p> : null}
           {prompt === undefined && run.loadingPrompt ? <LoadingNote text={PREDICTION_TEXT.loadingPrompt} /> : null}
           {prompt === undefined || draft === null ? null : (
+            <AnsweredFold answered={result !== undefined} question={prompt.question}>
             <PromptCard
               prompt={prompt}
               draft={draft}
@@ -109,6 +111,7 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
               onReason={run.setReason}
               onSubmit={run.submit}
             />
+            </AnsweredFold>
           )}
           {result === undefined ? null : <ResultCard result={result} flavor={flavor} onNext={run.next} />}
         </>

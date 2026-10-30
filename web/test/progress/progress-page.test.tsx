@@ -157,7 +157,7 @@ describe("R4.12 /progress", () => {
 
   it("R4.12 a heat map cell opens the class's existing auto drill (O-321)", async () => {
     const { router, fake } = renderApp("/progress", { ...PROGRESS, "GET /api/v1/drills": [jsonResponse(200, { items: [fixtureDrill], next_cursor: null })] });
-    fireEvent.click(await screen.findByRole("button", { name: /^rfi BB-UTG, live 100 bb:/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Open or fold, big blind versus under the gun, live 100bb:/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${fixtureDrill.id}/run`));
     expect(fake.keys()).not.toContain("POST /api/v1/drills");
   });
@@ -171,16 +171,16 @@ describe("R4.12 /progress", () => {
       [`GET /api/v1/drills/${CREATED_ID}`]: [jsonResponse(200, { ...fixtureDrill, id: CREATED_ID })],
     });
     queryClient.setQueryData(drillListKey(undefined), { pages: [], pageParams: [] });
-    fireEvent.click(await screen.findByRole("button", { name: "Drill this spot: rfi BB-UTG, live 100 bb" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Drill this spot: Open or fold, big blind versus under the gun, live 100bb" }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${CREATED_ID}/run`));
     const post = fake.calls.find((call) => call.method === "POST" && call.path === "/api/v1/drills");
-    expect(JSON.parse(post?.body ?? "{}")).toMatchObject({ name: "Leak drill: rfi BB-UTG live 100" });
+    expect(JSON.parse(post?.body ?? "{}")).toMatchObject({ name: "Leak drill: open or fold, big blind versus under the gun, live 100bb" });
     expect(queryClient.getQueryState(drillListKey(undefined))?.isInvalidated).toBe(true);
   });
 
   it("R4.12 a class no configuration covers says so in its card and creates nothing", async () => {
     const { fake } = renderApp("/progress", { ...PROGRESS, "GET /api/v1/drills": [NO_DRILLS], "GET /api/v1/configs": [CONFIGS] });
-    fireEvent.click(await screen.findByRole("button", { name: /^rfi BB-UTG, online 150 bb:/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Open or fold, big blind versus under the gun, online 150bb:/ }));
     const card = screen.getByTestId("mastery-heatmap");
     expect(await within(card).findByRole("alert")).toHaveTextContent("No covered configuration matches this spot");
     expect(within(screen.getByTestId("leak-trend")).queryByRole("alert")).toBeNull();
@@ -189,19 +189,19 @@ describe("R4.12 /progress", () => {
 
   it("R4.12 the clicked drill button is disabled while its drill opens, and a second click waits", async () => {
     const { fake } = renderApp("/progress", { ...PROGRESS, "GET /api/v1/drills": [() => new Promise<Response>(() => undefined)] });
-    const button = await screen.findByRole("button", { name: "Drill this spot: rfi BB-UTG, live 100 bb" });
+    const button = await screen.findByRole("button", { name: "Drill this spot: Open or fold, big blind versus under the gun, live 100bb" });
     fireEvent.click(button);
     await waitFor(() => expect(button).toBeDisabled());
     expect(button).toHaveTextContent("Opening");
-    fireEvent.click(screen.getByRole("button", { name: "Drill this spot: rfi BB-CO, live 100 bb" }));
+    fireEvent.click(screen.getByRole("button", { name: "Drill this spot: Open or fold, big blind versus cutoff, live 100bb" }));
     await waitFor(() => expect(fake.keys().filter((key) => key === "GET /api/v1/drills")).toHaveLength(1));
   });
 
   it("R4.12 a failed drill lookup shows the problem's title inline", async () => {
     renderApp("/progress", { ...PROGRESS, "GET /api/v1/drills": [problemResponse(500, "internal")] });
-    fireEvent.click(await screen.findByRole("button", { name: "Drill this spot: rfi BB-UTG, live 100 bb" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Drill this spot: Open or fold, big blind versus under the gun, live 100bb" }));
     const card = screen.getByTestId("leak-trend");
     expect(await within(card).findByRole("alert")).toHaveTextContent("Could not open a drill: title of internal.");
-    expect(within(card).getByRole("button", { name: "Drill this spot: rfi BB-UTG, live 100 bb" })).toBeEnabled();
+    expect(within(card).getByRole("button", { name: "Drill this spot: Open or fold, big blind versus under the gun, live 100bb" })).toBeEnabled();
   });
 });

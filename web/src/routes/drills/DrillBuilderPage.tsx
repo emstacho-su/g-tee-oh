@@ -19,7 +19,7 @@ import { draftFromDrill, newDrillDraft } from "../../drills/draft.js";
 import { clearHandedDraft, peekHandedDraft } from "../../drills/draft-handoff.js";
 import { drillFailureText } from "../../drills/failure-text.js";
 import { drillDetailQuery } from "../../drills/queries.js";
-import { spotSummary } from "../../drills/summary.js";
+import { spotSummary, spotWords } from "../../drills/summary.js";
 import { BuilderActions } from "./BuilderActions.js";
 import { DrillForm } from "./DrillForm.js";
 
@@ -36,8 +36,10 @@ export interface DrillBuilderPageProps {
   section: BuilderSectionSlug;
   /** The drill to edit; absent on /drills/new. */
   drillId?: string;
-  /** True right after this drill was created (?saved=1). */
+  /** True right after this drill was created (?saved=1 or ?saved=rerun). */
   justCreated?: boolean;
+  /** True when a Save and run landed after the draft changed again (?saved=rerun, S47). */
+  editedSinceRun?: boolean;
 }
 
 function BackLink() {
@@ -48,11 +50,13 @@ function BackLink() {
   );
 }
 
-function ExistingDrill({ drillId, section, justCreated }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean }) {
+function ExistingDrill({ drillId, section, justCreated, editedSinceRun }: { drillId: string; section: BuilderSectionSlug; justCreated: boolean; editedSinceRun: boolean }) {
   const api = useAppApi();
   const drill = useQuery(drillDetailQuery(api, drillId));
   // Edits made while this drill was being created come along as unsaved changes (review round 1 B).
   const [carried] = useState(() => peekHandedDraft(drillId));
+  // Whether the form's draft differs from the stored drill (S47, R3.14): the header actions follow it.
+  const [dirty, setDirty] = useState(false);
   useEffect(() => clearHandedDraft(drillId), [drillId]);
   if (drill.data === undefined) {
     return (
@@ -77,11 +81,11 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
     <>
       <div className="flex flex-col gap-2">
         <PageHeader title={stored.name} actions={<BackLink />} />
-        <p data-testid="spot-summary" className="text-sm text-muted md:text-base">
-          {spotSummary(stored.spot_filter)}
+        <p data-testid="spot-summary" className="text-sm text-muted md:text-base" title={spotSummary(stored.spot_filter)}>
+          {spotWords(stored.spot_filter)}
         </p>
       </div>
-      <BuilderActions api={api} drill={stored} />
+      <BuilderActions api={api} drill={stored} dirty={dirty} />
       <DrillForm
         key={stored.id}
         initial={draftFromDrill(stored)}
@@ -89,12 +93,14 @@ function ExistingDrill({ drillId, section, justCreated }: { drillId: string; sec
         section={section}
         drill={stored}
         justCreated={justCreated}
+        editedSinceRun={editedSinceRun}
+        onDirtyChange={setDirty}
       />
     </>
   );
 }
 
-export function DrillBuilderPage({ section, drillId, justCreated = false }: DrillBuilderPageProps) {
+export function DrillBuilderPage({ section, drillId, justCreated = false, editedSinceRun = false }: DrillBuilderPageProps) {
   return (
     <section className="flex flex-col gap-6">
       {drillId === undefined ? (
@@ -103,7 +109,7 @@ export function DrillBuilderPage({ section, drillId, justCreated = false }: Dril
           <DrillForm initial={newDrillDraft()} section={section} />
         </>
       ) : (
-        <ExistingDrill drillId={drillId} section={section} justCreated={justCreated} />
+        <ExistingDrill drillId={drillId} section={section} justCreated={justCreated} editedSinceRun={editedSinceRun} />
       )}
     </section>
   );

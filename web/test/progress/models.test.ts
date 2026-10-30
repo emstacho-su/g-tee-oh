@@ -73,8 +73,8 @@ describe("R4.12 heat map model", () => {
     expect(view?.text).toBe("12%");
     expect(view?.bin).toBe(1);
     expect(view?.recallPercent).toBe(98);
-    expect(view?.classText).toBe("rfi BB-UTG, live 100 bb");
-    expect(view?.label).toBe("rfi BB-UTG, live 100 bb: Known: 12%, Recall: 98%, Attempts: 6, Mastered: no, Due for review: no");
+    expect(view?.classText).toBe("Open or fold, big blind versus under the gun, live 100bb");
+    expect(view?.label).toBe("Open or fold, big blind versus under the gun, live 100bb: Known: 12%, Recall: 98%, Attempts: 6, Mastered: no, Due for review: no");
     expect(cellViewAt(fixtureHeatmap, lookup, 0, 99)).toBeUndefined();
     expect(cellViewAt(fixtureHeatmap, lookup, 99, 0)).toBeUndefined();
   });
@@ -99,9 +99,9 @@ describe("R4.12 heat map model", () => {
   });
 
   it("R4.12 depth bands read in bb when numeric", () => {
-    expect(depthBandLabel("150")).toBe("150 bb");
+    expect(depthBandLabel("150")).toBe("150bb");
     expect(depthBandLabel("deep")).toBe("deep");
-    expect(classLabel({ family: "rfi", pair: "SB-BB" }, { format: "online", depth_band: "short" })).toBe("rfi SB-BB, online short");
+    expect(classLabel({ family: "rfi", pair: "SB-BB" }, { format: "online", depth_band: "short" })).toBe("Open or fold, small blind versus big blind, online short");
   });
 });
 
@@ -147,9 +147,9 @@ describe("R4.12 leak trend model", () => {
   it("R4.12 joins each leak to its heat map cell by spot_class_key and labels it from the cell", () => {
     const rows = joinLeaksToCells(fixtureLeaks, fixtureHeatmap);
     expect(rows.map((row) => row.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(rows[0]?.label).toBe("rfi BB-UTG, live 100 bb");
-    expect(rows[1]?.label).toBe("rfi BB-CO, live 100 bb");
-    expect(rows[9]?.label).toBe("facing-3bet SB-BTN, online 100 bb");
+    expect(rows[0]?.label).toBe("Open or fold, big blind versus under the gun, live 100bb");
+    expect(rows[1]?.label).toBe("Open or fold, big blind versus cutoff, live 100bb");
+    expect(rows[9]?.label).toBe("Facing a 3-bet, small blind versus button, online 100bb");
     expect(rows.every((row) => row.cell !== null && row.noDrillReason === null)).toBe(true);
   });
 
@@ -157,7 +157,7 @@ describe("R4.12 leak trend model", () => {
     const stranger: LeakItem = { ...(fixtureLeaks.items[0] as LeakItem), spot_class_key: "absent", family: "squeeze" };
     const [missing] = joinLeaksToCells({ ...fixtureLeaks, items: [stranger] }, fixtureHeatmap);
     expect(missing?.cell).toBeNull();
-    expect(missing?.label).toBe("squeeze");
+    expect(missing?.label).toBe("Squeeze");
     expect(missing?.noDrillReason).toBe(NOT_ON_HEATMAP_REASON);
     const [loading] = joinLeaksToCells(fixtureLeaks, undefined);
     expect(loading?.noDrillReason).toBe(HEATMAP_LOADING_REASON);

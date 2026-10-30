@@ -59,16 +59,18 @@ afterEach(() => {
 });
 
 describe("R4.10 automated start", () => {
-  it("R4.10 the start panel names every covered configuration, the grouping and RNG from the defaults, with a Settings link", async () => {
+  it("R4.10 the start panel names every covered configuration and shows the grouping and RNG controls set from the defaults, with the scope link", async () => {
     setDefaults({ grouping: "grouped", rng: true });
     await renderTrain("automated", {});
     expect(screen.getByRole("heading", { level: 1, name: "Automated training" })).toBeInTheDocument();
     expect(await screen.findByTestId("scope-all")).toHaveTextContent("All covered configurations");
-    expect(screen.getByTestId("start-grouping")).toHaveTextContent("Grouped");
-    expect(screen.getByTestId("start-rng")).toHaveTextContent("On");
-    // S36: each link opens the settings page that holds what it changes (O-360).
+    // S47 (R4.10): the grouping and the roll are set here, not two screens away in Settings.
+    const controls = screen.getByRole("group", { name: "Session settings" });
+    expect(within(controls).getByRole("radio", { name: "Grouped" })).toHaveAttribute("aria-checked", "true");
+    expect(within(controls).getByRole("checkbox", { name: "Mixed-frequency mode" })).toBeChecked();
+    // S36: the scope link opens the settings page that holds it (O-360).
     expect(screen.getByRole("link", { name: "Change the configurations" })).toHaveAttribute("href", "/settings/configurations");
-    expect(screen.getByRole("link", { name: "Change the session defaults" })).toHaveAttribute("href", "/settings/session-defaults");
+    expect(screen.queryByRole("link", { name: "Change the session defaults" })).not.toBeInTheDocument();
   });
 
   it("R4.10 Start sends mode automated with grouping and rng, no config_ids and never a seed (O-325)", async () => {
@@ -85,7 +87,7 @@ describe("R4.10 automated start", () => {
     setDefaults({ configScope: [CONFIG.config_id, UNLISTED_ID] });
     const view = await renderTrain("automated", { ...automatedScript(), [CONFIGS_PATH]: [jsonResponse(200, { items: [CONFIG], next_cursor: null })] });
     const list = await screen.findByTestId("scope-list");
-    expect(list).toHaveTextContent("Online, 6 players, 100 bb deep, stakes online");
+    expect(list).toHaveTextContent("Online, 6 players, 100bb deep");
     expect(list).toHaveTextContent(UNLISTED_ID);
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     await screen.findByRole("group", { name: "Actions" });
@@ -129,7 +131,7 @@ describe("R4.10 automated session", () => {
     await renderTrain("automated", automatedScript());
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     const banner = await screen.findByTestId("block-banner");
-    await waitFor(() => expect(within(banner).getByTestId("block-class")).toHaveTextContent("rfi, Opens"));
+    await waitFor(() => expect(within(banner).getByTestId("block-class")).toHaveTextContent("Open or fold, Opens"));
     expect(within(banner).getByTestId("block-hand")).toHaveTextContent("Hand 1 of 3 in this block");
     expect(within(banner).getByTestId("block-rating")).toHaveTextContent("Rated block: first attempts count toward your rating");
     await decide();
@@ -141,7 +143,7 @@ describe("R4.10 automated session", () => {
     await renderTrain("automated", automatedScript(fixtureWorkedBlock));
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
     expect(await screen.findByTestId("block-rating")).toHaveTextContent("Worked example: panels visible, not rated");
-    await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("facing-open, Facing an open in position"));
+    await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("Facing an open, Facing an open in position"));
   });
 
   it("R3.13 R4.10 nothing is sent or revealed before the choice, and the choice submits without a confidence field (O-345, O-373)", async () => {

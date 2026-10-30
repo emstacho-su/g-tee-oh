@@ -181,7 +181,8 @@ function StatusPill({ status }: { status: InviteSummary["status"] }) {
 function InviteRow({ invite, onRevoke }: { invite: InviteSummary; onRevoke: (invite: InviteSummary) => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 py-2 first:border-t-0">
-      <span className="min-w-0 flex-1 truncate text-sm" title={invite.email}>
+      {/* The email takes the whole first line at phone width; status, expiry and Revoke wrap under it (S47 critic G2). */}
+      <span className="min-w-0 basis-full break-all text-sm sm:basis-0 sm:flex-1 sm:truncate sm:break-normal" title={invite.email}>
         {invite.email}
       </span>
       <StatusPill status={invite.status} />

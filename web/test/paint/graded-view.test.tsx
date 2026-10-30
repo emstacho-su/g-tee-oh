@@ -19,11 +19,16 @@ function setup() {
 }
 
 describe("R3.17 PaintGradedView", () => {
-  it("R3.17 shows the total weighted EV loss from the response and the unrated note", () => {
+  it("R3.17 shows the total weighted EV loss from the response at the screen's one precision and the unrated note (S47 critic G6)", () => {
     setup();
     const total = screen.getByTestId("paint-total");
     expect(total).toHaveTextContent(formatBb(fixturePaintGraded.total_weighted_loss_bb, 4));
     expect(screen.getByText(/unrated/i)).toBeInTheDocument();
+  });
+
+  it("R3.17 the legend keys the painted/solver letter codes (S47 critic G4)", () => {
+    setup();
+    expect(screen.getByTestId("paint-code-key")).toHaveTextContent("your action / the solver's action (F fold, C call, X check, B bet, R raise, A all-in)");
   });
 
   it("R3.17 lists the costliest classes, at most ten, costliest first, with the response's numbers", () => {
@@ -36,14 +41,16 @@ describe("R3.17 PaintGradedView", () => {
     if (first === undefined) throw new Error("the fixture grade has no loss");
     expect(rows[0]).toHaveTextContent(first.hand);
     expect(rows[0]).toHaveTextContent(formatBb(first.weighted_loss_bb, 4));
-    expect(rows[0]).toHaveTextContent(formatBb(first.loss_bb, 2));
+    expect(rows[0]).toHaveTextContent(formatBb(first.loss_bb, 4));
+    // Each figure carries its column name for the phone layout, where the header row is hidden (S47 critic G2).
+    expect(within(rows[0] as HTMLElement).getByText("Weighted loss:")).toHaveClass("sm:sr-only");
   });
 
   it("R3.17 each graded cell names its painted and the solver's action and its weighted loss as text", () => {
     setup();
     const grid = screen.getByRole("grid", { name: /graded range/i });
     const kk = within(grid).getByTitle(/^QQ:/);
-    expect(kk.getAttribute("title")).toMatch(/painted Call, solver Raise to 10bb, weighted loss \d+\.\d{4}bb/);
+    expect(kk.getAttribute("title")).toMatch(/painted Call, solver Raise to 10bb, weighted loss \d+\.\d{4}bb$/);
     expect(kk).toHaveAttribute("data-shade");
     expect(within(grid).getByTitle(/^72o:/).getAttribute("title")).toBe("72o: not in range");
     expect(within(grid).getAllByRole("gridcell")).toHaveLength(169);
@@ -92,5 +99,18 @@ describe("R3.17 PaintGradedView edge cases", () => {
     const cell = within(grid).getByTitle(new RegExp(`^${first.hand}:`));
     expect(cell.getAttribute("title")).toContain("painted Action 9");
     expect(cell).toHaveTextContent("?");
+  });
+
+  it("R3.17 a weighted loss of 0.0023bb prints non-zero in the total, the costliest table and the cell's name (PR #48 review HIGH 1)", () => {
+    const [first, ...rest] = fixturePaintGraded.per_hand;
+    if (first === undefined) throw new Error("the fixture grade has no hands");
+    const small = { ...first, loss_bb: 0.5, weight: 6 / 1326, weighted_loss_bb: 0.0023 };
+    const result = { ...fixturePaintGraded, total_weighted_loss_bb: 0.0023, per_hand: [small, ...rest.map((row) => ({ ...row, loss_bb: 0, weighted_loss_bb: 0 }))] };
+    render(<PaintGradedView prompt={fixturePaintPrompt} result={result} onNext={vi.fn()} />);
+    expect(screen.getByTestId("paint-total")).toHaveTextContent("0.0023bb");
+    expect(screen.getByTestId("paint-total")).not.toHaveTextContent("0.00bb ");
+    const table = screen.getByRole("table", { name: /costliest/i });
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("0.0023bb");
+    expect(within(screen.getByRole("grid", { name: /graded range/i })).getByTitle(new RegExp(`^${small.hand}:`)).getAttribute("title")).toMatch(/weighted loss 0.0023bb$/);
   });
 });

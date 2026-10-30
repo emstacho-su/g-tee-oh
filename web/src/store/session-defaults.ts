@@ -8,8 +8,10 @@
  * (guarded-storage.ts), so a storage failure only means the defaults are not remembered. A stored
  * value is validated field by field on read: grouping one of standard, grouped or simple; rng a
  * boolean; config scope "all" or a list of 1 to 32 distinct config ids that match the contract's
- * GameConfig config_id pattern. A field that fails falls back to its default and the others are
- * kept. The setters validate the same way and throw a RangeError on a value the api would refuse.
+ * GameConfig config_id pattern; scopeMode "all" or "chosen" (S47, O-486: the picker's radio, kept
+ * even with zero ticks, while the stored scope and the start body stay "all"). A field that fails
+ * falls back to its default and the others are kept. The setters validate the same way and throw a
+ * RangeError on a value the api would refuse.
  */
 import { create } from "zustand";
 
@@ -32,14 +34,18 @@ export const MAX_SCOPE_CONFIGS = 32;
 export const CONFIG_ID_PATTERN = /^cfg_[2-9]_(online|live)(_[a-z0-9]+)?_[0-9]+(cbb)?(_straddle)?(_ante[0-9]+)?$/;
 
 export type ConfigScope = typeof ALL_CONFIGS | readonly string[];
+/** Which radio the scope picker shows (S47, O-486): "chosen" with zero ticks is a valid moment on screen, stored as scope "all". */
+export type ScopeMode = "all" | "chosen";
+export const SCOPE_MODES: readonly ScopeMode[] = ["all", "chosen"];
 
 export interface SessionDefaults {
   readonly grouping: Grouping;
   readonly rng: boolean;
   readonly configScope: ConfigScope;
+  readonly scopeMode: ScopeMode;
 }
 
-export const DEFAULT_SESSION_DEFAULTS: SessionDefaults = { grouping: "standard", rng: false, configScope: ALL_CONFIGS };
+export const DEFAULT_SESSION_DEFAULTS: SessionDefaults = { grouping: "standard", rng: false, configScope: ALL_CONFIGS, scopeMode: "all" };
 
 export interface SessionDefaultsEnvironment {
   storage?: Storage | null;
@@ -50,6 +56,11 @@ export interface SessionDefaultsState {
   setGrouping: (grouping: Grouping) => void;
   setRng: (rng: boolean) => void;
   setConfigScope: (scope: ConfigScope) => void;
+  setScopeMode: (mode: ScopeMode) => void;
+}
+
+export function isScopeMode(value: unknown): value is ScopeMode {
+  return typeof value === "string" && (SCOPE_MODES as readonly string[]).includes(value);
 }
 
 export function isGrouping(value: unknown): value is Grouping {
@@ -67,11 +78,14 @@ export function isConfigScope(value: unknown): value is ConfigScope {
 /** Validates a stored value field by field; a field that fails takes its default. */
 export function parseSessionDefaults(value: unknown): SessionDefaults {
   if (!isRecord(value)) return DEFAULT_SESSION_DEFAULTS;
-  const { grouping, rng, configScope } = value;
+  const { grouping, rng, configScope, scopeMode } = value;
+  const scope: ConfigScope = isConfigScope(configScope) ? (configScope === ALL_CONFIGS ? ALL_CONFIGS : [...configScope]) : DEFAULT_SESSION_DEFAULTS.configScope;
   return {
     grouping: isGrouping(grouping) ? grouping : DEFAULT_SESSION_DEFAULTS.grouping,
     rng: typeof rng === "boolean" ? rng : DEFAULT_SESSION_DEFAULTS.rng,
-    configScope: isConfigScope(configScope) ? (configScope === ALL_CONFIGS ? ALL_CONFIGS : [...configScope]) : DEFAULT_SESSION_DEFAULTS.configScope,
+    configScope: scope,
+    // A chosen list always shows the chosen radio; an older stored value without the field follows its scope.
+    scopeMode: scope !== ALL_CONFIGS ? "chosen" : isScopeMode(scopeMode) ? scopeMode : DEFAULT_SESSION_DEFAULTS.scopeMode,
   };
 }
 
@@ -97,7 +111,12 @@ export function createSessionDefaultsStore(environment: SessionDefaultsEnvironme
       },
       setConfigScope: (scope) => {
         if (!isConfigScope(scope)) throw new RangeError(`the configuration scope is "all" or 1 to ${MAX_SCOPE_CONFIGS} distinct config ids`);
-        save({ configScope: scope === ALL_CONFIGS ? ALL_CONFIGS : [...scope] });
+        // A chosen list means the chosen mode; clearing the list keeps the mode the picker shows.
+        save(scope === ALL_CONFIGS ? { configScope: ALL_CONFIGS } : { configScope: [...scope], scopeMode: "chosen" });
+      },
+      setScopeMode: (mode) => {
+        if (!isScopeMode(mode)) throw new RangeError(`${String(mode)} is not a scope mode`);
+        save(mode === "all" ? { scopeMode: mode, configScope: ALL_CONFIGS } : { scopeMode: mode });
       },
     };
   });

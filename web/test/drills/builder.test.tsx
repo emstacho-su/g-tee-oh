@@ -66,7 +66,7 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     expect(sent("POST", "/api/v1/drills")[0]?.headers["idempotency-key"]).toBe("test-key-1");
     expect(await screen.findByRole("heading", { level: 1, name: "RFI boundary hands" })).toBeInTheDocument();
     expect(await screen.findByTestId("builder-status")).toHaveTextContent("Drill saved.");
-    expect(screen.getByTestId("spot-summary")).toHaveTextContent("hero BTN against any opponent; RFI; close decisions");
+    expect(screen.getByTestId("spot-summary")).toHaveTextContent("hero button against any opponent; open or fold; close decisions");
     expect(screen.getByRole("link", { name: "Run" })).toHaveAttribute("href", expect.stringMatching(/\/run$/));
   });
 
@@ -74,11 +74,16 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     const { sent } = renderDrills("/drills/new");
     const user = await openNew();
     await openSection(user, "Game");
-    await user.clear(screen.getByLabelText("Depths (bb)"));
-    await user.type(screen.getByLabelText("Depths (bb)"), "100, abc");
+    // The typed fields sit under Advanced: custom game since S47 (R3.37).
+    await user.click(screen.getByRole("button", { name: "Advanced: custom game" }));
+    await user.clear(screen.getByLabelText("Custom depths (bb)"));
+    await user.type(screen.getByLabelText("Custom depths (bb)"), "100, abc");
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     expect(screen.getByTestId("form-alert")).toHaveTextContent("Error: Fix the fields marked below.");
-    expect(screen.getByLabelText("Depths (bb)")).toHaveAttribute("aria-invalid", "true");
+    // S47 (O-483): a failed Save moves to the first page with an error and focuses its first invalid control.
+    await waitFor(() => expect(screen.getByLabelText("Name")).toHaveFocus());
+    await openSection(user, "Game");
+    expect(screen.getByLabelText("Custom depths (bb)")).toHaveAttribute("aria-invalid", "true");
     await openSection(user, "Seats");
     expect(group("Hero positions")).toHaveAccessibleDescription("Error: Choose at least one hero position.");
     await openSection(user, "Name and tags");
@@ -106,7 +111,8 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await user.click(screen.getByRole("button", { name: "Save drill" }));
     const alert = await screen.findByTestId("form-alert");
     await user.click(await within(alert).findByRole("link", { name: "Game: 1 field to fix" }));
-    expect(await screen.findByLabelText("Stake")).toHaveAccessibleDescription("Error: the server refuses this stake");
+    // The stake error is on the typed field, under Advanced, which opens itself when it holds an error (S47).
+    expect(await screen.findByLabelText("Custom stake")).toHaveAccessibleDescription("Error: the server refuses this stake");
     expect(screen.getByTestId("form-alert")).toHaveTextContent("unrecognized key");
     await openSection(user, "Name and tags");
     await user.type(screen.getByLabelText("Name"), " again");
@@ -201,19 +207,22 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     expect(nextCellIndex(5, "a")).toBeUndefined();
   });
 
-  it("R3.14 the stake choices follow the format, and the seats follow the table size", async () => {
+  it("R3.14 R3.37 the stake choices follow the format in the picker, and the seats follow the table size", async () => {
     renderDrills("/drills/new");
     const user = await openNew();
     await openSection(user, "Game");
-    await user.click(within(group("Format")).getByRole("radio", { name: "Live" }));
-    const stake = screen.getByLabelText("Stake");
-    await waitFor(() => expect(within(stake).getAllByRole("option").map((option) => option.textContent)).toEqual(["Choose a stake", "1/3", "2/5"]));
-    await user.selectOptions(stake, "2/5");
-    expect(stake).toHaveValue("2/5");
-    await openSection(user, "Seats");
-    expect(within(group("Hero positions")).queryByRole("checkbox", { name: "LJ" })).not.toBeInTheDocument();
-    await openSection(user, "Game");
-    await user.selectOptions(screen.getByLabelText("Table size"), "9");
+    const picker = await screen.findByTestId("config-picker");
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Live" }));
+    // At 6 players no live game exists, so the size must change before a stake is offered (Study's words).
+    expect(within(picker).getByTestId("picker-stake")).toHaveTextContent("Choose an available table size first.");
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Table size" })).getByRole("radio", { name: /^9 players/ }));
+    const stakes = within(picker).getByRole("radiogroup", { name: "Stake" });
+    expect(within(stakes).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["1/3 10% rake, cap $5.00, no flop no drop", "2/5 10% rake, cap $5.00, no flop no drop No 9-player game at this stake"]);
+    await user.click(within(stakes).getByRole("radio", { name: /^1\/3/ }));
+    // The custom fields hold the same draft: the stake is stored by its label.
+    await user.click(screen.getByRole("button", { name: "Advanced: custom game" }));
+    expect(screen.getByLabelText("Custom stake")).toHaveValue("1/3");
+    expect(screen.getByLabelText("Custom table size")).toHaveValue("9");
     await openSection(user, "Seats");
     expect(within(group("Hero positions")).getByRole("checkbox", { name: "LJ" })).toBeInTheDocument();
     await user.click(within(group("Hero positions")).getByRole("checkbox", { name: "CO" }));
@@ -260,5 +269,61 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await user.click(screen.getByRole("button", { name: "Export" }));
     const code = await within(screen.getByRole("dialog")).findByLabelText<HTMLTextAreaElement>("Export code");
     expect(code.value).toMatch(/^gteeoh1\./);
+  });
+
+  it("R3.14 Export and Duplicate are off while the draft is dirty: Save first: these act on the stored drill", async () => {
+    const user = userEvent.setup();
+    renderDrills(`/drills/${FIXTURE_DRILL_ID}`);
+    await screen.findByLabelText("Name");
+    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    await user.type(screen.getByLabelText("Name"), " edited");
+    expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeDisabled();
+    expect(screen.getByTestId("builder-actions-dirty")).toHaveTextContent("Save first: these act on the stored drill.");
+    expect(screen.getByRole("button", { name: "Export" })).toHaveAccessibleDescription("Save first: these act on the stored drill.");
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export" })).toBeEnabled());
+  });
+
+  it("R3.36 Save and run creates the drill and opens its run screen with autostart", async () => {
+    const { sent, router } = renderDrills("/drills/new");
+    const user = await openNew();
+    await fillRfiDrill(user);
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drills\/[0-9a-f-]{36}\/run$/));
+    expect(sent("POST", "/api/v1/drills")).toHaveLength(1);
+    // The run screen read the drill and started by itself, then dropped start=1 from the address (O-484).
+    await waitFor(() => expect(sent("POST", "/api/v1/sessions")).toHaveLength(1));
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("start"));
+  });
+
+  it("R3.36 Save and run on an unchanged stored drill opens the run screen without a write", async () => {
+    const user = userEvent.setup();
+    const { sent, router } = renderDrills(`/drills/${FIXTURE_DRILL_ID}`);
+    await screen.findByLabelText("Name");
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${FIXTURE_DRILL_ID}/run`));
+    expect(sent("PATCH", `/api/v1/drills/${FIXTURE_DRILL_ID}`)).toHaveLength(0);
+  });
+
+  it("R3.37 an error opens Advanced: custom game and it stays open once the error is fixed (PR #48 review MEDIUM 5)", async () => {
+    renderDrills("/drills/new");
+    const user = await openNew();
+    await openSection(user, "Game");
+    const picker = await screen.findByTestId("config-picker");
+    // Live with no stake chosen: Save marks the stake, which lives in the typed fields.
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Live" }));
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await openSection(user, "Game");
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Custom stake")).toHaveAttribute("aria-invalid", "true");
+    await user.selectOptions(screen.getByLabelText("Custom table size"), "9");
+    await user.selectOptions(screen.getByLabelText("Custom stake"), "1/3");
+    // The error is gone and the disclosure stays open: only the user closes it.
+    expect(screen.getByLabelText("Custom stake")).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Advanced: custom game" }));
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
   });
 });

@@ -18,7 +18,7 @@ const OWNER = { email: FIXTURE_USER_EMAIL, password: "any-non-empty-password" };
 const TREND_ROWS = 10;
 const HEAT_CELLS = 40;
 /** A practiced class the live 9-handed 1/3 configuration seats. */
-const DRILLED_CELL = /^rfi BB-UTG, live 100 bb:/;
+const DRILLED_CELL = /^Open or fold, big blind versus under the gun, live 100bb:/;
 
 test("R4.12 mock flow 6: /progress draws the leak trend and the heat map, checks one accessible representation per chart and opens a drill from a cell", async ({ page }) => {
   await installAppMockApi(page);

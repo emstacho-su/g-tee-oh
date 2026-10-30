@@ -43,12 +43,11 @@ describe("R4.12 home queue model", () => {
     expect(queue.leaks.map((leak) => leak.spotClassKey)).toEqual(fixtureLeaks.items.slice(0, 3).map((item) => item.spot_class_key));
     const first = fixtureLeaks.items[0];
     const firstCell = fixtureHeatmap.cells.find((each) => each.spot_class_key === first?.spot_class_key);
-    const row = fixtureHeatmap.rows[firstCell?.row ?? -1];
     const column = fixtureHeatmap.columns[firstCell?.column ?? -1];
     expect(queue.leaks[0]).toEqual({
       spotClassKey: first?.spot_class_key,
-      family: first?.family,
-      where: `${row?.pair}, ${column?.format}, ${column?.depth_band} bb`,
+      family: "Open or fold",
+      where: `big blind versus under the gun, ${column?.format} ${column?.depth_band}bb`,
       costText: "42.0 bb per 1,000 hands",
     });
   });

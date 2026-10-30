@@ -21,7 +21,7 @@ export function MainNav() {
     <PillNav label="Main" className={PANEL_CLASSES}>
       {NAV_ITEMS.map((item) => (
         <li key={item.to} className="shrink-0">
-          <Link to={item.to} activeOptions={{ exact: item.exact }} {...NAV_PILL_LINK_PROPS}>
+          <Link to={item.to} activeOptions={{ exact: item.exact, includeSearch: false }} {...NAV_PILL_LINK_PROPS}>
             {item.label}
           </Link>
         </li>

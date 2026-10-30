@@ -1,20 +1,27 @@
 /**
- * The builder's game, stake and sizing section (S26, R3.14, 05 section 4): format, table size and
- * depths (spot_filter.game_config), the stake label and the sizing. The stake choices are the
- * catalog's stakes of the chosen format (GET /stakes), named by label because a drill names its
- * stake by label (schemas/drills.ts); a stored label the catalog lacks stays offered, so an
- * imported drill still round-trips. Fixed sizing shows the open and three-bet sizes in big blinds.
+ * The builder's game, stake and sizing section (S26, R3.14, 05 section 4; S47, R3.37, design rule
+ * 8): the configuration picker first (ConfigPicker: format, table size, stake and depths from the
+ * catalog with the reasons a choice is unavailable), then "Advanced: custom game" with the typed
+ * fields (table size including sizes the catalog lacks, depths as text, the stake label, the sizing),
+ * so a drill can still name a game the catalog does not hold and an imported drill round-trips.
+ * The stake choices are the catalog's stakes of the chosen format (GET /stakes), named by their
+ * display words (stakeWords) and stored by label because a drill names its stake by label
+ * (schemas/drills.ts); a stored label the catalog lacks stays offered. Fixed sizing shows the open
+ * and three-bet sizes in big blinds.
  */
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
+import { Disclosure } from "../../components/ui/index.js";
 import type { DrillDraft } from "../../drills/draft.js";
 import { withFormat, withTableSize } from "../../drills/draft-edits.js";
 import type { GroupedErrors } from "../../drills/field-errors.js";
-import { FORMAT_LABELS } from "../../drills/labels.js";
+import { FORMAT_LABELS, stakeWords } from "../../drills/labels.js";
 import { OFFERED_TABLE_SIZES } from "../../drills/limits.js";
 import type { GameFormat, Sizing } from "../../drills/types.js";
 import { stakesQuery } from "../../study/queries.js";
+import { ConfigPicker } from "./ConfigPicker.js";
 import { FormSection, RadioField, SelectField, TextField, type Choice } from "./form-parts.js";
 
 export interface SectionProps {
@@ -22,6 +29,12 @@ export interface SectionProps {
   onChange: (draft: DrillDraft) => void;
   errors: GroupedErrors;
 }
+
+export const GAME_TEXT = {
+  title: "Game and stake",
+  advanced: "Advanced: custom game",
+  advancedHint: "Type a game the catalog does not list; it runs once the library builds it.",
+} as const;
 
 const FORMAT_CHOICES: readonly Choice<GameFormat>[] = [
   { value: "online", label: FORMAT_LABELS.online },
@@ -35,6 +48,14 @@ const SIZING_CHOICES: readonly Choice<Sizing["mode"]>[] = [
 
 const NO_STAKE = "";
 
+/** The typed fields' labels, distinct from the picker's facets so each control has one name. */
+export const CUSTOM_LABELS = {
+  format: "Custom format",
+  tableSize: "Custom table size",
+  depths: "Custom depths (bb)",
+  stake: "Custom stake",
+} as const;
+
 function tableSizeChoices(current: number): Choice<string>[] {
   const sizes = OFFERED_TABLE_SIZES.includes(current) ? OFFERED_TABLE_SIZES : [current, ...OFFERED_TABLE_SIZES];
   return sizes.map((size) => ({ value: String(size), label: `${size}-handed` }));
@@ -45,31 +66,33 @@ function useStakeChoices(format: GameFormat, current: string): { choices: Choice
   const stakes = useQuery(stakesQuery(api));
   const labels = (stakes.data ?? []).filter((stake) => stake.format === format).map((stake) => stake.label);
   const withCurrent = current === NO_STAKE || labels.includes(current) ? labels : [current, ...labels];
-  const choices = withCurrent.map((label) => ({ value: label, label }));
+  const choices = withCurrent.map((label) => ({ value: label, label: stakeWords(label, format) }));
   return { choices: [{ value: NO_STAKE, label: "Choose a stake" }, ...choices], failed: stakes.isError };
 }
 
-export function GameSection({ draft, onChange, errors }: SectionProps) {
+/** The typed fields: the game as text, for a configuration the catalog does not list (O-317). */
+function CustomGameFields({ draft, onChange, errors }: SectionProps) {
   const stakes = useStakeChoices(draft.format, draft.stake);
   return (
-    <FormSection title="Game and stake">
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted">{GAME_TEXT.advancedHint}</p>
       <div className="flex flex-wrap gap-6">
         <RadioField
-          legend="Format"
+          legend={CUSTOM_LABELS.format}
           value={draft.format}
           options={FORMAT_CHOICES}
           onChange={(format) => onChange(withFormat(draft, format))}
           errors={errors["spot_filter.game_config.format"]}
         />
         <SelectField
-          label="Table size"
+          label={CUSTOM_LABELS.tableSize}
           value={String(draft.tableSize)}
           options={tableSizeChoices(draft.tableSize)}
           onChange={(size) => onChange(withTableSize(draft, Number(size)))}
           errors={errors["spot_filter.game_config.table_size"]}
         />
         <TextField
-          label="Depths (bb)"
+          label={CUSTOM_LABELS.depths}
           hint="Effective stacks in big blinds, separated by commas, for example 100, 150."
           inputMode="numeric"
           value={draft.depthsText}
@@ -77,7 +100,7 @@ export function GameSection({ draft, onChange, errors }: SectionProps) {
           errors={errors["spot_filter.game_config.depths_bb"]}
         />
         <SelectField
-          label="Stake"
+          label={CUSTOM_LABELS.stake}
           value={draft.stake}
           options={stakes.choices}
           onChange={(stake) => onChange({ ...draft, stake })}
@@ -85,6 +108,23 @@ export function GameSection({ draft, onChange, errors }: SectionProps) {
           {...(stakes.failed ? { hint: "The stake list could not be loaded; the drill keeps its stake." } : {})}
         />
       </div>
+    </div>
+  );
+}
+
+export function GameSection({ draft, onChange, errors }: SectionProps) {
+  const gameErrors = ["spot_filter.game_config.format", "spot_filter.game_config.table_size", "spot_filter.game_config.depths_bb", "spot_filter.stake"] as const;
+  const hasGameError = gameErrors.some((key) => (errors[key]?.length ?? 0) > 0);
+  // Local open state (PR #48 review MEDIUM 5): an error opens the typed fields, and only the user
+  // closes them, so the disclosure never snaps shut while a field is being fixed.
+  const [advancedOpen, setAdvancedOpen] = useState(hasGameError);
+  if (hasGameError && !advancedOpen) setAdvancedOpen(true);
+  return (
+    <FormSection title={GAME_TEXT.title}>
+      <ConfigPicker draft={draft} onChange={onChange} />
+      <Disclosure title={GAME_TEXT.advanced} headingLevel={3} testId="custom-game" open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CustomGameFields draft={draft} onChange={onChange} errors={errors} />
+      </Disclosure>
       <RadioField
         legend="Sizing"
         value={draft.sizingMode}

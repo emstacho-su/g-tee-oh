@@ -4,3 +4,5 @@
  */
 export const COSMETICS_STORAGE_KEY = "gto-cosmetics";
 export const SESSION_DEFAULTS_STORAGE_KEY = "gto-session-defaults";
+/** The last label seen for each chosen configuration (S47, O-486). */
+export const CONFIG_LABELS_STORAGE_KEY = "gto-config-labels";
