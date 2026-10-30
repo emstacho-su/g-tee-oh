@@ -170,7 +170,12 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
   const startPanel = onStartPanel(state);
   useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
   const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
+  // The machine's state when an answer lands, read through a ref so a late answer sees the present.
+  const noCoverageNow = useRef(noCoverage);
+  noCoverageNow.current = noCoverage;
   const coverageArrived = (text: string): void => {
+    // Only a refusal still on screen is cleared (PR #48 review round 2 HIGH 2).
+    if (!noCoverageNow.current) return;
     setCoverageNote(text);
     session.reset();
   };

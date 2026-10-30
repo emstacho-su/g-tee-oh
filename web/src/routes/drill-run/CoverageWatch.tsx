@@ -11,12 +11,13 @@
  * the unordered seat set, reach-model.ts pairKeyOf, so the web applies no ordering rule). For such
  * an event the configuration's pairs are read again; only when that read marks one of the drill's
  * pairs preflop_available is the screen told, and the refusal cleared. Otherwise it keeps watching.
+ * It tells the screen once, and never after it has left the screen (a cancelled re-read).
  *
  * It is mounted only while the refusal is on screen: the api allows four streams per user, so a
  * drill screen holds one only when it is waiting on the builder.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
@@ -56,6 +57,16 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
   const configs = useQuery(allConfigsQuery(api));
   const [queued, setQueued] = useState<readonly CoverageAddedEvent[]>([]);
   useServerEvents({ onCoverageAdded: (event) => setQueued((current) => [...current, event]) });
+  // A re-read that answers after the watch left the screen, or after one answer already told the
+  // screen, does nothing (PR #48 review round 2 HIGH 2): fired once, and cancelled on unmount.
+  const mounted = useRef(true);
+  const fired = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (configs.data === undefined || queued.length === 0) return;
@@ -73,7 +84,9 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
         .fetchQuery({ ...practicePairsQuery(api, config.config_id), staleTime: 0 })
         .then((pairs) => {
           const nowCovered = pairs.some((pair) => pair.preflop_available && drillPairs.has(pairKeyOf(pair.oop, pair.ip)));
-          if (nowCovered) onCoverage(COVERAGE_WATCH_TEXT.added(event.pair, config));
+          if (!nowCovered || !mounted.current || fired.current) return;
+          fired.current = true;
+          onCoverage(COVERAGE_WATCH_TEXT.added(event.pair, config));
         })
         .catch((error: unknown) => {
           // A failed re-read keeps the watch running; the next event tries again.

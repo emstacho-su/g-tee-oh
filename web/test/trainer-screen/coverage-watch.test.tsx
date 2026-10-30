@@ -14,7 +14,7 @@ import { fixtureConfigs, fixturePairsByConfig } from "../../src/fixtures/study.j
 import { fixtureDrill, fixturePlainPrompt, fixturePracticeSession } from "../../src/fixtures/trainer.js";
 import { jsonResponse, problemResponse, type ResponseFactory } from "../api/fake-fetch.js";
 import { FakeEventStream } from "../library/render-library.js";
-import { NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
+import { DRILL_PATH, NEXT_PATH, START_PATH, renderRun, type RunView } from "./render-run.js";
 
 const CONFIGS_PATH = "GET /api/v1/configs";
 const PAIRS_PATH = "GET /api/v1/configs/cfg_6_online_100/pairs";
@@ -110,6 +110,45 @@ describe("R3.4 Start again on coverage_added", () => {
     releaseConfigs();
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(screen.getByTestId("start-note")).toHaveTextContent("Start again.");
+  });
+
+  it("R3.4 a late second re-read never resets what the user started since (PR #48 review round 2 HIGH 2)", async () => {
+    const { streams, deps } = withStreams();
+    const releases: (() => void)[] = [];
+    const heldPairs: ResponseFactory = () =>
+      new Promise((resolve) => {
+        releases.push(() => resolve(new Response(JSON.stringify({ items: PAIRS.map((pair) => ({ ...pair, preflop_available: true })), next_cursor: null }), { status: 200, headers: { "content-type": "application/json" } })));
+      });
+    // Two reached configurations (100bb and 200bb), so the two events start two distinct re-reads.
+    const twoDepths = { ...fixtureDrill, spot_filter: { ...fixtureDrill.spot_filter, game_config: { ...fixtureDrill.spot_filter.game_config, depths_bb: [100, 200] } } };
+    const view = renderRun({
+      libraryDeps: deps,
+      script: {
+        [DRILL_PATH]: [jsonResponse(200, twoDepths)],
+        // The second start fails another way (503): its alert must survive the late re-read.
+        [START_PATH]: [problemResponse(422, "no-coverage"), problemResponse(503, "unavailable")],
+        [CONFIGS_PATH]: [CONFIGS],
+        [PAIRS_PATH]: [heldPairs],
+        ["GET /api/v1/configs/cfg_6_online_200/pairs"]: [heldPairs],
+        [NEXT_PATH]: [jsonResponse(200, fixturePlainPrompt)],
+      },
+    });
+    await refuse(view, streams);
+    await waitFor(() => expect(view.sentTo(CONFIGS_PATH).length).toBeGreaterThan(0));
+    streams[0]?.emit("coverage_added", EVENT);
+    streams[0]?.emit("coverage_added", { ...EVENT, config_id: "cfg_6_online_200" });
+    await waitFor(() => expect(releases).toHaveLength(2));
+    releases[0]?.();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    const second = await screen.findByRole("alert");
+    expect(second).toHaveTextContent("did not answer in time");
+    releases[1]?.();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The second refusal stands: the late answer neither resets it nor brings the note back.
+    expect(screen.getByRole("alert")).toHaveTextContent("did not answer in time");
+    expect(screen.queryByTestId("start-note")).not.toBeInTheDocument();
+    expect(view.sentTo(START_PATH)).toHaveLength(2);
   });
 
   it("R3.4 without a refusal the run screen opens no stream", async () => {
