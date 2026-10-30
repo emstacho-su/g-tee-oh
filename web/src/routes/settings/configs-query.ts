@@ -9,6 +9,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { fetchAllPages } from "../../api/fetch-all-pages.js";
 import { problemFromBody } from "../../api/index.js";
 import type { AppApi } from "../../api/index.js";
+import { FORMAT_LABELS, isFormatStake } from "../../drills/labels.js";
+import { CBB_PER_BB } from "../../poker/format.js";
 import type { GameConfig } from "../../progress/types.js";
 
 /** The api's largest page. */
@@ -36,8 +38,6 @@ export function allConfigsQuery(api: AppApi) {
   });
 }
 
-const CBB_PER_BB = 100;
-const FORMAT_NAMES: Readonly<Record<GameConfig["format"], string>> = { online: "Online", live: "Live" };
 
 /**
  * "Online, 6 players, 100bb deep" or "Live, 9 players, 100bb deep, stakes 1/3", from the api's fields
@@ -46,10 +46,10 @@ const FORMAT_NAMES: Readonly<Record<GameConfig["format"], string>> = { online: "
  */
 export function configLabel(config: GameConfig): string {
   const parts = [
-    FORMAT_NAMES[config.format],
+    FORMAT_LABELS[config.format],
     `${config.table_size} players`,
     `${config.depth_cbb / CBB_PER_BB}bb deep`,
-    ...(config.stake_label === config.format ? [] : [`stakes ${config.stake_label}`]),
+    ...(isFormatStake(config.stake_label, config.format) ? [] : [`stakes ${config.stake_label}`]),
   ];
   return config.straddle ? [...parts, "straddle"].join(", ") : parts.join(", ");
 }

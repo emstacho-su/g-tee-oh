@@ -7,7 +7,7 @@
  */
 import { drillActionWords, positionWords } from "../progress/spot-words.js";
 import { FORMAT_LABELS, HANDS_MODE_LABELS, PREFLOP_ACTION_SHORT, STREET_LABELS, stakeWords } from "./labels.js";
-import type { SpotFilter } from "./types.js";
+import type { Position, PreflopAction, SpotFilter } from "./types.js";
 
 const ANY_OPPONENT = "any opponent";
 
@@ -21,16 +21,31 @@ function streetText(filter: SpotFilter): string {
   return filter.start_street === "preflop" ? "" : `, from the ${STREET_LABELS[filter.start_street].toLowerCase()}`;
 }
 
-/** The compact token line: seats and action tokens, as the export round trip compares (flow 2). */
-export function spotSummary(filter: SpotFilter): string {
+/** How a line names a seat and a preflop action: tokens (spotSummary) or words (spotWords). */
+interface LineWords {
+  readonly seat: (seat: Position) => string;
+  readonly action: (action: PreflopAction) => string;
+}
+
+/** The one line both forms share: the game, the seats, the actions and the hands. */
+function summaryLine(filter: SpotFilter, words: LineWords): string {
   const { format, table_size: size, depths_bb: depths } = filter.game_config;
-  const villains = filter.villain_positions.length === 0 ? ANY_OPPONENT : filter.villain_positions.join(", ");
+  const seats = (list: readonly Position[]) => list.map(words.seat).join(", ");
+  const villains = filter.villain_positions.length === 0 ? ANY_OPPONENT : seats(filter.villain_positions);
   return [
-    `${FORMAT_LABELS[format]} ${size}-handed, ${depths.map((depth) => `${depth}bb`).join(", ")}, stake ${stakeWords(filter.stake)}`,
-    `hero ${filter.hero_positions.join(", ")} against ${villains}`,
-    `${filter.preflop_action.map((action) => PREFLOP_ACTION_SHORT[action]).join(", ")}${streetText(filter)}`,
+    `${FORMAT_LABELS[format]} ${size}-handed, ${depths.map((depth) => `${depth}bb`).join(", ")}, stake ${stakeWords(filter.stake, format)}`,
+    `hero ${seats(filter.hero_positions)} against ${villains}`,
+    `${filter.preflop_action.map(words.action).join(", ")}${streetText(filter)}`,
     handsText(filter),
   ].join("; ");
+}
+
+const TOKENS: LineWords = { seat: (seat) => seat, action: (action) => PREFLOP_ACTION_SHORT[action] };
+const WORDS: LineWords = { seat: positionWords, action: drillActionWords };
+
+/** The compact token line: seats and action tokens, as the export round trip compares (flow 2). */
+export function spotSummary(filter: SpotFilter): string {
+  return summaryLine(filter, TOKENS);
 }
 
 /**
@@ -39,13 +54,5 @@ export function spotSummary(filter: SpotFilter): string {
  * header, with spotSummary as the tooltip.
  */
 export function spotWords(filter: SpotFilter): string {
-  const { format, table_size: size, depths_bb: depths } = filter.game_config;
-  const seats = (list: readonly string[]) => list.map(positionWords).join(", ");
-  const villains = filter.villain_positions.length === 0 ? ANY_OPPONENT : seats(filter.villain_positions);
-  return [
-    `${FORMAT_LABELS[format]} ${size}-handed, ${depths.map((depth) => `${depth}bb`).join(", ")}, stake ${stakeWords(filter.stake)}`,
-    `hero ${seats(filter.hero_positions)} against ${villains}`,
-    `${filter.preflop_action.map(drillActionWords).join(", ")}${streetText(filter)}`,
-    handsText(filter),
-  ].join("; ");
+  return summaryLine(filter, WORDS);
 }

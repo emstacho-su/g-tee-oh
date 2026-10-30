@@ -11,6 +11,7 @@
  * configuration reads through configLabel when the catalog lists it and as a plain sentence
  * otherwise, never as its key.
  */
+import { FORMAT_LABELS } from "../drills/labels.js";
 import type { PreflopAction } from "../drills/types.js";
 import { configLabel } from "../routes/settings/configs-query.js";
 import type { GameConfig, HeatmapColumn, HeatmapRow } from "./types.js";
@@ -55,7 +56,6 @@ export const POSITION_WORDS = {
   BB: "big blind",
 } as const satisfies Readonly<Record<string, string>>;
 
-const FORMAT_WORDS: Readonly<Record<string, string>> = { online: "Online", live: "Live" };
 const PAIR_SEPARATOR = "-";
 const PAIR_SEATS = 2;
 const BAND_IN_BB = /^\d+$/;
@@ -88,7 +88,7 @@ export function depthBandLabel(band: string): string {
 }
 
 export function formatWords(format: string): string {
-  return FORMAT_WORDS[format] ?? format;
+  return (FORMAT_LABELS as Readonly<Record<string, string>>)[format] ?? format;
 }
 
 export function capitalize(text: string): string {

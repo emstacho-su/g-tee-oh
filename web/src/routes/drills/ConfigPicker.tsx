@@ -25,6 +25,7 @@ import {
 import type { DrillDraft } from "../../drills/draft.js";
 import { withFormat, withTableSize } from "../../drills/draft-edits.js";
 import type { GameFormat } from "../../drills/types.js";
+import { CBB_PER_BB } from "../../poker/format.js";
 import { stakesQuery } from "../../study/queries.js";
 import { SETTING_LABELS, type FieldState, type SettingChoice } from "../../study/settings-fields.js";
 import { allConfigsQuery } from "../settings/configs-query.js";
@@ -35,7 +36,6 @@ export const PICKER_TEXT = {
   depths: "Depths",
 } as const;
 
-const CBB_PER_BB = 100;
 
 export interface ConfigPickerProps {
   draft: DrillDraft;

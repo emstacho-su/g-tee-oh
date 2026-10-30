@@ -7,7 +7,8 @@
 import type { NodeAction } from "../contracts.js";
 import { actionStyle } from "../theme/action-style.js";
 
-const CBB_PER_BB = 100;
+/** Centi-big-blinds per big blind: the catalog's unit (A4 section 1); the one copy the web uses. */
+export const CBB_PER_BB = 100;
 const PERCENT = 100;
 
 /** 250 cbb prints as "2.5bb", 10000 as "100bb"; at most two decimals, trailing zeros dropped. */

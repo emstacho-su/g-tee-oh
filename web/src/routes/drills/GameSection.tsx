@@ -66,7 +66,7 @@ function useStakeChoices(format: GameFormat, current: string): { choices: Choice
   const stakes = useQuery(stakesQuery(api));
   const labels = (stakes.data ?? []).filter((stake) => stake.format === format).map((stake) => stake.label);
   const withCurrent = current === NO_STAKE || labels.includes(current) ? labels : [current, ...labels];
-  const choices = withCurrent.map((label) => ({ value: label, label: stakeWords(label) }));
+  const choices = withCurrent.map((label) => ({ value: label, label: stakeWords(label, format) }));
   return { choices: [{ value: NO_STAKE, label: "Choose a stake" }, ...choices], failed: stakes.isError };
 }
 

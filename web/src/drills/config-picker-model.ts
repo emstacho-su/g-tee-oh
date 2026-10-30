@@ -11,12 +11,11 @@
  * Study's facet holds one, so the first depth stands for the draft in the facet chain and the depth
  * choices render as a multiple choice over depthsText. Pure; every function returns a new draft.
  */
-import { formatCbb } from "../poker/format.js";
+import { CBB_PER_BB, formatCbb } from "../poker/format.js";
 import type { GameConfig, PositionPairEntry, Stake } from "../study/queries.js";
 import { fieldStates, type FieldState, type SettingsCatalog, type SettingsDraft } from "../study/settings-fields.js";
 import { listOf, type DrillDraft } from "./draft.js";
 
-const CBB_PER_BB = 100;
 const DEPTH_SEPARATOR = ", ";
 const NO_PAIRS = (): readonly PositionPairEntry[] | undefined => undefined;
 

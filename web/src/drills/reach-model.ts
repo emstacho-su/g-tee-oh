@@ -13,6 +13,7 @@
  * arithmetic, never a poker number. "Queued" is not claimed: only a start knows the queue, so the
  * third figure is what is not built yet (O-485). Pure; every function returns new values.
  */
+import { CBB_PER_BB } from "../poker/format.js";
 import type { PositionPairEntry } from "../practice/catalog-spot.js";
 import type { GameConfig } from "../progress/types.js";
 import { seatedPositions } from "./limits.js";
@@ -35,7 +36,6 @@ export interface CoverageBadge {
   readonly text: string;
 }
 
-const CBB_PER_BB = 100;
 const NO_ANTE_CBB = 0;
 const KEY_SEPARATOR = "-";
 

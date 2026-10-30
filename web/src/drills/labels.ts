@@ -24,16 +24,22 @@ import type {
 
 export const FORMAT_LABELS: Readonly<Record<GameFormat, string>> = { online: "Online", live: "Live" };
 
-/** The one online stake's catalog label is the format's own name (gto-model ONLINE_STAKE_LABEL). */
-const ONLINE_STAKE_LABEL = "online";
+/**
+ * The one rule for a stake named after its format (S47 critic; PR #48 review LOW 10): the online
+ * stake's catalog label is the format's own name (gto-model ONLINE_STAKE_LABEL), so it adds
+ * nothing beside the format and reads as the format's word.
+ */
+export function isFormatStake(label: string, format: GameFormat): boolean {
+  return label === format;
+}
 
 /**
  * A stake label as the screen shows it (S47 critic, R3.14): the online stake reads "Online", a live
  * stake keeps its blinds ("1/3"). The catalog label itself is never renamed: the drill schema and
  * the configuration ids key the stake by it.
  */
-export function stakeWords(label: string): string {
-  return label === ONLINE_STAKE_LABEL ? FORMAT_LABELS.online : label;
+export function stakeWords(label: string, format: GameFormat): string {
+  return isFormatStake(label, format) ? FORMAT_LABELS[format] : label;
 }
 
 export const STREET_LABELS: Readonly<Record<StartStreet, string>> = {
