@@ -22,6 +22,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 /** Returns true when the event opened the overlay or ran a binding. */
 export function handleKeydown(store: HotkeyStore, event: KeyboardEvent): boolean {
   if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return false;
+  if (event.defaultPrevented) return false; // S45 (O-466): a control that handled the key (the matrix grid's arrows) keeps it.
   if (isEditableTarget(event.target)) return false;
   const state = store.getState();
   if (state.overlayOpen) return false;

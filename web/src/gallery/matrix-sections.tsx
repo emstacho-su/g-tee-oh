@@ -23,9 +23,10 @@ interface MatrixSectionProps {
   title: string;
   note: string;
   popOutHand?: string;
+  scaleByWeight?: boolean;
 }
 
-function MatrixSection({ mode, theme, name, title, note, popOutHand }: MatrixSectionProps) {
+function MatrixSection({ mode, theme, name, title, note, popOutHand, scaleByWeight = false }: MatrixSectionProps) {
   const [selected, setSelected] = useState<string | null>(popOutHand ?? "AJo");
   return (
     <GallerySection name={name} title={title} note={note}>
@@ -35,6 +36,7 @@ function MatrixSection({ mode, theme, name, title, note, popOutHand }: MatrixSec
         theme={theme}
         selectedHand={selected}
         onSelectHand={setSelected}
+        scaleByWeight={scaleByWeight}
         {...(popOutHand === undefined ? {} : { initialPopOutHand: popOutHand })}
       />
     </GallerySection>
@@ -68,6 +70,21 @@ export function MatrixSections({ theme }: MatrixSectionsProps) {
         name="range-matrix-weight"
         title="RangeMatrix, range-weight mode"
         note="The progress heat ramp fills each cell by its share of the range (O-385)."
+      />
+      <MatrixSection
+        mode="strategy_ev"
+        theme={theme}
+        name="range-matrix-strategy-ev"
+        title="RangeMatrix, strategy with EV"
+        note="Frequency bars scaled to each hand's range weight, with the best action's EV printed in the corner (R3.24, O-465)."
+        scaleByWeight
+      />
+      <MatrixSection
+        mode="compare"
+        theme={theme}
+        name="range-matrix-compare"
+        title="RangeMatrix, compare to best"
+        note="Each cell coloured by the chosen action's served loss against the best action, in percent of the pot on the EV scale's red side (R3.24, O-462, O-464)."
       />
       <MatrixSection
         mode="frequency"

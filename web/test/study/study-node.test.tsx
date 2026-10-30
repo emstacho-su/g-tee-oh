@@ -52,7 +52,7 @@ describe("R3.12 study node view", () => {
     renderStudy(`${BASE}&hand=AKs`);
     const range = await screen.findByRole("table", { name: "Range by action at this node" });
     expect(within(range).getByRole("row", { name: /Fold/ })).toHaveTextContent("55.0%");
-    expect(within(range).getByRole("row", { name: /Raise 2.5bb/ })).toHaveTextContent("38.0%");
+    expect(within(range).getByRole("row", { name: /Raise to 2.5bb/ })).toHaveTextContent("38.0%");
     const hand = screen.getByRole("table", { name: "AKs at this node: strategy and EV" });
     expect(within(hand).getAllByRole("row")).toHaveLength(5);
     expect(hand).toHaveTextContent("bb");
@@ -67,11 +67,11 @@ describe("R3.12 study node view", () => {
     );
   });
 
-  it("R3.12 the threshold card loads only for a selected hand", async () => {
+  it("R3.12 the threshold card shows only for a selected hand; before one, insights read with the stand-in (O-461)", async () => {
     const user = userEvent.setup();
     const { requests, router } = renderStudy(BASE);
-    expect(await screen.findByText("Pick a cell in the matrix to see that hand's threshold card.")).toBeInTheDocument();
-    expect(requests.some((request) => request.path === "/api/v1/study/insights")).toBe(false);
+    expect(await screen.findByText("Pick a cell in the matrix to see that hand's threshold card, blockers and role.")).toBeInTheDocument();
+    expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
 
     const grid = screen.getByRole("group", { name: /range matrix cells/i });
     grid.focus();

@@ -72,7 +72,7 @@ describe("R3.13 ActionBar", () => {
 
   it("R3.13 each button shows its hotkey number and the action's short letter", () => {
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" onAction={vi.fn()} />);
-    const raise = screen.getByRole("button", { name: "Raise 2.5bb" });
+    const raise = screen.getByRole("button", { name: "Raise to 2.5bb" });
     expect(raise).toHaveAttribute("aria-keyshortcuts", "3");
     expect(within(raise).getByText("3")).toBeInTheDocument();
     expect(within(raise).getByText("R")).toBeInTheDocument();

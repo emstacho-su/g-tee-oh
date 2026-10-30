@@ -12,7 +12,9 @@
  * NodeAction.index (O-198) when the caller passes them, otherwise from the token
  * (tokenActionLabel), and "Unnamed action" when neither names it; no index, token or field name is
  * ever shown. The hero's hand is marked wherever it appears. Every api string is a React text
- * node, never HTML. Numbers are the api's, only formatted (ADR 0004).
+ * node, never HTML. Numbers are the api's, only formatted (ADR 0004); shares print
+ * with one decimal (formatShare), the one precision of every text surface (S45, screen critic), while the
+ * rank wording still rounds to a whole percent (O-408).
  */
 import { useId, type ReactNode } from "react";
 
@@ -20,7 +22,7 @@ import { ActionSwatch } from "../trainer/ActionSwatch.js";
 import { InfoTip, RAISED_CLASS, cn } from "../ui/index.js";
 import type { NodeAction, ThresholdCardData } from "../../contracts.js";
 import { actionOfIndex } from "../../poker/action-index.js";
-import { exactActionLabel, formatWholePercent, wholePercent } from "../../poker/format.js";
+import { exactActionLabel, formatShare, wholePercent } from "../../poker/format.js";
 import { tokenActionLabel } from "../../poker/token-label.js";
 
 export interface ThresholdCardProps {
@@ -131,7 +133,7 @@ function HandPosition({ card, heroHand }: { card: ThresholdCardData; heroHand: s
       )}
       <p>{ranked ? rankText(rank) : RANK_TEXT.none}</p>
       {ranked ? (
-        <p className="text-muted">{`Equity against the opponent's range: ${formatWholePercent(position.equity_vs_villain)}`}</p>
+        <p className="text-muted">{`Equity against the opponent's range: ${formatShare(position.equity_vs_villain)}`}</p>
       ) : null}
     </Tile>
   );
@@ -157,7 +159,7 @@ function ActionRow({ entry, card, actions, heroHand }: ActionRowProps) {
         <span id={nameId} className="font-semibold">
           {name}
         </span>
-        <span className="text-muted">{`Played by ${formatWholePercent(entry.share_taking)} of the range`}</span>
+        <span className="text-muted">{`Played by ${formatShare(entry.share_taking)} of the range`}</span>
       </span>
       {weakest === null ? (
         <span className="text-muted">No hand plays it at least half the time</span>

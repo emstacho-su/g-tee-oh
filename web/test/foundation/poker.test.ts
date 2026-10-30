@@ -55,7 +55,7 @@ describe("R3.13 cards and formatting", () => {
     expect(formatBb(0.1234)).toBe("0.12bb");
     expect(formatShare(0.4567)).toBe("45.7%");
     expect(formatPercent(1.25)).toBe("1.25%");
-    expect(exactActionLabel(fixtureActions[2]!)).toBe("Raise 2.5bb");
+    expect(exactActionLabel(fixtureActions[2]!)).toBe("Raise to 2.5bb");
     expect(exactActionLabel(fixtureActions[0]!)).toBe("Fold");
   });
 

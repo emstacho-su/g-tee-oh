@@ -54,7 +54,7 @@ function node(hands: Row[], shares: number[] = [0.4, 0.35, 0.2, 0.05], overrides
     actions: ACTIONS,
     noise_flags: [],
     range_summary: {
-      by_action: shares.map((share, index) => ({ index, share })),
+      by_action: shares.map((share, index) => ({ index, share, combos: 0 })),
       ip: { combos: 0, reach_weighted_combos: 0 },
       oop: { combos: 0, reach_weighted_combos: 0 },
     },

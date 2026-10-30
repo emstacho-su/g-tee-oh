@@ -9,6 +9,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, configure } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+import { useStudySpotsStore } from "../src/store/study-spots.js";
+
 /**
  * findBy and waitFor wait this long (Testing Library's default is 1,000 ms). S25's whole-app
  * renders chain /me, the route's loader and the screen's own reads; under `just ts-test`, which
@@ -21,6 +23,15 @@ afterEach(cleanup);
 
 // A test file may opt into the node environment ("// @vitest-environment node"); it has no window.
 const hasWindow = typeof window !== "undefined";
+
+// S45 (R3.27): the study screen remembers spots in localStorage and a bare /study reopens the last
+// one, so every test starts with an empty storage and an empty saved spots store.
+if (hasWindow) {
+  afterEach(() => {
+    window.localStorage.clear();
+    useStudySpotsStore.getState().reload();
+  });
+}
 
 if (hasWindow) vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 

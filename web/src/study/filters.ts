@@ -45,8 +45,8 @@ export const NOT_IN_LIBRARY = "Not in the library";
 
 /** Filters a depth change keeps; every other change clears all filters below it. */
 const KEPT_BELOW: Readonly<Partial<Record<FilterKey, readonly FilterKey[]>>> = { depth: ["pair"] };
-/** Parameters that belong to one node and go whenever a filter changes. */
-const NODE_KEYS: readonly (keyof StudySearch)[] = ["line", "hand"];
+/** Parameters that belong to one node and go whenever a filter changes (S45: the action filters and the lens too). */
+const NODE_KEYS: readonly (keyof StudySearch)[] = ["line", "hand", "filters", "lens"];
 
 /** The distinct values, ascending; shared with settings.ts (S39). */
 export function distinctSorted(values: readonly number[]): number[] {
@@ -118,9 +118,21 @@ export function withFilter(search: StudySearch, key: FilterKey, raw: string): St
   return validateStudySearch(raw === "" ? base : { ...base, [key]: raw });
 }
 
-/** The search at another line of the same pair; "" is the root. The hand stays selected. */
+/**
+ * The choices that name a NodeAction.index (the action filters and the compared action), which
+ * belong to one node: at another node the same index names another action, so every change of node
+ * drops them (S45 code review, O-468). The mode and the hand stay.
+ */
+export const NODE_CHOICE_KEYS: readonly (keyof StudySearch)[] = ["filters", "lens"];
+
+/** The search without the node's own choices (NODE_CHOICE_KEYS). */
+export function withoutNodeChoices(search: StudySearch): StudySearch {
+  return validateStudySearch(without(search, NODE_CHOICE_KEYS));
+}
+
+/** The search at another line of the same pair; "" is the root. The hand stays; the filters and lens go. */
 export function withLine(search: StudySearch, line: string): StudySearch {
-  const base = without(search, ["line"]);
+  const base = without(search, ["line", ...NODE_CHOICE_KEYS]);
   return validateStudySearch(line === "" ? base : { ...base, line });
 }
 
@@ -130,4 +142,9 @@ export function withMode(search: StudySearch, mode: MatrixMode): StudySearch {
 
 export function withHand(search: StudySearch, hand: string): StudySearch {
   return validateStudySearch({ ...search, hand });
+}
+
+/** The search comparing another action (S45, R3.24): the lens is a NodeAction.index. */
+export function withLens(search: StudySearch, lens: number): StudySearch {
+  return validateStudySearch({ ...search, lens });
 }

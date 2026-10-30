@@ -51,8 +51,8 @@ function node(overrides: Partial<SqNode> = {}): SqNode {
     noise_flags: [],
     range_summary: {
       by_action: [
-        { index: 0, share: 0.4 },
-        { index: 1, share: 0.6 },
+        { index: 0, share: 0.4, combos: 0 },
+        { index: 1, share: 0.6, combos: 0 },
       ],
       ip: { combos: 0, reach_weighted_combos: 0 },
       oop: { combos: 0, reach_weighted_combos: 0 },
@@ -129,7 +129,7 @@ describe("R3.16 prediction derivation over a fake solver-query", () => {
   });
 
   it("R3.16 a node with no question on either ladder is a 502 upstream problem", async () => {
-    const bare = node({ actions: [FOLD], hands: [row("AA", [1], [0, 1])], range_summary: { ...node().range_summary, by_action: [{ index: 0, share: 1 }] } });
+    const bare = node({ actions: [FOLD], hands: [row("AA", [1], [0, 1])], range_summary: { ...node().range_summary, by_action: [{ index: 0, share: 1, combos: 0 }] } });
     const problem = await problemOf(derivePrediction(session(), fakePort(deal(), bare), NO_HISTORY));
     expect(problem.status).toBe(HTTP_STATUS.badGateway);
   });
@@ -140,7 +140,7 @@ describe("R3.16 prediction derivation over a fake solver-query", () => {
   });
 
   it("R3.16 a range prompt with no non-fold action falls back to the hand ladder", async () => {
-    const foldOnly = node({ actions: [FOLD], hands: [row("AA", [1])], range_summary: { ...node().range_summary, by_action: [{ index: 0, share: 1 }] } });
+    const foldOnly = node({ actions: [FOLD], hands: [row("AA", [1])], range_summary: { ...node().range_summary, by_action: [{ index: 0, share: 1, combos: 0 }] } });
     const derived = await derivePrediction(session(0), fakePort(deal(), foldOnly), NO_HISTORY);
     expect(derived.question).toMatchObject({ ladder: "hand", hand: "AA", answer_kind: "action" });
   });

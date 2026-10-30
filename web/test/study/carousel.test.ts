@@ -35,7 +35,7 @@ describe("R3.12 line prefixes and decisions", () => {
   it("R3.12 each prefix node is one decision: its seat, its line and the action the line took there", () => {
     const decisions = lineDecisions([OPEN, VERSUS_OPEN], "r250");
     expect(decisions).toEqual([
-      { seat: "BTN", line: "", taken: "Raise 2.5bb" },
+      { seat: "BTN", line: "", taken: "Raise to 2.5bb" },
       { seat: "BB", line: "r250", taken: undefined },
     ]);
   });
@@ -45,7 +45,7 @@ describe("R3.12 line prefixes and decisions", () => {
     const called: LineNode = { ...VERSUS_OPEN, actions: [...VERSUS_OPEN.actions, action(2, "c", "call", null)] };
     const decisions = lineDecisions([OPEN, called, flop], "r250.c");
     expect(decisions).toEqual([
-      { seat: "BTN", line: "", taken: "Raise 2.5bb" },
+      { seat: "BTN", line: "", taken: "Raise to 2.5bb" },
       { seat: "BB", line: "r250", taken: "Call" },
     ]);
     const items = carouselItems(seatedPositions(6), BB_BTN, decisions);
@@ -80,7 +80,7 @@ describe("R3.12 carousel items", () => {
   it("R3.12 one step down, the opener shows its action and the big blind is to act", () => {
     const items = carouselItems(seatedPositions(6), BB_BTN, lineDecisions([OPEN, VERSUS_OPEN], "r250"));
     expect(brief(items).slice(3)).toEqual([
-      { seat: "BTN", state: "acted", text: "Raise 2.5bb", line: "", reason: undefined },
+      { seat: "BTN", state: "acted", text: "Raise to 2.5bb", line: "", reason: undefined },
       { seat: "SB", state: "folded", text: "Folds", line: undefined, reason: "Outside this pair's solution" },
       { seat: "BB", state: "current", text: "To act", line: "r250", reason: undefined },
     ]);
@@ -90,7 +90,7 @@ describe("R3.12 carousel items", () => {
     const items = carouselItems(seatedPositions(6), BB_BTN, lineDecisions([OPEN, VERSUS_OPEN, VERSUS_RERAISE], "r250.r1100"));
     expect(items).toHaveLength(7);
     expect(brief(items).slice(5)).toEqual([
-      { seat: "BB", state: "acted", text: "Raise 11bb", line: "r250", reason: undefined },
+      { seat: "BB", state: "acted", text: "Raise to 11bb", line: "r250", reason: undefined },
       { seat: "BTN", state: "current", text: "To act", line: "r250.r1100", reason: undefined },
     ]);
     expect(new Set(items.map((item) => item.key)).size).toBe(7);

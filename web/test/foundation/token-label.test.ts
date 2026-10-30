@@ -13,10 +13,10 @@ describe("R3.12 tokenActionLabel", () => {
   });
 
   it("R3.12 names sized tokens with the size in big blinds, the way exactActionLabel does", () => {
-    expect(tokenActionLabel("r250")).toBe("Raise 2.5bb");
+    expect(tokenActionLabel("r250")).toBe("Raise to 2.5bb");
     expect(tokenActionLabel("b250")).toBe("Bet 2.5bb");
     expect(tokenActionLabel("s200")).toBe("Straddle 2bb");
-    expect(tokenActionLabel("r10000")).toBe("Raise 100bb");
+    expect(tokenActionLabel("r10000")).toBe("Raise to 100bb");
   });
 
   it("R3.12 returns null for text that is not a token, never a guess", () => {

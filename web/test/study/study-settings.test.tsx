@@ -139,7 +139,7 @@ describe("R3.12 study settings panel", () => {
     expect(screen.queryByRole("img", { name: /range matrix/i })).not.toBeInTheDocument();
   });
 
-  it("R3.12 Change settings reopens the panel from the URL; a new depth clears the line and hand and keeps the mode", async () => {
+  it("R3.12 Change settings reopens the panel from the URL; a new depth keeps the line, the hand and the mode (O-467)", async () => {
     const user = userEvent.setup();
     const { router } = renderStudy(`/study?${ONLINE_100}&pair=BB-BTN&line=r250&hand=AKs&mode=ev`);
     await user.click(await screen.findByRole("button", { name: "Change settings" }));
@@ -156,10 +156,12 @@ describe("R3.12 study settings panel", () => {
         stake: FIXTURE_ONLINE_STAKE_ID,
         depth: 20000,
         pair: "BB-BTN",
+        line: "r250",
+        hand: "AKs",
         mode: "ev",
       }),
     );
-    expect(await screen.findByText("Online, 6 players, online (5% rake, cap $1.50), 200bb, BTN against BB")).toBeInTheDocument();
+    expect(await screen.findByText("Online, 6 players, online (5% rake, cap $1.50), 200bb, BTN against BB, single-raised pot")).toBeInTheDocument();
   });
 
   it("R3.12 Cancel closes the panel and leaves the URL as it was", async () => {
@@ -169,7 +171,8 @@ describe("R3.12 study settings panel", () => {
     await user.click(await screen.findByRole("button", { name: "Change settings" }));
     await user.click(choice("Depth", "200bb"));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+    // S45: past the root the summary ends with the pot type.
+    expect(screen.getByText(`${SUMMARY}, single-raised pot`)).toBeInTheDocument();
     expect(validateStudySearch(router.state.location.search)).toMatchObject({ depth: 10000, line: "r250" });
   });
 
@@ -227,10 +230,10 @@ describe("R3.12 study settings panel", () => {
 
   it("R3.12 a failed read of the draft's seats shows inside the panel, says so and retries there", async () => {
     const user = userEvent.setup();
-    let failures = 1;
+    // Every read of the deep configuration's seats fails until Retry: the Up and Down keys read them too (S45, O-467).
+    let failing = true;
     renderStudy(`/study?${ONLINE_100}&pair=BB-BTN`, (request) => {
-      if (request.path !== `/api/v1/configs/${FIXTURE_DEEP_CONFIG_ID}/pairs` || failures === 0) return undefined;
-      failures -= 1;
+      if (request.path !== `/api/v1/configs/${FIXTURE_DEEP_CONFIG_ID}/pairs` || !failing) return undefined;
       return problemOf(500, "internal");
     });
     await user.click(await screen.findByRole("button", { name: "Change settings" }));
@@ -242,6 +245,7 @@ describe("R3.12 study settings panel", () => {
     expect(within(panel).getAllByText("The seats for these settings could not be loaded.").length).toBeGreaterThan(0);
     expect(within(panel).queryByText("Choose a depth first.")).not.toBeInTheDocument();
 
+    failing = false;
     await user.click(within(alert).getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(within(panel).getByRole("button", { name: "Confirm" })).toBeEnabled());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

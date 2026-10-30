@@ -35,7 +35,7 @@ function node(key: string, actions: SqAction[], shares: number[] = actions.map((
     range_summary: {
       oop: { combos: 1326, reach_weighted_combos: 1326 },
       ip: { combos: 1326, reach_weighted_combos: 1326 },
-      by_action: shares.map((share, index) => ({ index, share })),
+      by_action: shares.map((share, index) => ({ index, share, combos: 0 })),
     },
     synthetic: true,
   };

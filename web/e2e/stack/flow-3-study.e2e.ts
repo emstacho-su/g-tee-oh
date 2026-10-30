@@ -114,13 +114,13 @@ async function chooseSettings(page: Page): Promise<void> {
 
 async function switchModes(page: Page): Promise<void> {
   await captureThemes(page, "flow3-study-frequency", CRITERIA.frequency);
-  await page.getByRole("radio", { name: "EV" }).click();
+  await page.getByRole("radio", { name: "EV", exact: true }).click();
   await expect(matrix(page)).toHaveAccessibleName(/expected value mode/);
   await captureThemes(page, "flow3-study-ev", CRITERIA.ev);
-  await page.getByRole("radio", { name: "Range weight" }).click();
+  await page.getByRole("radio", { name: "Range weight", exact: true }).click();
   await expect(matrix(page)).toHaveAccessibleName(/range weight mode/);
   await captureThemes(page, "flow3-study-weight", CRITERIA.weight);
-  await page.getByRole("radio", { name: "Frequency" }).click();
+  await page.getByRole("radio", { name: "Frequency", exact: true }).click();
 }
 
 async function stepDownAndBack(page: Page): Promise<void> {

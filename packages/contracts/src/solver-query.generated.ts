@@ -263,6 +263,13 @@ export interface components {
         /** @description The reach-weighted share of the acting seat's range taking one action. */
         ActionShare: {
             /**
+             * Format: float
+             * @description The reach-weighted combos of the acting seat's range taking it (the share times the
+             *     seat's `reach_weighted_combos`), so a client prints "17.5%, 232 combos" without
+             *     multiplying anything itself (S45, R3.12, O-469, ADR 0004); additive.
+             */
+            combos: number;
+            /**
              * Format: int32
              * @description The action's index in the record.
              */

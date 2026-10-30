@@ -30,7 +30,7 @@ describe("R3.12 ActionFrequencyTable", () => {
 
   it("R3.12 each row shows swatch, short letter, name and size, frequency and a bar", () => {
     render(<ActionFrequencyTable actions={fixtureActions} frequencies={fixtureFeedback.freq_by_action} caption="c" />);
-    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    const raise = screen.getByRole("row", { name: /Raise to 2.5bb/ });
     expect(within(raise).getByTestId("action-swatch")).toHaveAttribute("data-pattern", "diagonal");
     expect(within(raise).getByText("R")).toBeInTheDocument();
     expect(raise).toHaveTextContent("80.0%");
@@ -53,7 +53,7 @@ describe("R3.12 ActionFrequencyTable", () => {
       "Frequency",
       "EV",
     ]);
-    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    const raise = screen.getByRole("row", { name: /Raise to 2.5bb/ });
     expect(raise).toHaveTextContent("0.62bb");
     expect(raise).toHaveTextContent("Best");
     expect(raise).toHaveAttribute("data-highlight", "true");
@@ -84,7 +84,7 @@ describe("R3.12 ActionFrequencyTable", () => {
         caption="c"
       />,
     );
-    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    const raise = screen.getByRole("row", { name: /Raise to 2.5bb/ });
     expect(raise).toHaveAttribute("data-highlight", "true");
     expect(raise).toHaveTextContent("80.0%");
     expect(raise).toHaveTextContent("0.62bb");
@@ -126,7 +126,7 @@ describe("R3.12 ActionFrequencyTable", () => {
     render(
       <ActionFrequencyTable actions={fixtureActions} frequencies={fixtureFeedback.freq_by_action} highlightIndexes={[2]} caption="c" />,
     );
-    const raise = screen.getByRole("row", { name: /Raise 2.5bb/ });
+    const raise = screen.getByRole("row", { name: /Raise to 2.5bb/ });
     expect(within(raise).getByTestId("highlight-chip")).toHaveTextContent("Best");
   });
 

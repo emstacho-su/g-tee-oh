@@ -12,6 +12,7 @@ import { BUILDER_STATE_TEXT } from "../library/format.js";
 import { useBuilderStatus, useIsAdmin } from "../library/use-builder.js";
 import { QueueCard } from "./home-cards/QueueCard.js";
 import { HomeRatingCard, HomeStreakCard } from "./home-cards/StatCards.js";
+import { SpotsCard } from "./home-cards/SpotsCard.js";
 
 export const HOME_DESCRIPTION = "What to practise today, your streak and rating, and the library builder.";
 
@@ -53,6 +54,9 @@ export function HomePage() {
         </div>
         <div className="min-w-0">
           <HomeRatingCard />
+        </div>
+        <div className="min-w-0 lg:col-span-3">
+          <SpotsCard />
         </div>
         <div className="min-w-0 lg:col-span-3">
           <BuilderStatusCard />
