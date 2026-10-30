@@ -3,6 +3,11 @@
  * O-467). Reads the pairs of every sibling configuration (the same format, table size and stake)
  * through pairsQuery, the query the settings panel already uses, so most reads are cache hits and the
  * rest are small catalog reads; depth-steps.ts does the rest, purely.
+ *
+ * The neighbours are computed on every render from the reads' current data (code review): there are
+ * two to four sibling configurations, so the work is a few short list scans, and no memo key can go
+ * stale when a refetch flips a pair's availability. Only the sibling list is memoised, since it
+ * decides which queries run.
  */
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -12,15 +17,12 @@ import { coveredDepths, depthNeighbours, siblingConfigIds, type DepthNeighbours 
 import { pairsQuery, type GameConfig, type PositionPairEntry } from "./queries.js";
 import type { StudySearch } from "./search.js";
 
+const NO_NEIGHBOURS: DepthNeighbours = { deeper: undefined, shallower: undefined };
+
 export function useDepthSteps(api: AppApi, configs: readonly GameConfig[] | undefined, search: StudySearch): DepthNeighbours {
   const siblings = useMemo(() => (configs === undefined ? [] : siblingConfigIds(configs, search)), [configs, search]);
   const reads = useQueries({ queries: siblings.map(({ configId }) => pairsQuery(api, configId)) });
-  const loaded = reads.map((read) => read.data);
-  const loadedKey = loaded.map((data) => (data === undefined ? "-" : String(data.length))).join("|");
-  return useMemo(() => {
-    if (configs === undefined) return { deeper: undefined, shallower: undefined };
-    const byConfig = new Map<string, readonly PositionPairEntry[] | undefined>(siblings.map(({ configId }, index) => [configId, loaded[index]]));
-    return depthNeighbours(coveredDepths(configs, search, (configId) => byConfig.get(configId)), search.depth);
-    // loadedKey stands for the loaded pair lists, which useQueries hands back as a new array each render.
-  }, [configs, search, siblings, loadedKey]);
+  if (configs === undefined) return NO_NEIGHBOURS;
+  const byConfig = new Map<string, readonly PositionPairEntry[] | undefined>(siblings.map(({ configId }, index) => [configId, reads[index]?.data]));
+  return depthNeighbours(coveredDepths(configs, search, (configId) => byConfig.get(configId)), search.depth);
 }
