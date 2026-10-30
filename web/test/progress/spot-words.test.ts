@@ -87,5 +87,8 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(configurationWords(config)).toBe("Online, 6 players, 100bb deep");
     expect(configurationWords(undefined)).toBe("a configuration the catalog does not list");
     expect(configurationWords(undefined)).not.toMatch(RAW_TOKEN);
+    expect(configurationWords(undefined, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
+    expect(configurationWords(undefined, "cfg_6_online_999", true)).toBe("configuration loading");
+    expect(configurationWords(undefined, "not-a-config")).toBe("not-a-config");
   });
 });

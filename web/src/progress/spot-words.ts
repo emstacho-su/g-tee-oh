@@ -12,6 +12,7 @@
  * otherwise, never as its key.
  */
 import { FORMAT_LABELS } from "../drills/labels.js";
+import { CBB_PER_BB } from "../poker/format.js";
 import type { PreflopAction } from "../drills/types.js";
 import { configLabel } from "../routes/settings/configs-query.js";
 import type { GameConfig, HeatmapColumn, HeatmapRow } from "./types.js";
@@ -60,6 +61,8 @@ const PAIR_SEPARATOR = "-";
 const PAIR_SEATS = 2;
 const BAND_IN_BB = /^\d+$/;
 const UNLISTED_CONFIGURATION = "a configuration the catalog does not list";
+const LOADING_CONFIGURATION = "configuration loading";
+const NOT_IN_CATALOG = "not in the catalog";
 
 export function familyWords(family: string | null | undefined): string {
   return family === null || family === undefined ? UNKNOWN_FAMILY_WORDS : (FAMILY_WORDS[family] ?? UNKNOWN_FAMILY_WORDS);
@@ -110,7 +113,37 @@ export function classWords(row: Pick<HeatmapRow, "family" | "pair">, column: Pic
   return `${rowWords(row)}, ${column.format} ${depthBandLabel(column.depth_band)}`;
 }
 
-/** The catalog's label for a configuration, or a plain sentence when the catalog does not list it; never the key. */
-export function configurationWords(config: GameConfig | undefined): string {
-  return config === undefined ? UNLISTED_CONFIGURATION : configLabel(config);
+/** A configuration id's facets (table size, format, stake code, depth); the key is a readable id (db seed, CONFIG_ID_PATTERN). */
+const CONFIG_ID_FACETS = /^cfg_([2-9])_(online|live)(?:_([a-z0-9]+))?_([0-9]+)(cbb)?(_straddle)?(?:_ante[0-9]+)?$/;
+
+/**
+ * An id the catalog does not list, in words from its own facets (PR #48 review round 2 MEDIUM 4):
+ * "Live, 9 players, 100bb deep, stake code 13, not in the catalog", so two unlisted configurations
+ * never read the same; the id itself only when it has no facets. The stake code stays a code: the
+ * web holds no map from codes to blinds.
+ */
+function unlistedWords(id: string): string {
+  const match = CONFIG_ID_FACETS.exec(id);
+  if (match === null) return id;
+  const [, size, format = "", stakeCode, depth = "", inCbb, straddle] = match;
+  const depthBb = inCbb === undefined ? Number(depth) : Number(depth) / CBB_PER_BB;
+  const parts = [
+    formatWords(format),
+    `${size} players`,
+    `${depthBb}bb deep`,
+    ...(stakeCode === undefined ? [] : [`stake code ${stakeCode}`]),
+    ...(straddle === undefined ? [] : ["straddle"]),
+  ];
+  return `${parts.join(", ")}, ${NOT_IN_CATALOG}`;
+}
+
+/**
+ * A configuration in words, never as its key: the catalog's label when it lists the configuration;
+ * while the configuration list is still loading, a loading phrase; when the loaded catalog does not
+ * list it, the id's own facets (unlistedWords), or a plain sentence without an id.
+ */
+export function configurationWords(config: GameConfig | undefined, id?: string, loading = false): string {
+  if (config !== undefined) return configLabel(config);
+  if (loading) return LOADING_CONFIGURATION;
+  return id === undefined ? UNLISTED_CONFIGURATION : unlistedWords(id);
 }

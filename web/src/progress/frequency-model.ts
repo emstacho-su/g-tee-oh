@@ -25,6 +25,8 @@ export type FrequencyRow = Schemas["FrequencyRow"];
 export interface SpotOption {
   readonly value: string;
   readonly label: string;
+  /** The configuration id, as the option's tooltip. */
+  readonly title: string;
 }
 
 const FIRST_DUPLICATE_NUMBER = 2;
@@ -36,7 +38,8 @@ export { familyWords };
 
 function spotName(spot: SpotFrequency, configs: readonly GameConfig[] | undefined): string {
   const config = configs?.find((entry) => entry.config_id === spot.config_id);
-  const table = configurationWords(config);
+  // A loading phrase until the list lands; an unlisted id by its own facets, never the bare key (round 2 MEDIUM 4).
+  const table = configurationWords(config, spot.config_id, configs === undefined);
   return `${capitalize(familyWords(spot.action_family))} as ${positionWords(spot.hero_position)} (${pairWords(spot.pair)}), ${table}`;
 }
 
@@ -54,7 +57,7 @@ export function spotOptions(spots: readonly SpotFrequency[], configs: readonly G
   return spots.map((spot, index) => {
     const name = names[index] ?? spot.node_key;
     const earlier = names.slice(0, index).filter((other) => other === name).length;
-    return { value: spotKey(spot), label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})` };
+    return { value: spotKey(spot), label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})`, title: spot.config_id };
   });
 }
 
