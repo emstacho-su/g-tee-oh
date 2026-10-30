@@ -238,13 +238,24 @@ export function searchFromDraft(search: StudySearch, draft: SettingsDraft, pair:
 }
 
 /** "Online, 6 players, online (5% rake, cap $1.50), 100bb, BTN against BB", then the pot type past the root (S45). */
-export function settingsSummary(stakes: readonly Stake[], search: StudySearch): string {
-  const stake = stakes.find((entry) => entry.id === search.stake);
+export interface SummaryOptions {
+  /** Name a stake the list does not hold by its id, so two spots that differ only by stake read apart (S45 code review). */
+  readonly unlistedStakeById?: boolean;
+}
+
+function stakeText(stakes: readonly Stake[], id: string | undefined, options: SummaryOptions): string {
+  if (id === undefined) return "";
+  const stake = stakes.find((entry) => entry.id === id);
+  if (stake !== undefined) return `${stake.label} (${stakeRakeText(stake)})`;
+  return options.unlistedStakeById === true ? `stake ${id}` : "";
+}
+
+export function settingsSummary(stakes: readonly Stake[], search: StudySearch, options: SummaryOptions = {}): string {
   const { first, against } = pairSeats(search.pair);
   return [
     search.format === undefined ? "" : formatLabel(search.format),
     search.table_size === undefined ? "" : `${search.table_size} players`,
-    stake === undefined ? "" : `${stake.label} (${stakeRakeText(stake)})`,
+    stakeText(stakes, search.stake, options),
     search.depth === undefined ? "" : formatCbb(search.depth),
     first === undefined || against === undefined ? "" : `${first} against ${against}`,
     potTypeLabel(search.line) ?? "",

@@ -6,7 +6,9 @@
  * Mechanism: SpotLinks lists spots as links into /study with the spot's validated search, so a pick
  * is an ordinary navigation (browser back returns) and the study page records it like any other
  * confirmed spot. Each list says in one line when it is empty, never hides behind a dialog. Labels
- * are the spot summary (settings.ts); where the stakes are not loaded the stake part is left out.
+ * are the spot summary (settings.ts); a stake the loaded list does not hold is named by its id, and
+ * each link is keyed by the spot's settings and line, so two spots that differ only by stake never
+ * share a key or a label (code review).
  * StarButton toggles the spot with aria-pressed and a visible filled or hollow star with words.
  */
 import { Link } from "@tanstack/react-router";
@@ -15,7 +17,7 @@ import { useStore } from "zustand";
 import { Button, cn } from "../../components/ui/index.js";
 import { isStarred } from "../../study/saved-spots.js";
 import type { StudySearch } from "../../study/search.js";
-import { settingsSummary } from "../../study/settings.js";
+import { settingsSignature, settingsSummary } from "../../study/settings.js";
 import type { Stake } from "../../study/queries.js";
 import { useStudySpotsStore } from "../../store/study-spots.js";
 
@@ -47,9 +49,9 @@ export function SpotLinks({ label, spots, stakes, empty }: SpotLinksProps) {
       ) : (
         <ul aria-label={label} className="flex flex-wrap gap-2">
           {spots.map((spot) => {
-            const text = settingsSummary(stakes, spot);
+            const text = settingsSummary(stakes, spot, { unlistedStakeById: true });
             return (
-              <li key={`${text}|${spot.line ?? ""}`} className="min-w-0">
+              <li key={`${settingsSignature(spot)}|${spot.line ?? ""}`} className="min-w-0">
                 <Link
                   to="/study"
                   search={spot}

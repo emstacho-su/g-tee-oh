@@ -6,9 +6,9 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR } from "../../src/fixtures/study.js";
+import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR, fixtureStakes } from "../../src/fixtures/study.js";
 import { SPOT_TEXT } from "../../src/routes/study/SpotShortcuts.js";
 import { useStudySpotsStore } from "../../src/store/study-spots.js";
 import { jsonResponse, sessionResponse, type FetchScript } from "../api/fake-fetch.js";
@@ -16,7 +16,9 @@ import { renderApp } from "../app/render-app.js";
 import { libraryPath, renderLibrary } from "../library/render-library.js";
 
 const SPOT = { format: "online", table_size: 6, stake: FIXTURE_ONLINE_STAKE_ID, depth: 10000, pair: FIXTURE_STUDY_PAIR } as const;
-const HOME_LABEL = "Online, 6 players, 100bb, BTN against BB";
+const HOME_LABEL = "Online, 6 players, online (5% rake, cap $1.50), 100bb, BTN against BB";
+/** An online stake the catalog does not list: its spots print the stake id instead of a label. */
+const UNLISTED_STAKE = "00000000-0000-4000-8000-0000000000b9";
 
 const HOME_SCRIPT: FetchScript = {
   "GET /api/v1/me": [sessionResponse()],
@@ -25,6 +27,7 @@ const HOME_SCRIPT: FetchScript = {
   "GET /api/v1/progress/leaks": [jsonResponse(500, {})],
   "GET /api/v1/progress/heatmap": [jsonResponse(500, {})],
   "GET /api/v1/progress/streak": [jsonResponse(500, {})],
+  "GET /api/v1/stakes": [jsonResponse(200, { items: fixtureStakes, next_cursor: null })],
 };
 
 describe("R3.27 spots in the library", () => {
@@ -53,10 +56,24 @@ describe("R3.27 spots on Home", () => {
     useStudySpotsStore.getState().recordConfirmed({ ...SPOT, line: "r250" });
     renderApp("/", HOME_SCRIPT);
     const card = await screen.findByRole("region", { name: SPOT_TEXT.cardTitle });
-    expect(within(within(card).getByRole("list", { name: SPOT_TEXT.yourSpots })).getByRole("link", { name: HOME_LABEL })).toBeInTheDocument();
+    // The labels name the stake once Home's stakes read has answered.
+    expect(await within(within(card).getByRole("list", { name: SPOT_TEXT.yourSpots })).findByRole("link", { name: HOME_LABEL })).toBeInTheDocument();
     expect(
-      within(within(card).getByRole("list", { name: SPOT_TEXT.recentSpots })).getByRole("link", { name: `${HOME_LABEL}, single-raised pot` }),
+      await within(within(card).getByRole("list", { name: SPOT_TEXT.recentSpots })).findByRole("link", { name: `${HOME_LABEL}, single-raised pot` }),
     ).toBeInTheDocument();
+  });
+
+  it("R3.27 spots that differ only by stake read differently on Home and never share a key (code review)", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    useStudySpotsStore.getState().toggleStar(SPOT);
+    useStudySpotsStore.getState().toggleStar({ ...SPOT, stake: UNLISTED_STAKE });
+    renderApp("/", HOME_SCRIPT);
+    const card = await screen.findByRole("region", { name: SPOT_TEXT.cardTitle });
+    const yours = within(card).getByRole("list", { name: SPOT_TEXT.yourSpots });
+    expect(await within(yours).findByRole("link", { name: HOME_LABEL })).toBeInTheDocument();
+    expect(within(yours).getByRole("link", { name: `Online, 6 players, stake ${UNLISTED_STAKE}, 100bb, BTN against BB` })).toBeInTheDocument();
+    expect(errors.mock.calls.some((call) => String(call[0]).includes("same key"))).toBe(false);
+    errors.mockRestore();
   });
 
   it("R3.27 an empty store shows the one-line empty states", async () => {
