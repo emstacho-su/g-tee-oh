@@ -131,7 +131,8 @@ export const fixtureInsights: StudyInsights = {
     strongest_folding_hand: "Q8o",
   },
   equity_distribution: { bin_edges: [0, 0.5, 1], ip: [0.4, 0.6], oop: [0.55, 0.45] },
-  range_advantage: { ip_mean_equity: 0.52, oop_mean_equity: 0.48, to_act_advantage_pct_points: 4 },
+  // to_act_advantage_pct_points is the acting seat's (BTN, ip) mean equity minus 50, as solver-query serves it.
+  range_advantage: { ip_mean_equity: 0.52, oop_mean_equity: 0.48, to_act_advantage_pct_points: 2 },
   nut_advantage: { ip_share: 0.12, oop_share: 0.08, threshold_equity: 0.8, to_act_advantage: 0.04 },
   blockers: { hand: "AJo", top_blocked: [{ hand: "AA", reach_removed: 0.5 }], villain_combos_removed: 6, villain_reach_removed_share: 0.03 },
   hand_role: "value",

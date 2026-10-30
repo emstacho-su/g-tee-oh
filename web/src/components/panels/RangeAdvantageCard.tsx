@@ -5,8 +5,12 @@
  * 0004): each seat's mean equity against the other range, and each seat's share of its range at or
  * above the served nut threshold. Both show as a pair of two-sided bars, out-of-position seat first,
  * each bar as wide as the seat's served share with the seat and the number printed beside it, so
- * colour is never the only signal. One sentence then says, for the seat to act, whether it is ahead
- * or behind and by how many points, from the served to-act differences. solver-query has no equity
+ * colour is never the only signal. Two sentences then say what the served to-act figures mean:
+ * to_act_advantage_pct_points is the acting seat's mean equity minus an even split (solver-query
+ * ranges.rs), so it reads as points above or below 50 percent, never as a gap between the seats
+ * (code review); to_act_advantage is the acting seat's nut share minus the other seat's. Zero reads
+ * as neither range ahead. Nothing is subtracted here (ADR 0004): the web picks the acting seat's own
+ * mean to print beside the served points. solver-query has no equity
  * at a postflop node in v1 (O-32), so both blocks are null there and the card says so in words. The
  * card does not depend on the selected hand: the screen reads it with a stand-in hand until one is
  * chosen (O-461). Numbers are only formatted, one decimal like every text surface.
@@ -21,6 +25,8 @@ export const ADVANTAGE_TEXT = {
   title: "Range and nut advantage",
   equity: "Mean equity",
   nuts: (threshold: string) => `Nut hands: ${threshold} equity or more`,
+  even: "Neither range is ahead.",
+  evenNuts: "Both ranges hold the same share of nut hands.",
   notComputed: "Range and nut advantage are not computed on the flop, turn or river in this version.",
 } as const;
 
@@ -85,17 +91,20 @@ function points(value: number): string {
   return `${Math.abs(value).toFixed(POINT_DECIMALS)} points`;
 }
 
-/** The to-act sentence from the two served differences. */
-function advantageSentence(
-  toAct: string,
-  range: NonNullable<StudyInsights["range_advantage"]>,
-  nuts: StudyInsights["nut_advantage"],
-): string {
-  const equity = range.to_act_advantage_pct_points;
-  const lead = `${toAct}, to act, is ${equity >= 0 ? "ahead" : "behind"} by ${points(equity)} of equity`;
-  if (nuts === null) return `${lead}.`;
-  const nutPoints = nuts.to_act_advantage * PERCENT;
-  return `${lead} and holds ${points(nutPoints)} ${nutPoints >= 0 ? "more" : "less"} of its range in nut hands.`;
+/** "BTN, to act, holds 52.0% range equity, 2.0 points above an even split." from the served figures. */
+function equitySentence(toAct: string, seats: AdvantageSeats, range: NonNullable<StudyInsights["range_advantage"]>): string {
+  const above = range.to_act_advantage_pct_points;
+  if (above === 0) return ADVANTAGE_TEXT.even;
+  const ownMean = toAct === seats.ip ? range.ip_mean_equity : range.oop_mean_equity;
+  return `${toAct}, to act, holds ${formatShare(ownMean)} range equity, ${points(above)} ${above > 0 ? "above" : "below"} an even split.`;
+}
+
+/** "BTN holds 4.0 points more of its range in nut hands than BB." from the served difference. */
+function nutSentence(toAct: string, seats: AdvantageSeats, nuts: NonNullable<StudyInsights["nut_advantage"]>): string {
+  const lead = nuts.to_act_advantage * PERCENT;
+  if (lead === 0) return ADVANTAGE_TEXT.evenNuts;
+  const other = toAct === seats.ip ? seats.oop : seats.ip;
+  return `${toAct} holds ${points(lead)} ${lead > 0 ? "more" : "less"} of its range in nut hands than ${other}.`;
 }
 
 export function RangeAdvantageCard({ rangeAdvantage, nutAdvantage, seats, toAct }: RangeAdvantageCardProps) {
@@ -121,7 +130,8 @@ export function RangeAdvantageCard({ rangeAdvantage, nutAdvantage, seats, toAct 
               ipShare={nutAdvantage.ip_share}
             />
           )}
-          <p>{advantageSentence(toAct, rangeAdvantage, nutAdvantage)}</p>
+          <p>{equitySentence(toAct, seats, rangeAdvantage)}</p>
+          {nutAdvantage === null ? null : <p>{nutSentence(toAct, seats, nutAdvantage)}</p>}
         </>
       )}
     </section>

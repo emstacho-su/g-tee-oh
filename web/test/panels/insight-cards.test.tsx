@@ -32,21 +32,38 @@ describe("R3.12 RangeAdvantageCard", () => {
     expect(nuts).toHaveTextContent("80.0% equity or more");
     expect(nuts).toHaveTextContent("BB 8.0%");
     expect(nuts).toHaveTextContent("BTN 12.0%");
-    expect(card).toHaveTextContent("BTN, to act, is ahead by 4.0 points of equity and holds 4.0 points more of its range in nut hands.");
+    // to_act_advantage_pct_points is the acting seat's mean equity minus an even split (solver-query ranges.rs), never a gap.
+    expect(card).toHaveTextContent("BTN, to act, holds 52.0% range equity, 2.0 points above an even split.");
+    expect(card).toHaveTextContent("BTN holds 4.0 points more of its range in nut hands than BB.");
   });
 
   it("R3.12 a seat to act that is behind reads as behind", () => {
     render(
       <RangeAdvantageCard
-        rangeAdvantage={{ oop_mean_equity: 0.55, ip_mean_equity: 0.45, to_act_advantage_pct_points: -10 }}
+        rangeAdvantage={{ oop_mean_equity: 0.55, ip_mean_equity: 0.45, to_act_advantage_pct_points: -5 }}
         nutAdvantage={{ threshold_equity: 0.8, oop_share: 0.1, ip_share: 0.05, to_act_advantage: -0.05 }}
         seats={SEATS}
         toAct="BTN"
       />,
     );
-    expect(screen.getByRole("region", { name: "Range and nut advantage" })).toHaveTextContent(
-      "BTN, to act, is behind by 10.0 points of equity and holds 5.0 points less of its range in nut hands.",
+    const card = screen.getByRole("region", { name: "Range and nut advantage" });
+    expect(card).toHaveTextContent("BTN, to act, holds 45.0% range equity, 5.0 points below an even split.");
+    expect(card).toHaveTextContent("BTN holds 5.0 points less of its range in nut hands than BB.");
+  });
+
+  it("R3.12 an even split and equal nut shares say neither range is ahead (code review)", () => {
+    render(
+      <RangeAdvantageCard
+        rangeAdvantage={{ oop_mean_equity: 0.5, ip_mean_equity: 0.5, to_act_advantage_pct_points: 0 }}
+        nutAdvantage={{ threshold_equity: 0.8, oop_share: 0.1, ip_share: 0.1, to_act_advantage: 0 }}
+        seats={SEATS}
+        toAct="BB"
+      />,
     );
+    const card = screen.getByRole("region", { name: "Range and nut advantage" });
+    expect(card).toHaveTextContent("Neither range is ahead.");
+    expect(card).toHaveTextContent("Both ranges hold the same share of nut hands.");
+    expect(card).not.toHaveTextContent("points");
   });
 
   it("R3.12 null advantages print the postflop sentence in words", () => {
