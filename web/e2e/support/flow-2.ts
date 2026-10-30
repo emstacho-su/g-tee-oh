@@ -43,7 +43,7 @@ export async function buildRfiDrill(page: Page, shot: Flow2Shooter = NO_SHOTS): 
   const picker = page.getByTestId("config-picker");
   await picker.getByRole("radiogroup", { name: "Format" }).getByRole("radio", { name: "Online" }).click();
   await picker.getByRole("radiogroup", { name: "Table size" }).getByRole("radio", { name: /^6 players/ }).click();
-  await picker.getByRole("radiogroup", { name: "Stake" }).getByRole("radio", { name: /^online/ }).click();
+  await picker.getByRole("radiogroup", { name: "Stake" }).getByRole("radio", { name: /^Online/ }).click();
   await expect(picker.getByRole("group", { name: "Depths" }).getByRole("button", { name: /^100bb/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("reach-status")).toContainText("Reaches");
   await openBuilderPage(page, "Seats");

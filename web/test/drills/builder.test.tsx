@@ -338,4 +338,13 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await waitFor(() => expect(sent("POST", "/api/v1/sessions")).toHaveLength(1));
     expect(sent("POST", "/api/v1/sessions")[0]?.body).toMatchObject({ mode: "drill", drill_id: FIXTURE_DRILL_ID, settings: { rng: true } });
   });
+
+  it("R3.37 the picker names the online stake in words, never the raw label (PR #48 review round 2 MEDIUM 6)", async () => {
+    renderDrills("/drills/new");
+    const user = await openNew();
+    await openSection(user, "Game");
+    const picker = await screen.findByTestId("config-picker");
+    const stakes = within(picker).getByRole("radiogroup", { name: "Stake" });
+    expect(within(stakes).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["Online 5% rake, cap $1.50"]);
+  });
 });

@@ -23,6 +23,7 @@ import {
   type PickerKey,
 } from "../../drills/config-picker-model.js";
 import type { DrillDraft } from "../../drills/draft.js";
+import { stakeWords } from "../../drills/labels.js";
 import { withFormat, withTableSize } from "../../drills/draft-edits.js";
 import type { GameFormat } from "../../drills/types.js";
 import { CBB_PER_BB } from "../../poker/format.js";
@@ -83,7 +84,16 @@ export function ConfigPicker({ draft, onChange }: ConfigPickerProps) {
         {(list) => <ToggleGroup wrap label={labelOf("table_size")} value={String(draft.tableSize)} options={toOptions(list)} onValueChange={(size) => onChange(withTableSize(draft, Number(size)))} />}
       </Facet>
       <Facet label={labelOf("stake")} state={choices.stake}>
-        {(list) => <ToggleGroup wrap label={labelOf("stake")} value={facet.stake} options={toOptions(list)} onValueChange={(stakeId) => onChange(withPickedStake(draft, stakeId, stakes.data))} />}
+        {(list) => (
+          <ToggleGroup
+            wrap
+            label={labelOf("stake")}
+            value={facet.stake}
+            // The stake by its display words, as the builder's other fields name it (round 2 MEDIUM 6).
+            options={toOptions(list.map((choice) => ({ ...choice, label: stakeWords(choice.label, draft.format) })))}
+            onValueChange={(stakeId) => onChange(withPickedStake(draft, stakeId, stakes.data))}
+          />
+        )}
       </Facet>
       <Facet label={PICKER_TEXT.depths} state={choices.depth}>
         {(list) => {
