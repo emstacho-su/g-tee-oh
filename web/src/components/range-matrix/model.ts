@@ -171,6 +171,19 @@ export function defaultScaleByWeight(cells: readonly MatrixCell[], street: Study
   return cells.some((cell) => cell.present && cell.weight !== null && cell.weight < FULL_WEIGHT);
 }
 
+/**
+ * The same default read straight from the node's rows (code review): the acting seat's reach of each
+ * row, with no 169-cell model built, for a screen that needs the default before the matrix builds.
+ */
+export function defaultScaleByWeightOf(node: MatrixSource & Pick<StudyNode, "street">): boolean {
+  if (node.street !== "preflop") return true;
+  const seat = actingSeatIndex(node);
+  return node.hands.some((row) => {
+    const weight = row.reach?.[seat];
+    return weight !== undefined && weight !== null && weight < FULL_WEIGHT;
+  });
+}
+
 export function buildMatrixModel(node: MatrixSource): MatrixModel {
   const rows = indexRows(node.hands, node.actions.length);
   const actingSeat = actingSeatIndex(node);

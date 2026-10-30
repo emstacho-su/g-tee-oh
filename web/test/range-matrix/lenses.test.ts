@@ -17,6 +17,7 @@ import {
   buildMatrixModel,
   defaultLensPosition,
   defaultScaleByWeight,
+  defaultScaleByWeightOf,
   lossScaleOf,
   type MatrixCell,
   type MatrixModel,
@@ -281,6 +282,21 @@ describe("R3.24 bars scaled by range weight (O-465)", () => {
       const rect = cellRect(cell);
       expect(actionBars(model, ops, rect).every((bar) => bar.h === rect.h)).toBe(true);
     }
+  });
+
+  it("R3.24 the default reads the node's rows directly and agrees with the model rule, with no model build (code review)", () => {
+    const full = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: [1, 1] })) };
+    const unknown = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: null })) };
+    const oopPartial = { ...full, hands: full.hands.map((row, index) => (index === 0 ? { ...row, reach: [0.4, 1] } : row)) };
+    const ipPartial = { ...full, hands: full.hands.map((row, index) => (index === 0 ? { ...row, reach: [1, 0.4] } : row)) };
+    for (const node of [fixtureStudyNode, full, unknown, oopPartial, ipPartial]) {
+      for (const street of ["preflop", "flop"] as const) {
+        expect(defaultScaleByWeightOf({ ...node, street }), street).toBe(defaultScaleByWeight(buildMatrixModel(node).cells, street));
+      }
+    }
+    // BTN acts in BB-BTN, so only the in-position reach counts.
+    expect(defaultScaleByWeightOf({ ...oopPartial, street: "preflop" })).toBe(false);
+    expect(defaultScaleByWeightOf({ ...ipPartial, street: "preflop" })).toBe(true);
   });
 
   it("R3.24 the default is on when any present weight is below 1 or the street is postflop, off otherwise", () => {

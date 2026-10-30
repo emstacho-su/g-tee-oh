@@ -23,9 +23,8 @@ import type { AppApi } from "../../api/index.js";
 import { MODE_NAMES } from "../../components/range-matrix/cell-text.js";
 import {
   BAR_MODES,
-  buildMatrixModel,
   defaultLensPosition,
-  defaultScaleByWeight,
+  defaultScaleByWeightOf,
   lensPositionOf,
   type MatrixMode,
 } from "../../components/range-matrix/model.js";
@@ -89,7 +88,8 @@ function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string |
 
 /** The scale-by-weight choice: the node's default until the user flips it, per node (O-465). */
 function useScaleByWeight(node: StudyNode): [boolean, (next: boolean) => void] {
-  const fallback = useMemo(() => defaultScaleByWeight(buildMatrixModel(node).cells, node.street), [node]);
+  // Read from the rows directly: RangeMatrix builds the one model of the node (code review).
+  const fallback = useMemo(() => defaultScaleByWeightOf(node), [node]);
   const [override, setOverride] = useState<{ nodeKey: string; value: boolean } | null>(null);
   const value = override !== null && override.nodeKey === node.node_key ? override.value : fallback;
   return [value, (next) => setOverride({ nodeKey: node.node_key, value: next })];

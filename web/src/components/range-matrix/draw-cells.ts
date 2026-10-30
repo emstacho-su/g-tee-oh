@@ -158,7 +158,11 @@ export function drawCellFill(frame: FrameContext, cell: MatrixCell, rect: Rect):
 /** True when the filters leave the hand out: present, filtered, and playing none of the highlighted actions. */
 export function dimmed(frame: FrameContext, cell: MatrixCell): boolean {
   if (frame.highlight === null || !cell.present) return false;
-  return [...frame.highlight].every((position) => (cell.frequencies[position] ?? 0) <= 0);
+  // A loop over the Set, so a frame allocates nothing per cell (the 16 ms budget, O-260; code review).
+  for (const position of frame.highlight) {
+    if ((cell.frequencies[position] ?? 0) > 0) return false;
+  }
+  return true;
 }
 
 /** The ink of a cell's texts: the label colour on a chip, else the step's own ink. */
