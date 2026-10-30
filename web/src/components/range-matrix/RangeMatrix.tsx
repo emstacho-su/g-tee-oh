@@ -24,8 +24,9 @@
  *
  * Hover (S45, R3.25): moving the pointer over the canvas keeps the hovered index in component state,
  * draws a thin outline there and reports the hand through onHoverHand (null on leave), with no address
- * write; a click still selects and pins. While the pointer is over the canvas an open pop-out shows the
- * hovered cell and returns to the pinned cell when the pointer leaves. Touch pointers are left alone.
+ * write; a click still selects and pins. An open pop-out follows the hovered cell once the pointer moves
+ * to another cell, and returns to the pinned cell when it leaves; a keyboard open or a click pin wins
+ * until then, so Enter on AKs shows AKs even with the pointer parked over 72o (code review). Touch pointers are left alone.
  *
  * Lenses (S45, R3.24): mode names the lens; lensIndex is the compared action (a NodeAction.index)
  * in compare mode, resolved to its position here and falling back to the default lens when it names
@@ -144,6 +145,8 @@ export function RangeMatrix({
   const [hasFocus, setHasFocus] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  // False from a keyboard open or a click pin until the pointer moves to another cell (R3.25).
+  const [hoverFollows, setHoverFollows] = useState(false);
   const popOutControl = usePopOut(popOut, indexOfHand(model.cells, initialPopOutHand), canvasRef);
   const lens = useMemo(() => lensOf(model, mode, lensIndex), [model, mode, lensIndex]);
   // Keyed by the list's content, so a new array with the same indexes keeps the memoised set.
@@ -194,6 +197,7 @@ export function RangeMatrix({
       event.preventDefault();
       selectCell(focusedIndex);
       if (popOut) {
+        setHoverFollows(false);
         popOutControl.open(focusedIndex);
         announceDetail(focusedIndex);
       }
@@ -208,12 +212,14 @@ export function RangeMatrix({
     if (index === null) return;
     focusCell(index);
     selectCell(index);
+    setHoverFollows(false);
     popOutControl.clickCell(index);
   }
 
   function hoverIndex(next: number | null): void {
     if (next === hoveredIndex) return;
     setHoveredIndex(next);
+    if (next !== null) setHoverFollows(true);
     onHoverHand?.(next === null ? null : (model.cells[next]?.hand ?? null));
   }
 
@@ -236,7 +242,7 @@ export function RangeMatrix({
   const filtered = highlighted.length === 0 ? "" : `, filtered to ${highlighted.map(exactActionLabel).join(", ")}`;
   const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands${filtered}`;
   // An open pop-out shows the hovered cell while the pointer is over the canvas (R3.25).
-  const openIndex = popOutControl.index === null ? null : (hoveredIndex ?? popOutControl.index);
+  const openIndex = popOutControl.index === null ? null : hoverFollows && hoveredIndex !== null ? hoveredIndex : popOutControl.index;
   const openCell = openIndex === null ? undefined : model.cells[openIndex];
 
   return (

@@ -75,6 +75,32 @@ describe("R3.25 hover inspects a cell, click pins it", () => {
     expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "QQ");
   });
 
+  it("R3.25 a keyboard open wins over a parked pointer until the pointer moves to another cell (code review)", () => {
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />);
+    const canvas = placedCanvas();
+    // 72o sits at row 12 (the 2) and column 7 (the 7), below the diagonal.
+    fireEvent.pointerMove(canvas, at(12, 7));
+    const grid = screen.getByRole("group", { name: /range matrix cells/i });
+    grid.focus();
+    fireEvent.keyDown(grid, { key: "ArrowRight" });
+    fireEvent.keyDown(grid, { key: "Enter" });
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+    fireEvent.pointerMove(canvas, at(12, 7));
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+    fireEvent.pointerMove(canvas, at(2, 2));
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "QQ");
+  });
+
+  it("R3.25 a click pins its cell; the pointer moving on to another cell follows again", () => {
+    render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />);
+    const canvas = placedCanvas();
+    fireEvent.pointerMove(canvas, at(0, 0));
+    fireEvent.click(canvas, at(0, 0));
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AA");
+    fireEvent.pointerMove(canvas, at(0, 1));
+    expect(screen.getByTestId("matrix-popout")).toHaveAttribute("data-hand", "AKs");
+  });
+
   it("R3.25 hovering with no pop-out open opens none", () => {
     render(<RangeMatrix node={fixtureStudyNode} mode="frequency" theme="light" onSelectHand={() => undefined} />);
     fireEvent.pointerMove(placedCanvas(), at(0, 1));
