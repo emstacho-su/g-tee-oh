@@ -72,6 +72,10 @@ export function toStudyNode(node: Readonly<SqNode>, next: NextLikely): StudyNode
  * The acting seat's range (O-469): the pair names the out-of-position seat first, so the seat to
  * act is `oop` when it is the pair's first position and `ip` otherwise. A name comparison only; the
  * numbers are solver-query's.
+ *
+ * Proposed open question (O-ID to assign; the S45 block O-460 to O-469 is full, code review 3): should
+ * solver-query serve the acting seat's range itself, so the api stops splitting the pair? Default:
+ * yes, deferred; until then the api keeps this name split, as the explain and session code do.
  */
 function actingSeatRange(node: Readonly<SqNode>): StudyNode["range_combos"] {
   const [outOfPosition] = node.pair.split("-");
