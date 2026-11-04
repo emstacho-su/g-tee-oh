@@ -18,7 +18,10 @@ import { parsePair } from "../../src/poker/pair.js";
 import {
   capitalize,
   classWords,
+  columnPhrase,
+  columnWords,
   configurationWords,
+  configurationWordsIn,
   depthBandLabel,
   drillActionWords,
   FAMILY_WORDS,
@@ -69,6 +72,20 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(classWords({ family: "facing-3bet", pair: "SB-BTN" }, { format: "online", depth_band: "short" })).toBe("Facing a 3-bet, small blind versus button, online short");
   });
 
+  it("R4.12 one column phrase serves the class words, the queue's where and the heat map column (PR #48 review 4 finding 7)", () => {
+    const column = { format: "live", depth_band: "100" };
+    expect(columnPhrase(column)).toBe("live 100bb");
+    expect(columnWords(column)).toBe(capitalize(columnPhrase(column)));
+    expect(classWords({ family: "rfi", pair: "BB-UTG" }, column).endsWith(`, ${columnPhrase(column)}`)).toBe(true);
+    const queue = buildHomeQueue(fixtureHeatmap, fixtureLeaks);
+    for (const leak of queue.leaks) {
+      const cell = fixtureHeatmap.cells.find((each) => each.spot_class_key === leak.spotClassKey);
+      const leakColumn = cell === undefined ? undefined : fixtureHeatmap.columns[cell.column];
+      if (leakColumn === undefined) throw new Error("a queued leak has no heat map column");
+      expect(leak.where?.endsWith(`, ${columnPhrase(leakColumn)}`)).toBe(true);
+    }
+  });
+
   it("R4.12 leak rows, the queue card and the auto drill's name print no raw token", () => {
     const rows = joinLeaksToCells(fixtureLeaks, fixtureHeatmap);
     for (const row of rows) expect(row.label).not.toMatch(RAW_TOKEN);
@@ -92,6 +109,13 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(configurationWords(undefined, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
     expect(configurationWords(undefined, "cfg_6_online_999", true)).toBe("configuration loading");
     expect(configurationWords(undefined, "not-a-config")).toBe("not-a-config");
+  });
+
+  it("R4.12 a configuration id reads through the list it is looked up in: its label, loading while the list is, its own facets when unlisted (PR #48 review 4 finding 4)", () => {
+    const config = fixtureConfigs[0] as GameConfig;
+    expect(configurationWordsIn(fixtureConfigs, config.config_id)).toBe("Online, 6 players, 100bb deep");
+    expect(configurationWordsIn(undefined, config.config_id)).toBe("configuration loading");
+    expect(configurationWordsIn(fixtureConfigs, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
   });
 
   it("R4.12 one pair split serves the words, the reach keys and the coverage events (PR #48 review round 2 LOW 9)", () => {

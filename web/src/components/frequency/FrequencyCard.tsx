@@ -10,16 +10,18 @@
  * with the same node_key stays its own option. A spot below the minimum sample shows only "n of 30 decisions at this spot" (the minimum is the
  * response's min_spot_decisions); a spot at or above it shows paired bars per action and the hand
  * rows (FrequencyBars, aria-hidden) and the same numbers in a screen-reader table (FrequencyTable).
- * With no spot the card says how to fill it.
+ * With no spot the card says how to fill it. Since the S47 follow-up (R4.12, R4.19) a list says each
+ * action's gap in points (gapSentence), outside the aria-hidden visual, and the chosen spot can be
+ * held by the caller (spot and onSpotChange), so /progress keeps it in the address.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
-import { sampleText, spotKey, spotOptions, type FrequencyComparison } from "../../progress/frequency-model.js";
+import { gapSentence, sampleText, spotKey, spotOptions, type FrequencyComparison, type FrequencyRow, type SpotFrequency } from "../../progress/frequency-model.js";
 import { allConfigsQuery } from "../../routes/settings/configs-query.js";
 import { Card, FIELD_CLASS, cn } from "../ui/index.js";
-import { FrequencyBars } from "./FrequencyBars.js";
+import { FrequencyBars, shareAt } from "./FrequencyBars.js";
 import { FrequencyTable } from "./FrequencyTable.js";
 
 export const FREQUENCY_TEXT = {
@@ -27,20 +29,41 @@ export const FREQUENCY_TEXT = {
   description: "How often you took each action at a spot you play, next to how often the solver takes it with the same hands.",
   spot: "Spot",
   empty: "Play 30 preflop decisions at one spot to compare your frequencies with the solver's.",
+  gaps: "Your gap to the solver",
 } as const;
 
 export const FREQUENCY_CARD_TEST_ID = "frequency-card";
 
 export interface FrequencyCardProps {
   comparison: FrequencyComparison;
+  /** The chosen spot's key (spotKey) when the caller holds it; otherwise the card holds its own. */
+  spot?: string | undefined;
+  onSpotChange?: (key: string) => void;
 }
 
-export function FrequencyCard({ comparison }: FrequencyCardProps) {
+function gapOf(label: string, { yours, solver }: { yours: number; solver: number }): string {
+  return gapSentence(label, yours, solver);
+}
+
+function GapList({ spot, pooled }: { spot: SpotFrequency; pooled: FrequencyRow }) {
+  return (
+    <ul aria-label={FREQUENCY_TEXT.gaps} data-testid="frequency-gaps" className="flex flex-col gap-1 text-sm">
+      {spot.actions.map((action, position) => (
+        <li key={action.index}>{gapOf(action.label, shareAt(pooled, position))}</li>
+      ))}
+    </ul>
+  );
+}
+
+export function FrequencyCard({ comparison, spot: heldSpot, onSpotChange }: FrequencyCardProps) {
   const api = useAppApi();
   const selectId = useId();
   const configs = useQuery(allConfigsQuery(api));
   const options = spotOptions(comparison.spots, configs.data);
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [ownChoice, setOwnChoice] = useState<string | null>(null);
+  const held = onSpotChange !== undefined;
+  const chosen = held ? (heldSpot ?? null) : ownChoice;
+  const choose = (key: string): void => (held ? onSpotChange(key) : setOwnChoice(key));
   const spot = comparison.spots.find((entry) => spotKey(entry) === chosen) ?? comparison.spots[0];
   const chosenKey = spot === undefined ? "" : spotKey(spot);
   const label = options.find((option) => option.value === chosenKey)?.label ?? "";
@@ -58,7 +81,7 @@ export function FrequencyCard({ comparison }: FrequencyCardProps) {
             <select
               id={selectId}
               value={chosenKey}
-              onChange={(event) => setChosen(event.target.value)}
+              onChange={(event) => choose(event.target.value)}
               className={cn(FIELD_CLASS, "h-10 max-w-full px-2 text-sm sm:max-w-xl")}
             >
               {options.map((option) => (
@@ -73,6 +96,7 @@ export function FrequencyCard({ comparison }: FrequencyCardProps) {
           ) : (
             <>
               <FrequencyBars spot={spot} pooled={spot.pooled} />
+              <GapList spot={spot} pooled={spot.pooled} />
               <FrequencyTable spot={spot} pooled={spot.pooled} caption={label} />
             </>
           )}

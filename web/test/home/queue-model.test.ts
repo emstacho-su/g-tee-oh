@@ -10,7 +10,8 @@ import {
   fixtureHeatmap,
   fixtureLeaks,
 } from "../../src/fixtures/progress.js";
-import { buildHomeQueue, dueText, freshText, isDue, TOP_LEAK_COUNT } from "../../src/progress/queue-model.js";
+import { drillTargetOf } from "../../src/progress/open-drill.js";
+import { buildHomeQueue, dueText, freshText, isDue, startTarget, TOP_LEAK_COUNT } from "../../src/progress/queue-model.js";
 import type { HeatmapCell, ProgressHeatmap } from "../../src/progress/types.js";
 
 function cell(overrides: Partial<HeatmapCell>): HeatmapCell {
@@ -44,7 +45,10 @@ describe("R4.12 home queue model", () => {
     const first = fixtureLeaks.items[0];
     const firstCell = fixtureHeatmap.cells.find((each) => each.spot_class_key === first?.spot_class_key);
     const column = fixtureHeatmap.columns[firstCell?.column ?? -1];
+    const row = fixtureHeatmap.rows[firstCell?.row ?? -1];
+    if (firstCell === undefined || row === undefined || column === undefined) throw new Error("the costliest leak has no cell");
     expect(queue.leaks[0]).toEqual({
+      target: drillTargetOf(firstCell, row, column),
       spotClassKey: first?.spot_class_key,
       family: "Open or fold",
       where: `big blind versus under the gun, ${column?.format} ${column?.depth_band}bb`,
@@ -63,6 +67,20 @@ describe("R4.12 home queue model", () => {
     expect(leaks.items[0]).toBe(cheap);
     const broken: ProgressHeatmap = { ...fixtureHeatmap, cells: [cell({ spot_class_key: b.spot_class_key, row: 99 })] };
     expect(buildHomeQueue(broken, leaks).leaks[0]?.where).toBeNull();
+  });
+
+  it("R4.9 leak rows carry a drill target and Start training takes the costliest one (O-488)", () => {
+    const queue = buildHomeQueue(fixtureHeatmap, fixtureLeaks);
+    for (const leak of queue.leaks) expect(leak.target?.spotClassKey).toBe(leak.spotClassKey);
+    expect(startTarget(queue)).toEqual(queue.leaks[0]?.target);
+    // The costliest leak has no heat map cell, so nothing to drill: Start training takes the next.
+    const [a, b] = fixtureLeaks.items;
+    if (a === undefined || b === undefined) throw new Error("fixture leaks missing");
+    const offMap = buildHomeQueue(fixtureHeatmap, { weeks: fixtureLeaks.weeks, items: [{ ...a, spot_class_key: "outside-the-map", leak_cost_bb_per_1k: 99 }, b] });
+    expect(offMap.leaks[0]?.target).toBeNull();
+    expect(startTarget(offMap)).toEqual(offMap.leaks[1]?.target);
+    // No leak at all: Start training keeps its /train link.
+    expect(startTarget(buildHomeQueue(fixtureFreshHeatmap, fixtureFreshLeaks))).toBeNull();
   });
 
   it("R4.12 a fresh learner has nothing due, every class new and no leaks", () => {

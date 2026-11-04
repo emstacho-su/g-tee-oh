@@ -212,11 +212,19 @@ export function DrillForm({ initial, start, section, drill, justCreated = false,
   const [checkedDraft, setCheckedDraft] = useState<DrillDraft | null>(null);
   const [status, setStatus] = useState(justCreated ? (editedSinceRun ? FORM_TEXT.editedSince : FORM_TEXT.saved) : "");
   // Set by the Save and run button's click, which lands before the form's submit event (S47, R3.36).
+  // It serves one save: read once when the save lands, and cleared when it fails (review 4 finding 5).
   const runIntent = useRef(false);
+  const takeRunIntent = (): boolean => {
+    const run = runIntent.current;
+    runIntent.current = false;
+    return run;
+  };
   const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
   const focusFirstError = useFocusFirstError(section, drill?.id, formRef);
-  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, unsentEdits, section, runAfter: () => runIntent.current }));
+  const save = useSaveDrill(api, useAfterSave({ setStatus, markClean, unsentEdits, section, runAfter: takeRunIntent }), () => {
+    runIntent.current = false;
+  });
   useDropSavedFlag(drill?.id, justCreated, section);
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 

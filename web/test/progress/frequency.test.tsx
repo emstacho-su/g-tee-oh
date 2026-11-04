@@ -9,6 +9,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { shareAt } from "../../src/components/frequency/FrequencyBars.js";
 import { FIELD_CLASS } from "../../src/components/ui/index.js";
 import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import {
@@ -20,7 +21,7 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
-import { familyWords, sampleText, spotKey, spotOptions } from "../../src/progress/frequency-model.js";
+import { familyWords, gapSentence, sampleText, spotKey, spotOptions } from "../../src/progress/frequency-model.js";
 import * as frequencyModel from "../../src/progress/frequency-model.js";
 import { frequencyQuery } from "../../src/progress/frequency-query.js";
 import { createAppApi } from "../../src/api/index.js";
@@ -128,6 +129,28 @@ describe("R4.12 the frequency model", () => {
     expect(Object.keys(frequencyModel)).not.toContain("percentText");
   });
 
+  it("R4.12 the gap reads in points with a direction word from two served shares", () => {
+    expect(gapSentence("Fold", 0.4, 0.35)).toBe("Fold: 5 points more than the solver");
+    expect(gapSentence("Raise to 10bb", 0.15, 0.23)).toBe("Raise to 10bb: 8 points less than the solver");
+    expect(gapSentence("Call", 0.3, 0.29)).toBe("Call: 1 point more than the solver");
+    expect(gapSentence("Call", 0.5, 0.5)).toBe("Call: matches the solver");
+    // Under half a point rounds to no gap.
+    expect(gapSentence("Call", 0.502, 0.5)).toBe("Call: matches the solver");
+  });
+
+  it("R4.12 the gap is the difference of the two percents the card shows, so it never disagrees with them (PR #51 review 7)", () => {
+    // 45% and 45% on screen: no gap, although the raw shares differ by 0.8 points.
+    expect(gapSentence("Call", 0.454, 0.446)).toBe("Call: matches the solver");
+    // 46% and 44% on screen: 2 points, although the raw shares differ by 1.2.
+    expect(gapSentence("Fold", 0.456, 0.444)).toBe("Fold: 2 points more than the solver");
+  });
+
+  it("R4.12 one shareAt reads an action's two shares for the bars and the gap list, 0 where the api sent none (PR #51 review 10)", () => {
+    const pooled = { your_freq: [0.4, 0.45], solver_freq: [0.35] };
+    expect(shareAt(pooled, 0)).toEqual({ yours: 0.4, solver: 0.35 });
+    expect(shareAt(pooled, 1)).toEqual({ yours: 0.45, solver: 0 });
+  });
+
   it("R4.12 the query reads GET /progress/frequencies under the progress root", async () => {
     const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: () => Promise.resolve(new Response(JSON.stringify(fixtureFrequencies), { status: 200, headers: { "content-type": "application/json" } })) });
     const options = frequencyQuery(api);
@@ -151,6 +174,18 @@ describe("R4.12 the frequency card on /progress", APP_SUITE, () => {
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("Fold");
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("You 40%");
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("Solver 35%");
+  });
+
+  it("R4.12 the card says each action's gap in points, readable by screen readers too", async () => {
+    renderApp("/progress", progress([jsonResponse(200, fixtureFrequencies)]));
+    const card = await loadedCard();
+    const gaps = await within(card).findByRole("list", { name: "Your gap to the solver" });
+    expect(gaps).not.toHaveAttribute("aria-hidden");
+    expect(within(gaps).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Fold: 5 points more than the solver",
+      "Call: 3 points more than the solver",
+      "Raise to 10bb: 8 points less than the solver",
+    ]);
   });
 
   it("R4.12 lists the hand rows in the api's order, the largest gap first", async () => {

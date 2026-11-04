@@ -5,7 +5,7 @@
  * picker by mouse and keyboard, the stake choices by format, and the v1 notes. Since S40 (O-405)
  * each section is its own page of the builder container, reached through the "Drill sections" list.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent, type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -295,6 +295,27 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     // The run screen read the drill and started by itself, then dropped start=1 from the address (O-484).
     await waitFor(() => expect(sent("POST", "/api/v1/sessions")).toHaveLength(1));
     await waitFor(() => expect(router.state.location.search).not.toHaveProperty("start"));
+  });
+
+  it("R3.36 a Save and run that failed leaves no run behind: the next save stays in the builder (PR #48 review 4 finding 5)", async () => {
+    let failed = false;
+    const { sent, router } = renderDrills("/drills/new", {
+      override: (request) => {
+        if (failed || request.method !== "POST" || request.path !== "/api/v1/drills") return undefined;
+        failed = true;
+        return jsonBody(503, { type: "urn:g-tee-oh:problem:unknown", title: "Unavailable", status: 503 }, "application/problem+json");
+      },
+    });
+    const user = await openNew();
+    await fillRfiDrill(user);
+    await user.click(screen.getByRole("button", { name: "Save and run" }));
+    await screen.findByRole("alert");
+    // A submit that no Save and run click started (the form submitted by itself) saves and stays.
+    fireEvent.submit(screen.getByRole("form", { name: "Drill builder" }));
+    await waitFor(() => expect(sent("POST", "/api/v1/drills")).toHaveLength(2));
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drills\/[0-9a-f-]{36}\/[a-z]+$/));
+    expect(router.state.location.pathname.endsWith("/run")).toBe(false);
+    expect(sent("POST", "/api/v1/sessions")).toHaveLength(0);
   });
 
   it("R3.36 Save and run on an unchanged stored drill opens the run screen without a write", async () => {

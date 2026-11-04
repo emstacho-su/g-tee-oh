@@ -297,3 +297,44 @@ describe("R4.12 HoldoutCard", () => {
     expect(screen.queryByTestId("holdout-open")).toBeNull();
   });
 });
+
+describe("R4.19 MasteryHeatMap Show choice", () => {
+  it("R4.19 Show narrows the grid to due, new or the ten weakest classes, and a row with none is left out", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const show = screen.getByRole("radiogroup", { name: "Show" });
+    expect(within(show).getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(within(show).getByRole("radio", { name: "Due" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(DUE_CELLS);
+    expect(screen.getAllByTestId("heat-due")).toHaveLength(DUE_CELLS);
+    fireEvent.click(within(show).getByRole("radio", { name: "New" }));
+    const fresh = screen.getAllByTestId("heat-cell");
+    expect(fresh).toHaveLength(NEW_CELLS);
+    for (const each of fresh) expect(each).toHaveAttribute("data-state", "new");
+    const rowsWithNew = new Set(fixtureHeatmap.cells.filter((each) => each.p_known === null).map((each) => each.row));
+    expect(within(screen.getByTestId("heat-grid")).getAllByRole("rowheader")).toHaveLength(rowsWithNew.size);
+    fireEvent.click(within(show).getByRole("radio", { name: "Weakest 10" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(10);
+    fireEvent.click(within(show).getByRole("radio", { name: "All" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(CELL_COUNT);
+  });
+});
+
+describe("R4.19 narrowed heat map columns", () => {
+  it("R4.19 a narrowed view leaves out a column with no class left; All keeps every column (PR #51 review 8)", () => {
+    // Every class in the first column (Live 100bb) has been practiced, so New has none there.
+    const practicedFirstColumn = {
+      ...fixtureHeatmap,
+      cells: fixtureHeatmap.cells.map((each) => (each.column === 0 && each.p_known === null ? { ...each, p_known: 0.5, retrievability: 0.99, n: 3 } : each)),
+    };
+    render(<MasteryHeatMap heatmap={practicedFirstColumn} onDrill={vi.fn()} />);
+    const headers = () => within(screen.getByTestId("heat-grid")).getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers()).toContain("Live 100bb");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Show" })).getByRole("radio", { name: "New" }));
+    expect(headers()).not.toContain("Live 100bb");
+    expect(headers()).toContain("Online 100bb");
+    // Each row still has one cell slot per column shown.
+    for (const row of within(screen.getByTestId("heat-grid")).getAllByRole("rowheader")) {
+      expect(row.parentElement?.querySelectorAll("td")).toHaveLength(3);
+    }
+  });
+});

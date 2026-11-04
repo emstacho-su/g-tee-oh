@@ -360,3 +360,68 @@ describe("R3.14 drill library", () => {
     expect(within(row).getByText("Stop rule:")).not.toHaveClass("sr-only");
   });
 });
+
+describe("R4.12 auto drills in the library (O-489)", () => {
+  const AUTO_NAME = "Leak drill: open or fold, big blind versus under the gun, live 100bb";
+  const autoDrill = { ...fixtureDrill, id: "00000000-0000-4000-8000-0000000004aa", name: AUTO_NAME, tags: ["auto-0123456789abcdef0123456789"] };
+
+  it("R4.12 auto drills hide behind Show auto drills and are named in family words (O-489)", async () => {
+    const user = userEvent.setup();
+    renderDrills("/drills", {
+      override: (request) =>
+        request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === undefined
+          ? jsonBody(200, { items: [autoDrill, fixtureDrill], next_cursor: null })
+          : undefined,
+    });
+    const shown = await rows();
+    expect(shown.map(nameOf)).toEqual([fixtureDrill.name]);
+    const toggle = screen.getByRole("checkbox", { name: "Show auto drills" });
+    expect(toggle).not.toBeChecked();
+    // Counted over what is loaded, and said so (PR #51 review 4).
+    expect(screen.getByTestId("auto-drills-hidden")).toHaveTextContent("1 of the 2 drills loaded is an auto drill from your leaks, hidden.");
+    await user.click(toggle);
+    expect((await rows()).map(nameOf)).toEqual([AUTO_NAME, fixtureDrill.name]);
+    // The name reads in family words, never a raw token.
+    expect(AUTO_NAME).not.toMatch(/rfi|BB-UTG|_/);
+  });
+
+  it("R4.12 a library of auto drills only keeps the empty state, with the toggle beside it (PR #51 review 4)", async () => {
+    renderDrills("/drills", {
+      override: (request) =>
+        request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === undefined ? jsonBody(200, { items: [autoDrill], next_cursor: null }) : undefined,
+    });
+    expect(await screen.findByRole("checkbox", { name: "Show auto drills" })).toBeInTheDocument();
+    expect(screen.getByText(/You have no drills yet/)).toBeInTheDocument();
+  });
+
+  it("R4.12 an imported auto drill is shown although auto drills are hidden (PR #51 review 4)", async () => {
+    const user = userEvent.setup();
+    renderDrills("/drills");
+    await rows();
+    const code = encodeMockExportCode({ name: AUTO_NAME, tags: [autoDrill.tags[0] as string], spot_filter: fixtureDrill.spot_filter, trainer: fixtureDrill.trainer });
+    await user.click(screen.getByRole("button", { name: "Import a drill" }));
+    const dialog = screen.getByRole("dialog", { name: "Import a drill" });
+    await user.click(within(dialog).getByLabelText("Export code"));
+    await user.paste(code);
+    await user.click(within(dialog).getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Imported ${AUTO_NAME}.`));
+    await waitFor(async () => expect((await rows()).map(nameOf)).toContain(AUTO_NAME));
+    expect(screen.getByRole("checkbox", { name: "Show auto drills" })).not.toBeChecked();
+  });
+
+  it("R4.12 the selected auto drill stays in the table when auto drills are hidden again (PR #51 review 4)", async () => {
+    const user = userEvent.setup();
+    renderDrills("/drills", {
+      override: (request) =>
+        request.method === "GET" && request.path === "/api/v1/drills" && request.query["tag"] === undefined
+          ? jsonBody(200, { items: [autoDrill, fixtureDrill], next_cursor: null })
+          : undefined,
+    });
+    await rows();
+    await user.click(screen.getByRole("checkbox", { name: "Show auto drills" }));
+    await user.click(await screen.findByRole("radio", { name: `Select ${AUTO_NAME}` }));
+    await user.click(screen.getByRole("checkbox", { name: "Show auto drills" }));
+    expect((await rows()).map(nameOf)).toEqual([AUTO_NAME, fixtureDrill.name]);
+    expect(screen.getByRole("radio", { name: `Select ${AUTO_NAME}` })).toBeChecked();
+  });
+});

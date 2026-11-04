@@ -11,10 +11,13 @@
  * drill from the trend or the heat map goes through useOpenDrill (O-321), whose pending key
  * disables the clicked button and whose message shows in the card that asked. The holdout card's
  * action starts or resumes this month's retest on /train (O-328). S41 adds the frequency card
- * (R4.12, O-353) between the heat map and the holdout card, with its own read and Try again.
+ * (R4.12, O-353) between the heat map and the holdout card, with its own read and Try again. Since
+ * the S47 follow-up (R4.19) the weeks and the frequency spot are the address's (progress-search.ts),
+ * written with replace.
  */
 import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { HoldoutCard, LeakTrendChart, MasteryHeatMap, ProgressCard, RatingCard, StreakBadge, TrackBreakdown } from "../../components/progress/index.js";
@@ -23,8 +26,10 @@ import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import { frequencyQuery } from "../../progress/frequency-query.js";
 import { describeCosmetic } from "../../cosmetics/catalog.js";
 import { useOpenDrill, type DrillOrigin, type DrillTarget } from "../../progress/open-drill.js";
+import type { ProgressSearch } from "../../progress/progress-search.js";
 import { heatmapQuery, holdoutQuery, leaksQuery, ratingQuery, streakQuery, tracksQuery } from "../../progress/queries.js";
 import { DEFAULT_LEAK_WEEKS, type LeakWeeks, type TrackKey, type TrackProgress } from "../../progress/types.js";
+import { describeFailureForLog } from "../../api/http-status.js";
 import { HoldoutRetestButton } from "../train/HoldoutRetestButton.js";
 
 export const TRY_AGAIN_TEXT = "Try again";
@@ -64,9 +69,25 @@ function namesOf(tracks: readonly TrackProgress[] | undefined): Partial<Record<T
   return tracks === undefined ? undefined : Object.fromEntries(tracks.map((track) => [track.track_key, track.name]));
 }
 
-export function ProgressPage() {
+/** Writes one choice to the address with replace, keeping the other (R4.19). */
+function useProgressAddress(): (change: ProgressSearch) => void {
+  const navigate = useNavigate();
+  return (change) => {
+    navigate({ to: "/progress", search: (current: ProgressSearch) => ({ ...current, ...change }), replace: true }).catch((error: unknown) => {
+      console.error(`g-tee-oh: writing the progress address failed (${describeFailureForLog(error)})`);
+    });
+  };
+}
+
+export interface ProgressPageProps {
+  search?: ProgressSearch;
+}
+
+export function ProgressPage({ search = {} }: ProgressPageProps) {
   const api = useAppApi();
-  const [weeks, setWeeks] = useState<LeakWeeks>(DEFAULT_LEAK_WEEKS);
+  const writeAddress = useProgressAddress();
+  const weeks: LeakWeeks = search.weeks ?? DEFAULT_LEAK_WEEKS;
+  const setWeeks = (next: LeakWeeks): void => writeAddress({ weeks: next });
   const rating = useQuery(ratingQuery(api));
   const tracks = useQuery(tracksQuery(api));
   const leaks = useQuery({ ...leaksQuery(api, weeks), placeholderData: keepPreviousData });
@@ -110,7 +131,7 @@ export function ProgressPage() {
         {(data) => <MasteryHeatMap heatmap={data} onDrill={drillFrom("heatmap")} pendingKey={drill.pendingKey} message={messageFor("heatmap")} />}
       </CardQuery>
       <CardQuery title={FREQUENCY_TEXT.title} subject="your frequencies" testId={FREQUENCY_CARD_TEST_ID} query={frequencies}>
-        {(data) => <FrequencyCard comparison={data} />}
+        {(data) => <FrequencyCard comparison={data} spot={search.spot} onSpotChange={(spot) => writeAddress({ spot })} />}
       </CardQuery>
       <CardQuery title="Holdout retest" subject="the holdout rounds" testId="holdout-card" query={holdout}>
         {(data) => (

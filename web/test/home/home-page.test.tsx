@@ -20,6 +20,7 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { defaultHotkeyStore } from "../../src/hotkeys/index.js";
+import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { NO_CLASSES_TEXT, NO_LEAKS_TEXT } from "../../src/progress/queue-model.js";
 import { COSMETIC_SLOTS, useCosmeticsStore, useThemeStore } from "../../src/store/index.js";
 import { jsonResponse, problemResponse, sessionResponse, type FetchScript, type ResponseFactory } from "../api/fake-fetch.js";
@@ -70,7 +71,7 @@ beforeEach(() => {
 afterEach(clearChoices);
 
 describe("R4.12 home queue card", () => {
-  it("R4.12 shows due and new counts, the top three leaks and a Start training link", async () => {
+  it("R4.12 shows due and new counts, the top three leaks and Start training", async () => {
     renderApp("/", seasoned);
 
     expect(await screen.findByTestId("queue-due")).toHaveTextContent("22 classes due for review.");
@@ -80,7 +81,25 @@ describe("R4.12 home queue card", () => {
     expect(leaks).toHaveLength(3);
     expect(leaks[0]).toHaveTextContent("Open or fold");
     expect(leaks[0]).toHaveTextContent("42.0 bb per 1,000 hands");
-    expect(within(queue).getByRole("link", { name: "Start training" })).toHaveAttribute("href", "/train");
+    // With leaks to drill, Start training opens the costliest one (O-488) rather than linking to /train.
+    expect(within(queue).getByRole("button", { name: "Start training" })).toBeInTheDocument();
+  });
+
+  it("R4.9 each top leak has a Drill button, and Start training opens the costliest leak's drill (O-488)", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp("/", { ...seasoned, "GET /api/v1/drills": [jsonResponse(200, { items: [fixtureDrill], next_cursor: null })] });
+    await screen.findByTestId("queue-due");
+    const queue = card("Today's queue");
+    const leaks = within(within(queue).getByRole("list", { name: "Top leaks" })).getAllByRole("listitem");
+    for (const leak of leaks) expect(within(leak).getByRole("button", { name: /^Drill this spot: / })).toBeInTheDocument();
+    await user.click(within(queue).getByRole("button", { name: "Start training" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${fixtureDrill.id}/run`));
+  });
+
+  it("R4.9 with no leak to drill, Start training stays the link to /train (O-488)", async () => {
+    renderApp("/", fresh);
+    await screen.findByTestId("queue-due");
+    expect(within(card("Today's queue")).getByRole("link", { name: "Start training" })).toHaveAttribute("href", "/train");
   });
 
   it("R4.12 a fresh learner sees nothing due, every class new and no leaks yet", async () => {

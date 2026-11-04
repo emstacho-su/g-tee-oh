@@ -9,7 +9,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { STARTER_PACK, STARTER_TAG } from "../../src/drills/starter-pack.js";
+import { STARTER_PACK, STARTER_TAG, starterIdTag } from "../../src/drills/starter-pack.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
 import { renderDrills } from "./render-drills.js";
@@ -123,6 +123,16 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
   });
 
+  it("R3.35 the header stays hidden when every starter drill is listed under a new name (PR #48 review 4 finding 3)", async () => {
+    const renamed = STARTER_PACK.map((entry, index) => ({ ...fixtureDrill, id: `00000000-0000-4000-8000-0000000003${String(index).padStart(2, "0")}`, name: `Renamed ${index}`, tags: [STARTER_TAG, starterIdTag(entry)] }));
+    renderDrills("/drills", {
+      override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" ? jsonBody(200, { items: renamed, next_cursor: null }) : undefined),
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await waitFor(() => expect(screen.getAllByTestId("drill-row")).toHaveLength(STARTER_PACK.length));
+    expect(screen.queryByRole("button", { name: /starter drills?$/ })).not.toBeInTheDocument();
+  });
+
   it("R3.35 the header decides from its own read, not the filtered page: starter drills outside the filter still count (PR #48 review HIGH 3)", async () => {
     const all = STARTER_PACK.map((entry, index) => ({ ...fixtureDrill, id: `00000000-0000-4000-8000-0000000002${String(index).padStart(2, "0")}`, name: entry.name, tags: [STARTER_TAG] }));
     const { sent } = renderDrills("/drills?tag=synthetic", {
@@ -189,5 +199,80 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(await screen.findByRole("radio", { name: `Select ${target.name}` })).toBeInTheDocument();
     // One drill is named in the singular (PR #48 review round 3 LOW 5).
     expect(screen.getByTestId("library-status")).toHaveTextContent("Added 1 starter drill.");
+  });
+
+  /** Fails the first import once with this answer, then lets every import through; returns the keys sent. */
+  async function retryAfterFirstAnswer(answer: () => Response): Promise<(string | undefined)[]> {
+    const user = userEvent.setup();
+    let failed = false;
+    const { sent } = renderDrills("/drills", {
+      override: (request) => {
+        if (failed || request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        failed = true;
+        return answer();
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    return sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"]);
+  }
+
+  it("R3.35 a code the api refused with a 4xx is retried under a fresh key, never the refused one (PR #48 review 4 finding 1)", async () => {
+    const refusal = { type: "urn:g-tee-oh:problem:rate-limited", title: "Too many requests", status: 429 };
+    const keys = await retryAfterFirstAnswer(() => jsonBody(429, refusal, "application/problem+json"));
+    expect(keys[0]).toBe("test-key-1-0");
+    expect(keys[1]).not.toBe("test-key-1-0");
+    expect(keys.slice(2)).toEqual(STARTER_PACK.slice(1).map((_, index) => `test-key-1-${index + 1}`));
+  });
+
+  it("R3.35 a code whose import failed with a 5xx keeps its key, so a request that did land is replayed (PR #48 review 4 finding 1)", async () => {
+    const failure = { type: "urn:g-tee-oh:problem:unknown", title: "Unavailable", status: 503 };
+    const keys = await retryAfterFirstAnswer(() => jsonBody(503, failure, "application/problem+json"));
+    expect(keys.slice(0, 2)).toEqual(["test-key-1-0", "test-key-1-0"]);
+  });
+
+  /** The first code's imports answer in turn: a lost answer (the request stalled), then this answer, then a create. */
+  async function keysAfterKeyCheck(answer: () => Response): Promise<{ keys: (string | undefined)[]; firstCodeImports: number }> {
+    const user = userEvent.setup();
+    let firstCodeCalls = 0;
+    const first = STARTER_PACK[0];
+    if (first === undefined) throw new Error("the pack is empty");
+    const { sent } = renderDrills("/drills", {
+      override: (request) => {
+        if (request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        if ((request.body as { export_code?: string } | undefined)?.export_code !== first.code) return undefined;
+        firstCodeCalls += 1;
+        if (firstCodeCalls === 1) return Promise.reject(new TypeError("Failed to fetch"));
+        if (firstCodeCalls === 2) return answer();
+        return undefined;
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(sent("POST", IMPORT_PATH)).toHaveLength(2));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    return { keys: sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"]), firstCodeImports: firstCodeCalls };
+  }
+
+  it("R3.35 a 409 in-flight answer keeps the code's key: the next retry reuses it and the drill is created once (PR #51 review HIGH 1)", async () => {
+    const inFlight = { type: "urn:g-tee-oh:problem:idempotency-in-flight", title: "A request with this Idempotency-Key is still being processed", status: 409 };
+    const { keys, firstCodeImports } = await keysAfterKeyCheck(() => jsonBody(409, inFlight, "application/problem+json"));
+    expect(firstCodeImports).toBe(3);
+    expect(keys.slice(0, 3)).toEqual(["test-key-1-0", "test-key-1-0", "test-key-1-0"]);
+    const table = await screen.findByRole("table", { name: "Your drills" });
+    expect(within(table).getAllByTestId("drill-name").filter((cell) => cell.textContent === STARTER_PACK[0]?.name)).toHaveLength(1);
+  });
+
+  it("R3.35 a 422 key mismatch keeps the code's key too: only a refusal that proves nothing landed mints a new one (PR #51 review HIGH 1)", async () => {
+    const mismatch = { type: "urn:g-tee-oh:problem:idempotency-mismatch", title: "Idempotency-Key reused with a different request", status: 422 };
+    const { keys } = await keysAfterKeyCheck(() => jsonBody(422, mismatch, "application/problem+json"));
+    expect(keys.slice(0, 3)).toEqual(["test-key-1-0", "test-key-1-0", "test-key-1-0"]);
   });
 });

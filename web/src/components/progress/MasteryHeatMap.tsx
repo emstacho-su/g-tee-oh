@@ -12,7 +12,9 @@
  * A wide grid scrolls inside the card with the row headers sticky, so the page itself never
  * scrolls sideways at 390 px. A legend explains every mark. The cell buttons are the one accessible
  * representation: each name states the class and every value (S36 review, O-347; no table). Family
- * headings, pair headers and the tooltip title read in words (spot-words.ts, S47).
+ * headings, pair headers and the tooltip title read in words (spot-words.ts, S47). A Show choice
+ * (R4.19) narrows the grid to the due, new or ten weakest classes; a row with no class left is not
+ * drawn, nor, in a narrowed view, a column with none (PR #51 review 8).
  */
 import { useState, type CSSProperties } from "react";
 
@@ -25,18 +27,25 @@ import {
   HEAT_BINS,
   HEAT_FILL,
   HEAT_INK,
+  HEAT_SHOW_LABELS,
+  HEAT_SHOW_MODES,
+  visibleHeatmap,
   type HeatCellView,
+  type HeatShowMode,
 } from "../../progress/heatmap-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import { capitalize, familyWords, pairWords } from "../../progress/spot-words.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
-import { cn, STICKY_LAYER_CLASS } from "../ui/index.js";
+import { cn, STICKY_LAYER_CLASS, ToggleGroup } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
 
 export const NO_CLASSES_TEXT = "No spot classes in the library yet.";
 export const OPEN_DRILL_HINT = "Select a cell to drill that spot.";
+export const NONE_SHOWN_TEXT = "No spot class matches this choice.";
+const SHOW_LABEL = "Show";
+const SHOW_OPTIONS = HEAT_SHOW_MODES.map((mode) => ({ value: mode, label: HEAT_SHOW_LABELS[mode] }));
 const MASTERED_GLYPH = "✓";
 
 /** The never-practiced texture: stripes of the sunken surface token over the raised surface. */
@@ -124,7 +133,15 @@ function CellButton({ view, pending, onDrill, onShow, onHide }: CellButtonProps)
 // on the sticky layer below the header, on the card's ground so cells never show through.
 const STICKY = cn("sticky left-0 bg-surface-raised", STICKY_LAYER_CLASS);
 
-function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; pendingKey: string | null; onDrill: (target: DrillTarget) => void }) {
+interface HeatGridProps {
+  heatmap: ProgressHeatmap;
+  /** A Show choice other than All: columns with no class left are left out too. */
+  narrowed: boolean;
+  pendingKey: string | null;
+  onDrill: (target: DrillTarget) => void;
+}
+
+function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   const lookup = cellLookup(heatmap);
   const tooltip = useTooltipAnchor();
   const [active, setActive] = useState<HeatCellView | null>(null);
@@ -136,7 +153,15 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
     setActive(null);
     tooltip.hide();
   };
-  const columnCount = heatmap.columns.length + 1;
+  const columnsWithCells = new Set(heatmap.cells.map((cell) => cell.column));
+  // Each shown column keeps its api index, so cells are still found by (row, column).
+  const columns = heatmap.columns.flatMap((column, index) => (narrowed && !columnsWithCells.has(index) ? [] : [{ column, index }]));
+  const columnCount = columns.length + 1;
+  // A row with no cell left after the Show choice is not drawn, nor a family with no row left.
+  const rowsShown = new Set(heatmap.cells.map((cell) => cell.row));
+  const groups = groupRowsByFamily(heatmap.rows)
+    .map((group) => ({ ...group, rows: group.rows.filter((entry) => rowsShown.has(entry.index)) }))
+    .filter((group) => group.rows.length > 0);
   return (
     <div className="max-w-full overflow-x-auto" data-testid="heat-grid">
       <table className="border-separate border-spacing-1 text-left text-sm">
@@ -144,14 +169,14 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
         <thead>
           <tr>
             <th scope="col" className={cn(STICKY, "pr-2 text-xs font-medium text-muted")}>Pair</th>
-            {heatmap.columns.map((column) => (
+            {columns.map(({ column }) => (
               <th key={`${column.format}-${column.depth_band}`} scope="col" className="w-20 text-center text-xs font-medium text-muted">
                 {columnLabel(column)}
               </th>
             ))}
           </tr>
         </thead>
-        {groupRowsByFamily(heatmap.rows).map((group) => (
+        {groups.map((group) => (
           <tbody key={group.family}>
             <tr>
               <th scope="colgroup" colSpan={columnCount} className="pt-2 text-xs font-semibold text-muted">
@@ -161,7 +186,7 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
             {group.rows.map((entry) => (
               <tr key={entry.index}>
                 <th scope="row" className={cn(STICKY, "whitespace-nowrap pr-2 font-medium")}>{capitalize(pairWords(entry.row.pair))}</th>
-                {heatmap.columns.map((_, columnIndex) => {
+                {columns.map(({ index: columnIndex }) => {
                   const view = cellViewAt(heatmap, lookup, entry.index, columnIndex);
                   return (
                     <td key={columnIndex}>
@@ -197,7 +222,9 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
 }
 
 export function MasteryHeatMap({ heatmap, onDrill, pendingKey = null, message = null }: MasteryHeatMapProps) {
+  const [show, setShow] = useState<HeatShowMode>("all");
   const empty = heatmap.cells.length === 0;
+  const shown = visibleHeatmap(heatmap, show);
   return (
     <ProgressCard title="Mastery heat map" testId="mastery-heatmap">
       <DrillAlert text={message} />
@@ -206,8 +233,9 @@ export function MasteryHeatMap({ heatmap, onDrill, pendingKey = null, message = 
       ) : (
         <>
           <p className="text-sm text-muted">{OPEN_DRILL_HINT}</p>
+          <ToggleGroup<HeatShowMode> label={SHOW_LABEL} value={show} options={SHOW_OPTIONS} onValueChange={setShow} />
           <Legend />
-          <HeatGrid heatmap={heatmap} pendingKey={pendingKey} onDrill={onDrill} />
+          {shown.cells.length === 0 ? <p className="text-sm text-muted">{NONE_SHOWN_TEXT}</p> : <HeatGrid heatmap={shown} narrowed={show !== "all"} pendingKey={pendingKey} onDrill={onDrill} />}
         </>
       )}
     </ProgressCard>
