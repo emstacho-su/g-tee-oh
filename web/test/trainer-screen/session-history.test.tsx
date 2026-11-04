@@ -64,7 +64,7 @@ describe("R3.32 session history", () => {
     expect(within(panel).queryByRole("button", { name: "Ask" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await userEvent.click(within(first).getByRole("button", { name: /Hand 1/ }));
-    expect(within(first).getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise 2.5bb");
+    expect(within(first).getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise to 2.5bb");
     expect(within(second).getByRole("button", { name: /Hand 2/ })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getAllByTestId("feedback-panel")).toHaveLength(1);
   });

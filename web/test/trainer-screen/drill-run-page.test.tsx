@@ -534,7 +534,7 @@ describe("R3.32 tally and history on the drill run", () => {
     expect(row).toHaveTextContent("Hand 1");
     expect(row).toHaveTextContent("Inaccuracy");
     await userEvent.click(within(row).getByRole("button", { name: /Hand 1/ }));
-    expect(within(row).getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise 2.5bb");
+    expect(within(row).getByTestId("feedback-panel")).toHaveTextContent("Your action: Raise to 2.5bb");
     expect(screen.getAllByTestId("feedback-panel")).toHaveLength(2);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
