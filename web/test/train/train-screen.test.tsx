@@ -250,3 +250,29 @@ describe("R4.10 holdout retest (O-328)", () => {
     expect(alert).not.toHaveTextContent("No retest spots");
   });
 });
+
+describe("R3.31 session length on /train", () => {
+  it("R3.31 the automated start panel offers the length, and a chosen length shows the hand count under the banner", async () => {
+    setDefaults({ sessionLength: 20 });
+    await renderTrain("automated", automatedScript());
+    const group = screen.getByRole("group", { name: "Session length" });
+    expect(within(group).getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["off", "10", "20", "50"]);
+    expect(within(group).getByRole("radio", { name: "20 hands" })).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Start training" }));
+    await screen.findByRole("group", { name: "Actions" });
+    expect(screen.getByTestId("hand-counter")).toHaveTextContent("Hand 1 of 20");
+  });
+
+  it("R3.31 choosing a length on the start panel is remembered in the session defaults", async () => {
+    await renderTrain("automated", {});
+    await userEvent.click(within(screen.getByRole("group", { name: "Session length" })).getByRole("radio", { name: "10 hands" }));
+    expect(useSessionDefaultsStore.getState().defaults.sessionLength).toBe(10);
+  });
+
+  it("R3.31 with the length off an automated session shows no hand counter", async () => {
+    await renderTrain("automated", automatedScript());
+    await userEvent.click(screen.getByRole("button", { name: "Start training" }));
+    await screen.findByRole("group", { name: "Actions" });
+    expect(screen.queryByTestId("hand-counter")).not.toBeInTheDocument();
+  });
+});

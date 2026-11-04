@@ -16,7 +16,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 
-import type { AppApi } from "../../api/index.js";
+import { isHandNotInRange, type AppApi } from "../../api/index.js";
 import { BlockersCard, HandRoleChip, RangeAdvantageCard, ThresholdCard } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
@@ -49,10 +49,26 @@ function insightsParams(node: InsightsNode, hand: string) {
   return { solutionId: node.solution_id, nodeKey: node.node_key, hand };
 }
 
-function AdvantageArea({ api, node, hand }: { api: AppApi; node: InsightsNode; hand: string }) {
-  const insights = useQuery(studyInsightsQuery(api, insightsParams(node, hand)));
+interface AdvantageAreaProps {
+  api: AppApi;
+  node: InsightsNode;
+  /** The selected hand, whose read the hand tiles make anyway; undefined before one is picked. */
+  selected: string | undefined;
+  standIn: string;
+}
+
+/**
+ * The range and nut advantage, read with the selected hand when there is one (the same query the
+ * hand tiles make, so one request, code review 2), else with the stand-in. When the selected hand
+ * is out of the range (404 hand-not-in-range), the stand-in read takes over so the card stays.
+ */
+function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
+  const primary = useQuery(studyInsightsQuery(api, insightsParams(node, selected ?? standIn)));
+  const fallBack = selected !== undefined && selected !== standIn && primary.isError && isHandNotInRange(primary.error);
+  const backup = useQuery({ ...studyInsightsQuery(api, insightsParams(node, standIn)), enabled: fallBack });
+  const insights = fallBack ? backup : primary;
   if (insights.isPending) return <LoadingNote text="Loading the range advantage." />;
-  // A failure here is the stand-in's, a hand the user never picked, so the message names none (code review).
+  // The message names no hand: the read may be the stand-in's, a hand the user never picked (code review).
   if (insights.isError) return <FailureAlert failure={advantageFailure(insights.error)} onRetry={() => void insights.refetch()} />;
   return (
     <RangeAdvantageCard
@@ -82,10 +98,10 @@ function SelectedHandInsights({ api, node, hand }: { api: AppApi; node: Insights
   );
 }
 
-/** The range and nut advantage, read with the stand-in hand; the Overview tab's half (R3.26). */
-export function AdvantageInsights({ api, node }: Omit<HandInsightsProps, "hand">) {
+/** The range and nut advantage, read with the selected hand when there is one, else the stand-in; the Overview tab's half (R3.26). */
+export function AdvantageInsights({ api, node, hand }: HandInsightsProps) {
   const standIn = standInHand(node);
-  return standIn === undefined ? null : <AdvantageArea api={api} node={node} hand={standIn} />;
+  return standIn === undefined ? null : <AdvantageArea api={api} node={node} selected={hand} standIn={standIn} />;
 }
 
 /** The selected hand's threshold card, blockers and role, or the prompt for one; the Hands tab (R3.26). */

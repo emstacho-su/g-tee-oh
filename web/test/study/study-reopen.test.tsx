@@ -8,7 +8,7 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR } from "../../src/fixtures/study.js";
 import { useStudySpotsStore } from "../../src/store/study-spots.js";
@@ -43,6 +43,55 @@ describe("R3.27 Study reopens on the last spot", () => {
     await waitFor(() => expect(router.state.location.search).toMatchObject({ pair: FIXTURE_STUDY_PAIR, line: "r250", mode: "ev" }));
     expect(router.history.length).toBe(1);
     expect(await screen.findByRole("img", { name: /expected value mode/ })).toBeInTheDocument();
+  });
+
+  it("R3.27 after a reopen, the nav Study link (a bare /study on the same page) reopens again, never a stuck note (code review 2)", async () => {
+    const user = userEvent.setup();
+    useStudySpotsStore.getState().recordConfirmed({ ...SPOT, line: "r250" });
+    const { router } = renderStudy("/study");
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ pair: FIXTURE_STUDY_PAIR, line: "r250" }));
+    await screen.findByRole("img", { name: /^Range matrix/ });
+    await user.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Study" }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ pair: FIXTURE_STUDY_PAIR, line: "r250" }));
+    expect(await screen.findByRole("img", { name: /^Range matrix/ })).toBeInTheDocument();
+    expect(screen.queryByText("Opening your last spot.")).not.toBeInTheDocument();
+  });
+
+  it("R3.27 a bare /study with a matrix mode keeps that mode over the stored spot's (code review 2)", async () => {
+    useStudySpotsStore.getState().recordConfirmed({ ...SPOT, mode: "ev" });
+    const { router } = renderStudy("/study?mode=weight");
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ pair: FIXTURE_STUDY_PAIR, mode: "weight" }));
+    expect(await screen.findByRole("img", { name: /range weight mode/ })).toBeInTheDocument();
+  });
+
+  it("R3.27 Start over shows only on the reopened spot, not on a later one (code review 2)", async () => {
+    const user = userEvent.setup();
+    useStudySpotsStore.getState().recordConfirmed(SPOT);
+    renderStudy("/study");
+    expect(await screen.findByRole("button", { name: SPOT_TEXT.startOver })).toBeInTheDocument();
+    const actions = await screen.findByRole("region", { name: /'s actions$/ });
+    await user.click(within(actions).getByRole("button", { name: /^Raise to 2\.5bb/ }));
+    await screen.findByText(`${SUMMARY}, single-raised pot`);
+    expect(screen.queryByRole("button", { name: SPOT_TEXT.startOver })).not.toBeInTheDocument();
+  });
+
+  it("R3.27 a spot is recorded once per spot and line, not on every re-render (code review 2)", async () => {
+    const user = userEvent.setup();
+    const original = useStudySpotsStore.getState().recordConfirmed;
+    const record = vi.fn();
+    useStudySpotsStore.setState({ recordConfirmed: record });
+    onTestFinished(() => useStudySpotsStore.setState({ recordConfirmed: original }));
+    renderStudy(BASE);
+    await screen.findByRole("img", { name: /^Range matrix/ });
+    await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("radio", { name: "EV" }));
+    await screen.findByRole("img", { name: /expected value mode/ });
+    await user.click(screen.getByRole("radio", { name: "Range weight" }));
+    await screen.findByRole("img", { name: /range weight mode/ });
+    expect(record).toHaveBeenCalledTimes(1);
+    const actions = await screen.findByRole("region", { name: /'s actions$/ });
+    await user.click(within(actions).getByRole("button", { name: /^Raise to 2\.5bb/ }));
+    await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
   });
 
   it("R3.27 any setting in the address wins over the stored spot", async () => {

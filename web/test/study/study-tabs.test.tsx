@@ -50,10 +50,11 @@ describe("R3.26 the right column as tabs", () => {
     const { requests } = renderStudy(`${BASE}&hand=AKs`);
     await screen.findByRole("region", { name: "Range and nut advantage" });
     expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
-    expect(insightHands(requests)).toEqual(["AA"]);
+    // The advantage card reads with the selected hand (code review 2); the Hands tab shares that read.
+    expect(insightHands(requests)).toEqual(["AKs"]);
     await user.click(screen.getByRole("tab", { name: /^Hands/ }));
     expect(await screen.findByTestId("threshold-card")).toHaveTextContent("Your hand: AKs");
-    expect(insightHands(requests)).toEqual(["AA", "AKs"]);
+    expect(insightHands(requests)).toEqual(["AKs"]);
   });
 
   it("R3.26 choosing a tab writes view to the address with replace and remembers it for this browser", async () => {

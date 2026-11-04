@@ -54,16 +54,19 @@ function useStableCallback<A extends unknown[]>(callback: (...args: A) => void):
 interface OverviewProps {
   api: AppApi;
   node: StudyNode;
+  /** The hovered or selected hand, for the hand row. */
   hand: string | undefined;
+  /** The selected hand, for the advantage read (never a hover). */
+  selectedHand: string | undefined;
   filters: readonly number[];
   onToggleFilter: (index: number) => void;
 }
 
-const OverviewTab = memo(function OverviewTab({ api, node, hand, filters, onToggleFilter }: OverviewProps) {
+const OverviewTab = memo(function OverviewTab({ api, node, hand, selectedHand, filters, onToggleFilter }: OverviewProps) {
   return (
     <>
       <NodeActionsPanel node={node} hand={hand} filters={filters} onToggleFilter={onToggleFilter} />
-      <AdvantageInsights api={api} node={node} />
+      <AdvantageInsights api={api} node={node} hand={selectedHand} />
     </>
   );
 });
@@ -86,7 +89,7 @@ export function StudyTabs(props: StudyTabsProps) {
 
   const tabs = useMemo<TabItem<StudyView>[]>(() => {
     const content: Record<StudyView, TabItem<StudyView>["content"]> = {
-      overview: <OverviewTab api={api} node={node} hand={rowHand} filters={filters} onToggleFilter={onToggleFilter} />,
+      overview: <OverviewTab api={api} node={node} hand={rowHand} selectedHand={selectedHand} filters={filters} onToggleFilter={onToggleFilter} />,
       hands: <HandsTab api={api} node={node} hand={selectedHand} />,
       compare: <CompareTab node={node} hand={rowHand} onCompare={onCompare} />,
     };

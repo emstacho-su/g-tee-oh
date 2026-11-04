@@ -302,13 +302,21 @@ pub fn action_combos(view: &NodeView) -> (Vec<f64>, f64) {
     (taken, total)
 }
 
+/// Each action's share from its combos and the seat's total (`action_combos`): the one
+/// divide-by-total and zero-total guard, shared by `action_shares` and `/v1/nodes`' range
+/// summary. Every share is 0 when the total is 0.
+#[must_use]
+pub fn shares_of(taken: &[f64], total: f64) -> Vec<f64> {
+    taken.iter().map(|combos| if total > 0.0 { combos / total } else { 0.0 }).collect()
+}
+
 /// The reach-weighted share of the acting seat's range taking each action, in record
 /// order; the shares sum to 1 because every hand's frequencies do. Every share is 0 when the
 /// seat holds no reach-weighted combo.
 #[must_use]
 pub fn action_shares(view: &NodeView) -> Vec<f64> {
     let (taken, total) = action_combos(view);
-    if total > 0.0 { taken.into_iter().map(|combos| combos / total).collect() } else { taken }
+    shares_of(&taken, total)
 }
 
 /// True when two or more actions are played at `MIX_EPSILON` or more (O-153, O-301): the

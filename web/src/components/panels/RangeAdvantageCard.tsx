@@ -86,6 +86,11 @@ function SeatPair({ label, seats, oopShare, ipShare }: PairProps) {
   );
 }
 
+/** The points as printed: rounded to POINT_DECIMALS, so a figure that prints as 0.0 reads as even (code review 2). */
+function printedPoints(value: number): number {
+  return Number(value.toFixed(POINT_DECIMALS));
+}
+
 /** "4.0 points": a served difference in percentage points, unsigned. */
 function points(value: number): string {
   return `${Math.abs(value).toFixed(POINT_DECIMALS)} points`;
@@ -94,7 +99,7 @@ function points(value: number): string {
 /** "BTN, to act, holds 52.0% range equity, 2.0 points above an even split." from the served figures. */
 function equitySentence(toAct: string, seats: AdvantageSeats, range: NonNullable<StudyInsights["range_advantage"]>): string {
   const above = range.to_act_advantage_pct_points;
-  if (above === 0) return ADVANTAGE_TEXT.even;
+  if (printedPoints(above) === 0) return ADVANTAGE_TEXT.even;
   const ownMean = toAct === seats.ip ? range.ip_mean_equity : range.oop_mean_equity;
   return `${toAct}, to act, holds ${formatShare(ownMean)} range equity, ${points(above)} ${above > 0 ? "above" : "below"} an even split.`;
 }
@@ -102,7 +107,7 @@ function equitySentence(toAct: string, seats: AdvantageSeats, range: NonNullable
 /** "BTN holds 4.0 points more of its range in nut hands than BB." from the served difference. */
 function nutSentence(toAct: string, seats: AdvantageSeats, nuts: NonNullable<StudyInsights["nut_advantage"]>): string {
   const lead = nuts.to_act_advantage * PERCENT;
-  if (lead === 0) return ADVANTAGE_TEXT.evenNuts;
+  if (printedPoints(lead) === 0) return ADVANTAGE_TEXT.evenNuts;
   const other = toAct === seats.ip ? seats.oop : seats.ip;
   return `${toAct} holds ${points(lead)} ${lead > 0 ? "more" : "less"} of its range in nut hands than ${other}.`;
 }

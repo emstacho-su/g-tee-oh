@@ -58,12 +58,12 @@ describe("R3.18 NoiseFlags chips (components/panels)", () => {
 });
 
 describe("R3.18 NoiseFlagsCard", () => {
-  it("R3.18 renders the chips and the unrated sentence only when the decision has flags", () => {
+  it("R3.18 renders the chips only when the decision has flags; the why-unrated sentence moved beside the Unrated chip (S46)", () => {
     const { rerender } = render(<NoiseFlagsCard flags={FLAGGED.noise_flags} />);
     const card = screen.getByRole("region", { name: "Noise flags" });
     expect(within(card).getByText("Close EV mix")).toBeTruthy();
     expect(within(card).getByText("Rare line")).toBeTruthy();
-    expect(card.textContent).toContain("graded for feedback but left out of your rating");
+    expect(card.textContent).not.toContain("left out of your rating");
     rerender(<NoiseFlagsCard flags={[]} />);
     expect(screen.queryByRole("region", { name: "Noise flags" })).toBeNull();
   });

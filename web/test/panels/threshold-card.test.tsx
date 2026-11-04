@@ -31,6 +31,7 @@ describe("R3.12 ThresholdCard", () => {
     const position = screen.getByRole("group", { name: "Hand position" });
     expect(position).toHaveTextContent("At or above 18% of this range by strength");
     expect(position).not.toHaveTextContent("Stronger than");
+    // One decimal for every share in the feedback panel (S46, critic round 3 G6); the rank keeps its whole percent (O-408).
     expect(position).toHaveTextContent("Equity against the opponent's range: 61.0%");
   });
 
