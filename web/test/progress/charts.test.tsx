@@ -318,3 +318,23 @@ describe("R4.19 MasteryHeatMap Show choice", () => {
     expect(screen.getAllByTestId("heat-cell")).toHaveLength(CELL_COUNT);
   });
 });
+
+describe("R4.19 narrowed heat map columns", () => {
+  it("R4.19 a narrowed view leaves out a column with no class left; All keeps every column (PR #51 review 8)", () => {
+    // Every class in the first column (Live 100bb) has been practiced, so New has none there.
+    const practicedFirstColumn = {
+      ...fixtureHeatmap,
+      cells: fixtureHeatmap.cells.map((each) => (each.column === 0 && each.p_known === null ? { ...each, p_known: 0.5, retrievability: 0.99, n: 3 } : each)),
+    };
+    render(<MasteryHeatMap heatmap={practicedFirstColumn} onDrill={vi.fn()} />);
+    const headers = () => within(screen.getByTestId("heat-grid")).getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers()).toContain("Live 100bb");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Show" })).getByRole("radio", { name: "New" }));
+    expect(headers()).not.toContain("Live 100bb");
+    expect(headers()).toContain("Online 100bb");
+    // Each row still has one cell slot per column shown.
+    for (const row of within(screen.getByTestId("heat-grid")).getAllByRole("rowheader")) {
+      expect(row.parentElement?.querySelectorAll("td")).toHaveLength(3);
+    }
+  });
+});
