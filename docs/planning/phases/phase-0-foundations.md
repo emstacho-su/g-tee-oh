@@ -3,7 +3,7 @@ id: 'g-tee-oh-phase-0-foundations'
 title: 'Phase 0 Foundations and test scaffolding'
 collection: 'g-tee-oh'
 type: phase
-status: 'planned'
+status: 'done 2026-11-04 pending the merge of pull request 53 (S04, R0.9 pass against O-50); see 09 section 11'
 created: 2026-10-19
 public: true
 phase: 0

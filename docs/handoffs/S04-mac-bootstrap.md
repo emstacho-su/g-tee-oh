@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s04-mac-bootstrap'
 title: 'S04 Mac bootstrap'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-11-04: Mac run passed O-50, mac-bootstrap.md written, pull request 53 open for the owner to merge'
 created: 2026-10-19
 public: true
 phase: 0
@@ -18,7 +18,7 @@ Back to [[projects/g-tee-oh/g-tee-oh|g-tee-oh index]] and [[projects/g-tee-oh/pl
 ## Before pasting
 
 - [ ] S01 merged into `sprint/1-v1` is preferred, so the benchmark builds the vendored engine. 09 section 3 lists no blocker for S04, so if it runs before S01 lands the benchmark builds the upstream engine at the commit S01 will pin (ADR 0002) and the Dockerfile path is adjusted when S01 merges. S02 is not needed.
-- [ ] At hand: the Mac on its power adapter, its administrator password, the external drive, the Docker Desktop installer or an installed Docker runtime, and about 90 minutes including the 30-minute benchmark cap.
+- [ ] At hand: the Mac on its power adapter, its administrator password, the external drive, the Docker Desktop installer or an installed Docker runtime, and about two hours: the image build, the native build and two measured runs of up to 30 minutes each (the 2026-11-04 run sheet below).
 - [ ] This session runs in PowerShell on the Zenbook; the owner types each Mac command by hand and pastes its output back.
 - [ ] The vault is readable through `/add-dir`.
 
@@ -104,3 +104,27 @@ The final message lists R0.9 with the report path and the O-50 verdict; the bran
 | `BACKUP_DRIVE_PATH` in the Mac clone's gitignored `.env` | the Mac only, for S20 |
 | Pull request `p0/mac-bootstrap` into `sprint/1-v1` | GitHub |
 | New O-IDs, if any | vault `planning/00-open-questions-and-risks.md` |
+
+## Status (2026-11-04)
+
+In progress on `p0/mac-bootstrap` off `sprint/1-v1` at 6543644, after the bridge sprint merged in full. The Mac was bootstrapped for the harness and other projects first (Docker Desktop, Claude Code, Tailscale on both machines), so the g-tee-oh items of step 3 are confirmed in this run and the benchmark is still to run.
+
+Deviation, recorded as O-506: no `engine-bench.Dockerfile`. `just mac-bench` reuses the S18 flop-line benchmark (the `library-builder` image for linux/arm64, the judged 32-bit and the informational 16-bit job specs under the 5 GB cap, then `estimate` and `bench-report` on the host), so the Mac writes `bench-flop-line-mac.json` and its Markdown twin and `mac-bootstrap.md` summarises them. `just mac-bench-clean` removes the containers, the scratch volume and the image (O-47). A Zenbook trial of the recipe (machine `zenbook-trial`, output under `target/bench/trial`, nothing committed) runs before the push. Tailscale is recorded as O-505; it changes nothing in this session.
+
+Mac run sheet, one item at a time, outputs pasted back into the Zenbook session (needs git, just, Node, rustup stable and Docker Desktop on the Mac, per the harness runbook):
+
+1. `docker info --format 'mem={{.MemTotal}} cpus={{.NCPU}}'`: 10 GB and all but 2 cores (Docker Desktop, Settings, Resources; apply and restart).
+2. `pmset -g custom`: sleep 0 under AC Power (System Settings, Battery, Options, prevent automatic sleeping on power adapter when the display is off).
+3. `df -h <mount point>` with the external drive attached. The mount path goes into the Mac clone's gitignored `.env` as `BACKUP_DRIVE_PATH`, never into the report.
+4. `git clone https://github.com/emstacho-su/g-tee-oh.git ~/projects/g-tee-oh` (or `git fetch` in an existing clone), then `cd ~/projects/g-tee-oh`, `git switch p0/mac-bootstrap`, `just hooks`.
+5. `cargo build --release -p library-builder`: warms the cache and builds the report step; note the minutes in chat.
+6. `claude --version`.
+7. `just mac-bench` (defaults: machine `mac`, the platform of the host, output `validation/reports`). In a second terminal run `docker stats --no-stream` every few minutes and paste the MEM USAGE column of the `gto-bench` and `gto-bench-16bit` rows. Do not stop the container by hand: each line stops itself at the spec's 30-minute budget and the report records the miss (O-50, O-178). If Docker kills the container for memory, the recipe still runs `bench-report`, which fails on the missing summary; there is then no `bench-flop-line-mac` report, and `mac-bootstrap.md` records the kill as the miss from the output and the memory figures you pasted (O-178). On a miss the recipe exits non-zero although both report files are written; step 8 still applies, since a miss is recorded, never softened (O-178).
+8. `git add validation/reports/bench-flop-line-mac.json validation/reports/bench-flop-line-mac.md`, then `git commit -m "test(validate): R0.9 Mac flop-line benchmark against O-50"` and `git push`. The owner's own commit needs no trailer; the hook asks for it only under Claude Code. A committed miss fails `just report-check` on purpose (validation/reports/README.md, the flop-line section), so the pull request stays red until the gate answers it with the R-9 fallbacks.
+9. `just mac-bench-clean`, then `docker ps -a` shows no container and `docker volume ls` no `gto-bench-scratch`; `docker images` shows no `g-tee-oh/library-builder:bench` (the two base images it pulled, rust and debian, may remain; O-47 is about nothing running).
+
+The Zenbook session then pulls, writes `validation/reports/mac-bootstrap.md` from items 1, 2, 7 and the Mac report, updates the Mac rows of `phase-0-gate.md`, runs the checks and the code review, and opens the pull request into `sprint/1-v1` for the owner to merge.
+
+## Done (2026-11-04, evening)
+
+The owner ran the sheet on the Mac the same evening. `bench-flop-line-mac.md`: verdict pass against O-50, peak RSS 1,489,641,472 bytes under the 5 GB cap, the judged line to 0.3 percent of the pot in 232 seconds (the Zenbook took 358). `validation/reports/mac-bootstrap.md` summarises it; the Docker virtual machine reads 10 GB and 10 cores; the power setting and Claude Code on the Mac are owner-confirmed without a pasted line. `just mac-bench-clean` left nothing of the run (O-47). Pull request 53 carries the recipe, four code-review rounds of fixes, the report and the 2026-11-04 replan mirror; the owner merges it with `gh pr merge 53 --merge`. The Phase 0 gate then closes in full. Follow-ups for the next builder session: a `--commit` flag on `bench-report` so the report step runs inside the image, and a failed report from a missing judged summary.

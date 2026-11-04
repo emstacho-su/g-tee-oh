@@ -7,7 +7,7 @@ Hand-made inputs of the library builder (S18; requirement identifiers (R IDs) R2
 | `tiny-bb-btn-srp.json` | A ranges fixture: five specific combos a side for the button (BTN) versus big blind (BB) single-raised pot of `cfg_6_online_100`, none on the flop `Ah7d2c` | `BUILDER_RANGES_FIXTURE` in the integration tests; `tiny-bb-btn-srp.spec.json` |
 | `tiny-bb-btn-srp.spec.json` | A job spec (O-205): the tiny ranges on `Ah7d2c`, K = 2, the S02 placeholder sizing convention of `cfg_6_online_100` | the real-solve tests; `library-builder --once --job-spec` |
 | `bench-bb-btn-srp.ranges.json` | A ranges fixture: a BTN opening range and a BB flatting range for the O-52 line | `bench-bb-btn-srp.json` |
-| `bench-bb-btn-srp.json` | The judged benchmark job (O-50, O-200): flop `Kh7d2c`, K = 20, 32-bit storage, target 0.3 percent of the pot, 1,800 seconds per line | the benchmark run behind `validation/reports/bench-flop-line-zenbook.md` |
+| `bench-bb-btn-srp.json` | The judged benchmark job (O-50, O-200): flop `Kh7d2c`, K = 20, 32-bit storage, target 0.3 percent of the pot, 1,800 seconds per line | the benchmark run behind `validation/reports/bench-flop-line-zenbook.md`, and `just mac-bench` for `bench-flop-line-mac.md` on the Mac (S04, R0.9, O-506) |
 | `bench-bb-btn-srp.16bit.json` | The informational twin: 16-bit storage at 0.5 percent of the pot, the O-194 floor | the same report, as an informational row |
 
 ## Ranges fixture, `schema_version` 1

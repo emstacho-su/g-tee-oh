@@ -3,7 +3,7 @@ id: 'g-tee-oh-phase-3-preflop-trainer'
 title: 'Phase 3 Preflop trainer'
 collection: 'g-tee-oh'
 type: phase
-status: 'planned'
+status: 'code complete 2026-11-04 with the bridge sprint (S21 to S28, S36 to S47 merged); gate S29 pending; see 09 section 11'
 created: 2026-10-19
 public: true
 phase: 3

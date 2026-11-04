@@ -61,7 +61,7 @@ Both throwaway branches were closed and deleted after the runs above were record
 | R0.6 | S02 rows (migrations, roles, seed, codegen) | Holds |
 | R0.7 | S06 rows | Holds |
 | R0.8 | Private capture repository CI on its sprint branch after its pull request #1 merged: https://github.com/emstacho-su/g-tee-oh-capture/actions/runs/39463601602 (private). Result only: guard, lint, typecheck, unit tests, migrations and database tests green | Holds |
-| R0.9 | Mac bootstrap (S04) | Not yet: pending, deadline S20 (O-67) |
+| R0.9 | S04: `validation/reports/mac-bootstrap.md` summarising `bench-flop-line-mac.md` (pass against O-50: peak RSS 1,489,641,472 bytes, 232 seconds to 0.3 percent of the pot on the judged line, O-506) | Holds |
 | R0.10 | S02 row (`bench-zenbook.json`) | Holds |
 | R0.11 | S05 pull request #6: pending vectors tagged, toy-game fixtures, OpenSpiel curve, report schema, `just test-tags` | Holds |
 | R0.12 | S01 row (docs mirror) | Holds |
@@ -75,11 +75,11 @@ Both throwaway branches were closed and deleted after the runs above were record
 | S03 capture repository | private #1 | Merged into the private sprint branch |
 | S05 test vectors | #6 | Merged |
 | S06 contracts | #8 | Open when this file was written; merges after review |
-| S04 Mac bootstrap | none yet | Pending (needs the owner at the Mac) |
+| S04 Mac bootstrap | #53 | Open when this file was updated on 2026-11-04; merges after review |
 
 ## Mac part
 
-Pending as of 2026-10-20. Deadline: S20, the first deploy (O-67). Its report will be `validation/reports/mac-bootstrap.md`.
+Closed on 2026-11-04 by S04 (pull request #53): the Mac ran `just mac-bench` for linux/arm64 under the 5 GB cap and `validation/reports/mac-bootstrap.md` records the Docker memory and cores, the power setting, the peak RSS and seconds per line against O-50 (pass), with seconds per iteration derived and that nothing was left running (O-47). The numbers come from `bench-flop-line-mac.json` (O-506).
 
 ## Partial success criteria
 
