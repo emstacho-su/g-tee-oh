@@ -25,15 +25,22 @@ export interface StarterMark {
   readonly tags: readonly string[];
 }
 
+/** True for a starter id tag, whichever pack entry it names. */
+function isStarterIdTag(tag: string): boolean {
+  return tag.startsWith(STARTER_ID_PREFIX);
+}
+
 /**
  * The starter drills the user does not have yet, in pack order (PR #48 review round 2 MEDIUM 3), so
  * a pack that landed partway offers only the rest. A pack entry counts as present when a listed
  * drill carries its id tag, so a renamed starter drill is never imported twice (review 4 finding
- * 3), or, for a drill imported before the id tags, has its name.
+ * 3), or, for a drill imported before the id tags (one carrying no id tag at all), has its name;
+ * a drill with an id tag is known by it alone, so one starter drill renamed to another's name
+ * hides neither (PR #51 review round 2).
  */
 export function missingStarterDrills(listed: readonly StarterMark[]): readonly StarterDrill[] {
   const tags = new Set(listed.flatMap((drill) => drill.tags));
-  const names = new Set(listed.map((drill) => drill.name));
+  const names = new Set(listed.filter((drill) => !drill.tags.some(isStarterIdTag)).map((drill) => drill.name));
   return STARTER_PACK.filter((entry) => !tags.has(starterIdTag(entry)) && !names.has(entry.name));
 }
 

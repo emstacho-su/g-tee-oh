@@ -132,6 +132,8 @@ export function useImportStarterPack(api: AppApi, onImported: (drills: readonly 
           imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
         } catch (error) {
           if (isRefusal(error)) remember(entry, starterImportKey(newKey(), packIndexOf(entry)));
+          // The codes that landed before the failure are announced as added, beside the failure (PR #51 review round 2).
+          if (imported.length > 0) onImported(imported);
           throw error;
         }
         forget(entry);

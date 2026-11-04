@@ -157,10 +157,11 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   // Each shown column keeps its api index, so cells are still found by (row, column).
   const columns = heatmap.columns.flatMap((column, index) => (narrowed && !columnsWithCells.has(index) ? [] : [{ column, index }]));
   const columnCount = columns.length + 1;
-  // A row with no cell left after the Show choice is not drawn, nor a family with no row left.
+  // In a narrowed view a row with no cell left is not drawn, nor a family with no row left; All
+  // keeps every row the api lists, cells or not (PR #51 review round 2).
   const rowsShown = new Set(heatmap.cells.map((cell) => cell.row));
   const groups = groupRowsByFamily(heatmap.rows)
-    .map((group) => ({ ...group, rows: group.rows.filter((entry) => rowsShown.has(entry.index)) }))
+    .map((group) => ({ ...group, rows: narrowed ? group.rows.filter((entry) => rowsShown.has(entry.index)) : group.rows }))
     .filter((group) => group.rows.length > 0);
   return (
     <div className="max-w-full overflow-x-auto" data-testid="heat-grid">

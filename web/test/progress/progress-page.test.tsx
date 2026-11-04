@@ -246,4 +246,14 @@ describe("R4.19 the progress address", { timeout: 20_000 }, () => {
     expect(validateProgressSearch({ spot: "not a spot" })).toEqual({});
     expect(validateProgressSearch({ spot: `${secondKey}${"x".repeat(600)}` })).toEqual({});
   });
+
+  it("R4.19 a spot's node key is kept as the api's nodeKeySchema allows it: 1 to 512 characters, any character (PR 51 review round 2)", () => {
+    const solution = secondKey.slice(0, secondKey.indexOf("|"));
+    const accented = `${solution}|cfg/BB-BTN/é`;
+    expect(validateProgressSearch({ spot: accented })).toEqual({ spot: accented });
+    const longest = `${solution}|${"k".repeat(512)}`;
+    expect(validateProgressSearch({ spot: longest })).toEqual({ spot: longest });
+    expect(validateProgressSearch({ spot: `${solution}|${"k".repeat(513)}` })).toEqual({});
+    expect(validateProgressSearch({ spot: `${solution}|` })).toEqual({});
+  });
 });

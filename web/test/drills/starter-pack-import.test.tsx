@@ -164,6 +164,8 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     await user.click(screen.getByRole("button", { name: BUTTON }));
     await screen.findByRole("alert");
     expect(view.sent("POST", IMPORT_PATH)).toHaveLength(5);
+    // The partial success is announced beside the failure (PR 51 review round 2).
+    expect(screen.getByTestId("library-status")).toHaveTextContent("Added 4 starter drills.");
     // The four that landed are in the library at once.
     await waitFor(() => expect(screen.getAllByTestId("drill-name").map((cell) => cell.textContent)).toContain(STARTER_PACK[3]?.name));
     failAt = null;

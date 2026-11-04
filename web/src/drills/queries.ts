@@ -25,6 +25,7 @@ import { IDEMPOTENCY_HEADER } from "../trainer/idempotency.js";
 import { TRAINER_QUERY_ROOT } from "../trainer/session-api.js";
 import { copyName } from "./draft.js";
 import { drillProblemFromBody } from "./problem.js";
+import type { StarterMark } from "./starter-pack.js";
 import type { Drill, DrillCreate, DrillPage, DrillPatch } from "./types.js";
 
 export const DRILLS_QUERY_ROOT = "drills";
@@ -59,12 +60,6 @@ export async function fetchDrillPage(api: AppApi, tag: string | undefined, curso
   return data;
 }
 
-/** A listed drill as the tag read keeps it: its name and its tags. */
-export interface TaggedMark {
-  readonly name: string;
-  readonly tags: readonly string[];
-}
-
 /**
  * The names and tags of the drills carrying one tag, from their own read (S47, PR #48 review HIGH 3 and round
  * 2 MEDIUM 3): GET /drills?tag=<tag>, every page, independent of the visible list's filter and
@@ -74,8 +69,8 @@ export interface TaggedMark {
 export function taggedMarksQuery(api: AppApi, tag: string) {
   return queryOptions({
     queryKey: [DRILLS_QUERY_ROOT, "tagged-marks", tag] as const,
-    queryFn: async (): Promise<TaggedMark[]> => {
-      const marks: TaggedMark[] = [];
+    queryFn: async (): Promise<StarterMark[]> => {
+      const marks: StarterMark[] = [];
       let cursor: string | undefined;
       do {
         const page = await fetchDrillPage(api, tag, cursor);
