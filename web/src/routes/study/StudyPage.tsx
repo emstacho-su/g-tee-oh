@@ -55,6 +55,7 @@ import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-
 import { useDepthSteps } from "../../study/use-depth-steps.js";
 import { withDepth } from "../../study/depth-steps.js";
 import { useStudySpotsStore } from "../../store/study-spots.js";
+import { spotLineKey } from "../../study/saved-spots.js";
 import { describeFailureForLog } from "../../api/http-status.js";
 import { SpotShortcuts, StarButton } from "./SpotShortcuts.js";
 import { StudyNodeArea } from "./StudyNodeArea.js";
@@ -231,11 +232,6 @@ export const REOPEN_TEXT = {
   opening: "Opening your last spot.",
   failed: "Your last spot could not be opened. Choose the settings below.",
 } as const;
-
-/** One spot and line: what Start over belongs to. */
-function spotLineKey(search: StudySearch): string {
-  return `${settingsSignature(search)}|${search.line ?? ""}`;
-}
 
 /** The stored spot with the bare address's presentation choices laid over it. */
 function seedFrom(last: StudySearch, search: StudySearch): StudySearch {

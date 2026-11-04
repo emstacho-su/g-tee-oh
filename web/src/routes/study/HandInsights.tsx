@@ -22,6 +22,7 @@ import type { StudyNode } from "../../contracts.js";
 import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { LoadingNote } from "../../components/ui/index.js";
+import { pairPositions } from "../../poker/pair.js";
 import { FailureAlert } from "./StudyNotices.js";
 
 export const PICK_A_CELL = "Pick a cell in the matrix to see that hand's threshold card, blockers and role.";
@@ -37,12 +38,6 @@ export interface HandInsightsProps {
 /** The hand the insights read uses before one is selected: the first class the node holds (O-461). */
 export function standInHand(node: Pick<StudyNode, "hands">): string | undefined {
   return node.hands[0]?.hand;
-}
-
-/** The pair's two seats, out of position first; the contract's pair pattern always has both. */
-function pairSeats(pair: string): { oop: string; ip: string } {
-  const [oop = pair, ip = pair] = pair.split("-");
-  return { oop, ip };
 }
 
 function insightsParams(node: InsightsNode, hand: string) {
@@ -75,7 +70,7 @@ function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
     <RangeAdvantageCard
       rangeAdvantage={insights.data.range_advantage}
       nutAdvantage={insights.data.nut_advantage}
-      seats={pairSeats(node.pair)}
+      seats={pairPositions(node.pair) ?? { oop: node.pair, ip: node.pair }}
       toAct={node.to_act}
     />
   );
