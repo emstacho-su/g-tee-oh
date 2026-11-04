@@ -160,10 +160,12 @@ export function lensPositionOf(actions: readonly NodeAction[], lensIndex: number
 
 const FULL_WEIGHT = 1;
 
-
 /**
- * The same default read straight from the node's rows (code review): the acting seat's reach of each
- * row, with no 169-cell model built, for a screen that needs the default before the matrix builds.
+ * Whether the bars scale by weight unless the user says otherwise (O-465): on when the street is
+ * postflop, where ranges are always partial, or when any row's acting-seat reach is known to be
+ * below its full class; off on a preflop root where every hand is fully in the range. Read
+ * straight from the node's rows, with no 169-cell model built, so a screen has the default before
+ * the matrix builds (code review).
  */
 export function defaultScaleByWeightOf(node: MatrixSource & Pick<StudyNode, "street">): boolean {
   if (node.street !== "preflop") return true;
