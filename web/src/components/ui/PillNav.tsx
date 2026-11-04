@@ -63,6 +63,11 @@ export function revealScroll(row: { readonly scrollLeft: number; readonly client
   return null;
 }
 
+/** True for a change that moves the current pill: aria-current itself, or a pill added to or removed from the row. */
+function revealsOn(record: MutationRecord, list: HTMLElement): boolean {
+  return record.type === "attributes" || (record.type === "childList" && record.target === list);
+}
+
 /** Scrolls the row, never the window, until the aria-current pill is in view. */
 function revealCurrent(list: HTMLElement): void {
   const current = list.querySelector<HTMLElement>(CURRENT_SELECTOR);
@@ -82,10 +87,11 @@ export function PillNav({ label, className, children }: PillNavProps) {
     if (list === null) return undefined;
     revealCurrent(list);
     measure();
-    // The router moves aria-current on a navigation; pills arrive (the admin pills once the session
-    // resolves) or widen (", needs a fix"); the row follows each (code review round 1, 1).
-    const moved = new MutationObserver(() => {
-      revealCurrent(list);
+    // The router moves aria-current on a navigation and pills arrive (the admin pills once the
+    // session resolves): both reveal the current pill. A relabel (", needs a fix") only re-measures
+    // the cues, so a row the user scrolled away from stays put (code review round 1, 1; round 2, 3).
+    const moved = new MutationObserver((records) => {
+      if (records.some((record) => revealsOn(record, list))) revealCurrent(list);
       measure();
     });
     moved.observe(list, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-current"] });

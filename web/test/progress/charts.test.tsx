@@ -332,6 +332,20 @@ describe("R4.19 the heat map's scroll cues", () => {
     expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "true");
     expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
   });
+
+  it("R4.19 a Show choice that narrows the table re-measures the cues without a scroll or a resize (code review round 2, 2)", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const frame = screen.getByTestId("heat-grid");
+    let scrollWidth = 720;
+    Object.defineProperty(frame, "clientWidth", { value: 358, configurable: true });
+    Object.defineProperty(frame, "scrollWidth", { get: () => scrollWidth, configurable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    // The narrowed table fits the frame: the cue must go without the user scrolling.
+    scrollWidth = 358;
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Show" })).getByRole("radio", { name: "New" }));
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
 });
 
 describe("R4.19 heat map rows without a cell", () => {

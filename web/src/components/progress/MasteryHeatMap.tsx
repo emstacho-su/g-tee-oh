@@ -16,7 +16,7 @@
  * (R4.19) narrows the grid to the due, new or ten weakest classes; a row with no class left is not
  * drawn, nor, in a narrowed view, a column with none (PR #51 review 8).
  */
-import { useState, type CSSProperties } from "react";
+import { useLayoutEffect, useState, type CSSProperties } from "react";
 
 import {
   cellLookup,
@@ -37,12 +37,12 @@ import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import { capitalize, familyWords, pairWords } from "../../progress/spot-words.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
 import { cn, EdgeCue, STICKY_LAYER_CLASS, ToggleGroup, useEdgeCues } from "../ui/index.js";
-
-/** The grid frame's edge cues: "heat-start-fade" and "heat-end-fade". */
-const CUE_PREFIX = "heat";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
+
+/** The grid frame's edge cues: "heat-start-fade" and "heat-end-fade". */
+const CUE_PREFIX = "heat";
 
 export const NO_CLASSES_TEXT = "No spot classes in the library yet.";
 export const OPEN_DRILL_HINT = "Select a cell to drill that spot.";
@@ -167,6 +167,14 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   const groups = groupRowsByFamily(heatmap.rows)
     .map((group) => ({ ...group, rows: narrowed ? group.rows.filter((entry) => rowsShown.has(entry.index)) : group.rows }))
     .filter((group) => group.rows.length > 0);
+  // A Show choice changes the table's width inside an unchanged frame, which no scroll or resize
+  // reports, so the cues are measured again after each change of what is drawn (code review round 2, 2).
+  const { measure } = frame;
+  const shownColumns = columns.length;
+  const shownRows = groups.reduce((count, group) => count + group.rows.length, 0);
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, shownColumns, shownRows]);
   return (
     <div className="relative">
       {/* The frame scrolls sideways at phone width; the shared edge cues say the depth columns continue (S48 round 5 verifier). */}

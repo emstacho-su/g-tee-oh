@@ -279,10 +279,15 @@ describe("R3.13 the shared nav pill list", () => {
     layOut(list, ["A", "B", "C"]);
     await waitFor(() => expect(list.scrollLeft).toBe(296));
     expect(screen.getByTestId("nav-start-fade")).toHaveAttribute("data-shown", "true");
-    // The current pill widens (", needs a fix"): the reveal follows its new right edge.
+    // The user scrolls back to the start; a relabel of the current pill (", needs a fix") re-measures the
+    // cues but never scrolls the row away from where the user left it (code review round 2, 3).
+    list.scrollLeft = 0;
+    fireEvent.scroll(list);
     rerender(rowOf("C", [{ name: "A" }, { name: "B" }, { name: "C", label: "C, needs a fix" }]));
     layOut(list, ["A", "B", "C"], 160);
-    await waitFor(() => expect(list.scrollLeft).toBe(376));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(list.scrollLeft).toBe(0);
+    expect(screen.getByTestId("nav-end-fade")).toHaveAttribute("data-shown", "true");
   });
 
   it("R3.13 overflowOf ignores a sub-pixel scroll at either edge, so a fractional reveal shows no start chevron at rest (code review round 1, 2)", () => {
