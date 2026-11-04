@@ -242,7 +242,7 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
 export function DrillRunPage({ drillId, seed: rawSeed, autostart = false, openedFrom }: DrillRunPageProps) {
   const api = useAppApi();
   const drill = useQuery(drillQuery(api, drillId));
-  const opened = useOpenedNote(openedFrom);
+  const opened = useOpenedNote(openedFrom, drillId);
   // The route validates the seed, but TanStack Router merges the parent route's unvalidated search
   // into the child's, so a malformed seed can still arrive here; check it again at this boundary.
   const { seed } = validateDrillRunSearch(rawSeed === undefined ? {} : { seed: rawSeed });

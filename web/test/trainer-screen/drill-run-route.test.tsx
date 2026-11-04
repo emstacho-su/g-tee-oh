@@ -56,6 +56,16 @@ describe("R3.13 drill run route", () => {
     expect(screen.getByTestId("opened-note")).toBeInTheDocument();
   });
 
+  it("R4.12 the opened line belongs to its drill: opening another drill on the same screen drops it (PR #51 review 6)", async () => {
+    const otherId = "00000000-0000-4000-8000-0000000006bb";
+    const other = { ...fixtureDrill, id: otherId, name: "Another drill" };
+    const app = renderApp(`/drills/${FIXTURE_DRILL_ID}/run?from=leak-created`, { ...SCRIPT, [`GET /api/v1/drills/${otherId}`]: [jsonResponse(200, other)] });
+    expect(await screen.findByTestId("opened-note")).toBeInTheDocument();
+    await app.router.navigate({ to: "/drills/$id/run", params: { id: otherId } });
+    await screen.findByRole("heading", { name: "Another drill" });
+    expect(screen.queryByTestId("opened-note")).not.toBeInTheDocument();
+  });
+
   it("R4.12 from=leak-reused says the drill was already there, and an unknown from says nothing", async () => {
     renderApp(`/drills/${FIXTURE_DRILL_ID}/run?from=leak-reused`, SCRIPT);
     expect(await screen.findByTestId("opened-note")).toHaveTextContent(`Opened ${fixtureDrill.name}, already in your drills.`);
