@@ -3,9 +3,10 @@
  * O-272, O-276, O-288). Pure.
  *
  * The api decides the rated flag (learning's isRated through grading/decide.ts); this names the
- * cause from what the web was served, in a fixed order: a noise flag on the decision (R3.18), then
- * the session's mode (a drill, the holdout retest, an automated session started with a seed, all
- * never rated), then the prompt (a worked example, a panel that reveals the answer), and otherwise
+ * cause from what the web was served, in a fixed order: the session's mode first (a drill, the
+ * holdout retest, an automated session started with a seed, all never rated, whatever the decision;
+ * PR #45 review round 4, finding e), then a noise flag on the decision (R3.18), then the prompt (a
+ * worked example, a panel that reveals the answer), and otherwise
  * a rating rule the web cannot see (the daily rated cap, a repeat attempt). A rated decision has
  * no reason.
  */
@@ -41,10 +42,10 @@ function isSeededAutomated(session: SessionFacts): boolean {
 
 export function unratedReason(feedback: FeedbackFacts, prompt: PromptFacts, session: SessionFacts): UnratedReason | null {
   if (feedback.rated) return null;
-  if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
   if (session.mode === "drill") return UNRATED_REASONS.drill;
   if (session.mode === "holdout") return UNRATED_REASONS.holdout;
   if (isSeededAutomated(session)) return UNRATED_REASONS.seeded;
+  if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
   if (!session.rated_eligible) return UNRATED_REASONS.rule;
   if (prompt.worked_example) return UNRATED_REASONS.workedExample;
   if (revealsAnswer(prompt.visible_panels)) return UNRATED_REASONS.revealed;
