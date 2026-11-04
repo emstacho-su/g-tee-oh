@@ -88,6 +88,21 @@ describe("R3.12 insights on the study screen", () => {
     expect(screen.queryByText("Loading the range advantage.")).not.toBeInTheDocument();
   });
 
+  it("R3.12 after a node switch the advantage card says it is loading, never the previous node's numbers as current (PR 52 review 1)", async () => {
+    const user = userEvent.setup();
+    renderStudy(BASE, (request) =>
+      request.path === "/api/v1/study/insights" && request.query["node_key"] !== fixtureRootNode.node_key
+        ? new Promise<Response>(() => undefined)
+        : undefined,
+    );
+    expect(await screen.findByRole("region", { name: "Range and nut advantage" })).toHaveTextContent("BTN 52.0%");
+    const actions = await screen.findByRole("region", { name: /'s actions$/ });
+    await user.click(within(actions).getByRole("button", { name: /^Raise to 2.5bb/ }));
+    await screen.findByRole("button", { name: "Back to the start of this spot" });
+    expect(await screen.findByText("Loading the range advantage.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Range and nut advantage" })).not.toBeInTheDocument();
+  }, FLOW_TIMEOUT_MS);
+
   it("R3.12 a failed stand-in read names no hand the user never picked (code review)", async () => {
     renderStudy(BASE, (request) => (request.path === "/api/v1/study/insights" ? problemOf(503, "unavailable") : undefined));
     const alert = await screen.findByRole("alert");
