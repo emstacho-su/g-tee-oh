@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
 import type { AppApi } from "../api/index.js";
-import { isApiProblem } from "../api/problem.js";
+import { isApiProblem, PROBLEM_SLUG } from "../api/problem.js";
 import { useLibraryDeps } from "../library/library-deps.js";
 import { useIntentMutation, type IntentMutation } from "../library/use-intent-mutation.js";
 import { drillQuery } from "../trainer/session-api.js";
@@ -75,9 +75,16 @@ export function useImportDrill(api: AppApi, onImported: (drill: Drill) => void):
 const CLIENT_ERROR_MIN = 400;
 const SERVER_ERROR_MIN = 500;
 
-/** A 4xx answer: the api refused the request, so nothing landed under its key. */
+/** The api's answers from the key check itself, which say nothing about whether the first request landed. */
+const KEY_CHECK_SLUGS: ReadonlySet<string> = new Set([PROBLEM_SLUG.idempotencyInFlight, PROBLEM_SLUG.idempotencyMismatch]);
+
+/**
+ * A 4xx the route itself answered: the api stores it under the key and replays it to every retry,
+ * so the code needs a fresh key. A 409 in-flight or a 422 mismatch comes from the key check (the
+ * first request may still land), so the key is kept (PR #51 review HIGH 1).
+ */
 function isRefusal(error: unknown): boolean {
-  return isApiProblem(error) && error.status >= CLIENT_ERROR_MIN && error.status < SERVER_ERROR_MIN;
+  return isApiProblem(error) && error.status >= CLIENT_ERROR_MIN && error.status < SERVER_ERROR_MIN && !KEY_CHECK_SLUGS.has(error.slug);
 }
 
 /** The Idempotency-Key of one starter code: a base key and the code's place in the whole pack. */
@@ -95,8 +102,9 @@ export function starterImportKey(baseKey: string, packIndex: number): string {
  * whose answer was lost replays instead of importing it twice; once it lands its key is dropped,
  * so re-adding a starter drill the user deleted later mints a fresh key and creates it again
  * (round 3 HIGH: a kept key made the api replay the first 201 and create nothing). A code the api
- * refused with a 4xx did not land, so its next attempt goes under a fresh key; a network error or a
- * 5xx may hide a request that landed, so that code keeps its key (review 4 finding 1).
+ * refused with a 4xx did not land, so its next attempt goes under a fresh key; a network error, a
+ * 5xx or the key check's own 409 in-flight and 422 mismatch may hide a request that landed, so that
+ * code keeps its key (review 4 finding 1, PR #51 review HIGH 1).
  */
 export function useImportStarterPack(api: AppApi, onImported: (drills: readonly Drill[]) => void): IntentMutation<readonly StarterDrill[], Drill[]> {
   const invalidate = useInvalidate();

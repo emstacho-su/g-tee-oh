@@ -233,4 +233,46 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     const keys = await retryAfterFirstAnswer(() => jsonBody(503, failure, "application/problem+json"));
     expect(keys.slice(0, 2)).toEqual(["test-key-1-0", "test-key-1-0"]);
   });
+
+  /** The first code's imports answer in turn: a lost answer (the request stalled), then this answer, then a create. */
+  async function keysAfterKeyCheck(answer: () => Response): Promise<{ keys: (string | undefined)[]; firstCodeImports: number }> {
+    const user = userEvent.setup();
+    let firstCodeCalls = 0;
+    const first = STARTER_PACK[0];
+    if (first === undefined) throw new Error("the pack is empty");
+    const { sent } = renderDrills("/drills", {
+      override: (request) => {
+        if (request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        if ((request.body as { export_code?: string } | undefined)?.export_code !== first.code) return undefined;
+        firstCodeCalls += 1;
+        if (firstCodeCalls === 1) return Promise.reject(new TypeError("Failed to fetch"));
+        if (firstCodeCalls === 2) return answer();
+        return undefined;
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(sent("POST", IMPORT_PATH)).toHaveLength(2));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    return { keys: sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"]), firstCodeImports: firstCodeCalls };
+  }
+
+  it("R3.35 a 409 in-flight answer keeps the code's key: the next retry reuses it and the drill is created once (PR #51 review HIGH 1)", async () => {
+    const inFlight = { type: "urn:g-tee-oh:problem:idempotency-in-flight", title: "A request with this Idempotency-Key is still being processed", status: 409 };
+    const { keys, firstCodeImports } = await keysAfterKeyCheck(() => jsonBody(409, inFlight, "application/problem+json"));
+    expect(firstCodeImports).toBe(3);
+    expect(keys.slice(0, 3)).toEqual(["test-key-1-0", "test-key-1-0", "test-key-1-0"]);
+    const table = await screen.findByRole("table", { name: "Your drills" });
+    expect(within(table).getAllByTestId("drill-name").filter((cell) => cell.textContent === STARTER_PACK[0]?.name)).toHaveLength(1);
+  });
+
+  it("R3.35 a 422 key mismatch keeps the code's key too: only a refusal that proves nothing landed mints a new one (PR #51 review HIGH 1)", async () => {
+    const mismatch = { type: "urn:g-tee-oh:problem:idempotency-mismatch", title: "Idempotency-Key reused with a different request", status: 422 };
+    const { keys } = await keysAfterKeyCheck(() => jsonBody(422, mismatch, "application/problem+json"));
+    expect(keys.slice(0, 3)).toEqual(["test-key-1-0", "test-key-1-0", "test-key-1-0"]);
+  });
 });
