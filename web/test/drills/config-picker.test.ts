@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { pickedDepths, pickerCatalog, pickerChoices, pickerDraft, withPickedStake, withPickedDepths } from "../../src/drills/config-picker-model.js";
 import { newDrillDraft } from "../../src/drills/draft.js";
+import { isNoAnteConfig } from "../../src/drills/reach-model.js";
 import { FIXTURE_LIVE_STAKE_ID, FIXTURE_ONLINE_STAKE_ID, fixtureConfigs, fixtureStakes } from "../../src/fixtures/study.js";
 
 const catalog = pickerCatalog(fixtureStakes, fixtureConfigs);
@@ -71,5 +72,18 @@ describe("R3.37 the configuration picker model", () => {
     const choices = pickerChoices(pickerCatalog(fixtureStakes, [...fixtureConfigs, anted]), pickerDraft(newDrillDraft(), fixtureStakes));
     if (choices.depth.kind !== "choices") throw new Error("no depth choices");
     expect(choices.depth.choices.map((choice) => choice.value)).toEqual(["10000", "20000"]);
+  });
+
+  it("R3.37 a stake whose every configuration has an ante is not offered, and one rule decides both (PR #51 review 9)", () => {
+    const [onlineStake] = fixtureStakes;
+    const [online] = fixtureConfigs;
+    if (onlineStake === undefined || online === undefined) throw new Error("the fixture catalog is empty");
+    const antedStake = { ...onlineStake, id: "stake-online-anted", label: "online anted" };
+    const anted = { ...online, config_id: "cfg_6_online_anted_100", stake_id: antedStake.id, stake_label: antedStake.label, ante_cbb: 50 };
+    const choices = pickerChoices(pickerCatalog([...fixtureStakes, antedStake], [...fixtureConfigs, anted]), pickerDraft(newDrillDraft(), fixtureStakes));
+    if (choices.stake.kind !== "choices") throw new Error("no stake choices");
+    expect(choices.stake.choices.map((choice) => choice.value)).not.toContain(antedStake.id);
+    expect(isNoAnteConfig(anted)).toBe(false);
+    expect(isNoAnteConfig(online)).toBe(true);
   });
 });
