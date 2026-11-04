@@ -5,7 +5,7 @@ One Dockerfile per service, multi-arch for linux/amd64 and linux/arm64, built wi
 | File | Service | Base images | Port |
 |---|---|---|---|
 | `solver-query.Dockerfile` | Rust, read-only query service | `rust:1-slim-bookworm` then `debian:bookworm-slim` | 7070 |
-| `library-builder.Dockerfile` | Rust, background build worker | `rust:1-slim-bookworm` then `debian:bookworm-slim` | 7071 |
+| `library-builder.Dockerfile` | Rust, background build worker; also the image `just mac-bench` builds for the flop-line measurement on the Mac (S04, R0.9, O-506) | `rust:1-slim-bookworm` then `debian:bookworm-slim` | 7071 |
 | `api.Dockerfile` | TypeScript, Fastify product application programming interface (API) | `node:24-slim` | 8080 |
 | `web.Dockerfile` | Vite single-page app served by Caddy | `node:24-slim` then `caddy:2-alpine` | 8080 |
 | `spike-preflop.Dockerfile` | Rust, the preflop spike (`validate spike-preflop`, R2.21, O-228); not in `images.json`. Builds `validate` with the `peak-alloc` cargo feature (build argument `FEATURES`, default `peak-alloc`), the accounting allocator that the plain build leaves out. Build: `docker buildx build --load --platform linux/amd64 -f infra/docker/spike-preflop.Dockerfile -t g-tee-oh/spike-preflop:dev .` Run: `docker run --rm --memory 5g --memory-swap 5g -e SPIKE_CONTAINER=... -e SPIKE_CONCURRENT=... -v <out>:/out g-tee-oh/spike-preflop:dev spike-preflop --out /out --machine zenbook --commit <sha> --allow-dirty` | `rust:1-slim-bookworm` then `debian:bookworm-slim` | none |

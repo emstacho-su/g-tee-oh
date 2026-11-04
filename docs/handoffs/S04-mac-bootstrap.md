@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s04-mac-bootstrap'
 title: 'S04 Mac bootstrap'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'in progress 2026-11-04: p0/mac-bootstrap branched, just mac-bench replaces the engine-bench container (O-506); waiting on the Mac run'
 created: 2026-10-19
 public: true
 phase: 0
@@ -104,3 +104,23 @@ The final message lists R0.9 with the report path and the O-50 verdict; the bran
 | `BACKUP_DRIVE_PATH` in the Mac clone's gitignored `.env` | the Mac only, for S20 |
 | Pull request `p0/mac-bootstrap` into `sprint/1-v1` | GitHub |
 | New O-IDs, if any | vault `planning/00-open-questions-and-risks.md` |
+
+## Status (2026-11-04)
+
+In progress on `p0/mac-bootstrap` off `sprint/1-v1` at 6543644, after the bridge sprint merged in full. The Mac was bootstrapped for the harness and other projects first (Docker Desktop, Claude Code, Tailscale on both machines), so the g-tee-oh items of step 3 are confirmed in this run and the benchmark is still to run.
+
+Deviation, recorded as O-506: no `engine-bench.Dockerfile`. `just mac-bench` reuses the S18 flop-line benchmark (the `library-builder` image for linux/arm64, the judged 32-bit and the informational 16-bit job specs under the 5 GB cap, then `estimate` and `bench-report` on the host), so the Mac writes `bench-flop-line-mac.json` and its Markdown twin and `mac-bootstrap.md` summarises them. `just mac-bench-clean` removes the container, its scratch volume and the image (O-47). A Zenbook trial of the recipe (machine `zenbook-trial`, output under `target/bench/trial`, nothing committed) runs before the push. Tailscale is recorded as O-505; it changes nothing in this session.
+
+Mac run sheet, one item at a time, outputs pasted back into the Zenbook session (needs git, just, Node, rustup stable and Docker Desktop on the Mac, per the harness runbook):
+
+1. `docker info --format 'mem={{.MemTotal}} cpus={{.NCPU}}'`: 10 GB and all but 2 cores (Docker Desktop, Settings, Resources; apply and restart).
+2. `pmset -g custom`: sleep 0 under AC Power (System Settings, Battery, Options, prevent automatic sleeping on power adapter when the display is off).
+3. `df -h <mount point>` with the external drive attached. The mount path goes into the Mac clone's gitignored `.env` as `BACKUP_DRIVE_PATH`, never into the report.
+4. `git clone https://github.com/emstacho-su/g-tee-oh.git ~/projects/g-tee-oh` (or `git fetch` in an existing clone), then `cd ~/projects/g-tee-oh`, `git switch p0/mac-bootstrap`, `just hooks`.
+5. `cargo build --release -p library-builder`: warms the cache and builds the report step; note the minutes in chat.
+6. `claude --version`.
+7. `just mac-bench` (defaults: machine `mac`, platform linux/arm64, output `validation/reports`). In a second terminal run `docker stats gto-bench --no-stream` every few minutes and paste the MEM USAGE column. Stop at 30 minutes per line and record a miss (O-50, O-178).
+8. `git add validation/reports/bench-flop-line-mac.json validation/reports/bench-flop-line-mac.md`, then `git commit -m "test(validate): R0.9 Mac flop-line benchmark against O-50"` and `git push`. The owner's own commit needs no trailer; the hook asks for it only under Claude Code.
+9. `just mac-bench-clean`, then `docker ps -a` and `docker images` show nothing from the run (O-47).
+
+The Zenbook session then pulls, writes `validation/reports/mac-bootstrap.md` from items 1, 2, 7 and the Mac report, updates the Mac rows of `phase-0-gate.md`, runs the checks and the code review, and opens the pull request into `sprint/1-v1` for the owner to merge.
