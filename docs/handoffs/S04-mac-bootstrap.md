@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s04-mac-bootstrap'
 title: 'S04 Mac bootstrap'
 collection: 'g-tee-oh'
 type: handoff
-status: 'done 2026-11-04: Mac run passed O-50, mac-bootstrap.md written, pull request 53 open for the owner to merge'
+status: 'done 2026-11-04, PR 53 merged'
 created: 2026-10-19
 public: true
 phase: 0
