@@ -178,6 +178,28 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /starter drills?$/ })).not.toBeInTheDocument());
   });
 
+  it("R3.35 a mid-pack failure announces the drills that landed after the list is read again, and keeps the tag filter (code review round 1, 5)", async () => {
+    const user = userEvent.setup();
+    let count = 0;
+    const view = renderDrills("/drills?tag=synthetic", {
+      override: (request) => {
+        if (request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        count += 1;
+        return count === 3 ? Promise.reject(new TypeError("Failed to fetch")) : undefined;
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    const listReads = () => view.sent("GET", "/api/v1/drills").length;
+    const readsBefore = listReads();
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent("Added 2 starter drills."));
+    // The list was read again before the announcement, as a full success does.
+    expect(listReads()).toBeGreaterThan(readsBefore);
+    // The user's filter stays on the error path; only a full success clears it.
+    expect(view.router.state.location.search).toEqual({ tag: "synthetic" });
+  });
+
   it("R3.35 a starter drill deleted after the pack landed is re-added under a fresh key and created again (PR #48 review round 3 HIGH)", async () => {
     const user = userEvent.setup();
     const view = renderDrills("/drills");

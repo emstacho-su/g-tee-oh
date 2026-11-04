@@ -106,7 +106,14 @@ export function starterImportKey(baseKey: string, packIndex: number): string {
  * 5xx or the key check's own 409 in-flight and 422 mismatch may hide a request that landed, so that
  * code keeps its key (review 4 finding 1, PR #51 review HIGH 1).
  */
-export function useImportStarterPack(api: AppApi, onImported: (drills: readonly Drill[]) => void): IntentMutation<readonly StarterDrill[], Drill[]> {
+export interface StarterPackCallbacks {
+  /** Every code landed: the list has been read again. */
+  readonly onImported: (drills: readonly Drill[]) => void;
+  /** A code failed after some landed: the list has been read again, these are in it (code review round 1, 5). */
+  readonly onPartial?: (drills: readonly Drill[]) => void;
+}
+
+export function useImportStarterPack(api: AppApi, { onImported, onPartial }: StarterPackCallbacks): IntentMutation<readonly StarterDrill[], Drill[]> {
   const invalidate = useInvalidate();
   const { newKey } = useLibraryDeps();
   const codeKeys = useRef<ReadonlyMap<string, string>>(new Map());
@@ -132,8 +139,10 @@ export function useImportStarterPack(api: AppApi, onImported: (drills: readonly 
           imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
         } catch (error) {
           if (isRefusal(error)) remember(entry, starterImportKey(newKey(), packIndexOf(entry)));
-          // The codes that landed before the failure are announced as added, beside the failure (PR #51 review round 2).
-          if (imported.length > 0) onImported(imported);
+          // The codes that landed before the failure are in the library: read it again, then say so
+          // beside the failure (review MEDIUM 3, PR #51 review round 2, code review round 1, 5).
+          await invalidate();
+          if (imported.length > 0) onPartial?.(imported);
           throw error;
         }
         forget(entry);
@@ -143,10 +152,6 @@ export function useImportStarterPack(api: AppApi, onImported: (drills: readonly 
     onSuccess: async (drills) => {
       await invalidate();
       onImported(drills);
-    },
-    // The codes that landed before the failure are in the library: show them (review MEDIUM 3).
-    onError: () => {
-      void invalidate();
     },
   });
 }

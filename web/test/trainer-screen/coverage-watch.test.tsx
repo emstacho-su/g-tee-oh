@@ -92,6 +92,10 @@ describe("R3.4 Start again on coverage_added", () => {
       },
     });
     await refuse(view, streams);
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
+    // The retry waits (BASELINE_RETRY_DELAY_MS), so a 429 or 503 is not asked again in the same tick (code review round 1, 6).
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
     await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(2));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(screen.getByTestId("start-note")).toHaveTextContent("Start again.");

@@ -7,8 +7,8 @@
  *
  * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7, review 4 finding 6, PR #51 review
  * HIGH 2, PR #51 review round 2): once the configuration list has loaded, each configuration the
- * drill reaches is read once, its baseline (a failed read is tried once more before an empty
- * baseline stands in). Coverage can land between the refusal and that read answering, so a baseline
+ * drill reaches is read once, its baseline (a failed read is tried once more after a short pause
+ * before an empty baseline stands in). Coverage can land between the refusal and that read answering, so a baseline
  * that already shows one of the drill's pairs covered tells the screen at once. An event counts
  * when its pair is one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so
  * the web applies no ordering rule) and its configuration is one the drill reaches (any other is
@@ -33,6 +33,10 @@ import { capitalize, configurationWords, pairWords } from "../../progress/spot-w
 import type { GameConfig } from "../../progress/types.js";
 import type { Drill } from "../../trainer/session-types.js";
 import { allConfigsQuery } from "../settings/configs-query.js";
+
+/** The baseline read's retries and the pause before each: one more read after a short wait. */
+export const BASELINE_RETRIES = 1;
+export const BASELINE_RETRY_DELAY_MS = 750;
 
 export const COVERAGE_WATCH_TEXT = {
   waiting: "Watching the library: Start is offered again as soon as the builder adds one of this drill's spots.",
@@ -100,15 +104,20 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
     (configId: string) => queryClient.fetchQuery({ ...practicePairsQuery(api, configId), staleTime: 0 }),
     [api, queryClient],
   );
+  // The baseline read is the query's own retry, once, after a pause, so a 429 or 503 is not asked
+  // again in the same tick (PR #51 review round 2, code review round 1, 6).
+  const readBaseline = useCallback(
+    (configId: string) => queryClient.fetchQuery({ ...practicePairsQuery(api, configId), staleTime: 0, retry: BASELINE_RETRIES, retryDelay: BASELINE_RETRY_DELAY_MS }),
+    [api, queryClient],
+  );
 
-  // The baseline: one read of each reached configuration, tried once more when it fails (PR #51
-  // review round 2); a drill pair it already shows covered is offered (HIGH 2).
+  // The baseline: one read of each reached configuration, tried once more when it fails; a drill
+  // pair it already shows covered is offered (HIGH 2).
   useEffect(() => {
     if (configs.data === undefined || baselineStarted.current) return;
     baselineStarted.current = true;
     for (const config of configsReached(filter, configs.data)) {
-      readPairs(config.config_id)
-        .catch(() => readPairs(config.config_id))
+      readBaseline(config.config_id)
         .then((pairs) => {
           const covered = drillCoveredIn(pairs);
           const already = pairs.find((entry) => covered.has(pairKeyOf(entry.oop, entry.ip)));
@@ -121,7 +130,7 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
           setBaseline(config.config_id, new Set());
         });
     }
-  }, [configs.data, filter, readPairs, setBaseline, drillCoveredIn, announce]);
+  }, [configs.data, filter, readBaseline, setBaseline, drillCoveredIn, announce]);
 
   // The events: a configuration with its baseline in is read again, once per batch.
   useEffect(() => {
