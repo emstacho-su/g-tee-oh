@@ -7,18 +7,34 @@
  * trees cannot serve it, so its row shows "Not built yet" rather than hiding a spot (ADR 0018).
  * services/api/test/drills-starter-pack.test.ts holds these codes to the real encoder and
  * web/test/drills/starter-pack.test.ts to the write rules and the catalogs. Every drill carries
- * STARTER_TAG, which is how the library knows the pack was added.
+ * STARTER_TAG, which is how the library knows the pack was added, and its own id tag (starterIdTag),
+ * which is how it knows which entry a drill is, whatever the user renames it to.
  */
 export const STARTER_TAG = "starter";
 
+const STARTER_ID_PREFIX = "starter-";
+
+/** The tag a starter drill keeps through a rename: "starter-" and its pack key (PR #48 review 4 finding 3). */
+export function starterIdTag(entry: Pick<StarterDrill, "key">): string {
+  return `${STARTER_ID_PREFIX}${entry.key}`;
+}
+
+/** What the presence rule reads of a listed drill carrying STARTER_TAG. */
+export interface StarterMark {
+  readonly name: string;
+  readonly tags: readonly string[];
+}
+
 /**
- * The starter drills the user does not have yet, in pack order (PR #48 review round 2 MEDIUM 3): a
- * pack entry counts as present when a drill carrying STARTER_TAG has its name, so a pack that
- * landed partway offers only the rest.
+ * The starter drills the user does not have yet, in pack order (PR #48 review round 2 MEDIUM 3), so
+ * a pack that landed partway offers only the rest. A pack entry counts as present when a listed
+ * drill carries its id tag, so a renamed starter drill is never imported twice (review 4 finding
+ * 3), or, for a drill imported before the id tags, has its name.
  */
-export function missingStarterDrills(starterNames: readonly string[]): readonly StarterDrill[] {
-  const present = new Set(starterNames);
-  return STARTER_PACK.filter((entry) => !present.has(entry.name));
+export function missingStarterDrills(listed: readonly StarterMark[]): readonly StarterDrill[] {
+  const tags = new Set(listed.flatMap((drill) => drill.tags));
+  const names = new Set(listed.map((drill) => drill.name));
+  return STARTER_PACK.filter((entry) => !tags.has(starterIdTag(entry)) && !names.has(entry.name));
 }
 
 export interface StarterDrill {
@@ -32,51 +48,51 @@ export const STARTER_PACK: readonly StarterDrill[] = [
   {
     key: "open-every-seat",
     name: "Open or fold: every seat",
-    code: "gteeoh1.eJxVkTFv3DAMhf_K4c0ckqWDxnRo0aEZmkzBQaDPtCOcTKmifEAS-L8X9B3adCPIR_J75AeUF0HAYxU9lHaYSh7DQS7S3g4m3EGwWnqcUu7SED7AHih3iV43hImzCWHmReKp6JRml41S-6vFYUB4ub-7OxKm0hbuCCiakwoInYcs0dK7IHzZCK-so3nzUkaHOuViEkc5JUtFDS6RVmItlvqeCS94fvoGwvcfIHx9BOHh6ScIvx5wJNQmUy418snlrm5T8oKl96Tz51VFL6K7aiNY57N8JrXOrUfrTcQd3OaCcEk5c9L_kI6bW5t3ur1RGmjfTBjKqiO3N4fojZNejzq3stadyDtcMYKQtK6-7opvIFRWyX6izePVHJKnLi0u6QpN-L2m0zk2sTX3v99pPvsWWxUZEaD-kLy7KzW2Nf-bdjvY7UWGcE_oaZGB9RwNQdect-0PIUbFEw",
+    code: "gteeoh1.eJxVUTFu3DAQ_Mph6j3AblKwdIoEKeIiTmUcCEpaycRRS4ZLHWAb-nuwvEvidAtyZnZm9h0SVobDY2E55HqYc5rcgS9cXw_KoYGgJTc_x9S4wr0j2CChsbd_hZtDUiYsYWU_ZpnjYrCJS3tRPwxwz_d3dyfCnOsaGhyypCgMQgtDYq_xjeE-7YSXIJMaec2TmRpTVvYTj1FjFoVBuGZfssbWX9wzfj59AeHrNxA-P4Lw8PQdhB8POBFK5Tnl4sNocEPXOdqHxrcoy8dVWS4sHbUTtIUzf3SqLdTmtVVmS3DTBeESUwpR_rN02i3a0t11IldQ30wY8iZTqK9_NLkec2E59saPvfETodUQ5Vr3UvNWulcjGHcCIUrZzMg1mIJQgnCy8nabNzX7YW5c_RqvcQi_tjiefWXdUvt7t2rat1kL8wQHsVOl7jEXX7f0T-1W5e14CndPaHHlIcjZK5xsKe37b_yTzpk",
   },
   {
     key: "open-button",
     name: "Open or fold: button",
-    code: "gteeoh1.eJxVkbFuHDEMRH_lMLUKu0mh0h-QNOmMg8Dd5a6F01KKSBmIjf33gHuHxOkIcTh8HH1CaGdE_Ggsl9ovay1LvEzDrAoCtFVLay7GHfET5IWQcVImU8SVinLARjunucqaN5ct3OxN0zQhvj4_PV0D1tp3MkRUKVkYAUZT4aT5gxG_HQFvJIv68F4XB5pLVU4Lz1lzFYVLuNfUqmY7X-IrXn5-xzWgdV5LbYlm73ijr9kbmj-ybF9dq7yznKojQI1u_BVKjboltc7ssA9fBLznUijLf9uvh1-xnSDnIHeEc3PAVIcs1H87hHXKcs9v63W0k8gnXLEgIEsbvu6OrwhoJFw8jcProQ5Jq3FPe75DB_waeb6lzjqK_f2I7t6PWhvzggjx7Mt5XW2pj_LP7RHY4zcU8TnA8s4TyS0pooxSjuMPPtC_Tg",
+    code: "gteeoh1.eJxVkcFu3DAMRH9lMWcFSC496NgPSC-9BQuBtmlHWJlSRTpAE_jfA3rdNr0R4nD0OPyA0MqI-NFYLrVf5lqmeBk2syoI0FYtzbkYd8QPkBdCxkmZTBFnKsoBC62cxipzXlw2cbNXTcOA-PL0-HgNmGtfyRBRpWRhBBgNhZPmd0b8tge8kkzqw2udHGgsVTlNPGbNVRQu4V5Tq5rteIkv-P7zGdeA1nkutSUaveONPmdvaH7Psnx1rfLGcqj2ADW68VcoNeqW1Dqzw56-CHjLpVCW_36_7r7FcoAcg9wRjp8DhrrJRP33H0_uD7WxPJzBXgOsU5Z7qkuvWzs4XexzEwKytM0h7kspAhoJF89o93pTR6fZuKc131cJ-LXl8ZY661bs73m6e5-1NuYJEeIXKQdfbalv5Z_bGeN5I0V8CrC88kByS4ooWyn7_glgBMdr",
   },
   {
     key: "bb-vs-btn",
     name: "Big blind facing a button open",
-    code: "gteeoh1.eJxdkcFu3DAMRH9lMWcVSC496Lgf0FNvwUKgbdohVqZUkd5DAv97IK_RBr1R0pB6M_yE0sqIuMpyGbLodJlpFF0udBk296KXUlkRYLV4miU7N8RPUC-UnJMxuSHOlI0DFlo5jUVnWbps4urvloYB8e315eUWMJe2kiOiaBZlBDgNmZPJByP-3APeSSfrzWuZOtqYi3GaeBSTooYu4VZSLSZ-3MQ3XK-4BdTGcy410dgf-v3D0mHgFmDyIbp8H1z0wXoo9wBzuvN3LnNqnswbc-c9ZyPgITmT6H8Av3_htnc3y3E-url1uf04MxyGzuGNRJ8pLq1s9YDqep2oTQgQrVv_8enCEFBJOfdM9l5v1jlpdm5plSd3wJ9NxntqbFv2v-toffZZW2WeEKF9A_kwWGpqW_437czt3Ikhvga4rDyQ3pMh6pbzvn8BAEbEOg",
+    code: "gteeoh1.eJxdkbFu3DAMhl_F4KwDkqWDxnuATt2Cg0DZtEOcTKkifUMCv3tAn9sG3Sjq54_vJz9BcCWIcOVlyIVlGmYcWZYBh7yZVRlqI4EA2qqlmYtRh_gJ6IWgUVJCU4gzFqUAC66UxiozLy6bqNm7ppwhvr2-vNwCzLWvaBChSmEhCGCYCyXlD4L4Yw_wjjKpD691crSxVKU00cjKVRRcQr2mVpXt6MQ3uF7hFqB1mkttCUf_8P5D0xHgFkD5g2X5blzlQXIo9wBqeKfvXGrYLal1Iuc9vSHAg0tBlv8Afv2E2-5pluN9TFN3uV7OHeb8x5b6JefLQy_ZDjbryPLc7NLr1g5Ql8qEfYIALG1zimcyhQANhYrvafd6U2fH2ainlZ9ZAvzeeLynTroV-3ui7t5nrY1oggjiVykHXW2pb-Wf27nL804K8TWA8UoZ5Z4Uomyl7PsXkq7LJw",
   },
   {
     key: "bb-vs-co",
     name: "Big blind facing a cutoff open",
-    code: "gteeoh1.eJxVkTFu5DAMRa9i_FoBkiaFyskB9gDBQKBtyiFGphRRniKB7x7IY-xmO0r6pN7__IbSyvC4yDKMSXQeIk2iy0DDtLUc45ALKxys5BaipMYV_hvUC6XGwZiawUdKxg4LrRymrFGWLpu5tA8L4wj__vL8fHWIua7U4JE1iTIcGo2Jg8kXw7_uDh-ks_XmNc8dbUrZOMw8iUlWQ5dwzaFkk3bc-HdcLrg6lMox5RJo6g_9_m7hMHB1MPkSXX4PznpnPZS7gzW68W8ua1RbsFaZO-85Gw53SYlE_wd4-4Pr3s0sx_Fo5trV9nRGOI4do1USfYS41LyVg6nrdaY6w0G0bP3DhwmDQyHl1CPZe71Zx6TYuIZVHtgOn5tMt1DZttT-bqP22WdthXmGh_YFpMNfLqFu6d-0M7ZzJQb_4tBk5ZH0Fgxet5T2_QcV5sPT",
+    code: "gteeoh1.eJxVkUFu3DAMRa9i_LUGSDZdaDk9QA8QDATKph1iZEoV5Vkk8N0Dedw23VHU58f75CeUVobHVZYhJtFpmGkUXQYaxq3leR5yYYWDldzCLKlxhf8E9UKpcTCmZvAzJWOHhVYOY9ZZli6buLR3CzHCv72-vNwc5lxXavDImkQZDo1i4mDywfA_dod30sn68JqnjjambBwmHsUkq6FLuOZQskk7Ov4N1ytuDqXynHIJNPaP3n9YOALcHEw-RJfvxlkfrIdyd7BGd_7OZY1qC9Yqc-c9veHwkJRI9H-An79w23uY5Xgew1y72i7nCmP848r1EuPlYZcxd7JWSfS516XmrRyYXakT1QkOomXrDM9cBodCyqlvae_1Zp2c5sY1rPJM4vB7k_EeKtuW2t8D1e591laYJ3hov0k64HIJdUv_3M5Nnlcy-FeHJitH0nsweN1S2vcvwkzKTg",
   },
   {
     key: "sb-vs-btn",
     name: "Small blind facing a button open",
-    code: "gteeoh1.eJxVkcFu3DAMRH_FmLMKJJcedMwH9JLegoVA27QjrEypIr2HBP73gt5tm94oaUi9GX5CaGNEvG5UyjCWLPOw0JRlHWgYd7MqQ20sCNBWLS25GHfET5AXQsZJmUwRFyrKASttnKYqS15dNnOzd03jiPj2_PR0CVhq38gQUaVkYQQYjYWT5g9G_H4EvJPM6s1bnR1uKlU5zTxlzVUULuFeU6ua7byJb3h9wSWgdV5KbYkmf_D7m6bTwCVA80eW9evgKjeWU3kEqNGVv3KpUbek1pmd9zEbAbdcCmX5H-Dl5w9cDneznuezm7vL9dufDEfnsE5Z7imuve7thHK9zNRnBGRpu_94d6EIaCRcPJPD612dkxbjnrZ85w74tefpmjrrXuzvOrrPftTamGdEiG-gnAZrS30v_6Y9cnvsRBGfAyxvPJJckyLKXspx_AYh-8VD",
+    code: "gteeoh1.eJxVkbFu5DAMRH_FmFoLJE0KlfmANLkuWAiUTTvCypQi0lsk8L8H8m7uch1FDQdvyC8IrQyP15VyHmJOMg0zjUmWgYa4mRUZSmWBg9ZiYU7ZuMF_gXohZByUyRR-pqzssNDKYSwyp6XLJq72riFG-LfHh4ezw1zaSgaPIjkJw8EoZg6aPhn-aXd4J5m0D69l6nBjLsph4jFpKqLoEm4l1KLJjo5_w-szzg618ZxLDTT2j96_ajgCnB00fSZZfhsXubIcyt1BjS78m0uNmgW1xtx5795wuKacKcn_AM9_XnDee5rleB_T3LpcTz87jD-23E4aT1c9RTvYrFGS22aXVrZ6gHapTNQmOCSpW6e4JVM4VBLOfU97rzft7DQbt7CmWxaHjy2Nl9BYt2x_T9S6973WyjzBQ_pV8kFXamhb_ud23-X9Tgr_6GBp5UhyCQovW877_g3WxcxB",
   },
   {
     key: "btn-vs-3bet",
     name: "Button facing a 3-bet from the blinds",
-    code: "gteeoh1.eJxVUUFu3DAM_IoxZwVIECAHHf2AXpJbsBBom_YKK1OKSC-QLPz3Qs62TW8EORzODG8QWhke_WaWpZtpjLJ01D0_DGzdXPPa2Zm7IUWZFA5asoU5JuMKfwO1Qsg4KJMp_ExJ2WGhlcOYZY5Lg01c7KxhGODfnx4fTw5zrisZPLKkKAwHoyFx0PjF8C-7w5naRX_DmqemkFJCa3PNoWSNFrMo_Dv6t184OZTKc8ol0NgmbXDVYOfKHAa2htD4FWX5QTlmubIc8N1BjS78U5EaVQtqlbkpvR-AwzWmRFH-l_Haw6Hvcdqbl-XoHQxc24o-PN9lWKUo3_EtNW_l0NSgMlGd4BClbO3gt5OWeiHh1MLYW71pk8lXrp9_3Dp8bHG8hMq6Jfv7htqo77UW5gke0pJPh71cQt3SEe5sXP-RHb9Q-CcHiysPJJeg8LKltO-_AY6LwrI",
+    code: "gteeoh1.eJxVkcFu3DAMRH_FmLMWSBCgBx39Abm0t2Ah0DbtFVamVIleoFn43ws62TS9EdSIfJy5Q2hlePSbapZupjHK0lH3chpYu7nmtdMLd0OKMjU4tJI1zDEpV_g7yAoh5dCYtMHPlBo7LLRyGLPMcTHZxEUvLQwD_Nvz09PZYc51JYVHlhSF4aA0JA4tvjP8j93hQrbR37HmyQgpJVibaw4lt6gxS4N_Q__rFWeHUnlOuQQa7cUebi3opTKHgdUULb5HWb6NHLPcWA757tCUrvydqClVDU0rs5F-LoDDLaZEUf7H-NnDoe9x3u2W5egdE7jal3Z6MQz36J0GldOje3bQSlE-TF1q3spBamKZqE5wiFI2w_i4z7IoJJzMot3qrRk837j-eXjg8HuL4zVUblvSr3Cqjf6sW2Ge4CGWRzrwcgl1S4fls3L9N-xIqME_O2hceSC5hgYvW0r7_heQs8pJ",
   },
   {
     key: "3bet-ip-co-vs-hj",
     name: "3-bet in position: cutoff over the hijack",
-    code: "gteeoh1.eJxVkbFu3DAMhl_F4KwCFwTooDVL0aUPEBwE2qZt9mRKEekbEvjdA_quyXWjxJ_kx58fILgSRHj-0ZN1LF0tysZFYjdsVqapK1dqnS3ULfwXhwsE0FosTZyNGsQPQA8EjZISmkKcMCsFmHGlNBSZeHbZSNUWTX0P8fXpdDoHmEpb0SBCkcxCEMCwz5SU3wnizz3AgjKqF69ldMohF6U00sDKRRRcQq2kf9AK8RVe_sA5QG005VITDp7wf1saUerJPK38zjI_ti5yJTm0ewA1vNAjmRo2S2qNyInv3SHAlXNGlv8Rfv2G8-7rzMfzKKYGAZ59fACuzmANWW4ezq1s9QBysYzYRpdJ3XzabQeFABWFsjuye7ypM-Jk1NLKN-YAbxsPl9RIt2xfx2je-x5rJRohgrj_-Viu1NS2_N3t7tr9IgrxKYDxSj3KJSlE2XLe908-6Mdm",
+    code: "gteeoh1.eJxVkU1u3DAMha9icC0DCQJ0oW03RTc9QDAQaJu2mZEpVaRnkcB3L-iZtOnuiT9PH8kPENwIIrz0A1nH0tWibFwkduNuZZ67cqPW2Urdym84XiGA1mJp5mzUIH4AuhA0SkpoCnHGrBRgwY3SWGTmxcsmqrZqGgaIr89PT5cAc2kbGkQoklkIAhgOmZLyO0H8dgRYUSb15q1MTjnmopQmGlm5iIKXUCvpE1ohvsL3X3AJUBvNudSEoyc8bmsjSgOZp5XfWZav1kVuJGftEUANr_SVTA2bJbVG5MQPdwhw45yR5X-EHz_hcvg4y_k8m6lBgBf_PgDXT0tqvcd6rv1Y-pv265vjWUOW-3qXVvZ6snqHTNgmd5C6O8h9PIUAFYWyL-twvavj42zU0sb3cQL83nm8pka6Z_t7p-beD62VaIII4qfJJ2Spqe35n9tjoY9jKcTnAMYbDSjXpBBlz_k4_gCVL9CQ",
   },
   {
     key: "3bet-oop-blinds-vs-btn",
     name: "3-bet out of position: blinds versus a button open",
-    code: "gteeoh1.eJxVkUFu3DAMRa9i_LUKJAjQhZZzgG7aXTAQZJv2CCOTikjNIoHvHsgzadMdCX5-PpIf4LgRPF5-jGSDNBtkGYposiTshzEnnnW4UdWmQxzGZiY8SCGGgxaxsKRsVOE_EHvA0SgoRVP4JWYlhzVuFCbhJa1dNlOxi4ZxhH99fno6OyxSt2jwEM6JCQ4Wx0xB0zvB_9wdLpFn7c2bzB13yqIUZpqSJmFFl1CV8EWu8K_4fYLD6YSzQ6m0ZCkhTr3ai3apRGEk62VN74nX7_7CN-JDuzuoxSt9x1OL1YJaJerYD3c43FLOMfH_HKc_v3De-1LrkR_dVOHw0uc7iJROYTUmvp9yrdLKgdTVPMc6wyFxaX3efQuFQ4lMuR9m73HTThkXoxq2dKd2eGtpuoZK2rL9_Unt3o9YC9EMD-5vyMd6UkJt-Z_b426Pxyj8s4OljcbI16Dw3HLe90-cZsyf",
+    code: "gteeoh1.eJxVkU1u3DAMha9ivLUMJAjQhZZzgG7aXTAQZJv2CCOTqkjPIoHvXsjjtumO4s_Tx8dPcFwJHm_9QNbJZp3MXRFNloR9N-TEk3YPqrppF7thMxPupBDDQYtYmFM2qvCfiC3gaBSUoin8HLOSwxJXCqPwnJbWNlGxm4ZhgH9_fXm5OsxS12jwEM6JCQ4Wh0xB0wfBf9sdbpEnbcOrTA13zKIUJhqTJmFFa6Eq4Q-5wr_jxwUOlwuuDqXSnKWEOLZqK9qtEoWBrJU1fSRevuoLP4iP3t1BLd7pK55arBbUKlHDPtXh8Eg5x8T_c1x-fsd1b0stx_uYpgqHt_a_gxyzZ7pvyV6k9E_z-4f2g3HDtBoTP71eqmzlYG5zPMU6wSFx2RrQc02FQ4lMuTm3t3jTtkacjWpY03Mth19bGu-hkm7Z_h6tNu0z1kI0wYPbnfKBKiXULf9TO409L6fwrw6WVhoi34PC85bzvv8G7HnYWg",
   },
   {
     key: "squeeze-blinds",
     name: "Squeeze from the blinds",
-    code: "gteeoh1.eJxVkbtuwzAMRX8luLOGdumgMb_QsQgEOqYdITKlinSHBP73gk7Qx0aY9OXh0R1CCyPi_XNlvvFh6nU52IUPQ8kyKgK0VUtTLsYd8Q7yQsg4KZMp4kRFOWCmhdO5ypRnHxu52UXTMCB-vL68nAKm2hcyRFQpWRgBRkPhpPnGiG9bwIV8Y7xjqaMzUSnwz9xralWz5SqK-IH3IwKOR5wCWuep1Jbo7F1v6uMSb2q-ZZn_JJ6rfLHsk1uAGl35L5AadUtqndlBn9kI-MqlUJZ_FKfNL5h3oP1H7h7xu906ZXlIm3td247iozJSHxGQpa2-58HurhsJF1eweb3qbmEy7mnJD9qAzzWfr6mzrsV-7HfPftbamEdEiAsv-1m1pb6W37SnrecTKOJrgOWFB5JrUkRZS9m2b419vAk",
+    code: "gteeoh1.eJxVkb1uwzAMhF8luFkBmqWDxrxCxyIQ6Jh2hMiUIsoZEvjdCzru30aQ1Om74xNCE8Pj4zYzP3g31Dzt2oV3XYrSKxy05BaGmBpX-CfICqHGQZmawg-UlB1GmjicswxxtLWeS7to6Dr4z8Pb28lhyHWiBo8sKQrDoVGXOGh8MPz74nAh-9E_MeXemCglWJtrDiVrbDGLwn_i4wiH4xEnh1J5SLkEOtvUhvpyYkONjyjjH8VzljvLurk4aKMr_wXSRrUFbZXZQDdtONxjShTlH8VpMQfjCrQ-5GoS2-_uu7ffOvst0JNDqxTlleZY81xWRtuXnmoPhyhlNoCXKTtCIeFk2SxWz7rGMzSuYYovGw63OZ6vobLOqf2cpZr2Vmth7uEhdom0IuYS6px-1bYYt9so_MGhxYk7kmtQeJlTWpYv0rDFVg",
   },
   {
     key: "live-13-open-every-seat",
     name: "Live 1/3: open or fold, every seat",
-    code: "gteeoh1.eJxVUctO7DAM_ZXqrC1BYUWWsOAKoXsXwAqNoszULdGkSYjTSoD678id8rgbx_Hj-Pj4A9GNDIN7P3PTnl2aJmWOTSpNn0JHDc9c3hphV0GQnKrtfahcYD7g1ImustW8wPQuCBMGN7I9pNj7Qcs6zvVF7H4P89yen-8IfSqjqzAIfmYQqtsHtuLfGeZqIby42Im2jqlTci4EaJhLsjmJrz5FgXnG0-MtSG17ei5AuL8D4Y-am38gXD_-BeHhGjtCLtyHlK07KIIClN5rQvy7j8OviYcUZ45r1UKQ6o4abc8usf5KtVILs-6wgYIw-xCcj_9R3C263rCyXRu5gL723qbX4nw8STqUNOWVilbHzpUOBB_zpKNOvAWE7CIHlWhRf5JVpb5ysaM_sSW8Tv5wtIVlCvX7NkWxN18ycweDqOcI62Yp2zKFH7RNqe1EAtMSqh957-LRCkycQliWT13PwnY",
+    code: "gteeoh1.eJxVUctO5DAQ_JWozh1Bdk74CIddIbQcYE9oZHkmnWCNYxu3E2lB-XfUmWEfF7vdj3JV9QeimxgGD37hprvamSZljk0qzZBCTw0vXH43wq6CIDlVO_hQucB8wGkQXWWrdYEZXBAmjG5ie0xx8KO29Zzrq9jDAealu77eE4ZUJldhEPzCIFR3CGzFvzPMzUp4dbEXHZ1Sr-RcCNA0l2RzEl99igLzgl_P30F6dufrGwgP9yD80OPuEYTb558gPN1iT8iFh5CydUdFUIAyeC2If_dx_OfHY4oLx61rJUh1J812Vztsr1Kt1MKsGi6gICw-BOfjfxT3q8obN7bbIBfQl279nb7SrSbbbtfqAtrN93bzfU-oxfl4Nn0sac4bWR2MvSs9CD7mWcmclQkI2UUOauKq8Sybj0PlYid_1kN4m_3xZAvLHOqf7RXFvsSSmXsYRF1Y2LimbMsc_qJdvLwsUWA6QvUTH1w8WYGJcwjr-gkRkc5q",
   },
 ];

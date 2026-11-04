@@ -9,7 +9,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { STARTER_PACK, STARTER_TAG } from "../../src/drills/starter-pack.js";
+import { STARTER_PACK, STARTER_TAG, starterIdTag } from "../../src/drills/starter-pack.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
 import { renderDrills } from "./render-drills.js";
@@ -121,6 +121,16 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     release();
     await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
     expect(sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"])).toEqual(STARTER_PACK.map((_, index) => `test-key-1-${index}`));
+  });
+
+  it("R3.35 the header stays hidden when every starter drill is listed under a new name (PR #48 review 4 finding 3)", async () => {
+    const renamed = STARTER_PACK.map((entry, index) => ({ ...fixtureDrill, id: `00000000-0000-4000-8000-0000000003${String(index).padStart(2, "0")}`, name: `Renamed ${index}`, tags: [STARTER_TAG, starterIdTag(entry)] }));
+    renderDrills("/drills", {
+      override: (request) => (request.method === "GET" && request.path === "/api/v1/drills" ? jsonBody(200, { items: renamed, next_cursor: null }) : undefined),
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await waitFor(() => expect(screen.getAllByTestId("drill-row")).toHaveLength(STARTER_PACK.length));
+    expect(screen.queryByRole("button", { name: /starter drills?$/ })).not.toBeInTheDocument();
   });
 
   it("R3.35 the header decides from its own read, not the filtered page: starter drills outside the filter still count (PR #48 review HIGH 3)", async () => {
