@@ -45,9 +45,11 @@ export async function buildRfiDrill(page: Page, shot: Flow2Shooter = NO_SHOTS): 
   await picker.getByRole("radiogroup", { name: "Table size" }).getByRole("radio", { name: /^6 players/ }).click();
   await picker.getByRole("radiogroup", { name: "Stake" }).getByRole("radio", { name: /^Online/ }).click();
   await expect(picker.getByRole("group", { name: "Depths" }).getByRole("button", { name: /^100bb/ })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("reach-status")).toContainText("Reaches");
+  // No hero yet, so the draft reaches no pair: the api rule (pairsAt) and the reach line agree (PR #48 round 3 LOW 9).
+  await expect(page.getByTestId("reach-status")).toHaveText("Names no seat to train.");
   await openBuilderPage(page, "Seats");
   await page.getByRole("group", { name: "Hero positions" }).getByRole("checkbox", { name: "BTN" }).check();
+  await expect(page.getByTestId("reach-status")).toContainText("Reaches");
   const villains = page.getByRole("group", { name: "Villain positions" }).getByRole("checkbox", { checked: true });
   await expect(villains).toHaveCount(0);
   await page.getByRole("group", { name: "Preflop action" }).getByRole("checkbox", { name: /^RFI/ }).check();
