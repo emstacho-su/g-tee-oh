@@ -15,12 +15,17 @@ import { useMemo } from "react";
 import type { AppApi } from "../api/index.js";
 import { coveredDepths, depthNeighbours, siblingConfigIds, type DepthNeighbours } from "./depth-steps.js";
 import { pairsQuery, type GameConfig, type PositionPairEntry } from "./queries.js";
-import type { StudySearch } from "./search.js";
+import { validateStudySearch, type StudySearch } from "./search.js";
 
 const NO_NEIGHBOURS: DepthNeighbours = { deeper: undefined, shallower: undefined };
 
 export function useDepthSteps(api: AppApi, configs: readonly GameConfig[] | undefined, search: StudySearch): DepthNeighbours {
-  const siblings = useMemo(() => (configs === undefined ? [] : siblingConfigIds(configs, search)), [configs, search]);
+  // Keyed on the settings the siblings depend on, never on the search object, a new one each render (code review 2).
+  const { format, table_size: tableSize, stake, depth } = search;
+  const siblings = useMemo(
+    () => (configs === undefined ? [] : siblingConfigIds(configs, validateStudySearch({ format, table_size: tableSize, stake, depth }))),
+    [configs, format, tableSize, stake, depth],
+  );
   const reads = useQueries({ queries: siblings.map(({ configId }) => pairsQuery(api, configId)) });
   if (configs === undefined) return NO_NEIGHBOURS;
   const byConfig = new Map<string, readonly PositionPairEntry[] | undefined>(siblings.map(({ configId }, index) => [configId, reads[index]?.data]));
