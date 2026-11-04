@@ -88,6 +88,8 @@ function StepBar({ label, caption, steps, fillOf }: StepBarProps) {
 
 /** The heat ramp darkens with weight on the light ground and lightens on the dark one (O-362). */
 const WEIGHT_CAPTION_LEAD: Readonly<Record<ThemeName, string>> = { light: "Darker", dark: "Lighter" };
+/** The loss ramp is the EV palette's negative steps, whose lightness runs away from the neutral middle: deeper in light, lighter in dark (matrix-theme.ts; S48 round 5 verifier). */
+const COMPARE_CAPTION_LEAD: Readonly<Record<ThemeName, string>> = { light: "deeper", dark: "lighter" };
 
 /** The EV a step stands for, at its middle, so evFill gives that step's colour. */
 function evAtStep(step: number, scaleBb: number): number {
@@ -106,7 +108,7 @@ function CompareLegend({ actions, theme, lens }: Pick<MatrixLegendProps, "action
   return (
     <StepBar
       label={LEGEND_TEXT.compareLabel}
-      caption={`${exactActionLabel(action)} against the best action: neutral where it is best (within ${COMPARE_NEUTRAL_PCT_POT}% of the pot), deeper brick red the more of the pot it gives up; past ${lens.scalePctPot.toFixed(1)}% the end colour holds.`}
+      caption={`${exactActionLabel(action)} against the best action: neutral where it is best (within ${COMPARE_NEUTRAL_PCT_POT}% of the pot), ${COMPARE_CAPTION_LEAD[theme]} brick red the more of the pot it gives up; past ${lens.scalePctPot.toFixed(1)}% the end colour holds.`}
       steps={compareLegend(lens.scalePctPot)}
       fillOf={(step) => lossFill(palette, lossAtStep(step, lens.scalePctPot), lens.scalePctPot)}
     />
