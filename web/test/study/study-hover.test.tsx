@@ -8,6 +8,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR } from "../../src/fixtures/study.js";
+import { COMPARE_TEXT } from "../../src/routes/study/CompareTab.js";
 import { renderStudy } from "./render-study.js";
 
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
@@ -47,12 +48,19 @@ describe("R3.25 hover on the study screen", () => {
     expect(insightHands).not.toContain("KQs");
   });
 
-  it("R3.25 with no selected hand, Compare keeps the last hovered hand after the pointer leaves, so its buttons can be clicked (PR 52 review 1)", async () => {
+  it("R3.25 with no selected hand, Compare follows the hover and asks for a cell once the pointer leaves; a click selects the hand and keeps its buttons (PR 52 review round 2)", async () => {
     const { router } = renderStudy(`${BASE}&view=compare`);
     const canvas = await placedCanvas();
     const panel = await screen.findByRole("tabpanel", { name: "Compare" });
     fireEvent.pointerMove(canvas, { clientX: 5, clientY: 5 });
     expect(await within(panel).findByRole("list", { name: "AA against the best action" })).toBeInTheDocument();
+    // No hover pin: crossing cells on the way to the buttons must never re-pin the wrong hand.
+    fireEvent.pointerLeave(canvas);
+    await waitFor(() => expect(within(panel).queryByRole("list")).not.toBeInTheDocument());
+    expect(within(panel).getByText(COMPARE_TEXT.pick)).toBeInTheDocument();
+    // A click selects the hand, which is what keeps the buttons.
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ hand: "AA" }));
     fireEvent.pointerLeave(canvas);
     const button = await within(panel).findByRole("button", { name: "Compare Raise to 2.5bb on the matrix" });
     fireEvent.click(button);
