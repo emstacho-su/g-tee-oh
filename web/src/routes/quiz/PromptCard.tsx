@@ -2,7 +2,7 @@
  * One quiz prompt (S27 lane A, S41, R3.16, O-301, O-57, O-412, O-414): the ladder and level badge
  * ("Range level 2 of 3", with the difficulty's name beside it for a quiz session), the spot (the hero's seat, the action so far, the hand on the hand
  * ladder), the question, the synthetic banner when the solution is a fixture, the answer input and
- * the required reason inside a form whose submit is the Submit button or Enter outside the reason.
+ * the required reason inside one form.
  * The form sends only from the Submit button or a plain Enter in the percent field (the submit
  * gate, answer-enter.ts): a modified or held Enter, or Enter on any other control, never submits,
  * whatever the browser's implicit submit does. Each answer option and region checkbox handles its
@@ -24,6 +24,14 @@ import { ReasonField } from "./ReasonField.js";
 
 /** A zero-delay timer runs once the current task, the keydown with its implicit submit, is over. */
 const AFTER_THIS_TASK_MS = 0;
+
+/**
+ * The element that sent the form, read without the SubmitEvent global, which older browsers lack
+ * (Safari before 15.4): there the gate sees no submitter (PR #49 review round 5).
+ */
+function submitterOf(event: Event): Element | null {
+  return "submitter" in event && event.submitter instanceof Element ? event.submitter : null;
+}
 
 export interface PromptCardProps {
   prompt: PredictionPrompt;
@@ -94,7 +102,8 @@ export function PromptCard(props: PromptCardProps) {
   // its keyup, at the submit it causes, or once that task is over, whichever comes first.
   const enterRef = useRef<RecordedEnter | null>(null);
   const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== SUBMIT_KEY) return;
+    // The reason field never submits, so its Enter (held for new lines) records nothing (PR #49 round 5).
+    if (event.key !== SUBMIT_KEY || event.target instanceof HTMLTextAreaElement) return;
     const recorded: RecordedEnter = { target: event.target, plain: isPlainEnter(event) };
     enterRef.current = recorded;
     window.setTimeout(() => {
@@ -108,7 +117,7 @@ export function PromptCard(props: PromptCardProps) {
     event.preventDefault();
     const enter = enterRef.current;
     enterRef.current = null;
-    const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
+    const submitter = submitterOf(event.nativeEvent);
     if (!readOnly && submitAccepted(enter, submitter)) onSubmit();
   };
   const questionId = `prediction-question-${readOnly ? "review" : "current"}`;
