@@ -72,9 +72,9 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
   const flavor = source.kind === "quiz" ? "quiz" : "drill";
   const difficulty = source.kind === "quiz" ? { difficulty: quizDifficultyName(source.choice.difficulty) } : {};
   const noQuestions = isNoQuizQuestions(run.error);
-  // Enter right after choosing an option (focus on the option button) still submits; Enter on any
-  // other focused control (End quiz, Previous, a link) does that control's own action (S46, R3.16,
-  // PR #45 review round 4, finding b).
+  // Enter on the chosen option or a region checkbox, or from the page, submits; Enter on an
+  // unchosen option picks it, and on any other focused control (End quiz, Previous, a link) does
+  // that control's own action (S46, R3.16, PR #45 review round 4 b, PR #49 review round 1).
   useHotkey(
     { key: SUBMIT_KEY, fromControls: QUIZ_OPTION_SELECTOR, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit },
     run.canSubmit && reviewing === null,

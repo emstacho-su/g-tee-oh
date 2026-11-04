@@ -1,8 +1,11 @@
 /**
  * The hotkey registry (S24, S46, A7 section 4 keyboard first, R3.13, R3.30, O-474).
  *
- * Mechanism: a Zustand vanilla store holds the list of mounted bindings (key, shift, description,
- * scope label, handler) in registration order, plus whether the shortcuts overlay is open. Every
+ * Mechanism: a Zustand vanilla store holds the list of mounted bindings (key, shift, fromControls,
+ * description, scope label, handler) in registration order, plus whether the shortcuts overlay is
+ * open. fromControls is an optional CSS selector naming the focused controls the binding still
+ * answers Enter and Space from (dispatch.ts gives every other focused control its own Enter and
+ * Space); register checks that it parses (PR #45 review round 4 b, PR #49 review round 1). Every
  * update returns a new list, never a mutated one. Keys compare case-insensitively ("s" and "S" are
  * the same key). A binding may ask for Shift (shift: true): it answers only while Shift is held.
  * A plain binding answers without Shift, and with Shift held too unless a chord of the same key is
@@ -10,8 +13,9 @@
  * typed with Shift still chooses a size (S46, O-474 as amended in PR #45 review rounds 1 and 3).
  * Duplicate policy: the later binding for a key and shift state wins while it is mounted, and the
  * earlier one becomes active again when the later unregisters, so a dialog or a nested panel can
- * take over a key for as long as it is on screen. The "?" key is reserved for the overlay and an empty
- * key is meaningless, so registering either throws a RangeError.
+ * take over a key for as long as it is on screen. The "?" key is reserved for the overlay and an
+ * empty key is meaningless, so registering either throws a RangeError, as does a fromControls
+ * selector that does not parse.
  */
 import { createStore, type StoreApi } from "zustand/vanilla";
 
@@ -26,10 +30,11 @@ export interface HotkeyBinding {
   /** True when the binding needs Shift held (a chord such as Shift+E); absent or false is the plain key. */
   readonly shift?: boolean;
   /**
-   * A selector of the focused controls this binding still answers Enter or Space from; by default
-   * a focused control (button, link, field, tab, menu item) keeps those keys (dispatch.ts). The
-   * quiz's submit names its option buttons, so Enter after choosing an option still submits while
-   * Enter on End quiz or a link does that control's own action (R3.16, PR #45 review round 4, b).
+   * A CSS selector of the focused controls this binding still answers Enter or Space from; the
+   * control itself must match it. By default a focused control (button, link, checkbox, tab, menu
+   * item) keeps those keys (dispatch.ts). The quiz's submit names its chosen option and its region
+   * checkboxes, so Enter there submits while Enter on End quiz or a link does that control's own
+   * action (R3.16, PR #45 review round 4 b, PR #49 review round 1).
    */
   readonly fromControls?: string;
   readonly description: string;
@@ -63,6 +68,20 @@ function requireBindableKey(key: string): void {
   if (key === SHORTCUTS_KEY) throw new RangeError(`the ${SHORTCUTS_KEY} key is reserved for the shortcuts overlay`);
 }
 
+/**
+ * A fromControls selector is checked once here, so the window listener never meets one that does
+ * not parse (PR #49 review round 1, finding 3). Without a document (no DOM) nothing can match, so
+ * nothing is checked.
+ */
+function requireValidSelector(selector: string | undefined): void {
+  if (selector === undefined || typeof document === "undefined") return;
+  try {
+    document.querySelector(selector);
+  } catch {
+    throw new RangeError(`the fromControls selector ${JSON.stringify(selector)} is not a valid CSS selector`);
+  }
+}
+
 /** A fresh, empty registry. Tests and isolated trees create their own; the app uses one default. */
 export function createHotkeyStore(): HotkeyStore {
   let nextId = 1;
@@ -71,6 +90,7 @@ export function createHotkeyStore(): HotkeyStore {
     overlayOpen: false,
     register: (binding) => {
       requireBindableKey(binding.key);
+      requireValidSelector(binding.fromControls);
       const id = nextId;
       nextId += 1;
       set((state) => ({ bindings: [...state.bindings, { ...binding, id }] }));
