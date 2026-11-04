@@ -15,6 +15,7 @@ import {
   displayBinding,
   findBinding,
   handleKeydown,
+  isPlainKey,
   useHotkey,
   type HotkeyStore,
 } from "../../src/hotkeys/index.js";
@@ -242,22 +243,47 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(onSpace).toHaveBeenCalledOnce();
   });
 
-  it("R3.16 a binding that asks for it still answers Enter from a focused control (the quiz's submit after choosing an option)", () => {
+  it("R3.16 R3.30 Enter on any focused control stays with it, whatever the binding; Enter on the page reaches it (PR #49 review round 2)", () => {
     const onSubmit = vi.fn();
-    function Submit() {
-      useHotkey({ key: "Enter", fromControls: true, description: "Submit", scope: "Quiz", handler: onSubmit });
-      return null;
-    }
     renderWithRoot(
       <>
-        <Submit />
+        <Probe hotkey="Enter" description="Submit" scope="Quiz" onPress={onSubmit} />
         <button type="button" aria-pressed="true">
           option
         </button>
+        <button type="button">End quiz</button>
+        <a href="#home">Home</a>
       </>,
     );
-    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
+    for (const name of ["option", "End quiz"]) fireEvent.keyDown(screen.getByRole("button", { name }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("link", { name: "Home" }), { key: "Enter" });
+    expect(onSubmit, "a focused control keeps its Enter: the quiz handles its own options locally").not.toHaveBeenCalled();
+    fireEvent.keyDown(document.body, { key: "Enter" });
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("R3.30 a digit or letter on a focused checkbox or radio never reaches a global binding: fields keep their keys (PR #49 review round 2)", () => {
+    const onDigit = vi.fn();
+    const onLetter = vi.fn();
+    renderWithRoot(
+      <>
+        <Probe hotkey="1" description="Size 1" onPress={onDigit} />
+        <Probe hotkey="f" description="Fold" onPress={onLetter} />
+        <label>
+          <input type="checkbox" /> Pairs
+        </label>
+        <label>
+          <input type="radio" name="r" /> Off
+        </label>
+      </>,
+    );
+    for (const field of [screen.getByRole("checkbox", { name: "Pairs" }), screen.getByRole("radio", { name: "Off" })]) {
+      fireEvent.keyDown(field, { key: "1" });
+      fireEvent.keyDown(field, { key: "f" });
+      fireEvent.keyDown(field, { key: "Enter" });
+    }
+    expect(onDigit).not.toHaveBeenCalled();
+    expect(onLetter).not.toHaveBeenCalled();
   });
 
   it("R3.30 a plain binding answers with Shift held unless a Shift chord of that key is registered (PR #45 review rounds 1 and 3)", () => {
@@ -380,5 +406,18 @@ describe("R3.30 PR #45 review round 3, finding 9: Space is listed as the replay 
     const session = within(overlay).getByRole("region", { name: "Session" });
     expect(within(session).getByText("Space")).toBeInTheDocument();
     expect(within(session).getByText("Skip the replay")).toBeInTheDocument();
+  });
+});
+
+describe("R3.30 PR #49 review round 3: one plain-key rule for the dispatch and the quiz's answer form", () => {
+  const BARE = { ctrlKey: false, altKey: false, metaKey: false, repeat: false };
+
+  it("R3.30 a key with no Ctrl, Alt or Meta and no auto-repeat is plain; Shift leaves it plain", () => {
+    expect(isPlainKey(BARE)).toBe(true);
+    expect(isPlainKey({ ...BARE, shiftKey: true } as typeof BARE)).toBe(true);
+  });
+
+  it("R3.30 Ctrl, Alt, Meta or a held key makes it not plain", () => {
+    for (const flag of ["ctrlKey", "altKey", "metaKey", "repeat"] as const) expect(isPlainKey({ ...BARE, [flag]: true }), flag).toBe(false);
   });
 });
