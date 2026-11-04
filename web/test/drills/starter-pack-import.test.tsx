@@ -190,4 +190,37 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     // One drill is named in the singular (PR #48 review round 3 LOW 5).
     expect(screen.getByTestId("library-status")).toHaveTextContent("Added 1 starter drill.");
   });
+
+  /** Fails the first import once with this answer, then lets every import through; returns the keys sent. */
+  async function retryAfterFirstAnswer(answer: () => Response): Promise<(string | undefined)[]> {
+    const user = userEvent.setup();
+    let failed = false;
+    const { sent } = renderDrills("/drills", {
+      override: (request) => {
+        if (failed || request.method !== "POST" || request.path !== IMPORT_PATH) return undefined;
+        failed = true;
+        return answer();
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    return sent("POST", IMPORT_PATH).map((request) => request.headers["idempotency-key"]);
+  }
+
+  it("R3.35 a code the api refused with a 4xx is retried under a fresh key, never the refused one (PR #48 review 4 finding 1)", async () => {
+    const refusal = { type: "urn:g-tee-oh:problem:rate-limited", title: "Too many requests", status: 429 };
+    const keys = await retryAfterFirstAnswer(() => jsonBody(429, refusal, "application/problem+json"));
+    expect(keys[0]).toBe("test-key-1-0");
+    expect(keys[1]).not.toBe("test-key-1-0");
+    expect(keys.slice(2)).toEqual(STARTER_PACK.slice(1).map((_, index) => `test-key-1-${index + 1}`));
+  });
+
+  it("R3.35 a code whose import failed with a 5xx keeps its key, so a request that did land is replayed (PR #48 review 4 finding 1)", async () => {
+    const failure = { type: "urn:g-tee-oh:problem:unknown", title: "Unavailable", status: 503 };
+    const keys = await retryAfterFirstAnswer(() => jsonBody(503, failure, "application/problem+json"));
+    expect(keys.slice(0, 2)).toEqual(["test-key-1-0", "test-key-1-0"]);
+  });
 });
