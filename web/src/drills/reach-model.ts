@@ -47,8 +47,8 @@ const KEY_SEPARATOR = "-";
 
 export const REACH_TEXT = {
   noConfig: "Names no configuration in the catalog.",
-  /** A configuration is reached but no hero seat pairs with anyone (round 3 LOW 9). */
-  noSeat: "Names no seat to train.",
+  /** A configuration is reached but no hero seat pairs with anyone (round 3 LOW 9); the next action with it (S48 critic G9). */
+  noSeat: "Names no seat to train: choose a hero seat on the Seats page.",
   counting: "Counting the spots this drill reaches.",
 } as const;
 

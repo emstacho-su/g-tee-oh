@@ -40,6 +40,8 @@ export const EXPLAIN_TEXT = {
   unavailable: "Ask is not available right now",
   /** The api's own warning text, used when an unvalidated answer arrives without one (O-308). */
   unvalidated: "Some numbers in this answer could not be checked against the solver data.",
+  /** The next action under any warning (S48 critic G9): the checked numbers sit in the feedback panel's Strategy table. */
+  warningNext: "For the solver's own numbers, read the Strategy table below this dialog.",
 } as const;
 
 const REASON_TEXT: Readonly<Record<AskStatus["reason"], string>> = {

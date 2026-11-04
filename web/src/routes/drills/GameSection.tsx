@@ -58,7 +58,8 @@ export const CUSTOM_LABELS = {
 
 function tableSizeChoices(current: number): Choice<string>[] {
   const sizes = OFFERED_TABLE_SIZES.includes(current) ? OFFERED_TABLE_SIZES : [current, ...OFFERED_TABLE_SIZES];
-  return sizes.map((size) => ({ value: String(size), label: `${size}-handed` }));
+  // "N players", the one word for a table size across the app (Study's picker, the settings, the progress spot words; S48 round 5 verifier).
+  return sizes.map((size) => ({ value: String(size), label: `${size} players` }));
 }
 
 function useStakeChoices(format: GameFormat, current: string): { choices: Choice<string>[]; failed: boolean } {

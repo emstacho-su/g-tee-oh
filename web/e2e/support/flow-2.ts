@@ -46,7 +46,8 @@ export async function buildRfiDrill(page: Page, shot: Flow2Shooter = NO_SHOTS): 
   await picker.getByRole("radiogroup", { name: "Stake" }).getByRole("radio", { name: /^Online/ }).click();
   await expect(picker.getByRole("group", { name: "Depths" }).getByRole("button", { name: /^100bb/ })).toHaveAttribute("aria-pressed", "true");
   // No hero yet, so the draft reaches no pair: the api rule (pairsAt) and the reach line agree (PR #48 round 3 LOW 9).
-  await expect(page.getByTestId("reach-status")).toHaveText("Names no seat to train.");
+  // The line names the next action too since the S48 fix pass (R3.14, critic G9).
+  await expect(page.getByTestId("reach-status")).toHaveText("Names no seat to train: choose a hero seat on the Seats page.");
   await openBuilderPage(page, "Seats");
   await page.getByRole("group", { name: "Hero positions" }).getByRole("checkbox", { name: "BTN" }).check();
   await expect(page.getByTestId("reach-status")).toContainText("Reaches");

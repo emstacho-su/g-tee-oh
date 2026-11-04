@@ -9,14 +9,14 @@
  * blinds and weight in percent of the class. Strategy with EV adds the best EV after the
  * frequencies; Compare to Best names the compared action and its served loss against the best in
  * percent of the pot (O-462, O-464). The canvas uses the short forms (one decimal EV, whole
- * percent weight, one decimal loss) because a 40 pixel cell has room for little more; the table
+ * percent weight, a loss of at most five characters) because a 40 pixel cell has room for little more; the table
  * carries the longer forms. These are display formats only; nothing is recomputed (ADR 0004).
  */
 import type { NodeAction } from "../../contracts.js";
 import { exactActionLabel, formatBb, formatCbb, formatPercent, formatShare } from "../../poker/format.js";
 import { actionStyle } from "../../theme/action-style.js";
 import { defaultLensPosition, type MatrixCell, type MatrixMode } from "./model.js";
-import { COMPARE_NEUTRAL_PCT_POT } from "./scales.js";
+import { atBest } from "./scales.js";
 
 const EV_TABLE_DECIMALS = 2;
 const LOSS_TABLE_DECIMALS = 2;
@@ -36,6 +36,14 @@ export const MISSING_MARK = "-";
 export const UNKNOWN_WEIGHT_MARK = "?";
 /** What a compare cell prints when the chosen action is the best there (within the neutral band). */
 export const BEST_MARK = "best";
+/** A row that carries no loss for an action (a short list, or not a number): never a made-up zero that reads as the best (code review round 1, 4). */
+export const LOSS_UNAVAILABLE_TEXT = "loss unavailable";
+
+/** The served loss of a cell for an action position, or null when the row carries none. */
+export function lossOf(cell: Pick<MatrixCell, "lossPctPot">, position: number): number | null {
+  const loss = cell.lossPctPot[position];
+  return loss !== undefined && Number.isFinite(loss) ? loss : null;
+}
 
 /** "F", "C", "R 2.5bb": the short letter, with the size for sized actions. */
 export function actionShortLabel(action: NodeAction): string {
@@ -54,9 +62,20 @@ export function formatWeightShort(weight: number): string {
   return `${Math.round(weight * PERCENT)}%`;
 }
 
-/** The canvas compare figure: "best" within the neutral band, else the loss as a negative percent of the pot. */
+/** Losses from here print as a whole percent, so the label never exceeds the canvas's five-character value budget. */
+const WHOLE_PERCENT_FROM = 10;
+
+/**
+ * The canvas compare figure: "best" within the neutral band, else the loss as a negative percent of
+ * the pot, one decimal under 10 ("-3.5%") and a whole percent from there ("-72%"), so the label
+ * fits the five characters a cell has room for (draw.ts VALUE_CHARS); a six-character "-72.0%"
+ * overran the cell and the shrunk 390 px canvas ran the labels together (S48 critic G2). The
+ * pop-out and the table keep the two-decimal figure.
+ */
 export function formatLossShort(lossPctPot: number): string {
-  return lossPctPot < COMPARE_NEUTRAL_PCT_POT ? BEST_MARK : `-${lossPctPot.toFixed(1)}%`;
+  if (atBest(lossPctPot)) return BEST_MARK;
+  const oneDecimal = lossPctPot.toFixed(1);
+  return Number(oneDecimal) >= WHOLE_PERCENT_FROM ? `-${Math.round(lossPctPot)}%` : `-${oneDecimal}%`;
 }
 
 function frequencyText(cell: MatrixCell, actions: readonly NodeAction[]): string {
@@ -67,14 +86,15 @@ function frequencyText(cell: MatrixCell, actions: readonly NodeAction[]): string
   return parts.length === 0 ? "no action" : parts.join(", ");
 }
 
-/** "Raise to 2.5bb is the best action" or "Raise to 2.5bb is 1.20% of the pot behind the best". */
+/** "Raise to 2.5bb is the best action", "Raise to 2.5bb is 1.20% of the pot behind the best" or "Raise to 2.5bb: loss unavailable". */
 function compareText(cell: MatrixCell, actions: readonly NodeAction[], lens: number | undefined): string {
   const position = lens ?? defaultLensPosition(actions);
   const action = position === null ? undefined : actions[position];
   if (action === undefined || position === null) return "no action to compare";
-  const loss = cell.lossPctPot[position] ?? 0;
+  const loss = lossOf(cell, position);
   const name = exactActionLabel(action);
-  if (loss < COMPARE_NEUTRAL_PCT_POT) return `${name} is the best action`;
+  if (loss === null) return `${name}: ${LOSS_UNAVAILABLE_TEXT}`;
+  if (atBest(loss)) return `${name} is the best action`;
   return `${name} is ${formatPercent(loss, LOSS_TABLE_DECIMALS)} of the pot behind the best`;
 }
 

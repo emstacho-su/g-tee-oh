@@ -77,6 +77,18 @@ describe("R3.13 tactile primitives (O-346)", () => {
     for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveClass(TACTILE_CLASS);
   });
 
+  it("R3.13 an idle ToggleGroup item draws a visible edge, so the one pressable choice beside dashed unavailable ones reads as pressable (round 5 verifier on study-settings-choices)", () => {
+    const options = [
+      { value: "a", label: "Only choice" },
+      { value: "b", label: "Gone", disabled: true, reason: "Not in the library" },
+    ] as const;
+    render(<ToggleGroup label="Seat" value={undefined} options={options} onValueChange={() => undefined} />);
+    const idle = screen.getByRole("radio", { name: "Only choice" });
+    expect(idle).toHaveClass("border", "border-border-strong");
+    expect(idle).not.toHaveClass("border-dashed");
+    expect(screen.getByRole("radio", { name: /Gone/ })).toHaveClass("border-dashed");
+  });
+
   it("R3.13 Card is a labelled region on the raised surface with optional description and actions", () => {
     render(
       <Card title="Streak" description="Days in a row" actions={<button type="button">Act</button>} testId="streak">

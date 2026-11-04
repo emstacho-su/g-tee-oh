@@ -4,8 +4,8 @@
  *
  * Mechanism: a router blocker (TanStack Router useBlocker with a resolver) blocks a navigation
  * when the draft is dirty and the next location is not a page of the same builder, and the
- * components/ui Dialog asks "Leave without saving?": Leave proceeds, Keep editing (or closing the
- * dialog) resets. Moving between pages of the same builder (/drills/new/<page> or
+ * components/ui Dialog asks "Leave without saving?": Keep editing (the first button, where focus
+ * lands, or closing the dialog) resets, Leave proceeds. Moving between pages of the same builder (/drills/new/<page> or
  * /drills/<id>/<page>, only the page differs) is not leaving. Whether the draft is dirty is read
  * from a ref at the moment of the navigation, so the caller can mark the draft clean right before
  * its own navigation after a save. A beforeunload listener is added only while the draft is
@@ -74,12 +74,15 @@ export function LeaveGuard({ dirtyRef, dirty }: LeaveGuardProps) {
       title={LEAVE_TEXT.title}
       description={LEAVE_TEXT.description}
     >
+      {/* The safe choice is first and the one filled button, so the dialog opens with focus on it and the
+          destructive choice reads apart from it; --danger is a shade of --accent in both themes, so two
+          filled buttons looked alike (S48 critic G10). */}
       <div className="flex flex-wrap gap-3">
-        <Button variant="danger" onClick={() => blocker.proceed()}>
-          {LEAVE_TEXT.leave}
-        </Button>
         <Button variant="primary" onClick={() => blocker.reset()}>
           {LEAVE_TEXT.stay}
+        </Button>
+        <Button variant="secondary" onClick={() => blocker.proceed()}>
+          {LEAVE_TEXT.leave}
         </Button>
       </div>
     </Dialog>

@@ -4,9 +4,11 @@
  * written with replace, so choosing never adds a history entry.
  *
  * The search is untrusted input: weeks must be one of the trend's offered spans (a number, or its
- * digits as text), and spot must have the shape of a spotKey (a solution uuid, "|", then a node key
- * of printable characters, bounded in length). Anything else is dropped and the page falls back to
- * its defaults: the default weeks and the first spot the api lists.
+ * digits as text), and spot must have the shape of a spotKey: a solution uuid, "|", then a node key
+ * the api's nodeKeySchema would take (1 to 512 characters of any kind, services/api/src/schemas/common.ts;
+ * PR 51 review round 2: a stricter shape here dropped a chosen spot the api serves). Anything else
+ * is dropped and the page falls back to its defaults: the default weeks and the first spot the
+ * api lists.
  */
 import { LEAK_WEEK_OPTIONS, type LeakWeeks } from "./types.js";
 
@@ -15,8 +17,10 @@ export interface ProgressSearch {
   readonly spot?: string;
 }
 
-const MAX_SPOT_KEY_LENGTH = 512;
-const SPOT_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\|[!-~]*$/;
+/** The api's MAX_NODE_KEY_LENGTH (schemas/common.ts), in UTF-16 units as zod's max counts them. */
+const MAX_NODE_KEY_LENGTH = 512;
+const SPOT_SEPARATOR = "|";
+const SOLUTION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function weeksOf(value: unknown): LeakWeeks | undefined {
   const number = typeof value === "string" && /^[0-9]+$/.test(value) ? Number(value) : value;
@@ -24,7 +28,12 @@ function weeksOf(value: unknown): LeakWeeks | undefined {
 }
 
 function spotOf(value: unknown): string | undefined {
-  return typeof value === "string" && value.length <= MAX_SPOT_KEY_LENGTH && SPOT_KEY_PATTERN.test(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const separator = value.indexOf(SPOT_SEPARATOR);
+  if (separator < 0) return undefined;
+  const solutionId = value.slice(0, separator);
+  const nodeKey = value.slice(separator + SPOT_SEPARATOR.length);
+  return SOLUTION_ID_PATTERN.test(solutionId) && nodeKey.length >= 1 && nodeKey.length <= MAX_NODE_KEY_LENGTH ? value : undefined;
 }
 
 export function validateProgressSearch(search: Record<string, unknown>): ProgressSearch {

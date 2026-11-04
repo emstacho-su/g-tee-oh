@@ -8,7 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { NODE_SWITCH_BUDGET_MS, buildNodeSwitchReport } from "../../e2e/bench/node-switch-report.js";
 import type { NodeSwitchBenchResult } from "../../src/bench/bench-api.js";
-import { benchNodes, runNodeSwitchBench } from "../../src/bench/node-switch.js";
+import { benchNodes, benchQueryClient, runNodeSwitchBench } from "../../src/bench/node-switch.js";
+import { ADVANTAGE_TEXT } from "../../src/components/panels/RangeAdvantageCard.js";
 
 const MACHINE = { name: "zenbook", os: "win32 10.0.26200", cpu: "Test CPU", cores: 20, memory_gb: 32 };
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
@@ -93,6 +94,48 @@ describe("R3.26 node-switch budget", () => {
     expect(outcome.p95).toBeGreaterThanOrEqual(outcome.p50);
     expect(outcome.nodes).toBe(benchNodes().length);
     // The loop unmounts its root when it is done, leaving the container empty.
+    expect(container.childElementCount).toBe(0);
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it("R3.26 a switch completes only once the Overview's advantage card has its data, so the budget covers the card's render (PR 52 review round 2; code review round 1, 3)", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const seen: { loading: boolean; card: boolean }[] = [];
+    await runNodeSwitchBench({
+      container,
+      switches: 2,
+      warmupSwitches: 0,
+      now: () => 1,
+      nextFrame: (callback) => {
+        // The frame after the switch completed: the card is drawn with its numbers, not its loading note.
+        const text = container.textContent ?? "";
+        seen.push({ loading: text.includes("Loading the range advantage."), card: text.includes(ADVANTAGE_TEXT.title) });
+        setTimeout(callback, 0);
+      },
+    });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((frame) => frame.card && !frame.loading)).toBe(true);
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it("R3.26 the bench client never refetches a revisited node, so no card re-render lands in the next measured window (code review round 3, 1)", () => {
+    const client = benchQueryClient();
+    expect(client.getDefaultOptions().queries?.staleTime).toBe(Number.POSITIVE_INFINITY);
+    expect(client.getDefaultOptions().queries?.retry).toBe(false);
+  });
+
+  it("R3.26 a switch whose frame never comes times out instead of hanging the bench (PR 52 review round 2)", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const container = document.createElement("div");
+    document.body.append(container);
+    await expect(
+      runNodeSwitchBench({ container, switches: 1, warmupSwitches: 0, now: () => 1, nextFrame: () => undefined, switchTimeoutMs: 20 }),
+    ).rejects.toThrow(/timed out/);
     expect(container.childElementCount).toBe(0);
     container.remove();
     vi.restoreAllMocks();

@@ -175,7 +175,8 @@ describe("R3.12 the Study rows are listed", () => {
 
   it("R3.12 the settings hotkey table lists every Study row", () => {
     for (const row of STUDY_HOTKEY_ROWS) expect(HOTKEY_ROWS).toContainEqual(row);
-    expect(STUDY_HOTKEY_ROWS.map((row) => row.key)).toEqual(["ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape"]);
+    // The rows carry the keycap words the table prints; the arrow keys read as words (S48 round 5 verifier).
+    expect(STUDY_HOTKEY_ROWS.map((row) => row.key)).toEqual(["Left arrow", "Right arrow", "R", "]", "[", "M", "S", "Escape"]);
   });
 });
 

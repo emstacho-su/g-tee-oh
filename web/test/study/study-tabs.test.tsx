@@ -1,132 +1,92 @@
 /**
- * Tests for the right column as tabs on the study screen (S45 follow-up, R3.26, item 10): a WAI-ARIA
- * tablist with Overview, Hands and Compare; Overview by default with the range table and the
- * advantage card; a tab's body and its reads mount only while it is open; the open tab is in the
- * address with replace and remembered per browser; a tab with no data at the node is absent; the
- * street-specific tab carries its street; Compare lists the served loss of every action for the
- * hand and opens the lens on the matrix.
+ * The study screen's right-column tabs (S45 follow-up, R3.12, R3.26; PR 52 review round 2
+ * leftovers for S48): Compare follows the hovered hand and, between hovers, the selected one,
+ * with no hover pin, so crossing cells on the way to its buttons never re-pins the wrong hand;
+ * choosing a tab updates the remembered view at once, so an address without a view shows the tab
+ * just chosen; and the same-node placeholder of the insights read recognises a key the query
+ * factory built.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR, fixtureRootNode } from "../../src/fixtures/study.js";
-import { STUDY_VIEW_STORAGE_KEY } from "../../src/store/preference-keys.js";
-import { nodeJson, renderStudy } from "./render-study.js";
+import { createAppApi } from "../../src/api/index.js";
+import { fixtureInsights, fixtureStudyNode } from "../../src/fixtures/index.js";
+import { COMPARE_TEXT } from "../../src/routes/study/CompareTab.js";
+import { sameNodePlaceholder } from "../../src/routes/study/HandInsights.js";
+import { StudyTabs } from "../../src/routes/study/StudyTabs.js";
+import { readStudyView } from "../../src/store/study-view.js";
+import { createHoverStore } from "../../src/study/hover-store.js";
+import { studyInsightsQuery } from "../../src/study/queries.js";
+import type { StudyView } from "../../src/study/study-views.js";
+import { createFakeFetch, jsonResponse } from "../api/fake-fetch.js";
+import { TEST_ORIGIN } from "../app/render-app.js";
 
-const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
-
-let spies: { mockRestore: () => void }[] = [];
-
-beforeEach(() => {
-  spies = [
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null),
-    vi.spyOn(console, "info").mockImplementation(() => undefined),
-  ];
-});
-
-afterEach(() => {
-  spies.forEach((spy) => spy.mockRestore());
-});
-
-function insightHands(requests: { path: string; query: Record<string, string> }[]): (string | undefined)[] {
-  return requests.filter((request) => request.path === "/api/v1/study/insights").map((request) => request.query["hand"]);
+function renderTabs(view: StudyView | undefined, selectedHand: string | undefined) {
+  const hover = createHoverStore();
+  const onViewChange = vi.fn();
+  const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: createFakeFetch({ "GET /api/v1/study/insights": [jsonResponse(200, fixtureInsights)] }).fetch });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view_ = render(
+    <QueryClientProvider client={client}>
+      <StudyTabs api={api} node={fixtureStudyNode} hover={hover} selectedHand={selectedHand} filters={[]} onToggleFilter={vi.fn()} view={view} onViewChange={onViewChange} onCompare={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  return { ...view_, hover, onViewChange };
 }
 
-describe("R3.26 the right column as tabs", () => {
-  it("R3.26 a tablist with Overview open by default, the range table and the advantage card inside it", async () => {
-    renderStudy(BASE);
-    const tablist = await screen.findByRole("tablist", { name: "Study panels" });
-    const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["Overview", "Hands Preflop", "Compare"]);
-    expect(within(tablist).getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-    const panel = screen.getByRole("tabpanel", { name: "Overview" });
-    expect(within(panel).getByRole("table", { name: /Range by action at this node/ })).toBeInTheDocument();
-    expect(await within(panel).findByRole("region", { name: "Range and nut advantage" })).toBeInTheDocument();
+describe("R3.12 Compare follows the hovered hand, else the selected one", () => {
+  it("R3.12 with nothing selected, Compare shows the hovered hand and asks for a cell once the hover ends: no hover pin", () => {
+    const { hover } = renderTabs("compare", undefined);
+    expect(screen.getByText(COMPARE_TEXT.pick)).toBeInTheDocument();
+    act(() => hover.set("AA"));
+    expect(screen.getByRole("list", { name: COMPARE_TEXT.list("AA") })).toBeInTheDocument();
+    act(() => hover.set("KK"));
+    expect(screen.getByRole("list", { name: COMPARE_TEXT.list("KK") })).toBeInTheDocument();
+    act(() => hover.set(null));
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.getByText(COMPARE_TEXT.pick)).toBeInTheDocument();
   });
 
-  it("R3.26 the Hands tab's reads mount only while it is open", async () => {
-    const user = userEvent.setup();
-    const { requests } = renderStudy(`${BASE}&hand=AKs`);
-    await screen.findByRole("region", { name: "Range and nut advantage" });
-    expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
-    // The advantage card reads with the selected hand (code review 2); the Hands tab shares that read.
-    expect(insightHands(requests)).toEqual(["AKs"]);
-    await user.click(screen.getByRole("tab", { name: /^Hands/ }));
-    expect(await screen.findByTestId("threshold-card")).toHaveTextContent("Your hand: AKs");
-    expect(insightHands(requests)).toEqual(["AKs"]);
+  it("R3.12 with a hand selected, Compare returns to it once the hover ends", () => {
+    const { hover } = renderTabs("compare", "QQ");
+    expect(screen.getByRole("list", { name: COMPARE_TEXT.list("QQ") })).toBeInTheDocument();
+    act(() => hover.set("AA"));
+    expect(screen.getByRole("list", { name: COMPARE_TEXT.list("AA") })).toBeInTheDocument();
+    act(() => hover.set(null));
+    expect(screen.getByRole("list", { name: COMPARE_TEXT.list("QQ") })).toBeInTheDocument();
   });
+});
 
-  it("R3.26 choosing a tab writes view to the address with replace and remembers it for this browser", async () => {
-    const user = userEvent.setup();
-    const { router } = renderStudy(BASE);
-    await screen.findByRole("tablist", { name: "Study panels" });
-    const depth = router.history.length;
-    await user.click(screen.getByRole("tab", { name: "Compare" }));
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ view: "compare" }));
-    expect(router.history.length).toBe(depth);
-    expect(JSON.parse(window.localStorage.getItem(STUDY_VIEW_STORAGE_KEY) ?? "null")).toBe("compare");
+describe("R3.12 the chosen tab is remembered at once", () => {
+  it("R3.12 choosing Compare with no view in the address shows Compare and stores it, so a later render without a view keeps it", async () => {
+    const { onViewChange, rerender, hover } = renderTabs(undefined, undefined);
+    const tabs = screen.getByRole("tablist");
+    expect(within(tabs).getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(within(tabs).getByRole("tab", { name: /Compare/ }));
+    expect(onViewChange).toHaveBeenCalledWith("compare");
+    expect(readStudyView()).toBe("compare");
+    // The address still names no view (the parent has not re-rendered with one): the chosen tab stays open.
+    expect(within(tabs).getByRole("tab", { name: /Compare/ })).toHaveAttribute("aria-selected", "true");
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <StudyTabs api={createAppApi({ baseUrl: TEST_ORIGIN, fetch: createFakeFetch({}).fetch })} node={fixtureStudyNode} hover={hover} selectedHand={undefined} filters={[]} onToggleFilter={vi.fn()} view={undefined} onViewChange={onViewChange} onCompare={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(within(screen.getByRole("tablist")).getByRole("tab", { name: /Compare/ })).toHaveAttribute("aria-selected", "true");
   });
+});
 
-  it("R3.26 the browser's last tab opens when the address names none, without rewriting the address", async () => {
-    window.localStorage.setItem(STUDY_VIEW_STORAGE_KEY, JSON.stringify("hands"));
-    const { router } = renderStudy(BASE);
-    expect(await screen.findByRole("tab", { name: /^Hands/ })).toHaveAttribute("aria-selected", "true");
-    expect(router.state.location.search).not.toHaveProperty("view");
-  });
-
-  it("R3.26 a fold-only node has no Compare tab and a view naming it opens Overview", async () => {
-    const foldOnly = {
-      ...fixtureRootNode,
-      actions: fixtureRootNode.actions.slice(0, 1),
-      range_by_action: [{ index: 0, share: 1 }],
-      hands: fixtureRootNode.hands.map((row) => ({ ...row, strategy: [1], ev_bb: [0], loss_pct_pot: [0] })),
-    };
-    renderStudy(`${BASE}&view=compare`, (request) => (request.path === "/api/v1/study/node" ? nodeJson(foldOnly) : undefined));
-    const tablist = await screen.findByRole("tablist", { name: "Study panels" });
-    expect(within(tablist).queryByRole("tab", { name: "Compare" })).not.toBeInTheDocument();
-    expect(within(tablist).getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("R3.26 the Hands tab carries its street as a badge", async () => {
-    renderStudy(BASE);
-    const hands = await screen.findByRole("tab", { name: /^Hands/ });
-    expect(within(hands).getByTestId("tab-badge")).toHaveTextContent("Preflop");
-  });
-
-  it("R3.26 each panel is named by its tab, badge included, with no label of its own (PR 52 review 1)", async () => {
-    renderStudy(`${BASE}&view=hands`);
-    const tab = await screen.findByRole("tab", { name: "Hands Preflop" });
-    const panel = await screen.findByRole("tabpanel", { name: "Hands Preflop" });
-    expect(panel).not.toHaveAttribute("aria-label");
-    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
-  });
-
-  it("R3.26 Compare lists each action's served loss for the hand and opens that lens on the matrix", async () => {
-    const user = userEvent.setup();
-    const { router } = renderStudy(`${BASE}&view=compare&hand=72o`);
-    const panel = await screen.findByRole("tabpanel", { name: "Compare" });
-    const row = fixtureRootNode.hands.find((candidate) => candidate.hand === "72o");
-    if (row === undefined) throw new Error("fixture has no 72o");
-    const list = within(panel).getByRole("list", { name: "72o against the best action" });
-    expect(within(list).getAllByRole("listitem")).toHaveLength(fixtureRootNode.actions.length);
-    expect(list).toHaveTextContent(`Raise to 2.5bb: ${(row.loss_pct_pot[2] ?? 0).toFixed(2)}% of the pot behind the best`);
-    await user.click(within(panel).getByRole("button", { name: "Compare Raise to 2.5bb on the matrix" }));
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ mode: "compare", lens: "2", view: "compare" }));
-  });
-
-  it("R3.26 Compare without a hand asks for one", async () => {
-    renderStudy(`${BASE}&view=compare`);
-    const panel = await screen.findByRole("tabpanel", { name: "Compare" });
-    expect(panel).toHaveTextContent("Pick a cell in the matrix to see what each action gives up against the best.");
-  });
-
-  it("R3.26 a matrix mode change keeps the open tab's body mounted", async () => {
-    const user = userEvent.setup();
-    renderStudy(BASE);
-    const table = await screen.findByRole("table", { name: /Range by action at this node/ });
-    await user.click(screen.getByRole("radio", { name: "EV" }));
-    await screen.findByRole("img", { name: /expected value mode/ });
-    expect(screen.getByRole("table", { name: /Range by action at this node/ })).toBe(table);
+describe("R3.12 the insights placeholder", () => {
+  it("R3.12 keeps the previous read for a key the query factory built for the same node, and drops it for another node", () => {
+    const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: createFakeFetch({}).fetch });
+    const node = { solution_id: fixtureStudyNode.solution_id, node_key: fixtureStudyNode.node_key };
+    const sameNode = studyInsightsQuery(api, { solutionId: node.solution_id, nodeKey: node.node_key, hand: "AA" }).queryKey;
+    const otherNode = studyInsightsQuery(api, { solutionId: node.solution_id, nodeKey: `${node.node_key}r250`, hand: "AA" }).queryKey;
+    const keep = sameNodePlaceholder(node);
+    expect(keep(fixtureInsights, { queryKey: sameNode })).toBe(fixtureInsights);
+    expect(keep(fixtureInsights, { queryKey: otherNode })).toBeUndefined();
+    expect(keep(fixtureInsights, undefined)).toBeUndefined();
   });
 });

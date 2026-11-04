@@ -205,7 +205,9 @@ export function DecisionArea(props: DecisionAreaProps) {
     >
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
-      {BEFORE_DECISION.has(state.kind) ? <RevealNotice key={promptKey} prompt={prompt} /> : null}
+      {BEFORE_DECISION.has(state.kind) ? (
+        <RevealNotice key={promptKey} prompt={prompt} {...("context" in state && state.context !== null ? { session: state.context.session } : {})} />
+      ) : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
       <ActionBar
         actions={prompt.buttons}

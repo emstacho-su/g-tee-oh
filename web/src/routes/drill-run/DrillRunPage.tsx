@@ -32,7 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
-import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
+import { RngExplainer, useFeedbackSections, useRngExplainer, type FeedbackSectionsControl } from "../../components/trainer/index.js";
 import { useStudyConfigs } from "../../trainer/use-study-configs.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
@@ -44,7 +44,7 @@ import { recapTallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch, type LeakOpen } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
-import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
+import { canEnd, type SessionContext, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "./CoverageNote.js";
 import { CoverageWatch } from "./CoverageWatch.js";
@@ -102,19 +102,25 @@ interface InSessionProps {
   drill: Drill;
   session: SpotSession;
   interactive: boolean;
+  /** The session's remembered section choices, owned by the screen so the recap's history shares them (O-387). */
+  feedbackSections: FeedbackSectionsControl;
   onAskEnd: () => void;
   onExplain: () => void;
   onExplainDialog: (open: boolean) => void;
 }
 
-function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
+/** The session whose section choices the screen keeps: the live one, or the ended one under its recap. */
+function sessionIdOf(state: SpotState): string | null {
+  if ("context" in state && state.context !== null) return state.context.session.session_id;
+  return state.kind === "ended" ? state.recap.session_id : null;
+}
+
+function InSession({ drill, session, interactive, feedbackSections, onAskEnd, onExplain, onExplainDialog }: InSessionProps) {
   // The table's replay of the line before the decision, owned by the session (S38, O-381 to O-383).
   const { state, replay } = session;
   const prompt = promptOf(state);
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   const context = "context" in state ? state.context : null;
-  // The feedback sections the user opened or closed stay that way for the session (O-387).
-  const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
   // The configurations for the reveal's Study this spot link (S46, R3.34).
   const studyConfigs = useStudyConfigs(state.kind === "feedback");
   // The session's own run settings decide, by the one rule (session-length.ts, PR #50 review).
@@ -183,14 +189,26 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284); the session pauses
   // the timer for the table's replay itself (O-381), at the drill's speed.
+  const trainer = runSettingsOf({ ...drill.trainer, ...overrides });
   const session = useSpotSession({
     spec: { mode: "drill", drillId: drill.id, seed },
     paused: !interactive,
-    trainer: runSettingsOf({ ...drill.trainer, ...overrides }),
+    trainer,
     sessionLength,
   });
   const { state } = session;
   const startPanel = onStartPanel(state);
+  // The feedback sections the user opened or closed stay that way for the session (O-387), through
+  // the recap's history too (S48 round 5 verifier on trainer-recap, R3.32).
+  const feedbackSections = useFeedbackSections(sessionIdOf(state));
+  // The context the api served, kept past the end so the recap's history reads the same stop rule
+  // the live list did, not a value derived again from the drill and the overrides (code review round
+  // 2, 6). Written in an effect, never during render (round 3, 2): the ended render reads the context
+  // the last live state's effect stored.
+  const lastContext = useRef<SessionContext | null>(null);
+  useEffect(() => {
+    if ("context" in state && state.context !== null) lastContext.current = state.context;
+  }, [state]);
   useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
   const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
   // The machine's state when an answer lands, read through a ref so a late answer sees the present.
@@ -224,7 +242,18 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
       ) : null}
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {noCoverage ? <CoverageWatch drill={drill} onCoverage={coverageArrived} /> : null}
-      {state.kind === "ended" ? <SessionRecapView recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onStartAnother={session.reset} /> : null}
+      {state.kind === "ended" ? (
+        <>
+          <SessionRecapView recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onStartAnother={session.reset} />
+          {/* The session's decisions stay reviewable under the totals: play fast, review later (R3.32, design rule 10). */}
+          <SessionHistoryList
+            log={session.log}
+            decisions={lastContext.current !== null && !oneDecisionPerHand(lastContext.current)}
+            onExplain={() => explainer.setOpen(true)}
+            sections={feedbackSections}
+          />
+        </>
+      ) : null}
       {startPanel ? (
         <StartPanel
           drill={{ ...drill, trainer: { ...drill.trainer, ...overrides } }}
@@ -243,7 +272,15 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
         />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
-        <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />
+        <InSession
+          drill={drill}
+          session={session}
+          interactive={interactive}
+          feedbackSections={feedbackSections}
+          onAskEnd={() => setConfirmOpen(true)}
+          onExplain={() => explainer.setOpen(true)}
+          onExplainDialog={setExplainDialogOpen}
+        />
       ) : null}
       {state.kind === "ending" ? <LoadingNote text={SESSION_TEXT.ending} /> : null}
       <EndSessionDialog open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={confirmEnd} />

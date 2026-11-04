@@ -147,8 +147,9 @@ export function DrillsPage({ search }: DrillsPageProps) {
     setAnnouncement(STARTER_TEXT.added(added.length));
     if (search.tag !== undefined) setTag(undefined);
   };
-  // One intent for the page (review HIGH 2): every button over it shares one key set.
-  const pack = useImportStarterPack(api, starterAdded);
+  // One intent for the page (review HIGH 2): every button over it shares one key set. A pack that
+  // failed partway announces what landed and keeps the user's tag filter (code review round 1, 5).
+  const pack = useImportStarterPack(api, { onImported: starterAdded, onPartial: (added) => setAnnouncement(STARTER_TEXT.added(added.length)) });
   const emptyUntagged = list.isSuccess && drills.length === 0 && search.tag === undefined;
   const offerInHeader = starterMarks.data !== undefined && missing.length > 0;
 

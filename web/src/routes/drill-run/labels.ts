@@ -75,7 +75,8 @@ export const SESSION_TEXT = {
  * prompt carries no node identity yet), so the notice names them and says so.
  */
 export const REVEAL_TEXT = {
-  notRated: "Revealed: this decision is not rated.",
+  /** The lead of the notice; the ranked reason follows it (unrated-reason.ts preDecisionReason, S48 round 5 verifier). */
+  notRated: "Not rated.",
   show: "Show this drill's panels",
   hide: "Hide this drill's panels",
   workedExample: "This is a worked example: the answer is part of the lesson.",

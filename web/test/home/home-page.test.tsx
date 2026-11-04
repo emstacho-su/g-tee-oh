@@ -21,7 +21,7 @@ import {
 } from "../../src/fixtures/progress.js";
 import { defaultHotkeyStore } from "../../src/hotkeys/index.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
-import { NO_CLASSES_TEXT, NO_LEAKS_TEXT } from "../../src/progress/queue-model.js";
+import { NO_CLASSES_TEXT, NO_LEAKS_TEXT, QUEUE_TIPS } from "../../src/progress/queue-model.js";
 import { COSMETIC_SLOTS, useCosmeticsStore, useThemeStore } from "../../src/store/index.js";
 import { jsonResponse, problemResponse, sessionResponse, type FetchScript, type ResponseFactory } from "../api/fake-fetch.js";
 import { renderApp } from "../app/render-app.js";
@@ -83,6 +83,15 @@ describe("R4.12 home queue card", () => {
     expect(leaks[0]).toHaveTextContent("42.0 bb per 1,000 hands");
     // With leaks to drill, Start training opens the costliest one (O-488) rather than linking to /train.
     expect(within(queue).getByRole("button", { name: "Start training" })).toBeInTheDocument();
+  });
+
+  it("R4.12 the queue defines a class and the leak cost where the counts appear (S48 critic G8)", async () => {
+    renderApp("/", seasoned);
+    await screen.findByTestId("queue-due");
+    const queue = card("Today's queue");
+    expect(within(queue).getByRole("button", { name: "About classes" })).toHaveAccessibleDescription(QUEUE_TIPS.classes);
+    expect(within(queue).getByRole("button", { name: "About the leak cost" })).toHaveAccessibleDescription(QUEUE_TIPS.leakCost);
+    expect(QUEUE_TIPS.leakCost).toMatch(/per 1,000 hands/);
   });
 
   it("R4.9 each top leak has a Drill button, and Start training opens the costliest leak's drill (O-488)", async () => {

@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createAppApi, ApiProblem } from "../../src/api/index.js";
-import { RatingCard, StreakBadge, UNRATED_HINT, UNRATED_TEXT } from "../../src/components/progress/index.js";
+import { RATING_TIPS, RatingCard, STREAK_TIPS, StreakBadge, UNRATED_HINT, UNRATED_TEXT } from "../../src/components/progress/index.js";
 import {
   fixtureFreshHeatmap,
   fixtureFreshRating,
@@ -135,6 +135,14 @@ describe("R4.12 RatingCard", () => {
     expect(screen.getByText("Updated Oct 27")).toBeInTheDocument();
   });
 
+  it("R4.12 the rating, its band and the tier are each defined where they appear (S48 critic G8)", () => {
+    render(<RatingCard rating={fixtureRating} />);
+    expect(screen.getByRole("button", { name: "About the rating" })).toHaveAccessibleDescription(RATING_TIPS.rating);
+    expect(screen.getByRole("button", { name: "About the tier" })).toHaveAccessibleDescription(RATING_TIPS.tier);
+    expect(RATING_TIPS.rating).toMatch(/deviation/);
+    expect(RATING_TIPS.tier).toMatch(/conservative rating/i);
+  });
+
   it("R4.12 says unrated with the way to get a rating before any rated session", () => {
     render(<RatingCard rating={fixtureFreshRating} footer={<a href="/progress">Open progress</a>} badge={<span>badge</span>} />);
     expect(screen.getByTestId("rating-value")).toHaveTextContent(UNRATED_TEXT);
@@ -161,6 +169,14 @@ describe("R4.14 StreakBadge", () => {
     expect(screen.getByText("Freezes left this week: 1")).toBeInTheDocument();
     expect(screen.getByTestId("streak-next")).toHaveTextContent("Next: 30 days unlocks the badge-streak-30 badge.");
     expect(screen.queryByTestId("streak-repair")).not.toBeInTheDocument();
+  });
+
+  it("R4.14 rated decisions and freezes are defined where the counts appear (S48 critic G8)", () => {
+    render(<StreakBadge streak={fixtureStreak} />);
+    expect(screen.getByRole("button", { name: "About rated decisions" })).toHaveAccessibleDescription(STREAK_TIPS.rated);
+    expect(screen.getByRole("button", { name: "About freezes" })).toHaveAccessibleDescription(STREAK_TIPS.freezes);
+    expect(STREAK_TIPS.rated).toMatch(/automated training/);
+    expect(STREAK_TIPS.freezes).toMatch(/missed day/);
   });
 
   it("R4.14 states a repairable day neutrally with the last local day of its window (api in Europe/Berlin)", () => {

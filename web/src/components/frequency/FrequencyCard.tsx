@@ -41,16 +41,13 @@ export interface FrequencyCardProps {
   onSpotChange?: (key: string) => void;
 }
 
-function gapOf(label: string, { yours, solver }: { yours: number; solver: number }): string {
-  return gapSentence(label, yours, solver);
-}
-
 function GapList({ spot, pooled }: { spot: SpotFrequency; pooled: FrequencyRow }) {
   return (
     <ul aria-label={FREQUENCY_TEXT.gaps} data-testid="frequency-gaps" className="flex flex-col gap-1 text-sm">
-      {spot.actions.map((action, position) => (
-        <li key={action.index}>{gapOf(action.label, shareAt(pooled, position))}</li>
-      ))}
+      {spot.actions.map((action, position) => {
+        const { yours, solver } = shareAt(pooled, position);
+        return <li key={action.index}>{gapSentence(action.label, yours, solver)}</li>;
+      })}
     </ul>
   );
 }

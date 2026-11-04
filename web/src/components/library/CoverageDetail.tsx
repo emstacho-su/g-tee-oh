@@ -34,7 +34,8 @@ export interface CoverageDetailProps {
 
 /** One-line definitions of the two statistics the tables carry (S47 critic, G8). */
 export const COLUMN_HELP = {
-  scenarios: "Scenarios: the pre-dealt turn and river runouts solved for the flop (ADR 0023).",
+  // Said in words: the decision behind it is ADR 0023, which product copy does not cite (S48 round 5 verifier).
+  scenarios: "Scenarios: the pre-dealt turn and river runouts solved for the flop.",
   priority: "Priority: the builder's order; a higher number is built sooner, and a request raises it.",
 } as const;
 

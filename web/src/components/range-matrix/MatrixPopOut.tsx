@@ -22,7 +22,7 @@ import { GRID_SIZE } from "../../poker/hands.js";
 import type { ThemeName } from "../../theme/action-style.js";
 import { ACTION_FILL_CLASSES, ActionSwatch, actionFillStyle } from "../trainer/ActionSwatch.js";
 import { TOOLTIP_LAYER_CLASS, cn } from "../ui/index.js";
-import { MISSING_TEXT, weightText } from "./cell-text.js";
+import { MISSING_TEXT, lossOf, weightText } from "./cell-text.js";
 import { MATRIX_PALETTES, evFill, evInk, lossFill, lossInk, weightFill, weightInk } from "./matrix-theme.js";
 import type { MatrixCell, MatrixMode } from "./model.js";
 
@@ -85,8 +85,11 @@ function flatFill(props: EnlargedCellProps): { background: string; color: string
   }
   if (mode === "weight") return { background: weightFill(palette, cell.weight) ?? palette.missingFill, color: weightInk(palette, cell.weight) };
   if (mode === "compare") {
-    if (lens === null) return { background: palette.missingFill, color: palette.labelText };
-    const loss = cell.lossPctPot[lens.position] ?? 0;
+    // No lens, or no loss for the action: the missing styling, as the canvas paints it (code review round 2, 1).
+    const missing = { background: palette.missingFill, color: palette.labelText };
+    if (lens === null) return missing;
+    const loss = lossOf(cell, lens.position);
+    if (loss === null) return missing;
     return { background: lossFill(palette, loss, lens.scalePctPot), color: lossInk(palette, loss, lens.scalePctPot) };
   }
   return null;

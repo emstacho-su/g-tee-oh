@@ -26,6 +26,7 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { STICKY_LAYER_CLASS } from "../../src/components/ui/index.js";
+import { isDue } from "../../src/progress/heatmap-model.js";
 import { NOT_ON_HEATMAP_REASON } from "../../src/progress/leak-model.js";
 import type { LeakItem, LeakWeeks } from "../../src/progress/types.js";
 
@@ -316,6 +317,70 @@ describe("R4.19 MasteryHeatMap Show choice", () => {
     expect(screen.getAllByTestId("heat-cell")).toHaveLength(10);
     fireEvent.click(within(show).getByRole("radio", { name: "All" }));
     expect(screen.getAllByTestId("heat-cell")).toHaveLength(CELL_COUNT);
+  });
+});
+
+describe("R4.19 the heat map's scroll cues", () => {
+  it("R4.19 the grid frame shows an edge cue toward the depth columns beyond its edge, following the scroll (round 5 verifier on progress-heatmap)", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const frame = screen.getByTestId("heat-grid");
+    for (const [name, value] of Object.entries({ clientWidth: 358, scrollWidth: 720, scrollLeft: 0 })) Object.defineProperty(frame, name, { value, configurable: true, writable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "false");
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    frame.scrollLeft = 362;
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "true");
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
+
+  it("R4.19 a Show change that swaps the rows but keeps their count still re-measures the cues (code review round 3, 3)", () => {
+    const due = fixtureHeatmap.cells.find(isDue);
+    const fresh = fixtureHeatmap.cells.find((each) => each.p_known === null);
+    const [firstRow, secondRow] = fixtureHeatmap.rows;
+    const [column] = fixtureHeatmap.columns;
+    if (due === undefined || fresh === undefined || firstRow === undefined || secondRow === undefined || column === undefined) throw new Error("the fixture lacks a due and a new cell");
+    // Due shows the first row alone and New the second alone: one row and one column either way.
+    const twoRows = { rows: [firstRow, secondRow], columns: [column], cells: [{ ...due, row: 0, column: 0 }, { ...fresh, row: 1, column: 0 }] };
+    render(<MasteryHeatMap heatmap={twoRows} onDrill={vi.fn()} />);
+    const show = screen.getByRole("radiogroup", { name: "Show" });
+    fireEvent.click(within(show).getByRole("radio", { name: "Due" }));
+    const frame = screen.getByTestId("heat-grid");
+    let scrollWidth = 720;
+    Object.defineProperty(frame, "clientWidth", { value: 358, configurable: true });
+    Object.defineProperty(frame, "scrollWidth", { get: () => scrollWidth, configurable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    scrollWidth = 358;
+    fireEvent.click(within(show).getByRole("radio", { name: "New" }));
+    expect(within(frame).getAllByRole("rowheader")).toHaveLength(1);
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
+
+  it("R4.19 a Show choice that narrows the table re-measures the cues without a scroll or a resize (code review round 2, 2)", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const frame = screen.getByTestId("heat-grid");
+    let scrollWidth = 720;
+    Object.defineProperty(frame, "clientWidth", { value: 358, configurable: true });
+    Object.defineProperty(frame, "scrollWidth", { get: () => scrollWidth, configurable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    // The narrowed table fits the frame: the cue must go without the user scrolling.
+    scrollWidth = 358;
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Show" })).getByRole("radio", { name: "New" }));
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
+});
+
+describe("R4.19 heat map rows without a cell", () => {
+  it("R4.19 All keeps a row the api lists even when it has no cell; a narrowed view leaves it out (PR 51 review round 2)", () => {
+    const withoutFirstRow = { ...fixtureHeatmap, cells: fixtureHeatmap.cells.filter((each) => each.row !== 0) };
+    render(<MasteryHeatMap heatmap={withoutFirstRow} onDrill={vi.fn()} />);
+    const rows = () => within(screen.getByTestId("heat-grid")).getAllByRole("rowheader");
+    expect(rows()).toHaveLength(fixtureHeatmap.rows.length);
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Show" })).getByRole("radio", { name: "New" }));
+    const rowsWithNew = new Set(withoutFirstRow.cells.filter((each) => each.p_known === null).map((each) => each.row));
+    expect(rows()).toHaveLength(rowsWithNew.size);
   });
 });
 

@@ -133,7 +133,7 @@ describe("R3.18 DriftCard", () => {
       <DriftCard spotClassKey={FIXTURE_SPOT_CLASS_KEY} attemptId={ATTEMPT_ID} />,
     );
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("Range drift could not load (status 503).");
+    expect(alert.textContent).toBe("Range drift could not load: the solver data is busy, so try again in a moment.");
     expect(alert.textContent).not.toContain("server detail text");
     await userEvent.click(screen.getByRole("button", { name: "Retry range drift" }));
     await screen.findByRole("table");
@@ -142,7 +142,7 @@ describe("R3.18 DriftCard", () => {
 
   it("R3.18 a network failure names no status", async () => {
     setup({ [DRIFT_PATH]: [networkFailure()] }, <DriftCard spotClassKey={FIXTURE_SPOT_CLASS_KEY} attemptId={ATTEMPT_ID} />);
-    expect((await screen.findByRole("alert")).textContent).toBe("Range drift could not load (network error).");
+    expect((await screen.findByRole("alert")).textContent).toBe("Range drift could not load: the network did not answer.");
   });
 
   it("R3.18 shows a loading note first", () => {

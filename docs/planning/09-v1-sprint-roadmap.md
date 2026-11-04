@@ -433,7 +433,7 @@ The bridge sprint, 2026-10-28 to 2026-11-04: S36 to S43 reworked the screens aft
 | Order | Session | What gates it | Who is present | Usage |
 |---|---|---|---|---|
 | 1 | S04 Mac run (the run sheet in the S04 handoff) | the branch pushed (done) | the owner at the Mac, about two hours | low |
-| 2 | S48 re-shoot and re-critique, with the fix pass queued in the S45 and S47 handoffs | pull request 50 merged (done) | agent | medium |
+| 2 | S48 re-shoot and re-critique, with the fix pass queued in the S45 and S47 handoffs (done 2026-11-04: 45 to 69 No became 92 Yes and 24 No over rounds 3 to 5; see screen-review-round4-auto) | pull request 50 merged (done) | agent | medium |
 | 3 | The owner's pre-S07 steps (the S07 handoff, Status 2026-11-04) | none | the owner, under an hour | none |
 | 4 | S07 sittings 1 and 2 | step 3 | the owner at the keyboard, two evenings | high |
 | 5 | S08 | S07 | agent | high |

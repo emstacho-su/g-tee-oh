@@ -163,7 +163,9 @@ describe("R3.19 More info as the inline Explanation section (O-388)", () => {
     );
     await openExplanation();
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("could not load (status 502)");
+    // The cause in words, never an HTTP status (S48 critic G4).
+    expect(alert).toHaveTextContent("The explanation could not load: the solver data did not answer.");
+    expect(alert).not.toHaveTextContent("status");
     expect(alert).not.toHaveTextContent("server detail text");
     await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.moreInfoRetry }));
     expect(await screen.findByRole("region", { name: fixtureMoreInfo.sections[0]?.title ?? "" })).toBeInTheDocument();
@@ -209,7 +211,7 @@ describe("R3.20 Ask button state", () => {
 
   it("R3.20 a status failure keeps Ask disabled with an alert and a retry", async () => {
     const { fake } = setup({ [STATUS_PATH]: [networkFailure(), jsonResponse(200, fixtureAskStatus)] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("could not load (network error)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not load: the network did not answer");
     expect(screen.getByRole("button", { name: EXPLAIN_TEXT.ask })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: EXPLAIN_TEXT.statusRetry }));
     await screen.findByTestId("ask-available");
@@ -258,6 +260,18 @@ describe("R3.20 Ask dialog", () => {
     const warning = await within(dialog).findByTestId("ask-warning");
     expect(warning).toHaveTextContent(`Warning: ${ASK_UNVALIDATED_WARNING}`);
     expect(within(dialog).getByTestId("ask-answer-text").textContent).toBe(fixtureAskWarning.text);
+  });
+
+  it("R3.20 a warning is followed by the next action: the Strategy table below holds the solver's own numbers (S48 critic G9)", async () => {
+    setup(askScript([fixtureAskAnswer, fixtureAskWarning]));
+    const dialog = await openAsk();
+    await send(dialog, QUESTION);
+    await within(dialog).findByTestId("ask-answer-text");
+    expect(within(dialog).queryByTestId("ask-warning-next")).not.toBeInTheDocument();
+    await send(dialog, "And calling?");
+    await within(dialog).findByTestId("ask-warning");
+    expect(within(dialog).getByTestId("ask-warning-next")).toHaveTextContent(EXPLAIN_TEXT.warningNext);
+    expect(EXPLAIN_TEXT.warningNext).toMatch(/Strategy/);
   });
 
   it("R3.20 an unvalidated answer without a warning text still shows the fixed warning", async () => {
@@ -316,7 +330,8 @@ describe("R3.20 Ask dialog", () => {
     const dialog = await openAsk();
     await send(dialog, QUESTION);
     const alert = await within(dialog).findByRole("alert");
-    expect(alert).toHaveTextContent("The answer could not load (status 502).");
+    expect(alert).toHaveTextContent("The answer could not load: the solver data did not answer.");
+    expect(alert).not.toHaveTextContent("status");
     expect(alert).not.toHaveTextContent("server detail text");
   });
 });

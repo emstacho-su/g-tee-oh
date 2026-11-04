@@ -22,6 +22,7 @@ import type { FetchScript } from "../api/fake-fetch.js";
 const ORIGIN = "http://localhost:4173";
 const NODE_PATH = "GET /api/v1/study/node";
 const INSIGHTS_PATH = "GET /api/v1/study/insights";
+const REQUEST_PATH = "POST /api/v1/coverage/requests";
 
 function setup(script: FetchScript, ui: ReactNode) {
   const fake = createFakeFetch(script);
@@ -131,7 +132,9 @@ describe("R3.13 FeedbackRangeView", () => {
       <FeedbackRangeView feedback={fixtureFeedback} />,
     );
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The range at this decision could not load (status 503)");
+    // The cause in words, never an HTTP status (S48 critic G4 on ask-disabled-cap).
+    expect(alert).toHaveTextContent("The range at this decision could not load: the solver data is busy, so try again in a moment.");
+    expect(alert).not.toHaveTextContent("status");
     expect(alert).not.toHaveTextContent("server detail text");
     await userEvent.click(screen.getByRole("button", { name: "Retry the range" }));
     expect(await screen.findByTestId("feedback-range-view")).toBeInTheDocument();
@@ -140,7 +143,32 @@ describe("R3.13 FeedbackRangeView", () => {
 
   it("R3.13 a network failure is explicit too", async () => {
     setup({ [NODE_PATH]: [networkFailure()] }, <FeedbackRangeView feedback={fixtureFeedback} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("The range at this decision could not load (network error)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The range at this decision could not load: the network did not answer");
+  });
+
+  it("R3.13 the failure row wraps, so the button keeps its width beside the cause at phone width (round 5 critic on ask-disabled-cap)", async () => {
+    setup({ [NODE_PATH]: [problemResponse(503, "solver-query-unavailable")] }, <FeedbackRangeView feedback={fixtureFeedback} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.parentElement).toHaveClass("flex-wrap");
+    expect(screen.getByRole("button", { name: "Retry the range" })).toHaveClass("shrink-0");
+  });
+
+  it("R3.13 a 404 offers Request this spot instead of Retry, keyed by the feedback's configuration and pair, and shows the request's answer (round 5 critic on ask-disabled-cap)", async () => {
+    const { fake } = setup(
+      {
+        [NODE_PATH]: [problemResponse(404, "not-found")],
+        [REQUEST_PATH]: [jsonResponse(202, { status: "queued", job_id: "job-1", priority: 5, queue_position: 1 })],
+      },
+      <FeedbackRangeView feedback={fixtureFeedback} />,
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The range at this decision could not load: the library has nothing for this spot.");
+    expect(screen.queryByRole("button", { name: "Retry the range" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Request this spot" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Queued for the builder at position 1.");
+    const request = fake.calls.find((call) => call.method === "POST" && call.path === "/api/v1/coverage/requests");
+    expect(JSON.parse(request?.body ?? "{}")).toEqual({ config_id: fixtureFeedback.config_id, pair: fixtureFeedback.pair });
+    expect(fake.keys().filter((key) => key === NODE_PATH)).toHaveLength(1);
   });
 });
 
@@ -206,15 +234,17 @@ describe("R3.13 FeedbackThreshold", () => {
       <FeedbackThreshold feedback={fixtureFeedback} />,
     );
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The threshold card could not load (status 502)");
+    expect(alert).toHaveTextContent("The threshold card could not load: the solver data did not answer.");
     expect(alert).not.toHaveTextContent("server detail text");
     await userEvent.click(screen.getByRole("button", { name: "Retry the threshold card" }));
     await waitFor(() => expect(screen.getByTestId("threshold-card")).toBeInTheDocument());
     expect(fake.keys()).toEqual([INSIGHTS_PATH, INSIGHTS_PATH]);
   });
 
-  it("R3.13 a 404 of another kind is an error, not the out-of-range note", async () => {
+  it("R3.13 a 404 of another kind is an error, not the out-of-range note, and offers Request this spot rather than Retry", async () => {
     setup({ [INSIGHTS_PATH]: [problemResponse(404, "not-found")] }, <FeedbackThreshold feedback={fixtureFeedback} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("The threshold card could not load (status 404)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The threshold card could not load: the library has nothing for this spot.");
+    expect(screen.queryByRole("button", { name: "Retry the threshold card" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request this spot" })).toBeInTheDocument();
   });
 });

@@ -90,7 +90,8 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
   it("R3.16 action: the node's actions as buttons with a swatch, and the hand", async () => {
     await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, fixturePredictionPrompt("action"))] });
     await question("action");
-    const group = screen.getByRole("group", { name: "Most frequent action" });
+    // One vocabulary with the start screen's Easy line and the api's question (S48 critic G6).
+    const group = screen.getByRole("group", { name: "Highest-EV action" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["FFold", "CCall", "RRaise to 10bb", "RRaise to 25bb"]);
     expect(within(group).getAllByTestId("action-swatch")).toHaveLength(4);
     expect(screen.getByText("A5s")).toBeInTheDocument();

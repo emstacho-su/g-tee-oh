@@ -43,9 +43,14 @@ export function evStep(evBb: number, scaleBb: number): number {
   return evBb > 0 ? step : -step;
 }
 
+/** True when a served loss is within the neutral band of the best action: the one rule every compare surface reads (S48 leftover). */
+export function atBest(lossPctPot: number): boolean {
+  return !(lossPctPot >= COMPARE_NEUTRAL_PCT_POT);
+}
+
 /** The compare step of a served loss in percent of the pot: 0 at or near the best, 1 to 5 behind it (O-464). */
 export function lossStep(lossPctPot: number, scalePctPot: number): number {
-  if (!(lossPctPot >= COMPARE_NEUTRAL_PCT_POT)) return 0;
+  if (atBest(lossPctPot)) return 0;
   const share = Math.min(1, lossPctPot / scalePctPot);
   return Math.min(COMPARE_STEPS, Math.max(1, Math.ceil(share * COMPARE_STEPS)));
 }
@@ -143,7 +148,8 @@ export function compareLegend(scalePctPot: number): readonly LegendStep[] {
     if (step === 0) return { step, short: "best", long: `best, or within ${pctPot(COMPARE_NEUTRAL_PCT_POT)} of the pot of it` };
     const lower = step === 1 ? COMPARE_NEUTRAL_PCT_POT : ((step - 1) * scalePctPot) / COMPARE_STEPS;
     const upper = (step * scalePctPot) / COMPARE_STEPS;
-    const short = `-${upper.toFixed(SHORT_DECIMALS)}`;
+    // The tick carries its unit, as the weight ticks do (S48 critic G6).
+    const short = `-${upper.toFixed(SHORT_DECIMALS)}%`;
     if (step === COMPARE_STEPS) return { step, short, long: `more than ${pctPot(lower)} of the pot behind the best` };
     return { step, short, long: `${pctPot(lower)} to ${pctPot(upper)} of the pot behind the best` };
   });

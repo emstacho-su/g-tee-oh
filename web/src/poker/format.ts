@@ -85,7 +85,12 @@ export function exactActionLabel(action: NodeAction): string {
   return sizedActionLabel(action.kind, action.size_cbb);
 }
 
-/** The label of an action kind at a size in cbb (null for an unsized kind); shared with tokenActionLabel. */
+/**
+ * The label of an action kind at a size in cbb (null for an unsized kind); shared with
+ * tokenActionLabel. The all-in rule lives here, the one place every label passes through: no
+ * caller names a sized all-in by any other route (tokenActionLabel's sized tokens are s, b and r),
+ * so one rule is the whole story (PR 52 review round 2, settled in code review round 1, 9).
+ */
 export function sizedActionLabel(kind: NodeAction["kind"], sizeCbb: number | null): string {
   const name = actionStyle(kind).name;
   if (sizeCbb === null || kind === "all_in") return name;

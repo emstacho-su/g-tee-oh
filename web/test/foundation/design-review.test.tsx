@@ -8,7 +8,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -25,6 +25,7 @@ import {
   TACTILE_CLASS,
   ToggleGroup,
 } from "../../src/components/ui/index.js";
+import { overflowOf } from "../../src/components/ui/PillNav.js";
 
 // vitest runs from web/ (the package root), as the other source-reading tests assume.
 const SRC = join(process.cwd(), "src");
@@ -200,5 +201,99 @@ describe("R3.13 the shared nav pill list", () => {
     const inactive = NAV_PILL_LINK_PROPS.inactiveProps.className.split(" ");
     expect(active.filter((name) => inactive.includes(name))).toEqual([]);
     expect(active).toContain("font-semibold");
+  });
+
+  /** jsdom lays nothing out, so the row's and the pills' measures are set by hand. */
+  function measure(element: Element, values: Readonly<Record<string, number>>): void {
+    for (const [name, value] of Object.entries(values)) Object.defineProperty(element, name, { value, configurable: true });
+  }
+
+  interface Pill {
+    readonly name: string;
+    /** The link text, the name unless a marker is appended (BuilderNav's ", needs a fix"). */
+    readonly label?: string;
+  }
+
+  function rowOf(current: string, pills: readonly Pill[] = [{ name: "A" }, { name: "B" }, { name: "C" }]) {
+    return (
+      <PillNav label="Sections">
+        {pills.map((pill) => (
+          <li key={pill.name}>
+            <a href={`/${pill.name}`} {...(pill.name === current ? { "aria-current": "page" as const } : {})}>
+              {pill.label ?? pill.name}
+            </a>
+          </li>
+        ))}
+      </PillNav>
+    );
+  }
+
+  /** Lays the pills out 250 px apart, 80 px wide, in a 300 px row with 600 px of content. */
+  function layOut(list: Element, names: readonly string[], width = 80): void {
+    measure(list, { clientWidth: 300, scrollWidth: 600, offsetLeft: 0 });
+    for (const [index, name] of names.entries()) measure(screen.getByRole("link", { name: new RegExp(`^${name}`) }), { offsetLeft: index * 250, offsetWidth: width });
+  }
+
+  function renderRow(current: string) {
+    const view = render(rowOf(current));
+    const list = screen.getByRole("list");
+    layOut(list, ["A", "B", "C"]);
+    // The measures landed after the mount, so the row is told to look again.
+    fireEvent.scroll(list);
+    return { ...view, list };
+  }
+
+  it("R3.13 the row's edge cues show only toward the pills beyond the edge, and follow the scroll (S48 critic G2)", () => {
+    const { list } = renderRow("A");
+    const cue = (side: "start" | "end") => screen.getByTestId(`nav-${side}-fade`);
+    expect(cue("start")).toHaveAttribute("aria-hidden", "true");
+    expect(cue("end")).toHaveAttribute("aria-hidden", "true");
+    // Nothing is scrolled: pills lie beyond the end only.
+    expect(cue("start")).toHaveAttribute("data-shown", "false");
+    expect(cue("end")).toHaveAttribute("data-shown", "true");
+    list.scrollLeft = 300;
+    fireEvent.scroll(list);
+    expect(cue("start")).toHaveAttribute("data-shown", "true");
+    expect(cue("end")).toHaveAttribute("data-shown", "false");
+  });
+
+  it("R3.13 the aria-current pill is scrolled into the row when the page changes, by the row's own scroll (S48 critic G10)", async () => {
+    const { list, rerender } = renderRow("A");
+    expect(list.scrollLeft).toBe(0);
+    rerender(rowOf("C"));
+    // C sits at 500 to 580 in a 300 px row: scrolled so its right edge plus the pad is in view.
+    await waitFor(() => expect(list.scrollLeft).toBe(296));
+    rerender(rowOf("A"));
+    await waitFor(() => expect(list.scrollLeft).toBe(0));
+  });
+
+  it("R3.13 the cues and the reveal follow a change of the pills themselves: one added, one widened (code review round 1, 1)", async () => {
+    const { rerender } = render(rowOf("B", [{ name: "A" }, { name: "B" }]));
+    const list = screen.getByRole("list");
+    // Two pills fit the row: no cue either way.
+    measure(list, { clientWidth: 300, scrollWidth: 300, offsetLeft: 0 });
+    fireEvent.scroll(list);
+    expect(screen.getByTestId("nav-end-fade")).toHaveAttribute("data-shown", "false");
+    // A third pill arrives (the admin pills once the session resolves) and is the current one, beyond the edge.
+    rerender(rowOf("C", [{ name: "A" }, { name: "B" }, { name: "C" }]));
+    layOut(list, ["A", "B", "C"]);
+    await waitFor(() => expect(list.scrollLeft).toBe(296));
+    expect(screen.getByTestId("nav-start-fade")).toHaveAttribute("data-shown", "true");
+    // The user scrolls back to the start; a relabel of the current pill (", needs a fix") re-measures the
+    // cues but never scrolls the row away from where the user left it (code review round 2, 3).
+    list.scrollLeft = 0;
+    fireEvent.scroll(list);
+    rerender(rowOf("C", [{ name: "A" }, { name: "B" }, { name: "C", label: "C, needs a fix" }]));
+    layOut(list, ["A", "B", "C"], 160);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(list.scrollLeft).toBe(0);
+    expect(screen.getByTestId("nav-end-fade")).toHaveAttribute("data-shown", "true");
+  });
+
+  it("R3.13 overflowOf ignores a sub-pixel scroll at either edge, so a fractional reveal shows no start chevron at rest (code review round 1, 2)", () => {
+    expect(overflowOf({ scrollLeft: 0.5, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: false, end: true });
+    expect(overflowOf({ scrollLeft: 2, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: true, end: true });
+    expect(overflowOf({ scrollLeft: 299.5, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: true, end: false });
+    expect(overflowOf({ scrollLeft: 0, clientWidth: 300, scrollWidth: 300 })).toEqual({ start: false, end: false });
   });
 });

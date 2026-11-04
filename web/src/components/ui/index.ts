@@ -9,6 +9,8 @@ export { CONTROL_EDGE_CLASS, FIELD_CLASS, FLAT_REST_CLASS, FOCUS_MARK_CLASS, RAI
 export { DIALOG_LAYER_CLASS, HEADER_LAYER_CLASS, OVERLAY_LAYER_CLASS, STICKY_LAYER_CLASS, TOOLTIP_LAYER_CLASS } from "./layers.js";
 export { NAV_PILL_LINK_PROPS, PillNav } from "./PillNav.js";
 export type { PillNavProps } from "./PillNav.js";
+export { EdgeCue, overflowOf, useEdgeCues } from "./EdgeCue.js";
+export type { EdgeCueProps, EdgeCues, RowMeasure, RowOverflow } from "./EdgeCue.js";
 export { Dialog } from "./Dialog.js";
 export { Disclosure } from "./Disclosure.js";
 export type { DisclosureHeadingLevel, DisclosureProps } from "./Disclosure.js";

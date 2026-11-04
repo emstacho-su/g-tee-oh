@@ -118,7 +118,8 @@ function ButtonSection() {
             </Button>
           </div>
         ))}
-        <div data-testid="press-row" className="flex items-center gap-3">
+        {/* Wraps at phone width, so the held button keeps its rest size and its label one line (S48 critic G2). */}
+        <div data-testid="press-row" className="flex flex-wrap items-center gap-3">
           <Button data-testid="press-neighbour-before">Before</Button>
           <Button data-testid="press-target" variant="primary" size="lg">
             Press and hold

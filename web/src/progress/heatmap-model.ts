@@ -85,10 +85,10 @@ export const HEAT_SHOW_LABELS: Readonly<Record<HeatShowMode, string>> = {
 
 /** The WEAKEST_COUNT practiced cells with the lowest known share; a tie keeps the one the api lists first. */
 function weakestCells(cells: readonly HeatmapCell[]): HeatmapCell[] {
+  // Only practiced cells rank, so each carries its known share (no fallback, PR #51 review round 2 LOW).
   const ranked = cells
-    .map((cell, index) => ({ cell, index }))
-    .filter((entry) => isPracticed(entry.cell))
-    .sort((left, right) => (left.cell.p_known ?? 0) - (right.cell.p_known ?? 0) || left.index - right.index)
+    .flatMap((cell, index) => (cell.p_known === null ? [] : [{ cell, index, known: cell.p_known }]))
+    .sort((left, right) => left.known - right.known || left.index - right.index)
     .slice(0, WEAKEST_COUNT);
   const kept = new Set(ranked.map((entry) => entry.cell));
   return cells.filter((cell) => kept.has(cell));

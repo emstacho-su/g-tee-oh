@@ -19,6 +19,7 @@ import {
   useHotkey,
   type HotkeyStore,
 } from "../../src/hotkeys/index.js";
+import { REPEAT_HAND_DESCRIPTION } from "../../src/hotkeys/reserved.js";
 
 interface ProbeProps {
   hotkey: string;
@@ -372,6 +373,14 @@ describe("R3.13 ShortcutsOverlay", () => {
     expect(within(overlay).getByText("Shift+E")).toBeInTheDocument();
     expect(displayBinding({ key: "e", shift: true })).toBe("Shift+E");
     expect(displayBinding({ key: "Enter" })).toBe("Enter");
+    // Arrow keys print as words, never as the raw key codes (round 5 verifier on settings-hotkeys).
+    expect(displayBinding({ key: "ArrowLeft" })).toBe("Left arrow");
+    expect(displayBinding({ key: "ArrowRight" })).toBe("Right arrow");
+    expect(displayBinding({ key: "ArrowUp" })).toBe("Up arrow");
+    expect(displayBinding({ key: "ArrowDown" })).toBe("Down arrow");
+    // The reserved row stays, worded for a user: no "api" in product copy.
+    expect(REPEAT_HAND_DESCRIPTION).toMatch(/reserved/);
+    expect(REPEAT_HAND_DESCRIPTION).not.toMatch(/\bapi\b/i);
   });
 
   it("R3.13 does not dispatch other hotkeys while open, and Escape closes it", async () => {

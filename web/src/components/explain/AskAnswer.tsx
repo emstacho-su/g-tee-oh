@@ -7,7 +7,8 @@
  * answer (it spent nothing, O-306) carries a "From the cache" note. An answer the validator could
  * not check carries the api's warning (O-308), prefixed with the word "Warning:" and a symbol, so
  * color is never the only signal; when the api sends no warning text for an unvalidated answer,
- * the same fixed sentence is shown.
+ * the same fixed sentence is shown. Under any warning a fixed line names the next action: the
+ * feedback panel's Strategy table below the dialog holds the solver's own numbers (S48 critic G9).
  */
 import type { AskResult } from "../../contracts.js";
 import { EXPLAIN_TEXT } from "../../explain/texts.js";
@@ -28,12 +29,18 @@ export function AskAnswer({ result }: AskAnswerProps) {
   return (
     <div data-testid="ask-answer" data-validated={result.validated} data-cached={result.cached} className="flex flex-col gap-2">
       {warning === null ? null : (
-        <p data-testid="ask-warning" className="text-sm text-warning">
-          <span aria-hidden="true" className="mr-1">
-            {WARNING_SYMBOL}
-          </span>
-          {`${EXPLAIN_TEXT.warningPrefix} ${warning}`}
-        </p>
+        <div className="flex flex-col gap-1 text-sm">
+          <p data-testid="ask-warning" className="text-warning">
+            <span aria-hidden="true" className="mr-1">
+              {WARNING_SYMBOL}
+            </span>
+            {`${EXPLAIN_TEXT.warningPrefix} ${warning}`}
+          </p>
+          {/* A warning names the cause; this names the next action (S48 critic G9): the feedback panel's Strategy table. */}
+          <p data-testid="ask-warning-next" className="text-muted">
+            {EXPLAIN_TEXT.warningNext}
+          </p>
+        </div>
       )}
       <p data-testid="ask-answer-text" className="whitespace-pre-line">
         {result.text}

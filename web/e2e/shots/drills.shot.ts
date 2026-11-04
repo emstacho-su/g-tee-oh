@@ -111,7 +111,10 @@ async function builderScreens(page: Page, shot: ReturnType<typeof shooter>): Pro
   await shot("drills-builder-manual-hands", CRITERIA.builderManual);
 
   await openBuilderPage(page, "Game");
-  await page.getByLabel("Depths (bb)").fill("100, abc");
+  // The typed fields sit under the "Advanced: custom game" disclosure since S47 (R3.37, O-485).
+  const advanced = page.getByRole("button", { name: "Advanced: custom game" });
+  if ((await advanced.getAttribute("aria-expanded")) !== "true") await advanced.click();
+  await page.getByLabel("Custom depths (bb)").fill("100, abc");
   await page.getByRole("button", { name: "Save drill" }).click();
   await expect(page.getByTestId("form-alert").getByRole("link", { name: "Game: 1 field to fix" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Drill sections" }).getByRole("link", { name: "Game, needs a fix" })).toBeVisible();

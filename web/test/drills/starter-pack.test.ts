@@ -95,4 +95,14 @@ describe("R3.35 the starter drill pack", () => {
     expect(missing).toContain(third.key);
     expect(missing).toHaveLength(STARTER_PACK.length - 2);
   });
+
+  it("R3.14 the name fallback counts only a drill with no starter id tag: one starter drill renamed to another's name hides neither (PR 51 review round 2)", () => {
+    const [first, second] = STARTER_PACK;
+    if (first === undefined || second === undefined) throw new Error("the pack has fewer than two drills");
+    // The first starter drill, renamed by the user to the second's name: its id tag says which it is.
+    const listed = [{ name: second.name, tags: [STARTER_TAG, starterIdTag(first)] }];
+    const missing = missingStarterDrills(listed).map((entry) => entry.key);
+    expect(missing).not.toContain(first.key);
+    expect(missing).toContain(second.key);
+  });
 });

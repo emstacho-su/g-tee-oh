@@ -91,3 +91,9 @@ export function freshText(fresh: number): string {
 
 export const NO_LEAKS_TEXT = "No leaks measured yet. Rated decisions build the leak list.";
 export const NO_CLASSES_TEXT = "No spot classes are in the library yet.";
+
+/** The definitions where the counts appear (S48 critic G8): what a class is, and what the leak cost measures. */
+export const QUEUE_TIPS = {
+  classes: "A class is one spot family at one position pair, format and depth: the unit the heat map on Progress practises and rates.",
+  leakCost: "The leak cost is the EV you give up in big blinds per 1,000 hands dealt in that class, measured on your rated decisions.",
+} as const;

@@ -88,6 +88,7 @@ export function FeedbackRangeView({ feedback }: FeedbackRangeViewProps) {
         error={query.error}
         retryLabel="Retry the range"
         onRetry={() => void query.refetch()}
+        spot={{ configId: feedback.config_id, pair: feedback.pair }}
       />
     );
   }

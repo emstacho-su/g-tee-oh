@@ -15,7 +15,7 @@
     {
       "path": "docs/handoffs/S04-mac-bootstrap.md",
       "source": "vault/handoffs/S04-mac-bootstrap.md",
-      "sha256": "726da8221ef15ce3c5157d5a1edf5f572420e610f99cda2efb9a8f083bec403e"
+      "sha256": "e16e8aae2d643318016bd8c8f972454cc09a19de5b4ce9aa0fce5c3613b9348a"
     },
     {
       "path": "docs/handoffs/S05-test-vectors.md",
@@ -150,7 +150,7 @@
     {
       "path": "docs/planning/09-v1-sprint-roadmap.md",
       "source": "vault/planning/09-v1-sprint-roadmap.md",
-      "sha256": "3666b399e37ef594a660175115f14ecf672e39d65982c1b668c5a6f673429184"
+      "sha256": "18049fbc46437d156a75d243a403b36e9e737d4011e486d3b9e9894850c5f1be"
     },
     {
       "path": "docs/planning/10-traceability.md",
@@ -160,7 +160,7 @@
     {
       "path": "docs/planning/phases/phase-0-foundations.md",
       "source": "vault/planning/phases/phase-0-foundations.md",
-      "sha256": "59856370b39efe1e5d139b443b325906983662a48de7443f383cdfd74d00f4c8"
+      "sha256": "69b9f392dbf48e406b9ec8d69b79b6beb756a92d166da335403d0e9afedcf0a0"
     },
     {
       "path": "docs/planning/phases/phase-2-engine-and-pipeline.md",
@@ -170,7 +170,7 @@
     {
       "path": "docs/planning/phases/phase-3-preflop-trainer.md",
       "source": "vault/planning/phases/phase-3-preflop-trainer.md",
-      "sha256": "b4c73aecc072941e4ac2b0ba2efe117c926bd162bcf38bfd1c8480021250e44d"
+      "sha256": "4d19bfb01bf69737ca45336325fcbe54dda8752de14b6ee28b0335af96598746"
     },
     {
       "path": "docs/planning/phases/phase-4-rating-and-release.md",

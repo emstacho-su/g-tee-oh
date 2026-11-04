@@ -80,6 +80,27 @@ describe("R3.4 Start again on coverage_added", () => {
     await screen.findByRole("group", { name: "Actions" });
   });
 
+  it("R3.4 a failed baseline read is tried once more before the watch settles for an empty baseline (PR 51 review round 2)", async () => {
+    const { streams, deps } = withStreams();
+    const view = renderRun({
+      libraryDeps: deps,
+      script: {
+        [START_PATH]: [problemResponse(422, "no-coverage")],
+        [CONFIGS_PATH]: [CONFIGS],
+        // The first baseline read fails; the retry already shows the drill's pair covered, so Start is offered.
+        [PAIRS_PATH]: [problemResponse(503, "unavailable"), pairsWith(true)],
+      },
+    });
+    await refuse(view, streams);
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
+    // The retry waits (BASELINE_RETRY_DELAY_MS), so a 429 or 503 is not asked again in the same tick (code review round 1, 6).
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByTestId("start-note")).toHaveTextContent("Start again.");
+  });
+
   it("R3.4 an event for another configuration or another pair at the same configuration does nothing", async () => {
     const { streams, deps } = withStreams();
     const view = renderRun({

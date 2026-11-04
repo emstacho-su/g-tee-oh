@@ -14,9 +14,10 @@
  * representation: each name states the class and every value (S36 review, O-347; no table). Family
  * headings, pair headers and the tooltip title read in words (spot-words.ts, S47). A Show choice
  * (R4.19) narrows the grid to the due, new or ten weakest classes; a row with no class left is not
- * drawn, nor, in a narrowed view, a column with none (PR #51 review 8).
+ * drawn, nor a column with none (PR #51 review 8); the All view keeps every row and column the
+ * api lists, cells or not (PR #51 review round 2).
  */
-import { useState, type CSSProperties } from "react";
+import { useLayoutEffect, useState, type CSSProperties } from "react";
 
 import {
   cellLookup,
@@ -36,10 +37,13 @@ import {
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import { capitalize, familyWords, pairWords } from "../../progress/spot-words.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
-import { cn, STICKY_LAYER_CLASS, ToggleGroup } from "../ui/index.js";
+import { cn, EdgeCue, STICKY_LAYER_CLASS, ToggleGroup, useEdgeCues } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
+
+/** The grid frame's edge cues: "heat-start-fade" and "heat-end-fade". */
+const CUE_PREFIX = "heat";
 
 export const NO_CLASSES_TEXT = "No spot classes in the library yet.";
 export const OPEN_DRILL_HINT = "Select a cell to drill that spot.";
@@ -144,6 +148,7 @@ interface HeatGridProps {
 function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   const lookup = cellLookup(heatmap);
   const tooltip = useTooltipAnchor();
+  const frame = useEdgeCues<HTMLDivElement>();
   const [active, setActive] = useState<HeatCellView | null>(null);
   const show = (view: HeatCellView, element: Element) => {
     setActive(view);
@@ -157,13 +162,25 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   // Each shown column keeps its api index, so cells are still found by (row, column).
   const columns = heatmap.columns.flatMap((column, index) => (narrowed && !columnsWithCells.has(index) ? [] : [{ column, index }]));
   const columnCount = columns.length + 1;
-  // A row with no cell left after the Show choice is not drawn, nor a family with no row left.
+  // In a narrowed view a row with no cell left is not drawn, nor a family with no row left; All
+  // keeps every row the api lists, cells or not (PR #51 review round 2).
   const rowsShown = new Set(heatmap.cells.map((cell) => cell.row));
   const groups = groupRowsByFamily(heatmap.rows)
-    .map((group) => ({ ...group, rows: group.rows.filter((entry) => rowsShown.has(entry.index)) }))
+    .map((group) => ({ ...group, rows: narrowed ? group.rows.filter((entry) => rowsShown.has(entry.index)) : group.rows }))
     .filter((group) => group.rows.length > 0);
+  // A Show choice changes the table's width inside an unchanged frame, which no scroll or resize
+  // reports, so the cues are measured again after each change of what is drawn (code review round
+  // 2, 2), keyed on which rows and columns show, not how many: a view that swaps one row for another
+  // of the same count changes the widths too (round 3, 3).
+  const { measure } = frame;
+  const shownKey = [columns.map((entry) => entry.index).join(","), groups.flatMap((group) => group.rows.map((entry) => entry.index)).join(",")].join("|");
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, shownKey]);
   return (
-    <div className="max-w-full overflow-x-auto" data-testid="heat-grid">
+    <div className="relative">
+      {/* The frame scrolls sideways at phone width; the shared edge cues say the depth columns continue (S48 round 5 verifier). */}
+      <div ref={frame.ref} onScroll={frame.measure} className="max-w-full overflow-x-auto" data-testid="heat-grid">
       <table className="border-separate border-spacing-1 text-left text-sm">
         <caption className="sr-only">Mastery by spot class. {OPEN_DRILL_HINT}</caption>
         <thead>
@@ -217,6 +234,9 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
           </>
         )}
       </ChartTooltip>
+      </div>
+      <EdgeCue side="start" shown={frame.cues.start} prefix={CUE_PREFIX} />
+      <EdgeCue side="end" shown={frame.cues.end} prefix={CUE_PREFIX} />
     </div>
   );
 }

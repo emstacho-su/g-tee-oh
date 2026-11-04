@@ -9,7 +9,9 @@ import type { MockProgress } from "../../e2e/support/mock-progress.js";
 import { createMockSessionRoute, mockSessionRoute } from "../../e2e/support/mock-sessions.js";
 import { FIXTURE_BLOCK_SIZE, fixtureHoldoutProgress, fixtureRatedBlock, fixtureWorkedBlock } from "../../src/fixtures/automated.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
-import type { SessionRecap } from "../../src/trainer/session-types.js";
+import { reachOf } from "../../src/drills/reach-model.js";
+import { fixtureConfigs, fixturePairsByConfig } from "../../src/fixtures/study.js";
+import type { Drill, SessionRecap } from "../../src/trainer/session-types.js";
 import {
   FIXTURE_DRILL_ID,
   FIXTURE_FULL_HAND_DRILL_ID,
@@ -24,6 +26,7 @@ import {
   fixtureStreetDrill,
   fixtureStreetHands,
   fixtureTrainerHands,
+  fixtureUncoveredDrill,
 } from "../../src/fixtures/trainer.js";
 
 const SIGNED = { [CSRF_HEADER]: FIXTURE_CSRF_TOKEN };
@@ -158,7 +161,8 @@ describe("R3.13 mocked session routes", () => {
     decide(api, id, { state_version: version, action_index: 0, response_ms: 1 });
     const end = api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED, body: {} }));
     expect(end.status).toBe(200);
-    expect(end.body).toMatchObject({ session_id: id, decisions: 1, rated_decisions: 1, mean_score: 0.84, ev_loss_bb_total: 0.011 });
+    // A drill session is never rated, so its recap counts no rated decision, as the api's count(*) filter (where rated) does (round 5 verifier).
+    expect(end.body).toMatchObject({ session_id: id, decisions: 1, rated_decisions: 0, mean_score: 0.84, ev_loss_bb_total: 0.011 });
     expect(api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED, body: {} })).body).toEqual(end.body);
     expect(next(api, id).status).toBe(409);
     expect(decide(api, id, { state_version: version + 1, action_index: 0, response_ms: 1 }).status).toBe(409);
@@ -198,6 +202,14 @@ describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)"
     const refused = startDrill(signedInApi(), FIXTURE_UNCOVERED_DRILL_ID);
     expect(refused.status).toBe(422);
     expect(refused.body).toMatchObject({ type: "urn:g-tee-oh:problem:no-coverage", pairs_total: 1, pairs_queued: 1 });
+  });
+
+  it("R3.23 the uncovered drill reaches a pair the mock catalog does not cover, so CoverageWatch leaves the refusal on screen for its shot", () => {
+    const served = signedInApi().handle(request("GET", `/api/v1/drills/${FIXTURE_UNCOVERED_DRILL_ID}`)).body as Drill;
+    expect(served).toEqual(fixtureUncoveredDrill);
+    const reach = reachOf(fixtureUncoveredDrill.spot_filter, fixtureConfigs, fixturePairsByConfig);
+    expect(reach?.spots).toBe(1);
+    expect(reach?.covered).toBe(0);
   });
 
   it("R3.13 drillOf supplies drills from another mocked route; the fixtures stay the fallback", () => {

@@ -57,6 +57,12 @@ describe("R3.27 Study reopens on the last spot", () => {
     expect(screen.queryByText("Opening your last spot.")).not.toBeInTheDocument();
   });
 
+  it("R3.27 a bare /study with a view keeps that tab over the stored spot's (PR 52 review round 2)", async () => {
+    useStudySpotsStore.getState().recordConfirmed({ ...SPOT, view: "hands" });
+    const { router } = renderStudy("/study?view=compare");
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ pair: FIXTURE_STUDY_PAIR, view: "compare" }));
+  });
+
   it("R3.27 a bare /study with a matrix mode keeps that mode over the stored spot's (code review 2)", async () => {
     useStudySpotsStore.getState().recordConfirmed({ ...SPOT, mode: "ev" });
     const { router } = renderStudy("/study?mode=weight");

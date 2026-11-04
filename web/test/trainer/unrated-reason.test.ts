@@ -10,11 +10,33 @@ import { fixtureFeedback, fixturePrompt } from "../../src/fixtures/index.js";
 import { fixturePracticeSession } from "../../src/fixtures/trainer.js";
 import { REVEALING_PANELS } from "../../src/trainer/revealing-panels.js";
 import type { PracticeSession } from "../../src/trainer/session-types.js";
-import { UNRATED_REASONS, unratedReason } from "../../src/trainer/unrated-reason.js";
+import { UNRATED_REASONS, preDecisionReason, unratedReason } from "../../src/trainer/unrated-reason.js";
 
 const CLEAN: DecisionFeedback = { ...fixtureFeedback, rated: false, noise_flags: [] };
 const PLAIN_PROMPT: TrainerPrompt = { ...fixturePrompt, worked_example: false, visible_panels: [] };
 const AUTOMATED: PracticeSession = { ...fixturePracticeSession, mode: "automated", rated_eligible: true, drill_id: null };
+
+describe("R3.33 the pre-decision reason follows the chip's order (code review round 2, 5)", () => {
+  const revealing: TrainerPrompt = { ...PLAIN_PROMPT, visible_panels: [...REVEALING_PANELS] };
+  const worked: TrainerPrompt = { ...PLAIN_PROMPT, worked_example: true };
+
+  it("R3.33 a plain prompt gives no reason, whatever the session", () => {
+    expect(preDecisionReason(PLAIN_PROMPT, AUTOMATED)).toBeNull();
+    expect(preDecisionReason(PLAIN_PROMPT, fixturePracticeSession)).toBeNull();
+  });
+
+  it("R3.33 the session's mode comes first, then an ineligible session's rating rule, then the prompt", () => {
+    expect(preDecisionReason(revealing, fixturePracticeSession)).toBe(UNRATED_REASONS.drill);
+    expect(preDecisionReason(worked, { ...AUTOMATED, mode: "holdout" })).toBe(UNRATED_REASONS.holdout);
+    // Ineligible but not the seeded shape (no block): the rating rule, as the chip says after the decision.
+    const ineligible: PracticeSession = { ...AUTOMATED, rated_eligible: false, automated: null };
+    expect(preDecisionReason(revealing, ineligible)).toBe(UNRATED_REASONS.rule);
+    expect(preDecisionReason(revealing, ineligible)).toBe(unratedReason(CLEAN, revealing, ineligible));
+    expect(preDecisionReason(revealing, AUTOMATED)).toBe(UNRATED_REASONS.revealed);
+    expect(preDecisionReason(worked, AUTOMATED)).toBe(UNRATED_REASONS.workedExample);
+    expect(preDecisionReason(revealing, undefined)).toBe(UNRATED_REASONS.revealed);
+  });
+});
 
 describe("R3.13 unrated reason", () => {
   it("R3.13 a rated decision has no reason", () => {

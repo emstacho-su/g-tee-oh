@@ -61,10 +61,16 @@ export async function capture(
 ): Promise<ShotRecord> {
   // Park the pointer in the corner so no button is caught in its hover state.
   await page.mouse.move(0, 0);
+  // A full-page shot taken after a scroll paints the sticky header mid-page (O-450), so start at the top.
+  if ("goto" in target) await page.evaluate(() => window.scrollTo(0, 0));
   await settle(page);
   const file = join(directory, `${shot.screen}-${shot.theme}-${shot.viewport.label}.png`);
   if ("goto" in target) await target.screenshot({ path: file, fullPage: true });
   else await target.screenshot({ path: file });
+  // A full-page shot resizes the viewport for the capture and back; two more frames let the layout
+  // (a canvas matrix sized from its slot) settle before the next step reads or shoots the page (S48
+  // verifier: a transient 1x1 viewport showed in a study shot taken right after one).
+  await settle(page);
   return {
     screen: shot.screen,
     theme: shot.theme,

@@ -144,7 +144,7 @@ describe("R3.16 Previous (O-414)", APP_SUITE, () => {
     expect(within(review).getByText("Suited wheel ace raises.")).toBeInTheDocument();
     expect(within(review).queryByRole("textbox")).not.toBeInTheDocument();
     expect(within(review).getByRole("button", { name: /Raise to 10bb/ })).toHaveAttribute("aria-pressed", "true");
-    for (const button of within(within(review).getByRole("group", { name: "Most frequent action" })).getAllByRole("button")) expect(button).toBeDisabled();
+    for (const button of within(within(review).getByRole("group", { name: "Highest-EV action" })).getAllByRole("button")) expect(button).toBeDisabled();
     expect(within(review).getByTestId("prediction-result")).toBeInTheDocument();
     expect(within(review).queryByRole("button", { name: "Next question" })).not.toBeInTheDocument();
     expect(within(review).queryByRole("button", { name: "Submit answer" })).not.toBeInTheDocument();

@@ -37,9 +37,17 @@ const SPACE_NAME = "Space";
 const SHIFT_PREFIX = "Shift+";
 
 /** Single letters print upper case, as on the keycap; the space bar prints its name. */
+/** Key codes that read as words, never as the raw code (S48 round 5 verifier on settings-hotkeys). */
+const KEY_NAMES: Readonly<Record<string, string>> = {
+  ArrowLeft: "Left arrow",
+  ArrowRight: "Right arrow",
+  ArrowUp: "Up arrow",
+  ArrowDown: "Down arrow",
+};
+
 export function displayKey(key: string): string {
   if (key === SPACE_KEY) return SPACE_NAME;
-  return key.length === 1 ? key.toUpperCase() : key;
+  return KEY_NAMES[key] ?? (key.length === 1 ? key.toUpperCase() : key);
 }
 
 /** The keycap text of a binding: "Shift+E", "Enter", "F". */

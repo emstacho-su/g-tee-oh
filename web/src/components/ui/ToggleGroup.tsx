@@ -42,8 +42,13 @@ export interface ToggleGroupProps<T extends string> {
   wrap?: boolean;
 }
 
+/**
+ * Every item draws the checked edge, so an idle item reads as pressable even when it is the one
+ * available choice beside dashed unavailable ones (S48 round 5 verifier on study-settings-choices).
+ */
 const ITEM_CLASSES = cn(
   "rounded-lg px-3 py-1 text-sm text-muted",
+  CONTROL_EDGE_CLASS,
   TACTILE_CLASS,
   FLAT_REST_CLASS,
   "data-[state=on]:bg-surface-raised data-[state=on]:font-semibold data-[state=on]:text-text",
@@ -51,7 +56,7 @@ const ITEM_CLASSES = cn(
 );
 const STACKED_ITEM_CLASSES = "flex flex-col items-start text-left";
 /** Unavailable items read as such by their dashed edge and their reason, never by fading the text. */
-const UNAVAILABLE_ITEM_CLASSES = "cursor-not-allowed border border-dashed border-border-strong";
+const UNAVAILABLE_ITEM_CLASSES = "cursor-not-allowed border-dashed";
 const SECOND_LINE_CLASSES = "text-xs font-normal";
 const REASON_LINE_CLASSES = "text-xs font-medium";
 /** Separates the lines in the accessible name ("2/5 10% rake No 9-player game at this stake"). */

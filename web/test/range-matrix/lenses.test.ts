@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MODE_NAMES, cellValueText, formatLossShort } from "../../src/components/range-matrix/cell-text.js";
+import { MISSING_MARK, MODE_NAMES, cellValueText, formatLossShort } from "../../src/components/range-matrix/cell-text.js";
 import { cellEdges, drawMatrix, type DrawOptions } from "../../src/components/range-matrix/draw.js";
 import { MATRIX_PALETTES, lossFill, lossInk } from "../../src/components/range-matrix/matrix-theme.js";
 import {
@@ -145,6 +145,42 @@ describe("R3.24 compare-to-best scale (O-464)", () => {
     expect(steps.map((step) => step.step)).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
+  it("R3.12 the compare ticks carry their unit, as the weight ticks do (S48 critic G6)", () => {
+    const ticks = compareLegend(2).map((step) => step.short);
+    expect(ticks[0]).toBe("best");
+    expect(ticks.slice(1)).toEqual(["-0.4%", "-0.8%", "-1.2%", "-1.6%", "-2.0%"]);
+  });
+
+  it("R3.12 a cell with no loss for the compared action paints as missing on the canvas, never as the best (code review round 2, 1)", () => {
+    const withoutLoss = { ...model, cells: model.cells.map((cell) => (cell.hand === "AA" ? { ...cell, lossPctPot: [] } : cell)) };
+    const aa = cellOf(withoutLoss, "AA");
+    const ops = draw(withoutLoss, { mode: "compare", lensPosition: 2 });
+    const rect = cellRect(aa);
+    expect(fillsIn(ops, rect).some((op) => op.style === palette.missingFill)).toBe(true);
+    expect(fillsIn(ops, rect).some((op) => op.style === palette.evNeutral)).toBe(false);
+    const texts = textsIn(ops, rect);
+    expect(texts.map((op) => op.text)).toEqual([aa.hand, MISSING_MARK]);
+    expect(texts.every((op) => op.style === palette.labelText)).toBe(true);
+  });
+
+  it("R3.12 a missing or non-numeric loss reads unavailable in the table text, never the best action (code review round 1, 4)", () => {
+    const aa = cellOf(model, "AA");
+    const short = { ...aa, lossPctPot: [0] };
+    expect(cellValueText(short, model.actions, "compare", 2)).toBe("Raise to 2.5bb: loss unavailable");
+    expect(cellValueText({ ...aa, lossPctPot: [0, Number.NaN] }, model.actions, "compare", 1)).toBe("Call: loss unavailable");
+    expect(cellValueText({ ...aa, lossPctPot: [0, 0.04] }, model.actions, "compare", 1)).toBe("Call is the best action");
+  });
+
+  it("R3.12 the canvas loss label fits the five-character value budget: a whole percent from 10, one decimal under (S48 critic G2)", () => {
+    expect(formatLossShort(72.04)).toBe("-72%");
+    expect(formatLossShort(35.3)).toBe("-35%");
+    expect(formatLossShort(100)).toBe("-100%");
+    expect(formatLossShort(9.96)).toBe("-10%");
+    expect(formatLossShort(3.52)).toBe("-3.5%");
+    expect(formatLossShort(0.1)).toBe("-0.1%");
+    for (const loss of [0.1, 0.55, 3.52, 9.94, 9.96, 35.3, 72.04, 100, 250]) expect(formatLossShort(loss).length).toBeLessThanOrEqual(5);
+  });
+
   it("R3.24 the loss fill is the EV palette's neutral for the best and its negative steps otherwise, with the step's ink", () => {
     expect(lossFill(palette, 0, 2)).toBe(palette.evNeutral);
     expect(lossInk(palette, 0, 2)).toBe(palette.evNeutralInk);
@@ -210,7 +246,8 @@ describe("R3.24 compare to best", () => {
     const behind = model.cells.find((cell) => (cell.lossPctPot[lensPosition] ?? 0) >= 1);
     if (best === undefined || behind === undefined) throw new Error("fixture has no best and behind cells for the raise");
     expect(formatLossShort(best.lossPctPot[lensPosition] ?? 0)).toBe("best");
-    expect(formatLossShort(behind.lossPctPot[lensPosition] ?? 0)).toMatch(/^-\d+\.\d%$/);
+    // One decimal under 10 percent of the pot, a whole percent from there (S48 critic G2).
+    expect(formatLossShort(behind.lossPctPot[lensPosition] ?? 0)).toMatch(/^-\d+(\.\d)?%$/);
     expect(formatLossShort(0.04)).toBe("best");
     const ops = draw(model, { mode: "compare", lensPosition });
     expect(fillsIn(ops, cellRect(best)).some((op) => op.style === palette.evNeutral)).toBe(true);

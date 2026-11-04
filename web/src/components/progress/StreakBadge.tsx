@@ -14,7 +14,16 @@ import type { ReactNode } from "react";
 
 import { formatShortDate } from "../../progress/format.js";
 import type { ProgressStreak } from "../../progress/types.js";
+import { InfoTip } from "../ui/index.js";
 import { ProgressCard } from "./ProgressCard.js";
+
+/** The definitions where the counts appear (S48 critic G8): the api's rules in words (streaks/rules.ts, grading/policy.ts). */
+export const STREAK_TIPS = {
+  rated:
+    "A rated decision can move your rating: a first attempt in automated training with the answer panels hidden and no close-call flag. Drills, worked examples and holdout retests are not rated.",
+  freezes:
+    "A missed day inside a streak takes a freeze by itself, so the streak holds; the week's freezes come back on Monday. A missed day with none left can still be repaired.",
+} as const;
 
 export interface StreakBadgeProps {
   streak: ProgressStreak;
@@ -37,14 +46,21 @@ export function StreakBadge({ streak, describeCosmetic = (key) => key, footer }:
         <span className="text-sm text-muted">Longest {days(streak.longest_days)}</span>
       </p>
       <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2 text-sm">
-          <span>Today</span>
-          <meter min={0} max={streak.day_minimum} value={Math.min(streak.today_rated, streak.day_minimum)} className="h-3 w-32" />
-          <span className="tabular-nums" data-testid="streak-today">
-            {streak.today_rated} of {streak.day_minimum} rated decisions{todayDone ? " (day counted)" : ""}
-          </span>
-        </label>
-        <p className="text-sm text-muted">Freezes left this week: {streak.freezes_left_this_week}</p>
+        {/* The tip sits beside the label, not inside it: a label's click would land on the first button within it. */}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <span>Today</span>
+            <meter min={0} max={streak.day_minimum} value={Math.min(streak.today_rated, streak.day_minimum)} className="h-3 w-32" />
+            <span className="tabular-nums" data-testid="streak-today">
+              {streak.today_rated} of {streak.day_minimum} rated decisions{todayDone ? " (day counted)" : ""}
+            </span>
+          </label>
+          <InfoTip subject="rated decisions">{STREAK_TIPS.rated}</InfoTip>
+        </div>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span>Freezes left this week: {streak.freezes_left_this_week}</span>
+          <InfoTip subject="freezes">{STREAK_TIPS.freezes}</InfoTip>
+        </p>
       </div>
       {streak.repairable === null ? null : (
         <p className="text-sm" data-testid="streak-repair">

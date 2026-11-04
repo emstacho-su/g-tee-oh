@@ -19,7 +19,7 @@ import { useAppApi } from "../../auth/index.js";
 import { askQuestion, askStatusKey, type AskInput } from "../../explain/queries.js";
 import { ASK_QUESTION_MAX_CHARS, askProblemText, EXPLAIN_TEXT, questionCounterText } from "../../explain/texts.js";
 import { useTrainerDeps } from "../../trainer/trainer-deps.js";
-import { failureReason } from "../trainer/FeedbackQueryState.js";
+import { failureSentence } from "../trainer/FeedbackQueryState.js";
 import { Button, Dialog, LoadingNote } from "../ui/index.js";
 import { AskAnswer } from "./AskAnswer.js";
 
@@ -34,7 +34,7 @@ interface AskFailureProps {
 }
 
 function AskFailure({ error }: AskFailureProps) {
-  const text = askProblemText(error) ?? `${EXPLAIN_TEXT.answerSubject} could not load (${failureReason(error)}).`;
+  const text = askProblemText(error) ?? failureSentence(EXPLAIN_TEXT.answerSubject, error);
   return (
     <p role="alert" className="text-sm text-danger">
       {text}

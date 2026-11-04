@@ -144,6 +144,20 @@ describe("R3.14 the leave guard (PM note 3, O-405)", { timeout: PAGES_TEST_TIMEO
     expect(await screen.findByRole("heading", { level: 1, name: "Drill library" })).toBeInTheDocument();
   });
 
+  it("R3.14 the guard opens on Keep editing, the one filled button; Leave is the plain secondary after it (S48 critic G10)", async () => {
+    const { user } = await newBuilder();
+    await user.type(screen.getByLabelText("Name"), "Unsaved");
+    await leaveByNav(user);
+    const dialog = await screen.findByRole("dialog", { name: "Leave without saving?" });
+    const keep = within(dialog).getByRole("button", { name: "Keep editing" });
+    const leave = within(dialog).getByRole("button", { name: "Leave" });
+    await waitFor(() => expect(keep).toHaveFocus());
+    expect(keep).toHaveClass("bg-accent");
+    expect(leave).not.toHaveClass("bg-accent");
+    expect(leave).not.toHaveClass("bg-danger");
+    expect(keep.compareDocumentPosition(leave) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("R3.14 a clean draft leaves without asking", async () => {
     const { user, view } = await newBuilder();
     await leaveByNav(user);

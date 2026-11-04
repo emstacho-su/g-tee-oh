@@ -99,9 +99,14 @@ export function studyNodeByKeyQuery(api: AppApi, params: StudyNodeByKeyParams) {
   });
 }
 
+/** The node part of an insights query key: every hand's read at a node shares it (HandInsights' same-node placeholder). */
+export function studyInsightsNodeKey(solutionId: string, nodeKey: string) {
+  return [STUDY_QUERY_ROOT, "insights", solutionId, nodeKey] as const;
+}
+
 export function studyInsightsQuery(api: AppApi, params: StudyInsightsParams) {
   return queryOptions({
-    queryKey: [STUDY_QUERY_ROOT, "insights", params.solutionId, params.nodeKey, params.hand] as const,
+    queryKey: [...studyInsightsNodeKey(params.solutionId, params.nodeKey), params.hand] as const,
     queryFn: async () => {
       const { data, error, response } = await api.client.GET("/api/v1/study/insights", {
         params: { query: { solution_id: params.solutionId, node_key: params.nodeKey, hand: params.hand } },

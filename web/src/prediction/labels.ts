@@ -31,7 +31,8 @@ export const PREDICTION_TEXT = {
   no: "No",
   percentLabel: "Share of the range, in percent",
   regionsLegend: "Regions with a mixed class",
-  actionLegend: "Most frequent action",
+  /** The api's level 1 hand question asks the highest-EV action (prediction/hand-questions.ts), as the start screen's Easy line says (S48 critic G6). */
+  actionLegend: "Highest-EV action",
   sizeLegend: "Most frequent size",
   bandLegend: "Frequency band",
   answerLegend: "Your answer",
