@@ -483,40 +483,39 @@ spike-preflop MACHINE="zenbook" PLATFORM="linux/amd64":
         --commit $(git rev-parse HEAD) --allow-dirty
 
 BENCH_IMAGE := "g-tee-oh/library-builder:bench"
-BENCH_RUN := "docker run --rm --name gto-bench --memory 5g --memory-swap 5g"
+BENCH_RUN := SPIKE_RUN + " --name gto-bench"
 BENCH_SCRATCH := "gto-bench-scratch"
 BENCH_DIR := "target/bench"
+BENCH_OUT := '--mount "type=bind,source=' + justfile_directory() + '/' + BENCH_DIR + ',target=/out"'
+BENCH_ENV := "-e BUILDER_SCRATCH_DIR=/scratch -v " + BENCH_SCRATCH + ":/scratch " + BENCH_OUT
+BENCH_PLATFORM := if arch() == "aarch64" { "linux/arm64" } else { "linux/amd64" }
 
 # A measurement, not a check: run alone, under the bench lock (O-228). The method is the flop-line
-# section of validation/reports/README.md; this recipe runs it for PLATFORM in the library-builder
-# image under the 5 GB cap (O-48), with the libraries on the scratch volume as compose has it and
-# only the summaries bind-mounted out to target/bench, then bench-report from the checkout, since
-# it reads git. A measured run that fails does not stop the recipe (the - prefix), so a miss or a
-# killed run still reaches bench-report, which records the miss or fails on the missing summary
-# (O-178); stale summaries are removed first. mac-bench-clean removes what the run left (O-47).
+# section of validation/reports/README.md; this recipe runs it for the host's platform (PLATFORM
+# overrides it) in the library-builder image under the spike's 5 GB cap (O-48), with each library
+# root on the scratch volume as the Zenbook benchmark run had it and only the summaries
+# bind-mounted out to target/bench, then bench-report from the checkout, since it reads git. The
+# scratch volume and target/bench are reset first, and a measured run that fails does not stop
+# the recipe (the - prefix), so a miss reaches bench-report, which records it and exits 1
+# (O-178); a run killed before its summary makes bench-report fail on the missing file.
+# mac-bench-clean removes what the run left (O-47).
 # Flop-line benchmark in the 5 GB container against O-50; the Mac bootstrap measurement (R0.9, S04)
-mac-bench $VALIDATE_MACHINE="mac" PLATFORM="linux/arm64" OUT="validation/reports":
+mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/reports":
     -docker rm -f gto-bench
+    -docker volume rm {{BENCH_SCRATCH}}
     node -e "require('node:fs').rmSync('{{BENCH_DIR}}', { recursive: true, force: true })"
     node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}', { recursive: true })"
     docker buildx build --load --platform {{PLATFORM}} -f infra/docker/library-builder.Dockerfile \
         -t {{BENCH_IMAGE}} .
     docker run --rm -v {{BENCH_SCRATCH}}:/scratch --entrypoint /bin/mkdir {{BENCH_IMAGE}} \
         -p /scratch/library-judged /scratch/library-16bit
-    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-judged -e BUILDER_SCRATCH_DIR=/scratch \
-        -v {{BENCH_SCRATCH}}:/scratch \
-        --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
-        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
-        --summary-out /out/judged.json
-    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-16bit -e BUILDER_SCRATCH_DIR=/scratch \
-        -v {{BENCH_SCRATCH}}:/scratch \
-        --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
-        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
+    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} {{BENCH_IMAGE}} \
+        --once --job-spec /fixtures/builder/bench-bb-btn-srp.json --summary-out /out/judged.json
+    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-16bit {{BENCH_ENV}} {{BENCH_IMAGE}} \
+        --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
         --summary-out /out/informational.json
-    docker run --rm \
-        --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
-        {{BENCH_IMAGE}} estimate --job-spec /fixtures/builder/bench-bb-btn-srp.json \
-        --out /out/sweep.json
+    docker run --rm {{BENCH_OUT}} {{BENCH_IMAGE}} estimate \
+        --job-spec /fixtures/builder/bench-bb-btn-srp.json --out /out/sweep.json
     cargo run --release -p library-builder -- bench-report --judged {{BENCH_DIR}}/judged.json \
         --informational {{BENCH_DIR}}/informational.json --sweep {{BENCH_DIR}}/sweep.json \
         --out {{OUT}}
