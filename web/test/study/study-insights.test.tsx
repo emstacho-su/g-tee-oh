@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_OUT_OF_RANGE_HAND, FIXTURE_STUDY_PAIR, fixtureRootNode } from "../../src/fixtures/study.js";
 import { problemOf, renderStudy } from "./render-study.js";
 
+/** Multi-step flows through the whole app; under a full parallel run they need more than the 5 s default. */
+const FLOW_TIMEOUT_MS = 15_000;
 const BASE = `/study?format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
 
 let spies: { mockRestore: () => void }[] = [];
@@ -40,7 +42,8 @@ describe("R3.12 insights on the study screen", () => {
     expect(insightHands(requests)).toEqual(["AA"]);
     expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Blockers" })).not.toBeInTheDocument();
-    expect(screen.getByText("Pick a cell in the matrix to see that hand's threshold card, blockers and role.")).toBeInTheDocument();
+    // The hand-dependent tiles live on the Hands tab, which is closed and reads nothing (R3.26).
+    expect(screen.getByRole("tab", { name: /^Hands/ })).toHaveAttribute("aria-selected", "false");
   });
 
   it("R3.12 a selected hand adds the threshold card with named actions, the blockers and the role chip", async () => {
@@ -50,6 +53,7 @@ describe("R3.12 insights on the study screen", () => {
     const grid = screen.getByRole("group", { name: /range matrix cells/i });
     grid.focus();
     await user.keyboard("{ArrowRight}{Enter}");
+    await user.click(screen.getByRole("tab", { name: /^Hands/ }));
     const card = await screen.findByTestId("threshold-card");
     expect(card).toHaveTextContent("Your hand: AKs");
     expect(within(card).getByRole("listitem", { name: "Raise to 2.5bb" })).toBeInTheDocument();
@@ -57,7 +61,7 @@ describe("R3.12 insights on the study screen", () => {
     expect(screen.getByRole("region", { name: "Blockers" })).toHaveTextContent("Removes 6 combos");
     expect(screen.getByTestId("hand-role")).toHaveTextContent("Value");
     expect(screen.getByRole("heading", { name: /^AKs/ })).toBeInTheDocument();
-  });
+  }, FLOW_TIMEOUT_MS);
 
   it("R3.12 a failed stand-in read names no hand the user never picked (code review)", async () => {
     renderStudy(BASE, (request) => (request.path === "/api/v1/study/insights" ? problemOf(503, "unavailable") : undefined));
@@ -81,8 +85,10 @@ describe("R3.12 insights on the study screen", () => {
   });
 
   it("R3.12 a selected hand outside the range says so and the advantage card stays", async () => {
-    renderStudy(`${BASE}&hand=${FIXTURE_OUT_OF_RANGE_HAND}`);
+    const user = userEvent.setup();
+    renderStudy(`${BASE}&hand=${FIXTURE_OUT_OF_RANGE_HAND}&view=hands`);
     expect(await screen.findByText("72o is not in the range at this node, so it has no threshold card.")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Overview" }));
     expect(await screen.findByRole("region", { name: "Range and nut advantage" })).toBeInTheDocument();
   });
 });

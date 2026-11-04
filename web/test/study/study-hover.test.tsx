@@ -42,7 +42,7 @@ describe("R3.25 hover on the study screen", () => {
     expect(router.state.location.search).toMatchObject({ hand: "AKs" });
     fireEvent.pointerLeave(canvas);
     expect(await screen.findByRole("table", { name: "AKs at this node: strategy and EV" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("threshold-card")).toHaveTextContent("Your hand: AKs"));
+    await screen.findByRole("region", { name: "Range and nut advantage" });
     const insightHands = requests.filter((request) => request.path === "/api/v1/study/insights").map((request) => request.query["hand"]);
     expect(insightHands).not.toContain("KQs");
   });

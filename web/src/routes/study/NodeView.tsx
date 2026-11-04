@@ -38,9 +38,9 @@ import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
 import { knownFilters, nextFilterState, parseFilters } from "../../study/action-filters.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { FilterChips } from "./FilterChips.js";
-import { HandInsights } from "./HandInsights.js";
 import { LineEscape } from "./LineEscape.js";
-import { NodeActionsPanel } from "./NodeActionsPanel.js";
+import { StudyTabs } from "./StudyTabs.js";
+import type { StudyView } from "../../study/study-views.js";
 import { SyntheticBanner } from "../../components/ui/index.js";
 import { NoiseFlags, PostflopNote } from "./StudyNotices.js";
 import { useMatrixSize } from "./use-matrix-size.js";
@@ -75,6 +75,10 @@ export interface NodeViewProps {
   onLensChange: (lens: number) => void;
   /** The action filter set (R3.12, O-468); with `compare`, Compare to Best opens on that action. */
   onFiltersChange: (filters: readonly number[], compare?: number) => void;
+  /** The right column's open tab (R3.26). */
+  onViewChange: (view: StudyView) => void;
+  /** Opens Compare to Best on one action (the Compare tab, R3.26). */
+  onCompare: (index: number) => void;
 }
 
 function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string | undefined): void {
@@ -137,7 +141,8 @@ function LensControls({ node, mode, lensPosition, scaleByWeight, onScaleByWeight
   );
 }
 
-export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange }: NodeViewProps) {
+export function NodeView(props: NodeViewProps) {
+  const { api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange } = props;
   const theme = useThemeStore((state) => state.theme);
   const sizePx = useMatrixSize();
   const preflop = node.street === "preflop";
@@ -197,8 +202,17 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
             />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <NodeActionsPanel node={node} hand={rowHand} filters={filters} onToggleFilter={toggleFilter} />
-            <HandInsights api={api} node={node} hand={search.hand} />
+            <StudyTabs
+              api={api}
+              node={node}
+              rowHand={rowHand}
+              selectedHand={search.hand}
+              filters={filters}
+              onToggleFilter={toggleFilter}
+              view={search.view}
+              onViewChange={props.onViewChange}
+              onCompare={props.onCompare}
+            />
           </div>
         </div>
       ) : (

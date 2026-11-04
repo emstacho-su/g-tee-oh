@@ -1,5 +1,7 @@
 /**
- * The insights beside the study matrix (S25, S45, R3.12, O-286, O-461).
+ * The insights beside the study matrix (S25, S45, R3.12, R3.26, O-286, O-461). Two halves, one per
+ * right-column tab: AdvantageInsights on Overview, HandDetails on Hands; each mounts, and reads, only
+ * while its tab is open.
  *
  * Mechanism: the insights read requires a hand, but the range and nut advantage do not depend on
  * it. So the advantage card reads with a stand-in hand (the first class the node holds) from the
@@ -80,12 +82,13 @@ function SelectedHandInsights({ api, node, hand }: { api: AppApi; node: Insights
   );
 }
 
-export function HandInsights({ api, node, hand }: HandInsightsProps) {
+/** The range and nut advantage, read with the stand-in hand; the Overview tab's half (R3.26). */
+export function AdvantageInsights({ api, node }: Omit<HandInsightsProps, "hand">) {
   const standIn = standInHand(node);
-  return (
-    <div className="flex flex-col gap-4">
-      {standIn === undefined ? null : <AdvantageArea api={api} node={node} hand={standIn} />}
-      {hand === undefined ? <p className="text-sm text-muted">{PICK_A_CELL}</p> : <SelectedHandInsights api={api} node={node} hand={hand} />}
-    </div>
-  );
+  return standIn === undefined ? null : <AdvantageArea api={api} node={node} hand={standIn} />;
+}
+
+/** The selected hand's threshold card, blockers and role, or the prompt for one; the Hands tab (R3.26). */
+export function HandDetails({ api, node, hand }: HandInsightsProps) {
+  return hand === undefined ? <p className="text-sm text-muted">{PICK_A_CELL}</p> : <SelectedHandInsights api={api} node={node} hand={hand} />;
 }

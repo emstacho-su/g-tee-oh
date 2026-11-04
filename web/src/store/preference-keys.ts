@@ -10,3 +10,5 @@ export const STUDY_LAST_SPOT_STORAGE_KEY = "gto-study-last-spot";
 export const STUDY_STARRED_STORAGE_KEY = "gto-study-starred";
 /** S45 (R3.27): the last ten confirmed study searches. */
 export const STUDY_RECENT_STORAGE_KEY = "gto-study-recent";
+/** S45 follow-up (R3.26): the right column's last open tab on Study, the seed when the address names none. */
+export const STUDY_VIEW_STORAGE_KEY = "gto-study-view";

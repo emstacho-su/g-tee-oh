@@ -192,6 +192,8 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
           onOpenLine={navigation.openLine}
           onLensChange={navigation.setLens}
           onFiltersChange={navigation.setFilters}
+          onViewChange={navigation.setView}
+          onCompare={navigation.compareAction}
           onOpenSettings={openSettings}
           depths={depths}
           onDepthChange={(depth) => navigation.confirm(withDepth(search, depth))}
