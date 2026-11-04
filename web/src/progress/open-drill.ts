@@ -23,7 +23,8 @@
  * useOpenDrill wraps it for the screens: one open at a time, the clicked target's key as pending
  * (its button is disabled), navigation to /drills/$id/run on success, and an inline message for
  * the card that asked when no config matches or a request fails. The failure text is the api
- * problem's title (fixed text per problem type), never its detail (A9 section 3).
+ * problem's title (fixed text per problem type), never its detail (A9 section 3). Since the S47
+ * follow-up (R4.12) the navigation carries from=leak-created or from=leak-reused.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -33,14 +34,14 @@ import { HTTP_STATUS, isApiProblem } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
 import type { DrillCreate } from "../drills/types.js";
 import { useAppApi } from "../auth/index.js";
+import { AUTO_TAG_HASH_CHARS, AUTO_TAG_PREFIX } from "../drills/auto-drills.js";
 import { checkDrillBody } from "../drills/body-rules.js";
 import { createDrill, fetchDrill, fetchDrillPage, invalidateDrills } from "../drills/queries.js";
 import { formatConfigsQuery } from "../study/queries.js";
 import { isDrillFormat, leakDrillBody, type DrillSpot } from "./drill-family.js";
 import type { GameConfig, HeatmapCell, HeatmapColumn, HeatmapRow } from "./types.js";
 
-export const AUTO_TAG_PREFIX = "auto-";
-export const AUTO_TAG_HASH_CHARS = 26;
+export { AUTO_TAG_HASH_CHARS, AUTO_TAG_PREFIX };
 export const AUTO_IDEMPOTENCY_PREFIX = "auto-drill-";
 export const NO_CONFIG_TEXT = "No covered configuration matches this spot";
 export const OPEN_FAILED_PREFIX = "Could not open a drill";
@@ -160,7 +161,7 @@ export function unopenedText(result: Exclude<OpenDrillResult, { kind: "opened" }
 }
 
 /** Which card asked, so only that card shows the message. */
-export type DrillOrigin = "leaks" | "heatmap";
+export type DrillOrigin = "leaks" | "heatmap" | "queue";
 
 export interface DrillMessage {
   readonly origin: DrillOrigin;
@@ -194,7 +195,8 @@ export function useOpenDrill(): OpenDrillControl {
             return;
           }
           if (result.created) await invalidateDrills(queryClient);
-          await navigate({ to: "/drills/$id/run", params: { id: result.drillId } });
+          // The run screen says whether the drill was made or found (R4.12).
+          await navigate({ to: "/drills/$id/run", params: { id: result.drillId }, search: { from: result.created ? "leak-created" : "leak-reused" } });
         })
         .catch((error: unknown) => setMessage({ origin, text: openFailureText(error) }))
         .finally(() => setPendingKey(null));

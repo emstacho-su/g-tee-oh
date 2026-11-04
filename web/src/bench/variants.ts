@@ -23,7 +23,7 @@ const SECOND_RAISE_SHARE = 0.4;
 const SPLIT_ACTIONS: readonly NodeAction[] = [
   ...fixtureActions.slice(0, RAISE_POSITION + 1),
   { index: 3, token: "r600", kind: "raise", size_cbb: 600, bucket: "overbet", label: "Raise to 6bb", next_node_key: null },
-  { index: 4, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 4, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 function shiftedRow(hand: string, row: number, col: number, variant: number): NodeHandRow {

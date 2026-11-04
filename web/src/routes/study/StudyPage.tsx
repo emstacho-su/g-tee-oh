@@ -55,6 +55,7 @@ import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-
 import { useDepthSteps } from "../../study/use-depth-steps.js";
 import { withDepth } from "../../study/depth-steps.js";
 import { useStudySpotsStore } from "../../store/study-spots.js";
+import { spotLineKey } from "../../study/saved-spots.js";
 import { describeFailureForLog } from "../../api/http-status.js";
 import { SpotShortcuts, StarButton } from "./SpotShortcuts.js";
 import { StudyNodeArea } from "./StudyNodeArea.js";
@@ -132,6 +133,21 @@ interface StudyScreenProps {
   onStartOver: () => void;
 }
 
+export const POT_TYPE_TEXT = {
+  loading: "pot type loading",
+  unavailable: "pot type unavailable",
+} as const;
+
+/**
+ * What the summary says about the pot type while the line's node reads (which decide the preflop part)
+ * are not in (code review 3): loading, or unavailable after a failure; nothing at the root or once
+ * they have loaded, when settingsSummary names the pot type itself.
+ */
+function potTypeState(line: string | undefined, nodes: { readonly ancestors: unknown; readonly error: unknown }): string {
+  if (line === undefined || line === "" || nodes.ancestors !== undefined) return "";
+  return `, ${nodes.error === null ? POT_TYPE_TEXT.loading : POT_TYPE_TEXT.unavailable}`;
+}
+
 /**
  * Remembers every confirmed spot on screen, however it was reached (confirm, a line step, a link,
  * back). Keyed on the spot and the line (code review 2), so a re-render, a mode or a hand change
@@ -158,6 +174,7 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   const lineNodes = useLineNodes(api, configId ?? "", studyPair?.pair ?? "", confirmed ? search.line : undefined);
   const preflop = preflopLine(search.line, lineNodes.ancestors ?? []);
   const summarySearch = validateStudySearch({ ...search, line: preflop ?? "" });
+  const potTypeNote = potTypeState(search.line, lineNodes);
   const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
   useRecordSpot(search, confirmed);
   // S45 (O-467): the covered depths around this one, for the ] and [ Study keys.
@@ -189,7 +206,7 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
     return (
       <>
         <SettingsSummary
-          summary={settingsSummary(entry.stakes ?? [], summarySearch)}
+          summary={`${settingsSummary(entry.stakes ?? [], summarySearch)}${potTypeNote}`}
           onChange={openSettings}
           star={<StarButton spot={search} />}
           {...(reopened ? { onStartOver } : {})}
@@ -205,6 +222,8 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
           onOpenLine={navigation.openLine}
           onLensChange={navigation.setLens}
           onFiltersChange={navigation.setFilters}
+          onViewChange={navigation.setView}
+          onCompare={navigation.compareAction}
           onOpenSettings={openSettings}
           depths={depths}
           onDepthChange={(depth) => navigation.confirm(withDepth(search, depth))}
@@ -229,11 +248,6 @@ export const REOPEN_TEXT = {
   opening: "Opening your last spot.",
   failed: "Your last spot could not be opened. Choose the settings below.",
 } as const;
-
-/** One spot and line: what Start over belongs to. */
-function spotLineKey(search: StudySearch): string {
-  return `${settingsSignature(search)}|${search.line ?? ""}`;
-}
 
 /** The stored spot with the bare address's presentation choices laid over it. */
 function seedFrom(last: StudySearch, search: StudySearch): StudySearch {

@@ -61,7 +61,7 @@ describe("R3.13 FeedbackPanel summary", () => {
   it("R3.13 names only the lowest-loss members as best (ADR 0024, O-375)", () => {
     const feedback: DecisionFeedback = { ...RATED, best_action_indexes: [2, 3] };
     render(<FeedbackPanel feedback={feedback} actions={fixtureActions} chosenIndex={1} />);
-    expect(screen.getByTestId("feedback-summary")).toHaveTextContent("Best: Raise to 2.5bb or All-in 100bb");
+    expect(screen.getByTestId("feedback-summary")).toHaveTextContent("Best: Raise to 2.5bb or All-in");
   });
 
   it("R3.13 says so when the choice is one of the best actions, and when no EV was lost", () => {
@@ -203,7 +203,7 @@ describe("R3.13 FeedbackPanel sections (O-387, O-388)", () => {
     await openSection(FEEDBACK_SECTION_TITLES.strategy);
     const table = screen.getByRole("table", { name: "This hand's strategy" });
     expect(within(table).getByRole("row", { name: /Raise to 2.5bb/ })).toHaveTextContent("Best");
-    expect(within(table).getByRole("row", { name: /All-in 100bb/ })).not.toHaveTextContent("Best");
+    expect(within(table).getByRole("row", { name: /All-in/ })).not.toHaveTextContent("Best");
     expect(within(table).getByRole("row", { name: /Call/ })).not.toHaveTextContent("Best");
   });
 

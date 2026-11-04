@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR } from "../../src/fixtures/study.js";
 import { useStudySpotsStore } from "../../src/store/study-spots.js";
 import { SPOT_TEXT } from "../../src/routes/study/SpotShortcuts.js";
-import { renderStudy } from "./render-study.js";
+import { problemOf, renderStudy } from "./render-study.js";
 
 const SETTINGS = `format=online&table_size=6&stake=${FIXTURE_ONLINE_STAKE_ID}&depth=10000&pair=${FIXTURE_STUDY_PAIR}`;
 const BASE = `/study?${SETTINGS}`;
@@ -92,6 +92,16 @@ describe("R3.27 Study reopens on the last spot", () => {
     const actions = await screen.findByRole("region", { name: /'s actions$/ });
     await user.click(within(actions).getByRole("button", { name: /^Raise to 2\.5bb/ }));
     await waitFor(() => expect(record).toHaveBeenCalledTimes(2));
+  });
+
+  it("R3.12 the summary says the pot type is loading while the line's reads load, and unavailable when they fail (code review 3)", async () => {
+    const isRootRead = (request: { path: string; query: Record<string, string> }) =>
+      request.path === "/api/v1/study/node" && request.query["line"] === undefined && request.query["node_key"] === undefined;
+    const pending = renderStudy(`${BASE}&line=r250`, (request) => (isRootRead(request) ? new Promise<Response>(() => undefined) : undefined));
+    expect(await screen.findByText(`${SUMMARY}, pot type loading`)).toBeInTheDocument();
+    pending.unmount();
+    renderStudy(`${BASE}&line=r250`, (request) => (isRootRead(request) ? problemOf(503, "unavailable") : undefined));
+    expect(await screen.findByText(`${SUMMARY}, pot type unavailable`)).toBeInTheDocument();
   });
 
   it("R3.27 any setting in the address wins over the stored spot", async () => {

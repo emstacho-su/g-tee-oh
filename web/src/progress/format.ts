@@ -23,8 +23,13 @@ export function formatDeviation(rd: number): string {
   return `± ${rd.toFixed(RATING_DECIMALS)}`;
 }
 
+/** A share as the whole percent the screens print. */
+export function percentOf(fraction: number): number {
+  return Math.round(fraction * PERCENT_SCALE);
+}
+
 export function formatPercent(fraction: number): string {
-  return `${Math.round(fraction * PERCENT_SCALE)}%`;
+  return `${percentOf(fraction)}%`;
 }
 
 export function formatLeak(bbPer1k: number): string {

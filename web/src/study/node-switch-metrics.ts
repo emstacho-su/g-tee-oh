@@ -10,7 +10,9 @@
  * replaces an older one, and cancel drops a pending one (the node failed, or it has no matrix), so
  * there is one line per switch. Flow 3 collects these lines into test-results/node-switch.json;
  * they are dev-stack numbers for the latency report, never the O-40 guard (S29). The clock, the
- * frame scheduler and the log are injectable for tests; the defaults are read at call time.
+ * frame scheduler and the log are injectable for tests; the defaults are read at call time. An
+ * optional measure callback receives the same duration as a number, so the node-switch bench reports
+ * the metric's own measurement rather than timing it again (PR 52 review 1).
  * console.info is allowed here only, for O-287.
  */
 import { createContext, useContext } from "react";
@@ -22,6 +24,8 @@ export interface NodeSwitchMetricsOptions {
   now?: () => number;
   nextFrame?: (callback: () => void) => void;
   log?: (line: string) => void;
+  /** Called with each logged switch's duration in ms, just before the log line. */
+  measure?: (ms: number) => void;
 }
 
 export interface NodeSwitchMetrics {
@@ -55,7 +59,11 @@ export function createNodeSwitchMetrics(options: NodeSwitchMetricsOptions = {}):
       const start = pendingStart;
       if (start === null) return;
       pendingStart = null;
-      nextFrame(() => log(formatNodeSwitchLine(now() - start, line)));
+      nextFrame(() => {
+        const ms = now() - start;
+        options.measure?.(ms);
+        log(formatNodeSwitchLine(ms, line));
+      });
     },
     cancel() {
       pendingStart = null;

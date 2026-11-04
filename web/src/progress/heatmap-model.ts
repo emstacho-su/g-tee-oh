@@ -12,7 +12,9 @@
  * family in the order the api lists them, each row keeping its api index, and cells are found by
  * (row, column) through one lookup map. Every figure shown comes from the api response; nothing
  * here reads a spot_class_key (ADR 0004). Since S47 the row, column and class labels are the
- * shared spot vocabulary (spot-words.ts): words, never the api's tokens.
+ * shared spot vocabulary (spot-words.ts): words, never the api's tokens. Since the S47 follow-up
+ * (R4.19) the map can show only the due classes (isDue), the new ones (never practiced) or the ten
+ * with the lowest known share (visibleHeatmap), so a long grid can be read by what needs work.
  */
 import { retentionFor } from "@g-tee-oh/learning";
 
@@ -69,6 +71,40 @@ export function isDue(cell: HeatmapCell): boolean {
 }
 
 export { depthBandLabel };
+
+export const HEAT_SHOW_MODES = ["all", "due", "new", "weakest"] as const;
+export type HeatShowMode = (typeof HEAT_SHOW_MODES)[number];
+/** How many classes "Weakest" shows. */
+export const WEAKEST_COUNT = 10;
+export const HEAT_SHOW_LABELS: Readonly<Record<HeatShowMode, string>> = {
+  all: "All",
+  due: "Due",
+  new: "New",
+  weakest: `Weakest ${WEAKEST_COUNT}`,
+};
+
+/** The WEAKEST_COUNT practiced cells with the lowest known share; a tie keeps the one the api lists first. */
+function weakestCells(cells: readonly HeatmapCell[]): HeatmapCell[] {
+  const ranked = cells
+    .map((cell, index) => ({ cell, index }))
+    .filter((entry) => isPracticed(entry.cell))
+    .sort((left, right) => (left.cell.p_known ?? 0) - (right.cell.p_known ?? 0) || left.index - right.index)
+    .slice(0, WEAKEST_COUNT);
+  const kept = new Set(ranked.map((entry) => entry.cell));
+  return cells.filter((cell) => kept.has(cell));
+}
+
+const SHOWN: Readonly<Record<Exclude<HeatShowMode, "all">, (cells: readonly HeatmapCell[]) => HeatmapCell[]>> = {
+  due: (cells) => cells.filter(isDue),
+  new: (cells) => cells.filter((cell) => !isPracticed(cell)),
+  weakest: weakestCells,
+};
+
+/** The heat map with only the cells a Show choice keeps, in the api's order; rows and columns stay, so indexes hold (R4.19). */
+export function visibleHeatmap(heatmap: ProgressHeatmap, mode: HeatShowMode): ProgressHeatmap {
+  if (mode === "all") return heatmap;
+  return { ...heatmap, cells: SHOWN[mode](heatmap.cells) };
+}
 
 /** "Online 100 bb" (spot-words.ts, S47). */
 export function columnLabel(column: Pick<HeatmapColumn, "format" | "depth_band">): string {

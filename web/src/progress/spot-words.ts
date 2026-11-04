@@ -13,6 +13,7 @@
  */
 import { FORMAT_LABELS } from "../drills/labels.js";
 import { CBB_PER_BB } from "../poker/format.js";
+import { parsePair } from "../poker/pair.js";
 import type { PreflopAction } from "../drills/types.js";
 import { configLabel } from "../routes/settings/configs-query.js";
 import type { GameConfig, HeatmapColumn, HeatmapRow } from "./types.js";
@@ -57,8 +58,6 @@ export const POSITION_WORDS = {
   BB: "big blind",
 } as const satisfies Readonly<Record<string, string>>;
 
-const PAIR_SEPARATOR = "-";
-const PAIR_SEATS = 2;
 const BAND_IN_BB = /^\d+$/;
 const UNLISTED_CONFIGURATION = "a configuration the catalog does not list";
 const LOADING_CONFIGURATION = "configuration loading";
@@ -74,18 +73,6 @@ export function drillActionWords(action: PreflopAction): string {
 
 export function positionWords(seat: string): string {
   return (POSITION_WORDS as Readonly<Record<string, string>>)[seat] ?? seat;
-}
-
-/**
- * A pair as the api writes it ("BB-BTN", out of position first) split into its two seats, or null
- * when it is not two non-empty parts (PR #48 review round 2 LOW 9: the one split the web uses).
- * It reads the seats only; it never orders or checks them, so the web applies no rule of its own.
- */
-export function parsePair(pair: string): readonly [string, string] | null {
-  const seats = pair.split(PAIR_SEPARATOR);
-  const [first, second] = seats;
-  if (seats.length !== PAIR_SEATS || first === undefined || second === undefined || first === "" || second === "") return null;
-  return [first, second];
 }
 
 /** "BB-BTN" reads "big blind versus button"; anything that is not two known seats keeps its text. */
@@ -110,9 +97,14 @@ export function capitalize(text: string): string {
   return text === "" ? text : `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
-/** A heat map column: "Online 100bb". */
+/** A heat map column inside a sentence: "live 100bb"; the class words and the queue end with it. */
+export function columnPhrase(column: Pick<HeatmapColumn, "format" | "depth_band">): string {
+  return `${formatWords(column.format).toLowerCase()} ${depthBandLabel(column.depth_band)}`;
+}
+
+/** A heat map column as a header: "Live 100bb". */
 export function columnWords(column: Pick<HeatmapColumn, "format" | "depth_band">): string {
-  return `${formatWords(column.format)} ${depthBandLabel(column.depth_band)}`;
+  return capitalize(columnPhrase(column));
 }
 
 /** A heat map row: "Open or fold, big blind versus button". */
@@ -122,7 +114,7 @@ export function rowWords(row: Pick<HeatmapRow, "family" | "pair">): string {
 
 /** A class: "Open or fold, big blind versus button, online 100bb". */
 export function classWords(row: Pick<HeatmapRow, "family" | "pair">, column: Pick<HeatmapColumn, "format" | "depth_band">): string {
-  return `${rowWords(row)}, ${column.format} ${depthBandLabel(column.depth_band)}`;
+  return `${rowWords(row)}, ${columnPhrase(column)}`;
 }
 
 /** A configuration id's facets (table size, format, stake code, depth); the key is a readable id (db seed, CONFIG_ID_PATTERN). */
@@ -158,4 +150,9 @@ export function configurationWords(config: GameConfig | undefined, id?: string, 
   if (config !== undefined) return configLabel(config);
   if (loading) return LOADING_CONFIGURATION;
   return id === undefined ? UNLISTED_CONFIGURATION : unlistedWords(id);
+}
+
+/** A configuration id in words through the list it is looked up in; undefined is a list still loading. */
+export function configurationWordsIn(configs: readonly GameConfig[] | undefined, id: string): string {
+  return configurationWords(configs?.find((config) => config.config_id === id), id, configs === undefined);
 }

@@ -15,7 +15,7 @@
  */
 import { CBB_PER_BB } from "../poker/format.js";
 import type { PositionPairEntry } from "../practice/catalog-spot.js";
-import { parsePair } from "../progress/spot-words.js";
+import { parsePair } from "../poker/pair.js";
 import type { GameConfig } from "../progress/types.js";
 import { seatedPositions } from "./limits.js";
 import type { Position, SpotFilter } from "./types.js";
@@ -38,6 +38,11 @@ export interface CoverageBadge {
 }
 
 const NO_ANTE_CBB = 0;
+
+/** The api's candidate rule reaches only configurations without an ante (configRowMatches); the one test for it. */
+export function isNoAnteConfig(config: Pick<GameConfig, "ante_cbb">): boolean {
+  return config.ante_cbb === NO_ANTE_CBB;
+}
 const KEY_SEPARATOR = "-";
 
 export const REACH_TEXT = {
@@ -65,7 +70,7 @@ export function configsReached(filter: ReachFilter, configs: readonly GameConfig
       config.table_size === tableSize &&
       config.stake_label === filter.stake &&
       depthsCbb.has(config.depth_cbb) &&
-      config.ante_cbb === NO_ANTE_CBB,
+      isNoAnteConfig(config),
   );
 }
 

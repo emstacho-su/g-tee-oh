@@ -143,6 +143,8 @@ async function selectHand(page: Page): Promise<void> {
   await page.getByRole("group", { name: /Range matrix cells/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/[?&]hand=AA/);
+  // R3.26: the threshold card lives on the Hands tab of the right column.
+  await page.getByRole("tab", { name: /^Hands/ }).click();
   await expect(page.getByTestId("threshold-card")).toBeVisible();
   await captureThemes(page, "flow3-study-threshold-card", CRITERIA.threshold);
 }

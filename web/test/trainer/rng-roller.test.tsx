@@ -51,7 +51,7 @@ describe("R3.13 RngRoller", () => {
       "F1-5 Fold",
       "C6-15 Call",
       "R16-95 Raise to 2.5bb",
-      "A96-100 All-in 100bb",
+      "A96-100 All-in",
     ]);
   });
 
@@ -167,7 +167,7 @@ describe("R3.13 critic round 3: a band too narrow for the chip is never a clippe
   it("R3.13 a band under the chip threshold (1-5 Fold, 96-100 All-in, 5 rolls each) shows its fill alone, no swatch chip; the tooltip, the hidden text and the legend still name it", () => {
     render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
     const items = within(screen.getByRole("list", { name: "Mixed-frequency bands" })).getAllByRole("listitem");
-    for (const [index, text] of [[0, "1-5 Fold"], [3, "96-100 All-in 100bb"]] as const) {
+    for (const [index, text] of [[0, "1-5 Fold"], [3, "96-100 All-in"]] as const) {
       const item = items[index] as HTMLElement;
       expect(item).toHaveAttribute("title", text);
       expect(within(item).queryByTestId("action-swatch")).not.toBeInTheDocument();

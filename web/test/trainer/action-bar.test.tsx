@@ -35,7 +35,7 @@ describe("R3.13 ActionBar", () => {
       "Fold",
       "Call",
       "Raise to 2.5bb",
-      "All-in 100bb",
+      "All-in",
     ]);
   });
 
@@ -79,7 +79,7 @@ describe("R3.13 ActionBar", () => {
     expect(within(raise).getByTestId("action-swatch")).toHaveAttribute("data-pattern", "diagonal");
     expect(screen.getByRole("button", { name: "Fold" })).toHaveAttribute("aria-keyshortcuts", "F");
     expect(screen.getByRole("button", { name: "Call" })).toHaveAttribute("aria-keyshortcuts", "C");
-    expect(screen.getByRole("button", { name: "All-in 100bb" })).toHaveAttribute("aria-keyshortcuts", "A");
+    expect(screen.getByRole("button", { name: "All-in" })).toHaveAttribute("aria-keyshortcuts", "A");
   });
 
   it("R3.30 clicking, a letter or a digit calls onAction with the record index", async () => {

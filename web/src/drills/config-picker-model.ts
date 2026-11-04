@@ -15,6 +15,7 @@ import { CBB_PER_BB, formatCbb } from "../poker/format.js";
 import type { GameConfig, PositionPairEntry, Stake } from "../study/queries.js";
 import { fieldStates, type FieldState, type SettingsCatalog, type SettingsDraft } from "../study/settings-fields.js";
 import { listOf, type DrillDraft } from "./draft.js";
+import { isNoAnteConfig } from "./reach-model.js";
 
 const DEPTH_SEPARATOR = ", ";
 const NO_PAIRS = (): readonly PositionPairEntry[] | undefined => undefined;
@@ -22,9 +23,18 @@ const NO_PAIRS = (): readonly PositionPairEntry[] | undefined => undefined;
 export type PickerKey = "format" | "table_size" | "stake" | "depth";
 export type PickerChoices = Readonly<Record<PickerKey, FieldState>>;
 
-/** Study's catalog over the two reads the picker makes; it never needs a configuration's seats. */
+/**
+ * Study's catalog over the two reads the picker makes; it never needs a configuration's seats.
+ * Only configurations without an ante are offered, and a stake whose every configuration has an
+ * ante is dropped: the api's candidate rule (configRowMatches) reaches no other (review 4 finding
+ * 2, PR #51 review 9). A stake with no configuration at all stays, with Study's own reason.
+ */
 export function pickerCatalog(stakes: readonly Stake[], configs: readonly GameConfig[]): SettingsCatalog {
-  return { stakes, configs, pairsOf: NO_PAIRS };
+  const reachable = configs.filter(isNoAnteConfig);
+  const reachableStakes = new Set(reachable.map((config) => config.stake_id));
+  const listedStakes = new Set(configs.map((config) => config.stake_id));
+  const offered = stakes.filter((stake) => reachableStakes.has(stake.id) || !listedStakes.has(stake.id));
+  return { stakes: offered, configs: reachable, pairsOf: NO_PAIRS };
 }
 
 /** The whole-number depths typed in the draft, in the order typed; anything else is dropped. */

@@ -8,6 +8,7 @@
  * (config_id, pair, line and hand in packages/contracts/api.openapi.json); the api validates again.
  */
 import type { MatrixMode } from "../components/range-matrix/model.js";
+import { STUDY_VIEWS, type StudyView } from "./study-views.js";
 
 export type StudyFormat = "online" | "live";
 
@@ -29,6 +30,8 @@ export interface StudySearch {
   lens?: number;
   /** Action filters (S45, R3.12, O-468): a comma list of distinct NodeAction.index values, for example 0,2. */
   filters?: string;
+  /** The right column's open tab (S45 follow-up, R3.26). */
+  view?: StudyView;
 }
 
 export const STUDY_MODES: readonly MatrixMode[] = ["frequency", "ev", "weight", "strategy_ev", "compare"];
@@ -84,6 +87,7 @@ export function validateStudySearch(search: Record<string, unknown>): StudySearc
     ["hand", matching(search["hand"], HAND_CLASS_PATTERN, MAX_LINE_LENGTH)],
     ["lens", integerIn(search["lens"], 0, MAX_ACTION_INDEX)],
     ["filters", filterList(search["filters"])],
+    ["view", oneOf(search["view"], STUDY_VIEWS)],
   ];
   const kept: StudySearch = Object.fromEntries(entries.filter(([, value]) => value !== undefined));
   return kept;

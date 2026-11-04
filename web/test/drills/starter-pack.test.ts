@@ -14,7 +14,7 @@ import { decodeMockExportCode } from "../../e2e/support/mock-drills.js";
 import { checkDrillBody } from "../../src/drills/body-rules.js";
 import { MAX_EXPORT_CODE_LENGTH } from "../../src/drills/limits.js";
 import { configsReached } from "../../src/drills/reach-model.js";
-import { STARTER_PACK, STARTER_TAG, type StarterDrill } from "../../src/drills/starter-pack.js";
+import { missingStarterDrills, STARTER_PACK, STARTER_TAG, starterIdTag, type StarterDrill } from "../../src/drills/starter-pack.js";
 import type { DrillCreate } from "../../src/drills/types.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
 import type { GameConfig } from "../../src/progress/types.js";
@@ -57,6 +57,8 @@ describe("R3.35 the starter drill pack", () => {
       expect(checkDrillBody(body)).toEqual([]);
       expect(body.name).toBe(entry.name);
       expect(body.tags).toContain(STARTER_TAG);
+      // A stable id the drill keeps through a rename (PR #48 review 4 finding 3).
+      expect(body.tags).toContain(starterIdTag(entry));
     }
   });
 
@@ -76,5 +78,21 @@ describe("R3.35 the starter drill pack", () => {
     const extra = STARTER_PACK.map((entry) => entry.name).filter((name) => !acceptance.cases.some((entry) => entry.name === name));
     expect(extra).toEqual([SQUEEZE_NAME]);
     expect(byName.get(SQUEEZE_NAME)?.spot_filter.preflop_action).toEqual(["squeeze"]);
+  });
+
+  it("R3.35 a starter drill counts as present by its id tag, so a renamed one is not offered again (PR #48 review 4 finding 3)", () => {
+    const [first, second, third] = STARTER_PACK;
+    if (first === undefined || second === undefined || third === undefined) throw new Error("the pack has fewer than three drills");
+    const listed = [
+      // Renamed by the user: the id tag still names it.
+      { name: "My opening ranges", tags: [STARTER_TAG, starterIdTag(first)] },
+      // Imported before the id tags: its name still counts.
+      { name: second.name, tags: [STARTER_TAG] },
+    ];
+    const missing = missingStarterDrills(listed).map((entry) => entry.key);
+    expect(missing).not.toContain(first.key);
+    expect(missing).not.toContain(second.key);
+    expect(missing).toContain(third.key);
+    expect(missing).toHaveLength(STARTER_PACK.length - 2);
   });
 });

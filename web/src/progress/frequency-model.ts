@@ -8,11 +8,14 @@
  * is loaded the configuration takes its label, else a plain sentence (never its key); two spots that would share a name are numbered. A spot is keyed by
  * its solution and node (spotKey), since a rebuilt node keeps its node_key under a new solution
  * (PR #39 review finding 6). The api already sorts the hand rows by their largest gap, so the card
- * keeps the api's order; shares are written with the progress format's formatPercent.
+ * keeps the api's order; shares are written with the progress format's formatPercent. Since the
+ * S47 follow-up (R4.12) each action's gap reads in points (gapSentence): the difference of the two
+ * served shares as the card prints them, whole percents, and nothing else.
  */
 import type { ApiComponents } from "@g-tee-oh/contracts";
 
-import { capitalize, configurationWords, familyWords, pairWords, positionWords } from "./spot-words.js";
+import { percentOf } from "./format.js";
+import { capitalize, configurationWordsIn, familyWords, pairWords, positionWords } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
 type Schemas = ApiComponents["schemas"];
@@ -37,9 +40,8 @@ const SPOT_KEY_SEPARATOR = "|";
 export { familyWords };
 
 function spotName(spot: SpotFrequency, configs: readonly GameConfig[] | undefined): string {
-  const config = configs?.find((entry) => entry.config_id === spot.config_id);
   // A loading phrase until the list lands; an unlisted id by its own facets, never the bare key (round 2 MEDIUM 4).
-  const table = configurationWords(config, spot.config_id, configs === undefined);
+  const table = configurationWordsIn(configs, spot.config_id);
   return `${capitalize(familyWords(spot.action_family))} as ${positionWords(spot.hero_position)} (${pairWords(spot.pair)}), ${table}`;
 }
 
@@ -59,6 +61,17 @@ export function spotOptions(spots: readonly SpotFrequency[], configs: readonly G
     const earlier = names.slice(0, index).filter((other) => other === name).length;
     return { value: spotKey(spot), label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})`, title: spot.config_id };
   });
+}
+
+/**
+ * "Fold: 5 points more than the solver", "Call: matches the solver" when the shares print as the same
+ * percent: the gap is the difference of the two percents the card shows (PR #51 review 7).
+ */
+export function gapSentence(label: string, yours: number, solver: number): string {
+  const points = percentOf(yours) - percentOf(solver);
+  if (points === 0) return `${label}: matches the solver`;
+  const size = Math.abs(points);
+  return `${label}: ${size} ${size === 1 ? "point" : "points"} ${points > 0 ? "more" : "less"} than the solver`;
 }
 
 /** "12 of 30 decisions at this spot". */

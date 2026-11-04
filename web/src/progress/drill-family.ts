@@ -30,7 +30,8 @@ import { DEFAULT_TRAINER } from "../drills/draft.js";
 import { MAX_DEPTHS, seatedPositions } from "../drills/limits.js";
 import type { DrillCreate, Position, PreflopAction, SpotFilter } from "../drills/types.js";
 import { CBB_PER_BB } from "../poker/format.js";
-import { classWords, parsePair } from "./spot-words.js";
+import { parsePair } from "../poker/pair.js";
+import { classWords } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
 /** gto-model's action family (ActionFamily::as_str) to the drill family that trains it. */

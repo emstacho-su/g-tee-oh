@@ -11,10 +11,15 @@
  * with the renderer string (renderer.ts) and the user agent. The canvas is not created with
  * willReadFrequently, so it stays on the browser's default (accelerated when a GPU is there)
  * path and the one-pixel read really waits for the drawing to finish.
+ *
+ * S45 follow-up (R3.26): the page also exposes window.__runNodeSwitchBench(options), which mounts the
+ * matrix and the right column's Overview in a second container and times node switches with the
+ * study screen's own metrics (node-switch.tsx), paced by requestAnimationFrame.
  */
 import "../styles.css";
 
-import type { MatrixBenchOptions, MatrixBenchResult } from "./bench-api.js";
+import type { MatrixBenchOptions, MatrixBenchResult, NodeSwitchBenchOptions, NodeSwitchBenchResult } from "./bench-api.js";
+import { DEFAULT_NODE_SWITCHES, DEFAULT_WARMUP_SWITCHES, runNodeSwitchBench } from "./node-switch.js";
 import { detectRenderer } from "./renderer.js";
 import {
   BENCH_PIXEL_RATIO,
@@ -85,3 +90,22 @@ heading.textContent = "Matrix frame bench (R3.12)";
 container.append(heading);
 const canvas = createBenchCanvas(container);
 window.__runMatrixBench = (options) => runBench(canvas, options);
+
+async function runSwitchBench(host: HTMLElement, options: NodeSwitchBenchOptions = {}): Promise<NodeSwitchBenchResult> {
+  const switches = countOption(options.switches, DEFAULT_NODE_SWITCHES, "switches", 1);
+  const warmupSwitches = countOption(options.warmupSwitches, DEFAULT_WARMUP_SWITCHES, "warmupSwitches", 0);
+  const timings = await runNodeSwitchBench({
+    container: host,
+    switches,
+    warmupSwitches,
+    now: () => performance.now(),
+    nextFrame: (callback) => {
+      window.requestAnimationFrame(() => callback());
+    },
+  });
+  return { ...timings, renderer: detectRenderer(document), userAgent: navigator.userAgent };
+}
+
+const switchHost = document.createElement("div");
+container.append(switchHost);
+window.__runNodeSwitchBench = (options) => runSwitchBench(switchHost, options);

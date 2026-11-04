@@ -57,7 +57,7 @@ describe("R3.12 ActionFrequencyTable", () => {
     expect(raise).toHaveTextContent("0.62bb");
     expect(raise).toHaveTextContent("Best");
     expect(raise).toHaveAttribute("data-highlight", "true");
-    expect(screen.getByRole("row", { name: /All-in 100bb/ })).toHaveTextContent("-0.40bb");
+    expect(screen.getByRole("row", { name: /All-in/ })).toHaveTextContent("-0.40bb");
     expect(screen.getByRole("row", { name: /Fold/ })).not.toHaveTextContent("Best");
   });
 

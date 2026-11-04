@@ -11,7 +11,8 @@
  * default without rewriting the URL, O-462) and the bar lenses a checkbox that scales the bars
  * by range weight, starting from the node's rule (O-465) and kept for this page only. Selecting a
  * matrix cell writes the hand to the URL; hovering one (R3.25) only swaps the hand row beside the
- * matrix to the hovered hand, in component state, while the insights stay on the selected hand. A node on a later street renders the v1.5 note, a way
+ * matrix to the hovered hand, through a small store (study/hover-store.ts) that only the hand row and
+ * Compare subscribe to, so a hover never re-renders this view; the insights stay on the selected hand. A node on a later street renders the v1.5 note, a way
  * back (LineEscape) and no carousel or matrix, so RangeMatrix never meets exact-combination rows
  * (O-196) and no button walks further into a postflop subtree (review round 1). After each new
  * node renders, an effect completes the pending node switch timing: React runs the matrix's draw
@@ -38,9 +39,10 @@ import { useNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
 import { knownFilters, nextFilterState, parseFilters } from "../../study/action-filters.js";
 import { studyModeOf, type StudySearch } from "../../study/search.js";
 import { FilterChips } from "./FilterChips.js";
-import { HandInsights } from "./HandInsights.js";
 import { LineEscape } from "./LineEscape.js";
-import { NodeActionsPanel } from "./NodeActionsPanel.js";
+import { StudyTabs } from "./StudyTabs.js";
+import { createHoverStore } from "../../study/hover-store.js";
+import type { StudyView } from "../../study/study-views.js";
 import { SyntheticBanner } from "../../components/ui/index.js";
 import { NoiseFlags, PostflopNote } from "./StudyNotices.js";
 import { useMatrixSize } from "./use-matrix-size.js";
@@ -75,6 +77,10 @@ export interface NodeViewProps {
   onLensChange: (lens: number) => void;
   /** The action filter set (R3.12, O-468); with `compare`, Compare to Best opens on that action. */
   onFiltersChange: (filters: readonly number[], compare?: number) => void;
+  /** The right column's open tab (R3.26). */
+  onViewChange: (view: StudyView) => void;
+  /** Opens Compare to Best on one action (the Compare tab, R3.26). */
+  onCompare: (index: number) => void;
 }
 
 function useCompleteNodeSwitch(nodeKey: string, preflop: boolean, line: string | undefined): void {
@@ -137,15 +143,16 @@ function LensControls({ node, mode, lensPosition, scaleByWeight, onScaleByWeight
   );
 }
 
-export function NodeView({ api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange }: NodeViewProps) {
+export function NodeView(props: NodeViewProps) {
+  const { api, node, search, carousel, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange } = props;
   const theme = useThemeStore((state) => state.theme);
   const sizePx = useMatrixSize();
   const preflop = node.street === "preflop";
   const mode = studyModeOf(search);
   const lensPosition = lensPositionOf(node.actions, search.lens) ?? defaultLensPosition(node.actions);
   const [scaleByWeight, setScaleByWeight] = useScaleByWeight(node);
-  const [hovered, setHovered] = useState<string | null>(null);
-  const rowHand = hovered ?? search.hand;
+  // The hovered hand lives in a small store, so a hover re-renders only the hand row and Compare (code review 3).
+  const [hover] = useState(createHoverStore);
   // Only the indexes that name an action here count (code review): a stale one is ignored, never rewritten.
   const filters = useMemo(() => knownFilters(parseFilters(search), node.actions), [search, node.actions]);
   const toggleFilter = (index: number) => {
@@ -191,14 +198,23 @@ export function NodeView({ api, node, search, carousel, onModeChange, onSelectHa
               onSelectHand={onSelectHand}
               lensIndex={search.lens ?? null}
               scaleByWeight={scaleByWeight}
-              onHoverHand={setHovered}
+              onHoverHand={hover.set}
               highlightIndexes={filters}
               legendActions={false}
             />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <NodeActionsPanel node={node} hand={rowHand} filters={filters} onToggleFilter={toggleFilter} />
-            <HandInsights api={api} node={node} hand={search.hand} />
+            <StudyTabs
+              api={api}
+              node={node}
+              hover={hover}
+              selectedHand={search.hand}
+              filters={filters}
+              onToggleFilter={toggleFilter}
+              view={search.view}
+              onViewChange={props.onViewChange}
+              onCompare={props.onCompare}
+            />
           </div>
         </div>
       ) : (

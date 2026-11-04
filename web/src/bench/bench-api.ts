@@ -51,3 +51,35 @@ declare global {
     __runMatrixBench?: (options?: MatrixBenchOptions) => Promise<MatrixBenchResult>;
   }
 }
+
+/**
+ * The node-switch bench (S45 follow-up, R3.26, item 10): the time from a node switch request to the
+ * frame after the new node's matrix and right column rendered, as node-switch-metrics.ts measures
+ * it on the study screen.
+ */
+export interface NodeSwitchBenchOptions {
+  /** Recorded switches; 60 by default. */
+  readonly switches?: number;
+  /** Untimed switches before recording; 5 by default. */
+  readonly warmupSwitches?: number;
+}
+
+export interface NodeSwitchBenchResult {
+  readonly n: number;
+  /** Every recorded switch time in milliseconds, sorted ascending. */
+  readonly switchesMs: readonly number[];
+  readonly p50: number;
+  readonly p95: number;
+  readonly max: number;
+  readonly warmupSwitches: number;
+  readonly renderer: RendererInfo;
+  readonly userAgent: string;
+  /** How many distinct synthetic nodes the switches rotate through. */
+  readonly nodes: number;
+}
+
+declare global {
+  interface Window {
+    __runNodeSwitchBench?: (options?: NodeSwitchBenchOptions) => Promise<NodeSwitchBenchResult>;
+  }
+}

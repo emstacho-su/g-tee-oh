@@ -11,6 +11,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
 import type { AppApi } from "../api/index.js";
+import { isApiProblem, PROBLEM_SLUG } from "../api/problem.js";
+import { useLibraryDeps } from "../library/library-deps.js";
 import { useIntentMutation, type IntentMutation } from "../library/use-intent-mutation.js";
 import { drillQuery } from "../trainer/session-api.js";
 import { createDrill, deleteDrill, duplicateDrill, importDrill, invalidateDrills, patchDrill } from "./queries.js";
@@ -24,7 +26,7 @@ function useInvalidate(): () => Promise<void> {
   return () => invalidateDrills(queryClient);
 }
 
-export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInput) => void): IntentMutation<SaveInput, Drill> {
+export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInput) => void, onFailed?: () => void): IntentMutation<SaveInput, Drill> {
   const invalidate = useInvalidate();
   const queryClient = useQueryClient();
   return useIntentMutation<SaveInput, Drill>({
@@ -36,6 +38,7 @@ export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInp
       queryClient.setQueryData(drillQuery(api, drill.id).queryKey, drill);
       onSaved(drill, input);
     },
+    ...(onFailed === undefined ? {} : { onError: onFailed }),
   });
 }
 
@@ -69,6 +72,21 @@ export function useImportDrill(api: AppApi, onImported: (drill: Drill) => void):
   });
 }
 
+const CLIENT_ERROR_MIN = 400;
+const SERVER_ERROR_MIN = 500;
+
+/** The api's answers from the key check itself, which say nothing about whether the first request landed. */
+const KEY_CHECK_SLUGS: ReadonlySet<string> = new Set([PROBLEM_SLUG.idempotencyInFlight, PROBLEM_SLUG.idempotencyMismatch]);
+
+/**
+ * A 4xx the route itself answered: the api stores it under the key and replays it to every retry,
+ * so the code needs a fresh key. A 409 in-flight or a 422 mismatch comes from the key check (the
+ * first request may still land), so the key is kept (PR #51 review HIGH 1).
+ */
+function isRefusal(error: unknown): boolean {
+  return isApiProblem(error) && error.status >= CLIENT_ERROR_MIN && error.status < SERVER_ERROR_MIN && !KEY_CHECK_SLUGS.has(error.slug);
+}
+
 /** The Idempotency-Key of one starter code: a base key and the code's place in the whole pack. */
 export function starterImportKey(baseKey: string, packIndex: number): string {
   return `${baseKey}-${packIndex}`;
@@ -83,24 +101,40 @@ export function starterImportKey(baseKey: string, packIndex: number): string {
  * was first sent under until that code lands, whatever the input around it, so a retry of a code
  * whose answer was lost replays instead of importing it twice; once it lands its key is dropped,
  * so re-adding a starter drill the user deleted later mints a fresh key and creates it again
- * (round 3 HIGH: a kept key made the api replay the first 201 and create nothing).
+ * (round 3 HIGH: a kept key made the api replay the first 201 and create nothing). A code the api
+ * refused with a 4xx did not land, so its next attempt goes under a fresh key; a network error, a
+ * 5xx or the key check's own 409 in-flight and 422 mismatch may hide a request that landed, so that
+ * code keeps its key (review 4 finding 1, PR #51 review HIGH 1).
  */
 export function useImportStarterPack(api: AppApi, onImported: (drills: readonly Drill[]) => void): IntentMutation<readonly StarterDrill[], Drill[]> {
   const invalidate = useInvalidate();
+  const { newKey } = useLibraryDeps();
   const codeKeys = useRef<ReadonlyMap<string, string>>(new Map());
+  const packIndexOf = (entry: StarterDrill): number => STARTER_PACK.findIndex((each) => each.key === entry.key);
+  const remember = (entry: StarterDrill, key: string): void => {
+    codeKeys.current = new Map([...codeKeys.current, [entry.key, key]]);
+  };
+  const forget = (entry: StarterDrill): void => {
+    codeKeys.current = new Map([...codeKeys.current].filter(([codeKey]) => codeKey !== entry.key));
+  };
   const keyFor = (entry: StarterDrill, baseKey: string): string => {
     const known = codeKeys.current.get(entry.key);
     if (known !== undefined) return known;
-    const key = starterImportKey(baseKey, STARTER_PACK.findIndex((each) => each.key === entry.key));
-    codeKeys.current = new Map([...codeKeys.current, [entry.key, key]]);
+    const key = starterImportKey(baseKey, packIndexOf(entry));
+    remember(entry, key);
     return key;
   };
   return useIntentMutation<readonly StarterDrill[], Drill[]>({
     run: async (pack, key) => {
       const imported: Drill[] = [];
       for (const entry of pack) {
-        imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
-        codeKeys.current = new Map([...codeKeys.current].filter(([codeKey]) => codeKey !== entry.key));
+        try {
+          imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
+        } catch (error) {
+          if (isRefusal(error)) remember(entry, starterImportKey(newKey(), packIndexOf(entry)));
+          throw error;
+        }
+        forget(entry);
       }
       return imported;
     },

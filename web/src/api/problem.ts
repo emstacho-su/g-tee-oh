@@ -22,6 +22,10 @@ export const PROBLEM_SLUG = {
   notImplemented: "not-implemented",
   /** Every bad invite token (S42, O-422). */
   inviteInvalid: "invite-invalid",
+  /** The Idempotency-Key check itself (services/api plugins/idempotency.ts): the first request under the key is still running. */
+  idempotencyInFlight: "idempotency-in-flight",
+  /** The Idempotency-Key check itself: the key was first used for a different request. */
+  idempotencyMismatch: "idempotency-mismatch",
   unknown: UNKNOWN_SLUG,
 } as const;
 

@@ -2,7 +2,9 @@
  * Start again when the library catches up (S47, R3.4, ADR 0018; PR #48 review MEDIUM 4): after a
  * 422 no-coverage the run screen opens one event stream. A coverage_added counts only for a
  * configuration and a pair the drill reaches; the configuration's pairs are read again, and Start
- * is offered only when that read shows one of the drill's pairs covered. An event for another
+ * is offered when the watch's first read (its baseline) already shows one of the drill's pairs
+ * covered, or later when a read shows one newly covered since that baseline (PR #48 review 4
+ * finding 6, PR #51 review HIGH 2). An event for another
  * configuration or another pair does nothing, an event that arrives before the configuration list
  * has loaded is checked once it has, and the stream closes when the refusal leaves the screen.
  */
@@ -104,7 +106,7 @@ describe("R3.4 Start again on coverage_added", () => {
       });
     const view = renderRun({
       libraryDeps: deps,
-      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [lateConfigs], [PAIRS_PATH]: [pairsWith(true)] },
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [lateConfigs], [PAIRS_PATH]: [pairsWith(false), pairsWith(true)] },
     });
     await refuse(view, streams);
     streams[0]?.emit("coverage_added", EVENT);
@@ -130,13 +132,15 @@ describe("R3.4 Start again on coverage_added", () => {
         // The second start fails another way (503): its alert must survive the late re-read.
         [START_PATH]: [problemResponse(422, "no-coverage"), problemResponse(503, "unavailable")],
         [CONFIGS_PATH]: [CONFIGS],
-        [PAIRS_PATH]: [heldPairs],
-        ["GET /api/v1/configs/cfg_6_online_200/pairs"]: [heldPairs],
+        [PAIRS_PATH]: [pairsWith(false), heldPairs],
+        ["GET /api/v1/configs/cfg_6_online_200/pairs"]: [pairsWith(false), heldPairs],
         [NEXT_PATH]: [jsonResponse(200, fixturePlainPrompt)],
       },
     });
     await refuse(view, streams);
-    await waitFor(() => expect(view.sentTo(CONFIGS_PATH).length).toBeGreaterThan(0));
+    // Both baselines are read before the events, so each event makes its own held re-read.
+    await waitFor(() => expect(view.sentTo("GET /api/v1/configs/cfg_6_online_200/pairs")).toHaveLength(1));
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
     streams[0]?.emit("coverage_added", EVENT);
     streams[0]?.emit("coverage_added", { ...EVENT, config_id: "cfg_6_online_200" });
     await waitFor(() => expect(releases).toHaveLength(2));
@@ -153,17 +157,37 @@ describe("R3.4 Start again on coverage_added", () => {
     expect(view.sentTo(START_PATH)).toHaveLength(2);
   });
 
-  it("R3.4 the mount check re-reads the pairs once, so coverage that landed before the subscription still offers Start (PR #48 review round 3 MEDIUM 2)", async () => {
+  it("R3.4 a pair covered before the baseline read answers is offered at once (PR #51 review HIGH 2)", async () => {
+    const { streams, deps } = withStreams();
+    let releaseBaseline: () => void = () => undefined;
+    const heldBaseline: ResponseFactory = () =>
+      new Promise((resolve) => {
+        releaseBaseline = () =>
+          resolve(new Response(JSON.stringify({ items: PAIRS.map((pair) => (pair.pair === "BB-BTN" ? { ...pair, preflop_available: true } : pair)), next_cursor: null }), { status: 200, headers: { "content-type": "application/json" } }));
+      });
+    const view = renderRun({
+      libraryDeps: deps,
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [heldBaseline] },
+    });
+    await refuse(view, streams);
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
+    // The coverage landed while the baseline read was out, and its event came before the read answered.
+    streams[0]?.emit("coverage_added", EVENT);
+    releaseBaseline();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByTestId("start-note")).toHaveTextContent("The library just added Big blind versus button at Online, 6 players, 100bb deep. Start again.");
+  });
+
+  it("R3.4 the baseline read alone, with no event, offers Start when a drill pair is covered (PR #51 review HIGH 2)", async () => {
     const { streams, deps } = withStreams();
     const view = renderRun({
       libraryDeps: deps,
       script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(true)] },
     });
     await refuse(view, streams);
-    // No event at all: the one mount read already shows the pair covered.
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
-    expect(screen.getByTestId("start-note")).toHaveTextContent("The library just added Big blind versus button at Online, 6 players, 100bb deep. Start again.");
+    expect(screen.getByTestId("start-note")).toHaveTextContent("Start again.");
   });
 
   it("R3.4 a batch of events at one configuration makes one read (PR #48 review round 3 MEDIUM 6)", async () => {
@@ -175,7 +199,7 @@ describe("R3.4 Start again on coverage_added", () => {
       });
     const view = renderRun({
       libraryDeps: deps,
-      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [lateConfigs], [PAIRS_PATH]: [pairsWith(false)] },
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [lateConfigs], [PAIRS_PATH]: [pairsWith(false), pairsWith(false)] },
     });
     await refuse(view, streams);
     streams[0]?.emit("coverage_added", EVENT);
@@ -184,8 +208,10 @@ describe("R3.4 Start again on coverage_added", () => {
     releaseConfigs();
     await waitFor(() => expect(view.sentTo(PAIRS_PATH).length).toBeGreaterThan(0));
     await new Promise((resolve) => setTimeout(resolve, 50));
-    // The mount check and the three queued events are one batch for one configuration: one read.
-    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
+    // The baseline read, then the three queued events as one batch for one configuration: one more read.
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(2);
   });
 
   it("R3.4 without a refusal the run screen opens no stream", async () => {
