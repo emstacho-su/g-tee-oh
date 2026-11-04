@@ -8,7 +8,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -200,5 +200,58 @@ describe("R3.13 the shared nav pill list", () => {
     const inactive = NAV_PILL_LINK_PROPS.inactiveProps.className.split(" ");
     expect(active.filter((name) => inactive.includes(name))).toEqual([]);
     expect(active).toContain("font-semibold");
+  });
+
+  /** jsdom lays nothing out, so the row's and the pills' measures are set by hand. */
+  function measure(element: Element, values: Readonly<Record<string, number>>): void {
+    for (const [name, value] of Object.entries(values)) Object.defineProperty(element, name, { value, configurable: true });
+  }
+
+  function rowOf(current: string) {
+    return (
+      <PillNav label="Sections">
+        {["A", "B", "C"].map((name) => (
+          <li key={name}>
+            <a href={`/${name}`} {...(name === current ? { "aria-current": "page" as const } : {})}>
+              {name}
+            </a>
+          </li>
+        ))}
+      </PillNav>
+    );
+  }
+
+  function renderRow(current: string) {
+    const view = render(rowOf(current));
+    const list = screen.getByRole("list");
+    measure(list, { clientWidth: 300, scrollWidth: 600, offsetLeft: 0 });
+    for (const [index, name] of ["A", "B", "C"].entries()) measure(screen.getByRole("link", { name }), { offsetLeft: index * 250, offsetWidth: 80 });
+    // The measures landed after the mount, so the row is told to look again.
+    fireEvent.scroll(list);
+    return { ...view, list };
+  }
+
+  it("R3.13 the row's edge cues show only toward the pills beyond the edge, and follow the scroll (S48 critic G2)", () => {
+    const { list } = renderRow("A");
+    const cue = (side: "start" | "end") => screen.getByTestId(`nav-${side}-fade`);
+    expect(cue("start")).toHaveAttribute("aria-hidden", "true");
+    expect(cue("end")).toHaveAttribute("aria-hidden", "true");
+    // Nothing is scrolled: pills lie beyond the end only.
+    expect(cue("start")).toHaveAttribute("data-shown", "false");
+    expect(cue("end")).toHaveAttribute("data-shown", "true");
+    list.scrollLeft = 300;
+    fireEvent.scroll(list);
+    expect(cue("start")).toHaveAttribute("data-shown", "true");
+    expect(cue("end")).toHaveAttribute("data-shown", "false");
+  });
+
+  it("R3.13 the aria-current pill is scrolled into the row when the page changes, by the row's own scroll (S48 critic G10)", async () => {
+    const { list, rerender } = renderRow("A");
+    expect(list.scrollLeft).toBe(0);
+    rerender(rowOf("C"));
+    // C sits at 500 to 580 in a 300 px row: scrolled so its right edge plus the pad is in view.
+    await waitFor(() => expect(list.scrollLeft).toBe(296));
+    rerender(rowOf("A"));
+    await waitFor(() => expect(list.scrollLeft).toBe(0));
   });
 });
