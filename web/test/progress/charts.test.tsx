@@ -297,3 +297,24 @@ describe("R4.12 HoldoutCard", () => {
     expect(screen.queryByTestId("holdout-open")).toBeNull();
   });
 });
+
+describe("R4.19 MasteryHeatMap Show choice", () => {
+  it("R4.19 Show narrows the grid to due, new or the ten weakest classes, and a row with none is left out", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const show = screen.getByRole("radiogroup", { name: "Show" });
+    expect(within(show).getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(within(show).getByRole("radio", { name: "Due" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(DUE_CELLS);
+    expect(screen.getAllByTestId("heat-due")).toHaveLength(DUE_CELLS);
+    fireEvent.click(within(show).getByRole("radio", { name: "New" }));
+    const fresh = screen.getAllByTestId("heat-cell");
+    expect(fresh).toHaveLength(NEW_CELLS);
+    for (const each of fresh) expect(each).toHaveAttribute("data-state", "new");
+    const rowsWithNew = new Set(fixtureHeatmap.cells.filter((each) => each.p_known === null).map((each) => each.row));
+    expect(within(screen.getByTestId("heat-grid")).getAllByRole("rowheader")).toHaveLength(rowsWithNew.size);
+    fireEvent.click(within(show).getByRole("radio", { name: "Weakest 10" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(10);
+    fireEvent.click(within(show).getByRole("radio", { name: "All" }));
+    expect(screen.getAllByTestId("heat-cell")).toHaveLength(CELL_COUNT);
+  });
+});

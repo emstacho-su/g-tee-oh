@@ -15,7 +15,10 @@ import {
   HEAT_FILL,
   HEAT_INK,
   isDue,
+  isPracticed,
   NEW_CELL_TEXT,
+  visibleHeatmap,
+  WEAKEST_COUNT,
 } from "../../src/progress/heatmap-model.js";
 import { isDue as queueIsDue } from "../../src/progress/queue-model.js";
 import {
@@ -161,5 +164,30 @@ describe("R4.12 leak trend model", () => {
     expect(missing?.noDrillReason).toBe(NOT_ON_HEATMAP_REASON);
     const [loading] = joinLeaksToCells(fixtureLeaks, undefined);
     expect(loading?.noDrillReason).toBe(HEATMAP_LOADING_REASON);
+  });
+});
+
+describe("R4.19 heat map Show filters", () => {
+  it("R4.19 Show filters: Due from isDue, New from isPracticed, Weakest 10 by lowest known share", () => {
+    const all = fixtureHeatmap.cells;
+    expect(visibleHeatmap(fixtureHeatmap, "all")).toBe(fixtureHeatmap);
+    expect(visibleHeatmap(fixtureHeatmap, "due").cells).toEqual(all.filter(isDue));
+    expect(visibleHeatmap(fixtureHeatmap, "new").cells).toEqual(all.filter((each) => !isPracticed(each)));
+    // Rows and columns stay: cells keep their api indexes.
+    expect(visibleHeatmap(fixtureHeatmap, "due").rows).toBe(fixtureHeatmap.rows);
+    const weakest = visibleHeatmap(fixtureHeatmap, "weakest").cells;
+    expect(WEAKEST_COUNT).toBe(10);
+    expect(weakest).toHaveLength(WEAKEST_COUNT);
+    const highestShown = Math.max(...weakest.map((each) => each.p_known ?? 0));
+    for (const each of weakest) expect(isPracticed(each)).toBe(true);
+    for (const each of all.filter((entry) => isPracticed(entry) && !weakest.includes(entry))) expect(each.p_known ?? 0).toBeGreaterThanOrEqual(highestShown);
+    // Shown in the api's order, not sorted.
+    expect(weakest).toEqual(all.filter((each) => weakest.includes(each)));
+  });
+
+  it("R4.19 a tie at the Weakest 10 cut keeps the classes the api lists first", () => {
+    const tied = { ...fixtureHeatmap, cells: fixtureHeatmap.cells.map((each) => (each.p_known === null ? each : { ...each, p_known: 0.5 })) };
+    const practiced = tied.cells.filter(isPracticed);
+    expect(visibleHeatmap(tied, "weakest").cells).toEqual(practiced.slice(0, WEAKEST_COUNT));
   });
 });
