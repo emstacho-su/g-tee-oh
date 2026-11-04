@@ -15,7 +15,7 @@
     {
       "path": "docs/handoffs/S04-mac-bootstrap.md",
       "source": "vault/handoffs/S04-mac-bootstrap.md",
-      "sha256": "d3b6a72d9f1385ef91d2c502e08244f3c06679eeb7668b077d1c20bd1577b87e"
+      "sha256": "bef25934be0905b0a01a5f245bfafee4ac03f40c492775775ee1646fb40fffc1"
     },
     {
       "path": "docs/handoffs/S05-test-vectors.md",
@@ -150,7 +150,7 @@
     {
       "path": "docs/planning/09-v1-sprint-roadmap.md",
       "source": "vault/planning/09-v1-sprint-roadmap.md",
-      "sha256": "8dfda842ae3287fcb37a5dedc028348003992bbb29a5a2aec734a34c1ed99281"
+      "sha256": "3666b399e37ef594a660175115f14ecf672e39d65982c1b668c5a6f673429184"
     },
     {
       "path": "docs/planning/10-traceability.md",
@@ -160,22 +160,22 @@
     {
       "path": "docs/planning/phases/phase-0-foundations.md",
       "source": "vault/planning/phases/phase-0-foundations.md",
-      "sha256": "1dac98df1e1c0540dbc662ffd2391d832f01da60ac342a46aa168d4d53e832c1"
+      "sha256": "d889ece59232eb525c8e4d15980db89268d3a9f051c09fabc39946a9aebf8cb5"
     },
     {
       "path": "docs/planning/phases/phase-2-engine-and-pipeline.md",
       "source": "vault/planning/phases/phase-2-engine-and-pipeline.md",
-      "sha256": "0e82b4adc5b5d0a8bda8fdbbbdc7faf2a93fcff6c509207b48f0f9f037439fc7"
+      "sha256": "ce7ac5beda0dce8d1eda8030264ca979ea68de8d5da6ccb516823156b0ff1b57"
     },
     {
       "path": "docs/planning/phases/phase-3-preflop-trainer.md",
       "source": "vault/planning/phases/phase-3-preflop-trainer.md",
-      "sha256": "25d67ce24f903e6a0996d541975c8bcc0a4c44e977207edaf06877fb5da21dea"
+      "sha256": "b4c73aecc072941e4ac2b0ba2efe117c926bd162bcf38bfd1c8480021250e44d"
     },
     {
       "path": "docs/planning/phases/phase-4-rating-and-release.md",
       "source": "vault/planning/phases/phase-4-rating-and-release.md",
-      "sha256": "e150861c4d9e725b25237df8b706096ff60b8401409f50d00f6d21f1d5dd557c"
+      "sha256": "dbc9fd617ff3ba122f86ad186b03391d86aa49c26b187dab448e50203e3f877c"
     }
   ]
 }

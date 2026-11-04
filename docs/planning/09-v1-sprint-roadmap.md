@@ -3,7 +3,7 @@ id: 'g-tee-oh-v1-sprint-roadmap'
 title: 'g-tee-oh: v1 sprint roadmap'
 collection: 'g-tee-oh'
 type: planning
-status: 'accepted 2026-10-19 (S00 step 2); phase docs and handoffs written in step 3'
+status: 'accepted 2026-10-19 (S00 step 2); phase docs and handoffs written in step 3; replanned 2026-11-04 (section 11 is the schedule of record)'
 created: 2026-10-19
 tags: [g-tee-oh, planning, roadmap]
 public: true
@@ -29,6 +29,8 @@ Two deploy events (O-20). Deploy 1 closes Phase 2 (session S20, paced for week 3
 Relation to 07 Roadmap. 07 is indicative and runs the phases almost in sequence. This roadmap keeps its phase numbers and gates, replaces the sequence with a dependency order (only one Phase 2 step and one Phase 3 test need captured data), turns its checklists into requirements with IDs and named tests, maps execution sessions, and paces them by Claude usage. Where 07's wording is stale, the answered questions and the architecture set win (O-27).
 
 ## 2. Phase table
+
+The dates and usage in this section are the plan of 2026-10-19; the schedule of record from 2026-11-04 is section 11.
 
 Earliest starts are dependency-limited; paced dates come from section 4. Usage counts sessions at high 3, medium 2, low 1.
 
@@ -113,6 +115,8 @@ Dependency edges with reasons (session ids are defined in section 5):
 - S29, S33 and S20 block S34; S34 blocks S35 (the release follows the gate report).
 
 ## 4. Critical path and parallel tracks
+
+The chains, groups and the paced calendar in this section are the plan of 2026-10-19; section 11 replaces them from 2026-11-04.
 
 Longest chain by dependency, 14 days: S03 (day 2, after the S01 scaffold) to S07 (days 3 and 4) to S08 (day 5) to S09 (day 6, then the unattended campaign) to S11 (day 13) to S34 (day 14, 2026-11-02). The capture campaign sets this chain's length, but nearly all of it is unattended and costs only the daily check-in, so it never binds the paced calendar.
 
@@ -407,3 +411,79 @@ Proposed new O-IDs, one sequence from O-38. Where two drafts asked the same ques
 | O-65 | Criterion 6's "converges to that skill" has no sample size or tolerance in any document | Within 25 rating points after 300 items at a known score distribution, as a constant in R4.2's test |
 | O-66 | The 2/5 live rake cap (O-2) has no owner task or deadline | The owner verifies it before S11; until then the catalog row is flagged unverified, and R2.2's and R3.21's tests pass either way because the caps differ in bb at the two stakes |
 | O-67 | Owner time is unbudgeted: S07 (week 1, two sittings), S04 (any evening through week 2), S20 (week 3), S34 (day 31), and the build card export before S26 (week 4, O-24) | When the owner is unavailable: S07 slips and S08 and S09 slip with it while the public plan continues; S04 slips to any evening before S20; S20 slips inside week 3 and O-61 covers a missing pack; S34 slips to the O-39 fallback date; S26 runs the drills named in 05 section 4 and S29 blocks on the card |
+
+## 11. Replan 2026-11-04
+
+Written on day 16. Sections 2 to 5 stay as the plan of 2026-10-19; this section is the schedule of record from today. What changed: every session an agent can run on its own has merged into `sprint/1-v1` (head 6543644); the five phases ran in dependency order rather than in sequence, so Phases 2, 3 and 4 are code complete while Phase 1 has not started; a bridge sprint of thirteen sessions (S36 to S48) that this roadmap never listed rebuilt the screens after the owner's screen review and the UX comparison of 2026-10-28; and the Mac bootstrap (S04) is landing now on `p0/mac-bootstrap`. What is left needs the owner at a keyboard: the Mac run, the private capture sittings, the build card, the visual pass, two deploys and a release. The pacing variable is therefore owner evenings, not Claude units (O-508 in section 11.7).
+
+### 11.1 State by phase
+
+| Phase | Requirements with a tagged test on `sprint/1-v1` | Sessions done | Open |
+|---|---|---|---|
+| 0 | 11 of 12 | S01, S02, S03, S05, S06 | R0.9: S04 landing through `just mac-bench` (O-506); the Phase 0 gate closes when its pull request merges |
+| 1 | 0 of 11 | none | S07 to S11, private; the owner's inputs for S07 are in place except one tool install (the S07 handoff, Status 2026-11-04) |
+| 2 | 21 of 22 | S12 to S19 (the G4 report is private, in the capture repository's draft pull request 2) | R2.22 and the Mac part of R2.21: S20 Deploy 1 |
+| 3 | 35 of 35 feature requirements (R3.1 to R3.37; R3.28 and R3.29 unused) | S21 to S28, S36 to S47 | R3.22 and the gate reports: S29; the S48 re-shoot |
+| 4 | 15 of 19 | S30, S31, S32 | R4.15 (S33), R4.16 and R4.17 (S34), R4.18 (S35) |
+
+The bridge sprint, 2026-10-28 to 2026-11-04: S36 to S43 reworked the screens after the owner's round-1 review (pull requests 32 to 43); S44 put an automated screen critic and the review page builder in the repository (R3.23, pull request 44); S45 to S47 and their follow-ups took the UX comparison's top items and the critic's lists (R3.24 to R3.27, R3.30 to R3.37, R4.19; pull requests 45 to 52); S48, the re-shoot and re-critique, has not run. Their records are the vault handoffs S36 to S47 and the decisions O-343 to O-504.
+
+### 11.2 Remaining sessions in order
+
+| Order | Session | What gates it | Who is present | Usage |
+|---|---|---|---|---|
+| 1 | S04 Mac run (the run sheet in the S04 handoff) | the branch pushed (done) | the owner at the Mac, about two hours | low |
+| 2 | S48 re-shoot and re-critique, with the fix pass queued in the S45 and S47 handoffs | pull request 50 merged (done) | agent | medium |
+| 3 | The owner's pre-S07 steps (the S07 handoff, Status 2026-11-04) | none | the owner, under an hour | none |
+| 4 | S07 sittings 1 and 2 | step 3 | the owner at the keyboard, two evenings | high |
+| 5 | S08 | S07 | agent | high |
+| 6 | S09 first run, then one short check-in a day | S08 | the owner for the first run | low per sitting |
+| 7 | S20 Deploy 1 under O-61 (O-507) | S04 merged and a Mac evening | the owner at the Mac | medium |
+| 8 | The build card export (O-24) | none | the owner, under an hour | none |
+| 9 | S29 Phase 3 gate | step 8 and the visual pass; S48 first, so the pass sees the re-shot screens | agent, then the owner for the visual pass | high |
+| 10 | S10 first pack, then S20b first real build (O-507) | S09's first configuration | agent; a short Mac sitting for S20b | high, then low |
+| 11 | S33 Phase 4 gate | S29's perf report | agent | medium |
+| 12 | S11 Phase 1 exit | the O-19 set complete | agent | medium |
+| 13 | S34 Deploy 2 and the v1 gate | S20, S29, S33, S11 | the owner at the Mac | medium |
+| 14 | S35 docs and release | S34 | agent; the owner approves the merge into `main` | low |
+
+### 11.3 Critical path
+
+Owner evenings, in order: the Mac run (S04), two S07 sittings, the S09 first run, a Mac evening for S20, the S29 visual pass, a Mac evening for S34. The longest chain is Phase 1: S07 to S08 to S09 to the campaign days to S10 to S11, then S34; the campaign's length is set by its pace (ADR 0021) and is unattended. Everything an agent runs alone (S48, S08, S10, S11, S29, S33, S35 and the backlog of 11.5) fits between evenings and no longer binds. The Mac run date, 2026-11-04 or 2026-11-05, moves two things by one day, the S04 merge and the earliest evening for S20, and moves the v1 date by nothing.
+
+### 11.4 Paced calendar
+
+At three owner evenings a week, one at the Mac and two at the keyboard:
+
+| Week | Dates | Owner evenings | Agent sessions | Milestones |
+|---|---|---|---|---|
+| 1 | 2026-11-04 to 2026-11-09 | the Mac run (11-04 or 11-05); the pre-S07 steps and S07 sitting 1; S07 sitting 2 | the S04 pull request, S48 | Phase 0 gate closed at the S04 merge (11-05 or 11-06) |
+| 2 | 2026-11-10 to 2026-11-16 | the S09 first run; S20 under O-61 at the Mac; the build card export and the S29 visual pass | S08, the S09 check-ins, S29, S33 | Phase 2 gate under O-61; Phase 3 gate; Phase 4 gate |
+| 3 | 2026-11-17 to 2026-11-23 | S20b, a short Mac sitting; check-in pastes | S10, the S09 check-ins | the first pack; the first real build on the Mac |
+| 4 | 2026-11-24 to 2026-11-30 | S34 at the Mac | S11, S35 | Phase 1 exit; the v1 gate about day 40 to 42 (2026-11-28 to 2026-11-30) |
+
+At two evenings a week the same order lands the v1 gate around day 54 (2026-12-12). The Phase 1 exit also depends on the campaign reaching the O-19 set, which can stretch past either date; S34 then waits for S11, as its preconditions say, and the date is reset at the next weekly check-in (O-508).
+
+### 11.5 Backlog, not gating
+
+Work that needs no owner evening. It runs only when no session in 11.2 is runnable and inside the week's spare units, never ahead of a gate.
+
+| Item | Where it is recorded |
+|---|---|
+| UX comparison work items 12, 15, 16, 18, 21, 22 and 24 to 30 (the vault research note of 2026-10-28) | O-461, O-471, O-480 and O-501 to O-504 name their api parts |
+| S48's fix pass: the MEDIUM and LOW leftovers of the S45 and S47 follow-up reviews | the S45 and S47 handoffs |
+| Api reads proposed by the bridge sprint: the acting seat's range from solver-query (O-490), recap attempt ids (O-492), the explanation template spacing (O-448), the shared revealing-panel list (O-449) | planning/00 |
+| Owner questions still open: the matrix pop-out default (O-386); whether the commit hook accepts other Claude models | planning/00, the S45 and S46 handoffs |
+
+### 11.6 Trims, revised
+
+The first trim is already taken: S20 runs under O-61 before the first pack (O-507). Still available, in order: fold S33 into S29 as one gate workflow, and fold S35 into S34; each saves an agent session, not an evening. Evening savers: if the first pack lands before the S20 evening, S20b disappears; the S29 visual pass and a capture sitting can share an evening, since one is at a local port and the other in the browser. Not available: skipping S48 (cheap, and the visual pass depends on the re-shot screens) or any gate (O-39).
+
+### 11.7 Proposed questions
+
+Appended to planning/00 under "Phase 0 close-out and Phase 1 start (2026-11-04)".
+
+| O-ID | Question | Default |
+|---|---|---|
+| O-507 | Deploy 1 before the first pack | S20 runs at the next Mac evening after S04 merges, under O-61 (a smoke build on the synthetic 6-max ranges); the first real build is a short follow-up sitting S20b after S10, recorded as an addendum to the Deploy 1 report; the Phase 2 gate closes at S20 on the smoke build's memory and storage numbers and S20b replaces them with the real build's |
+| O-508 | The v1 date, now that owner evenings pace the plan | Day 40 to 42 (2026-11-28 to 2026-11-30) at three evenings a week, about 2026-12-12 at two; the date is reset at each weekly check-in from the evenings actually available, and units are no longer the pacing variable (replaces the O-39 date; the O-39 rule "never defer a gate" stands) |

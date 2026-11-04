@@ -3,7 +3,7 @@ id: 'g-tee-oh-phase-4-rating-and-release'
 title: 'Phase 4 Rating, scheduling, progress, Deploy 2 and the v1 gate'
 collection: 'g-tee-oh'
 type: phase
-status: 'planned'
+status: 'code complete 2026-10-28 (S30 to S32 merged); gate S33, Deploy 2 and the release pending; see 09 section 11'
 created: 2026-10-19
 public: true
 phase: 4
