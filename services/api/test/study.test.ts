@@ -77,6 +77,24 @@ describe("R3.3 GET /study/node", () => {
     expect(body.range_by_action).toEqual(upstream.data?.range_summary.by_action);
   });
 
+  it("R3.12 relays each action's combos and the acting seat's range combos from solver-query (O-469, ADR 0004)", async () => {
+    const response = await app.inject({ method: "GET", url: nodeUrl({}), headers: readHeaders(session) });
+    const body = studyNodeSchema.parse(response.json());
+    const upstream = await fixtureSolverQuery().GET(NODES_PATH, {
+      params: { query: { solution_id: body.solution_id, node_key: ROOT, hands: "class" } },
+    });
+    const summary = upstream.data?.range_summary;
+    expect(summary).toBeDefined();
+    expect(body.range_by_action.map((entry) => entry.combos)).toEqual(summary?.by_action.map((entry) => entry.combos));
+    expect(body.range_by_action.every((entry) => typeof entry.combos === "number" && entry.combos >= 0)).toBe(true);
+    // The pair names the out-of-position seat first; the seat to act picks which SeatRange is the range.
+    const [outOfPosition] = body.pair.split("-");
+    const acting = body.to_act === outOfPosition ? summary?.oop : summary?.ip;
+    expect(body.range_combos).toEqual({ combos: acting?.combos, reach_weighted_combos: acting?.reach_weighted_combos });
+    const total = body.range_by_action.reduce((sum, entry) => sum + (entry.combos ?? 0), 0);
+    expect(Math.abs(total - (acting?.reach_weighted_combos ?? 0))).toBeLessThan(0.05);
+  });
+
   it("R3.3 walks a line through next_node_key and reads a node by node_key", async () => {
     const root = studyNodeSchema.parse(
       (await app.inject({ method: "GET", url: nodeUrl({}), headers: readHeaders(session) })).json(),

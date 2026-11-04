@@ -28,8 +28,11 @@ function Cells({ row, count }: { row: FrequencyRow; count: number }) {
 
 export function FrequencyTable({ spot, pooled, caption }: FrequencyTableProps) {
   const count = spot.actions.length;
+  // The wrapper is the sr-only box: a table ignores the 1px width, so sr-only on the table itself
+  // widened the document past 390px at phone width (S47 critic G2; TrackBreakdown's pattern).
   return (
-    <table className="sr-only">
+    <div className="sr-only" data-testid="frequency-sr-table">
+    <table>
       <caption>{caption}</caption>
       <thead>
         <tr>
@@ -57,5 +60,6 @@ export function FrequencyTable({ spot, pooled, caption }: FrequencyTableProps) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

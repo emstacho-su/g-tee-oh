@@ -175,7 +175,7 @@ describe("R3.12 range matrix drawing", () => {
   });
 
   it("R3.12 weight 0 shows the plain ground", () => {
-    const hands = fixtureStudyNode.hands.map((row) => (row.hand === "AA" ? { ...row, reach: [0] } : row));
+    const hands = fixtureStudyNode.hands.map((row) => (row.hand === "AA" ? { ...row, reach: [0, 0] } : row));
     const zero = buildMatrixModel({ ...fixtureStudyNode, hands });
     const fills = fillsIn(draw(zero, { mode: "weight" }), cellRect(zero.cells[0] as MatrixCell));
     expect(fills.at(-1)?.style).toBe(MATRIX_PALETTES.light.background);
@@ -276,7 +276,7 @@ describe("R3.12 range matrix drawing", () => {
 
   it("R3.12 clamps a weight above 1 and frequencies summing above 1 to the cell", () => {
     const hands = fixtureStudyNode.hands.map((row) =>
-      row.hand === "AA" ? { ...row, reach: [1.5], strategy: [0.6, 0.6, 0, 0] } : row,
+      row.hand === "AA" ? { ...row, reach: [1.5, 1.5], strategy: [0.6, 0.6, 0, 0] } : row,
     );
     const odd = buildMatrixModel({ ...fixtureStudyNode, hands });
     const rect = cellRect(odd.cells[0] as MatrixCell);

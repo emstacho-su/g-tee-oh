@@ -30,7 +30,7 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
     const view = renderQuiz("/quiz", {});
     const table = await startScreen();
     await waitFor(() => expect(within(table).getAllByRole("option")).toHaveLength(3));
-    expect(within(table).getByRole("option", { name: "Online, 6 players, 100 bb deep, stakes online" })).toBeInTheDocument();
+    expect(within(table).getByRole("option", { name: "Online, 6 players, 100bb deep" })).toBeInTheDocument();
     expect(table).toHaveValue("cfg_6_online_100");
     expect(view.sentTo(START_PATH)).toHaveLength(0);
   });
@@ -62,11 +62,12 @@ describe("R3.16 /quiz start screen", APP_SUITE, () => {
     expect(within(kinds).getAllByRole("button").map((button) => button.textContent)).toEqual(["Range questions", "Hand questions"]);
     const difficulty = screen.getByRole("radiogroup", { name: "Difficulty" });
     expect(within(difficulty).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["Easy", "Medium", "Hard"]);
-    expect(
-      screen.getByText(
-        "Easy: over or under a share, and the highest-EV action. Medium: the share, and a frequency band. Hard: which regions mix, and the raise size played most.",
-      ),
-    ).toBeInTheDocument();
+    // One line per level, as a list (S47 critic G8).
+    expect(within(screen.getByRole("list", { name: "Difficulty" })).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Easy: over or under a share, and the highest-EV action.",
+      "Medium: the share, and a frequency band.",
+      "Hard: which regions mix, and the raise size played most.",
+    ]);
   });
 
   it("R3.16 Start quiz waits for a position, a spot type and a question kind, then writes the choice to the address", async () => {

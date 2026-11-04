@@ -80,15 +80,15 @@ describe("R4.12 /settings session defaults", () => {
     expect(within(defaults).getByText(/Choose at least one configuration/)).toBeInTheDocument();
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
 
-    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100 bb deep, stakes 1/3" }));
-    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100 bb deep, stakes online" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100bb deep, stakes 1/3" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100bb deep" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toEqual([FIRST_CONFIG.config_id, THIRD_CONFIG.config_id]);
 
-    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100 bb deep, stakes online" }));
-    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100 bb deep, stakes 1/3" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Online, 6 players, 100bb deep" }));
+    await user.click(within(list).getByRole("checkbox", { name: "Live, 9 players, 100bb deep, stakes 1/3" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
 
-    await user.click(within(list).getByRole("checkbox", { name: /200 bb deep/ }));
+    await user.click(within(list).getByRole("checkbox", { name: /200bb deep/ }));
     await user.click(within(defaults).getByRole("radio", { name: "All covered configurations" }));
     expect(useSessionDefaultsStore.getState().defaults.configScope).toBe(ALL_CONFIGS);
     expect(within(defaults).queryByRole("list", { name: "Configurations to train" })).toBeNull();
@@ -112,8 +112,8 @@ describe("R4.12 /settings session defaults", () => {
 
     const defaults = await screen.findByRole("region", { name: "Configuration scope" });
     expect(await within(defaults).findByText("At most 32 configurations can be chosen.")).toBeInTheDocument();
-    expect(within(defaults).getByRole("checkbox", { name: /, 33 bb deep/ })).toBeDisabled();
-    expect(within(defaults).getByRole("checkbox", { name: /, 32 bb deep/ })).toBeEnabled();
+    expect(within(defaults).getByRole("checkbox", { name: /, 33bb deep/ })).toBeDisabled();
+    expect(within(defaults).getByRole("checkbox", { name: /, 32bb deep/ })).toBeEnabled();
   });
 
   it("R4.12 a failed or empty configuration read says so, and Try again reloads it", async () => {
@@ -137,10 +137,14 @@ describe("R4.14 /settings cosmetics", () => {
     const backs = await within(cosmetics).findByRole("group", { name: "Card back" });
     expect(within(backs).getByRole("radio", { name: /^None/ })).toBeChecked();
     expect(within(backs).getByRole("radio", { name: /Fourteen-day streak card back/ })).toBeEnabled();
+    // Locked items fold behind "Show N locked" per slot and keep their unlock rule (S47 critic G3).
+    expect(within(backs).queryByRole("radio", { name: /Sixty-day streak card back/ })).not.toBeInTheDocument();
+    await userEvent.click(within(backs).getByRole("button", { name: /^Show \d+ locked/ }));
     const sixty = within(backs).getByRole("radio", { name: /Sixty-day streak card back/ });
     expect(sixty).toBeDisabled();
     expect(sixty).toHaveAccessibleDescription("Locked: Reach a 60-day streak");
     const felts = within(cosmetics).getByRole("group", { name: "Table felt" });
+    await userEvent.click(within(felts).getByRole("button", { name: /^Show \d+ locked/ }));
     expect(within(felts).getByRole("radio", { name: /Tier V felt/ })).toBeDisabled();
     expect(within(felts).getByText("Locked: Reach Tier V")).toBeInTheDocument();
     expect(within(cosmetics).getByRole("group", { name: "Badge" })).toBeInTheDocument();
@@ -185,6 +189,7 @@ describe("R4.12 /settings hotkeys and layout", () => {
     const hotkeys = await screen.findByRole("region", { name: "Hotkeys" });
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
     // S46 (R3.30, R3.34): letters by action kind, digits for the sizes, Enter, Shift chords, R reserved.
+    // S45 (O-466): the Study scope's rows follow the trainer and app rows.
     expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual([
       "F",
       "C",
@@ -198,6 +203,7 @@ describe("R4.12 /settings hotkeys and layout", () => {
       "R",
       "I",
       "?",
+      ...["ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape"],
     ]);
     expect(rows[0]).toHaveTextContent("Fold");
     expect(rows[5]).toHaveTextContent("bet or raise size");

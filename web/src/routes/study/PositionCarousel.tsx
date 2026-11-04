@@ -77,7 +77,15 @@ function SeatButton({ item, expanded, actionsId, onPress }: SeatButtonProps) {
         unavailable && "cursor-not-allowed border-dashed font-normal text-muted",
       )}
     >
-      <span className="text-sm font-semibold">{item.seat}</span>{" "}
+      <span className="flex items-center gap-1 text-sm font-semibold">
+        {item.seat}
+        {/* S45 (R3.12): the current seat button doubles as the drop-down toggle, so it shows a chevron. */}
+        {isCurrent ? (
+          <span aria-hidden="true" data-testid="seat-chevron" data-open={expanded ? "true" : "false"} className={cn("inline-block text-xs transition-transform", expanded && "rotate-180")}>
+            ▾
+          </span>
+        ) : null}
+      </span>{" "}
       <span className="text-xs font-normal">{item.text}</span>
       {item.reason === undefined ? null : <span className="sr-only">{`, ${item.reason}`}</span>}
     </Button>

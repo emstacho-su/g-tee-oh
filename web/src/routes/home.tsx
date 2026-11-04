@@ -10,9 +10,12 @@ import { useAppApi } from "../auth/index.js";
 import { Card, PageHeader } from "../components/ui/index.js";
 import { BUILDER_STATE_TEXT } from "../library/format.js";
 import { useBuilderStatus, useIsAdmin } from "../library/use-builder.js";
+import { LoadError } from "./home-cards/LoadError.js";
 import { QueueCard } from "./home-cards/QueueCard.js";
 import { HomeRatingCard, HomeStreakCard } from "./home-cards/StatCards.js";
+import { SpotsCard } from "./home-cards/SpotsCard.js";
 
+export const BUILDER_STATUS_FAILED = "The builder status could not be loaded.";
 export const HOME_DESCRIPTION = "What to practise today, your streak and rating, and the library builder.";
 
 function BuilderStatusCard() {
@@ -21,12 +24,16 @@ function BuilderStatusCard() {
   let summary = "Background library builder health is on the Library screen.";
   if (isAdmin && status.data !== undefined) {
     summary = `Builder state: ${BUILDER_STATE_TEXT[status.data.state]}. ${status.data.queue.queued} builds queued.`;
-  } else if (isAdmin && status.isError) {
-    summary = "The builder status could not be loaded.";
   }
+  const failed = isAdmin && status.data === undefined && status.isError;
   return (
     <Card title="Builder status">
-      <p className="text-sm text-muted">{summary}</p>
+      {/* A failed read offers Try again like the other home cards (S47 critic G9). */}
+      {failed ? (
+        <LoadError message={BUILDER_STATUS_FAILED} retries="the builder status" onRetry={() => void status.refetch()} />
+      ) : (
+        <p className="text-sm text-muted">{summary}</p>
+      )}
       <Link to="/library" className="self-start text-sm font-medium text-accent underline underline-offset-4">
         Open the library
       </Link>
@@ -53,6 +60,9 @@ export function HomePage() {
         </div>
         <div className="min-w-0">
           <HomeRatingCard />
+        </div>
+        <div className="min-w-0 lg:col-span-3">
+          <SpotsCard />
         </div>
         <div className="min-w-0 lg:col-span-3">
           <BuilderStatusCard />

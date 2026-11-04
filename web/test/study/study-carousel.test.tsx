@@ -75,7 +75,7 @@ describe("R3.12 position carousel", () => {
     const fold = within(actions).getByRole("button", { name: /^Fold/ });
     expect(fold).toHaveAttribute("aria-disabled", "true");
     expect(fold).toHaveAccessibleName(/Ends the solution/);
-    expect(within(actions).getByRole("button", { name: /^Raise 2\.5bb.*next likely/ })).not.toHaveAttribute("aria-disabled");
+    expect(within(actions).getByRole("button", { name: /^Raise to 2.5bb.*next likely/ })).not.toHaveAttribute("aria-disabled");
     expect(within(actions).queryByRole("link")).toBeNull();
   });
 
@@ -84,11 +84,11 @@ describe("R3.12 position carousel", () => {
     const user = userEvent.setup();
     const { router } = renderStudy(BASE);
     const actions = await screen.findByRole("region", { name: "BTN's actions" });
-    await user.click(within(actions).getByRole("button", { name: /^Raise 2\.5bb/ }));
+    await user.click(within(actions).getByRole("button", { name: /^Raise to 2.5bb/ }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ line: FIXTURE_CHILD_LINE }));
     expect(await screen.findByText(/BB to act/)).toBeInTheDocument();
     await waitFor(() => expect(seat(/^BB/)).toHaveAttribute("aria-current", "step"));
-    expect(seat(/^BTN/)).toHaveTextContent("Raise 2.5bb");
+    expect(seat(/^BTN/)).toHaveTextContent("Raise to 2.5bb");
     expect(await screen.findByRole("region", { name: "BB's actions" })).toBeInTheDocument();
     await waitFor(() => expect(info.mock.calls.some(([line]) => String(line).endsWith(` ${FIXTURE_CHILD_LINE}`))).toBe(true));
 
@@ -112,7 +112,7 @@ describe("R3.12 position carousel", () => {
     const user = userEvent.setup();
     const { router } = renderStudy(`${BASE}&line=${FIXTURE_CHILD_LINE}`);
     await screen.findByText(/BB to act/);
-    await waitFor(() => expect(seat(/^BTN/)).toHaveTextContent("Raise 2.5bb"));
+    await waitFor(() => expect(seat(/^BTN/)).toHaveTextContent("Raise to 2.5bb"));
     await user.click(seat(/^BTN/));
     await waitFor(() => expect(router.state.location.search).not.toHaveProperty("line"));
     expect(await screen.findByRole("heading", { name: "BTN's range at this node" })).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe("R3.12 position carousel", () => {
     renderStudy(`${BASE}&line=${FIXTURE_GRANDCHILD_LINE}`);
     await screen.findByText(/BTN to act/);
     await waitFor(() => expect(seats()).toHaveLength(7));
-    expect(seats()[5]).toHaveTextContent(/^BB.*Raise 11bb/);
+    expect(seats()[5]).toHaveTextContent(/^BB.*Raise to 11bb/);
     expect(seats()[6]).toHaveAttribute("aria-current", "step");
     expect(screen.getByTestId("synthetic-banner")).toBeInTheDocument();
   });
@@ -145,7 +145,7 @@ describe("R3.12 position carousel", () => {
     expect(stripScroll.mock.calls.at(-1)?.[0]).toEqual({ left: 0, behavior: "smooth" });
 
     stripScroll.mockClear();
-    await user.click(within(actions).getByRole("button", { name: /^Raise 2\.5bb/ }));
+    await user.click(within(actions).getByRole("button", { name: /^Raise to 2.5bb/ }));
     await screen.findByRole("region", { name: "BB's actions" });
     await waitFor(() => expect(stripScroll).toHaveBeenCalled());
   });

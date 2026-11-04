@@ -18,18 +18,18 @@ describe("R3.10 solver frequency of the chosen action", () => {
     // fixtureFeedback.freq_by_action is [0.05, 0.1, 0.8, 0.05]: Call 10%, Raise 80%.
     expect(solverFrequency(fixtureFeedback, fixtureActions, CALL_INDEX)).toEqual({
       chosen: { label: "Call", share: 0.1 },
-      top: { label: "Raise 2.5bb", share: 0.8 },
+      top: { label: "Raise to 2.5bb", share: 0.8 },
       chosenIsTop: false,
     });
     expect(solverFrequencyText(fixtureFeedback, fixtureActions, CALL_INDEX)).toBe(
-      "The solver takes Call 10.0% of the time; its most frequent action is Raise 2.5bb at 80.0%.",
+      "The solver takes Call 10.0% of the time; its most frequent action is Raise to 2.5bb at 80.0%.",
     );
     expect(solverFrequencyShort(fixtureFeedback, fixtureActions, CALL_INDEX)).toBe("Solver 10.0%");
   });
 
   it("R3.10 says so when the chosen action is the most frequent one", () => {
     expect(solverFrequencyText(fixtureFeedback, fixtureActions, RAISE_INDEX)).toBe(
-      "The solver takes Raise 2.5bb 80.0% of the time, its most frequent action.",
+      "The solver takes Raise to 2.5bb 80.0% of the time, its most frequent action.",
     );
   });
 
@@ -66,6 +66,6 @@ describe("R3.13 PR #45 review round 2, finding 5: a tie for the top share counts
       { index: 1, token: "r250b", kind: "raise", size_cbb: 250, bucket: null, label: "Raise", next_node_key: null },
     ] as const;
     const feedback: DecisionFeedback = { ...fixtureFeedback, freq_by_action: [0.7, 0.3] };
-    expect(solverFrequencyText(feedback, actions, 1)).toBe("The solver takes Raise 2.5bb 30.0% of the time; its most frequent action is Raise 2.5bb at 70.0%.");
+    expect(solverFrequencyText(feedback, actions, 1)).toBe("The solver takes Raise to 2.5bb 30.0% of the time; its most frequent action is Raise to 2.5bb at 70.0%.");
   });
 });

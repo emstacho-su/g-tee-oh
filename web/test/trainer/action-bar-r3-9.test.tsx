@@ -78,7 +78,7 @@ describe("R3.9 action buttons come from the node's tree actions", () => {
     expect(screen.queryByText("Small")).not.toBeInTheDocument();
     unmount();
     withRoot(<ActionBar actions={PREFLOP_OPEN} grouping="standard" street="preflop" onAction={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Raise 2.5bb" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Raise to 2.5bb" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All-in 100bb" })).toBeInTheDocument();
   });
 

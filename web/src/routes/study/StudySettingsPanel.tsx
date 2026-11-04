@@ -11,9 +11,16 @@
  * failed read of the draft's seats shows here with a retry, never over a confirmed solution. Once
  * a spot is confirmed the panel folds into a one-line summary with "Change settings". The
  * component holds no state: the caller owns the draft and the URL.
+ *
+ * S45 (R3.27): the panel opens with the saved spots (the caller's shortcuts slot: Your spots and
+ * Recent spots, inline) and counts the covered pairs once the draft's seats have loaded; the summary
+ * carries a star for the spot and, when the spot came from the browser's memory, Start over.
  */
+import type { ReactNode } from "react";
+
 import { Button, Card, Panel, ToggleGroup } from "../../components/ui/index.js";
 import { catalogFailure } from "../../study/problem-text.js";
+import { SPOT_TEXT } from "./SpotShortcuts.js";
 import { FailureAlert } from "./StudyNotices.js";
 import { SETTING_KEYS, SETTING_LABELS, type FieldState, type FieldStates, type SettingKey, type SettingsDraft } from "../../study/settings.js";
 
@@ -39,6 +46,10 @@ export interface StudySettingsPanelProps {
   onConfirm: () => void;
   /** Offered only when a confirmed spot is behind the panel. */
   onCancel?: () => void;
+  /** The saved spots, shown first (S45). */
+  shortcuts?: ReactNode;
+  /** "2 covered pairs at these settings", once the draft's pairs have loaded (S45). */
+  coveredText?: string;
 }
 
 interface SettingFieldProps {
@@ -65,9 +76,10 @@ function SettingField({ name, state, value, onChange }: SettingFieldProps) {
 }
 
 export function StudySettingsPanel(props: StudySettingsPanelProps) {
-  const { fields, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel } = props;
+  const { fields, draft, blocker, notice, seatsFailure, onChange, onConfirm, onCancel, shortcuts, coveredText } = props;
   return (
     <Card title={PANEL_TEXT.title} description={PANEL_TEXT.description}>
+      {shortcuts}
       {notice === undefined ? null : (
         <p role="status" className="text-sm font-medium">
           {notice}
@@ -91,6 +103,7 @@ export function StudySettingsPanel(props: StudySettingsPanelProps) {
         </Button>
         {onCancel === undefined ? null : <Button onClick={onCancel}>{PANEL_TEXT.cancel}</Button>}
         {blocker === undefined ? null : <span className="text-sm text-muted">{blocker}</span>}
+        {coveredText === undefined ? null : <span className="text-sm">{coveredText}</span>}
       </div>
     </Card>
   );
@@ -99,15 +112,27 @@ export function StudySettingsPanel(props: StudySettingsPanelProps) {
 export interface SettingsSummaryProps {
   summary: string;
   onChange: () => void;
+  /** The star beside the summary (S45, R3.27). */
+  star?: ReactNode;
+  /** Offered when the spot was reopened from the browser's memory: forgets it (S45, R3.27). */
+  onStartOver?: () => void;
 }
 
-export function SettingsSummary({ summary, onChange }: SettingsSummaryProps) {
+export function SettingsSummary({ summary, onChange, star, onStartOver }: SettingsSummaryProps) {
   return (
     <Panel className="flex-row flex-wrap items-center justify-between">
       <p className="text-sm font-medium">{summary}</p>
-      <Button size="sm" onClick={onChange}>
-        {PANEL_TEXT.change}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {star}
+        {onStartOver === undefined ? null : (
+          <Button size="sm" onClick={onStartOver}>
+            {SPOT_TEXT.startOver}
+          </Button>
+        )}
+        <Button size="sm" onClick={onChange}>
+          {PANEL_TEXT.change}
+        </Button>
+      </div>
     </Panel>
   );
 }

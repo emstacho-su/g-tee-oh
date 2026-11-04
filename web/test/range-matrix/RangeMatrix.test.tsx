@@ -250,7 +250,8 @@ describe("R3.12 RangeMatrix pop-out (O-386)", () => {
       expect(line).toHaveTextContent(formatShare(row.strategy[position] ?? 0, 1));
       expect(line).toHaveTextContent(formatBb(row.ev_bb[position] ?? 0, 2));
     });
-    expect(popOut).toHaveTextContent(`Range weight ${formatShare(row.reach?.[0] ?? 0, 1)}`);
+    // The acting seat is in position at the fixture root, so its reach is the second entry (O-463).
+    expect(popOut).toHaveTextContent(`Range weight ${formatShare(row.reach?.[1] ?? 0, 1)}`);
     expect(popOut).toHaveClass("z-(--layer-tooltip)");
     expect(popOut).not.toHaveAttribute("tabindex");
   });
@@ -369,7 +370,7 @@ describe("R3.12 RangeMatrix legends", () => {
     render(<RangeMatrix node={fixtureStudyNode} mode="ev" theme="dark" onSelectHand={() => undefined} />);
     const legend = screen.getByRole("list", { name: /EV legend/ });
     expect(within(legend).getAllByRole("listitem")).toHaveLength(11);
-    expect(legend).toHaveTextContent("near 0");
+    expect(legend).toHaveTextContent("near 0: within");
     expect(legend).toHaveTextContent(/more than \+\d/);
   });
 

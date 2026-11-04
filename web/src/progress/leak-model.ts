@@ -14,6 +14,7 @@
  */
 import type { HeatmapCell, HeatmapColumn, HeatmapRow, LeakItem, ProgressHeatmap, ProgressLeaks } from "./types.js";
 import { classLabel } from "./heatmap-model.js";
+import { capitalize, familyWords } from "./spot-words.js";
 
 /** The scale's top when no class has any cost yet. */
 export const EMPTY_SCALE_MAX = 1;
@@ -105,7 +106,7 @@ export interface LeakRow {
   readonly cell: HeatmapCell | null;
   readonly row: HeatmapRow | null;
   readonly column: HeatmapColumn | null;
-  /** "facing-open BB-BTN, live 100 bb" from the cell, else the item's family. */
+  /** "Facing an open, big blind versus button, live 100 bb" from the cell, else the item's family in words. */
   readonly label: string;
   /** Why the row has no drill button; null when it has one. */
   readonly noDrillReason: string | null;
@@ -115,7 +116,7 @@ export const HEATMAP_LOADING_REASON = "The heat map is still loading, so this cl
 export const NOT_ON_HEATMAP_REASON = "This class is not on the heat map, so there is no spot to drill.";
 
 function unjoined(item: LeakItem, rank: number, reason: string): LeakRow {
-  return { rank, item, cell: null, row: null, column: null, label: item.family, noDrillReason: reason };
+  return { rank, item, cell: null, row: null, column: null, label: capitalize(familyWords(item.family)), noDrillReason: reason };
 }
 
 /** Each leak item, ranked in api order, joined to its heat map cell by spot_class_key. */

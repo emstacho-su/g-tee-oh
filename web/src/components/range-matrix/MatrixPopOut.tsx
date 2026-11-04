@@ -23,7 +23,7 @@ import type { ThemeName } from "../../theme/action-style.js";
 import { ACTION_FILL_CLASSES, ActionSwatch, actionFillStyle } from "../trainer/ActionSwatch.js";
 import { TOOLTIP_LAYER_CLASS, cn } from "../ui/index.js";
 import { MISSING_TEXT, weightText } from "./cell-text.js";
-import { MATRIX_PALETTES, evFill, evInk, weightFill, weightInk } from "./matrix-theme.js";
+import { MATRIX_PALETTES, evFill, evInk, lossFill, lossInk, weightFill, weightInk } from "./matrix-theme.js";
 import type { MatrixCell, MatrixMode } from "./model.js";
 
 /** The space between the cell and the pop-out, in CSS pixels. */
@@ -70,9 +70,27 @@ export interface MatrixPopOutProps {
   theme: ThemeName;
   /** The model's EV scale end, so the EV fill matches the canvas. */
   evScaleBb: number;
+  /** Compare to best (R3.24): the compared action's position and scale end, so the fill matches the canvas. */
+  lens?: { readonly position: number; readonly scalePctPot: number } | null;
 }
 
 type EnlargedCellProps = MatrixPopOutProps;
+
+/** The flat fill and ink of a cell in a filled-step lens, or null for the bar lenses. */
+function flatFill(props: EnlargedCellProps): { background: string; color: string } | null {
+  const { cell, mode, theme, evScaleBb, lens = null } = props;
+  const palette = MATRIX_PALETTES[theme];
+  if (mode === "ev") {
+    return { background: evFill(palette, cell.evBestBb ?? 0, evScaleBb), color: evInk(palette, cell.evBestBb ?? 0, evScaleBb) };
+  }
+  if (mode === "weight") return { background: weightFill(palette, cell.weight) ?? palette.missingFill, color: weightInk(palette, cell.weight) };
+  if (mode === "compare") {
+    if (lens === null) return { background: palette.missingFill, color: palette.labelText };
+    const loss = cell.lossPctPot[lens.position] ?? 0;
+    return { background: lossFill(palette, loss, lens.scalePctPot), color: lossInk(palette, loss, lens.scalePctPot) };
+  }
+  return null;
+}
 
 function FrequencyBars({ cell, actions }: Pick<EnlargedCellProps, "cell" | "actions">) {
   return (
@@ -94,16 +112,10 @@ function FrequencyBars({ cell, actions }: Pick<EnlargedCellProps, "cell" | "acti
 
 /** The cell drawn large in the mode's fill, with the hand name. */
 function EnlargedCell(props: EnlargedCellProps) {
-  const { cell, actions, mode, theme, evScaleBb } = props;
+  const { cell, actions, mode, theme } = props;
   const palette = MATRIX_PALETTES[theme];
   const missing = !cell.present || (mode === "weight" && cell.weight === null);
-  const flat = missing
-    ? { background: palette.missingFill, color: palette.labelText }
-    : mode === "ev"
-      ? { background: evFill(palette, cell.evBestBb ?? 0, evScaleBb), color: evInk(palette, cell.evBestBb ?? 0, evScaleBb) }
-      : mode === "weight"
-        ? { background: weightFill(palette, cell.weight) ?? palette.missingFill, color: weightInk(palette, cell.weight) }
-        : null;
+  const flat = missing ? { background: palette.missingFill, color: palette.labelText } : flatFill(props);
   return (
     <div
       aria-hidden="true"

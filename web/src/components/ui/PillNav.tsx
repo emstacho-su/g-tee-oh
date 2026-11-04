@@ -13,7 +13,8 @@ import { FLAT_REST_CLASS, TACTILE_CLASS } from "./tactile.js";
 
 export const NAV_PILL_LINK_PROPS = {
   className: cn("block whitespace-nowrap rounded-xl px-3 py-2 text-sm", TACTILE_CLASS),
-  activeProps: { className: "bg-surface-raised font-semibold text-accent" },
+  // aria-current names the open page for assistive tech as well as the raised pill (S47 critic, R3.4).
+  activeProps: { className: "bg-surface-raised font-semibold text-accent", "aria-current": "page" },
   inactiveProps: { className: cn("text-text hover:bg-surface-sunken", FLAT_REST_CLASS) },
 } as const;
 
@@ -25,10 +26,21 @@ export interface PillNavProps {
   children: ReactNode;
 }
 
+/**
+ * At phone width the row scrolls sideways; an end fade over the row and scroll padding say so
+ * (S47 critic, G2: the last pill was cut at the viewport edge with no cue). The fade is a
+ * decoration on the nav itself, so it never takes a tap.
+ */
+const PHONE_ROW_CLASSES =
+  "flex snap-x snap-mandatory flex-nowrap gap-1 overflow-x-auto scroll-px-4 px-4 py-1 md:flex-col md:snap-none md:overflow-visible md:px-0 md:py-0";
+const END_FADE_CLASSES =
+  "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface to-transparent md:hidden";
+
 export function PillNav({ label, className, children }: PillNavProps) {
   return (
-    <nav aria-label={label} className={cn("-mx-4 md:mx-0", className)}>
-      <ul className="flex flex-nowrap gap-1 overflow-x-auto px-4 py-1 md:flex-col md:overflow-visible md:px-0 md:py-0">{children}</ul>
+    <nav aria-label={label} className={cn("relative -mx-4 md:mx-0", className)}>
+      <ul className={PHONE_ROW_CLASSES}>{children}</ul>
+      <span aria-hidden="true" data-testid="nav-end-fade" className={END_FADE_CLASSES} />
     </nav>
   );
 }

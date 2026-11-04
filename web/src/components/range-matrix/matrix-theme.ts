@@ -16,7 +16,7 @@
  */
 import type { ThemeName } from "../../theme/action-style.js";
 import { inkFor } from "../../theme/color-contrast.js";
-import { EV_STEPS, evStep, weightStep } from "./scales.js";
+import { EV_STEPS, evStep, lossStep, weightStep } from "./scales.js";
 
 export interface MatrixPalette {
   readonly background: string;
@@ -45,6 +45,8 @@ export interface MatrixPalette {
   /** A thin line inside the focus ring, so the ring shows on any fill. */
   readonly focusHalo: string;
   readonly selected: string;
+  /** Over a hand the action filters leave out (S45, O-468): the ground, translucent, so the hatch and letters show through. */
+  readonly dimOverlay: string;
 }
 
 /** A palette with the ink per step resolved once. */
@@ -91,6 +93,7 @@ const LIGHT: MatrixPalette = {
   focus: LIGHT_TEXT, // --focus: var(--text), with the ground halo inside (O-433)
   focusHalo: LIGHT_GROUND, // --focus-halo: var(--surface-raised)
   selected: "#8c1c13", // --selected: var(--accent), the 8c1c13 oxblood palette value (O-434)
+  dimOverlay: "rgba(251, 247, 241, 0.65)", // --surface-raised, translucent
 };
 
 /** --surface-raised (dark): the matrix ground and the halo inside its focus and selection marks (--focus-halo). */
@@ -129,6 +132,7 @@ const DARK: MatrixPalette = {
   focus: DARK_TEXT, // --focus (dark): var(--text), a neutral near-white apart from the red EV and raise fills (O-432)
   focusHalo: DARK_GROUND, // --focus-halo: var(--surface-raised)
   selected: "#ffb3ab", // --selected (dark): bf4342 brick, lifted past the accent (O-434)
+  dimOverlay: "rgba(30, 30, 30, 0.65)", // --surface-raised (dark), translucent
 };
 
 function resolve(palette: MatrixPalette): ResolvedPalette {
@@ -172,4 +176,16 @@ export function weightInk(palette: ResolvedPalette, weight: number | null): stri
   const step = weightStep(weight);
   if (step === null || step === 0) return palette.text;
   return palette.weightInk[step - 1] ?? palette.text;
+}
+
+/** The fill of a compare-to-best loss (S45, O-464): the neutral for the best, else the EV palette's negative step. */
+export function lossFill(palette: MatrixPalette, lossPctPot: number, scalePctPot: number): string {
+  const step = lossStep(lossPctPot, scalePctPot);
+  return step === 0 ? palette.evNeutral : (palette.evNegative[step - 1] ?? palette.evNeutral);
+}
+
+/** The ink printed on a compare-to-best loss's fill. */
+export function lossInk(palette: ResolvedPalette, lossPctPot: number, scalePctPot: number): string {
+  const step = lossStep(lossPctPot, scalePctPot);
+  return step === 0 ? palette.evNeutralInk : (palette.evNegativeInk[step - 1] ?? palette.evNeutralInk);
 }

@@ -154,9 +154,17 @@ describe("R3.12 study settings changes", () => {
     expect(deeper).toEqual({ ...draft, depth: 20000 });
   });
 
-  it("R3.12 a change drops the lower choices that became unavailable", () => {
+  it("R3.12 R3.27 a change drops the lower choices that became unavailable, then fills each field with one choice", () => {
     const draft: SettingsDraft = { ...ONLINE_100, first: "BTN", against: "BB" };
-    expect(withSetting(CATALOG, draft, "format", "live")).toEqual({ format: "live" });
+    // Live has one table size, one stake, one depth and one covered pair in the catalog: each is filled (S45).
+    expect(withSetting(CATALOG, draft, "format", "live")).toEqual({
+      format: "live",
+      table_size: 9,
+      stake: FIXTURE_LIVE_STAKE_ID,
+      depth: 10000,
+      first: "BTN",
+      against: "BB",
+    });
     const live: SettingsDraft = { format: "live", table_size: 9, stake: FIXTURE_LIVE_STAKE_ID, depth: 10000 };
     expect(withSetting(CATALOG, live, "table_size", "6")).toEqual({ format: "live", table_size: 6 });
   });
@@ -273,13 +281,24 @@ describe("R3.12 study settings and the URL", () => {
     expect(draftFromSearch({})).toEqual({});
   });
 
-  it("R3.12 Confirm with changed settings clears the line and the hand and keeps the mode", () => {
-    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "ev" as const };
+  it("R3.12 Confirm with a changed seat, size or format clears the line and the hand and keeps the mode", () => {
+    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "ev" as const, filters: "2" };
+    expect(searchFromDraft(search, { ...ONLINE_100, first: "SB", against: "BTN" }, "SB-BTN")).toEqual({
+      ...ONLINE_100,
+      pair: "SB-BTN",
+      mode: "ev",
+    });
+  });
+
+  it("R3.12 Confirm with only the depth or the stake changed keeps the line, hand and mode and drops the filters and lens (O-467, code review)", () => {
+    const search = { ...ONLINE_100, pair: "BB-BTN", line: "r250", hand: "AKs", mode: "compare" as const, lens: 2, filters: "2" };
     expect(searchFromDraft(search, { ...ONLINE_100, depth: 20000, first: "BTN", against: "BB" }, "BB-BTN")).toEqual({
       ...ONLINE_100,
-      depth: 20000,
       pair: "BB-BTN",
-      mode: "ev",
+      depth: 20000,
+      line: "r250",
+      hand: "AKs",
+      mode: "compare",
     });
   });
 

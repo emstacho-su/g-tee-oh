@@ -67,9 +67,9 @@ export const NODE_55: SqNode = {
     oop: { combos: 1326, reach_weighted_combos: 1326.0 },
     ip: { combos: 1326, reach_weighted_combos: 470.558 },
     by_action: [
-      { index: 0, share: 0.7718274 },
-      { index: 1, share: 0.09679118 },
-      { index: 2, share: 0.13138142 },
+      { index: 0, share: 0.7718274, combos: 363.2 },
+      { index: 1, share: 0.09679118, combos: 45.5 },
+      { index: 2, share: 0.13138142, combos: 61.8 },
     ],
   },
   noise_flags: [],

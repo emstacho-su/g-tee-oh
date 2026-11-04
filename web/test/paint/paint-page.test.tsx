@@ -108,7 +108,9 @@ describe("R3.17 /paint", PAINTER_SUITE, () => {
     });
     expect(app.router.state.location.search).toEqual({ config: "cfg_6_online_100", position: "BB", spot: "vs_open" });
     expect(screen.getByTestId("synthetic-banner")).toBeInTheDocument();
-    expect(screen.getByText(/Raise to 2\.5bb/)).toBeInTheDocument();
+    // The spot reads as the picker named it, the seats in words; the line before the node is the tooltip (S47 critic R4).
+    expect(screen.getByTestId("paint-spot")).toHaveTextContent("Button versus big blind: paint the big blind's range.");
+    expect(screen.getByTestId("paint-spot").getAttribute("title")).toMatch(/Raise to 2\.5bb/);
     await user.keyboard("3");
     await user.click(screen.getByRole("button", { name: /^AA: / }));
     await user.click(screen.getByRole("button", { name: /submit range/i }));

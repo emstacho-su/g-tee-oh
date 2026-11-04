@@ -23,6 +23,7 @@ import {
   SHORTCUTS_KEY,
 } from "../../hotkeys/index.js";
 import { END_SESSION_BINDING, NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
+import { STUDY_HOTKEY_ROWS } from "../../study/study-hotkeys.js";
 
 const FIRST_SIZE_KEY = 1;
 
@@ -57,4 +58,5 @@ export const HOTKEY_ROWS: readonly HotkeyRow[] = [
   ...RESERVED_ROWS,
   { key: displayKey(RNG_EXPLAINER_KEY), action: RNG_EXPLAINER_TITLE, scope: RNG_EXPLAINER_SCOPE },
   { key: SHORTCUTS_KEY, action: SHORTCUTS_DESCRIPTION, scope: GENERAL_SCOPE },
+  ...STUDY_HOTKEY_ROWS,
 ];

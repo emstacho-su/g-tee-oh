@@ -101,10 +101,10 @@ describe("R3.16 /quiz renders each answer kind", APP_SUITE, () => {
     await question("band");
     const group = screen.getByRole("group", { name: "Frequency band" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "0 to 25 percent",
-      "25 to 50 percent",
-      "50 to 75 percent",
-      "75 to 100 percent",
+      "under 25 percent",
+      "25 to under 50 percent",
+      "50 to under 75 percent",
+      "75 percent and over",
     ]);
   });
 
@@ -135,7 +135,10 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
     expect(within(panel).getByText(entry.truth.text)).toBeInTheDocument();
     expect(within(panel).getByText(/18 correct of 20/)).toBeInTheDocument();
     expect(panel.textContent).not.toMatch(UNRATED);
-    expect(screen.getByRole("form").textContent).not.toMatch(UNRATED);
+    // The answered question folds to one line and the verdict takes the focus (S47 critic G3).
+    expect(screen.getByRole("button", { name: /^Your answer/ })).toHaveAttribute("aria-expanded", "false");
+    expect(within(panel).getByRole("status")).toHaveFocus();
+    expect(screen.getByRole("form", { hidden: true }).textContent).not.toMatch(UNRATED);
   });
 
   it("R3.16 a drill-backed session may keep its unlock message", async () => {
@@ -155,7 +158,7 @@ describe("R3.16 /quiz answers and results", APP_SUITE, () => {
     const result = fixturePredictionResult(entry, { kind: "band", band: "0_25" }, 3);
     const view = await renderStartedQuiz(RUN_PATH, { [NEXT_PATH]: [jsonResponse(200, { ...entry.prompt, state_version: 3 })], [ANSWER_PATH]: [jsonResponse(200, result)] });
     await question("band");
-    await userEvent.click(screen.getByRole("button", { name: "0 to 25 percent" }));
+    await userEvent.click(screen.getByRole("button", { name: "under 25 percent" }));
     await typeReason();
     await userEvent.click(screen.getByRole("button", { name: "Submit answer" }));
     const panel = await screen.findByTestId("prediction-result");
