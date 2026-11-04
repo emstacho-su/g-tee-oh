@@ -61,10 +61,34 @@ const SEAT_BOXES: Readonly<Record<TableOrientation, { readonly bottom: SeatBox; 
 };
 
 /**
- * How far along the line from a card to the felt's centre its bet spot sits. Portrait cards sit
- * close to the narrow felt, so a chip goes further in there to clear the side seats.
+ * How far along the line from a card to the felt's centre its bet spot sits (landscape), or how far
+ * across towards the centre (portrait: the narrow felt puts a chip further in to clear the side
+ * seats, and its row is set apart from the board instead).
  */
 const BET_SPOT_SHARE: Readonly<Record<TableOrientation, number>> = { landscape: 0.55, portrait: 0.7 };
+
+export interface TableBand {
+  readonly topPercent: number;
+  readonly bottomPercent: number;
+}
+
+/**
+ * The rows the board and the pot line take on the portrait felt, in percent of the box (S46, critic
+ * round 3): PokerTable centres them on the felt, and the band is sized for the narrowest phone,
+ * where they take the largest share of the height. Portrait bet chips sit on a row above or below
+ * it, so no chip ever covers a community card, before or after the flop.
+ */
+export const PORTRAIT_BOARD_BAND: TableBand = { topPercent: 34, bottomPercent: 56 };
+
+/** Half an action chip's height on the portrait table, in percent of the box, at the narrowest phone. */
+export const BET_CHIP_HALF_HEIGHT_PERCENT = 3;
+
+/** The portrait bet row on a seat's side of the board: midway between the felt's edge and the band. */
+function portraitBetTop(seatTop: number): number {
+  const felt = FELT_BOXES.portrait;
+  const above = seatTop < feltCentre("portrait").topPercent;
+  return above ? (felt.topPercent + PORTRAIT_BOARD_BAND.topPercent) / 2 : (PORTRAIT_BOARD_BAND.bottomPercent + (100 - felt.bottomPercent)) / 2;
+}
 
 type Slot = readonly [left: number, top: number];
 
@@ -100,7 +124,7 @@ function slotAt(slot: Slot, isBottom: boolean, orientation: TableOrientation): S
     seat: { leftPercent: left, topPercent: top },
     bet: {
       leftPercent: left + BET_SPOT_SHARE[orientation] * (centre.leftPercent - left),
-      topPercent: top + BET_SPOT_SHARE[orientation] * (centre.topPercent - top),
+      topPercent: orientation === "portrait" ? portraitBetTop(top) : top + BET_SPOT_SHARE[orientation] * (centre.topPercent - top),
     },
     box: isBottom ? SEAT_BOXES[orientation].bottom : SEAT_BOXES[orientation].other,
   };

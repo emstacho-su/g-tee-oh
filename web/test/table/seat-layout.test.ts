@@ -7,6 +7,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BET_CHIP_HALF_HEIGHT_PERCENT,
+  PORTRAIT_BOARD_BAND,
   FELT_BOXES,
   PORTRAIT_BELOW_PX,
   TABLE_ORIENTATIONS,
@@ -96,6 +98,8 @@ describe("R3.13 seatLayout", () => {
       });
 
       it(`R3.13 ${orientation}, ${count} seats: each bet spot lies between its seat and the felt centre`, () => {
+        // Portrait bet spots sit on a row clear of the board instead (critic round 3, tested below).
+        if (orientation === "portrait") return;
         const centre = feltCentre(orientation);
         for (const slot of seatLayout(count, 1, orientation)) {
           const dx = centre.leftPercent - slot.seat.leftPercent;
@@ -122,4 +126,35 @@ describe("R3.13 seatLayout", () => {
     expect(() => seatLayout(5, 0, "landscape")).toThrow(RangeError);
     expect(() => seatLayout(10, 0, "portrait")).toThrow(RangeError);
   });
+});
+
+describe("R3.13 critic round 3: portrait bet chips never cover the board", () => {
+  const band = PORTRAIT_BOARD_BAND;
+  const felt = FELT_BOXES.portrait;
+  const centre = feltCentre("portrait");
+  for (const count of COUNTS) {
+    it(`R3.13 portrait, ${count} seats: no bet spot falls inside the board band, for any hero seat`, () => {
+      for (let hero = 0; hero < count; hero += 1) {
+        for (const slot of seatLayout(count, hero, "portrait")) {
+          const chipTop = slot.bet.topPercent - BET_CHIP_HALF_HEIGHT_PERCENT;
+          const chipBottom = slot.bet.topPercent + BET_CHIP_HALF_HEIGHT_PERCENT;
+          expect(chipBottom <= band.topPercent || chipTop >= band.bottomPercent, `bet at ${slot.bet.topPercent}%`).toBe(true);
+        }
+      }
+    });
+
+    it(`R3.13 portrait, ${count} seats: each bet spot sits on the felt, on its seat's side of the board, between the seat and the centre across`, () => {
+      for (const slot of seatLayout(count, 0, "portrait")) {
+        expect(slot.bet.topPercent - BET_CHIP_HALF_HEIGHT_PERCENT).toBeGreaterThanOrEqual(felt.topPercent);
+        expect(slot.bet.topPercent + BET_CHIP_HALF_HEIGHT_PERCENT).toBeLessThanOrEqual(100 - felt.bottomPercent);
+        expect(slot.bet.topPercent < centre.topPercent).toBe(slot.seat.topPercent < centre.topPercent);
+        const dx = centre.leftPercent - slot.seat.leftPercent;
+        if (Math.abs(dx) > EPSILON) {
+          const along = (slot.bet.leftPercent - slot.seat.leftPercent) / dx;
+          expect(along).toBeGreaterThan(0);
+          expect(along).toBeLessThan(1);
+        }
+      }
+    });
+  }
 });
