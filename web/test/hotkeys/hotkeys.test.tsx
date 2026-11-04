@@ -242,22 +242,29 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(onSpace).toHaveBeenCalledOnce();
   });
 
-  it("R3.16 a binding that asks for it still answers Enter from a focused control (the quiz's submit after choosing an option)", () => {
+  it("R3.16 R3.30 a binding answers Enter only from the focused controls its selector names; every other control keeps its Enter (PR #45 review round 4, b)", () => {
     const onSubmit = vi.fn();
     function Submit() {
-      useHotkey({ key: "Enter", fromControls: true, description: "Submit", scope: "Quiz", handler: onSubmit });
+      useHotkey({ key: "Enter", fromControls: "[data-quiz-option]", description: "Submit", scope: "Quiz", handler: onSubmit });
       return null;
     }
     renderWithRoot(
       <>
         <Submit />
-        <button type="button" aria-pressed="true">
+        <button type="button" aria-pressed="true" data-quiz-option="">
           option
         </button>
+        <button type="button">End quiz</button>
+        <a href="#home">Home</a>
       </>,
     );
+    fireEvent.keyDown(screen.getByRole("button", { name: "End quiz" }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("link", { name: "Home" }), { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
     expect(onSubmit).toHaveBeenCalledOnce();
+    fireEvent.keyDown(document.body, { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 
   it("R3.30 a plain binding answers with Shift held unless a Shift chord of that key is registered (PR #45 review rounds 1 and 3)", () => {
