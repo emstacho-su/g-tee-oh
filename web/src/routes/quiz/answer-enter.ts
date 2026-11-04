@@ -8,7 +8,10 @@
  * from a plain Enter in a text entry field (the percent field), recorded by the form's keydown
  * for that same press. Every other submit is rejected: a modified or held Enter anywhere, and Enter
  * on any other control, such as a checkbox, so the browser's implicit submit never sends an answer
- * past these rules and no target needs its default blocked to stop it.
+ * past these rules and no target needs its default blocked to stop it. The one other way an answer
+ * is sent from the form is the chosen answer control's own plain Enter below, which calls the
+ * screen's submit itself while the control is enabled and the answer complete (PR #49 review
+ * round 5); the page's Enter hotkey skips it, since that press has its default prevented.
  *
  * On an answer control's own plain Enter (an option button or a region checkbox, AnswerInput):
  * the chosen option or a ticked region submits a complete answer (canSubmit) and holds an

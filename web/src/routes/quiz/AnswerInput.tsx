@@ -37,11 +37,15 @@ type SubmitProps = Pick<AnswerInputProps, "canSubmit" | "onSubmit">;
 /**
  * A plain Enter on an answer control: the chosen one submits or holds, an unchosen one is picked
  * (answer-enter.ts). Only that plain Enter has its default prevented; a modified or held Enter
- * keeps it, and the form's submit gate rejects any submit it causes.
+ * keeps it, and the form's submit gate rejects any submit it causes. A disabled control is no
+ * control (dispatch.ts): one that kept the focus after the answer was sent, or in review, never
+ * picks or submits (PR #49 review round 5). The chosen control's submit is the one path that does
+ * not pass the form's gate; it is the control's own plain Enter, and it runs only while the
+ * answer can still be changed and is complete (answer-enter.ts states the same).
  */
-function answerKeyDown(chosen: boolean, pick: () => void, { canSubmit, onSubmit }: SubmitProps): EnterKeyDown {
+function answerKeyDown(chosen: boolean, pick: () => void, { canSubmit, onSubmit }: SubmitProps, disabled: boolean): EnterKeyDown {
   return (event) => {
-    if (!isPlainEnter(event)) return;
+    if (disabled || !isPlainEnter(event)) return;
     event.preventDefault();
     const action = answerEnterAction(chosen, canSubmit);
     if (action === "submit") onSubmit();
@@ -66,7 +70,7 @@ function Choice({ label, chosen, disabled, onChoose, submit, action, actions }: 
       aria-pressed={chosen}
       disabled={disabled}
       onClick={onChoose}
-      onKeyDown={answerKeyDown(chosen, onChoose, submit)}
+      onKeyDown={answerKeyDown(chosen, onChoose, submit, disabled)}
     >
       {action === undefined ? null : <ActionSwatch action={action} actions={actions ?? [action]} />}
       <span>{label}</span>
@@ -125,7 +129,7 @@ function RegionChoices({ prompt, draft, disabled, onChange, ...submit }: AnswerI
               checked={ticked}
               disabled={disabled}
               onChange={toggle}
-              onKeyDown={answerKeyDown(ticked, toggle, submit)}
+              onKeyDown={answerKeyDown(ticked, toggle, submit, disabled)}
             />
             {REGION_LABELS[region]}
           </label>
