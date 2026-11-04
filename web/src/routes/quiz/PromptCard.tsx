@@ -3,18 +3,27 @@
  * ("Range level 2 of 3", with the difficulty's name beside it for a quiz session), the spot (the hero's seat, the action so far, the hand on the hand
  * ladder), the question, the synthetic banner when the solution is a fixture, the answer input and
  * the required reason inside a form whose submit is the Submit button or Enter outside the reason.
+ * The form sends only from the Submit button or a plain Enter in the percent field (the submit
+ * gate, answer-enter.ts): a modified or held Enter, or Enter on any other control, never submits,
+ * whatever the browser's implicit submit does. Each answer option and region checkbox handles its
+ * own plain Enter: the chosen one submits a complete answer, an unchosen one is picked (PR #49
+ * review rounds 2 to 4).
  * No strategy number is shown before the answer (predict before peek, O-302): the prompt carries
  * none. In review (readOnly) the same card shows an earlier answer: every input disabled with the
  * answer filled, the reason as text, no Submit.
  */
-import type { FormEvent } from "react";
+import { useRef, type FormEvent, type KeyboardEvent } from "react";
 
 import { Button, Panel, SyntheticBanner } from "../../components/ui/index.js";
 import type { PredictionPrompt } from "../../contracts.js";
 import type { AnswerDraft } from "../../prediction/draft.js";
 import { PREDICTION_TEXT, SUBMIT_KEY, levelBadge } from "../../prediction/labels.js";
+import { isPlainEnter, submitAccepted, type RecordedEnter } from "./answer-enter.js";
 import { AnswerInput } from "./AnswerInput.js";
 import { ReasonField } from "./ReasonField.js";
+
+/** A zero-delay timer runs once the current task, the keydown with its implicit submit, is over. */
+const AFTER_THIS_TASK_MS = 0;
 
 export interface PromptCardProps {
   prompt: PredictionPrompt;
@@ -80,21 +89,39 @@ function Badges({ prompt, difficulty }: { prompt: PredictionPrompt; difficulty: 
 export function PromptCard(props: PromptCardProps) {
   const { prompt, draft, reason, answered, canSubmit, submitting, readOnly = false, difficulty, reasonRefused = false, onDraft, onReason, onSubmit } = props;
   const locked = readOnly || answered || submitting;
-  const submit = (event: FormEvent) => {
+  // The Enter press under way, for the submit gate (answer-enter.ts, PR #49 review round 4): the
+  // browser's implicit submit runs inside the same task as the keydown, so the record is dropped at
+  // its keyup, at the submit it causes, or once that task is over, whichever comes first.
+  const enterRef = useRef<RecordedEnter | null>(null);
+  const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== SUBMIT_KEY) return;
+    const recorded: RecordedEnter = { target: event.target, plain: isPlainEnter(event) };
+    enterRef.current = recorded;
+    window.setTimeout(() => {
+      if (enterRef.current === recorded) enterRef.current = null;
+    }, AFTER_THIS_TASK_MS);
+  };
+  const onKeyUp = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === SUBMIT_KEY) enterRef.current = null;
+  };
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!readOnly) onSubmit();
+    const enter = enterRef.current;
+    enterRef.current = null;
+    const submitter = event.nativeEvent instanceof SubmitEvent ? event.nativeEvent.submitter : null;
+    if (!readOnly && submitAccepted(enter, submitter)) onSubmit();
   };
   const questionId = `prediction-question-${readOnly ? "review" : "current"}`;
   return (
     <Panel>
-      <form aria-labelledby={questionId} onSubmit={submit} className="flex flex-col gap-4">
+      <form aria-labelledby={questionId} onSubmit={submit} onKeyDown={onKeyDown} onKeyUp={onKeyUp} className="flex flex-col gap-4">
         {prompt.synthetic ? <SyntheticBanner /> : null}
         <Badges prompt={prompt} difficulty={difficulty} />
         <SpotLine prompt={prompt} />
         <h2 id={questionId} className="text-lg font-semibold">
           {prompt.question}
         </h2>
-        <AnswerInput prompt={prompt} draft={draft} disabled={locked} onChange={onDraft} />
+        <AnswerInput prompt={prompt} draft={draft} disabled={locked} canSubmit={canSubmit} onChange={onDraft} onSubmit={onSubmit} />
         {readOnly ? <ReasonText reason={reason} /> : <ReasonField value={reason} disabled={locked} refused={reasonRefused} onChange={onReason} />}
         {answered || readOnly ? null : (
           <Button type="submit" variant="primary" className="self-start" disabled={!canSubmit} aria-keyshortcuts={SUBMIT_KEY}>
