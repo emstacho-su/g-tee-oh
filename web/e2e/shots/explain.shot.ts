@@ -96,6 +96,16 @@ async function askAndWait(page: Page, question: string): Promise<void> {
   await expect(dialog.getByTestId("ask-answer-text")).toBeVisible();
 }
 
+/** Opens or closes the named feedback sections, reading aria-expanded so an already-open section is left alone. */
+async function setSections(panel: Locator, titles: readonly string[], open: boolean): Promise<void> {
+  for (const title of titles) {
+    const button = panel.getByRole("button", { name: title });
+    await expect(button).toBeVisible();
+    if (((await button.getAttribute("aria-expanded")) === "true") !== open) await button.click();
+    await expect(button).toHaveAttribute("aria-expanded", String(open));
+  }
+}
+
 async function explainScreens(page: Page, theme: Theme, viewport: Viewport): Promise<void> {
   const shot = async (target: Page | Locator, screen: string, criterion: string) => {
     records.push(await capture(target, page, OUT_DIR, { screen, theme, viewport, criterion, source: SOURCE }));
@@ -106,20 +116,21 @@ async function explainScreens(page: Page, theme: Theme, viewport: Viewport): Pro
   await useAskStatus(page, "flag_off");
   await startSession(page);
   await decideHand(page);
-  // The cards live in collapsed sections since S38 (O-387): open them for the shot, close them after.
-  for (const title of [THRESHOLD_SECTION, INSIGHTS_SECTION]) await panel.getByRole("button", { name: title }).click();
+  // The cards live in collapsible sections (S38, O-387) whose default-open set now follows the
+  // prompt's visible_panels (S46, R3.33), so a blind click can close a section that opened on its
+  // own: set each section's state instead of toggling it.
+  await setSections(panel, [THRESHOLD_SECTION, INSIGHTS_SECTION], true);
   await expect(panel.getByTestId("threshold-card")).toBeVisible();
   await shot(panel, "feedback-cards", CRITERIA.cards);
-  for (const title of [THRESHOLD_SECTION, INSIGHTS_SECTION]) await panel.getByRole("button", { name: title }).click();
+  await setSections(panel, [THRESHOLD_SECTION, INSIGHTS_SECTION], false);
   await expect(reason).toHaveText(EXPLAIN_TEXT.flagOff);
   await shot(panel, "ask-disabled-flag-off", CRITERIA.flagOff);
   // More info is the inline Explanation section (O-388): it expands in place, nothing to exit.
-  const explanation = panel.getByRole("button", { name: EXPLAIN_TEXT.explanation });
-  await explanation.click();
+  await setSections(panel, [EXPLAIN_TEXT.explanation], true);
   const moreInfo = panel.getByRole("region", { name: EXPLAIN_TEXT.explanation });
   await expect(moreInfo.getByTestId("more-info-sections")).toBeVisible();
   await shot(panel, "feedback-more-info", CRITERIA.moreInfo);
-  await explanation.click();
+  await setSections(panel, [EXPLAIN_TEXT.explanation], false);
   await expect(moreInfo).toBeHidden();
 
   await useAskStatus(page, "cap_reached");
