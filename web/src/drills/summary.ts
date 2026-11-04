@@ -33,7 +33,8 @@ function summaryLine(filter: SpotFilter, words: LineWords): string {
   const seats = (list: readonly Position[]) => list.map(words.seat).join(", ");
   const villains = filter.villain_positions.length === 0 ? ANY_OPPONENT : seats(filter.villain_positions);
   return [
-    `${FORMAT_LABELS[format]} ${size}-handed, ${depths.map((depth) => `${depth}bb`).join(", ")}, stake ${stakeWords(filter.stake, format)}`,
+    // "Online, 6 players": the table size in the one word the app uses (S48 round 5 verifier on drills-builder-errors).
+    `${FORMAT_LABELS[format]}, ${size} players, ${depths.map((depth) => `${depth}bb`).join(", ")}, stake ${stakeWords(filter.stake, format)}`,
     `hero ${seats(filter.hero_positions)} against ${villains}`,
     `${filter.preflop_action.map(words.action).join(", ")}${streetText(filter)}`,
     handsText(filter),

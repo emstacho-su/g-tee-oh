@@ -13,9 +13,9 @@ export interface ReservedKey {
 /** The trainer session's hotkey scope; routes/drill-run/labels.ts re-exports it. */
 export const SESSION_SCOPE = "Session";
 
-/** R repeats the hand once the api can replay a prompt (O-473). */
+/** R repeats the hand once the api can replay a prompt (O-473); the row's words name no api (S48 round 5 verifier). */
 export const REPEAT_HAND_KEY = "R";
-export const REPEAT_HAND_DESCRIPTION = "Repeat hand (reserved until the api can replay a prompt)";
+export const REPEAT_HAND_DESCRIPTION = "Repeat hand (reserved until a hand can be replayed)";
 
 /** The space bar skips the table replay (S46, R3.30, O-475). */
 export const REPLAY_SKIP_KEY = " ";

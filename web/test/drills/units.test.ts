@@ -13,9 +13,10 @@ import { fixtureDrill } from "../../src/fixtures/trainer.js";
 
 describe("R3.14 drill screen units", () => {
   it("R3.14 the spot summary names the game, seats, actions and hands in words", () => {
-    expect(spotSummary(fixtureDrill.spot_filter)).toBe("Online 6-handed, 100bb, stake Online; hero BTN against BB; RFI; all hands");
+    // One word for a table size across the app, "N players", as Study, the settings and the progress spot words say it (round 5 verifier on drills-builder-errors).
+    expect(spotSummary(fixtureDrill.spot_filter)).toBe("Online, 6 players, 100bb, stake Online; hero BTN against BB; RFI; all hands");
     const manual = { ...fixtureDrill.spot_filter, start_street: "flop" as const, villain_positions: [], hands: { mode: "manual" as const, hands: ["AKs"] } };
-    expect(spotSummary(manual)).toBe("Online 6-handed, 100bb, stake Online; hero BTN against any opponent; RFI, from the flop; 1 chosen hand");
+    expect(spotSummary(manual)).toBe("Online, 6 players, 100bb, stake Online; hero BTN against any opponent; RFI, from the flop; 1 chosen hand");
     expect(spotSummary({ ...manual, hands: { mode: "manual", hands: ["AKs", "77"] } })).toMatch(/2 chosen hands$/);
   });
 

@@ -121,7 +121,7 @@ function seatErrors(filter: SpotFilter): FieldError[] {
   ];
   const unseated = (["hero_positions", "villain_positions"] as const).flatMap((field) =>
     filter[field].flatMap((position, index) =>
-      seated.includes(position) ? [] : [error(`${SF}.${field}.${index}`, `${position} is not seated at a ${size}-handed table.`)],
+      seated.includes(position) ? [] : [error(`${SF}.${field}.${index}`, `${position} is not seated at a table of ${size} players.`)],
     ),
   );
   const overlap = villains.flatMap((position, index) =>
