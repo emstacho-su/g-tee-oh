@@ -119,7 +119,7 @@ Mac run sheet, one item at a time, outputs pasted back into the Zenbook session 
 4. `git clone https://github.com/emstacho-su/g-tee-oh.git ~/projects/g-tee-oh` (or `git fetch` in an existing clone), then `cd ~/projects/g-tee-oh`, `git switch p0/mac-bootstrap`, `just hooks`.
 5. `cargo build --release -p library-builder`: warms the cache and builds the report step; note the minutes in chat.
 6. `claude --version`.
-7. `just mac-bench` (defaults: machine `mac`, platform linux/arm64, output `validation/reports`). In a second terminal run `docker stats gto-bench --no-stream` every few minutes and paste the MEM USAGE column. Stop at 30 minutes per line and record a miss (O-50, O-178).
+7. `just mac-bench` (defaults: machine `mac`, platform linux/arm64, output `validation/reports`). In a second terminal run `docker stats gto-bench --no-stream` every few minutes and paste the MEM USAGE column. Do not stop the container by hand: each line stops itself at the spec's 30-minute budget and the report records the miss (O-50, O-178). If Docker kills the container for memory, the recipe still runs `bench-report`, which fails on the missing summary; paste that output too.
 8. `git add validation/reports/bench-flop-line-mac.json validation/reports/bench-flop-line-mac.md`, then `git commit -m "test(validate): R0.9 Mac flop-line benchmark against O-50"` and `git push`. The owner's own commit needs no trailer; the hook asks for it only under Claude Code.
 9. `just mac-bench-clean`, then `docker ps -a` and `docker images` show nothing from the run (O-47).
 

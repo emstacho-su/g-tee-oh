@@ -486,38 +486,37 @@ BENCH_IMAGE := "g-tee-oh/library-builder:bench"
 BENCH_RUN := "docker run --rm --name gto-bench --memory 5g --memory-swap 5g"
 BENCH_SCRATCH := "gto-bench-scratch"
 BENCH_DIR := "target/bench"
-BENCH_SPEC_DIR := "validation/fixtures/builder"
 
-# A measurement, not a check: run alone, under the bench lock (O-228). Builds the library-builder
-# image for PLATFORM (linux/arm64 on the Mac for S04 and S20; linux/amd64 on the Zenbook through
-# WSL2 for a trial), then runs the S18 flop-line benchmark in it twice under the 5 GB cap (O-48):
-# the judged 32-bit spec and the informational 16-bit spec (O-200), each `library-builder --once
-# --job-spec` without a database (O-205), summaries written to target/bench. The image carries
-# the specs at /fixtures/builder; each run's library root is a directory under the bind-mounted
-# target/bench and the scratch is a named volume owned by the image's user, as compose does.
-# Then `estimate` and `bench-report` run from the host checkout (bench-report reads git) and
-# write bench-flop-line-<VALIDATE_MACHINE>.json and its Markdown twin into OUT, judged against
-# O-50: on the Mac this is the R0.9 measurement (S04, O-506), the same rule S18 met on the
-# Zenbook. mac-bench-clean removes what the run left (O-47). A trial that must not touch
-# validation/reports passes OUT=target/bench/trial and a machine name of its own.
+# A measurement, not a check: run alone, under the bench lock (O-228). The method is the flop-line
+# section of validation/reports/README.md; this recipe runs it for PLATFORM in the library-builder
+# image under the 5 GB cap (O-48), with the libraries on the scratch volume as compose has it and
+# only the summaries bind-mounted out to target/bench, then bench-report from the checkout, since
+# it reads git. A measured run that fails does not stop the recipe (the - prefix), so a miss or a
+# killed run still reaches bench-report, which records the miss or fails on the missing summary
+# (O-178); stale summaries are removed first. mac-bench-clean removes what the run left (O-47).
 # Flop-line benchmark in the 5 GB container against O-50; the Mac bootstrap measurement (R0.9, S04)
 mac-bench $VALIDATE_MACHINE="mac" PLATFORM="linux/arm64" OUT="validation/reports":
+    -docker rm -f gto-bench
+    node -e "require('node:fs').rmSync('{{BENCH_DIR}}', { recursive: true, force: true })"
+    node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}', { recursive: true })"
     docker buildx build --load --platform {{PLATFORM}} -f infra/docker/library-builder.Dockerfile \
         -t {{BENCH_IMAGE}} .
-    node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}/library-judged', { recursive: true })"
-    node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}/library-16bit', { recursive: true })"
-    {{BENCH_RUN}} -e LIBRARY_ROOT=/out/library-judged -e BUILDER_SCRATCH_DIR=/scratch \
+    docker run --rm -v {{BENCH_SCRATCH}}:/scratch --entrypoint /bin/mkdir {{BENCH_IMAGE}} \
+        -p /scratch/library-judged /scratch/library-16bit
+    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-judged -e BUILDER_SCRATCH_DIR=/scratch \
         -v {{BENCH_SCRATCH}}:/scratch \
         --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
         {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
         --summary-out /out/judged.json
-    {{BENCH_RUN}} -e LIBRARY_ROOT=/out/library-16bit -e BUILDER_SCRATCH_DIR=/scratch \
+    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-16bit -e BUILDER_SCRATCH_DIR=/scratch \
         -v {{BENCH_SCRATCH}}:/scratch \
         --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
         {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
         --summary-out /out/informational.json
-    cargo run --release -p library-builder -- estimate \
-        --job-spec {{BENCH_SPEC_DIR}}/bench-bb-btn-srp.json --out {{BENCH_DIR}}/sweep.json
+    docker run --rm \
+        --mount "type=bind,source={{justfile_directory()}}/{{BENCH_DIR}},target=/out" \
+        {{BENCH_IMAGE}} estimate --job-spec /fixtures/builder/bench-bb-btn-srp.json \
+        --out /out/sweep.json
     cargo run --release -p library-builder -- bench-report --judged {{BENCH_DIR}}/judged.json \
         --informational {{BENCH_DIR}}/informational.json --sweep {{BENCH_DIR}}/sweep.json \
         --out {{OUT}}
@@ -529,7 +528,7 @@ mac-bench-clean:
     -docker volume rm {{BENCH_SCRATCH}}
     -docker rmi {{BENCH_IMAGE}}
 
-EQUITY_TABLE :="validation/fixtures/equity/preflop-169.json"
+EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
 
 # Exact enumeration in gto_solve::equity, run once on the Zenbook from a clean tree and
 # committed, never in CI (O-126).
