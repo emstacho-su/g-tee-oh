@@ -11,13 +11,16 @@
  * the starter drills the user does not have yet (its own read of the starter tag, taggedMarksQuery),
  * so a pack that landed partway offers only the rest. Both buttons share the page's one intent. The duplicate and delete requests belong to this page, so a
  * change of selection while one runs never drops its result; a failure shows with the drill it
- * acted on whenever that drill is selected (PR #42 review round 1 C).
+ * acted on whenever that drill is selected (PR #42 review round 1 C). Auto drills, the ones /progress
+ * makes for a leak, are hidden behind "Show auto drills" (S47 follow-up, O-489, page state), unless
+ * the tag filter names an auto tag.
  */
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
+import { isAutoDrill, isAutoTag } from "../../drills/auto-drills.js";
 import { useAppApi } from "../../auth/index.js";
 import { Button, LoadingNote, PageHeader, Panel } from "../../components/ui/index.js";
 import { drillFailureText } from "../../drills/failure-text.js";
@@ -45,7 +48,25 @@ export const LIBRARY_TEXT = {
   empty: "You have no drills yet. Build one, or import one from an export code.",
   emptyTagged: "No drill carries this tag.",
   more: "Load more drills",
+  showAuto: "Show auto drills",
+  autoHidden: (count: number) => `${count} auto ${count === 1 ? "drill" : "drills"} from your leaks ${count === 1 ? "is" : "are"} hidden.`,
 } as const;
+
+function AutoDrillsToggle({ checked, hidden, onChange }: { checked: boolean; hidden: number; onChange: (checked: boolean) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        {LIBRARY_TEXT.showAuto}
+      </label>
+      {checked ? null : (
+        <span data-testid="auto-drills-hidden" className="text-muted">
+          {LIBRARY_TEXT.autoHidden(hidden)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function NewDrillLink() {
   return (
@@ -93,7 +114,12 @@ export function DrillsPage({ search }: DrillsPageProps) {
   const [importing, setImporting] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
-  const drills = list.data?.pages.flatMap((page) => page.items) ?? [];
+  const [showAuto, setShowAuto] = useState(false);
+  const listed = list.data?.pages.flatMap((page) => page.items) ?? [];
+  // Auto drills stay hidden until asked for, or when the filter names an auto tag (O-489).
+  const autoShown = showAuto || (search.tag !== undefined && isAutoTag(search.tag));
+  const autoCount = listed.filter(isAutoDrill).length;
+  const drills = autoShown ? listed : listed.filter((drill) => !isAutoDrill(drill));
   const selected = drills.find((drill) => drill.id === selectedId);
   // The requests live here, not in the toolbar, so a change of selection never drops their result.
   const duplicate = useDuplicateDrill(api, (copy) => setAnnouncement(`Duplicated as ${copy.name}.`));
@@ -110,7 +136,7 @@ export function DrillsPage({ search }: DrillsPageProps) {
   };
   // One intent for the page (review HIGH 2): every button over it shares one key set.
   const pack = useImportStarterPack(api, starterAdded);
-  const emptyUntagged = list.isSuccess && drills.length === 0 && search.tag === undefined;
+  const emptyUntagged = list.isSuccess && listed.length === 0 && search.tag === undefined;
   const offerInHeader = starterMarks.data !== undefined && missing.length > 0;
 
   function imported(drill: Drill): void {
@@ -146,7 +172,8 @@ export function DrillsPage({ search }: DrillsPageProps) {
           </div>
         ) : null}
         {list.isPending ? <LoadingNote text={LIBRARY_TEXT.loading} /> : null}
-        {list.isSuccess && drills.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} missing={missing} /> : null}
+        {list.isSuccess && listed.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} missing={missing} /> : null}
+        {autoCount > 0 && !(search.tag !== undefined && isAutoTag(search.tag)) ? <AutoDrillsToggle checked={showAuto} hidden={autoCount} onChange={setShowAuto} /> : null}
         {drills.length === 0 ? null : (
           <>
             <DrillToolbar
