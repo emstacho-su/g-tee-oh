@@ -23,6 +23,12 @@ describe("R3.16 prediction fixtures", () => {
     expect(() => fixturePredictionPrompt("nothing" as never)).toThrow(RangeError);
   });
 
+  it("R3.16 the hand level 1 question and its reveal name the highest-EV action, as the api does (S48 critic G6)", () => {
+    const action = fixturePredictions.find((entry) => entry.prompt.answer_kind === "action");
+    expect(action?.prompt.question).toBe("What is BB's highest-EV action with A5s?");
+    expect(action?.truth.text).toBe("BB's highest-EV action with A5s is Raise to 10bb (61.0 percent).");
+  });
+
   it("R3.16 judging follows the api's rules", () => {
     const truth = { ...EMPTY, share_pct: 38.4, regions: ["pairs" as const], action_indexes: [2], band: "50_75" as const };
     expect(judgeFixture(truth, { kind: "yes_no", value: true }, 30)).toBe(true);

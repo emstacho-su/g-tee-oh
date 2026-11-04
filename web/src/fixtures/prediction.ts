@@ -90,8 +90,9 @@ export const fixturePredictions: readonly FixturePrediction[] = [
     truth: { ...NO_TRUTH, text: "BB takes Call with 38.4 percent of its range.", share_pct: 38.4, action_indexes: [1] },
   },
   {
-    prompt: prompt(1, { ladder: "hand", level: 1, answer_kind: "action", question: "What does BB do most often with A5s?", hand: "A5s" }),
-    truth: { ...NO_TRUTH, text: "BB plays A5s most often as Raise to 10bb (61.0 percent).", frequency_pct: 61, action_indexes: [2] },
+    // Worded as the api's actionQuestion and actionReveal are (services/api/src/prediction/hand-questions.ts).
+    prompt: prompt(1, { ladder: "hand", level: 1, answer_kind: "action", question: "What is BB's highest-EV action with A5s?", hand: "A5s" }),
+    truth: { ...NO_TRUTH, text: "BB's highest-EV action with A5s is Raise to 10bb (61.0 percent).", frequency_pct: 61, action_indexes: [2] },
   },
   {
     prompt: prompt(2, { ladder: "range", level: 2, answer_kind: "percent", question: "What share of BB's range takes Call? Answer to the nearest 5 percent.", action_index: 1 }),
