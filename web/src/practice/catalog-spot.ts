@@ -45,12 +45,14 @@ export const POSITIONS: readonly Position[] = ["UTG", "UTG1", "UTG2", "LJ", "HJ"
 
 /** The api's largest page; a 9-handed table has 36 pairs, so one page holds them all. */
 const PAIRS_PAGE_LIMIT = 200;
+/** The query root of the pairs read, so a coverage_added can refresh one configuration's pairs (S47). */
+export const PRACTICE_PAIRS_KEY_ROOT = "practice";
 /** The catalog changes only when the owner adds configurations or builds; half an hour is fresh enough. */
 const PAIRS_STALE_MS = 30 * 60 * 1000;
 
 export function practicePairsQuery(api: AppApi, configId: string) {
   return queryOptions({
-    queryKey: ["practice", "pairs", configId] as const,
+    queryKey: [PRACTICE_PAIRS_KEY_ROOT, "pairs", configId] as const,
     queryFn: async (): Promise<PositionPairEntry[]> => {
       const { data, error, response } = await api.client.GET("/api/v1/configs/{id}/pairs", {
         params: { path: { id: configId }, query: { limit: PAIRS_PAGE_LIMIT } },

@@ -75,8 +75,8 @@ export function BuilderHealth({ status, progress, onSetPaused, pending, failure 
         <Item term="Queue depth">{`${queue.queued} queued, ${queue.running} running, ${queue.failed} failed, ${queue.blocked_budget} waiting on budget`}</Item>
         <Item term="Flops per day">{`${flopsPerDay(status.throughput_per_hour)} (last 24 hours)`}</Item>
         <Item term="Storage against budget">{storageText(status)}</Item>
-        <Item term="Last backup">Not tracked yet: backups arrive with the Mac deploy (S34)</Item>
-        <Item term="LLM spend this month">Not tracked yet: arrives with the Ask path (S27)</Item>
+        <Item term="Last backup">Not tracked yet: backups start with the production deploy</Item>
+        <Item term="Explanation spend this month">Not tracked yet: starts with written explanations</Item>
       </dl>
       {progress === null ? null : <p className="text-sm font-medium">{`Current build: ${progressText(progress)}`}</p>}
     </Card>

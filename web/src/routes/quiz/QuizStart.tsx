@@ -68,7 +68,11 @@ export function QuizStart({ initial, onStart }: QuizStartProps) {
       </ChoiceField>
       <ChoiceField label={QUIZ_START_TEXT.difficulty}>
         <ToggleGroup wrap label={QUIZ_START_TEXT.difficulty} value={difficulty} options={DIFFICULTY_OPTIONS} onValueChange={setDifficulty} />
-        <p className="text-xs text-muted">{QUIZ_START_TEXT.levels}</p>
+        <ul aria-label={QUIZ_START_TEXT.difficulty} className="flex flex-col gap-0.5 text-xs text-muted">
+          {QUIZ_START_TEXT.levels.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       </ChoiceField>
       <div>
         <Button

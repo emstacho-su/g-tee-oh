@@ -4,7 +4,9 @@
  * fields take the shared FIELD_CLASS edge and a section is the components/ui Card. Every
  * control has a visible label; an error line is tied to its control through aria-describedby and
  * aria-invalid and starts with the word "Error", so color is never the only signal; native inputs
- * keep every control keyboard operable (Tab, arrows within a radio group, Space to toggle).
+ * keep every control keyboard operable (Tab, arrows within a radio group, Space to toggle). The
+ * radio and checkbox fieldsets take focus through tabIndex -1, so a failed Save can land on the
+ * first invalid group (use-focus-first-error.ts, S47, O-483).
  */
 import { useId, type ReactNode } from "react";
 
@@ -159,7 +161,7 @@ export interface RadioFieldProps<T extends string> extends Omit<FieldShell, "lab
 export function RadioField<T extends string>({ legend, hint, errors, value, options, onChange }: RadioFieldProps<T>) {
   const ids = useFieldIds(hint, errors);
   return (
-    <fieldset className="flex flex-col gap-1 text-sm" aria-describedby={ids.described} aria-invalid={ids.invalid}>
+    <fieldset tabIndex={-1} className="flex flex-col gap-1 text-sm" aria-describedby={ids.described} aria-invalid={ids.invalid}>
       <legend className="mb-1 font-medium">{legend}</legend>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {options.map((option) => (
@@ -190,7 +192,7 @@ export interface CheckboxGroupProps<T extends string> extends Omit<FieldShell, "
 export function CheckboxGroup<T extends string>({ legend, hint, errors, options, selected, onToggle }: CheckboxGroupProps<T>) {
   const ids = useFieldIds(hint, errors);
   return (
-    <fieldset className="flex flex-col gap-1 text-sm" aria-describedby={ids.described} aria-invalid={ids.invalid}>
+    <fieldset tabIndex={-1} className="flex flex-col gap-1 text-sm" aria-describedby={ids.described} aria-invalid={ids.invalid}>
       <legend className="mb-1 font-medium">{legend}</legend>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {options.map((option) => (

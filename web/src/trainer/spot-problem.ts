@@ -91,7 +91,7 @@ export function isRetryable(problem: SpotProblem): boolean {
 
 const MESSAGES: Readonly<Record<Exclude<SpotProblemKind, "other">, string>> = {
   no_coverage:
-    "This drill has no covered spot in the library yet. Its gaps were queued for the library builder; try again once it has built them.",
+    "This drill has no covered spot in the library yet. Its spots were queued for the library builder; try again once it has built them.",
   stale: "The session moved on, so this is its current hand.",
   session_ended: "This session has ended.",
   in_flight: "The same request is still being processed. Try again in a moment.",

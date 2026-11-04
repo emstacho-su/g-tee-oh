@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "source": "starter",
+  "library_note": "The starter drill pack the web bundles as export codes (S47, R3.35, O-481), in the acceptance-file format so just drill-acceptance proves each case runs on the committed fixture library (validation/fixtures/library): online 6-max at 100 bb and live 9-handed 1/3 at 100 bb. The pack's tenth drill, Squeeze from the blinds, is bundled but not listed here: the synthetic library holds pair trees, so no squeeze node exists and a start answers 422; the drill shows that honestly through the coverage badge (ADR 0018).",
+  "cases": [
+    {
+      "name": "Open or fold: every seat",
+      "drill": {
+        "name": "Open or fold: every seat",
+        "tags": ["starter", "rfi", "boundary"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["UTG", "HJ", "CO", "BTN", "SB"],
+          "villain_positions": [],
+          "preflop_action": ["rfi"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Raise first in from every opening seat, close decisions only (synthetic case: RFI boundary hands, every opening seat)."
+    },
+    {
+      "name": "Open or fold: button",
+      "drill": {
+        "name": "Open or fold: button",
+        "tags": ["starter", "rfi", "boundary"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["BTN"],
+          "villain_positions": [],
+          "preflop_action": ["rfi"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "The drill flow 2 builds by hand (synthetic case: RFI boundary hands, BTN)."
+    },
+    {
+      "name": "Big blind facing a button open",
+      "drill": {
+        "name": "Big blind facing a button open",
+        "tags": ["starter", "vs-open", "bb"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["BB"],
+          "villain_positions": ["BTN"],
+          "preflop_action": ["vs_open"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Synthetic case: BB vs BTN mixed region."
+    },
+    {
+      "name": "Big blind facing a cutoff open",
+      "drill": {
+        "name": "Big blind facing a cutoff open",
+        "tags": ["starter", "vs-open", "bb"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["BB"],
+          "villain_positions": ["CO"],
+          "preflop_action": ["vs_open"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Synthetic case: BB vs CO mixed region."
+    },
+    {
+      "name": "Small blind facing a button open",
+      "drill": {
+        "name": "Small blind facing a button open",
+        "tags": ["starter", "vs-open", "sb"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["SB"],
+          "villain_positions": ["BTN"],
+          "preflop_action": ["vs_open"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "The 6-max set holds all 15 pairs, SB-BTN among them."
+    },
+    {
+      "name": "Button facing a 3-bet from the blinds",
+      "drill": {
+        "name": "Button facing a 3-bet from the blinds",
+        "tags": ["starter", "vs-3bet"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["BTN"],
+          "villain_positions": ["SB", "BB"],
+          "preflop_action": ["vs_three_bet"],
+          "hands": { "mode": "all" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "every_action",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Synthetic case: BTN vs three-bet from the blinds."
+    },
+    {
+      "name": "3-bet in position: cutoff over the hijack",
+      "drill": {
+        "name": "3-bet in position: cutoff over the hijack",
+        "tags": ["starter", "3bet", "ip"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["CO"],
+          "villain_positions": ["HJ"],
+          "preflop_action": ["three_bet"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Synthetic case: CO three-bets the HJ open."
+    },
+    {
+      "name": "3-bet out of position: blinds versus a button open",
+      "drill": {
+        "name": "3-bet out of position: blinds versus a button open",
+        "tags": ["starter", "3bet", "oop"],
+        "spot_filter": {
+          "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] },
+          "stake": "online",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["SB", "BB"],
+          "villain_positions": ["BTN"],
+          "preflop_action": ["three_bet"],
+          "hands": { "mode": "close_decisions" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "The pairs SB-BTN and BB-BTN of the 6-max set."
+    },
+    {
+      "name": "Live 1/3: open or fold, every seat",
+      "drill": {
+        "name": "Live 1/3: open or fold, every seat",
+        "tags": ["starter", "live", "rfi"],
+        "spot_filter": {
+          "game_config": { "format": "live", "table_size": 9, "depths_bb": [100] },
+          "stake": "1/3",
+          "sizing": { "mode": "convention" },
+          "start_street": "preflop",
+          "hero_positions": ["UTG", "UTG1", "UTG2", "LJ", "HJ", "CO", "BTN", "SB"],
+          "villain_positions": [],
+          "preflop_action": ["rfi"],
+          "hands": { "mode": "all" },
+          "alternate_seats": false
+        },
+        "trainer": {
+          "stop_rule": "after_action",
+          "input": "actions",
+          "grouping": "standard",
+          "rng": false,
+          "pause": "after_mistake",
+          "speed": "normal",
+          "quick_result": false,
+          "tables": 1,
+          "timebank_s": null,
+          "panels": {}
+        }
+      },
+      "note": "Synthetic case: Live-depth opens, 1/3 (the fixture library's live configurations stop at 100 bb, O-316)."
+    }
+  ]
+}

@@ -42,7 +42,8 @@ function SectionNav({ isAdmin, search }: { isAdmin: boolean; search: LibrarySear
     <PillNav label={LIBRARY_PAGE_TEXT.sections} className="md:w-56 md:shrink-0">
       {visibleLibrarySections(isAdmin).map((entry) => (
         <li key={entry.slug} className="shrink-0">
-          <Link to="/library/$section" params={{ section: entry.slug }} search={search} {...NAV_PILL_LINK_PROPS}>
+          {/* The coverage search rides along, so the match ignores it (S47 critic: the pill was never active with a configuration in the address). */}
+          <Link to="/library/$section" params={{ section: entry.slug }} search={search} activeOptions={{ includeSearch: false }} {...NAV_PILL_LINK_PROPS}>
             {entry.label}
           </Link>
         </li>

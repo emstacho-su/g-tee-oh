@@ -22,6 +22,11 @@
  * the table RunProgress shows the covered-part note and the hand and decision counter (S40, O-352:
  * how the last hand ended is logged by the api, not shown), and a start refused with 422
  * no-coverage adds the queued count and a library link.
+ *
+ * S47 (R3.36, R3.4, O-484, O-487): ?start=1 starts the session once the drill is read
+ * (use-autostart.ts); the start panel offers session-only pause and speed overrides behind Options
+ * and an Edit drill link; after a 422 no-coverage, CoverageWatch listens for a coverage_added on a
+ * configuration the drill reaches and, when one arrives, clears the refusal and says so.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -39,16 +44,21 @@ import type { Drill } from "../../trainer/session-types.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "./CoverageNote.js";
+import { CoverageWatch } from "./CoverageWatch.js";
 import { DecisionArea } from "./DecisionArea.js";
 import { END_SESSION_BINDING, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { RunProgress } from "./RunProgress.js";
+import { SessionOverrides, type SessionOverrideValues } from "./SessionOverrides.js";
 import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts.js";
 import { SpotTable } from "./SpotTable.js";
 import { StartPanel } from "./StartPanel.js";
+import { useAutostart } from "./use-autostart.js";
 
 export interface DrillRunPageProps {
   drillId: string;
   seed?: string;
+  /** The address carried start=1 (S47, R3.36, O-484): the session starts once the drill is read. */
+  autostart?: boolean;
 }
 
 /** The prompt on screen in a state, if any. */
@@ -134,10 +144,19 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
 interface DrillRunProps {
   drill: Drill;
   seed: string | undefined;
+  autostart: boolean;
+  /** The drill read is settled: not fetching, so the drill on screen is the one the api holds. */
+  drillSettled: boolean;
 }
 
-function DrillRun({ drill, seed }: DrillRunProps) {
-  const [rng, setRng] = useState(drill.trainer.rng);
+function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
+  // The switch follows the drill until the user touches it, so a refetched drill's setting is the
+  // one shown and started (PR #48 review round 2 HIGH 1); a touched switch overrides this session.
+  const [rngChoice, setRngChoice] = useState<boolean | null>(null);
+  const rng = rngChoice ?? drill.trainer.rng;
+  // Session-only pause and speed (S47, O-487) and the line CoverageWatch leaves when the library caught up.
+  const [overrides, setOverrides] = useState<SessionOverrideValues>({});
+  const [coverageNote, setCoverageNote] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // S27: More info and Ask dialogs pause the screen like the explainer and the end confirm.
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
@@ -151,18 +170,29 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const session = useSpotSession({
     spec: { mode: "drill", drillId: drill.id, seed },
     paused: !interactive,
-    trainer: runSettingsOf(drill.trainer),
+    trainer: runSettingsOf({ ...drill.trainer, ...overrides }),
     sessionLength,
   });
   const { state } = session;
   const startPanel = onStartPanel(state);
+  useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
+  const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
+  // The machine's state when an answer lands, read through a ref so a late answer sees the present.
+  const noCoverageNow = useRef(noCoverage);
+  noCoverageNow.current = noCoverage;
+  const coverageArrived = (text: string): void => {
+    // Only a refusal still on screen is cleared (PR #48 review round 2 HIGH 2).
+    if (!noCoverageNow.current) return;
+    setCoverageNote(text);
+    session.reset();
+  };
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(
     { ...END_SESSION_BINDING, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
     canEnd(state) && interactive,
   );
   const changeRng = (next: boolean) => {
-    setRng(next);
+    setRngChoice(next);
     if (next) explainer.showIfFirstUse();
   };
   const confirmEnd = () => {
@@ -177,16 +207,23 @@ function DrillRun({ drill, seed }: DrillRunProps) {
         <SessionAlert problem={state.problem} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} />
       ) : null}
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
+      {noCoverage ? <CoverageWatch drill={drill} onCoverage={coverageArrived} /> : null}
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel
-          drill={drill}
+          drill={{ ...drill, trainer: { ...drill.trainer, ...overrides } }}
           rng={rng}
           onRngChange={changeRng}
           sessionLength={sessionLength}
           onSessionLengthChange={setSessionLength}
-          onStart={() => session.start(rng)}
+          onStart={() => {
+            setCoverageNote(null);
+            session.start(rng);
+          }}
           starting={state.kind === "starting"}
+          options={<SessionOverrides trainer={runSettingsOf(drill.trainer)} value={overrides} onChange={setOverrides} />}
+          editLink
+          note={coverageNote}
         />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
@@ -199,7 +236,7 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   );
 }
 
-export function DrillRunPage({ drillId, seed: rawSeed }: DrillRunPageProps) {
+export function DrillRunPage({ drillId, seed: rawSeed, autostart = false }: DrillRunPageProps) {
   const api = useAppApi();
   const drill = useQuery(drillQuery(api, drillId));
   // The route validates the seed, but TanStack Router merges the parent route's unvalidated search
@@ -211,7 +248,7 @@ export function DrillRunPage({ drillId, seed: rawSeed }: DrillRunPageProps) {
       {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
       {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
       {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}
-      {drill.data === undefined ? null : <DrillRun drill={drill.data} seed={seed} />}
+      {drill.data === undefined ? null : <DrillRun drill={drill.data} seed={seed} autostart={autostart} drillSettled={!drill.isFetching} />}
     </section>
   );
 }

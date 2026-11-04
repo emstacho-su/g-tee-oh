@@ -12,12 +12,12 @@ describe("R4.12 progress gallery sections", () => {
       expect(screen.getByTestId(`gallery-${name}`)).toBeInTheDocument();
     }
     const heat = screen.getByTestId("gallery-mastery-heatmap");
-    fireEvent.click(within(heat).getByRole("button", { name: /^rfi BB-UTG, live 100 bb:/ }));
+    fireEvent.click(within(heat).getByRole("button", { name: /^Open or fold, big blind versus under the gun, live 100bb:/ }));
     expect(heat).toHaveTextContent("Would open the drill for rfi BB-UTG live 100.");
     const leaks = screen.getByTestId("gallery-leak-trend");
     fireEvent.click(within(leaks).getByRole("radio", { name: "4 weeks" }));
     expect(within(leaks).getByRole("radio", { name: "4 weeks" })).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(within(leaks).getByRole("button", { name: "Drill this spot: rfi BB-CO, live 100 bb" }));
+    fireEvent.click(within(leaks).getByRole("button", { name: "Drill this spot: Open or fold, big blind versus cutoff, live 100bb" }));
     expect(leaks).toHaveTextContent("Would open the drill for rfi BB-CO live 100.");
   });
 });

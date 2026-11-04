@@ -62,7 +62,7 @@ export function FrequencyCard({ comparison }: FrequencyCardProps) {
               className={cn(FIELD_CLASS, "h-10 max-w-full px-2 text-sm sm:max-w-xl")}
             >
               {options.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={option.value} value={option.value} title={option.title}>
                   {option.label}
                 </option>
               ))}

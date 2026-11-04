@@ -23,6 +23,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
 import { FIXTURE_QUEUE_PAIR, FIXTURE_REQUESTED_FLOP } from "../../src/fixtures/library.js";
 import { FIXTURE_ONLINE_STAKE_ID } from "../../src/fixtures/study.js";
+import { capitalize, pairWords } from "../../src/progress/spot-words.js";
 import { installAppMockApi } from "../support/mock-app.js";
 import { emitServerEvent, installFakeEventSource } from "../support/mock-events.js";
 import { mergeShotManifest, shotDirectory, type ShotRecord, type Theme } from "../support/shot-manifest.js";
@@ -79,8 +80,8 @@ async function coverageScreens(page: Page, shot: ReturnType<typeof shooter>): Pr
   await expect(page.getByTestId("live-coverage")).toContainText("New coverage");
   await shot("library-live-coverage", CRITERIA.live);
 
-  await page.getByRole("list", { name: "Pairs" }).getByRole("button", { name: new RegExp(`^${UNCOVERED_PAIR}`) }).click();
-  await page.getByRole("button", { name: `Request ${UNCOVERED_PAIR} preflop` }).click();
+  await page.getByRole("list", { name: "Pairs" }).getByRole("button", { name: new RegExp(`^${capitalize(pairWords(UNCOVERED_PAIR))}`) }).click();
+  await page.getByRole("button", { name: `Request ${pairWords(UNCOVERED_PAIR)} preflop` }).click();
   await expect(page.getByTestId("gap-request-result")).toContainText("Recorded for the planner");
   await shot("library-gap-recorded", CRITERIA.recorded);
 }

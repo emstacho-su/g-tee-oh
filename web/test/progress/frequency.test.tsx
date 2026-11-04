@@ -65,7 +65,7 @@ describe("R4.12 the frequency model", () => {
   });
 
   it("R4.12 names action families in words, never by key", () => {
-    expect(familyWords("rfi")).toBe("open");
+    expect(familyWords("rfi")).toBe("open or fold");
     expect(familyWords("facing-open")).toBe("facing an open");
     expect(familyWords("facing-3bet")).toBe("facing a 3-bet");
     expect(familyWords("facing-4bet")).toBe("facing a 4-bet");
@@ -76,18 +76,35 @@ describe("R4.12 the frequency model", () => {
 
   it("R4.12 names each spot from the response fields, with the configuration's label when the list is loaded", () => {
     expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.label)).toEqual([
-      "BB facing an open (BB-BTN), cfg_6_online_100",
-      "BTN open (BB-BTN), cfg_6_online_100",
+      "Facing an open as big blind (big blind versus button), configuration loading",
+      "Open or fold as button (big blind versus button), configuration loading",
     ]);
-    expect(spotOptions(fixtureFrequencies.spots, fixtureConfigs)[0]?.label).toBe("BB facing an open (BB-BTN), Online, 6 players, 100 bb deep, stakes online");
+    expect(spotOptions(fixtureFrequencies.spots, fixtureConfigs)[0]?.label).toBe("Facing an open as big blind (big blind versus button), Online, 6 players, 100bb deep");
     expect(spotOptions(fixtureFrequencies.spots, undefined).map((option) => option.value)).toEqual([spotKey(ABOVE), spotKey(BELOW)]);
+  });
+
+  it("R4.12 while the list loads a spot says so; once loaded an unlisted configuration reads by its own facets, each distinct, with its id as the tooltip (PR #48 review round 2 MEDIUM 4)", () => {
+    const [first, second] = fixtureFrequencies.spots;
+    if (first === undefined || second === undefined) throw new Error("fixture spots missing");
+    const spots = [{ ...first, config_id: "cfg_6_online_150" }, { ...second, config_id: "cfg_9_live_13_100" }];
+    const loading = spotOptions(spots, undefined);
+    expect(loading.map((option) => option.label)).toEqual([
+      "Facing an open as big blind (big blind versus button), configuration loading",
+      "Open or fold as button (big blind versus button), configuration loading",
+    ]);
+    const loaded = spotOptions(spots, []);
+    expect(loaded.map((option) => option.label)).toEqual([
+      "Facing an open as big blind (big blind versus button), Online, 6 players, 150bb deep, not in the catalog",
+      "Open or fold as button (big blind versus button), Live, 9 players, 100bb deep, stake code 13, not in the catalog",
+    ]);
+    expect(loaded.map((option) => option.title)).toEqual(["cfg_6_online_150", "cfg_9_live_13_100"]);
   });
 
   it("R4.12 numbers two spots that would share a name", () => {
     const twin = { ...ABOVE, node_key: `${ABOVE.node_key}.c` };
     expect(spotOptions([ABOVE, twin], undefined).map((option) => option.label)).toEqual([
-      "BB facing an open (BB-BTN), cfg_6_online_100",
-      "BB facing an open (BB-BTN), cfg_6_online_100 (2)",
+      "Facing an open as big blind (big blind versus button), configuration loading",
+      "Facing an open as big blind (big blind versus button), configuration loading (2)",
     ]);
   });
 

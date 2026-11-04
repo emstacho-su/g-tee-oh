@@ -39,12 +39,17 @@ export async function buildRfiDrill(page: Page, shot: Flow2Shooter = NO_SHOTS): 
   await expect(page.getByRole("heading", { level: 1, name: "New drill" })).toBeVisible();
   await page.getByLabel("Name", { exact: true }).fill(FLOW_2_DRILL_NAME);
   await openBuilderPage(page, "Game");
-  await page.getByRole("group", { name: "Format" }).getByRole("radio", { name: "Online" }).check();
-  await page.getByLabel("Table size", { exact: true }).selectOption("6");
-  await page.getByLabel("Depths (bb)").fill("100");
-  await page.getByLabel("Stake", { exact: true }).selectOption("online");
+  // S47 (R3.37): the game is picked from the catalog; each facet is a segmented choice.
+  const picker = page.getByTestId("config-picker");
+  await picker.getByRole("radiogroup", { name: "Format" }).getByRole("radio", { name: "Online" }).click();
+  await picker.getByRole("radiogroup", { name: "Table size" }).getByRole("radio", { name: /^6 players/ }).click();
+  await picker.getByRole("radiogroup", { name: "Stake" }).getByRole("radio", { name: /^Online/ }).click();
+  await expect(picker.getByRole("group", { name: "Depths" }).getByRole("button", { name: /^100bb/ })).toHaveAttribute("aria-pressed", "true");
+  // No hero yet, so the draft reaches no pair: the api rule (pairsAt) and the reach line agree (PR #48 round 3 LOW 9).
+  await expect(page.getByTestId("reach-status")).toHaveText("Names no seat to train.");
   await openBuilderPage(page, "Seats");
   await page.getByRole("group", { name: "Hero positions" }).getByRole("checkbox", { name: "BTN" }).check();
+  await expect(page.getByTestId("reach-status")).toContainText("Reaches");
   const villains = page.getByRole("group", { name: "Villain positions" }).getByRole("checkbox", { checked: true });
   await expect(villains).toHaveCount(0);
   await page.getByRole("group", { name: "Preflop action" }).getByRole("checkbox", { name: /^RFI/ }).check();
@@ -95,7 +100,7 @@ export async function expectImportedTwin(page: Page): Promise<void> {
   const rows = page.getByTestId("drill-row").filter({ has: page.getByRole("rowheader", { name: FLOW_2_DRILL_NAME, exact: true }) });
   await expect(rows).toHaveCount(2);
   const summaries = await rows.getByTestId("spot-summary").allTextContents();
-  expect(summaries[0]).toContain("hero BTN against any opponent; RFI; close decisions");
+  expect(summaries[0]).toContain("hero button against any opponent; open or fold; close decisions");
   expect(summaries[0]).toBe(summaries[1]);
 }
 

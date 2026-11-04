@@ -11,7 +11,8 @@
  * due. A click, Enter or Space opens the class's drill (O-321); mastery gates nothing (ADR 0012).
  * A wide grid scrolls inside the card with the row headers sticky, so the page itself never
  * scrolls sideways at 390 px. A legend explains every mark. The cell buttons are the one accessible
- * representation: each name states the class and every value (S36 review, O-347; no table).
+ * representation: each name states the class and every value (S36 review, O-347; no table). Family
+ * headings, pair headers and the tooltip title read in words (spot-words.ts, S47).
  */
 import { useState, type CSSProperties } from "react";
 
@@ -27,6 +28,7 @@ import {
   type HeatCellView,
 } from "../../progress/heatmap-model.js";
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
+import { capitalize, familyWords, pairWords } from "../../progress/spot-words.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
 import { cn, STICKY_LAYER_CLASS } from "../ui/index.js";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
@@ -153,12 +155,12 @@ function HeatGrid({ heatmap, pendingKey, onDrill }: { heatmap: ProgressHeatmap; 
           <tbody key={group.family}>
             <tr>
               <th scope="colgroup" colSpan={columnCount} className="pt-2 text-xs font-semibold text-muted">
-                <span className={cn(STICKY, "inline-block pr-2")}>{group.family}</span>
+                <span className={cn(STICKY, "inline-block pr-2")}>{capitalize(familyWords(group.family))}</span>
               </th>
             </tr>
             {group.rows.map((entry) => (
               <tr key={entry.index}>
-                <th scope="row" className={cn(STICKY, "whitespace-nowrap pr-2 font-medium")}>{entry.row.pair}</th>
+                <th scope="row" className={cn(STICKY, "whitespace-nowrap pr-2 font-medium")}>{capitalize(pairWords(entry.row.pair))}</th>
                 {heatmap.columns.map((_, columnIndex) => {
                   const view = cellViewAt(heatmap, lookup, entry.index, columnIndex);
                   return (
