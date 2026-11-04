@@ -6,8 +6,9 @@
  * Mechanism: the caller owns the open tab (value and onValueChange) and passes each tab's label, an
  * optional badge and its content. Radix mounts only the open tab's content (no forceMount), so a
  * closed tab's body, and every read inside it, mounts only when the tab opens: the lazy mount the
- * right column relies on. A badge is part of the tab's accessible name and is shown as visible
- * text, never colour alone. Radix prevents the arrow keys it uses, so the Study keyboard scope's
+ * right column relies on. A badge is part of the tab's accessible name, after a space, and is shown
+ * as visible text, never colour alone. Each panel is named by its tab through Radix's
+ * aria-labelledby, so the panel's name carries the badge too (PR 52 review 1). Radix prevents the arrow keys it uses, so the Study keyboard scope's
  * arrows yield while the tablist has focus.
  */
 import * as RadixTabs from "@radix-ui/react-tabs";
@@ -57,6 +58,7 @@ export function Tabs<T extends string>({ label, value, tabs, onValueChange }: Ta
         {tabs.map((tab) => (
           <RadixTabs.Trigger key={tab.value} value={tab.value} className={TRIGGER_CLASSES}>
             {tab.label}
+            {tab.badge === undefined ? null : " "}
             {tab.badge === undefined ? null : (
               <span data-testid="tab-badge" className="rounded-full border border-border px-1.5 text-xs font-medium">
                 {tab.badge}
@@ -66,7 +68,7 @@ export function Tabs<T extends string>({ label, value, tabs, onValueChange }: Ta
         ))}
       </RadixTabs.List>
       {tabs.map((tab) => (
-        <RadixTabs.Content key={tab.value} value={tab.value} aria-label={tab.label} className="flex min-w-0 flex-col gap-4">
+        <RadixTabs.Content key={tab.value} value={tab.value} className="flex min-w-0 flex-col gap-4">
           {tab.content}
         </RadixTabs.Content>
       ))}

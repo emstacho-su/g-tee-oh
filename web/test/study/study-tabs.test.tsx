@@ -38,7 +38,7 @@ describe("R3.26 the right column as tabs", () => {
     renderStudy(BASE);
     const tablist = await screen.findByRole("tablist", { name: "Study panels" });
     const tabs = within(tablist).getAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["Overview", "HandsPreflop", "Compare"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Overview", "Hands Preflop", "Compare"]);
     expect(within(tablist).getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     const panel = screen.getByRole("tabpanel", { name: "Overview" });
     expect(within(panel).getByRole("table", { name: /Range by action at this node/ })).toBeInTheDocument();
@@ -92,6 +92,14 @@ describe("R3.26 the right column as tabs", () => {
     renderStudy(BASE);
     const hands = await screen.findByRole("tab", { name: /^Hands/ });
     expect(within(hands).getByTestId("tab-badge")).toHaveTextContent("Preflop");
+  });
+
+  it("R3.26 each panel is named by its tab, badge included, with no label of its own (PR 52 review 1)", async () => {
+    renderStudy(`${BASE}&view=hands`);
+    const tab = await screen.findByRole("tab", { name: "Hands Preflop" });
+    const panel = await screen.findByRole("tabpanel", { name: "Hands Preflop" });
+    expect(panel).not.toHaveAttribute("aria-label");
+    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
   });
 
   it("R3.26 Compare lists each action's served loss for the hand and opens that lens on the matrix", async () => {
