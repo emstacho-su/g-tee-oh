@@ -75,7 +75,9 @@
   --shadow-press-hover:
     inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -2px 0 rgb(43 26 22 / 0.16), 0 2px 4px rgb(76 48 42 / 0.22),
     0 9px 18px -6px rgb(76 48 42 / 0.32);
-  --shadow-press-down: inset 0 2px 5px rgb(43 26 22 / 0.32), inset 0 -1px 0 rgb(255 255 255 / 0.2), 0 1px 1px rgb(76 48 42 / 0.16);
+  /* The pressed inset is a black shade, not the umber tint: at 0.32 the umber could not darken the
+     oxblood primary fill, so a held button read as a resting one in light (S48 critic G10). */
+  --shadow-press-down: inset 0 2px 6px rgb(0 0 0 / 0.55), inset 0 -1px 0 rgb(255 255 255 / 0.2), 0 1px 1px rgb(76 48 42 / 0.16);
   /* The release overshoots slightly and settles: the spring back after the squish. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /*
