@@ -31,8 +31,8 @@ type TrackNames = Readonly<Partial<Record<TrackKey, string>>>;
 
 export interface TrainingRecapProps {
   recap: SessionRecap;
-  /** The session's own tally (S46, R3.32): its five label counts follow the api's figures. */
-  tally?: SessionTally;
+  /** The session's own tally (S46, R3.32), given only when its decisions match the api's (recapTallyOf). */
+  tally?: SessionTally | undefined;
   trackNames?: TrackNames;
   onTrainAgain: () => void;
 }

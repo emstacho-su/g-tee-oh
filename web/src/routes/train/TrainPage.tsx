@@ -31,7 +31,7 @@ import { heatmapQuery, tracksQuery } from "../../progress/queries.js";
 import type { TrackKey } from "../../progress/types.js";
 import { ALL_CONFIGS, useSessionDefaultsStore, type SessionDefaults } from "../../store/session-defaults.js";
 import type { SessionStartSpec } from "../../trainer/session-api.js";
-import { tallyOf } from "../../trainer/session-log.js";
+import { recapTallyOf } from "../../trainer/session-log.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "../drill-run/CoverageNote.js";
@@ -120,7 +120,7 @@ function TrainRun({ mode }: TrainPageProps) {
     <>
       {state.kind === "error" ? <TrainAlert mode={mode} problem={state.problem} onStart={startPanel} canRetry={state.retry !== null && !startPanel} onRetry={session.retry} /> : null}
       {state.kind === "error" && startPanel && mode === "automated" ? <NoCoverageNote problem={state.problem} /> : null}
-      {state.kind === "ended" ? <TrainingRecap recap={state.recap} tally={tallyOf(session.log.entries)} onTrainAgain={trainAgain} {...(trackNames === undefined ? {} : { trackNames })} /> : null}
+      {state.kind === "ended" ? <TrainingRecap recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onTrainAgain={trainAgain} {...(trackNames === undefined ? {} : { trackNames })} /> : null}
       {startPanel && mode === "automated" ? (
         <AutomatedStart defaults={defaults} onSessionLengthChange={setSessionLength} starting={starting} onStart={() => session.start(rng)} />
       ) : null}

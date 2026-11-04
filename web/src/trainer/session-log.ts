@@ -109,3 +109,14 @@ export function tallyOf(entries: readonly DecisionEntry[]): SessionTally {
 export function showsRun(prompt: Pick<TrainerPrompt, "visible_panels"> | null): boolean {
   return prompt !== null && prompt.visible_panels.includes(RUN_PANEL_KEY);
 }
+
+/**
+ * The tally a recap shows beside the api's figures, or undefined when the log missed a decision
+ * the api counted (a reveal lost to a failed response, or End pressed while a decision was being
+ * graded): the five label counts must add up to the recap's own decisions, never to fewer
+ * (PR #50 review).
+ */
+export function recapTallyOf(recap: { readonly decisions: number }, entries: readonly DecisionEntry[]): SessionTally | undefined {
+  const tally = tallyOf(entries);
+  return tally.decisions === recap.decisions ? tally : undefined;
+}

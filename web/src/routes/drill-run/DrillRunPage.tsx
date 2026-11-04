@@ -39,7 +39,7 @@ import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
 import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
-import { tallyOf } from "../../trainer/session-log.js";
+import { recapTallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
@@ -219,7 +219,7 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
       ) : null}
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {noCoverage ? <CoverageWatch drill={drill} onCoverage={coverageArrived} /> : null}
-      {state.kind === "ended" ? <SessionRecapView recap={state.recap} tally={tallyOf(session.log.entries)} onStartAnother={session.reset} /> : null}
+      {state.kind === "ended" ? <SessionRecapView recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel
           drill={{ ...drill, trainer: { ...drill.trainer, ...overrides } }}

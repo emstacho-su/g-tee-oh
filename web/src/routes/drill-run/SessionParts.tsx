@@ -24,8 +24,8 @@ export const RECAP_COUNTS_LABEL = "Decisions by grade";
 
 export interface SessionRecapViewProps {
   recap: SessionRecap;
-  /** The session's own tally (S46, R3.32): its five label counts follow the api's figures. */
-  tally?: SessionTally;
+  /** The session's own tally (S46, R3.32), given only when its decisions match the api's (recapTallyOf). */
+  tally?: SessionTally | undefined;
   onStartAnother: () => void;
 }
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { DecisionFeedback, FeedbackLabel } from "../../src/contracts.js";
 import { fixtureFeedback, fixturePrompt } from "../../src/fixtures/index.js";
 import { fixturePracticeSession, fixtureRecap } from "../../src/fixtures/trainer.js";
-import { EMPTY_LOG, RUN_PANEL_KEY, logAfter, runOf, showsRun, tallyOf, type DecisionEntry, type SessionLog } from "../../src/trainer/session-log.js";
+import { EMPTY_LOG, RUN_PANEL_KEY, logAfter, recapTallyOf, runOf, showsRun, tallyOf, type DecisionEntry, type SessionLog } from "../../src/trainer/session-log.js";
 import type { SessionContext, SpotState } from "../../src/trainer/spot-machine.js";
 
 const CONTEXT: SessionContext = { session: fixturePracticeSession, rng: false, hand: { handNo: 0, ordinal: 1, decision: 1, stateVersion: 3, heroPosition: "BB" } };
@@ -91,5 +91,17 @@ describe("R3.32 session tally", () => {
     expect(showsRun({ visible_panels: [RUN_PANEL_KEY] })).toBe(true);
     expect(showsRun({ visible_panels: ["hero_range_matrix"] })).toBe(false);
     expect(showsRun(null)).toBe(false);
+  });
+});
+
+describe("R3.32 PR #50 review: the recap's label counts agree with the api's decisions", () => {
+  it("R3.32 the recap gets the tally when the log saw every decision the api counted", () => {
+    const log = logOf(reveal("d1", "best", 0), reveal("d2", "mistake", 0.2, false, 2), reveal("d3", "correct", 0.01, false, 3));
+    expect(recapTallyOf({ ...fixtureRecap, decisions: 3 }, log.entries)).toEqual(tallyOf(log.entries));
+  });
+
+  it("R3.32 a decision the log never saw (its reveal lost) leaves the recap without label counts, never counts that add up wrong", () => {
+    const log = logOf(reveal("d1", "best", 0), reveal("d2", "mistake", 0.2, false, 2));
+    expect(recapTallyOf({ ...fixtureRecap, decisions: 3 }, log.entries)).toBeUndefined();
   });
 });
