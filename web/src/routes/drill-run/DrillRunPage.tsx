@@ -39,6 +39,7 @@ import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
 import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
+import { oneDecisionPerHand } from "../../trainer/session-length.js";
 import { recapTallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
@@ -113,7 +114,8 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
   // The configurations for the reveal's Study this spot link (S46, R3.34).
   const studyConfigs = useStudyConfigs(state.kind === "feedback");
-  const streetModes = (drill.trainer.stop_rule ?? "after_action") !== "after_action";
+  // The session's own run settings decide, by the one rule (session-length.ts, PR #50 review).
+  const streetModes = context !== null && !oneDecisionPerHand(context);
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : <RunProgress context={context} />}
