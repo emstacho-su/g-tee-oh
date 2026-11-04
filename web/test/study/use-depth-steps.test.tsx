@@ -6,7 +6,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createAppApi } from "../../src/api/index.js";
 import { pairsQuery, type PositionPairEntry } from "../../src/study/queries.js";
@@ -23,6 +23,32 @@ function pairs(available: boolean): PositionPairEntry[] {
   ];
 }
 
+describe("R3.12 useDepthSteps reports a failed sibling read (code review 3)", () => {
+  it("R3.12 a sibling depth whose seats fail to load is logged once and listed as unchecked, never silently dropped", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetch = (input: Request): Promise<Response> =>
+      Promise.resolve(
+        input.url.includes("/configs/cfg_6_online_200/pairs")
+          ? new Response(JSON.stringify({ type: "urn:g-tee-oh:problem:internal", title: "t", status: 500 }), { status: 500, headers: { "content-type": "application/problem+json" } })
+          : new Response(null, { status: 599 }),
+      );
+    const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch });
+    const client = new QueryClient();
+    const key = (configId: string) => pairsQuery(api, configId).queryKey;
+    client.setQueryData(key("cfg_6_online_100"), pairs(true));
+    client.setQueryData(key("cfg_6_online_300"), pairs(true));
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, rerender } = renderHook(() => useDepthSteps(api, fixtureConfigs, SEARCH), { wrapper });
+    await waitFor(() => expect(result.current.unchecked).toEqual([20000]));
+    expect(result.current).toMatchObject({ deeper: 30000, shallower: undefined });
+    rerender();
+    const logged = errors.mock.calls.filter((call) => String(call[0]).includes("could not be read for the depth keys"));
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0]?.[0])).toContain("cfg_6_online_200");
+    errors.mockRestore();
+  });
+});
+
 describe("R3.12 useDepthSteps (O-467)", () => {
   it("R3.12 a refetch that flips a pair's availability, same list length, moves the neighbours (code review)", async () => {
     // A fetch that never answers: every read here comes from the seeded cache.
@@ -34,11 +60,11 @@ describe("R3.12 useDepthSteps (O-467)", () => {
     client.setQueryData(key("cfg_6_online_300"), pairs(true));
     const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
     const { result } = renderHook(() => useDepthSteps(api, fixtureConfigs, SEARCH), { wrapper });
-    expect(result.current).toEqual({ deeper: 20000, shallower: undefined });
+    expect(result.current).toEqual({ deeper: 20000, shallower: undefined, unchecked: [] });
     act(() => {
       client.setQueryData(key("cfg_6_online_200"), pairs(false));
     });
     // React Query notifies observers on a later tick, so the new neighbours arrive asynchronously.
-    await waitFor(() => expect(result.current).toEqual({ deeper: 30000, shallower: undefined }));
+    await waitFor(() => expect(result.current).toEqual({ deeper: 30000, shallower: undefined, unchecked: [] }));
   });
 });
