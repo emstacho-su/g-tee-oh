@@ -15,7 +15,7 @@ import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
 import { DRILL_BUTTON_TEXT, DrillAlert, ProgressCard } from "../../components/progress/index.js";
-import { Button, LoadingNote } from "../../components/ui/index.js";
+import { Button, InfoTip, LoadingNote } from "../../components/ui/index.js";
 import { useOpenDrill, type DrillTarget, type OpenDrillControl } from "../../progress/open-drill.js";
 import { heatmapQuery, leaksQuery } from "../../progress/queries.js";
 import {
@@ -24,6 +24,7 @@ import {
   freshText,
   NO_CLASSES_TEXT,
   NO_LEAKS_TEXT,
+  QUEUE_TIPS,
   startTarget,
   type HomeQueue,
   type QueueLeak,
@@ -86,13 +87,17 @@ function QueueBody({ queue, classCount }: { queue: HomeQueue; classCount: number
           <p className="text-lg font-semibold" data-testid="queue-due">
             {dueText(queue.due)}
           </p>
-          <p className="text-sm text-muted" data-testid="queue-new">
-            {freshText(queue.fresh)}
+          <p className="flex flex-wrap items-center gap-2 text-sm text-muted" data-testid="queue-new">
+            <span>{freshText(queue.fresh)}</span>
+            <InfoTip subject="classes">{QUEUE_TIPS.classes}</InfoTip>
           </p>
         </div>
       )}
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold">Top leaks</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold">Top leaks</h3>
+          <InfoTip subject="the leak cost">{QUEUE_TIPS.leakCost}</InfoTip>
+        </div>
         {queue.leaks.length === 0 ? (
           <p className="text-sm text-muted">{NO_LEAKS_TEXT}</p>
         ) : (

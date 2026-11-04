@@ -4,9 +4,9 @@
  */
 export { ProgressCard } from "./ProgressCard.js";
 export type { ProgressCardProps } from "./ProgressCard.js";
-export { RatingCard, UNRATED_HINT, UNRATED_TEXT } from "./RatingCard.js";
+export { RATING_TIPS, RatingCard, UNRATED_HINT, UNRATED_TEXT } from "./RatingCard.js";
 export type { RatingCardProps } from "./RatingCard.js";
-export { StreakBadge } from "./StreakBadge.js";
+export { STREAK_TIPS, StreakBadge } from "./StreakBadge.js";
 export type { StreakBadgeProps } from "./StreakBadge.js";
 // Lane A (charts) exports go below this line.
 export { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";

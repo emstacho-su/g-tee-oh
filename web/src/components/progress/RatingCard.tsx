@@ -12,10 +12,22 @@ import type { ReactNode } from "react";
 
 import { formatDeviation, formatRating, formatShortDate, tierLabel, trackName } from "../../progress/format.js";
 import type { ProgressRating, TrackKey } from "../../progress/types.js";
+import { InfoTip } from "../ui/index.js";
 import { ProgressCard } from "./ProgressCard.js";
 
 export const UNRATED_TEXT = "Unrated";
 export const UNRATED_HINT = "Finish an automated training session with rated decisions to get a rating.";
+
+/**
+ * The definitions where the figures appear (S48 critic G8; design rule 11): words only, the figures
+ * stay the api's (ADR 0011). The tier cutoffs are not quoted, since the learning package owns them
+ * and recalibrates them (06 section 3.5).
+ */
+export const RATING_TIPS = {
+  rating:
+    "Your rating on a chess-style scale, moved only by rated decisions. The ± figure is the deviation band: your true rating most likely sits within it, and it narrows as you play.",
+  tier: "Tiers are cut on the conservative rating: the rating less two deviations, weighted across your tracks, so a lucky run never lifts a tier. A tier above I also waits until every track's deviation has settled.",
+} as const;
 
 export interface RatingCardProps {
   rating: ProgressRating;
@@ -45,12 +57,14 @@ export function RatingCard({ rating, trackNames, badge, footer }: RatingCardProp
             <span className="text-lg text-muted tabular-nums" aria-label={`plus or minus ${formatRating(overall.rd)}`}>
               {formatDeviation(overall.rd)}
             </span>
+            <InfoTip subject="the rating">{RATING_TIPS.rating}</InfoTip>
           </p>
           <p className="flex flex-wrap items-center gap-2">
             <span className="rounded-md border border-border bg-surface-sunken px-2 py-0.5 text-sm font-semibold" data-testid="rating-tier">
               {tierLabel(overall.tier)}
             </span>
             <span className="text-sm text-muted tabular-nums">Conservative rating {formatRating(overall.conservative)}</span>
+            <InfoTip subject="the tier">{RATING_TIPS.tier}</InfoTip>
           </p>
           {overall.band_tier !== overall.tier && overall.blocked_by.length > 0 ? (
             <p className="text-sm text-muted" data-testid="rating-blocked">
