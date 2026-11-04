@@ -37,7 +37,7 @@ export const TRAIN_TEXT = {
   changeScope: "Change the configurations",
   changeDefaults: "Change the session defaults",
   retry: "Try again",
-  workedExample: "Worked example: panels visible, not rated",
+  workedExample: "Worked example: not rated; its panels open after the decision",
   ratedBlock: "Rated block: first attempts count toward your rating",
   unratedSession: "Not rated",
   holdoutBanner: "Holdout retest: not rated",

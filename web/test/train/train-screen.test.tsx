@@ -139,10 +139,10 @@ describe("R4.10 automated session", () => {
     await waitFor(() => expect(screen.getByTestId("block-hand")).toHaveTextContent("Hand 2 of 3 in this block"));
   });
 
-  it("R4.10 a worked example's banner says panels visible, not rated (O-272)", async () => {
+  it("R4.10 R3.33 a worked example's banner says it is not rated and its panels open after the decision, never that they show before it (O-272, O-471)", async () => {
     await renderTrain("automated", automatedScript(fixtureWorkedBlock));
     await userEvent.click(screen.getByRole("button", { name: "Start training" }));
-    expect(await screen.findByTestId("block-rating")).toHaveTextContent("Worked example: panels visible, not rated");
+    expect(await screen.findByTestId("block-rating")).toHaveTextContent("Worked example: not rated; its panels open after the decision");
     await waitFor(() => expect(screen.getByTestId("block-class")).toHaveTextContent("Facing an open, Facing an open in position"));
   });
 

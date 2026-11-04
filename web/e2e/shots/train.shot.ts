@@ -32,7 +32,7 @@ const CRITERIA = {
   start: "R4.10 automated start: one line on what it does, configuration scope, grouping and RNG from the session defaults, a Settings link and Start; no seed offered (O-323, O-325)",
   prompt: "R4.10 rated block prompt: banner with family, track name, hand 1 of 3 in the block and that it counts toward the rating, above the table and actions (O-272)",
   feedback: "R4.10 R3.13 feedback after the choice, which submits it (the confidence tap is retired, O-345): label, EV loss, frequencies, range view and threshold card, Next and End session",
-  worked: "R4.10 worked example prompt: banner says Worked example: panels visible, not rated (O-272, O-325)",
+  worked: "R4.10 R3.33 worked example prompt: banner says Worked example: not rated; its panels open after the decision (O-272, O-325, O-471)",
   confirm: "R4.10 end confirm: End this session? with Keep playing and End session (O-285)",
   recap: "R4.10 recap: decisions, rated decisions, mean score percent, EV loss, per-track rating before (new) and after with RD, tier held by a named track, the unlocked badge, Train again and See progress (O-325)",
   holdoutStart: "R4.12 holdout retest start: what the retest is, that it is never rated, and an explicit Start (O-328)",
@@ -77,7 +77,7 @@ async function trainScreens(page: Page, theme: Theme, viewport: Viewport): Promi
     await decide(page);
   }
   await nextHand(page);
-  await expect(page.getByTestId("block-rating")).toHaveText("Worked example: panels visible, not rated");
+  await expect(page.getByTestId("block-rating")).toHaveText("Worked example: not rated; its panels open after the decision");
   await shot("train-worked-example", CRITERIA.worked);
 
   await page.keyboard.press("Shift+E");

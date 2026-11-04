@@ -24,7 +24,7 @@ test("R4.10 R4.12 mock flow 1: an automated session of five decisions turns an u
   await expect(page.getByTestId("block-hand")).toHaveText("Hand 1 of 3 in this block");
   await playDecisions(page, FLOW_1_DECISIONS);
   // Decisions 4 and 5 are the second block, a worked example in the mock.
-  await expect(page.getByTestId("block-rating")).toHaveText("Worked example: panels visible, not rated");
+  await expect(page.getByTestId("block-rating")).toHaveText("Worked example: not rated; its panels open after the decision");
 
   const rated = await endAndReadRecap(page);
   expect(rated, "the rated block's three decisions were rated").toBe(3);

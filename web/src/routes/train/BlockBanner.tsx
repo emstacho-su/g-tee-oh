@@ -2,8 +2,9 @@
  * The banner above the table in /train (S32, R4.10, O-272, O-325, O-328). In an automated session
  * it names the shown hand's class by its action family and rating track (the track's name from the
  * tracks read, its key while that loads), the hand's place in its block ("Hand 2 of 3 in this
- * block") and whether the block counts: a worked example says "Worked example: panels visible, not
- * rated"; a block of a rated session says it counts toward the rating. In a holdout retest it says
+ * block") and whether the block counts: a worked example says "Worked example: not rated; its
+ * panels open after the decision" (S46, R3.33: the panels before the decision wait on O-471); a
+ * block of a rated session says it counts toward the rating. In a holdout retest it says
  * "Holdout retest: not rated" with the round's answered of total. Every fact is in words, so the
  * accent border is never the only signal. The values come from block-progress.ts.
  */
