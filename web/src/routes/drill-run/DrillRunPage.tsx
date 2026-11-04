@@ -44,7 +44,7 @@ import { recapTallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch, type LeakOpen } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
-import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
+import { canEnd, type SessionContext, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "./CoverageNote.js";
 import { CoverageWatch } from "./CoverageWatch.js";
@@ -201,6 +201,10 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
   // The feedback sections the user opened or closed stay that way for the session (O-387), through
   // the recap's history too (S48 round 5 verifier on trainer-recap, R3.32).
   const feedbackSections = useFeedbackSections(sessionIdOf(state));
+  // The context the api served, kept past the end so the recap's history reads the same stop rule
+  // the live list did, not a value derived again from the drill and the overrides (code review round 2, 6).
+  const lastContext = useRef<SessionContext | null>(null);
+  if ("context" in state && state.context !== null) lastContext.current = state.context;
   useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
   const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
   // The machine's state when an answer lands, read through a ref so a late answer sees the present.
@@ -238,7 +242,12 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
         <>
           <SessionRecapView recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onStartAnother={session.reset} />
           {/* The session's decisions stay reviewable under the totals: play fast, review later (R3.32, design rule 10). */}
-          <SessionHistoryList log={session.log} decisions={!oneDecisionPerHand({ trainer })} onExplain={() => explainer.setOpen(true)} sections={feedbackSections} />
+          <SessionHistoryList
+            log={session.log}
+            decisions={lastContext.current !== null && !oneDecisionPerHand(lastContext.current)}
+            onExplain={() => explainer.setOpen(true)}
+            sections={feedbackSections}
+          />
         </>
       ) : null}
       {startPanel ? (

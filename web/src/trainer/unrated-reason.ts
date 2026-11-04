@@ -57,24 +57,30 @@ function promptReason(prompt: PromptFacts): UnratedReason | null {
   return null;
 }
 
+/** The session's ineligibility, after its mode and before the prompt: a rating rule the web cannot see. */
+function eligibilityReason(session: SessionFacts): UnratedReason | null {
+  return session.rated_eligible ? null : UNRATED_REASONS.rule;
+}
+
 export function unratedReason(feedback: FeedbackFacts, prompt: PromptFacts, session: SessionFacts): UnratedReason | null {
   if (feedback.rated) return null;
   const bySession = sessionReason(session);
   if (bySession !== null) return bySession;
   if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
-  if (!session.rated_eligible) return UNRATED_REASONS.rule;
-  return promptReason(prompt) ?? UNRATED_REASONS.rule;
+  return eligibilityReason(session) ?? promptReason(prompt) ?? UNRATED_REASONS.rule;
 }
 
 /**
  * The reason the reveal notice gives before the decision, in the same ranked order as the chip
  * after it, so one session gives one reason (S48 round 5 verifier on street-next-hand and the
- * drill screens): the session's mode first, then the prompt. Shown only when the prompt itself
- * leaves the decision unrated (RevealNotice decides that); without session facts the prompt's
- * reason stands.
+ * drill screens): the session's mode, then its ineligibility (the noise flag is not known before
+ * the decision), then the prompt, the one order unratedReason applies (code review round 2, 5).
+ * Shown only when the prompt itself leaves the decision unrated (RevealNotice decides that);
+ * without session facts the prompt's reason stands.
  */
 export function preDecisionReason(prompt: PromptFacts, session: SessionFacts | undefined): UnratedReason | null {
   const byPrompt = promptReason(prompt);
   if (byPrompt === null) return null;
-  return (session === undefined ? null : sessionReason(session)) ?? byPrompt;
+  if (session === undefined) return byPrompt;
+  return sessionReason(session) ?? eligibilityReason(session) ?? byPrompt;
 }
