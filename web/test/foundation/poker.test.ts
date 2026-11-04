@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { fixtureActions, fixtureStudyNode } from "../../src/fixtures/index.js";
 import { cardName, parseCard, rankLabel, suitSymbol } from "../../src/poker/cards.js";
-import { exactActionLabel, formatBb, formatCbb, formatPercent, formatShare, formatWholePercent, wholePercent } from "../../src/poker/format.js";
+import { exactActionLabel, formatBb, formatCbb, formatPercent, formatShare, wholePercent } from "../../src/poker/format.js";
 import { toGradeActions } from "../../src/poker/grade-actions.js";
 import { HAND_CLASS_COUNT, HAND_GRID, cellOf, handAt } from "../../src/poker/hands.js";
 import { ACTION_STYLES, actionColor, actionStyle, sizeRank } from "../../src/theme/action-style.js";
@@ -59,12 +59,11 @@ describe("R3.13 cards and formatting", () => {
     expect(exactActionLabel(fixtureActions[0]!)).toBe("Fold");
   });
 
-  it("R3.12 one whole-percent rounding for every share shown as a whole percent (PR #42 review round 1, I)", () => {
+  it("R3.12 one whole-percent rounding for the rank wording (PR #42 review round 1, I; O-408)", () => {
     expect(wholePercent(0.996)).toBe(100);
     expect(wholePercent(0.004)).toBe(0);
     expect(wholePercent(0.5)).toBe(50);
-    expect(formatWholePercent(0.613)).toBe("61%");
-    expect(formatWholePercent(0.996)).toBe(`${wholePercent(0.996)}%`);
+    expect(wholePercent(0.613)).toBe(61);
   });
 });
 

@@ -22,7 +22,7 @@ function shownValue(term: string): string {
 }
 
 function renderPanel(drill: Drill): void {
-  render(<StartPanel drill={drill} rng={false} onRngChange={() => undefined} onStart={() => undefined} starting={false} />);
+  render(<StartPanel drill={drill} rng={false} onRngChange={() => undefined} onStart={() => undefined} starting={false} sessionLength={null} onSessionLengthChange={() => undefined} />);
 }
 
 describe("R3.14 one label map for drill settings", () => {

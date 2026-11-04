@@ -11,9 +11,11 @@
  *
  * The Mixed-frequency mode explainer (lane C's useRngExplainer and RngExplainer) opens on first
  * use: when the switch is turned on, and at the first prompt of a session that shows a roll (O-283);
- * the roll scale's info button and the I key open it at any time. Hotkeys (O-285) go through
- * useHotkey: N next hand (only on the reveal), E end session (opens the confirm), plus 1 to 9 from
- * the action bar (the S and U keys left with the confidence tap, O-345). While a dialog is open the screen's buttons and hotkeys pause.
+ * the roll scale's info button and the I key open it at any time. Hotkeys (O-285, S46 R3.30) go
+ * through useHotkey: N or Enter next hand (only on the reveal), Shift+E end session (opens the
+ * confirm), plus the action keys from the action bar (a letter per kind, digits for the sizes;
+ * the S and U keys left with the confidence tap, O-345). While a dialog is open the screen's
+ * buttons and hotkeys pause.
  *
  * S26 (R3.13, R3.14, O-312 to O-314): the drill's run settings (stop rule, pause, speed,
  * quick_result) go into the session, so street and full-hand modes run on the same screen; above
@@ -28,7 +30,8 @@ import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
-import { useHotkey } from "../../hotkeys/index.js";
+import { displayBinding, useHotkey } from "../../hotkeys/index.js";
+import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
 import { validateDrillRunSearch } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
@@ -37,7 +40,7 @@ import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import { useSpotSession, type SpotSession } from "../../trainer/use-spot-session.js";
 import { NoCoverageNote } from "./CoverageNote.js";
 import { DecisionArea } from "./DecisionArea.js";
-import { END_SESSION_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { END_SESSION_BINDING, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { RunProgress } from "./RunProgress.js";
 import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts.js";
 import { SpotTable } from "./SpotTable.js";
@@ -117,9 +120,9 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
         </>
       )}
       {canEnd(state) ? (
-        <Button variant="secondary" aria-keyshortcuts={END_SESSION_KEY} disabled={!interactive} onClick={onAskEnd} className="self-start">
+        <Button variant="secondary" aria-keyshortcuts={displayBinding(END_SESSION_BINDING)} disabled={!interactive} onClick={onAskEnd} className="self-start">
           <kbd aria-hidden="true" className="font-mono text-xs">
-            {END_SESSION_KEY}
+            {displayBinding(END_SESSION_BINDING)}
           </kbd>
           {SESSION_TEXT.endSession}
         </Button>
@@ -138,6 +141,9 @@ function DrillRun({ drill, seed }: DrillRunProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   // S27: More info and Ask dialogs pause the screen like the explainer and the end confirm.
   const [explainDialogOpen, setExplainDialogOpen] = useState(false);
+  // The planned length lives in the session defaults (S46, R3.31) and is read into the session at Start.
+  const sessionLength = useSessionDefaultsStore((store) => store.defaults.sessionLength);
+  const setSessionLength = useSessionDefaultsStore((store) => store.setSessionLength);
   const explainer = useRngExplainer({ hotkey: rng });
   const interactive = !confirmOpen && !explainer.open && !explainDialogOpen;
   // Time under the explainer or the end confirm is not response time (O-284); the session pauses
@@ -146,12 +152,13 @@ function DrillRun({ drill, seed }: DrillRunProps) {
     spec: { mode: "drill", drillId: drill.id, seed },
     paused: !interactive,
     trainer: runSettingsOf(drill.trainer),
+    sessionLength,
   });
   const { state } = session;
   const startPanel = onStartPanel(state);
   useFirstRollExplainer(state, explainer.showIfFirstUse);
   useHotkey(
-    { key: END_SESSION_KEY, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
+    { ...END_SESSION_BINDING, description: SESSION_TEXT.endSession, scope: SESSION_SCOPE, handler: () => setConfirmOpen(true) },
     canEnd(state) && interactive,
   );
   const changeRng = (next: boolean) => {
@@ -172,7 +179,15 @@ function DrillRun({ drill, seed }: DrillRunProps) {
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
       {startPanel ? (
-        <StartPanel drill={drill} rng={rng} onRngChange={changeRng} onStart={() => session.start(rng)} starting={state.kind === "starting"} />
+        <StartPanel
+          drill={drill}
+          rng={rng}
+          onRngChange={changeRng}
+          sessionLength={sessionLength}
+          onSessionLengthChange={setSessionLength}
+          onStart={() => session.start(rng)}
+          starting={state.kind === "starting"}
+        />
       ) : null}
       {state.kind !== "ended" && !startPanel ? (
         <InSession drill={drill} session={session} interactive={interactive} onAskEnd={() => setConfirmOpen(true)} onExplain={() => explainer.setOpen(true)} onExplainDialog={setExplainDialogOpen} />

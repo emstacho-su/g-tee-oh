@@ -76,3 +76,22 @@ describe("R3.13 hand progress", () => {
     expect(handCounterText(progress)).toBe("Hand 1, decision 2");
   });
 });
+
+describe("R3.31 hand counter with a session length", () => {
+  it("R3.31 spot mode counts hands against the length; street modes add the decision; no length keeps the S26 text", () => {
+    const progress = play(FIRST);
+    expect(handCounterText(progress, { length: 20, decision: false })).toBe("Hand 1 of 20");
+    expect(handCounterText(progress, { length: 20 })).toBe("Hand 1 of 20, decision 1");
+    expect(handCounterText(progress, { length: null })).toBe("Hand 1, decision 1");
+    expect(handCounterText(progress, { length: null, decision: false })).toBe("Hand 1");
+    expect(handCounterText(progress)).toBe("Hand 1, decision 1");
+  });
+});
+
+describe("R3.31 PR #45 review round 3, finding 5: the planned-length counter names graded hands", () => {
+  it("R3.31 the counter can name the hand by the graded-hand number instead of the prompts seen", () => {
+    const progress = play(FIRST);
+    expect(handCounterText(progress, { length: 20, decision: false, ordinal: 2 })).toBe("Hand 2 of 20");
+    expect(handCounterText(progress, { length: 20, ordinal: 2 })).toBe("Hand 2 of 20, decision 1");
+  });
+});
