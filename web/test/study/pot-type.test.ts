@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import { fixtureStakes } from "../../src/fixtures/study.js";
-import { potTypeLabel } from "../../src/study/pot-type.js";
+import { potTypeLabel, preflopLine } from "../../src/study/pot-type.js";
 import { settingsSummary } from "../../src/study/settings.js";
 
 describe("R3.12 the pot type of a line", () => {
@@ -27,9 +27,21 @@ describe("R3.12 the pot type of a line", () => {
     ["r250.r1100.r2400", "four-bet pot"],
     ["r250.c.r1300.r3000", "four-bet pot"],
     ["r250.r1100.r2400.r5000", "5-bet pot"],
-    ["r250.a", "three-bet pot"],
+    // An all-in is never counted as a raise: the web cannot tell one for less from a raise (code review 2).
+    ["r250.a", "all-in pot"],
+    ["a", "all-in pot"],
+    ["r250.r1100.a.c", "all-in pot"],
   ])("R3.12 %s is %s", (line, label) => {
     expect(potTypeLabel(line)).toBe(label);
+  });
+
+  it("R3.12 preflopLine keeps the tokens taken at preflop nodes, so a postflop token is never counted (code review 2)", () => {
+    const streets = (...list: ("preflop" | "flop" | "turn" | "river")[]) => list.map((street) => ({ street }));
+    expect(preflopLine("r250.c.x.b300", streets("preflop", "preflop", "flop", "flop"))).toBe("r250.c");
+    expect(preflopLine("r250.r1100", streets("preflop", "preflop"))).toBe("r250.r1100");
+    expect(preflopLine("r250.c.b300", streets("preflop", "preflop", "flop"))).toBe("r250.c");
+    expect(preflopLine(undefined, [])).toBeUndefined();
+    expect(potTypeLabel(preflopLine("r250.c.b300.r900", streets("preflop", "preflop", "flop", "flop")))).toBe("single-raised pot");
   });
 
   it("R3.12 the summary ends with the pot type past the root and leaves it out at the root", () => {

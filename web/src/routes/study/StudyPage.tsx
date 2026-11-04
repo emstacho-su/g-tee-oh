@@ -49,6 +49,8 @@ import {
   type SettingsDraft,
 } from "../../study/settings.js";
 import { useStudyEntry, type StudyEntry } from "../../study/use-study-entry.js";
+import { useLineNodes } from "../../study/use-line-nodes.js";
+import { preflopLine } from "../../study/pot-type.js";
 import { useStudyNavigation, type StudyNavigation } from "../../study/use-study-navigation.js";
 import { useDepthSteps } from "../../study/use-depth-steps.js";
 import { withDepth } from "../../study/depth-steps.js";
@@ -152,6 +154,10 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   const entry = useStudyEntry(api, search, draft);
   const { configId, studyPair, catalogReads } = entry;
   const confirmed = configId !== undefined && studyPair !== undefined && search.table_size !== undefined;
+  // The line's node reads (the carousel's, so cache hits) say which tokens are preflop (code review 2).
+  const lineNodes = useLineNodes(api, configId ?? "", studyPair?.pair ?? "", confirmed ? search.line : undefined);
+  const preflop = preflopLine(search.line, lineNodes.ancestors ?? []);
+  const summarySearch = validateStudySearch({ ...search, line: preflop ?? "" });
   const settling = hasAllSettings(search) && catalogReads.error === null && !entry.urlSettled;
   useRecordSpot(search, confirmed);
   // S45 (O-467): the covered depths around this one, for the ] and [ Study keys.
@@ -183,7 +189,7 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
     return (
       <>
         <SettingsSummary
-          summary={settingsSummary(entry.stakes ?? [], search)}
+          summary={settingsSummary(entry.stakes ?? [], summarySearch)}
           onChange={openSettings}
           star={<StarButton spot={search} />}
           {...(reopened ? { onStartOver } : {})}
