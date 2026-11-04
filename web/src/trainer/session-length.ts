@@ -12,12 +12,10 @@
  * arrives, so the prompt that opens a hand past the length ends the session at once
  * (pastSessionLimit); that dealt hand goes unplayed, which the api-side length of O-472 removes.
  */
+import { SPOT_MODE_SETTINGS } from "./pause-rule.js";
 import type { SessionContext, SpotState } from "./spot-machine.js";
 
 export const SESSION_LENGTHS = [10, 20, 50] as const;
-
-/** The stop rule of one decision per hand (pause-rule.ts SPOT_MODE_SETTINGS). */
-const SPOT_STOP_RULE = "after_action";
 
 /** A planned length in hands, or null for no limit. */
 export type SessionLength = (typeof SESSION_LENGTHS)[number] | null;
@@ -42,9 +40,13 @@ export function sessionLengthOf(context: SessionContext): SessionLength {
   return context.length ?? null;
 }
 
-/** One decision per hand: spot mode (stop rule after_action) and the automated and holdout sessions, which carry no run settings. */
+/**
+ * One decision per hand: spot mode (stop rule after_action, also when the run settings name none)
+ * and the automated and holdout sessions, which carry no run settings. The rule is read from
+ * pause-rule.ts SPOT_MODE_SETTINGS, never retyped (PR #45 review round 4, finding h).
+ */
 export function oneDecisionPerHand(context: Pick<SessionContext, "trainer">): boolean {
-  return (context.trainer?.stop_rule ?? SPOT_STOP_RULE) === SPOT_STOP_RULE;
+  return (context.trainer?.stop_rule ?? SPOT_MODE_SETTINGS.stop_rule) === SPOT_MODE_SETTINGS.stop_rule;
 }
 
 /** The hands of the session with at least one graded decision, and the last of them (its hand_no). */
