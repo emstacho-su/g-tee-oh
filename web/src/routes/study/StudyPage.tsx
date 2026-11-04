@@ -22,7 +22,7 @@
  * it. The address stays the source of truth: storage only seeds a /study that names no setting.
  */
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import type { AppApi } from "../../api/index.js";
@@ -31,7 +31,7 @@ import { LoadingNote, PageHeader } from "../../components/ui/index.js";
 import { seatedPositions } from "../../drills/limits.js";
 import { NodeSwitchMetricsContext, createNodeSwitchMetrics } from "../../study/node-switch-metrics.js";
 import { catalogFailure } from "../../study/problem-text.js";
-import type { StudySearch } from "../../study/search.js";
+import { validateStudySearch, type StudySearch } from "../../study/search.js";
 import {
   confirmBlocker,
   coveredPairCount,
@@ -130,12 +130,19 @@ interface StudyScreenProps {
   onStartOver: () => void;
 }
 
-/** Remembers every confirmed spot on screen, however it was reached (confirm, a line step, a link, back). */
+/**
+ * Remembers every confirmed spot on screen, however it was reached (confirm, a line step, a link,
+ * back). Keyed on the spot and the line (code review 2), so a re-render, a mode or a hand change
+ * writes nothing; the search of the moment the spot or line changed is what is stored.
+ */
 function useRecordSpot(search: StudySearch, confirmed: boolean): void {
   const record = useStore(useStudySpotsStore, (state) => state.recordConfirmed);
+  const latest = useRef(search);
+  latest.current = search;
+  const key = confirmed ? spotLineKey(search) : null;
   useEffect(() => {
-    if (confirmed) record(search);
-  }, [confirmed, record, search]);
+    if (key !== null) record(latest.current);
+  }, [key, record]);
 }
 
 function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
@@ -209,38 +216,98 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   );
 }
 
+/** The address's own presentation choices, which win over the stored spot's when it reopens (code review 2). */
+const PRESENTATION_KEYS: readonly (keyof StudySearch)[] = ["mode"];
+
+export const REOPEN_TEXT = {
+  opening: "Opening your last spot.",
+  failed: "Your last spot could not be opened. Choose the settings below.",
+} as const;
+
+/** One spot and line: what Start over belongs to. */
+function spotLineKey(search: StudySearch): string {
+  return `${settingsSignature(search)}|${search.line ?? ""}`;
+}
+
+/** The stored spot with the bare address's presentation choices laid over it. */
+function seedFrom(last: StudySearch, search: StudySearch): StudySearch {
+  const kept = Object.fromEntries(PRESENTATION_KEYS.flatMap((key) => (search[key] === undefined ? [] : [[key, search[key]]])));
+  return validateStudySearch({ ...last, ...kept });
+}
+
+interface Reopen {
+  /** A bare /study is on its way to the stored spot. */
+  readonly opening: boolean;
+  /** The navigation there was rejected: the empty panel shows with a sentence. */
+  readonly failed: boolean;
+  /** The spot on screen is the one that was reopened, so its summary offers Start over. */
+  readonly reopened: boolean;
+  readonly startOver: () => void;
+}
+
 /**
- * A bare /study replaces to the browser's last spot (S45, R3.27): read once, at the first render, so
- * Start over (which forgets it and opens a bare /study) does not bounce straight back.
+ * A bare /study replaces to the browser's last spot (S45, R3.27). The seed is derived from the
+ * current search every time it is bare (code review 2), so the nav Study link on an open Study page
+ * reopens again, and the address's matrix mode wins over the seed's. A rejected navigation falls back
+ * to the empty panel with a sentence instead of a note that never goes away. Start over forgets the
+ * spot, so the bare /study it opens shows the panel, and it is offered only while the reopened spot
+ * and line are on screen.
  */
-function useReopenLastSpot(search: StudySearch): { reopened: boolean; startOver: () => void } {
+function useReopenLastSpot(search: StudySearch): Reopen {
   const navigate = useNavigate();
-  const [seed] = useState(() => (hasNoSettings(search) ? useStudySpotsStore.getState().last : null));
-  const [reopened, setReopened] = useState(seed !== null);
+  const last = useStore(useStudySpotsStore, (state) => state.last);
+  const bare = hasNoSettings(search);
+  const [failed, setFailed] = useState(false);
+  const [reopenedKey, setReopenedKey] = useState<string | null>(null);
+  const seed = bare && !failed && last !== null ? seedFrom(last, search) : null;
+  const seedKey = seed === null ? null : JSON.stringify(seed);
+
   useEffect(() => {
-    if (seed === null) return;
+    if (seed === null) return undefined;
+    let current = true;
+    setReopenedKey(spotLineKey(seed));
     navigate({ to: "/study", search: seed, replace: true }).catch((error: unknown) => {
       console.error(`g-tee-oh: reopening the last study spot failed (${describeFailureForLog(error)})`);
+      if (current) setFailed(true);
     });
-  }, [navigate, seed]);
+    return () => {
+      current = false;
+    };
+    // seedKey stands for seed, a new object on every render.
+  }, [navigate, seedKey]);
+
+  useEffect(() => {
+    if (!bare) setFailed(false);
+  }, [bare]);
+
   const startOver = () => {
     useStudySpotsStore.getState().clearLast();
-    setReopened(false);
+    setReopenedKey(null);
     navigate({ to: "/study", search: {} }).catch((error: unknown) => {
       console.error(`g-tee-oh: starting over on study failed (${describeFailureForLog(error)})`);
     });
   };
-  return { reopened, startOver };
+  return {
+    opening: seed !== null,
+    failed: failed && bare,
+    reopened: reopenedKey !== null && !bare && spotLineKey(search) === reopenedKey,
+    startOver,
+  };
 }
 
 export function StudyPage({ search }: StudyPageProps) {
   const api = useAppApi();
   const [metrics] = useState(createNodeSwitchMetrics);
-  const { reopened, startOver } = useReopenLastSpot(search);
-  if (reopened && hasNoSettings(search)) return <LoadingNote text="Opening your last spot." />;
+  const reopen = useReopenLastSpot(search);
+  if (reopen.opening) return <LoadingNote text={REOPEN_TEXT.opening} />;
   return (
     <NodeSwitchMetricsContext.Provider value={metrics}>
-      <StudyScreen key={settingsSignature(search)} api={api} search={search} reopened={reopened} onStartOver={startOver} />
+      {reopen.failed ? (
+        <p role="status" className="text-sm font-medium">
+          {REOPEN_TEXT.failed}
+        </p>
+      ) : null}
+      <StudyScreen key={settingsSignature(search)} api={api} search={search} reopened={reopen.reopened} onStartOver={reopen.startOver} />
     </NodeSwitchMetricsContext.Provider>
   );
 }
