@@ -25,6 +25,14 @@ export interface AnswerInputProps {
 const CHOSEN_MARK = "✓";
 const GROUP_CLASSES = "flex flex-wrap gap-2";
 
+/**
+ * The quiz's option buttons (yes and no, actions, bands): the only focused controls the screen's
+ * Enter submits from, so Enter right after choosing an option submits (R3.16, PR #45 review
+ * round 4, finding b). The checkboxes and the percent field are fields, which keep their keys.
+ */
+export const QUIZ_OPTION_ATTRIBUTE = "data-quiz-option";
+export const QUIZ_OPTION_SELECTOR = `[${QUIZ_OPTION_ATTRIBUTE}]`;
+
 interface ChoiceProps {
   label: string;
   chosen: boolean;
@@ -36,7 +44,7 @@ interface ChoiceProps {
 
 function Choice({ label, chosen, disabled, onChoose, action, actions }: ChoiceProps) {
   return (
-    <Button variant={chosen ? "primary" : "secondary"} aria-pressed={chosen} disabled={disabled} onClick={onChoose}>
+    <Button variant={chosen ? "primary" : "secondary"} aria-pressed={chosen} disabled={disabled} onClick={onChoose} {...{ [QUIZ_OPTION_ATTRIBUTE]: "" }}>
       {action === undefined ? null : <ActionSwatch action={action} actions={actions ?? [action]} />}
       <span>{label}</span>
       {chosen ? <span aria-hidden="true">{CHOSEN_MARK}</span> : null}

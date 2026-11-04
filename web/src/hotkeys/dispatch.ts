@@ -8,9 +8,10 @@
  * modal dialog), and when a widget already handled it (defaultPrevented). Enter and Space pressed
  * while a control has focus (a button, link, summary or field, an element with the role button,
  * link, menuitem, tab, checkbox, radio, switch or option, or any element with a tabindex of 0 or
- * more; never a disabled one) are that control's: a binding answers them only when it asks to
- * (fromControls, the quiz's submit), so Enter on a focused End session or Ask button, or on the
- * range matrix, never deals the next hand (S46, PR #45 review rounds 1 and 2). The listener runs
+ * more; never a disabled one) are that control's: a binding answers them only from the controls
+ * its fromControls selector names (the quiz's submit names its option buttons), so Enter on a
+ * focused End session, End quiz or Ask button, a link, or the range matrix, never runs a hotkey
+ * (S46, PR #45 review rounds 1, 2 and 4). The listener runs
  * in the bubble phase on window. "?" opens the overlay; any other key goes to the binding that
  * answers it in the event's shift state (registry.ts, O-474), and a handled key has its default
  * prevented.
@@ -55,6 +56,11 @@ export function isActivatableTarget(target: EventTarget | null): boolean {
   return control !== null && control !== document.body && !control.matches(DISABLED_SELECTOR);
 }
 
+/** Whether a binding answers Enter or Space from this focused control: only one its selector names. */
+function answersFromControl(fromControls: string | undefined, target: EventTarget | null): boolean {
+  return fromControls !== undefined && target instanceof Element && target.closest(fromControls) !== null;
+}
+
 /** Returns true when the event opened the overlay or ran a binding. */
 export function handleKeydown(store: HotkeyStore, event: KeyboardEvent): boolean {
   // A widget that handled its own key wins: the range matrix selects a cell on Enter and prevents
@@ -72,7 +78,7 @@ export function handleKeydown(store: HotkeyStore, event: KeyboardEvent): boolean
   }
   const binding = findBinding(state.bindings, event.key, event.shiftKey);
   if (binding === undefined) return false;
-  if (CONTROL_KEYS.has(event.key) && isActivatableTarget(event.target) && binding.fromControls !== true) return false;
+  if (CONTROL_KEYS.has(event.key) && isActivatableTarget(event.target) && !answersFromControl(binding.fromControls, event.target)) return false;
   event.preventDefault();
   binding.handler();
   return true;

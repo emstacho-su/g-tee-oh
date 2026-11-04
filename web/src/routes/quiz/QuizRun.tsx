@@ -22,6 +22,7 @@ import { NEXT_KEY, PREDICTION_SCOPE, PREDICTION_TEXT, SUBMIT_KEY, isNoQuizQuesti
 import { noQuestionsText, quizDifficultyName } from "../../prediction/quiz-text.js";
 import { useEndQuiz } from "../../prediction/use-end-quiz.js";
 import { usePredictionRun } from "../../prediction/use-prediction-run.js";
+import { QUIZ_OPTION_SELECTOR } from "./AnswerInput.js";
 import { PromptCard } from "./PromptCard.js";
 import { ResultCard } from "./ResultCard.js";
 import { ReviewCard } from "./ReviewCard.js";
@@ -71,9 +72,11 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
   const flavor = source.kind === "quiz" ? "quiz" : "drill";
   const difficulty = source.kind === "quiz" ? { difficulty: quizDifficultyName(source.choice.difficulty) } : {};
   const noQuestions = isNoQuizQuestions(run.error);
-  // fromControls: Enter right after choosing an option (focus on the option button) still submits (S46, R3.16).
+  // Enter right after choosing an option (focus on the option button) still submits; Enter on any
+  // other focused control (End quiz, Previous, a link) does that control's own action (S46, R3.16,
+  // PR #45 review round 4, finding b).
   useHotkey(
-    { key: SUBMIT_KEY, fromControls: true, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit },
+    { key: SUBMIT_KEY, fromControls: QUIZ_OPTION_SELECTOR, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit },
     run.canSubmit && reviewing === null,
   );
   useHotkey({ key: NEXT_KEY, description: PREDICTION_TEXT.next, scope: PREDICTION_SCOPE, handler: run.next }, result !== undefined && reviewing === null);

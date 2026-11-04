@@ -26,11 +26,12 @@ export interface HotkeyBinding {
   /** True when the binding needs Shift held (a chord such as Shift+E); absent or false is the plain key. */
   readonly shift?: boolean;
   /**
-   * True when the binding also answers Enter or Space while a control (button, link, field, tab,
-   * menu item) has focus; by default a focused control keeps those keys (dispatch.ts). The quiz's
-   * submit sets it, so Enter after choosing an option still submits (R3.16).
+   * A selector of the focused controls this binding still answers Enter or Space from; by default
+   * a focused control (button, link, field, tab, menu item) keeps those keys (dispatch.ts). The
+   * quiz's submit names its option buttons, so Enter after choosing an option still submits while
+   * Enter on End quiz or a link does that control's own action (R3.16, PR #45 review round 4, b).
    */
-  readonly fromControls?: boolean;
+  readonly fromControls?: string;
   readonly description: string;
   /** A label grouping bindings in the overlay, for example "Actions". */
   readonly scope: string;
