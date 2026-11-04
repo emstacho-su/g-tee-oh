@@ -12,6 +12,10 @@
  * a failed read there shows its own alert with a retry, and the matrix still shows. Review round
  * 1: a failed node read also offers LineEscape (one decision back, or the spot's start), built
  * from the URL alone, since no carousel can show then.
+ *
+ * S45 (R3.12, O-466, O-467): LineEscape also sits under the carousel on every node past the root,
+ * and the area registers the Study keyboard scope (use-study-hotkeys.ts); the children's streets are
+ * read here once so the carousel and the Right key share them.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -19,6 +23,7 @@ import { useEffect } from "react";
 import type { AppApi } from "../../api/index.js";
 import type { MatrixMode } from "../../components/range-matrix/model.js";
 import { LoadingNote } from "../../components/ui/index.js";
+import { formatCbb } from "../../poker/format.js";
 import type { StudyNode } from "../../contracts.js";
 import type { Position } from "../../drills/types.js";
 import { carouselItems, lineDecisions, type CarouselPair } from "../../study/carousel.js";
@@ -27,7 +32,11 @@ import { usePrefetchNextLikely } from "../../study/prefetch.js";
 import { nodeFailure } from "../../study/problem-text.js";
 import { studyNodeQuery } from "../../study/queries.js";
 import type { StudySearch } from "../../study/search.js";
-import { useChildStreets, useLineNodes } from "../../study/use-line-nodes.js";
+import { useChildStreets, useLineNodes, type ChildStreets } from "../../study/use-line-nodes.js";
+import { knownFilters, parseFilters } from "../../study/action-filters.js";
+import type { DepthNeighbours } from "../../study/depth-steps.js";
+import { studyModeOf } from "../../study/search.js";
+import { useStudyHotkeys } from "../../study/use-study-hotkeys.js";
 import { LineEscape } from "./LineEscape.js";
 import { NodeView } from "./NodeView.js";
 import { PositionCarousel } from "./PositionCarousel.js";
@@ -43,6 +52,15 @@ export interface StudyNodeAreaProps {
   onModeChange: (mode: MatrixMode) => void;
   onSelectHand: (hand: string) => void;
   onOpenLine: (line: string) => void;
+  /** Compare to best: another action to compare (S45, R3.24). */
+  onLensChange: (lens: number) => void;
+  /** The action filter set (S45, R3.12, O-468). */
+  onFiltersChange: (filters: readonly number[], compare?: number) => void;
+  /** The S key: the spot settings panel (S45, O-466). */
+  onOpenSettings: () => void;
+  /** The covered depths around this one, for the ] and [ keys (S45, O-467). */
+  depths: DepthNeighbours;
+  onDepthChange: (depth: number) => void;
 }
 
 interface LineCarouselProps {
@@ -52,12 +70,12 @@ interface LineCarouselProps {
   seats: readonly Position[];
   node: StudyNode;
   line: string | undefined;
+  childStreets: ChildStreets;
   onOpenLine: (line: string) => void;
 }
 
-function LineCarousel({ api, configId, pair, seats, node, line, onOpenLine }: LineCarouselProps) {
+function LineCarousel({ api, configId, pair, seats, node, line, childStreets, onOpenLine }: LineCarouselProps) {
   const { ancestors, error, retry } = useLineNodes(api, configId, pair.pair, line);
-  const childStreets = useChildStreets(api, configId, pair.pair, line, node);
   if (error !== null) return <FailureAlert failure={nodeFailure(error)} onRetry={retry} />;
   if (ancestors === undefined) return <LoadingNote text="Loading the line." />;
   const items = carouselItems(seats, pair, lineDecisions([...ancestors, node], line));
@@ -73,10 +91,37 @@ function LineCarousel({ api, configId, pair, seats, node, line, onOpenLine }: Li
   );
 }
 
-export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine }: StudyNodeAreaProps) {
+/** What the ] and [ keys do here, for screen readers. */
+function depthStepText({ deeper, shallower }: DepthNeighbours): string {
+  const up = deeper === undefined ? "no deeper depth covers this pair" : `opens ${formatCbb(deeper)}`;
+  const down = shallower === undefined ? "no shallower depth covers this pair" : `opens ${formatCbb(shallower)}`;
+  return `The ] key ${up}; the [ key ${down}.`;
+}
+
+/** A node with no actions, so the children's streets read nothing while the node loads or failed. */
+const NO_ACTIONS: Pick<StudyNode, "actions"> = { actions: [] };
+
+export function StudyNodeArea(props: StudyNodeAreaProps) {
+  const { api, configId, pair, seats, search, onModeChange, onSelectHand, onOpenLine, onLensChange, onFiltersChange } = props;
   const metrics = useNodeSwitchMetrics();
   const node = useQuery(studyNodeQuery(api, { configId, pair: pair.pair, line: search.line ?? "" }));
   usePrefetchNextLikely(api, node.data, configId, pair.pair);
+  const childStreets = useChildStreets(api, configId, pair.pair, search.line, node.data ?? NO_ACTIONS);
+  // Escape is live only while a filter names an action at this node (code review).
+  const filters = knownFilters(parseFilters(search), node.data?.actions ?? []);
+  useStudyHotkeys({
+    line: search.line,
+    nextLikelyLine: node.data?.next_likely_line,
+    childStreets,
+    mode: node.data?.street === "preflop" ? studyModeOf(search) : undefined,
+    filterCount: filters.length,
+    depths: props.depths,
+    onOpenLine,
+    onModeChange,
+    onClearFilters: () => onFiltersChange([]),
+    onDepthChange: props.onDepthChange,
+    onOpenSettings: props.onOpenSettings,
+  });
   const failed = node.isError;
   useEffect(() => {
     if (failed) metrics.cancel();
@@ -92,15 +137,22 @@ export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange
     );
   }
   const carousel = (
-    <LineCarousel
-      api={api}
-      configId={configId}
-      pair={pair}
-      seats={seats}
-      node={node.data}
-      line={search.line}
-      onOpenLine={onOpenLine}
-    />
+    <>
+      <LineCarousel
+        api={api}
+        configId={configId}
+        pair={pair}
+        seats={seats}
+        node={node.data}
+        line={search.line}
+        childStreets={childStreets}
+        onOpenLine={onOpenLine}
+      />
+      <LineEscape line={search.line} onOpenLine={onOpenLine} />
+      <p data-testid="depth-steps" data-deeper={props.depths.deeper ?? ""} data-shallower={props.depths.shallower ?? ""} className="sr-only">
+        {depthStepText(props.depths)}
+      </p>
+    </>
   );
   return (
     <NodeView
@@ -111,6 +163,8 @@ export function StudyNodeArea({ api, configId, pair, seats, search, onModeChange
       onModeChange={onModeChange}
       onSelectHand={onSelectHand}
       onOpenLine={onOpenLine}
+      onLensChange={onLensChange}
+      onFiltersChange={onFiltersChange}
     />
   );
 }

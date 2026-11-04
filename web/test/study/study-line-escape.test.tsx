@@ -97,7 +97,7 @@ describe("R3.12 the carousel stays preflop", () => {
     const call = within(actions).getByRole("button", { name: /^Call/ });
     await waitFor(() => expect(call).toHaveAttribute("aria-disabled", "true"));
     expect(call).toHaveAccessibleName(POSTFLOP_REASON);
-    expect(within(actions).getByRole("button", { name: /^Raise 11bb/ })).not.toHaveAttribute("aria-disabled");
+    expect(within(actions).getByRole("button", { name: /^Raise to 11bb/ })).not.toHaveAttribute("aria-disabled");
   });
 
   it("R3.12 a child read that failed leaves its action enabled", async () => {
@@ -108,7 +108,7 @@ describe("R3.12 the carousel stays preflop", () => {
     // Wait for the failure itself, an error-only signal, before checking the action.
     const childKey = studyNodeKey({ configId: FIXTURE_STUDY_CONFIG_ID, pair: FIXTURE_STUDY_PAIR, line: FIXTURE_CHILD_LINE });
     await waitFor(() => expect(queryClient.getQueryState(childKey)?.status).toBe("error"));
-    const raise = within(actions).getByRole("button", { name: /^Raise 2\.5bb/ });
+    const raise = within(actions).getByRole("button", { name: /^Raise to 2.5bb/ });
     expect(raise).not.toHaveAttribute("aria-disabled");
     expect(raise).not.toHaveAccessibleName(POSTFLOP_REASON);
   });
@@ -120,7 +120,7 @@ describe("R3.12 the carousel stays preflop", () => {
     );
     const actions = await screen.findByRole("region", { name: "BTN's actions" });
     await waitFor(() => expect(nodeRequests().map((request) => request.query["line"])).toContain(FIXTURE_CHILD_LINE));
-    expect(within(actions).getByRole("button", { name: /^Raise 2\.5bb/ })).not.toHaveAttribute("aria-disabled");
+    expect(within(actions).getByRole("button", { name: /^Raise to 2.5bb/ })).not.toHaveAttribute("aria-disabled");
   });
 
   it("R3.12 a postflop node shows the v1.5 note with a way back and no carousel", async () => {

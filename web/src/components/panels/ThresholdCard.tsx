@@ -12,7 +12,9 @@
  * NodeAction.index (O-198) when the caller passes them, otherwise from the token
  * (tokenActionLabel), and "Unnamed action" when neither names it; no index, token or field name is
  * ever shown. The hero's hand is marked wherever it appears. Every api string is a React text
- * node, never HTML. Numbers are the api's, only formatted (ADR 0004).
+ * node, never HTML. Numbers are the api's, only formatted (ADR 0004); shares print
+ * with one decimal (formatShare), the one precision of every text surface (S45, screen critic), while the
+ * rank wording still rounds to a whole percent (O-408).
  */
 import { useId, type ReactNode } from "react";
 

@@ -39,7 +39,7 @@ describe("R3.30 the focus leaves the action bar (review round 3, finding 1)", ()
   it("R3.30 clicking an action moves the focus off the bar, onto the decision area", async () => {
     const onChoose = vi.fn();
     render(area(awaiting(fixturePlainPrompt), fixturePlainPrompt, onChoose));
-    await userEvent.click(screen.getByRole("button", { name: "Raise 2.5bb" }));
+    await userEvent.click(screen.getByRole("button", { name: "Raise to 2.5bb" }));
     expect(onChoose).toHaveBeenCalledOnce();
     expect(actionButtons()).not.toContain(document.activeElement);
     expect(document.activeElement).toBe(screen.getByTestId("decision-area"));
@@ -48,7 +48,7 @@ describe("R3.30 the focus leaves the action bar (review round 3, finding 1)", ()
   it("R3.30 a new prompt in the same area takes the focus off a focused action button; Space and Enter then submit nothing", async () => {
     const onChoose = vi.fn();
     const { rerender } = render(area(awaiting(fixturePlainPrompt), fixturePlainPrompt, onChoose));
-    screen.getByRole("button", { name: "Raise 2.5bb" }).focus();
+    screen.getByRole("button", { name: "Raise to 2.5bb" }).focus();
     rerender(area(awaiting(NEXT), NEXT, onChoose));
     expect(actionButtons()).not.toContain(document.activeElement);
     await userEvent.keyboard(" ");

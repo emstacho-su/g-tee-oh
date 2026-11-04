@@ -5374,10 +5374,14 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         ActionShare: {
+            /** @description The reach-weighted combos taking the action, from solver-query (S45, O-469, ADR 0004); absent until the solver answers it */
+            combos?: number;
             index: number;
             share: number;
         };
         ActionShareInput: {
+            /** @description The reach-weighted combos taking the action, from solver-query (S45, O-469, ADR 0004); absent until the solver answers it */
+            combos?: number;
             index: number;
             share: number;
         };
@@ -7413,6 +7417,11 @@ export interface components {
             pot_cbb: number;
             /** @description Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004) */
             range_by_action: components["schemas"]["ActionShare"][];
+            /** @description The acting seat's range at this node: its combos and reach-weighted combos, from solver-query's range summary (S45, O-469, ADR 0004) */
+            range_combos?: {
+                combos: number;
+                reach_weighted_combos: number;
+            };
             /** Format: uuid */
             solution_id: string;
             spot_class_key: string | null;
@@ -7442,6 +7451,11 @@ export interface components {
             pot_cbb: number;
             /** @description Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004) */
             range_by_action: components["schemas"]["ActionShareInput"][];
+            /** @description The acting seat's range at this node: its combos and reach-weighted combos, from solver-query's range summary (S45, O-469, ADR 0004) */
+            range_combos?: {
+                combos: number;
+                reach_weighted_combos: number;
+            };
             /** Format: uuid */
             solution_id: string;
             spot_class_key: string | null;

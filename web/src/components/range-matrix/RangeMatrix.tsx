@@ -1,6 +1,7 @@
 /**
  * RangeMatrix: the 13 by 13 hand matrix of a study node, drawn on a canvas for speed with an
- * accessible table that holds the same data (S24, S38, R3.12, A7 section 4, O-260, O-347, O-386).
+ * accessible table that holds the same data (S24, S38, S45, R3.12, R3.24, A7 section 4, O-260,
+ * O-347, O-386).
  *
  * Mechanism: the node becomes a MatrixModel once per node (model.ts); useMatrixCanvas draws it
  * through one animation frame per input change at the device pixel ratio, so the backing store
@@ -21,18 +22,29 @@
  * Escape, an arrow key or leaving the grid (Tab) closes it. It is non-modal and never takes focus.
  * popOut={false} turns it off; initialPopOutHand opens it on a hand at mount (the gallery).
  *
+ * Hover (S45, R3.25): moving the pointer over the canvas keeps the hovered index in component state,
+ * draws a thin outline there and reports the hand through onHoverHand (null on leave), with no address
+ * write; a click still selects and pins. An open pop-out follows the hovered cell once the pointer moves
+ * to another cell, and returns to the pinned cell when it leaves; a keyboard open or a click pin wins
+ * until then, so Enter on AKs shows AKs even with the pointer parked over 72o (code review). Touch pointers are left alone.
+ *
+ * Lenses (S45, R3.24): mode names the lens; lensIndex is the compared action (a NodeAction.index)
+ * in compare mode, resolved to its position here and falling back to the default lens when it names
+ * no action; scaleByWeight makes the bars' height the cell's range weight (O-465).
+ *
  * Colour is never the only signal: bars carry hatch patterns, cells print their hand and numbers,
- * and the legend (MatrixLegend.tsx) names each action, EV step or weight step in words. The
- * component computes no poker math (ADR 0004); it displays the api numbers.
+ * and the legend (MatrixLegend.tsx) names each action, EV step, weight step or loss step in words.
+ * The component computes no poker math (ADR 0004); it displays the api numbers.
  */
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
+import { exactActionLabel } from "../../poker/format.js";
 import { GRID_SIZE } from "../../poker/hands.js";
 import type { ThemeName } from "../../theme/action-style.js";
 import { MODE_NAMES, cellDetailText, cellText } from "./cell-text.js";
 import { MatrixLegend } from "./MatrixLegend.js";
 import { MatrixPopOut } from "./MatrixPopOut.js";
-import { buildMatrixModel, type MatrixMode, type MatrixSource } from "./model.js";
+import { buildMatrixModel, defaultLensPosition, lensPositionOf, type MatrixMode, type MatrixModel, type MatrixSource } from "./model.js";
 import { RangeMatrixTable } from "./RangeMatrixTable.js";
 import { useDevicePixelRatio } from "./use-device-pixel-ratio.js";
 import { useMatrixCanvas } from "./use-matrix-canvas.js";
@@ -50,6 +62,16 @@ export interface RangeMatrixProps {
   popOut?: boolean;
   /** A hand whose pop-out is open at mount, for the gallery's screenshot. */
   initialPopOutHand?: string;
+  /** Compare to best (R3.24): the compared action's NodeAction.index; absent, the first action that is not a fold. */
+  lensIndex?: number | null;
+  /** Bars take the cell's range weight as their height (R3.24, O-465). */
+  scaleByWeight?: boolean;
+  /** The hand under the pointer, or null when it leaves the canvas (R3.25); never written to the address here. */
+  onHoverHand?: (hand: string | null) => void;
+  /** The action filters (R3.12, O-468): NodeAction.index values whose shares alone are painted; unknown ones are ignored. */
+  highlightIndexes?: readonly number[];
+  /** Whether the legend lists the actions; false where an action table beside the matrix is the legend (design rule 3). */
+  legendActions?: boolean;
 }
 
 export const DEFAULT_MATRIX_SIZE_PX = 520;
@@ -63,6 +85,7 @@ const MOVES: Readonly<Record<string, readonly [number, number]>> = {
 const SELECT_KEYS: ReadonlySet<string> = new Set(["Enter", " "]);
 const CLOSE_KEY = "Escape";
 const KEY_SHORTCUTS = "ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space Escape";
+const TOUCH_POINTER = "touch";
 
 function clampToGrid(value: number): number {
   return Math.min(GRID_SIZE - 1, Math.max(0, value));
@@ -92,6 +115,13 @@ function indexOfHand(cells: readonly { hand: string }[], hand: string | null | u
   return index < 0 ? null : index;
 }
 
+/** The compared action's position and scale end in compare mode (the lens, else the default), or null. */
+function lensOf(model: MatrixModel, mode: MatrixMode, lensIndex: number | null | undefined) {
+  if (mode !== "compare") return null;
+  const position = lensPositionOf(model.actions, lensIndex) ?? defaultLensPosition(model.actions);
+  return position === null ? null : { position, scalePctPot: model.lossScalePctPot[position] ?? 0 };
+}
+
 export function RangeMatrix({
   node,
   mode,
@@ -101,6 +131,11 @@ export function RangeMatrix({
   onSelectHand,
   popOut = true,
   initialPopOutHand,
+  lensIndex = null,
+  scaleByWeight = false,
+  onHoverHand,
+  highlightIndexes,
+  legendActions = true,
 }: RangeMatrixProps) {
   const model = useMemo(() => buildMatrixModel(node), [node]);
   const tableId = useId();
@@ -109,7 +144,18 @@ export function RangeMatrix({
   const [focusedIndex, setFocusedIndex] = useState(() => indexOfHand(model.cells, selectedHand) ?? 0);
   const [hasFocus, setHasFocus] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  // False from a keyboard open or a click pin until the pointer moves to another cell (R3.25).
+  const [hoverFollows, setHoverFollows] = useState(false);
   const popOutControl = usePopOut(popOut, indexOfHand(model.cells, initialPopOutHand), canvasRef);
+  const lens = useMemo(() => lensOf(model, mode, lensIndex), [model, mode, lensIndex]);
+  // Keyed by the list's content, so a new array with the same indexes keeps the memoised set.
+  const highlightKey = (highlightIndexes ?? []).join(",");
+  const highlighted = useMemo(
+    () => (highlightKey === "" ? [] : model.actions.filter((action) => highlightKey.split(",").map(Number).includes(action.index))),
+    [model, highlightKey],
+  );
+  const highlight = useMemo(() => new Set(highlighted.map((action) => model.actions.indexOf(action))), [model, highlighted]);
 
   useMatrixCanvas(canvasRef, model, {
     mode,
@@ -118,13 +164,17 @@ export function RangeMatrix({
     theme,
     focusedIndex: hasFocus ? focusedIndex : null,
     selectedHand,
+    scaleByWeight,
+    lensPosition: lens?.position ?? null,
+    hoveredIndex,
+    highlight,
   });
 
   function focusCell(index: number): void {
     const cell = model.cells[index];
     if (cell === undefined) return;
     setFocusedIndex(index);
-    setAnnouncement(cellText(cell, model.actions, mode));
+    setAnnouncement(cellText(cell, model.actions, mode, lens?.position));
   }
 
   function selectCell(index: number): void {
@@ -147,6 +197,7 @@ export function RangeMatrix({
       event.preventDefault();
       selectCell(focusedIndex);
       if (popOut) {
+        setHoverFollows(false);
         popOutControl.open(focusedIndex);
         announceDetail(focusedIndex);
       }
@@ -161,7 +212,25 @@ export function RangeMatrix({
     if (index === null) return;
     focusCell(index);
     selectCell(index);
+    setHoverFollows(false);
     popOutControl.clickCell(index);
+  }
+
+  function hoverIndex(next: number | null): void {
+    if (next === hoveredIndex) return;
+    setHoveredIndex(next);
+    if (next !== null) setHoverFollows(true);
+    onHoverHand?.(next === null ? null : (model.cells[next]?.hand ?? null));
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLCanvasElement>): void {
+    if (event.pointerType === TOUCH_POINTER) return;
+    hoverIndex(indexAtPointer(event));
+  }
+
+  function onPointerLeave(event: PointerEvent<HTMLCanvasElement>): void {
+    if (event.pointerType === TOUCH_POINTER) return;
+    hoverIndex(null);
   }
 
   function onBlur(): void {
@@ -170,8 +239,11 @@ export function RangeMatrix({
   }
 
   const backing = Math.round(sizePx * pixelRatio);
-  const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands`;
-  const openCell = popOutControl.index === null ? undefined : model.cells[popOutControl.index];
+  const filtered = highlighted.length === 0 ? "" : `, filtered to ${highlighted.map(exactActionLabel).join(", ")}`;
+  const label = `Range matrix, ${MODE_NAMES[mode]} mode, ${model.presentCount} hands${filtered}`;
+  // An open pop-out shows the hovered cell while the pointer is over the canvas (R3.25).
+  const openIndex = popOutControl.index === null ? null : hoverFollows && hoveredIndex !== null ? hoveredIndex : popOutControl.index;
+  const openCell = openIndex === null ? undefined : model.cells[openIndex];
 
   return (
     <div className="inline-block max-w-full">
@@ -195,21 +267,23 @@ export function RangeMatrix({
             height={backing}
             style={{ width: `${sizePx}px`, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1" }}
             onClick={onClick}
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
             className="block cursor-pointer"
           />
         </div>
         {openCell === undefined ? null : (
-          <MatrixPopOut cell={openCell} actions={model.actions} mode={mode} theme={theme} evScaleBb={model.evScaleBb} />
+          <MatrixPopOut cell={openCell} actions={model.actions} mode={mode} theme={theme} evScaleBb={model.evScaleBb} lens={lens} />
         )}
       </div>
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
       <div className="mt-2">
-        <MatrixLegend mode={mode} actions={model.actions} theme={theme} evScaleBb={model.evScaleBb} />
+        <MatrixLegend mode={mode} actions={model.actions} theme={theme} evScaleBb={model.evScaleBb} lens={lens} hideActions={!legendActions} />
       </div>
       <div className="sr-only">
-        <RangeMatrixTable model={model} mode={mode} id={tableId} />
+        <RangeMatrixTable model={model} mode={mode} id={tableId} {...(lens === null ? {} : { lens: lens.position })} />
       </div>
     </div>
   );

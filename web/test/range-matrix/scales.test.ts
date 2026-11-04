@@ -154,7 +154,7 @@ describe("R3.12 range matrix EV and weight steps", () => {
   it("R3.12 the EV legend has eleven steps from -5 to 5 with bb boundaries and a named neutral", () => {
     const legend = evLegend(2);
     expect(legend.map((entry) => entry.step)).toEqual([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]);
-    expect(legend[5]?.short).toBe("near 0");
+    expect(legend[5]?.short).toBe("0");
     expect(legend[5]?.long).toBe("near 0: within 0.05bb either way");
     expect(legend[6]?.short).toBe("+0.4");
     expect(legend[6]?.long).toBe("+0.05bb to +0.4bb");

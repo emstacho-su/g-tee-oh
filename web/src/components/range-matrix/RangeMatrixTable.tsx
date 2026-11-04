@@ -20,6 +20,8 @@ export interface RangeMatrixTableProps {
   mode: MatrixMode;
   /** The table's id, which the canvas references through aria-describedby. */
   id: string;
+  /** Compare to best (R3.24): the compared action's position; absent, the default lens. */
+  lens?: number;
 }
 
 const ROW_INDEXES = Array.from({ length: GRID_SIZE }, (_, index) => index);
@@ -28,7 +30,7 @@ const ROW_INDEXES = Array.from({ length: GRID_SIZE }, (_, index) => index);
  * Memoized: model comes memoized per node, mode is a string and id comes from useId, so a focus
  * move or a selection change in RangeMatrix does not re-render the 169 cells.
  */
-export const RangeMatrixTable = memo(function RangeMatrixTable({ model, mode, id }: RangeMatrixTableProps) {
+export const RangeMatrixTable = memo(function RangeMatrixTable({ model, mode, id, lens }: RangeMatrixTableProps) {
   return (
     <table id={id} className="w-full border-collapse text-xs">
       <caption className="mb-1 text-left text-sm font-semibold">
@@ -54,7 +56,7 @@ export const RangeMatrixTable = memo(function RangeMatrixTable({ model, mode, id
             </th>
             {model.cells.slice(row * GRID_SIZE, (row + 1) * GRID_SIZE).map((cell) => (
               <td key={cell.hand} className="border border-border px-1 align-top">
-                {cellText(cell, model.actions, mode)}
+                {cellText(cell, model.actions, mode, lens)}
               </td>
             ))}
           </tr>
