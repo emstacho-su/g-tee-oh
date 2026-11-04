@@ -165,4 +165,27 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(view.sent("POST", IMPORT_PATH).slice(5).map((request) => request.body)).toEqual(STARTER_PACK.slice(4).map((entry) => ({ export_code: entry.code })));
     await waitFor(() => expect(screen.queryByRole("button", { name: /starter drills?$/ })).not.toBeInTheDocument());
   });
+
+  it("R3.35 a starter drill deleted after the pack landed is re-added under a fresh key and created again (PR #48 review round 3 HIGH)", async () => {
+    const user = userEvent.setup();
+    const view = renderDrills("/drills");
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent(`Added ${STARTER_PACK.length} starter drills.`));
+    const target = STARTER_PACK[2];
+    if (target === undefined) throw new Error("the pack has no third drill");
+    const firstKey = view.sent("POST", IMPORT_PATH)[2]?.headers["idempotency-key"];
+    // Delete one starter drill on the same page.
+    await user.click(await screen.findByRole("radio", { name: `Select ${target.name}` }));
+    await user.click(screen.getByRole("button", { name: `Delete ${target.name}` }));
+    await user.click(within(screen.getByRole("dialog", { name: "Delete this drill?" })).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("radio", { name: `Select ${target.name}` })).not.toBeInTheDocument());
+    // Re-add it: a new key, so the api creates it instead of replaying the first answer.
+    await user.click(await screen.findByRole("button", { name: "Add the 1 missing starter drill" }));
+    await waitFor(() => expect(view.sent("POST", IMPORT_PATH)).toHaveLength(STARTER_PACK.length + 1));
+    const reAdd = view.sent("POST", IMPORT_PATH).at(-1);
+    expect(reAdd?.body).toEqual({ export_code: target.code });
+    expect(reAdd?.headers["idempotency-key"]).not.toBe(firstKey);
+    expect(await screen.findByRole("radio", { name: `Select ${target.name}` })).toBeInTheDocument();
+  });
 });

@@ -80,8 +80,10 @@ export function starterImportKey(baseKey: string, packIndex: number): string {
  * for a code that landed. The input is the codes still missing (missingStarterDrills): after a
  * failure partway, the drill reads are invalidated so the codes that landed show, and the next
  * click sends only what is still missing (PR #48 review round 2 MEDIUM 3). A code keeps the key it
- * was first sent under for as long as the page is mounted, whatever the input around it, so a
- * retry of a code whose answer was lost replays instead of importing it twice.
+ * was first sent under until that code lands, whatever the input around it, so a retry of a code
+ * whose answer was lost replays instead of importing it twice; once it lands its key is dropped,
+ * so re-adding a starter drill the user deleted later mints a fresh key and creates it again
+ * (round 3 HIGH: a kept key made the api replay the first 201 and create nothing).
  */
 export function useImportStarterPack(api: AppApi, onImported: (drills: readonly Drill[]) => void): IntentMutation<readonly StarterDrill[], Drill[]> {
   const invalidate = useInvalidate();
@@ -98,6 +100,7 @@ export function useImportStarterPack(api: AppApi, onImported: (drills: readonly 
       const imported: Drill[] = [];
       for (const entry of pack) {
         imported.push(await importDrill(api, entry.code, keyFor(entry, key)));
+        codeKeys.current = new Map([...codeKeys.current].filter(([codeKey]) => codeKey !== entry.key));
       }
       return imported;
     },
