@@ -5,16 +5,17 @@
  * the drill now reaches a covered spot, so nothing polls and Start is offered the moment it can
  * succeed.
  *
- * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7, review 4 finding 6): once the
- * configuration list has loaded, each configuration the drill reaches is read once; that read is
- * its baseline, the drill's pairs already covered when the watch opened, and it announces nothing
- * (a pair covered then was not just added: the refusal had another cause). An event counts when its
- * pair is one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so the web
- * applies no ordering rule); its configuration waits until that configuration's baseline is in,
- * then is read again, one read per configuration however many events named it. Only a drill pair
- * covered now and not in the baseline tells the screen, and clears the refusal; otherwise the read
- * becomes the new baseline and it keeps watching. It tells the screen once, and never after it has
- * left the screen (a cancelled re-read).
+ * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7, review 4 finding 6, PR #51 review
+ * HIGH 2): once the configuration list has loaded, each configuration the drill reaches is read
+ * once, its baseline. Coverage can land between the refusal and that read answering, so a baseline
+ * that already shows one of the drill's pairs covered tells the screen at once. An event counts
+ * when its pair is one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so
+ * the web applies no ordering rule) and its configuration is one the drill reaches (any other is
+ * dropped); it waits until that configuration's baseline is in, then is read again, one read per
+ * configuration however many events named it. A drill pair covered now and not in the baseline
+ * tells the screen, and clears the refusal; otherwise the read becomes the new baseline and it
+ * keeps watching. It tells the screen once, and never after it has left the screen (a cancelled
+ * re-read).
  *
  * It is mounted only while the refusal is on screen: the api allows four streams per user, so a
  * drill screen holds one only when it is waiting on the builder.
@@ -85,6 +86,11 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
     (pairs: readonly PositionPairEntry[]): Set<string> => new Set([...coveredKeys(pairs)].filter((key) => drillPairs.has(key))),
     [drillPairs],
   );
+  const announce = useCallback((pair: string, config: GameConfig): void => {
+    if (!mounted.current || fired.current) return;
+    fired.current = true;
+    onCoverageRef.current(COVERAGE_WATCH_TEXT.added(pair, config));
+  }, []);
   const setBaseline = useCallback((configId: string, covered: ReadonlySet<string>): void => {
     baselines.current = new Map([...baselines.current, [configId, covered]]);
     setBaselineCount((count) => count + 1);
@@ -94,28 +100,37 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
     [api, queryClient],
   );
 
-  // The baseline: one read of each reached configuration, announcing nothing.
+  // The baseline: one read of each reached configuration; a drill pair it already shows covered is offered (HIGH 2).
   useEffect(() => {
     if (configs.data === undefined || baselineStarted.current) return;
     baselineStarted.current = true;
     for (const config of configsReached(filter, configs.data)) {
       readPairs(config.config_id)
-        .then((pairs) => setBaseline(config.config_id, drillCoveredIn(pairs)))
+        .then((pairs) => {
+          const covered = drillCoveredIn(pairs);
+          const already = pairs.find((entry) => covered.has(pairKeyOf(entry.oop, entry.ip)));
+          if (already !== undefined) announce(already.pair, config);
+          setBaseline(config.config_id, covered);
+        })
         .catch((error: unknown) => {
           // Without a first read, every drill pair counts as uncovered, so the next event can still offer Start.
           console.error(`g-tee-oh: reading the pairs for the coverage baseline failed (${describeFailureForLog(error)})`);
           setBaseline(config.config_id, new Set());
         });
     }
-  }, [configs.data, filter, readPairs, setBaseline, drillCoveredIn]);
+  }, [configs.data, filter, readPairs, setBaseline, drillCoveredIn, announce]);
 
   // The events: a configuration with its baseline in is read again, once per batch.
   useEffect(() => {
     if (configs.data === undefined || queued.length === 0) return;
-    const ready = configsReached(filter, configs.data).filter((config) => queued.includes(config.config_id) && baselines.current.has(config.config_id));
-    if (ready.length === 0) return;
+    const reached = configsReached(filter, configs.data);
+    const reachedIds = new Set(reached.map((config) => config.config_id));
+    const ready = reached.filter((config) => queued.includes(config.config_id) && baselines.current.has(config.config_id));
     const readyIds = new Set(ready.map((config) => config.config_id));
-    setQueued((current) => current.filter((id) => !readyIds.has(id)));
+    // A configuration the drill does not reach is dropped; a reached one waits for its baseline (PR #51 review 5).
+    if (ready.length > 0 || queued.some((id) => !reachedIds.has(id))) {
+      setQueued((current) => current.filter((id) => reachedIds.has(id) && !readyIds.has(id)));
+    }
     for (const config of ready) {
       readPairs(config.config_id)
         .then((pairs) => {
@@ -130,16 +145,14 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
             setBaseline(config.config_id, covered);
             return;
           }
-          if (!mounted.current || fired.current) return;
-          fired.current = true;
-          onCoverageRef.current(COVERAGE_WATCH_TEXT.added(added.pair, config));
+          announce(added.pair, config);
         })
         .catch((error: unknown) => {
           // A failed re-read keeps the watch running; the next event tries again.
           console.error(`g-tee-oh: re-reading the pairs after coverage_added failed (${describeFailureForLog(error)})`);
         });
     }
-  }, [queued, baselineCount, configs.data, filter, readPairs, setBaseline, drillCoveredIn]);
+  }, [queued, baselineCount, configs.data, filter, readPairs, setBaseline, drillCoveredIn, announce]);
 
   return (
     <p role="status" data-testid="coverage-watch" className="text-sm text-muted">

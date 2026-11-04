@@ -2,8 +2,9 @@
  * Start again when the library catches up (S47, R3.4, ADR 0018; PR #48 review MEDIUM 4): after a
  * 422 no-coverage the run screen opens one event stream. A coverage_added counts only for a
  * configuration and a pair the drill reaches; the configuration's pairs are read again, and Start
- * is offered only when that read shows one of the drill's pairs newly covered since the watch's
- * first read, its baseline (PR #48 review 4 finding 6). An event for another
+ * is offered when the watch's first read (its baseline) already shows one of the drill's pairs
+ * covered, or later when a read shows one newly covered since that baseline (PR #48 review 4
+ * finding 6, PR #51 review HIGH 2). An event for another
  * configuration or another pair does nothing, an event that arrives before the configuration list
  * has loaded is checked once it has, and the stream closes when the refusal leaves the screen.
  */
@@ -156,23 +157,37 @@ describe("R3.4 Start again on coverage_added", () => {
     expect(view.sentTo(START_PATH)).toHaveLength(2);
   });
 
-  it("R3.4 the mount read is the baseline: a pair already covered when the watch opened is never announced as just added (PR #48 review 4 finding 6)", async () => {
+  it("R3.4 a pair covered before the baseline read answers is offered at once (PR #51 review HIGH 2)", async () => {
     const { streams, deps } = withStreams();
+    let releaseBaseline: () => void = () => undefined;
+    const heldBaseline: ResponseFactory = () =>
+      new Promise((resolve) => {
+        releaseBaseline = () =>
+          resolve(new Response(JSON.stringify({ items: PAIRS.map((pair) => (pair.pair === "BB-BTN" ? { ...pair, preflop_available: true } : pair)), next_cursor: null }), { status: 200, headers: { "content-type": "application/json" } }));
+      });
     const view = renderRun({
       libraryDeps: deps,
-      // Covered at the first read and still covered after an event: the refusal had another cause.
-      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(true), pairsWith(true)] },
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [heldBaseline] },
     });
     await refuse(view, streams);
     await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByTestId("start-note")).not.toBeInTheDocument();
+    // The coverage landed while the baseline read was out, and its event came before the read answered.
     streams[0]?.emit("coverage_added", EVENT);
-    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(2));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.queryByTestId("start-note")).not.toBeInTheDocument();
+    releaseBaseline();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByTestId("start-note")).toHaveTextContent("The library just added Big blind versus button at Online, 6 players, 100bb deep. Start again.");
+  });
+
+  it("R3.4 the baseline read alone, with no event, offers Start when a drill pair is covered (PR #51 review HIGH 2)", async () => {
+    const { streams, deps } = withStreams();
+    const view = renderRun({
+      libraryDeps: deps,
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(true)] },
+    });
+    await refuse(view, streams);
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
+    expect(screen.getByTestId("start-note")).toHaveTextContent("Start again.");
   });
 
   it("R3.4 a batch of events at one configuration makes one read (PR #48 review round 3 MEDIUM 6)", async () => {
