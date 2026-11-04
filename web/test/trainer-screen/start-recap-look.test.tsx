@@ -5,12 +5,14 @@
  * control edge while keeping its role, name and On or Off text, and a recap leads with a row of
  * stat tiles. Numbers and names are the ones the screens showed before; only the look changes.
  */
+import { DAILY_RATED_CAP } from "@g-tee-oh/learning";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CONTROL_EDGE_CLASS, RAISED_CLASS, TACTILE_CLASS } from "../../src/components/ui/index.js";
 import { fixtureDrill, fixtureRecap } from "../../src/fixtures/trainer.js";
 import { SessionAlert, SessionRecapView } from "../../src/routes/drill-run/SessionParts.js";
+import { RECAP_TIPS } from "../../src/routes/drill-run/SessionLook.js";
 import { StartPanel } from "../../src/routes/drill-run/StartPanel.js";
 import { HoldoutStart } from "../../src/routes/train/AutomatedStart.js";
 
@@ -87,5 +89,14 @@ describe("R3.32 recap label counts", () => {
   it("R3.32 without a tally the recap shows the api's four tiles only", () => {
     render(<SessionRecapView recap={fixtureRecap} onStartAnother={vi.fn()} />);
     expect(screen.queryByTestId("recap-label-counts")).not.toBeInTheDocument();
+  });
+});
+
+describe("R3.13 PR #45 review round 4, finding c: the Rated decisions tip names every rating rule", () => {
+  it("R3.13 the tip names the daily rated cap from learning's DAILY_RATED_CAP and that a seeded automated session is never rated", () => {
+    const { text } = RECAP_TIPS.ratedDecisions;
+    expect(text).toContain(`${DAILY_RATED_CAP}`);
+    expect(text).toMatch(/a day/);
+    expect(text).toMatch(/seed/);
   });
 });

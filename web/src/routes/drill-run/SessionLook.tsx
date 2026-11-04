@@ -12,6 +12,7 @@
  * never by colour. Both sit on the sunken ground inside a raised Card, which gives the depth;
  * neither draws a border of its own. Nothing here computes a number: values arrive as text.
  */
+import { DAILY_RATED_CAP } from "@g-tee-oh/learning";
 import type { ReactNode } from "react";
 
 import { InfoTip } from "../../components/ui/index.js";
@@ -30,11 +31,15 @@ export interface StatTile {
   readonly info?: ReactNode;
 }
 
-/** One definition per recap statistic, the words of 05 section 6.3 and 06 section 3.6. */
+/**
+ * One definition per recap statistic, the words of 05 section 6.3 and 06 section 3.6. The rated
+ * decisions tip names every rule of learning's isRated, the daily cap read from DAILY_RATED_CAP
+ * (PR #45 review round 4, finding c).
+ */
 export const RECAP_TIPS = {
   ratedDecisions: {
     subject: "rated decisions",
-    text: "Decisions that count toward your rating: first attempts in automated training, with no answer-revealing panel on and no noise flag.",
+    text: `Decisions that count toward your rating: first attempts in automated training that was not started with a seed, with no answer-revealing panel on and no noise flag, up to ${DAILY_RATED_CAP} a day in each track.`,
   },
   meanScore: {
     subject: "mean score",
