@@ -8,7 +8,7 @@
  * refuses the reason (a 400 naming body.rationale), its fixed sentence shows under the field, the
  * field is marked invalid and the sentence joins its description. Enter inside it types a newline:
  * a textarea never submits its form, and the hotkey dispatch ignores keys typed into a textarea
- * (hotkeys/dispatch.ts), so only the Submit button or Enter outside the field sends the answer.
+ * (hotkeys/dispatch.ts); the form's submit gate decides what sends the answer (answer-enter.ts).
  */
 import { RATIONALE_MAX_CHARS, checkRationale } from "@g-tee-oh/contracts";
 import { useId } from "react";

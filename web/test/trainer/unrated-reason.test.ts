@@ -21,9 +21,15 @@ describe("R3.13 unrated reason", () => {
     expect(unratedReason({ ...fixtureFeedback, rated: true, noise_flags: [] }, PLAIN_PROMPT, AUTOMATED)).toBeNull();
   });
 
-  it("R3.13 noise flags come first, whatever the session (R3.18)", () => {
+  it("R3.13 the session mode comes before a noise flag: a drill or a holdout retest is never rated, flagged or not (PR #45 review round 4, finding e)", () => {
     const flagged: DecisionFeedback = { ...CLEAN, noise_flags: ["close_ev_mix"] };
-    expect(unratedReason(flagged, PLAIN_PROMPT, { ...AUTOMATED, mode: "drill" })).toBe(UNRATED_REASONS.noise);
+    expect(unratedReason(flagged, PLAIN_PROMPT, { ...AUTOMATED, mode: "drill", rated_eligible: false })).toBe(UNRATED_REASONS.drill);
+    expect(unratedReason(flagged, PLAIN_PROMPT, { ...AUTOMATED, mode: "holdout", rated_eligible: false })).toBe(UNRATED_REASONS.holdout);
+  });
+
+  it("R3.13 in a session that could be rated, a noise flag is the reason (R3.18)", () => {
+    const flagged: DecisionFeedback = { ...CLEAN, noise_flags: ["close_ev_mix"] };
+    expect(unratedReason(flagged, PLAIN_PROMPT, AUTOMATED)).toBe(UNRATED_REASONS.noise);
   });
 
   it("R3.13 a drill session and a holdout retest are never rated", () => {

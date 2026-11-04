@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s23-api-trainer'
 title: 'S23 api trainer'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 25 merged'
 created: 2026-10-19
 public: true
 phase: 3

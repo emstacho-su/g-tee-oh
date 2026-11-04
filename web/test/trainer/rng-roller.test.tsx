@@ -36,13 +36,11 @@ describe("R3.13 RngRoller", () => {
   it("R3.13 a band narrower than the label threshold shows only its swatch, with the full text in a tooltip", () => {
     render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
     const items = within(screen.getByRole("list", { name: "Mixed-frequency bands" })).getAllByRole("listitem");
-    // 1-5 Fold and 6-15 Call are 5 and 10 rolls wide, under the threshold; 16-95 Raise is 80 wide.
-    for (const [index, text] of [[0, "1-5 Fold"], [1, "6-15 Call"], [3, "96-100 All-in"]] as const) {
-      const item = items[index] as HTMLElement;
-      expect(item).toHaveAttribute("title", text);
-      expect(within(item).getByTestId("action-swatch")).toBeInTheDocument();
-      expect(within(item).queryByTestId("rng-band-label")).not.toBeInTheDocument();
-    }
+    // 6-15 Call is 10 rolls wide, under the label threshold; 16-95 Raise is 80 wide.
+    const call = items[1] as HTMLElement;
+    expect(call).toHaveAttribute("title", "6-15 Call");
+    expect(within(call).getByTestId("action-swatch")).toBeInTheDocument();
+    expect(within(call).queryByTestId("rng-band-label")).not.toBeInTheDocument();
     expect(within(items[2] as HTMLElement).getByTestId("rng-band-label")).toHaveTextContent("16-95 Raise to 2.5bb");
   });
 
@@ -162,5 +160,19 @@ describe("R3.13 RngRoller", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Mixed-frequency bands unavailable");
     rerender(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={101} onExplain={vi.fn()} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Mixed-frequency bands unavailable");
+  });
+});
+
+describe("R3.13 critic round 3: a band too narrow for the chip is never a clipped glyph", () => {
+  it("R3.13 a band under the chip threshold (1-5 Fold, 96-100 All-in, 5 rolls each) shows its fill alone, no swatch chip; the tooltip, the hidden text and the legend still name it", () => {
+    render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
+    const items = within(screen.getByRole("list", { name: "Mixed-frequency bands" })).getAllByRole("listitem");
+    for (const [index, text] of [[0, "1-5 Fold"], [3, "96-100 All-in"]] as const) {
+      const item = items[index] as HTMLElement;
+      expect(item).toHaveAttribute("title", text);
+      expect(within(item).queryByTestId("action-swatch")).not.toBeInTheDocument();
+      expect(item).toHaveTextContent(text);
+    }
+    expect(within(screen.getByRole("list", { name: "Mixed-frequency band legend" })).getAllByRole("listitem")).toHaveLength(4);
   });
 });

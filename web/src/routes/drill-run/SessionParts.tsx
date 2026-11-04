@@ -15,10 +15,17 @@ import { formatPercent } from "../../progress/format.js";
 import type { SessionRecap } from "../../trainer/session-types.js";
 import { problemMessage, type SpotProblem } from "../../trainer/spot-problem.js";
 import { SESSION_TEXT } from "./labels.js";
+import type { SessionTally } from "../../trainer/session-log.js";
 import { RECAP_TIPS, StatTiles, type StatTile } from "./SessionLook.js";
+import { labelCountTiles } from "./SessionTally.js";
+
+/** Names the recap's label counts for a screen reader (S46, R3.32). */
+export const RECAP_COUNTS_LABEL = "Decisions by grade";
 
 export interface SessionRecapViewProps {
   recap: SessionRecap;
+  /** The session's own tally (S46, R3.32), given only when its decisions match the api's (recapTallyOf). */
+  tally?: SessionTally | undefined;
   onStartAnother: () => void;
 }
 
@@ -32,10 +39,11 @@ function recapTiles(recap: SessionRecap): StatTile[] {
   ];
 }
 
-export function SessionRecapView({ recap, onStartAnother }: SessionRecapViewProps) {
+export function SessionRecapView({ recap, tally, onStartAnother }: SessionRecapViewProps) {
   return (
     <Card title={SESSION_TEXT.recapHeading} testId="session-recap" className="max-w-2xl">
       <StatTiles tiles={recapTiles(recap)} />
+      {tally === undefined ? null : <StatTiles tiles={labelCountTiles(tally)} testId="recap-label-counts" label={RECAP_COUNTS_LABEL} />}
       <Button variant="primary" onClick={onStartAnother} className="self-start">
         {SESSION_TEXT.startAnother}
       </Button>

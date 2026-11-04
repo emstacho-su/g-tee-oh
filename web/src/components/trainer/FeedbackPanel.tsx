@@ -6,7 +6,7 @@
  * down", with sections that "just expand and collapse" rather than a pop-out to exit. So the panel
  * is a short summary (FeedbackSummary: the label with its definitions tip, your action against the
  * best, the loss and the solver's frequency, Unrated with its reason, the roll), then the controls
- * row the caller gives (Ask) directly under it so the controls are reached
+ * row the caller gives (Ask, and Study this spot, R3.34) directly under it so the controls are reached
  * without scrolling past the open sections (S46, critic round 3 R10), and under that one Disclosure
  * per section the caller gives: Roll (the roll scale with its followed-the-roll mark, S37),
  * Strategy (the hand's frequency and EV per action, best actions marked Best), Range, Where your

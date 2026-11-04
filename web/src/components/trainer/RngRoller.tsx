@@ -16,7 +16,8 @@
  *   prefers-reduced-motion (Tailwind's motion-reduce) there is no transition, so the bands simply
  *   appear (O-376). A band narrower than NARROW_BAND_ROLLS rolls shows only its swatch and letter in
  *   the strip, with the full text as its tooltip and for screen readers; the legend under the strip
- *   always lists every band in full.
+ *   always lists every band in full. A band narrower than TINY_BAND_ROLLS shows its fill alone, with
+ *   no chip, so it is never a clipped glyph (S46, critic round 3).
  * The bands and the band the roll fell in come only from rngBands and rollSelectedAction in
  * packages/learning, the one entry grade() also uses (O-213); this component computes no band. It
  * never says Best: the label follows EV (ADR 0024 rule 1) and FeedbackRoller adds the separate
@@ -79,6 +80,11 @@ const PERCENT = 100;
 const HALF_SLOT = 0.5;
 /** Bands narrower than this many rolls (a fifth of the strip) show no text inside the strip. */
 export const NARROW_BAND_ROLLS = 20;
+/**
+ * Bands narrower than this many rolls show no swatch chip either: at a phone's 390 px a 5-roll band
+ * is about 20 px, narrower than the chip, which would clip to a fragment (S46, critic round 3).
+ */
+export const TINY_BAND_ROLLS = 8;
 /** The tick values of the hidden scale. */
 export const SCALE_TICKS: readonly number[] = [RNG_ROLL_MIN, 25, 50, 75, RNG_ROLL_MAX];
 /** The clip-path of the band list before and after the reveal (left to right, O-376). */
@@ -228,7 +234,9 @@ function BandStrip({ actions, bands, selectedPosition }: BandStripProps) {
         const action = actions[band.actionIndex];
         if (action === undefined) return null;
         const text = bandText(band, action);
-        const narrow = band.to - band.from + 1 < NARROW_BAND_ROLLS;
+        const rolls = band.to - band.from + 1;
+        const narrow = rolls < NARROW_BAND_ROLLS;
+        const tiny = rolls < TINY_BAND_ROLLS;
         const current = band.actionIndex === selectedPosition;
         return (
           <li
@@ -244,10 +252,14 @@ function BandStrip({ actions, bands, selectedPosition }: BandStripProps) {
               current && FOCUS_MARK_CLASS,
             )}
           >
-            <span className="flex items-center gap-1 truncate rounded bg-white/80 px-1">
-              <ActionSwatch action={action} actions={actions} />
-              {narrow ? <VisuallyHidden>{text}</VisuallyHidden> : <span data-testid="rng-band-label">{text}</span>}
-            </span>
+            {tiny ? (
+              <VisuallyHidden>{text}</VisuallyHidden>
+            ) : (
+              <span className="flex items-center gap-1 truncate rounded bg-white/80 px-1">
+                <ActionSwatch action={action} actions={actions} />
+                {narrow ? <VisuallyHidden>{text}</VisuallyHidden> : <span data-testid="rng-band-label">{text}</span>}
+              </span>
+            )}
           </li>
         );
       })}

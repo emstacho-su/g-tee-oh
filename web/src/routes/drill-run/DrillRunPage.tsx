@@ -33,11 +33,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
+import { useStudyConfigs } from "../../trainer/use-study-configs.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
 import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
+import { oneDecisionPerHand } from "../../trainer/session-length.js";
+import { recapTallyOf } from "../../trainer/session-log.js";
 import { validateDrillRunSearch, type LeakOpen } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
@@ -50,6 +53,7 @@ import { END_SESSION_BINDING, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
 import { RunProgress } from "./RunProgress.js";
 import { SessionOverrides, type SessionOverrideValues } from "./SessionOverrides.js";
 import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts.js";
+import { SessionHistoryList, SessionTallyRow } from "./SessionRecord.js";
 import { SpotTable } from "./SpotTable.js";
 import { StartPanel } from "./StartPanel.js";
 import { useAutostart } from "./use-autostart.js";
@@ -111,9 +115,15 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
   const context = "context" in state ? state.context : null;
   // The feedback sections the user opened or closed stay that way for the session (O-387).
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
+  // The configurations for the reveal's Study this spot link (S46, R3.34).
+  const studyConfigs = useStudyConfigs(state.kind === "feedback");
+  // The session's own run settings decide, by the one rule (session-length.ts, PR #50 review).
+  const streetModes = context !== null && !oneDecisionPerHand(context);
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : <RunProgress context={context} />}
+      {/* The running tally above the table, from the first prompt (S46, R3.32). */}
+      {context === null ? null : <SessionTallyRow log={session.log} prompt={prompt} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
@@ -125,6 +135,7 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
             interactive={interactive}
             replaying={replay.replaying}
             feedbackSections={feedbackSections}
+            {...(studyConfigs === undefined ? {} : { studyConfigs })}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
@@ -140,6 +151,8 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
           {SESSION_TEXT.endSession}
         </Button>
       ) : null}
+      {/* Every decision of the session, reopened in place (S46, R3.32). */}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={streetModes} onExplain={onExplain} sections={feedbackSections} />}
     </div>
   );
 }
@@ -211,7 +224,7 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
       ) : null}
       {state.kind === "error" && startPanel ? <NoCoverageNote problem={state.problem} /> : null}
       {noCoverage ? <CoverageWatch drill={drill} onCoverage={coverageArrived} /> : null}
-      {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
+      {state.kind === "ended" ? <SessionRecapView recap={state.recap} tally={recapTallyOf(state.recap, session.log.entries)} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel
           drill={{ ...drill, trainer: { ...drill.trainer, ...overrides } }}

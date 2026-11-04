@@ -23,6 +23,16 @@ export const NEXT_HAND_ENTER_KEY = "Enter";
 /** End session is the chord Shift+E (R3.30, O-474). */
 export const END_SESSION_KEY = "E";
 export const END_SESSION_BINDING = { key: END_SESSION_KEY, shift: true } as const;
+/** Study this spot is the chord Shift+S, in the feedback's scope (S46, R3.34, item 11). */
+export const STUDY_SPOT_BINDING = { key: "S", shift: true } as const;
+
+/**
+ * The decision area's name, which the focus lands on when a new prompt arrives (PR #45 review round 4,
+ * finding f): the hero's seat and the street, read from the served prompt.
+ */
+export function decisionAreaName(prompt: { readonly hero_position: string; readonly street: string }): string {
+  return `Your decision: ${prompt.hero_position} on the ${prompt.street}`;
+}
 
 export const SESSION_TEXT = {
   heading: "Drill session",
@@ -35,6 +45,10 @@ export const SESSION_TEXT = {
   /** Next on the last planned hand's reveal (R3.31). */
   finishSession: "Finish session",
   endSession: "End session",
+  /** The reveal's link to the decision's node in Study, in a new tab (R3.34). */
+  studySpot: "Study this spot",
+  /** Said beside Ask when the configuration list did not load, so the link is not there (R3.34). */
+  studyUnavailable: "Study this spot is unavailable: the configuration list did not load.",
   confirmTitle: "End this session?",
   confirmDescription: "The recap shows how the session went. A decision you have not made yet is not graded.",
   keepPlaying: "Keep playing",
@@ -53,4 +67,17 @@ export const SESSION_TEXT = {
   openLibrary: "Open the library",
   /** The start panel's chip list (S38). */
   drillSettings: "Drill settings",
+} as const;
+
+/**
+ * The reveal notice before the decision (S46, R3.33, item 14, O-471): a panel that shows the answer,
+ * or a worked example, leaves the decision unrated. The panels themselves wait on O-471 (the
+ * prompt carries no node identity yet), so the notice names them and says so.
+ */
+export const REVEAL_TEXT = {
+  notRated: "Revealed: this decision is not rated.",
+  show: "Show this drill's panels",
+  hide: "Hide this drill's panels",
+  workedExample: "This is a worked example: the answer is part of the lesson.",
+  later: "These panels show here before the decision in a later version; for now they open on the reveal.",
 } as const;

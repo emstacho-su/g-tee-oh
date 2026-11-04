@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s22-grading-policy'
 title: 'S22 grading policy'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-27, PR 19 merged at c887701'
 created: 2026-10-19
 public: true
 phase: 3

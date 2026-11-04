@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s31-api-learning'
 title: 'S31 api learning'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 27 merged'
 created: 2026-10-19
 public: true
 phase: 4

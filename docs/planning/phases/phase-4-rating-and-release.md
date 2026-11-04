@@ -120,6 +120,7 @@ Open-question answers that bind this phase: O-8 (placeholder tier names), O-20, 
 | R4.16 | Deploy 2 with the owner's explicit yes (O-20): full stack on the Mac, catalog seeded, reference library imported, user created, nightly backups, restore drill to the Zenbook running the end-to-end flows (A9 section 5); `sprint/1-v1` green on all seven jobs; full-history guard clean | Post-deploy report with Mac p95 for study node read under 150 ms and decision to feedback under 250 ms (O-21, A9 section 6) and the restore drill result | 10 | S34 |
 | R4.17 | v1 gate report listing all eleven criteria with report paths (public under `validation/reports/`, private in the capture repo) | `just v1-gate` asserts every linked report exists and passes; its output is committed with `validation/reports/v1-gate.md` | 1 to 11 | S34 |
 | R4.18 | Release: docs mirror refreshed (O-45), `docs/security.md` reviewed, README, SBOM per release (A9 section 3), tagged release with multi-arch images pushed, `sprint/1-v1` merged to `main` | `images` job on the tag; SBOM artifact attached; docs provenance test green | none | S35 |
+| R4.19 | Heat-map filters and the progress address (S47 follow-up, work item 23): Show All, Due, New, Weakest 10 from isDue and isPracticed; weeks and the frequency spot written to the address with replace and restored on load | heatmap-model and progress-page tests in the follow-up pull request | none | S47 follow-up |
 
 ## Definition of Done
 

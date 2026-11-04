@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s32-web-progress'
 title: 'S32 Web progress'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 31 merged'
 created: 2026-10-19
 public: true
 phase: 4

@@ -128,7 +128,7 @@ export const PANEL_LABELS: Readonly<Record<PanelKey, string>> = {
   threshold_card: "Threshold card",
   hero_strategy_matrix: "Your strategy",
   rng_roller: "Mixed-frequency roll",
-  streak_counter: "Streak counter",
+  streak_counter: "Run counter",
 };
 
 /** What v1 serves, said next to a stored setting it does not serve yet (O-317). */
@@ -137,4 +137,23 @@ export const V1_NOTES = {
   board: "v1 serves preflop spots; a board filter is kept with the drill.",
   input: "v1 takes action input; frequency input is kept with the drill.",
   tables: "v1 plays one table; this count is kept with the drill.",
+  timebank: "v1 keeps the timebank with the drill but does not run a clock on the decision yet.",
 } as const;
+
+/**
+ * The panels the trainer has no component for yet (S46, R3.33, item 14): kept with the drill, shown
+ * nowhere in v1. Every other panel opens its section on the reveal (feedback-sections.ts).
+ */
+export const PANELS_WITHOUT_COMPONENT: readonly PanelKey[] = [
+  "equity_distribution_chart",
+  "range_advantage",
+  "hand_class",
+  "made_hand_breakdown",
+  "draw_breakdown",
+  "villain_range_matrix",
+];
+
+/** The note beside the chosen panels v1 does not show, named by their labels. */
+export function panelV1Note(labels: readonly string[]): string {
+  return `v1 does not show ${labels.join(", ")} yet; the choice is kept with the drill.`;
+}

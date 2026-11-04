@@ -3,7 +3,7 @@
  * review rounds 2 to 4): the form sends only from the Submit button or a plain Enter in a text
  * entry field, and a plain Enter on an option or region submits the chosen one or picks it.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { answerEnterAction, isPlainEnter, submitAccepted } from "../../src/routes/quiz/answer-enter.js";
 
@@ -62,5 +62,24 @@ describe("R3.16 the answer form's submit gate (PR #49 review round 4)", () => {
     const option = document.createElement("button");
     option.setAttribute("aria-pressed", "true");
     for (const target of [input("checkbox"), input("radio"), option, null]) expect(submitAccepted({ target, plain: true }, submitButton())).toBe(false);
+  });
+});
+
+describe("R3.16 PR #49 review round 5: a disabled answer control is no control", () => {
+  it("R3.16 Enter on a disabled option or region that kept the focus neither picks nor submits, and keeps its default", async () => {
+    const { fireEvent, render, screen } = await import("@testing-library/react");
+    const { AnswerInput } = await import("../../src/routes/quiz/AnswerInput.js");
+    const { fixturePredictions } = await import("../../src/fixtures/prediction.js");
+    const entry = fixturePredictions.find((item) => item.prompt.answer_kind === "yes_no");
+    if (entry === undefined) throw new Error("no yes or no fixture prediction");
+    const onChange = vi.fn();
+    const onSubmit = vi.fn();
+    render(<AnswerInput prompt={entry.prompt} draft={{ kind: "yes_no", value: true }} disabled canSubmit onChange={onChange} onSubmit={onSubmit} />);
+    for (const name of ["Yes", "No"]) {
+      const unprevented = fireEvent.keyDown(screen.getByRole("button", { name }), { key: "Enter" });
+      expect(unprevented, name).toBe(true);
+    }
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -30,7 +30,7 @@ const CRITERIA = {
   placeholder: "Route placeholders render under the shell (DoD 1, A7 section 2)",
   shortcuts: "Keyboard-first: the ? shortcuts overlay (A7 section 4, R3.13 hotkeys)",
   table:
-    "R3.13 PokerTable as seat cards around the felt, landscape at 1440 and portrait at 390 by its own width (O-380); each seat's last action as a badge and chip after the replay (O-381 to O-383)",
+    "R3.13 PokerTable as seat cards around the felt, landscape at 1440 and portrait at 390 by its own width (O-380); each seat's last action as a badge after the replay, with its chip in landscape only: the portrait table shows no chips (O-381 to O-383, S46 PR #50 review)",
   cards: "CardView and BoardReveal (R3.13)",
   actionBar: "ActionBar: buttons from the node's tree actions, exact size preflop, bucket with size postflop (R3.13, O-22, ADR 0020)",
   roller: "R3.10 RngRoller revealed: the roll, the cumulative bands grown in from the left and where the roll fell (R3.13, O-213, O-376)",

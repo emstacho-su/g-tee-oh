@@ -86,7 +86,7 @@ function sameKey(binding: HotkeyBinding, key: string): boolean {
  * still opens the explainer, and AZERTY digits typed with Shift still choose a size (PR #45 review
  * rounds 1 and 3, O-474).
  */
-export function bindingMatches(binding: HotkeyBinding, key: string, shift: boolean, bindings: readonly HotkeyBinding[] = []): boolean {
+function bindingMatches(binding: HotkeyBinding, key: string, shift: boolean, bindings: readonly HotkeyBinding[]): boolean {
   if (!sameKey(binding, key)) return false;
   if (binding.shift === true) return shift;
   return !shift || !bindings.some((other) => other.shift === true && sameKey(other, key));

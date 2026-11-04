@@ -25,9 +25,6 @@ const CONTROL_SELECTOR = [
   "button",
   "a[href]",
   "summary",
-  "input",
-  "select",
-  "textarea",
   ...["button", "link", "menuitem", "tab", "checkbox", "radio", "switch", "option"].map((role) => `[role="${role}"]`),
 ].join(", ");
 /** The keys a focused control keeps for itself. */
@@ -47,14 +44,13 @@ const DISABLED_SELECTOR = ':disabled, [aria-disabled="true"]';
 /**
  * A focused control, whose own Enter and Space activate it: a button, link or summary, an element
  * with a control role, or any element with a tabindex of 0 or more (a custom widget). Fields
- * (inputs of every type, textareas, selects) match too, for a caller that asks without checking
- * isEditableTarget first; handleKeydown and the replay's Space skip check fields first, and a
- * field keeps every key. A disabled control is none, since the focus can stay on a button that
- * the trainer disabled after the choice (PR #45 review round 2, findings 1 and 2). The body is
- * never a control.
+ * (inputs of every type, textareas, selects) are isEditableTarget's, which every caller checks
+ * first, since a field keeps every key (PR #45 review round 4, finding j). A disabled control is
+ * none, since the focus can stay on a button that the trainer disabled after the choice (PR #45
+ * review round 2, findings 1 and 2). The body is never a control.
  */
 export function isActivatableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element) || target === document.body || target === document.documentElement) return false;
+  if (!(target instanceof Element)) return false;
   const control = target.closest(`${CONTROL_SELECTOR}, ${FOCUSABLE_SELECTOR}`);
   return control !== null && control !== document.body && !control.matches(DISABLED_SELECTOR);
 }

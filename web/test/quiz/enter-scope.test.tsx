@@ -2,12 +2,13 @@
  * Where the quiz's Enter submits from (R3.16, R3.30, PR #45 review round 4 finding b, PR #49
  * review round 1). PR 45 let the quiz's Enter binding answer from any focused control, so Enter on
  * a focused End quiz button or a link submitted the answer and the control's own action never ran.
- * Enter now submits from the page body, the chosen option, or a region checkbox; Enter on an
- * unchosen option picks it (its own click), and every other focused control keeps its own Enter.
+ * Enter now submits from the page body, the chosen option or a ticked region, or the percent field
+ * (the form's submit gate, PR #49 rounds 3 to 5); Enter on an unchosen option or region picks it,
+ * and every other focused control keeps its own Enter.
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { fixturePredictionResult, fixturePredictions } from "../../src/fixtures/prediction.js";
 import { jsonResponse } from "../api/fake-fetch.js";
@@ -185,6 +186,19 @@ describe("R3.16 the answer form submits only from the Submit button or a plain E
     const view = await startOn(PERCENT, { kind: "percent", value: 35 });
     await userEvent.type(screen.getByRole("spinbutton", { name: "Share of the range, in percent" }), "35");
     await userEvent.click(submitButton());
+    await screen.findByTestId("prediction-result");
+    expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
+  });
+
+  it("R3.16 a click on Submit still submits in a browser with no global SubmitEvent (PR #49 review round 5)", async () => {
+    const view = await startOn(PERCENT, { kind: "percent", value: 35 });
+    await userEvent.type(screen.getByRole("spinbutton", { name: "Share of the range, in percent" }), "35");
+    vi.stubGlobal("SubmitEvent", undefined);
+    try {
+      await userEvent.click(submitButton());
+    } finally {
+      vi.unstubAllGlobals();
+    }
     await screen.findByTestId("prediction-result");
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
   });

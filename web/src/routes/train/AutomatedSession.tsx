@@ -12,6 +12,7 @@
  * the start panel Start is the retry.
  */
 import { DecisionArea } from "../drill-run/DecisionArea.js";
+import { SessionHistoryList, SessionTallyRow } from "../drill-run/SessionRecord.js";
 import { END_SESSION_BINDING, SESSION_TEXT } from "../drill-run/labels.js";
 import { SessionHandCounter } from "../drill-run/RunProgress.js";
 import { SpotTable } from "../drill-run/SpotTable.js";
@@ -20,6 +21,7 @@ import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { displayBinding } from "../../hotkeys/index.js";
 import type { TrackKey } from "../../progress/types.js";
 import { useFeedbackSections } from "../../components/trainer/index.js";
+import { useStudyConfigs } from "../../trainer/use-study-configs.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
 import type { SpotSession } from "../../trainer/use-spot-session.js";
@@ -85,6 +87,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   // The feedback sections the user opened or closed stay that way for the session (O-387).
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
+  // The configurations for the reveal's Study this spot link (S46, R3.34).
+  const studyConfigs = useStudyConfigs(state.kind === "feedback");
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : (
@@ -92,6 +96,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
       )}
       {/* "Hand 7 of 20" once a session length is planned (S46, R3.31), by the drill run's one rule. */}
       {context === null ? null : <SessionHandCounter context={context} />}
+      {/* The running tally above the table, from the first prompt (S46, R3.32). */}
+      {context === null ? null : <SessionTallyRow log={session.log} prompt={prompt} />}
       {loading ? <LoadingNote text={SESSION_TEXT.loadingPrompt} /> : null}
       {prompt === null ? null : (
         <>
@@ -103,6 +109,7 @@ export function AutomatedSession(props: AutomatedSessionProps) {
             interactive={interactive}
             replaying={replay.replaying}
             feedbackSections={feedbackSections}
+            {...(studyConfigs === undefined ? {} : { studyConfigs })}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
@@ -118,6 +125,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
           {SESSION_TEXT.endSession}
         </Button>
       ) : null}
+      {/* Every decision of the session, reopened in place (S46, R3.32); one decision per hand here. */}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={false} onExplain={onExplain} sections={feedbackSections} />}
     </div>
   );
 }

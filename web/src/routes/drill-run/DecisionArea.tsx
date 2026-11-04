@@ -14,35 +14,34 @@
  * inline Explanation section (S38, O-388), each in a section that expands and collapses, with the
  * prompt's worked-example flag and the session's remembered choices (O-387). All action indexes are
  * NodeAction.index (O-198). Choosing an action, and every new prompt, moves the focus off the
- * action bar onto the area itself (tabindex -1), so a clicked button never takes a later Enter or
- * Space (S46, PR #45 review round 3, finding 1). In street and full-hand modes a reveal that does not pause (O-314)
+ * action bar onto the area itself (tabindex -1, a group named by the prompt), and a reveal moves
+ * it on to the Next hand button, so a clicked button never takes a later Enter or Space and the
+ * focus always sits on a named target with the app's focus ring (S46, PR #45 review rounds 3 and
+ * 4, findings 1 and f). In street and full-hand modes a reveal that does not pause (O-314)
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
- * available (S26).
+ * available (S26). Before the decision, a prompt that names a panel revealing the answer, or a
+ * worked example, shows the reveal notice above the action bar (RevealNotice, S46, R3.33); on the
+ * reveal the prompt's visible panels open their feedback sections (sectionsFromPanels).
  */
 import { useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 
-import {
-  ActionBar,
-  FeedbackPanel,
-  FeedbackRangeView,
-  FeedbackRoller,
-  FeedbackThreshold,
-  RngRoller,
-  type FeedbackSectionsControl,
-} from "../../components/trainer/index.js";
+import { ActionBar, FeedbackPanel, RngRoller, sectionsFromPanels, type FeedbackSectionsControl } from "../../components/trainer/index.js";
 import { ExplainControls } from "../../components/explain/ExplainControls.js";
-import { MoreInfoSection } from "../../components/explain/MoreInfoSection.js";
-import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import type { GameConfig } from "../../progress/types.js";
 import { replayKey } from "../../trainer/action-replay.js";
 import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
+import { studyLinkFor } from "../../trainer/study-link.js";
 import { unratedReason } from "../../trainer/unrated-reason.js";
-import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { feedbackSlots } from "./feedback-slots.js";
+import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT, STUDY_SPOT_BINDING, decisionAreaName } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
+import { RevealNotice } from "./RevealNotice.js";
+import { STUDY_TAB_FEATURES, STUDY_TAB_TARGET, StudySpotLink } from "./StudySpotLink.js";
 
 export interface DecisionAreaProps {
   state: SpotState;
@@ -68,10 +67,21 @@ export interface DecisionAreaProps {
    * because this area unmounts between hands; without it each panel starts from the defaults.
    */
   feedbackSections?: FeedbackSectionsControl;
+  /**
+   * The configuration list (settings/configs-query.ts) for the reveal's Study this spot link
+   * (S46, R3.34); absent while it loads, and then no link shows; null when it failed to load.
+   */
+  studyConfigs?: readonly GameConfig[] | null;
 }
 
-/** The action bar inside the area, whose buttons must not keep the focus across prompts. */
-const ACTION_BAR_SELECTOR = "[data-testid=\"action-bar\"]";
+/** The Next hand button, the focus target once a reveal mounts (PR #45 review round 4, finding f). */
+const NEXT_HAND_SELECTOR = "[data-next-hand]";
+
+/** Whether the focus is the page's or the area's own, so moving it takes nothing from the user. */
+function focusIsOurs(area: HTMLElement | null): boolean {
+  const active = document.activeElement;
+  return area !== null && (active === null || active === document.body || area.contains(active));
+}
 
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
@@ -89,33 +99,39 @@ function chosenIndexOf(state: SpotState): number | null {
   }
 }
 
-function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections }: DecisionAreaProps) {
+function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections, studyConfigs }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
   // On the last planned hand's reveal Next finishes the session (S46, R3.31).
   const nextLabel = atSessionLimit(state) ? SESSION_TEXT.finishSession : SESSION_TEXT.nextHand;
   // N and Enter both go on (S46, R3.30, design rule 9).
   useHotkey({ key: NEXT_HAND_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   useHotkey({ key: NEXT_HAND_ENTER_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  // Study this spot: the link and Shift+S open the decision's node in Study in a new tab (R3.34).
+  const studyHref = state.kind === "feedback" && studyConfigs !== undefined && studyConfigs !== null ? studyLinkFor(state.feedback, prompt, studyConfigs) : null;
+  const openStudy = () => {
+    if (studyHref !== null) window.open(studyHref, STUDY_TAB_TARGET, STUDY_TAB_FEATURES);
+  };
+  useHotkey({ ...STUDY_SPOT_BINDING, description: SESSION_TEXT.studySpot, scope: SESSION_SCOPE, handler: openStudy }, enabled && studyHref !== null);
   if (state.kind !== "feedback") return null;
   const { feedback, decision, context } = state;
   // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
   const continuesByItself = autoContinueDelay(state) !== null;
-  const roller = context.rng ? (
-    <FeedbackRoller
-      feedback={feedback}
-      actions={prompt.buttons}
-      chosenIndex={decision.actionIndex}
-      // The grouping the session was started and graded with, never a setting changed since (PR #33 review round 1).
-      grouping={context.session.grouping}
-      street={prompt.street}
-      onExplain={onExplain}
-    />
-  ) : undefined;
+  // The same section bodies the session history reopens the decision with (S46, R3.32). The
+  // grouping is the session's, never a setting changed since (PR #33 review round 1).
+  const slots = feedbackSlots({
+    feedback,
+    actions: prompt.buttons,
+    chosenIndex: decision.actionIndex,
+    grouping: context.session.grouping,
+    street: prompt.street,
+    rng: context.rng,
+    onExplain,
+  });
   // Next hand stands above the panel, so it is reached without scrolling past the open sections
   // (S46, critic round 3 R10); the row inside the panel holds Ask.
   return (
     <div className="flex flex-col gap-3">
-      <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
+      <Button data-next-hand="" variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
         <kbd aria-hidden="true" className="font-mono text-xs">
           {NEXT_HAND_KEY}
         </kbd>
@@ -129,13 +145,16 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           actions={prompt.buttons}
           chosenIndex={decision.actionIndex}
           unratedReason={unratedReason(feedback, prompt, context.session)}
-          rangeView={<FeedbackRangeView feedback={feedback} />}
-          thresholdCard={<FeedbackThreshold feedback={feedback} actions={prompt.buttons} />}
-          roller={roller}
-          insights={<FeedbackInsights feedback={feedback} />}
-          explanation={<MoreInfoSection key={`more-info-${feedback.attempt_id}`} attemptId={feedback.attempt_id} />}
-          explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
+          {...slots}
+          explain={
+            <div className="flex flex-wrap items-center gap-2">
+              <ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />
+              {studyHref === null ? null : <StudySpotLink href={studyHref} />}
+              {studyConfigs === null ? <p className="text-sm text-muted">{SESSION_TEXT.studyUnavailable}</p> : null}
+            </div>
+          }
           workedExample={prompt.worked_example}
+          defaultOpen={sectionsFromPanels(prompt.visible_panels)}
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}
         />
       )}
@@ -160,18 +179,33 @@ export function DecisionArea(props: DecisionAreaProps) {
   // button that kept the focus would then take the next Enter or Space (PR #45 review round 3, 1).
   const promptKey = replayKey(prompt);
   useLayoutEffect(() => {
-    const bar = areaRef.current?.querySelector(ACTION_BAR_SELECTOR);
-    if (bar?.contains(document.activeElement) === true) focusOffBar();
+    if (focusIsOurs(areaRef.current)) focusOffBar();
   }, [promptKey, focusOffBar]);
+  // Once the reveal mounts, the focus goes on to Next hand, a named button whose own Enter goes on
+  // (PR #45 review round 4, finding f), unless the user has put it somewhere else.
+  const revealed = state.kind === "feedback";
+  useLayoutEffect(() => {
+    if (!revealed || !focusIsOurs(areaRef.current)) return;
+    areaRef.current?.querySelector<HTMLElement>(NEXT_HAND_SELECTOR)?.focus({ preventScroll: true });
+  }, [revealed, promptKey]);
   const choose = (actionIndex: number) => {
     focusOffBar();
     onChoose(actionIndex);
   };
   return (
-    // tabindex -1: a focus target for the code above, never a tab stop.
-    <div ref={areaRef} tabIndex={-1} className="flex min-w-0 flex-col gap-3 outline-none" data-testid="decision-area">
+    // tabindex -1: a focus target for the code above, never a tab stop. Named by the prompt, and it
+    // keeps the app's focus ring (PR #45 review round 4, finding f).
+    <div
+      ref={areaRef}
+      role="group"
+      aria-label={decisionAreaName(prompt)}
+      tabIndex={-1}
+      className="flex min-w-0 flex-col gap-3 rounded-xl"
+      data-testid="decision-area"
+    >
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
+      {BEFORE_DECISION.has(state.kind) ? <RevealNotice key={promptKey} prompt={prompt} /> : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
       <ActionBar
         actions={prompt.buttons}

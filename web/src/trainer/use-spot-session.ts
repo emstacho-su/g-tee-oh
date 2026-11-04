@@ -32,6 +32,8 @@
  * S46 (R3.31): the sessionLength option rides into Start; Next, the automatic continue and every
  * prompt load carry a fresh end key, which the machine uses only when the planned length is
  * reached (session-length.ts); the screen reads the same atSessionLimit for its Finish session label.
+ * The hook also keeps the session's decision log (session-log.ts): every reveal's prompt and
+ * feedback, cleared at Start and on reset, kept through the recap (R3.32).
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -42,6 +44,7 @@ import { invalidateProgress } from "../progress/queries.js";
 import { useTrainerTableStore } from "../store/index.js";
 import { createSession, endSession, fetchNextPrompt, nextPromptQuery, submitDecision, type SessionStartSpec } from "./session-api.js";
 import type { SessionLength } from "./session-length.js";
+import { EMPTY_LOG, logAfter, type SessionLog } from "./session-log.js";
 import type { RunSettings } from "./session-types.js";
 import { createSpotDriver, type SpotIo } from "./spot-driver.js";
 import { INITIAL_SPOT_STATE, autoContinueDelay, type SpotEvent, type SpotState } from "./spot-machine.js";
@@ -97,6 +100,8 @@ export interface SpotSession {
   state: SpotState;
   /** The table's replay of the line before the decision; the timer is paused while it plays (O-381). */
   replay: ActionReplay;
+  /** Every decision of the session with its prompt and feedback, for the tally and the history (S46, R3.32). */
+  log: SessionLog;
   start: (rng: boolean) => void;
   /** Takes NodeAction.index (O-198); choosing submits the decision (O-345). */
   chooseAction: (actionIndex: number) => void;
@@ -168,9 +173,15 @@ export function useSpotSession(options: SpotSessionOptions): SpotSession {
     send(paused ? { type: "pause", at: now() } : { type: "resume", at: now() });
   }, [paused, shownPrompt, send, now]);
   useAutoContinue(state, paused, schedule, send, newKey);
+  // The log follows the state while rendering (React's derived-state pattern), so the reveal's
+  // own render already counts it, even one that continues by itself (S46, R3.32).
+  const [log, setLog] = useState<SessionLog>(EMPTY_LOG);
+  const nextLog = logAfter(log, state);
+  if (nextLog !== log) setLog(nextLog);
   return {
     state,
     replay,
+    log: nextLog,
     start: (rng) =>
       send({
         type: "start",

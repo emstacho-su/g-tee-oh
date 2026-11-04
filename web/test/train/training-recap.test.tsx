@@ -60,6 +60,9 @@ describe("R4.10 training recap", () => {
     expect(within(summary).getByRole("button", { name: "About mean score" })).toBeInTheDocument();
     expect(within(summary).getByRole("button", { name: "About rated decisions" })).toBeInTheDocument();
     expect(within(summary).getByRole("button", { name: "About EV loss" })).toBeInTheDocument();
+    // S46 (R3.32, PR #50 review): the api counted 5 decisions this page never saw (the session ends
+    // before any reveal here), so the recap shows no label counts rather than counts that add up wrong.
+    expect(within(recap).queryByTestId("recap-label-counts")).not.toBeInTheDocument();
   });
 
   it("R4.10 R3.13 the rating cards give each track before and after with RD, new for a first rating, and the change (S38: cards, not a table)", async () => {

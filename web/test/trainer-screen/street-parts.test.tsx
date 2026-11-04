@@ -10,6 +10,10 @@ import { describe, expect, it } from "vitest";
 import { FeedbackPanel } from "../../src/components/trainer/index.js";
 import { fixtureActions, fixtureFeedback } from "../../src/fixtures/index.js";
 import { HandCounter } from "../../src/routes/drill-run/HandCounter.js";
+import { SessionHandCounter } from "../../src/routes/drill-run/RunProgress.js";
+import { fixturePracticeSession } from "../../src/fixtures/trainer.js";
+import { SPOT_MODE_SETTINGS } from "../../src/trainer/pause-rule.js";
+import type { SessionContext } from "../../src/trainer/spot-machine.js";
 import { ResultChip } from "../../src/routes/drill-run/ResultChip.js";
 
 describe("R3.13 hand counter", () => {
@@ -59,5 +63,19 @@ describe("R3.13 result chip", () => {
     const chip = screen.getByTestId("result-chip");
     expect(chip).toHaveTextContent("Solver 10.0%");
     expect(within(chip).getByRole("button", { name: "About grade labels" })).toBeInTheDocument();
+  });
+});
+
+describe("R3.31 PR #45 review round 4, finding g: every counter names the hand by the played hands", () => {
+  it("R3.31 in street mode without a length the counter uses the played-hand number, not the hands seen", () => {
+    const context: SessionContext = {
+      session: fixturePracticeSession,
+      rng: false,
+      trainer: { ...SPOT_MODE_SETTINGS, stop_rule: "end_of_street" },
+      hand: { handNo: 5, ordinal: 4, decision: 2, stateVersion: 9, heroPosition: "BB" },
+      played: { count: 2, lastHandNo: 3 },
+    };
+    render(<SessionHandCounter context={context} />);
+    expect(screen.getByTestId("hand-counter")).toHaveTextContent("Hand 3, decision 2");
   });
 });

@@ -6,7 +6,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { GROUPING_LABELS, PAUSE_LABELS, STOP_RULE_LABELS } from "../../src/drills/labels.js";
+import { GROUPING_LABELS, PANEL_LABELS, PAUSE_LABELS, STOP_RULE_LABELS } from "../../src/drills/labels.js";
 import { fixtureDrill, fixtureFullHandDrill, fixtureStreetDrill } from "../../src/fixtures/trainer.js";
 import * as runLabels from "../../src/routes/drill-run/labels.js";
 import { StartPanel } from "../../src/routes/drill-run/StartPanel.js";
@@ -38,5 +38,12 @@ describe("R3.14 one label map for drill settings", () => {
     expect(Object.keys(runLabels)).not.toEqual(expect.arrayContaining(["STOP_RULE_NAMES"]));
     expect(Object.keys(runLabels)).not.toEqual(expect.arrayContaining(["GROUPING_NAMES"]));
     expect(Object.keys(runLabels)).not.toEqual(expect.arrayContaining(["PAUSE_RULE_NAMES"]));
+  });
+});
+
+describe("R3.32 the run panel's name", () => {
+  it("R3.32 the streak_counter key is named a run, never a streak (O-278, O-377)", () => {
+    expect(PANEL_LABELS.streak_counter).toBe("Run counter");
+    expect(Object.values(PANEL_LABELS).some((label) => /streak/i.test(label))).toBe(false);
   });
 });

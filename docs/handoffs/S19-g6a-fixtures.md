@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s19-g6a-fixtures'
 title: 'S19 G6a and fixtures'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-27, PR 24 squash-merged'
 created: 2026-10-19
 public: true
 phase: 2

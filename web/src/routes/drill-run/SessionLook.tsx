@@ -12,6 +12,7 @@
  * never by colour. Both sit on the sunken ground inside a raised Card, which gives the depth;
  * neither draws a border of its own. Nothing here computes a number: values arrive as text.
  */
+import { DAILY_RATED_CAP } from "@g-tee-oh/learning";
 import type { ReactNode } from "react";
 
 import { InfoTip } from "../../components/ui/index.js";
@@ -26,13 +27,19 @@ export interface StatTile {
   readonly term: string;
   readonly value: string;
   readonly tip?: StatTip;
+  /** A ready-made tip for the corner instead of tip, for example the grade definitions (GradeTip). */
+  readonly info?: ReactNode;
 }
 
-/** One definition per recap statistic, the words of 05 section 6.3 and 06 section 3.6. */
+/**
+ * One definition per recap statistic, the words of 05 section 6.3 and 06 section 3.6. The rated
+ * decisions tip names every rule of learning's isRated, the daily cap read from DAILY_RATED_CAP
+ * (PR #45 review round 4, finding c).
+ */
 export const RECAP_TIPS = {
   ratedDecisions: {
     subject: "rated decisions",
-    text: "Decisions that count toward your rating: first attempts in automated training, with no answer-revealing panel on and no noise flag.",
+    text: `Decisions that count toward your rating: first attempts in automated training that was not started with a seed, with no answer-revealing panel on and no noise flag, up to ${DAILY_RATED_CAP} a day in each track.`,
   },
   meanScore: {
     subject: "mean score",
@@ -47,22 +54,34 @@ export const RECAP_TIPS = {
 export interface StatTilesProps {
   tiles: readonly StatTile[];
   testId?: string;
+  /** Smaller tiles in more columns, for the in-session tally above the table (S46, R3.32). */
+  compact?: boolean;
+  /** Names the list for a screen reader, for example "This session so far". */
+  label?: string;
 }
 
 const TILE_CLASSES = "relative flex min-w-0 flex-col gap-0.5 rounded-xl bg-surface-sunken px-3 py-2";
+const COMPACT_TILE_CLASSES = "relative flex min-w-0 flex-col rounded-lg bg-surface-sunken px-2 py-1";
 
-export function StatTiles({ tiles, testId }: StatTilesProps) {
+function TileTip({ tip, info }: { tip: StatTip | undefined; info: ReactNode }) {
+  if (info !== undefined) return <span className="absolute top-1.5 right-1.5">{info}</span>;
+  if (tip === undefined) return null;
   return (
-    <dl data-testid={testId} className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-4">
-      {tiles.map(({ term, value, tip }) => (
-        <div key={term} data-testid="stat-tile" className={TILE_CLASSES}>
+    <InfoTip subject={tip.subject} className="absolute top-2 right-2">
+      {tip.text}
+    </InfoTip>
+  );
+}
+
+export function StatTiles({ tiles, testId, compact = false, label }: StatTilesProps) {
+  const grid = compact ? "grid grid-cols-3 gap-1.5 tabular-nums sm:grid-cols-5" : "grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-4";
+  return (
+    <dl data-testid={testId} aria-label={label} className={grid}>
+      {tiles.map(({ term, value, tip, info }) => (
+        <div key={term} data-testid="stat-tile" className={compact ? COMPACT_TILE_CLASSES : TILE_CLASSES}>
           <dt className="pr-6 text-xs font-medium text-muted">{term}</dt>
-          <dd className="text-xl font-semibold tracking-tight">{value}</dd>
-          {tip === undefined ? null : (
-            <InfoTip subject={tip.subject} className="absolute top-2 right-2">
-              {tip.text}
-            </InfoTip>
-          )}
+          <dd className={compact ? "text-base font-semibold" : "text-xl font-semibold tracking-tight"}>{value}</dd>
+          <TileTip tip={tip} info={info} />
         </div>
       ))}
     </dl>

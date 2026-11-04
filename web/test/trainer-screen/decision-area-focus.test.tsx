@@ -65,3 +65,16 @@ describe("R3.30 the focus leaves the action bar (review round 3, finding 1)", ()
     expect(document.activeElement).toBe(call);
   });
 });
+
+describe("R3.30 the decision area is a labelled focus target with a visible focus ring (PR #45 review round 4, finding f)", () => {
+  it("R3.30 the area is a group named by the prompt: the hero's seat and the street", () => {
+    render(area(awaiting(fixturePlainPrompt), fixturePlainPrompt, vi.fn()));
+    const decisionArea = screen.getByRole("group", { name: `Your decision: ${fixturePlainPrompt.hero_position} on the ${fixturePlainPrompt.street}` });
+    expect(decisionArea).toBe(screen.getByTestId("decision-area"));
+  });
+
+  it("R3.30 the area never removes the app's focus ring", () => {
+    render(area(awaiting(fixturePlainPrompt), fixturePlainPrompt, vi.fn()));
+    expect(screen.getByTestId("decision-area").className).not.toMatch(/\boutline-none\b/);
+  });
+});

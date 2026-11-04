@@ -104,7 +104,7 @@ export function BoardReveal({ cards, fourColor = false }: BoardRevealProps) {
                   key={index}
                   role="img"
                   aria-label={`${street.name} not dealt`}
-                  className="inline-block h-12 w-9 rounded-md border-2 border-dashed border-white/40"
+                  className="inline-block h-12 w-9 rounded-md border-2 border-dashed border-current opacity-50"
                 />
               );
             }
