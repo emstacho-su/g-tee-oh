@@ -8,7 +8,8 @@
  * bench's variants, so every switch draws different data). Each switch marks a request on the
  * study screen's own node-switch metrics (node-switch-metrics.ts), renders the next node, and the
  * harness completes the switch in an effect after the commit in which the advantage card has its
- * data (its first visit of a node includes the offline read, a later visit is a cache hit); the metrics
+ * data (its first visit of a node includes the offline read, a later visit is a cache hit that never
+ * goes stale, benchQueryClient, so no refetch lands in the next switch's window); the metrics
  * measure one frame later, and the duration they measure is the one recorded, never a second clock
  * around it (PR 52 review 1). Warm-up switches are not recorded. The clock
  * and the frame scheduler are injected, so the loop runs in jsdom for the unit tests; the bench
@@ -114,11 +115,20 @@ function NodeSwitchHarness({ api, node, metrics }: HarnessProps) {
   );
 }
 
+/**
+ * The bench's query client: no retries, and nothing ever stale, so a revisited node's advantage
+ * card is a cache hit that never refetches and re-renders after the switch completed, inside the
+ * next measured window (code review round 3, 1).
+ */
+export function benchQueryClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } } });
+}
+
 export async function runNodeSwitchBench(input: NodeSwitchRunInput): Promise<NodeSwitchTimings> {
   const nodes = benchNodes();
   const root = createRoot(input.container);
   const api = benchApi();
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = benchQueryClient();
   const timeoutMs = input.switchTimeoutMs ?? DEFAULT_SWITCH_TIMEOUT_MS;
   let finish: ((ms: number) => void) | null = null;
   const metrics = createNodeSwitchMetrics({

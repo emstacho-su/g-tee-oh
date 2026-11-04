@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { NODE_SWITCH_BUDGET_MS, buildNodeSwitchReport } from "../../e2e/bench/node-switch-report.js";
 import type { NodeSwitchBenchResult } from "../../src/bench/bench-api.js";
-import { benchNodes, runNodeSwitchBench } from "../../src/bench/node-switch.js";
+import { benchNodes, benchQueryClient, runNodeSwitchBench } from "../../src/bench/node-switch.js";
 import { ADVANTAGE_TEXT } from "../../src/components/panels/RangeAdvantageCard.js";
 
 const MACHINE = { name: "zenbook", os: "win32 10.0.26200", cpu: "Test CPU", cores: 20, memory_gb: 32 };
@@ -121,6 +121,12 @@ describe("R3.26 node-switch budget", () => {
     expect(seen.every((frame) => frame.card && !frame.loading)).toBe(true);
     container.remove();
     vi.restoreAllMocks();
+  });
+
+  it("R3.26 the bench client never refetches a revisited node, so no card re-render lands in the next measured window (code review round 3, 1)", () => {
+    const client = benchQueryClient();
+    expect(client.getDefaultOptions().queries?.staleTime).toBe(Number.POSITIVE_INFINITY);
+    expect(client.getDefaultOptions().queries?.retry).toBe(false);
   });
 
   it("R3.26 a switch whose frame never comes times out instead of hanging the bench (PR 52 review round 2)", async () => {
