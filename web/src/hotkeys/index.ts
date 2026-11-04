@@ -20,7 +20,6 @@ export {
   SHORTCUTS_DESCRIPTION,
   SHORTCUTS_KEY,
   activeBindings,
-  bindingMatches,
   createHotkeyStore,
   defaultHotkeyStore,
   findBinding,
