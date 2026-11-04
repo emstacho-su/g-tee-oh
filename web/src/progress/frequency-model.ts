@@ -10,10 +10,11 @@
  * (PR #39 review finding 6). The api already sorts the hand rows by their largest gap, so the card
  * keeps the api's order; shares are written with the progress format's formatPercent. Since the
  * S47 follow-up (R4.12) each action's gap reads in points (gapSentence): the difference of the two
- * shares the api served, rounded to a whole point, and nothing else.
+ * served shares as the card prints them, whole percents, and nothing else.
  */
 import type { ApiComponents } from "@g-tee-oh/contracts";
 
+import { percentOf } from "./format.js";
 import { capitalize, configurationWordsIn, familyWords, pairWords, positionWords } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
@@ -62,11 +63,12 @@ export function spotOptions(spots: readonly SpotFrequency[], configs: readonly G
   });
 }
 
-const POINTS_PER_SHARE = 100;
-
-/** "Fold: 5 points more than the solver", "Call: matches the solver" when the shares round to the same point. */
+/**
+ * "Fold: 5 points more than the solver", "Call: matches the solver" when the shares print as the same
+ * percent: the gap is the difference of the two percents the card shows (PR #51 review 7).
+ */
 export function gapSentence(label: string, yours: number, solver: number): string {
-  const points = Math.round((yours - solver) * POINTS_PER_SHARE);
+  const points = percentOf(yours) - percentOf(solver);
   if (points === 0) return `${label}: matches the solver`;
   const size = Math.abs(points);
   return `${label}: ${size} ${size === 1 ? "point" : "points"} ${points > 0 ? "more" : "less"} than the solver`;

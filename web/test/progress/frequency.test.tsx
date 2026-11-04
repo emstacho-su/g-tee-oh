@@ -137,6 +137,13 @@ describe("R4.12 the frequency model", () => {
     expect(gapSentence("Call", 0.502, 0.5)).toBe("Call: matches the solver");
   });
 
+  it("R4.12 the gap is the difference of the two percents the card shows, so it never disagrees with them (PR #51 review 7)", () => {
+    // 45% and 45% on screen: no gap, although the raw shares differ by 0.8 points.
+    expect(gapSentence("Call", 0.454, 0.446)).toBe("Call: matches the solver");
+    // 46% and 44% on screen: 2 points, although the raw shares differ by 1.2.
+    expect(gapSentence("Fold", 0.456, 0.444)).toBe("Fold: 2 points more than the solver");
+  });
+
   it("R4.12 the query reads GET /progress/frequencies under the progress root", async () => {
     const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: () => Promise.resolve(new Response(JSON.stringify(fixtureFrequencies), { status: 200, headers: { "content-type": "application/json" } })) });
     const options = frequencyQuery(api);
