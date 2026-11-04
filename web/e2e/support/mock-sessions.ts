@@ -108,6 +108,8 @@ function fixtureDrillOf(id: string): Drill | undefined {
 interface Graded {
   readonly score: number;
   readonly evLossBb: number;
+  /** The feedback's rated flag, so the recap counts rated decisions as the api does (count(*) filter (where rated), sessions/repository.ts). */
+  readonly rated: boolean;
 }
 
 /** In street and full-hand modes: the hero's first action once taken, for the second decision. */
@@ -216,7 +218,8 @@ function recapOf(session: MockSession): SessionRecap {
     session_id: session.id,
     ended_at: ENDED_AT,
     decisions: session.graded.length,
-    rated_decisions: session.graded.length,
+    // Only rated decisions count, as the api's recap does; a drill session has none (S48 round 5 verifier on trainer-recap).
+    rated_decisions: session.graded.filter((entry) => entry.rated).length,
     mean_score: session.graded.length === 0 ? null : total / session.graded.length,
     ev_loss_bb_total: session.graded.reduce((sum, entry) => sum + entry.evLossBb, 0),
     rating_changes: [],
@@ -301,7 +304,7 @@ export function createMockSessionRoute(options: MockSessionOptions = {}): MockRo
       ...session,
       ...moved,
       version: feedback.state_version,
-      graded: [...session.graded, { score: feedback.score, evLossBb: feedback.ev_loss_bb }],
+      graded: [...session.graded, { score: feedback.score, evLossBb: feedback.ev_loss_bb, rated: feedback.rated }],
       replies: key === undefined ? session.replies : new Map([...session.replies, [key, response]]),
     });
     return response;

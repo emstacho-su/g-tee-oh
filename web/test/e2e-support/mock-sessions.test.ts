@@ -161,7 +161,8 @@ describe("R3.13 mocked session routes", () => {
     decide(api, id, { state_version: version, action_index: 0, response_ms: 1 });
     const end = api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED, body: {} }));
     expect(end.status).toBe(200);
-    expect(end.body).toMatchObject({ session_id: id, decisions: 1, rated_decisions: 1, mean_score: 0.84, ev_loss_bb_total: 0.011 });
+    // A drill session is never rated, so its recap counts no rated decision, as the api's count(*) filter (where rated) does (round 5 verifier).
+    expect(end.body).toMatchObject({ session_id: id, decisions: 1, rated_decisions: 0, mean_score: 0.84, ev_loss_bb_total: 0.011 });
     expect(api.handle(request("POST", `/api/v1/sessions/${id}/end`, { headers: SIGNED, body: {} })).body).toEqual(end.body);
     expect(next(api, id).status).toBe(409);
     expect(decide(api, id, { state_version: version + 1, action_index: 0, response_ms: 1 }).status).toBe(409);
