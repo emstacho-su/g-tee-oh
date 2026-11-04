@@ -90,15 +90,16 @@ export function useFeedbackSections(resetKey: string | null): FeedbackSectionsCo
  * (services/api/src/sessions/prompt.ts). A panel with no section in the feedback panel (the
  * breakdowns, the opponent's range, the run counter) opens nothing here.
  */
-const PANEL_SECTIONS: Readonly<Partial<Record<PanelKey, FeedbackSectionKey>>> = {
+const PANEL_SECTIONS = {
   hero_range_matrix: "range",
   hero_strategy_matrix: "strategy",
   action_frequency_table: "strategy",
   threshold_card: "threshold",
   rng_roller: "roll",
-};
+} as const satisfies Readonly<Partial<Record<PanelKey, FeedbackSectionKey>>>;
 
-function isPanelKey(key: string): key is PanelKey {
+/** Whether a visible panel has a section here (the panels without one open nothing). */
+function hasSection(key: string): key is keyof typeof PANEL_SECTIONS {
   return Object.hasOwn(PANEL_SECTIONS, key);
 }
 
@@ -107,9 +108,5 @@ function isPanelKey(key: string): key is PanelKey {
  * keeps its own default, and the user's choices still win (resolveSectionOpen, O-387).
  */
 export function sectionsFromPanels(visiblePanels: readonly string[]): FeedbackOpenState {
-  const sections = visiblePanels.filter(isPanelKey).flatMap((panel) => {
-    const section = PANEL_SECTIONS[panel];
-    return section === undefined ? [] : [section];
-  });
-  return Object.fromEntries(sections.map((section) => [section, true]));
+  return Object.fromEntries(visiblePanels.filter(hasSection).map((panel) => [PANEL_SECTIONS[panel], true]));
 }

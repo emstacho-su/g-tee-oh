@@ -47,6 +47,8 @@ export const SESSION_TEXT = {
   endSession: "End session",
   /** The reveal's link to the decision's node in Study, in a new tab (R3.34). */
   studySpot: "Study this spot",
+  /** Said beside Ask when the configuration list did not load, so the link is not there (R3.34). */
+  studyUnavailable: "Study this spot is unavailable: the configuration list did not load.",
   confirmTitle: "End this session?",
   confirmDescription: "The recap shows how the session went. A decision you have not made yet is not graded.",
   keepPlaying: "Keep playing",
@@ -74,8 +76,8 @@ export const SESSION_TEXT = {
  */
 export const REVEAL_TEXT = {
   notRated: "Revealed: this decision is not rated.",
-  show: "Show the revealed panels",
-  hide: "Hide the revealed panels",
+  show: "Show this drill's panels",
+  hide: "Hide this drill's panels",
   workedExample: "This is a worked example: the answer is part of the lesson.",
   later: "These panels show here before the decision in a later version; for now they open on the reveal.",
 } as const;

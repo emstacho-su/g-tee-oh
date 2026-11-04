@@ -30,7 +30,7 @@ function revealed(): SpotState {
   return { kind: "feedback", context: CONTEXT, prompt: PROMPT, decision: { actionIndex: 1, responseMs: 50, idempotencyKey: "d1", stateVersion: 3 }, feedback: FEEDBACK };
 }
 
-function renderReveal(configs: readonly GameConfig[] | undefined) {
+function renderReveal(configs: readonly GameConfig[] | null | undefined) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -78,6 +78,17 @@ describe("R3.34 Study this spot", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     renderReveal(undefined);
     expect(screen.queryByRole("link", { name: new RegExp(SESSION_TEXT.studySpot) })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Shift>}S{/Shift}");
+    expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe("R3.34 PR #50 review: a failed configuration read is said, never silent", () => {
+  it("R3.34 when the configuration list fails, the controls row says Study this spot is unavailable, and no link or Shift+S is offered", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderReveal(null);
+    expect(screen.queryByRole("link", { name: new RegExp(SESSION_TEXT.studySpot) })).not.toBeInTheDocument();
+    expect(screen.getByText(SESSION_TEXT.studyUnavailable)).toBeInTheDocument();
     await userEvent.keyboard("{Shift>}S{/Shift}");
     expect(open).not.toHaveBeenCalled();
   });

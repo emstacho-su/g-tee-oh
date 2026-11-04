@@ -69,9 +69,9 @@ export interface DecisionAreaProps {
   feedbackSections?: FeedbackSectionsControl;
   /**
    * The configuration list (settings/configs-query.ts) for the reveal's Study this spot link
-   * (S46, R3.34); absent while it loads, and then no link shows.
+   * (S46, R3.34); absent while it loads, and then no link shows; null when it failed to load.
    */
-  studyConfigs?: readonly GameConfig[];
+  studyConfigs?: readonly GameConfig[] | null;
 }
 
 /** The Next hand button, the focus target once a reveal mounts (PR #45 review round 4, finding f). */
@@ -107,7 +107,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
   useHotkey({ key: NEXT_HAND_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   useHotkey({ key: NEXT_HAND_ENTER_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   // Study this spot: the link and Shift+S open the decision's node in Study in a new tab (R3.34).
-  const studyHref = state.kind === "feedback" && studyConfigs !== undefined ? studyLinkFor(state.feedback, prompt, studyConfigs) : null;
+  const studyHref = state.kind === "feedback" && studyConfigs !== undefined && studyConfigs !== null ? studyLinkFor(state.feedback, prompt, studyConfigs) : null;
   const openStudy = () => {
     if (studyHref !== null) window.open(studyHref, STUDY_TAB_TARGET, STUDY_TAB_FEATURES);
   };
@@ -150,6 +150,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
             <div className="flex flex-wrap items-center gap-2">
               <ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />
               {studyHref === null ? null : <StudySpotLink href={studyHref} />}
+              {studyConfigs === null ? <p className="text-sm text-muted">{SESSION_TEXT.studyUnavailable}</p> : null}
             </div>
           }
           workedExample={prompt.worked_example}
