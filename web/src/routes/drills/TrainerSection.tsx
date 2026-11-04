@@ -11,6 +11,8 @@ import {
   GROUPING_LABELS,
   INPUT_LABELS,
   PANEL_LABELS,
+  PANELS_WITHOUT_COMPONENT,
+  panelV1Note,
   PAUSE_LABELS,
   SPEED_LABELS,
   STOP_RULE_HINTS,
@@ -74,6 +76,7 @@ export function TrainerSection({ draft, onChange, errors }: SectionProps) {
         />
       </div>
       {trainer.tables > MIN_TABLES ? <V1Note text={V1_NOTES.tables} /> : null}
+      {trainer.timebank_s === null ? null : <V1Note text={V1_NOTES.timebank} />}
       <div className="flex flex-wrap gap-6">
         <CheckboxField
           label="Mixed-frequency mode"
@@ -89,6 +92,7 @@ export function TrainerSection({ draft, onChange, errors }: SectionProps) {
 
 export function PanelsSection({ draft, onChange, errors }: SectionProps) {
   const selected = PANEL_KEYS.filter((key) => draft.trainer.panels[key] === true);
+  const unserved = PANELS_WITHOUT_COMPONENT.filter((key) => selected.includes(key)).map((key) => PANEL_LABELS[key]);
   return (
     <FormSection title="Panels">
       <CheckboxGroup
@@ -98,6 +102,7 @@ export function PanelsSection({ draft, onChange, errors }: SectionProps) {
         onToggle={(key) => onChange(togglePanel(draft, key))}
         errors={[...(errors["trainer.panels"] ?? []), ...(errors.trainer ?? [])]}
       />
+      {unserved.length === 0 ? null : <V1Note text={panelV1Note(unserved)} />}
     </FormSection>
   );
 }
