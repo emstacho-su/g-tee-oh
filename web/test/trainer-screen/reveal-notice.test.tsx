@@ -10,7 +10,9 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TrainerPrompt } from "../../src/contracts.js";
+import { fixtureAutomatedSession } from "../../src/fixtures/automated.js";
 import { fixturePlainPrompt, fixturePracticeSession } from "../../src/fixtures/trainer.js";
+import { UNRATED_REASONS } from "../../src/trainer/unrated-reason.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 import { DecisionArea } from "../../src/routes/drill-run/DecisionArea.js";
 import { REVEAL_TEXT } from "../../src/routes/drill-run/labels.js";
@@ -18,14 +20,14 @@ import type { SessionContext, SpotState } from "../../src/trainer/spot-machine.j
 
 const CONTEXT: SessionContext = { session: fixturePracticeSession, rng: false };
 
-function awaiting(prompt: TrainerPrompt): SpotState {
-  return { kind: "await_action", context: CONTEXT, prompt, timer: { shownAt: 0, pausedMs: 0, pausedSince: null }, notice: null };
+function awaiting(prompt: TrainerPrompt, context: SessionContext = CONTEXT): SpotState {
+  return { kind: "await_action", context, prompt, timer: { shownAt: 0, pausedMs: 0, pausedSince: null }, notice: null };
 }
 
-function renderArea(prompt: TrainerPrompt) {
+function renderArea(prompt: TrainerPrompt, context: SessionContext = CONTEXT) {
   return render(
     <HotkeyRoot store={createHotkeyStore()}>
-      <DecisionArea state={awaiting(prompt)} prompt={prompt} grouping="standard" interactive onChoose={vi.fn()} onNext={vi.fn()} onExplain={vi.fn()} />
+      <DecisionArea state={awaiting(prompt, context)} prompt={prompt} grouping="standard" interactive onChoose={vi.fn()} onNext={vi.fn()} onExplain={vi.fn()} />
     </HotkeyRoot>,
   );
 }
@@ -33,17 +35,28 @@ function renderArea(prompt: TrainerPrompt) {
 const PLAIN: TrainerPrompt = { ...fixturePlainPrompt, visible_panels: [], worked_example: false };
 
 describe("R3.33 the reveal notice before the decision", () => {
-  it("R3.33 a prompt that names a revealing panel says the decision is not rated, above the action bar", () => {
+  it("R3.33 a prompt that names a revealing panel says why the decision is not rated, above the action bar: the session's ranked reason (round 5 verifier)", () => {
+    // A drill session: the one reason the feedback chip gives too (unrated-reason.ts ranks the mode first).
     renderArea({ ...PLAIN, visible_panels: ["hero_strategy_matrix", "hero_range_matrix"] });
     const notice = screen.getByTestId("reveal-notice");
-    expect(notice).toHaveTextContent(REVEAL_TEXT.notRated);
+    expect(notice).toHaveTextContent(UNRATED_REASONS.drill);
+    expect(notice).not.toHaveTextContent("Revealed");
     const bar = screen.getByTestId("action-bar");
     expect(notice.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("R3.33 a worked example says it too, even with no revealing panel", () => {
+  it("R3.33 in an automated session the reason is the revealing panel, or the worked example", () => {
+    const automated: SessionContext = { session: fixtureAutomatedSession(), rng: false };
+    const { unmount } = renderArea({ ...PLAIN, visible_panels: ["hero_strategy_matrix", "hero_range_matrix"] }, automated);
+    expect(screen.getByTestId("reveal-notice")).toHaveTextContent(UNRATED_REASONS.revealed);
+    unmount();
+    renderArea({ ...PLAIN, worked_example: true }, automated);
+    expect(screen.getByTestId("reveal-notice")).toHaveTextContent(UNRATED_REASONS.workedExample);
+  });
+
+  it("R3.33 a worked example in a drill still names the drill, the session's one reason", () => {
     renderArea({ ...PLAIN, worked_example: true });
-    expect(screen.getByTestId("reveal-notice")).toHaveTextContent(REVEAL_TEXT.notRated);
+    expect(screen.getByTestId("reveal-notice")).toHaveTextContent(UNRATED_REASONS.drill);
   });
 
   it("R3.33 the panels sit behind an eye button, off by default; it names them and says they arrive later", async () => {

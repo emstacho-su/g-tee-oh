@@ -40,14 +40,41 @@ function isSeededAutomated(session: SessionFacts): boolean {
   return session.mode === "automated" && session.automated !== null && !session.rated_eligible;
 }
 
-export function unratedReason(feedback: FeedbackFacts, prompt: PromptFacts, session: SessionFacts): UnratedReason | null {
-  if (feedback.rated) return null;
+export type PreDecisionSessionFacts = SessionFacts;
+
+/** The session's own reason, the first in the ranked order, or null when the session alone does not settle it. */
+function sessionReason(session: SessionFacts): UnratedReason | null {
   if (session.mode === "drill") return UNRATED_REASONS.drill;
   if (session.mode === "holdout") return UNRATED_REASONS.holdout;
   if (isSeededAutomated(session)) return UNRATED_REASONS.seeded;
-  if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
-  if (!session.rated_eligible) return UNRATED_REASONS.rule;
+  return null;
+}
+
+/** The prompt's own reason: a worked example, then a panel that reveals the answer; null for a plain prompt. */
+function promptReason(prompt: PromptFacts): UnratedReason | null {
   if (prompt.worked_example) return UNRATED_REASONS.workedExample;
   if (revealsAnswer(prompt.visible_panels)) return UNRATED_REASONS.revealed;
-  return UNRATED_REASONS.rule;
+  return null;
+}
+
+export function unratedReason(feedback: FeedbackFacts, prompt: PromptFacts, session: SessionFacts): UnratedReason | null {
+  if (feedback.rated) return null;
+  const bySession = sessionReason(session);
+  if (bySession !== null) return bySession;
+  if (feedback.noise_flags.length > 0) return UNRATED_REASONS.noise;
+  if (!session.rated_eligible) return UNRATED_REASONS.rule;
+  return promptReason(prompt) ?? UNRATED_REASONS.rule;
+}
+
+/**
+ * The reason the reveal notice gives before the decision, in the same ranked order as the chip
+ * after it, so one session gives one reason (S48 round 5 verifier on street-next-hand and the
+ * drill screens): the session's mode first, then the prompt. Shown only when the prompt itself
+ * leaves the decision unrated (RevealNotice decides that); without session facts the prompt's
+ * reason stands.
+ */
+export function preDecisionReason(prompt: PromptFacts, session: SessionFacts | undefined): UnratedReason | null {
+  const byPrompt = promptReason(prompt);
+  if (byPrompt === null) return null;
+  return (session === undefined ? null : sessionReason(session)) ?? byPrompt;
 }

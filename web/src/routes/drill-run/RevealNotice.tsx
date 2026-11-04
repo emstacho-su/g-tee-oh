@@ -17,6 +17,7 @@ import { Button, EyeIcon } from "../../components/ui/index.js";
 import type { PanelKey, TrainerPrompt } from "../../contracts.js";
 import { PANEL_LABELS } from "../../drills/labels.js";
 import { revealsAnswer } from "../../trainer/revealing-panels.js";
+import { preDecisionReason, type PreDecisionSessionFacts } from "../../trainer/unrated-reason.js";
 import { REVEAL_TEXT } from "./labels.js";
 
 /** The panels a drill can show before the decision, in the order the eye names them. */
@@ -31,17 +32,21 @@ export function showsRevealNotice(prompt: RevealFacts): boolean {
 
 export interface RevealNoticeProps {
   prompt: RevealFacts;
+  /** The session's facts, so the line names the same ranked reason the feedback chip will (unrated-reason.ts). */
+  session?: PreDecisionSessionFacts;
 }
 
-export function RevealNotice({ prompt }: RevealNoticeProps) {
+export function RevealNotice({ prompt, session }: RevealNoticeProps) {
   const [open, setOpen] = useState(false);
   const listId = useId();
   if (!showsRevealNotice(prompt)) return null;
   const panels = PRE_DECISION_PANELS.filter((panel) => prompt.visible_panels.includes(panel));
+  // One reason per session: a drill names the drill, not the panel (S48 round 5 verifier).
+  const reason = preDecisionReason(prompt, session);
   return (
     <div role="note" data-testid="reveal-notice" className="flex flex-col gap-2 rounded-xl bg-surface-sunken px-3 py-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="font-semibold">{REVEAL_TEXT.notRated}</p>
+        <p className="font-semibold">{reason === null ? REVEAL_TEXT.notRated : `${REVEAL_TEXT.notRated} ${reason}`}</p>
         {panels.length === 0 ? null : (
           <Button size="sm" variant="ghost" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
             <EyeIcon className="size-4" />
