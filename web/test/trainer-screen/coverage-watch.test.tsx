@@ -57,19 +57,21 @@ describe("R3.4 Start again on coverage_added", () => {
       script: {
         [START_PATH]: [problemResponse(422, "no-coverage"), jsonResponse(201, fixturePracticeSession)],
         [CONFIGS_PATH]: [CONFIGS],
-        [PAIRS_PATH]: [pairsWith(false), pairsWith(true)],
+        // The mount check, then the first event's read: both still uncovered; the second event's read covers it.
+        [PAIRS_PATH]: [pairsWith(false), pairsWith(false), pairsWith(true)],
         [NEXT_PATH]: [jsonResponse(200, fixturePlainPrompt)],
       },
     });
     await refuse(view, streams);
     expect(screen.getByTestId("coverage-watch")).toHaveTextContent("Watching the library");
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
     // The re-read still shows the pair uncovered (a flop build, say): keep watching.
     streams[0]?.emit("coverage_added", EVENT);
-    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(2));
     expect(screen.getByRole("alert")).toBeInTheDocument();
     streams[0]?.emit("coverage_added", EVENT);
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
-    expect(view.sentTo(PAIRS_PATH)).toHaveLength(2);
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(3);
     expect(screen.getByTestId("start-note")).toHaveTextContent("The library just added Big blind versus button at Online, 6 players, 100bb deep. Start again.");
     await waitFor(() => expect(streams[0]?.closed).toBe(true));
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
@@ -80,15 +82,15 @@ describe("R3.4 Start again on coverage_added", () => {
     const { streams, deps } = withStreams();
     const view = renderRun({
       libraryDeps: deps,
-      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(true)] },
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(false), pairsWith(true)] },
     });
     await refuse(view, streams);
-    await waitFor(() => expect(view.sentTo(CONFIGS_PATH).length).toBeGreaterThan(0));
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH)).toHaveLength(1));
     streams[0]?.emit("coverage_added", { ...EVENT, config_id: "cfg_9_live_13_100" });
     streams[0]?.emit("coverage_added", { ...EVENT, pair: "SB-BTN" });
-    // Give the watch a moment: nothing is read and the refusal stays.
+    // Give the watch a moment: nothing beyond the mount check is read and the refusal stays.
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(view.sentTo(PAIRS_PATH)).toHaveLength(0);
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByTestId("start-note")).not.toBeInTheDocument();
   });
@@ -149,6 +151,41 @@ describe("R3.4 Start again on coverage_added", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("did not answer in time");
     expect(screen.queryByTestId("start-note")).not.toBeInTheDocument();
     expect(view.sentTo(START_PATH)).toHaveLength(2);
+  });
+
+  it("R3.4 the mount check re-reads the pairs once, so coverage that landed before the subscription still offers Start (PR #48 review round 3 MEDIUM 2)", async () => {
+    const { streams, deps } = withStreams();
+    const view = renderRun({
+      libraryDeps: deps,
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [CONFIGS], [PAIRS_PATH]: [pairsWith(true)] },
+    });
+    await refuse(view, streams);
+    // No event at all: the one mount read already shows the pair covered.
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
+    expect(screen.getByTestId("start-note")).toHaveTextContent("The library just added Big blind versus button at Online, 6 players, 100bb deep. Start again.");
+  });
+
+  it("R3.4 a batch of events at one configuration makes one read (PR #48 review round 3 MEDIUM 6)", async () => {
+    const { streams, deps } = withStreams();
+    let releaseConfigs: () => void = () => undefined;
+    const lateConfigs: ResponseFactory = () =>
+      new Promise((resolve) => {
+        releaseConfigs = () => resolve(new Response(JSON.stringify({ items: fixtureConfigs, next_cursor: null }), { status: 200, headers: { "content-type": "application/json" } }));
+      });
+    const view = renderRun({
+      libraryDeps: deps,
+      script: { [START_PATH]: [problemResponse(422, "no-coverage")], [CONFIGS_PATH]: [lateConfigs], [PAIRS_PATH]: [pairsWith(false)] },
+    });
+    await refuse(view, streams);
+    streams[0]?.emit("coverage_added", EVENT);
+    streams[0]?.emit("coverage_added", { ...EVENT, flop: "Qc9h4d" });
+    streams[0]?.emit("coverage_added", { ...EVENT, flop: "Th6c2s" });
+    releaseConfigs();
+    await waitFor(() => expect(view.sentTo(PAIRS_PATH).length).toBeGreaterThan(0));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The mount check and the three queued events are one batch for one configuration: one read.
+    expect(view.sentTo(PAIRS_PATH)).toHaveLength(1);
   });
 
   it("R3.4 without a refusal the run screen opens no stream", async () => {

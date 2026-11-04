@@ -5,13 +5,15 @@
  * the drill now reaches a covered spot, so nothing polls and Start is offered the moment it can
  * succeed.
  *
- * Mechanism (PR #48 review MEDIUM 4): every event is queued, so one that arrives before the
- * configuration list has loaded is checked once it has, never dropped. A queued event counts when
- * its configuration is one the drill reaches and its pair is one of the drill's pairs (matched by
- * the unordered seat set, reach-model.ts pairKeyOf, so the web applies no ordering rule). For such
- * an event the configuration's pairs are read again; only when that read marks one of the drill's
- * pairs preflop_available is the screen told, and the refusal cleared. Otherwise it keeps watching.
- * It tells the screen once, and never after it has left the screen (a cancelled re-read).
+ * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7): an event counts when its pair is
+ * one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so the web applies
+ * no ordering rule); its configuration is queued. Every configuration the drill reaches is also
+ * queued once on mount, so an event that arrived between the refusal and the subscription is not
+ * lost. Once the configuration list has loaded (events that came earlier wait in the queue), the
+ * queued configurations the drill reaches are read again, one read per configuration however many
+ * events named it; only when a read marks one of the drill's pairs preflop_available is the screen
+ * told, and the refusal cleared. Otherwise it keeps watching. It tells the screen once, and never
+ * after it has left the screen (a cancelled re-read).
  *
  * It is mounted only while the refusal is on screen: the api allows four streams per user, so a
  * drill screen holds one only when it is waiting on the builder.
@@ -21,8 +23,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
-import { configsReached, pairKeyOf, pairKeyOfText, pairKeys } from "../../drills/reach-model.js";
-import type { CoverageAddedEvent } from "../../library/events.js";
+import { configsReached, coveredKeys, pairKeyOf, pairKeyOfText, pairKeys } from "../../drills/reach-model.js";
 import { useServerEvents } from "../../library/use-server-events.js";
 import { practicePairsQuery } from "../../practice/catalog-spot.js";
 import { capitalize, configurationWords, pairWords } from "../../progress/spot-words.js";
@@ -42,17 +43,21 @@ export interface CoverageWatchProps {
   onCoverage: (text: string) => void;
 }
 
-/** The event's pair as a seat-set key, or null when it is not two seats. */
-function eventPairKey(event: CoverageAddedEvent): string | null {
-  return pairKeyOfText(event.pair);
-}
-
 export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
   const api = useAppApi();
   const queryClient = useQueryClient();
   const configs = useQuery(allConfigsQuery(api));
-  const [queued, setQueued] = useState<readonly CoverageAddedEvent[]>([]);
-  useServerEvents({ onCoverageAdded: (event) => setQueued((current) => [...current, event]) });
+  const filter = drill.spot_filter;
+  const drillPairs = new Set(pairKeys(filter.game_config.table_size, filter.hero_positions, filter.villain_positions));
+  // Configuration ids waiting for a re-read; the mount check queues every reached one once.
+  const [queued, setQueued] = useState<readonly string[]>([]);
+  const mountChecked = useRef(false);
+  useServerEvents({
+    onCoverageAdded: (event) => {
+      const key = pairKeyOfText(event.pair);
+      if (key !== null && drillPairs.has(key)) setQueued((current) => [...current, event.config_id]);
+    },
+  });
   // A re-read that answers after the watch left the screen, or after one answer already told the
   // screen, does nothing (PR #48 review round 2 HIGH 2): fired once, and cancelled on unmount.
   const mounted = useRef(true);
@@ -65,31 +70,38 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
   }, []);
 
   useEffect(() => {
-    if (configs.data === undefined || queued.length === 0) return;
-    const batch = queued;
-    setQueued((current) => current.filter((event) => !batch.includes(event)));
-    const filter = drill.spot_filter;
+    if (configs.data === undefined) return;
     const reached = configsReached(filter, configs.data);
-    const drillPairs = new Set(pairKeys(filter.game_config.table_size, filter.hero_positions, filter.villain_positions));
-    for (const event of batch) {
-      const config = reached.find((entry) => entry.config_id === event.config_id);
-      const key = eventPairKey(event);
-      if (config === undefined || key === null || !drillPairs.has(key)) continue;
-      // The pairs read again, fresh: Start is offered only when it shows one of the drill's pairs covered.
+    if (!mountChecked.current) {
+      mountChecked.current = true;
+      setQueued((current) => [...current, ...reached.map((config) => config.config_id)]);
+      return;
+    }
+    if (queued.length === 0) return;
+    const batch = queued;
+    setQueued((current) => current.slice(batch.length));
+    const keys = new Set(pairKeys(filter.game_config.table_size, filter.hero_positions, filter.villain_positions));
+    // One read per configuration, however many events named it (round 3 MEDIUM 6).
+    for (const config of reached.filter((entry) => batch.includes(entry.config_id))) {
       queryClient
         .fetchQuery({ ...practicePairsQuery(api, config.config_id), staleTime: 0 })
         .then((pairs) => {
-          const nowCovered = pairs.some((pair) => pair.preflop_available && drillPairs.has(pairKeyOf(pair.oop, pair.ip)));
-          if (!nowCovered || !mounted.current || fired.current) return;
+          // reach-model's own rule for a covered pair (round 3 MEDIUM 7), limited to the drill's pairs.
+          const covered = coveredKeys(pairs);
+          const pair = pairs.find((entry) => {
+            const key = pairKeyOf(entry.oop, entry.ip);
+            return covered.has(key) && keys.has(key);
+          });
+          if (pair === undefined || !mounted.current || fired.current) return;
           fired.current = true;
-          onCoverage(COVERAGE_WATCH_TEXT.added(event.pair, config));
+          onCoverage(COVERAGE_WATCH_TEXT.added(pair.pair, config));
         })
         .catch((error: unknown) => {
           // A failed re-read keeps the watch running; the next event tries again.
           console.error(`g-tee-oh: re-reading the pairs after coverage_added failed (${describeFailureForLog(error)})`);
         });
     }
-  }, [queued, configs.data, drill.spot_filter, api, queryClient, onCoverage]);
+  }, [queued, configs.data, filter, api, queryClient, onCoverage]);
 
   return (
     <p role="status" data-testid="coverage-watch" className="text-sm text-muted">

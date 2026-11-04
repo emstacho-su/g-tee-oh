@@ -87,7 +87,8 @@ export function pairKeys(tableSize: number, heroes: readonly Position[], villain
   return [...new Set(keys)].sort();
 }
 
-function coveredKeys(pairs: readonly PositionPairEntry[]): Set<string> {
+/** The seat-set keys of the pairs a read marks preflop_available: the one covered-pair rule. */
+export function coveredKeys(pairs: readonly PositionPairEntry[]): Set<string> {
   return new Set(pairs.filter((pair) => pair.preflop_available).map((pair) => pairKeyOf(pair.oop, pair.ip)));
 }
 
