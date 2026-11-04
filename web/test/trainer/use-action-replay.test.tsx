@@ -126,6 +126,14 @@ describe("R3.13 useActionReplay", () => {
     handled.remove();
   });
 
+  it("R3.30 an auto-repeat of Space, a key held down, does not finish the replay; a fresh press does (PR #45 review round 4, finding d)", () => {
+    const { result } = renderReplay(FIRST);
+    act(() => void fireEvent.keyDown(window, { key: " ", repeat: true }));
+    expect(result.current.replaying).toBe(true);
+    act(() => void fireEvent.keyDown(window, { key: " " }));
+    expect(result.current.replaying).toBe(false);
+  });
+
   it("R3.13 while a dialog is open (keySkip off) Space does not finish the replay (review round 1, 6)", () => {
     const { result, rerender } = renderReplay(FIRST, { reducedMotion: false, keySkip: false });
     act(() => void fireEvent.keyDown(window, { key: " " }));

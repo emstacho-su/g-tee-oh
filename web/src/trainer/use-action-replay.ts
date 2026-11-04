@@ -72,14 +72,15 @@ export interface ActionReplay {
 
 
 /**
- * Space with no modifier, pressed outside a field and a focused control (dispatch.ts: a button,
+ * Space with no modifier and not an auto-repeat (holding Space never skips twice; PR #45 review
+ * round 4, finding d), pressed outside a field and a focused control (dispatch.ts: a button,
  * link, field or any tabindex widget such as the range matrix, never a disabled one), and not
  * already handled by a widget (defaultPrevented: the matrix selects a cell on Space). This window
  * listener runs in the bubble phase, after React's handlers (PR #45 review round 2, finding 1).
  */
 function isSkipKey(event: KeyboardEvent): boolean {
   if (event.defaultPrevented) return false;
-  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat) return false;
   if (event.key !== REPLAY_SKIP_KEY) return false;
   const { target } = event;
   return !isEditableTarget(target) && !isActivatableTarget(target);
