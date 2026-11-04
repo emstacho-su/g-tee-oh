@@ -120,3 +120,13 @@ describe("R3.13 BoardReveal", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("A board holds 0, 3, 4 or 5 cards; got 2.");
   });
 });
+
+describe("R3.13 critic round 3: an undealt slot reads on every ground", () => {
+  it("R3.13 the undealt slot's dashed edge takes the ground's own text colour, never a fixed white that vanishes on a light card", () => {
+    render(<BoardReveal cards={[]} />);
+    for (const slot of screen.getAllByRole("img", { name: /not dealt/ })) {
+      expect(slot.className).not.toMatch(/border-white/);
+      expect(slot.className).toMatch(/\bborder-current\b/);
+    }
+  });
+});
