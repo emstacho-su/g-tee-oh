@@ -23,7 +23,7 @@ import type { StudyNode } from "../../contracts.js";
 import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { LoadingNote } from "../../components/ui/index.js";
-import { pairPositions } from "../../poker/pair.js";
+import { parsePair } from "../../poker/pair.js";
 import { FailureAlert } from "./StudyNotices.js";
 
 export const PICK_A_CELL = "Pick a cell in the matrix to see that hand's threshold card, blockers and role.";
@@ -62,6 +62,12 @@ function sameNodePlaceholder(node: Pick<InsightsNode, "solution_id" | "node_key"
   };
 }
 
+/** The advantage card's seats, out of position first; a malformed pair names itself for both. */
+function advantageSeats(pair: string): { oop: string; ip: string } {
+  const [oop, ip] = parsePair(pair) ?? [pair, pair];
+  return { oop, ip };
+}
+
 interface AdvantageAreaProps {
   api: AppApi;
   node: InsightsNode;
@@ -88,7 +94,7 @@ function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
     <RangeAdvantageCard
       rangeAdvantage={insights.data.range_advantage}
       nutAdvantage={insights.data.nut_advantage}
-      seats={pairPositions(node.pair) ?? { oop: node.pair, ip: node.pair }}
+      seats={advantageSeats(node.pair)}
       toAct={node.to_act}
     />
   );

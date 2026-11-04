@@ -8,16 +8,16 @@ import { describe, expect, it } from "vitest";
 
 import { actingSeatIndex } from "../../src/components/range-matrix/model.js";
 import { spotLineKey } from "../../src/study/saved-spots.js";
-import { pairPositions } from "../../src/poker/pair.js";
+import { parsePair } from "../../src/poker/pair.js";
 import { draftFromSearch } from "../../src/study/settings.js";
 
 describe("R3.12 one pair split", () => {
-  it("R3.12 pairPositions reads oop then ip and refuses anything that is not two parts", () => {
-    expect(pairPositions("BB-BTN")).toEqual({ oop: "BB", ip: "BTN" });
-    expect(pairPositions("SB-BB")).toEqual({ oop: "SB", ip: "BB" });
-    expect(pairPositions("BB")).toBeNull();
-    expect(pairPositions("BB-BTN-CO")).toBeNull();
-    expect(pairPositions(undefined)).toBeNull();
+  it("R3.12 parsePair reads oop then ip and refuses anything that is not two parts", () => {
+    expect(parsePair("BB-BTN")).toEqual(["BB", "BTN"]);
+    expect(parsePair("SB-BB")).toEqual(["SB", "BB"]);
+    expect(parsePair("BB")).toBeNull();
+    expect(parsePair("BB-BTN-CO")).toBeNull();
+    expect(parsePair(undefined)).toBeNull();
   });
 
   it("R3.12 the matrix, the settings panel and the saved spots agree on it", () => {

@@ -18,7 +18,7 @@
  */
 import type { NodeAction, NodeHandRow, StudyNode } from "../../contracts.js";
 import { HAND_GRID, cellOf, type HandKind } from "../../poker/hands.js";
-import { pairPositions } from "../../poker/pair.js";
+import { parsePair } from "../../poker/pair.js";
 import {
   COMPARE_NEUTRAL_PCT_POT,
   EV_NEUTRAL_BB,
@@ -86,7 +86,7 @@ const OUT_OF_POSITION: SeatIndex = 0;
 /** The index of the acting seat's reach: 1 when the seat to act is the pair's in-position (second) seat, else 0. */
 export function actingSeatIndex(source: Pick<MatrixSource, "to_act" | "pair">): SeatIndex {
   if (source.pair === undefined || source.to_act === undefined) return OUT_OF_POSITION;
-  return pairPositions(source.pair)?.ip === source.to_act ? IN_POSITION : OUT_OF_POSITION;
+  return parsePair(source.pair)?.[IN_POSITION] === source.to_act ? IN_POSITION : OUT_OF_POSITION;
 }
 
 function validateRow(row: NodeHandRow, actionCount: number): void {

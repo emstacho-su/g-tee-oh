@@ -14,6 +14,7 @@ import { familyWords as frequencyFamilyWords } from "../../src/progress/frequenc
 import { classLabel, columnLabel, rowLabel } from "../../src/progress/heatmap-model.js";
 import { joinLeaksToCells } from "../../src/progress/leak-model.js";
 import { buildHomeQueue } from "../../src/progress/queue-model.js";
+import { parsePair } from "../../src/poker/pair.js";
 import {
   capitalize,
   classWords,
@@ -23,7 +24,6 @@ import {
   FAMILY_WORDS,
   familyWords,
   pairWords,
-  parsePair,
   POSITION_WORDS,
   positionWords,
 } from "../../src/progress/spot-words.js";

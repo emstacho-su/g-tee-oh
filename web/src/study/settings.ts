@@ -10,7 +10,7 @@
  * pairs load. confirmBlocker names the first thing in field order that stops Confirm.
  */
 import { formatCbb } from "../poker/format.js";
-import { pairPositions } from "../poker/pair.js";
+import { parsePair } from "../poker/pair.js";
 import { FORMAT_OPTIONS, withoutNodeChoices } from "./filters.js";
 import { potTypeLabel } from "./pot-type.js";
 import type { Stake } from "./queries.js";
@@ -194,8 +194,7 @@ export function draftUncoveredPair(catalog: SettingsCatalog, draft: SettingsDraf
 
 /** The pair's two seats, the one that acts first preflop first; undefined for a malformed pair. */
 function pairSeats(pair: string | undefined): Pick<SettingsDraft, "first" | "against"> {
-  const parts = pairPositions(pair);
-  const seats = (parts === null ? [] : [parts.oop, parts.ip]).filter(isPosition);
+  const seats = [...(parsePair(pair) ?? [])].filter(isPosition);
   if (seats.length !== 2) return {};
   const [first, against] = [...seats].sort((left, right) => SEAT_ORDER.indexOf(left) - SEAT_ORDER.indexOf(right));
   return first === undefined || against === undefined ? {} : { first, against };

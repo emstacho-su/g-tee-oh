@@ -15,7 +15,7 @@
  */
 import { CBB_PER_BB } from "../poker/format.js";
 import type { PositionPairEntry } from "../practice/catalog-spot.js";
-import { parsePair } from "../progress/spot-words.js";
+import { parsePair } from "../poker/pair.js";
 import type { GameConfig } from "../progress/types.js";
 import { seatedPositions } from "./limits.js";
 import type { Position, SpotFilter } from "./types.js";
