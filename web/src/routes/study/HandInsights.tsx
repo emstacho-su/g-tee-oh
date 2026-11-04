@@ -14,7 +14,7 @@
  * (advantageFailure, code review), and the stand-in read is keyed per node, so a revisit is a cache hit; other failures show the fixed message
  * from problem-text.ts with a retry when it can help. A hand-less api variant is O-461.
  */
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { isHandNotInRange, type AppApi } from "../../api/index.js";
 import { BlockersCard, HandRoleChip, RangeAdvantageCard, ThresholdCard } from "../../components/panels/index.js";
@@ -63,7 +63,8 @@ interface AdvantageAreaProps {
  * is out of the range (404 hand-not-in-range), the stand-in read takes over so the card stays.
  */
 function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
-  const primary = useQuery(studyInsightsQuery(api, insightsParams(node, selected ?? standIn)));
+  // The previous read's card stays while a newly selected hand's read loads: no loading flash on a click (code review 3).
+  const primary = useQuery({ ...studyInsightsQuery(api, insightsParams(node, selected ?? standIn)), placeholderData: keepPreviousData });
   const fallBack = selected !== undefined && selected !== standIn && primary.isError && isHandNotInRange(primary.error);
   const backup = useQuery({ ...studyInsightsQuery(api, insightsParams(node, standIn)), enabled: fallBack });
   const insights = fallBack ? backup : primary;

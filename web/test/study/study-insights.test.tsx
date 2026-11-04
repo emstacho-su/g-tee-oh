@@ -73,6 +73,21 @@ describe("R3.12 insights on the study screen", () => {
     expect(insightHands(requests)).toEqual(["AKs"]);
   });
 
+  it("R3.12 selecting a cell keeps the advantage card on screen while the hand's read loads, no loading flash (code review 3)", async () => {
+    const user = userEvent.setup();
+    renderStudy(BASE, (request) =>
+      request.path === "/api/v1/study/insights" && request.query["hand"] === "AKs" ? new Promise<Response>(() => undefined) : undefined,
+    );
+    const card = await screen.findByRole("region", { name: "Range and nut advantage" });
+    expect(card).toHaveTextContent("BTN 52.0%");
+    const grid = screen.getByRole("group", { name: /range matrix cells/i });
+    grid.focus();
+    await user.keyboard("{ArrowRight}{Enter}");
+    await screen.findByRole("table", { name: "AKs at this node: strategy and EV" });
+    expect(screen.getByRole("region", { name: "Range and nut advantage" })).toHaveTextContent("BTN 52.0%");
+    expect(screen.queryByText("Loading the range advantage.")).not.toBeInTheDocument();
+  });
+
   it("R3.12 a failed stand-in read names no hand the user never picked (code review)", async () => {
     renderStudy(BASE, (request) => (request.path === "/api/v1/study/insights" ? problemOf(503, "unavailable") : undefined));
     const alert = await screen.findByRole("alert");
