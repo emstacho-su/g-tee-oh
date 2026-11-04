@@ -149,7 +149,7 @@ const childActions: readonly NodeAction[] = [
     label: "Raise to 11bb",
     next_node_key: childKey(FIXTURE_STUDY_CONFIG_ID, FIXTURE_STUDY_PAIR, FIXTURE_GRANDCHILD_LINE),
   },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 function shifted(value: number): number {
@@ -189,7 +189,7 @@ const grandchildActions: readonly NodeAction[] = [
   { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
   { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
   { index: 2, token: "r2500", kind: "raise", size_cbb: 2500, bucket: "pot", label: "Raise to 25bb", next_node_key: null },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 /** The grandchild's rows sit twice the child's shift towards weaker hands. */

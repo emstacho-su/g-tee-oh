@@ -18,6 +18,7 @@
  */
 import type { NodeAction, NodeHandRow, StudyNode } from "../../contracts.js";
 import { HAND_GRID, cellOf, type HandKind } from "../../poker/hands.js";
+import { parsePair } from "../../poker/pair.js";
 import {
   COMPARE_NEUTRAL_PCT_POT,
   EV_NEUTRAL_BB,
@@ -79,15 +80,13 @@ export interface MatrixModel {
 export type MatrixSource = Pick<StudyNode, "actions" | "hands"> & Partial<Pick<StudyNode, "to_act" | "pair">>;
 
 const EMPTY: readonly number[] = Object.freeze([]);
-const PAIR_SEPARATOR = "-";
 const IN_POSITION: SeatIndex = 1;
 const OUT_OF_POSITION: SeatIndex = 0;
 
 /** The index of the acting seat's reach: 1 when the seat to act is the pair's in-position (second) seat, else 0. */
 export function actingSeatIndex(source: Pick<MatrixSource, "to_act" | "pair">): SeatIndex {
   if (source.pair === undefined || source.to_act === undefined) return OUT_OF_POSITION;
-  const inPosition = source.pair.split(PAIR_SEPARATOR)[1];
-  return inPosition === source.to_act ? IN_POSITION : OUT_OF_POSITION;
+  return parsePair(source.pair)?.[IN_POSITION] === source.to_act ? IN_POSITION : OUT_OF_POSITION;
 }
 
 function validateRow(row: NodeHandRow, actionCount: number): void {
@@ -162,18 +161,11 @@ export function lensPositionOf(actions: readonly NodeAction[], lensIndex: number
 const FULL_WEIGHT = 1;
 
 /**
- * Whether the bars scale by weight unless the user says otherwise (O-465): on when any present
- * cell is known to hold less than its full class, or when the street is postflop, where ranges
- * are always partial; off on a preflop root where every hand is fully in the range.
- */
-export function defaultScaleByWeight(cells: readonly MatrixCell[], street: StudyNode["street"]): boolean {
-  if (street !== "preflop") return true;
-  return cells.some((cell) => cell.present && cell.weight !== null && cell.weight < FULL_WEIGHT);
-}
-
-/**
- * The same default read straight from the node's rows (code review): the acting seat's reach of each
- * row, with no 169-cell model built, for a screen that needs the default before the matrix builds.
+ * Whether the bars scale by weight unless the user says otherwise (O-465): on when the street is
+ * postflop, where ranges are always partial, or when any row's acting-seat reach is known to be
+ * below its full class; off on a preflop root where every hand is fully in the range. Read
+ * straight from the node's rows, with no 169-cell model built, so a screen has the default before
+ * the matrix builds (code review).
  */
 export function defaultScaleByWeightOf(node: MatrixSource & Pick<StudyNode, "street">): boolean {
   if (node.street !== "preflop") return true;

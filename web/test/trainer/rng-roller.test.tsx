@@ -37,7 +37,7 @@ describe("R3.13 RngRoller", () => {
     render(<RngRoller actions={fixtureActions} freqByAction={FREQUENCIES} roll={null} onExplain={vi.fn()} />);
     const items = within(screen.getByRole("list", { name: "Mixed-frequency bands" })).getAllByRole("listitem");
     // 1-5 Fold and 6-15 Call are 5 and 10 rolls wide, under the threshold; 16-95 Raise is 80 wide.
-    for (const [index, text] of [[0, "1-5 Fold"], [1, "6-15 Call"], [3, "96-100 All-in 100bb"]] as const) {
+    for (const [index, text] of [[0, "1-5 Fold"], [1, "6-15 Call"], [3, "96-100 All-in"]] as const) {
       const item = items[index] as HTMLElement;
       expect(item).toHaveAttribute("title", text);
       expect(within(item).getByTestId("action-swatch")).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("R3.13 RngRoller", () => {
       "F1-5 Fold",
       "C6-15 Call",
       "R16-95 Raise to 2.5bb",
-      "A96-100 All-in 100bb",
+      "A96-100 All-in",
     ]);
   });
 

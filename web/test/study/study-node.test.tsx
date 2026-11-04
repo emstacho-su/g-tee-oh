@@ -67,9 +67,9 @@ describe("R3.12 study node view", () => {
     );
   });
 
-  it("R3.12 the threshold card shows only for a selected hand; before one, insights read with the stand-in (O-461)", async () => {
+  it("R3.12 R3.26 the threshold card on the Hands tab shows only for a selected hand", async () => {
     const user = userEvent.setup();
-    const { requests, router } = renderStudy(BASE);
+    const { requests, router } = renderStudy(`${BASE}&view=hands`);
     expect(await screen.findByText("Pick a cell in the matrix to see that hand's threshold card, blockers and role.")).toBeInTheDocument();
     expect(screen.queryByTestId("threshold-card")).not.toBeInTheDocument();
 
@@ -84,7 +84,7 @@ describe("R3.12 study node view", () => {
   });
 
   it("R3.12 a hand that left the range says so instead of a card", async () => {
-    renderStudy(`${BASE}&hand=${FIXTURE_OUT_OF_RANGE_HAND}`);
+    renderStudy(`${BASE}&hand=${FIXTURE_OUT_OF_RANGE_HAND}&view=hands`);
     expect(await screen.findByText("72o is not in the range at this node, so it has no threshold card.")).toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe("R3.12 study node errors", () => {
 
   it("R3.12 an insights failure is retryable for a 503", async () => {
     let failed = false;
-    renderStudy(`${BASE}&hand=AKs`, (request) => {
+    renderStudy(`${BASE}&hand=AKs&view=hands`, (request) => {
       if (request.path !== "/api/v1/study/insights" || failed) return undefined;
       failed = true;
       return problemOf(503, "unavailable");

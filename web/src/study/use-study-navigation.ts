@@ -14,6 +14,7 @@ import { withFilters } from "./action-filters.js";
 import { withHand, withLens, withLine, withMode } from "./filters.js";
 import { useNodeSwitchMetrics } from "./node-switch-metrics.js";
 import type { StudySearch } from "./search.js";
+import type { StudyView } from "./study-views.js";
 
 export interface StudyNavigation {
   /** Writes confirmed settings (a push). */
@@ -26,6 +27,10 @@ export interface StudyNavigation {
   setLens: (lens: number) => void;
   /** Writes the action filter set (a replace, S45, O-468); with `compare`, also opens Compare to Best on that action. */
   setFilters: (filters: readonly number[], compare?: number) => void;
+  /** Opens a right-column tab (a replace, R3.26). */
+  setView: (view: StudyView) => void;
+  /** Opens Compare to Best on one action (a replace, R3.26: the Compare tab's rows). */
+  compareAction: (lens: number) => void;
 }
 
 export function useStudyNavigation(search: StudySearch): StudyNavigation {
@@ -54,5 +59,7 @@ export function useStudyNavigation(search: StudySearch): StudyNavigation {
       const next = withFilters(search, filters);
       go(compare === undefined ? next : withLens(withMode(next, "compare"), compare), true);
     },
+    setView: (view) => go({ ...search, view }, true),
+    compareAction: (lens) => go(withLens(withMode(search, "compare"), lens), true),
   };
 }

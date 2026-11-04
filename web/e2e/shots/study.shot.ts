@@ -72,6 +72,8 @@ async function solutionScreens(page: Page, shot: (screen: string, criterion: str
   await page.getByRole("radio", { name: "Frequency", exact: true }).click();
   await page.getByRole("group", { name: /Range matrix cells/ }).focus();
   await page.keyboard.press("Enter");
+  // R3.26: the threshold card lives on the Hands tab of the right column.
+  await page.getByRole("tab", { name: /^Hands/ }).click();
   await expect(page.getByTestId("threshold-card")).toBeVisible();
   await shot("study-threshold-card", CRITERIA.threshold);
 }

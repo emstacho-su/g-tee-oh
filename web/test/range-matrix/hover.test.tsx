@@ -127,6 +127,17 @@ describe("R3.25 the hover outline", () => {
     );
   }
 
+  it("R3.25 the hover outline is drawn after the chips and texts, so a label chip never covers it (code review 3)", () => {
+    const { ctx, ops } = recordingContext();
+    drawMatrix(ctx, model, options({ hoveredIndex: 14 }));
+    const hover = strokesIn(ops, 14).find((op) => op.style === MATRIX_PALETTES.light.focus);
+    if (hover === undefined) throw new Error("no hover outline");
+    const lastText = ops.reduce((last, op, index) => (op.op === "fillText" ? index : last), -1);
+    const lastChip = ops.reduce((last, op, index) => (op.op === "fillRect" && op.style === MATRIX_PALETTES.light.labelChip ? index : last), -1);
+    expect(ops.indexOf(hover)).toBeGreaterThan(lastText);
+    expect(ops.indexOf(hover)).toBeGreaterThan(lastChip);
+  });
+
   it("R3.25 strokes a thin outline on the hovered cell, thinner than the focus ring, and none when nothing is hovered", () => {
     const { ctx, ops } = recordingContext();
     drawMatrix(ctx, model, options({ hoveredIndex: 14, focusedIndex: 0 }));

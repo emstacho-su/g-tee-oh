@@ -26,8 +26,8 @@ export function spotOf(search: StudySearch): StudySpot | undefined {
   return { format, table_size: tableSize, stake, depth, pair };
 }
 
-/** One entry per spot and line in the recent list. */
-function recentKey(search: StudySearch): string {
+/** One spot and line: the recent list's identity and what Start over belongs to (one key, code review 3). */
+export function spotLineKey(search: StudySearch): string {
   return `${settingsSignature(search)}|${search.line ?? ""}`;
 }
 
@@ -60,8 +60,8 @@ export function parseStarredSpots(value: unknown): StudySpot[] {
 /** The recent list with this search first, its older entry for the same spot and line gone, ten at most. */
 export function pushRecent(recent: readonly StudySearch[], search: StudySearch): StudySearch[] {
   if (spotOf(search) === undefined) return [...recent];
-  const key = recentKey(search);
-  return [search, ...recent.filter((entry) => recentKey(entry) !== key)].slice(0, MAX_RECENT_SPOTS);
+  const key = spotLineKey(search);
+  return [search, ...recent.filter((entry) => spotLineKey(entry) !== key)].slice(0, MAX_RECENT_SPOTS);
 }
 
 export function isStarred(starred: readonly StudySpot[], search: StudySearch): boolean {

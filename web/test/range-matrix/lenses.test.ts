@@ -16,7 +16,6 @@ import {
   actingSeatIndex,
   buildMatrixModel,
   defaultLensPosition,
-  defaultScaleByWeight,
   defaultScaleByWeightOf,
   lossScaleOf,
   type MatrixCell,
@@ -284,14 +283,16 @@ describe("R3.24 bars scaled by range weight (O-465)", () => {
     }
   });
 
-  it("R3.24 the default reads the node's rows directly and agrees with the model rule, with no model build (code review)", () => {
+  it("R3.24 the default reads the node's rows directly, with no model build (code review)", () => {
     const full = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: [1, 1] })) };
     const unknown = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: null })) };
     const oopPartial = { ...full, hands: full.hands.map((row, index) => (index === 0 ? { ...row, reach: [0.4, 1] } : row)) };
     const ipPartial = { ...full, hands: full.hands.map((row, index) => (index === 0 ? { ...row, reach: [1, 0.4] } : row)) };
     for (const node of [fixtureStudyNode, full, unknown, oopPartial, ipPartial]) {
       for (const street of ["preflop", "flop"] as const) {
-        expect(defaultScaleByWeightOf({ ...node, street }), street).toBe(defaultScaleByWeight(buildMatrixModel(node).cells, street));
+        // On when any row's acting-seat reach is known and below 1, or postflop; never on unknown reach alone.
+        const partial = node.hands.some((row) => (row.reach?.[1] ?? 1) < 1);
+        expect(defaultScaleByWeightOf({ ...node, street }), street).toBe(street !== "preflop" || partial);
       }
     }
     // BTN acts in BB-BTN, so only the in-position reach counts.
@@ -300,11 +301,11 @@ describe("R3.24 bars scaled by range weight (O-465)", () => {
   });
 
   it("R3.24 the default is on when any present weight is below 1 or the street is postflop, off otherwise", () => {
-    expect(defaultScaleByWeight(model.cells, "preflop")).toBe(true);
-    const full = model.cells.map((cell) => ({ ...cell, weight: cell.present ? 1 : null }));
-    expect(defaultScaleByWeight(full, "preflop")).toBe(false);
-    expect(defaultScaleByWeight(full, "flop")).toBe(true);
-    const unknown = model.cells.map((cell) => ({ ...cell, weight: null }));
-    expect(defaultScaleByWeight(unknown, "preflop")).toBe(false);
+    expect(defaultScaleByWeightOf({ ...fixtureStudyNode, street: "preflop" })).toBe(true);
+    const full = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: [1, 1] })) };
+    expect(defaultScaleByWeightOf({ ...full, street: "preflop" })).toBe(false);
+    expect(defaultScaleByWeightOf({ ...full, street: "flop" })).toBe(true);
+    const unknown = { ...fixtureStudyNode, hands: fixtureStudyNode.hands.map((row) => ({ ...row, reach: null })) };
+    expect(defaultScaleByWeightOf({ ...unknown, street: "preflop" })).toBe(false);
   });
 });

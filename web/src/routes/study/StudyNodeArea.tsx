@@ -34,9 +34,10 @@ import { studyNodeQuery } from "../../study/queries.js";
 import type { StudySearch } from "../../study/search.js";
 import { useChildStreets, useLineNodes, type ChildStreets } from "../../study/use-line-nodes.js";
 import { knownFilters, parseFilters } from "../../study/action-filters.js";
-import type { DepthNeighbours } from "../../study/depth-steps.js";
+import type { DepthSteps } from "../../study/use-depth-steps.js";
 import { studyModeOf } from "../../study/search.js";
 import { useStudyHotkeys } from "../../study/use-study-hotkeys.js";
+import type { StudyView } from "../../study/study-views.js";
 import { LineEscape } from "./LineEscape.js";
 import { NodeView } from "./NodeView.js";
 import { PositionCarousel } from "./PositionCarousel.js";
@@ -56,10 +57,13 @@ export interface StudyNodeAreaProps {
   onLensChange: (lens: number) => void;
   /** The action filter set (S45, R3.12, O-468). */
   onFiltersChange: (filters: readonly number[], compare?: number) => void;
+  /** The right column's open tab and the Compare tab's rows (R3.26). */
+  onViewChange: (view: StudyView) => void;
+  onCompare: (index: number) => void;
   /** The S key: the spot settings panel (S45, O-466). */
   onOpenSettings: () => void;
   /** The covered depths around this one, for the ] and [ keys (S45, O-467). */
-  depths: DepthNeighbours;
+  depths: DepthSteps;
   onDepthChange: (depth: number) => void;
 }
 
@@ -92,10 +96,12 @@ function LineCarousel({ api, configId, pair, seats, node, line, childStreets, on
 }
 
 /** What the ] and [ keys do here, for screen readers. */
-function depthStepText({ deeper, shallower }: DepthNeighbours): string {
+function depthStepText({ deeper, shallower, unchecked }: DepthSteps): string {
   const up = deeper === undefined ? "no deeper depth covers this pair" : `opens ${formatCbb(deeper)}`;
   const down = shallower === undefined ? "no shallower depth covers this pair" : `opens ${formatCbb(shallower)}`;
-  return `The ] key ${up}; the [ key ${down}.`;
+  // A depth whose seats could not be read is said in words, never left out silently (code review 3).
+  const missing = unchecked.length === 0 ? "" : ` ${unchecked.map(formatCbb).join(", ")} could not be checked.`;
+  return `The ] key ${up}; the [ key ${down}.${missing}`;
 }
 
 /** A node with no actions, so the children's streets read nothing while the node loads or failed. */
@@ -165,6 +171,8 @@ export function StudyNodeArea(props: StudyNodeAreaProps) {
       onOpenLine={onOpenLine}
       onLensChange={onLensChange}
       onFiltersChange={onFiltersChange}
+      onViewChange={props.onViewChange}
+      onCompare={props.onCompare}
     />
   );
 }

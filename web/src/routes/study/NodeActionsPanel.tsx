@@ -13,6 +13,7 @@ import { ActionFrequencyTable } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { formatCombos } from "../../poker/format.js";
 import { knownFilters } from "../../study/action-filters.js";
+import { useHoveredHand, type HoverStore } from "../../study/hover-store.js";
 import { combosByPosition, sharesByPosition } from "../../study/range-shares.js";
 
 export const RANGE_TABLE_CAPTION = "Range by action at this node";
@@ -20,7 +21,10 @@ export const FILTERED_LABEL = "Filtered";
 
 export interface NodeActionsPanelProps {
   node: Pick<StudyNode, "actions" | "range_by_action" | "range_combos" | "hands">;
+  /** The selected hand. */
   hand: string | undefined;
+  /** The hovered hand (R3.25): the hand row follows it, subscribing alone (code review 3). */
+  hover?: HoverStore;
   /** The filtered NodeAction.index values (O-468); absent, the table is read-only. */
   filters?: readonly number[];
   onToggleFilter?: (index: number) => void;
@@ -56,7 +60,20 @@ function rangeNote(node: NodeActionsPanelProps["node"]): string | undefined {
   return `${reaching} of ${formatCombos(range.combos)} reach this node`;
 }
 
-export function NodeActionsPanel({ node, hand, filters = [], onToggleFilter }: NodeActionsPanelProps) {
+interface FollowingHandRowProps {
+  node: NodeActionsPanelProps["node"];
+  hand: string | undefined;
+  hover: HoverStore;
+  filters: readonly number[];
+}
+
+/** The hand row for the hovered hand, else the selected one; the only part of the panel a hover re-renders. */
+function FollowingHandRow({ node, hand, hover, filters }: FollowingHandRowProps) {
+  const shown = useHoveredHand(hover) ?? hand;
+  return shown === undefined ? null : <HandRow node={node} hand={shown} filters={filters} />;
+}
+
+export function NodeActionsPanel({ node, hand, hover, filters = [], onToggleFilter }: NodeActionsPanelProps) {
   const shares = sharesByPosition(node.actions, node.range_by_action);
   const combos = shares.kind === "ok" ? combosByPosition(node.actions, node.range_by_action) : null;
   const note = rangeNote(node);
@@ -74,7 +91,11 @@ export function NodeActionsPanel({ node, hand, filters = [], onToggleFilter }: N
       ) : (
         <p role="alert" className="text-danger">{`Cannot show the range by action: ${shares.problem}.`}</p>
       )}
-      {hand === undefined ? null : <HandRow node={node} hand={hand} filters={filters} />}
+      {hover !== undefined ? (
+        <FollowingHandRow node={node} hand={hand} hover={hover} filters={filters} />
+      ) : hand === undefined ? null : (
+        <HandRow node={node} hand={hand} filters={filters} />
+      )}
     </div>
   );
 }

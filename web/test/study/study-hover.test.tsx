@@ -4,7 +4,7 @@
  * and the insights (the threshold card) stay on the selected hand, so a sweep over the matrix
  * reads no insights.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIXTURE_ONLINE_STAKE_ID, FIXTURE_STUDY_PAIR } from "../../src/fixtures/study.js";
@@ -42,9 +42,34 @@ describe("R3.25 hover on the study screen", () => {
     expect(router.state.location.search).toMatchObject({ hand: "AKs" });
     fireEvent.pointerLeave(canvas);
     expect(await screen.findByRole("table", { name: "AKs at this node: strategy and EV" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("threshold-card")).toHaveTextContent("Your hand: AKs"));
+    await screen.findByRole("region", { name: "Range and nut advantage" });
     const insightHands = requests.filter((request) => request.path === "/api/v1/study/insights").map((request) => request.query["hand"]);
     expect(insightHands).not.toContain("KQs");
+  });
+
+  it("R3.25 with no selected hand, Compare keeps the last hovered hand after the pointer leaves, so its buttons can be clicked (PR 52 review 1)", async () => {
+    const { router } = renderStudy(`${BASE}&view=compare`);
+    const canvas = await placedCanvas();
+    const panel = await screen.findByRole("tabpanel", { name: "Compare" });
+    fireEvent.pointerMove(canvas, { clientX: 5, clientY: 5 });
+    expect(await within(panel).findByRole("list", { name: "AA against the best action" })).toBeInTheDocument();
+    fireEvent.pointerLeave(canvas);
+    const button = await within(panel).findByRole("button", { name: "Compare Raise to 2.5bb on the matrix" });
+    fireEvent.click(button);
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ mode: "compare", lens: "2" }));
+    fireEvent.pointerMove(canvas, { clientX: CELL_PX * 2 + 5, clientY: CELL_PX * 1 + 5 });
+    expect(await within(panel).findByRole("list", { name: "KQs against the best action" })).toBeInTheDocument();
+  });
+
+  it("R3.25 with a selected hand, Compare returns to it when the pointer leaves (PR 52 review 1)", async () => {
+    renderStudy(`${BASE}&view=compare&hand=AKs`);
+    const canvas = await placedCanvas();
+    const panel = await screen.findByRole("tabpanel", { name: "Compare" });
+    expect(await within(panel).findByRole("list", { name: "AKs against the best action" })).toBeInTheDocument();
+    fireEvent.pointerMove(canvas, { clientX: CELL_PX * 2 + 5, clientY: CELL_PX * 1 + 5 });
+    expect(await within(panel).findByRole("list", { name: "KQs against the best action" })).toBeInTheDocument();
+    fireEvent.pointerLeave(canvas);
+    expect(await within(panel).findByRole("list", { name: "AKs against the best action" })).toBeInTheDocument();
   });
 
   it("R3.25 with no selected hand, hovering shows the hovered hand's row and leaving shows none", async () => {

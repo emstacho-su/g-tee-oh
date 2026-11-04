@@ -1,5 +1,7 @@
 /**
- * The insights beside the study matrix (S25, S45, R3.12, O-286, O-461).
+ * The insights beside the study matrix (S25, S45, R3.12, R3.26, O-286, O-461). Two halves, one per
+ * right-column tab: AdvantageInsights on Overview, HandDetails on Hands; each mounts, and reads, only
+ * while its tab is open.
  *
  * Mechanism: the insights read requires a hand, but the range and nut advantage do not depend on
  * it. So the advantage card reads with a stand-in hand (the first class the node holds) from the
@@ -12,14 +14,16 @@
  * (advantageFailure, code review), and the stand-in read is keyed per node, so a revisit is a cache hit; other failures show the fixed message
  * from problem-text.ts with a retry when it can help. A hand-less api variant is O-461.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type Query } from "@tanstack/react-query";
 
 import { isHandNotInRange, type AppApi } from "../../api/index.js";
+import type { StudyInsights } from "../../contracts.js";
 import { BlockersCard, HandRoleChip, RangeAdvantageCard, ThresholdCard } from "../../components/panels/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
 import { studyInsightsQuery } from "../../study/queries.js";
 import { LoadingNote } from "../../components/ui/index.js";
+import { parsePair } from "../../poker/pair.js";
 import { FailureAlert } from "./StudyNotices.js";
 
 export const PICK_A_CELL = "Pick a cell in the matrix to see that hand's threshold card, blockers and role.";
@@ -37,14 +41,31 @@ export function standInHand(node: Pick<StudyNode, "hands">): string | undefined 
   return node.hands[0]?.hand;
 }
 
-/** The pair's two seats, out of position first; the contract's pair pattern always has both. */
-function pairSeats(pair: string): { oop: string; ip: string } {
-  const [oop = pair, ip = pair] = pair.split("-");
-  return { oop, ip };
-}
-
 function insightsParams(node: InsightsNode, hand: string) {
   return { solutionId: node.solution_id, nodeKey: node.node_key, hand };
+}
+
+/** Where the solution id and node key sit in studyInsightsQuery's key. */
+const KEY_SOLUTION_INDEX = 2;
+const KEY_NODE_INDEX = 3;
+
+/**
+ * The previous read's data, kept as a placeholder only while the node and solution are the same:
+ * a new hand at the same node keeps the card (code review 3), but a node switch shows the loading
+ * note, never the previous node's numbers as current (PR 52 review 1).
+ */
+function sameNodePlaceholder(node: Pick<InsightsNode, "solution_id" | "node_key">) {
+  return (previous: StudyInsights | undefined, previousQuery: Pick<Query<StudyInsights>, "queryKey"> | undefined): StudyInsights | undefined => {
+    const key = previousQuery?.queryKey;
+    const sameNode = key?.[KEY_SOLUTION_INDEX] === node.solution_id && key[KEY_NODE_INDEX] === node.node_key;
+    return sameNode ? previous : undefined;
+  };
+}
+
+/** The advantage card's seats, out of position first; a malformed pair names itself for both. */
+function advantageSeats(pair: string): { oop: string; ip: string } {
+  const [oop, ip] = parsePair(pair) ?? [pair, pair];
+  return { oop, ip };
 }
 
 interface AdvantageAreaProps {
@@ -61,7 +82,8 @@ interface AdvantageAreaProps {
  * is out of the range (404 hand-not-in-range), the stand-in read takes over so the card stays.
  */
 function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
-  const primary = useQuery(studyInsightsQuery(api, insightsParams(node, selected ?? standIn)));
+  // At the same node the previous read's card stays while a new hand's read loads (code review 3, PR 52 review 1).
+  const primary = useQuery({ ...studyInsightsQuery(api, insightsParams(node, selected ?? standIn)), placeholderData: sameNodePlaceholder(node) });
   const fallBack = selected !== undefined && selected !== standIn && primary.isError && isHandNotInRange(primary.error);
   const backup = useQuery({ ...studyInsightsQuery(api, insightsParams(node, standIn)), enabled: fallBack });
   const insights = fallBack ? backup : primary;
@@ -72,7 +94,7 @@ function AdvantageArea({ api, node, selected, standIn }: AdvantageAreaProps) {
     <RangeAdvantageCard
       rangeAdvantage={insights.data.range_advantage}
       nutAdvantage={insights.data.nut_advantage}
-      seats={pairSeats(node.pair)}
+      seats={advantageSeats(node.pair)}
       toAct={node.to_act}
     />
   );
@@ -96,12 +118,13 @@ function SelectedHandInsights({ api, node, hand }: { api: AppApi; node: Insights
   );
 }
 
-export function HandInsights({ api, node, hand }: HandInsightsProps) {
+/** The range and nut advantage, read with the selected hand when there is one, else the stand-in; the Overview tab's half (R3.26). */
+export function AdvantageInsights({ api, node, hand }: HandInsightsProps) {
   const standIn = standInHand(node);
-  return (
-    <div className="flex flex-col gap-4">
-      {standIn === undefined ? null : <AdvantageArea api={api} node={node} selected={hand} standIn={standIn} />}
-      {hand === undefined ? <p className="text-sm text-muted">{PICK_A_CELL}</p> : <SelectedHandInsights api={api} node={node} hand={hand} />}
-    </div>
-  );
+  return standIn === undefined ? null : <AdvantageArea api={api} node={node} selected={hand} standIn={standIn} />;
+}
+
+/** The selected hand's threshold card, blockers and role, or the prompt for one; the Hands tab (R3.26). */
+export function HandDetails({ api, node, hand }: HandInsightsProps) {
+  return hand === undefined ? <p className="text-sm text-muted">{PICK_A_CELL}</p> : <SelectedHandInsights api={api} node={node} hand={hand} />;
 }

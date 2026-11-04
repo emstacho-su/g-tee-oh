@@ -13,6 +13,7 @@
  */
 import { FORMAT_LABELS } from "../drills/labels.js";
 import { CBB_PER_BB } from "../poker/format.js";
+import { parsePair } from "../poker/pair.js";
 import type { PreflopAction } from "../drills/types.js";
 import { configLabel } from "../routes/settings/configs-query.js";
 import type { GameConfig, HeatmapColumn, HeatmapRow } from "./types.js";
@@ -57,8 +58,6 @@ export const POSITION_WORDS = {
   BB: "big blind",
 } as const satisfies Readonly<Record<string, string>>;
 
-const PAIR_SEPARATOR = "-";
-const PAIR_SEATS = 2;
 const BAND_IN_BB = /^\d+$/;
 const UNLISTED_CONFIGURATION = "a configuration the catalog does not list";
 const LOADING_CONFIGURATION = "configuration loading";
@@ -74,18 +73,6 @@ export function drillActionWords(action: PreflopAction): string {
 
 export function positionWords(seat: string): string {
   return (POSITION_WORDS as Readonly<Record<string, string>>)[seat] ?? seat;
-}
-
-/**
- * A pair as the api writes it ("BB-BTN", out of position first) split into its two seats, or null
- * when it is not two non-empty parts (PR #48 review round 2 LOW 9: the one split the web uses).
- * It reads the seats only; it never orders or checks them, so the web applies no rule of its own.
- */
-export function parsePair(pair: string): readonly [string, string] | null {
-  const seats = pair.split(PAIR_SEPARATOR);
-  const [first, second] = seats;
-  if (seats.length !== PAIR_SEATS || first === undefined || second === undefined || first === "" || second === "") return null;
-  return [first, second];
 }
 
 /** "BB-BTN" reads "big blind versus button"; anything that is not two known seats keeps its text. */

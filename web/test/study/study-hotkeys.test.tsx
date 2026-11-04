@@ -77,7 +77,8 @@ describe("R3.12 Study keys move along the line", () => {
     const grid = screen.getByRole("group", { name: /range matrix cells/i });
     grid.focus();
     fireEvent.keyDown(grid, { key: "ArrowRight" });
-    expect(screen.getByRole("status")).toHaveTextContent(/^AKs: /);
+    // The matrix's own live region; the advantage card's loading note is a status region too (R3.26).
+    expect(screen.getAllByRole("status").some((region) => /^AKs: /.test(region.textContent))).toBe(true);
     expect(router.state.location.search).not.toHaveProperty("line");
   });
 
