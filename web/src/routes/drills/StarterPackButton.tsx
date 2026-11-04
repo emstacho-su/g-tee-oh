@@ -20,7 +20,7 @@ export const STARTER_TEXT = {
   adding: "Adding the starter drills",
   retry: "Try again",
   hint: `${STARTER_PACK.length} drills: opens, blind defence, 3-bets and a squeeze, ready to run or to edit.`,
-  added: (count: number) => `Added ${count} starter drills.`,
+  added: (count: number) => `Added ${count} starter ${count === 1 ? "drill" : "drills"}.`,
 } as const;
 
 export type StarterPackIntent = IntentMutation<readonly StarterDrill[], Drill[]>;

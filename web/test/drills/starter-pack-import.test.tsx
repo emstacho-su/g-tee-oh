@@ -187,5 +187,7 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(reAdd?.body).toEqual({ export_code: target.code });
     expect(reAdd?.headers["idempotency-key"]).not.toBe(firstKey);
     expect(await screen.findByRole("radio", { name: `Select ${target.name}` })).toBeInTheDocument();
+    // One drill is named in the singular (PR #48 review round 3 LOW 5).
+    expect(screen.getByTestId("library-status")).toHaveTextContent("Added 1 starter drill.");
   });
 });
