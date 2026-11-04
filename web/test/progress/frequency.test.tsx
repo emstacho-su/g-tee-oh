@@ -9,6 +9,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { shareAt } from "../../src/components/frequency/FrequencyBars.js";
 import { FIELD_CLASS } from "../../src/components/ui/index.js";
 import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import {
@@ -142,6 +143,12 @@ describe("R4.12 the frequency model", () => {
     expect(gapSentence("Call", 0.454, 0.446)).toBe("Call: matches the solver");
     // 46% and 44% on screen: 2 points, although the raw shares differ by 1.2.
     expect(gapSentence("Fold", 0.456, 0.444)).toBe("Fold: 2 points more than the solver");
+  });
+
+  it("R4.12 one shareAt reads an action's two shares for the bars and the gap list, 0 where the api sent none (PR #51 review 10)", () => {
+    const pooled = { your_freq: [0.4, 0.45], solver_freq: [0.35] };
+    expect(shareAt(pooled, 0)).toEqual({ yours: 0.4, solver: 0.35 });
+    expect(shareAt(pooled, 1)).toEqual({ yours: 0.45, solver: 0 });
   });
 
   it("R4.12 the query reads GET /progress/frequencies under the progress root", async () => {

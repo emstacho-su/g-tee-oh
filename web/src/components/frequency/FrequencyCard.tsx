@@ -21,7 +21,7 @@ import { useAppApi } from "../../auth/index.js";
 import { gapSentence, sampleText, spotKey, spotOptions, type FrequencyComparison, type FrequencyRow, type SpotFrequency } from "../../progress/frequency-model.js";
 import { allConfigsQuery } from "../../routes/settings/configs-query.js";
 import { Card, FIELD_CLASS, cn } from "../ui/index.js";
-import { FrequencyBars } from "./FrequencyBars.js";
+import { FrequencyBars, shareAt } from "./FrequencyBars.js";
 import { FrequencyTable } from "./FrequencyTable.js";
 
 export const FREQUENCY_TEXT = {
@@ -41,11 +41,15 @@ export interface FrequencyCardProps {
   onSpotChange?: (key: string) => void;
 }
 
+function gapOf(label: string, { yours, solver }: { yours: number; solver: number }): string {
+  return gapSentence(label, yours, solver);
+}
+
 function GapList({ spot, pooled }: { spot: SpotFrequency; pooled: FrequencyRow }) {
   return (
     <ul aria-label={FREQUENCY_TEXT.gaps} data-testid="frequency-gaps" className="flex flex-col gap-1 text-sm">
       {spot.actions.map((action, position) => (
-        <li key={action.index}>{gapSentence(action.label, pooled.your_freq[position] ?? 0, pooled.solver_freq[position] ?? 0)}</li>
+        <li key={action.index}>{gapOf(action.label, shareAt(pooled, position))}</li>
       ))}
     </ul>
   );

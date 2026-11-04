@@ -29,7 +29,8 @@ function Bar({ who, share, fillClass }: BarProps) {
   );
 }
 
-function shareAt(row: FrequencyRow, index: number): { yours: number; solver: number } {
+/** An action's two shares in a row, 0 where the api sent none; the bars, hand rows and gap list share it. */
+export function shareAt(row: FrequencyRow, index: number): { yours: number; solver: number } {
   return { yours: row.your_freq[index] ?? 0, solver: row.solver_freq[index] ?? 0 };
 }
 
