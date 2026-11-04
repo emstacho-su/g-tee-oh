@@ -9,6 +9,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { drillFailureText } from "../../src/drills/failure-text.js";
 import { STARTER_PACK, STARTER_TAG, starterIdTag } from "../../src/drills/starter-pack.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { jsonBody } from "../library/render-library.js";
@@ -198,6 +199,34 @@ describe("R3.35 Add the starter drills", { timeout: 20_000 }, () => {
     expect(listReads()).toBeGreaterThan(readsBefore);
     // The user's filter stays on the error path; only a full success clears it.
     expect(view.router.state.location.search).toEqual({ tag: "synthetic" });
+  });
+
+  it("R3.35 when the list re-read after a mid-pack failure fails too, the import failure is the one shown and the landed drills are still announced (code review round 2, 4)", async () => {
+    const user = userEvent.setup();
+    let imports = 0;
+    let listFailures = 0;
+    const view = renderDrills("/drills", {
+      override: (request) => {
+        if (request.method === "POST" && request.path === IMPORT_PATH) {
+          imports += 1;
+          return imports === 3 ? Promise.reject(new TypeError("Failed to fetch")) : undefined;
+        }
+        // The first list read after the failed import fails as well.
+        if (request.method === "GET" && request.path === "/api/v1/drills" && imports === 3 && listFailures === 0) {
+          listFailures += 1;
+          return jsonBody(503, { type: "urn:g-tee-oh:problem:unavailable", title: "Unavailable", status: 503, detail: "server detail text" });
+        }
+        return undefined;
+      },
+    });
+    await screen.findByRole("table", { name: "Your drills" });
+    await user.click(screen.getByRole("button", { name: BUTTON }));
+    // The pack's own alert (the list's failed re-read raises the list's alert beside it).
+    const alert = await screen.findByText(`Error: ${drillFailureText(new TypeError("Failed to fetch"))}`);
+    expect(alert.closest("[role=alert]")).not.toBeNull();
+    await waitFor(() => expect(screen.getByTestId("library-status")).toHaveTextContent("Added 2 starter drills."));
+    expect(listFailures).toBe(1);
+    expect(view.sent("POST", IMPORT_PATH)).toHaveLength(3);
   });
 
   it("R3.35 a starter drill deleted after the pack landed is re-added under a fresh key and created again (PR #48 review round 3 HIGH)", async () => {

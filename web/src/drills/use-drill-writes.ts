@@ -10,6 +10,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
+import { describeFailureForLog } from "../api/http-status.js";
 import type { AppApi } from "../api/index.js";
 import { isApiProblem, PROBLEM_SLUG } from "../api/problem.js";
 import { useLibraryDeps } from "../library/library-deps.js";
@@ -140,8 +141,13 @@ export function useImportStarterPack(api: AppApi, { onImported, onPartial }: Sta
         } catch (error) {
           if (isRefusal(error)) remember(entry, starterImportKey(newKey(), packIndexOf(entry)));
           // The codes that landed before the failure are in the library: read it again, then say so
-          // beside the failure (review MEDIUM 3, PR #51 review round 2, code review round 1, 5).
-          await invalidate();
+          // beside the failure (review MEDIUM 3, PR #51 review round 2, code review round 1, 5). A
+          // failed re-read is logged and never replaces the import's own failure (round 2, 4).
+          try {
+            await invalidate();
+          } catch (listError: unknown) {
+            console.error(`g-tee-oh: re-reading the drills after a failed starter import failed (${describeFailureForLog(listError)})`);
+          }
           if (imported.length > 0) onPartial?.(imported);
           throw error;
         }
