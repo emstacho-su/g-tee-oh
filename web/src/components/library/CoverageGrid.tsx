@@ -5,12 +5,14 @@
  * CoverageDetail shows the flop families and the build queue from GET /coverage.
  *
  * Color is never the only signal (A7 section 4): every cell says "In the library" or "Not in
- * the library" in words, and an uncovered cell also has a dashed border.
+ * the library" in words, and an uncovered cell also has a dashed border. The pair reads in words
+ * with its token as the tooltip (S47 critic, spot-words.ts).
  *
  * S40 (O-406): the body of the coverage page's "Coverage" card, so it brings no heading of its
  * own. Each cell is a tactile button on the control edge; the selected cell is raised with an
  * accent ring and its aria-pressed state, so the choice never rests on colour alone.
  */
+import { capitalize, pairWords } from "../../progress/spot-words.js";
 import type { PositionPairEntry } from "../../study/queries.js";
 import { cn, CONTROL_EDGE_CLASS, TACTILE_CLASS } from "../ui/index.js";
 
@@ -34,6 +36,7 @@ export function CoverageGrid({ pairs, selectedPair, onSelectPair }: CoverageGrid
             <button
               type="button"
               aria-pressed={entry.pair === selectedPair}
+              title={entry.pair}
               onClick={() => onSelectPair(entry.pair)}
               className={cn(
                 "flex w-full flex-col items-start rounded-xl px-3 py-2 text-left text-sm",
@@ -42,7 +45,7 @@ export function CoverageGrid({ pairs, selectedPair, onSelectPair }: CoverageGrid
                 entry.pair === selectedPair && "ring-2 ring-accent ring-offset-2 ring-offset-surface-raised",
               )}
             >
-              <span className="font-semibold">{entry.pair}</span>
+              <span className="font-semibold">{capitalize(pairWords(entry.pair))}</span>
               <span className="text-xs text-muted">{entry.preflop_available ? IN_LIBRARY : NOT_IN_LIBRARY_TEXT}</span>
             </button>
           </li>

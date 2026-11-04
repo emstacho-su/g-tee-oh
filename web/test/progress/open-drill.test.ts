@@ -107,7 +107,7 @@ describe("R4.12 drill spot filter from a cell's coordinates (O-321)", () => {
   });
 
   it("R4.12 names the drill from the coordinates and uses the builder's default trainer settings", () => {
-    expect(leakDrillName(ONLINE_100)).toBe("Leak drill: facing-open BB-BTN online 100");
+    expect(leakDrillName(ONLINE_100)).toBe("Leak drill: facing an open, big blind versus button, online 100bb");
     const body = leakDrillBody(ONLINE_100, "auto-x", fixtureConfigs);
     expect(body?.trainer).toEqual(DEFAULT_TRAINER);
     expect(body?.tags).toEqual(["auto-x"]);
@@ -194,7 +194,7 @@ describe("R4.12 openClassDrill", () => {
     expect(fake.keys()).toContain(`GET /api/v1/drills/${CREATED_ID}`);
     expect(deps.freshKeySuffix).not.toHaveBeenCalled();
     const body = JSON.parse(post?.body ?? "{}") as { name: string; tags: string[]; spot_filter: { stake: string }; trainer: unknown };
-    expect(body.name).toBe("Leak drill: rfi BB-UTG live 100");
+    expect(body.name).toBe("Leak drill: open or fold, big blind versus under the gun, live 100bb");
     expect(body.tags).toEqual([TAG]);
     expect(body.spot_filter.stake).toBe("1/3");
     expect(body.trainer).toEqual(DEFAULT_TRAINER);

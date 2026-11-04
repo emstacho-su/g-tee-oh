@@ -21,13 +21,15 @@ export const FLOPS_CARD_TITLE = "Flops and queue";
 export interface CoveragePanelProps {
   api: AppApi;
   configId: string;
+  /** The configuration in words, from the catalog the page already read (S47). */
+  configurationLabel: string;
   pair: string;
   preflopAvailable: boolean;
   /** The spot the selection names, for the heading's star (S45, R3.27); absent, no star. */
   spot?: StudySearch;
 }
 
-export function CoveragePanel({ api, configId, pair, preflopAvailable, spot }: CoveragePanelProps) {
+export function CoveragePanel({ api, configId, configurationLabel, pair, preflopAvailable, spot }: CoveragePanelProps) {
   const coverage = useQuery(coverageQuery(api, configId, pair));
   const request = useGapRequest(api, configId, pair);
   return (
@@ -45,6 +47,7 @@ export function CoveragePanel({ api, configId, pair, preflopAvailable, spot }: C
         {coverage.data === undefined ? null : (
           <CoverageDetail
             coverage={coverage.data}
+            configurationLabel={configurationLabel}
             requestPending={request.pending}
             onRequestFlop={(flop) => request.send({ flop })}
             {...(spot === undefined ? {} : { star: <StarButton spot={spot} /> })}

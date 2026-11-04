@@ -6,6 +6,8 @@
  * no unlocks (O-410), so only an old drill-backed session shows the unlock banner. In review there
  * is no Next. No rating, score or grade label: questions are unrated (05 section 8).
  */
+import { useEffect, useRef } from "react";
+
 import { Button, Panel } from "../../components/ui/index.js";
 import type { PredictionResult } from "../../contracts.js";
 import { NEXT_KEY, PREDICTION_TEXT, passedText, unlockedText, windowText, type RunFlavor } from "../../prediction/labels.js";
@@ -22,10 +24,16 @@ const WRONG_MARK = "✗";
 
 export function ResultCard({ result, flavor, onNext }: ResultCardProps) {
   const verdict = result.correct ? PREDICTION_TEXT.correct : PREDICTION_TEXT.incorrect;
+  // A fresh result takes the focus, so on a phone the verdict scrolls into view (S47 critic G3); review does not.
+  const verdictRef = useRef<HTMLParagraphElement>(null);
+  const live = onNext !== undefined;
+  useEffect(() => {
+    if (live) verdictRef.current?.focus();
+  }, [live, result]);
   return (
     <section aria-label="Result" data-testid="prediction-result">
       <Panel>
-        <p role="status" className="text-lg font-semibold">
+        <p ref={verdictRef} tabIndex={-1} role="status" className="text-lg font-semibold">
           <span aria-hidden="true">{result.correct ? RIGHT_MARK : WRONG_MARK} </span>
           {verdict}
         </p>

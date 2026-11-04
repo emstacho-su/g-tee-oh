@@ -14,6 +14,7 @@ import { ApiProvider, createQueryClient } from "../../src/auth/index.js";
 import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import { FIXTURE_DRILL_ID, fixtureDrill, fixturePracticeSession } from "../../src/fixtures/trainer.js";
 import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
+import { LibraryDepsProvider, type LibraryDeps } from "../../src/library/library-deps.js";
 import { DrillRunPage } from "../../src/routes/drill-run/DrillRunPage.js";
 import { TrainerDepsProvider, type Scheduler, type TrainerDeps } from "../../src/trainer/trainer-deps.js";
 import { createFakeFetch, jsonResponse, type FetchScript } from "../api/fake-fetch.js";
@@ -61,6 +62,8 @@ export interface RenderRunOptions {
    * prefers-reduced-motion, so the replay shows its end at once (test/support/motion.ts).
    */
   motion?: boolean;
+  /** The library deps (event stream factory, key factory) for CoverageWatch (S47); the defaults when absent. */
+  libraryDeps?: LibraryDeps;
 }
 
 /** The drill read plus a 201 session, the usual first two answers. */
@@ -78,7 +81,7 @@ function parseBody(text: string): unknown {
   }
 }
 
-export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule, motion = false }: RenderRunOptions): RunView {
+export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule, motion = false, libraryDeps }: RenderRunOptions): RunView {
   setReducedMotion(!motion);
   const fake = createFakeFetch({ ...BASE_SCRIPT, ...script });
   const sent: SentRequest[] = [];
@@ -107,15 +110,16 @@ export function renderRun({ script, seed, drillId = FIXTURE_DRILL_ID, schedule, 
     ...(schedule === undefined ? {} : { schedule }),
   };
   const router = createScreenRouter();
+  const screen = (
+    <ScreenRouterView router={router}>
+      <DrillRunPage drillId={drillId} {...(seed === undefined ? {} : { seed })} />
+    </ScreenRouterView>
+  );
   const view = render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={api}>
         <HotkeyRoot store={createHotkeyStore()}>
-          <TrainerDepsProvider deps={deps}>
-            <ScreenRouterView router={router}>
-              <DrillRunPage drillId={drillId} {...(seed === undefined ? {} : { seed })} />
-            </ScreenRouterView>
-          </TrainerDepsProvider>
+          <TrainerDepsProvider deps={deps}>{libraryDeps === undefined ? screen : <LibraryDepsProvider deps={libraryDeps}>{screen}</LibraryDepsProvider>}</TrainerDepsProvider>
         </HotkeyRoot>
       </ApiProvider>
     </QueryClientProvider>,

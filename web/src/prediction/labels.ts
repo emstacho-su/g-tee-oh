@@ -68,11 +68,12 @@ export const REGION_LABELS: Readonly<Record<HandRegion, string>> = {
   offsuit_other: "Other offsuit hands",
 };
 
+/** The api's bands are lower-edge inclusive (prediction/hand-questions.ts bandOf), so the words say which band takes a boundary (S47 critic G8). */
 export const BAND_LABELS: Readonly<Record<FrequencyBand, string>> = {
-  "0_25": "0 to 25 percent",
-  "25_50": "25 to 50 percent",
-  "50_75": "50 to 75 percent",
-  "75_100": "75 to 100 percent",
+  "0_25": "under 25 percent",
+  "25_50": "25 to under 50 percent",
+  "50_75": "50 to under 75 percent",
+  "75_100": "75 percent and over",
 };
 
 /** "Range level 2 of 3". */

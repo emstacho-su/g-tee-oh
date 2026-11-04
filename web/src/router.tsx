@@ -191,7 +191,7 @@ export const drillSectionRoute = createRoute({
     const { id } = drillSectionRoute.useParams();
     const { saved } = validateDrillBuilderSearch(drillSectionRoute.useSearch());
     const { section } = drillSectionRoute.useRouteContext();
-    return <DrillBuilderPage key={id} drillId={id} section={section} justCreated={saved === "1"} />;
+    return <DrillBuilderPage key={id} drillId={id} section={section} justCreated={saved !== undefined} editedSinceRun={saved === "rerun"} />;
   },
 });
 // /study and /drills/$id/run are real screens (S25, O-286, O-288). validateSearch types the
@@ -205,8 +205,8 @@ export const drillRunRoute = createRoute({
   validateSearch: validateDrillRunSearch,
   component: function DrillRunRouteScreen() {
     const { id } = drillRunRoute.useParams();
-    const { seed } = validateDrillRunSearch(drillRunRoute.useSearch());
-    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} />;
+    const { seed, start } = validateDrillRunSearch(drillRunRoute.useSearch());
+    return <DrillRunPage drillId={id} {...(seed === undefined ? {} : { seed })} {...(start === undefined ? {} : { autostart: true })} />;
   },
 });
 export const studyRoute = createRoute({

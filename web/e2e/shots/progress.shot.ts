@@ -30,7 +30,7 @@ const S41_SESSION = "S41";
 const SOURCE = "mock";
 const OWNER = { email: FIXTURE_USER_EMAIL, password: "synthetic-password" };
 /** A practiced, due class in the middle of the grid, so its tooltip sits inside the card. */
-const TOOLTIP_CELL = /^facing-open BB-CO, online 100 bb:/;
+const TOOLTIP_CELL = /^Facing an open, big blind versus cutoff, online 100bb:/;
 
 const CRITERIA = {
   tracks: "R4.12 track breakdown: each track rating as a dot with its deviation whisker on one shared axis with tier floors, weight and rated decisions in words, a track with no coverage dimmed and named (O-320)",

@@ -4,6 +4,8 @@
  */
 export const COSMETICS_STORAGE_KEY = "gto-cosmetics";
 export const SESSION_DEFAULTS_STORAGE_KEY = "gto-session-defaults";
+/** The last label seen for each chosen configuration (S47, O-486). */
+export const CONFIG_LABELS_STORAGE_KEY = "gto-config-labels";
 /** S45 (R3.27, O-460): the last confirmed study spot, the seed of a bare /study. */
 export const STUDY_LAST_SPOT_STORAGE_KEY = "gto-study-last-spot";
 /** S45 (R3.27): the starred study spots, at most fifty. */
