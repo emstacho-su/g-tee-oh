@@ -28,6 +28,8 @@ const CONTRACT_RECIPES = [
   'test-tags',
   'images',
   'docs-mirror',
+  'mac-bench',
+  'mac-bench-clean',
   'hooks',
   'bench',
   'gates',

@@ -483,7 +483,6 @@ spike-preflop MACHINE="zenbook" PLATFORM="linux/amd64":
         --commit $(git rev-parse HEAD) --allow-dirty
 
 BENCH_IMAGE := "g-tee-oh/library-builder:bench"
-BENCH_RUN := SPIKE_RUN
 BENCH_SCRATCH := "gto-bench-scratch"
 BENCH_DIR := "target/bench"
 BENCH_OUT := '--mount "type=bind,source=' + justfile_directory() + '/' + BENCH_DIR + ',target=/out"'
@@ -498,29 +497,31 @@ BENCH_PLATFORM := if arch() == "aarch64" { "linux/arm64" } else { "linux/amd64" 
 # scratch volume and target/bench are reset first, and a measured run that fails does not stop
 # the recipe (the - prefix), so a miss reaches bench-report, which records it and exits 1
 # (O-178); a run killed before its summary makes bench-report fail on the missing file, and
-# mac-bootstrap.md then records the kill as the miss. Needs Docker Desktop (the Zenbook through
-# WSL2, the Mac), whose file sharing lets the image's user write the bind mount (O-23). A
-# PLATFORM other than the host's runs under emulation and is warned about, not refused.
-# mac-bench-clean removes what the run left (O-47).
+# mac-bootstrap.md then records the kill as the miss (when only the 16-bit summary is missing,
+# rerun bench-report by hand without --informational). Needs Docker Desktop (the Zenbook through
+# WSL2, the Mac), whose file sharing lets the image's user write the bind mount (O-23); the
+# helper container probes that before the measured runs. A PLATFORM other than the host's would
+# run under emulation, so it is refused. estimate runs before the measured runs, so a broken spec
+# fails in seconds, not after an hour. mac-bench-clean removes what the run left (O-47).
 # Flop-line benchmark in the 5 GB container against O-50; the Mac bootstrap measurement (R0.9, S04)
 mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/reports":
-    {{ if PLATFORM == BENCH_PLATFORM { "echo mac-bench: platform " + PLATFORM + " matches the host" } else { "echo mac-bench: WARNING, platform " + PLATFORM + " differs from the host " + BENCH_PLATFORM + ", the image runs under emulation and the numbers are not a measurement" } }}
+    {{ if PLATFORM == BENCH_PLATFORM { 'echo "mac-bench: platform ' + PLATFORM + ' matches the host"' } else { 'echo "mac-bench: refused, platform ' + PLATFORM + ' differs from the host ' + BENCH_PLATFORM + ' and would run under emulation; run on that machine"; exit 1' } }}
     -docker rm -f gto-bench gto-bench-16bit
     -docker volume rm {{BENCH_SCRATCH}}
     node -e "require('node:fs').rmSync('{{BENCH_DIR}}', { recursive: true, force: true })"
     node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}', { recursive: true })"
     docker buildx build --load --platform {{PLATFORM}} -f infra/docker/library-builder.Dockerfile \
         -t {{BENCH_IMAGE}} .
-    docker run --rm -v {{BENCH_SCRATCH}}:/scratch --entrypoint /bin/mkdir {{BENCH_IMAGE}} \
-        -p /scratch/library-judged /scratch/library-16bit
-    -{{BENCH_RUN}} --name gto-bench -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} \
-        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
-        --summary-out /out/judged.json
-    -{{BENCH_RUN}} --name gto-bench-16bit -e LIBRARY_ROOT=/scratch/library-16bit {{BENCH_ENV}} \
-        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
-        --summary-out /out/informational.json
+    docker run --rm {{BENCH_ENV}} --entrypoint /bin/sh {{BENCH_IMAGE}} \
+        -c 'rm -rf /scratch/* && mkdir -p /scratch/library-judged /scratch/library-16bit && touch /out/writable'
     docker run --rm {{BENCH_OUT}} {{BENCH_IMAGE}} estimate \
         --job-spec /fixtures/builder/bench-bb-btn-srp.json --out /out/sweep.json
+    -{{SPIKE_RUN}} --name gto-bench -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} \
+        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
+        --summary-out /out/judged.json
+    -{{SPIKE_RUN}} --name gto-bench-16bit -e LIBRARY_ROOT=/scratch/library-16bit {{BENCH_ENV}} \
+        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
+        --summary-out /out/informational.json
     cargo run --release -p library-builder -- bench-report --judged {{BENCH_DIR}}/judged.json \
         --informational {{BENCH_DIR}}/informational.json --sweep {{BENCH_DIR}}/sweep.json \
         --out {{OUT}}
