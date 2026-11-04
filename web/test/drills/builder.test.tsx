@@ -347,4 +347,27 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     const stakes = within(picker).getByRole("radiogroup", { name: "Stake" });
     expect(within(stakes).getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["Online 5% rake, cap $1.50"]);
   });
+
+  it("R3.37 a closed Advanced stays closed while the same error stands and reopens on a new error (PR #48 review round 2 MEDIUM 7)", async () => {
+    renderDrills("/drills/new");
+    const user = await openNew();
+    await openSection(user, "Game");
+    const picker = await screen.findByTestId("config-picker");
+    const advanced = () => screen.getByRole("button", { name: "Advanced: custom game" });
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Live" }));
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await openSection(user, "Game");
+    expect(advanced()).toHaveAttribute("aria-expanded", "true");
+    await user.click(advanced());
+    expect(advanced()).toHaveAttribute("aria-expanded", "false");
+    // Another edit while the same stake error stands: the user's close holds.
+    const pickerAgain = screen.getByTestId("config-picker");
+    await user.click(within(within(pickerAgain).getByRole("radiogroup", { name: "Table size" })).getByRole("radio", { name: /^9 players/ }));
+    expect(advanced()).toHaveAttribute("aria-expanded", "false");
+    // A new error set (no depth left) opens it again.
+    await user.click(within(within(pickerAgain).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Online" }));
+    await user.click(within(within(pickerAgain).getByRole("radiogroup", { name: "Table size" })).getByRole("radio", { name: /^6 players/ }));
+    await user.click(within(within(pickerAgain).getByRole("group", { name: "Depths" })).getByRole("button", { name: /^100bb/ }));
+    expect(advanced()).toHaveAttribute("aria-expanded", "true");
+  });
 });
