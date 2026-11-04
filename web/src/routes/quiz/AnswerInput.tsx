@@ -25,15 +25,6 @@ export interface AnswerInputProps {
 const CHOSEN_MARK = "✓";
 const GROUP_CLASSES = "flex flex-wrap gap-2";
 
-/**
- * The focused controls the screen's Enter submits from (R3.16, PR #45 review round 4 b, PR #49
- * review round 1): the chosen option button (yes and no, actions, bands) and the region
- * checkboxes, marked data-quiz-option="". An unchosen option is not marked, so Enter on it does
- * its own click and picks it; a second Enter on it, now chosen, submits. The percent field is a
- * text field and keeps its keys (its form submits on Enter).
- */
-export const QUIZ_OPTION_SELECTOR = "[data-quiz-option]";
-
 interface ChoiceProps {
   label: string;
   chosen: boolean;
@@ -45,7 +36,7 @@ interface ChoiceProps {
 
 function Choice({ label, chosen, disabled, onChoose, action, actions }: ChoiceProps) {
   return (
-    <Button variant={chosen ? "primary" : "secondary"} aria-pressed={chosen} disabled={disabled} onClick={onChoose} data-quiz-option={chosen ? "" : undefined}>
+    <Button variant={chosen ? "primary" : "secondary"} aria-pressed={chosen} disabled={disabled} onClick={onChoose}>
       {action === undefined ? null : <ActionSwatch action={action} actions={actions ?? [action]} />}
       <span>{label}</span>
       {chosen ? <span aria-hidden="true">{CHOSEN_MARK}</span> : null}
@@ -96,7 +87,6 @@ function RegionChoices({ prompt, draft, disabled, onChange }: AnswerInputProps) 
         <label key={region} className="inline-flex items-center gap-2 rounded-md border border-border-strong px-3 py-2 text-sm">
           <input
             type="checkbox"
-            data-quiz-option=""
             checked={draft.value.includes(region)}
             disabled={disabled}
             onChange={() => onChange(toggleRegion(draft, region, offered))}

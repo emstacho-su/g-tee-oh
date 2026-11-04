@@ -10,7 +10,6 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { fixturePredictionResult, fixturePredictions } from "../../src/fixtures/prediction.js";
-import { QUIZ_OPTION_SELECTOR } from "../../src/routes/quiz/AnswerInput.js";
 import { jsonResponse } from "../api/fake-fetch.js";
 import { ANSWER_PATH, END_PATH, NEXT_PATH, renderStartedQuiz, typeReason, type QuizView } from "./render-quiz.js";
 import { APP_SUITE } from "./app-suite-timeout.js";
@@ -64,7 +63,7 @@ describe("R3.16 the quiz's Enter submits from the chosen option or the page only
   it("R3.16 Enter right after choosing an option, with the focus on that option, still submits", async () => {
     const view = await readyToSubmit();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "No" }));
-    expect(document.activeElement?.matches(QUIZ_OPTION_SELECTOR)).toBe(true);
+    expect(document.activeElement).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("{Enter}");
     await screen.findByTestId("prediction-result");
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
@@ -94,15 +93,28 @@ describe("R3.16 the quiz's Enter submits from the chosen option or the page only
     expect(view.sentTo(ANSWER_PATH)[0]?.body).toMatchObject({ answer: { kind: "action", action_index: 2 } });
   });
 
-  it("R3.16 R3.30 Enter right after ticking a region checkbox submits (PR #49 round 1, finding 2)", async () => {
-    const view = await startOn(REGIONS, { kind: "regions", value: ["pairs"] });
-    const pairs = screen.getByRole("checkbox", { name: "Pairs" });
-    await userEvent.click(pairs);
-    expect(pairs).toBeChecked();
-    expect(document.activeElement).toBe(pairs);
+  it("R3.16 Enter on an unticked region ticks it and sends nothing (PR #49 round 2, the HIGH)", async () => {
+    const view = await startOn(REGIONS, { kind: "regions", value: ["pairs", "suited_aces"] });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Pairs" }));
+    const suited = screen.getByRole("checkbox", { name: "Suited aces" });
+    expect(suited).not.toBeChecked();
+    suited.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("checkbox", { name: "Suited aces" })).toBeChecked();
+    expect(view.sentTo(ANSWER_PATH), "Enter on an unticked region only ticks it").toHaveLength(0);
+    expect(screen.queryByTestId("prediction-result")).not.toBeInTheDocument();
+  });
+
+  it("R3.16 Enter on a ticked region with a complete answer sends it with every ticked region (PR #49 round 2)", async () => {
+    const view = await startOn(REGIONS, { kind: "regions", value: ["pairs", "suited_aces"] });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Pairs" }));
+    const suited = screen.getByRole("checkbox", { name: "Suited aces" });
+    await userEvent.click(suited);
+    expect(document.activeElement).toBe(suited);
     await userEvent.keyboard("{Enter}");
     await screen.findByTestId("prediction-result");
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
+    expect(view.sentTo(ANSWER_PATH)[0]?.body).toMatchObject({ answer: { kind: "regions", value: ["pairs", "suited_aces"] } });
   });
 
   it("R3.16 R3.30 Enter on the focused End quiz button ends the quiz and submits nothing", async () => {

@@ -18,7 +18,6 @@ import {
   useHotkey,
   type HotkeyStore,
 } from "../../src/hotkeys/index.js";
-import { QUIZ_OPTION_SELECTOR } from "../../src/routes/quiz/AnswerInput.js";
 
 interface ProbeProps {
   hotkey: string;
@@ -243,82 +242,47 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(onSpace).toHaveBeenCalledOnce();
   });
 
-  it("R3.16 R3.30 a binding answers Enter only from the focused controls its selector names; every other control keeps its Enter (PR #45 review round 4, b)", () => {
+  it("R3.16 R3.30 Enter on any focused control stays with it, whatever the binding; Enter on the page reaches it (PR #49 review round 2)", () => {
     const onSubmit = vi.fn();
-    function Submit() {
-      useHotkey({ key: "Enter", fromControls: QUIZ_OPTION_SELECTOR, description: "Submit", scope: "Quiz", handler: onSubmit });
-      return null;
-    }
     renderWithRoot(
       <>
-        <Submit />
-        <button type="button" aria-pressed="true" data-quiz-option="">
+        <Probe hotkey="Enter" description="Submit" scope="Quiz" onPress={onSubmit} />
+        <button type="button" aria-pressed="true">
           option
         </button>
         <button type="button">End quiz</button>
         <a href="#home">Home</a>
       </>,
     );
-    fireEvent.keyDown(screen.getByRole("button", { name: "End quiz" }), { key: "Enter" });
+    for (const name of ["option", "End quiz"]) fireEvent.keyDown(screen.getByRole("button", { name }), { key: "Enter" });
     fireEvent.keyDown(screen.getByRole("link", { name: "Home" }), { key: "Enter" });
-    expect(onSubmit).not.toHaveBeenCalled();
-    fireEvent.keyDown(screen.getByRole("button", { name: "option" }), { key: "Enter" });
-    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit, "a focused control keeps its Enter: the quiz handles its own options locally").not.toHaveBeenCalled();
     fireEvent.keyDown(document.body, { key: "Enter" });
-    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 
-  it("R3.30 a control nested inside an element the selector names does not inherit the opt-out (PR #49 review round 1, finding 4)", () => {
-    const onSubmit = vi.fn();
-    function Submit() {
-      useHotkey({ key: "Enter", fromControls: QUIZ_OPTION_SELECTOR, description: "Submit", scope: "Quiz", handler: onSubmit });
-      return null;
-    }
+  it("R3.30 a digit or letter on a focused checkbox or radio never reaches a global binding: fields keep their keys (PR #49 review round 2)", () => {
+    const onDigit = vi.fn();
+    const onLetter = vi.fn();
     renderWithRoot(
       <>
-        <Submit />
-        <div data-quiz-option="">
-          <button type="button">End quiz</button>
-        </div>
-      </>,
-    );
-    fireEvent.keyDown(screen.getByRole("button", { name: "End quiz" }), { key: "Enter" });
-    expect(onSubmit).not.toHaveBeenCalled();
-  });
-
-  it("R3.30 a checkbox or radio is a control for Enter, while a text field keeps every key (PR #49 review round 1, finding 2)", () => {
-    const onSubmit = vi.fn();
-    function Submit() {
-      useHotkey({ key: "Enter", fromControls: "input[type='checkbox']", description: "Submit", scope: "Quiz", handler: onSubmit });
-      return null;
-    }
-    renderWithRoot(
-      <>
-        <Submit />
+        <Probe hotkey="1" description="Size 1" onPress={onDigit} />
+        <Probe hotkey="f" description="Fold" onPress={onLetter} />
         <label>
           <input type="checkbox" /> Pairs
         </label>
         <label>
           <input type="radio" name="r" /> Off
         </label>
-        <label>
-          Share <input type="number" />
-        </label>
       </>,
     );
-    fireEvent.keyDown(screen.getByRole("checkbox", { name: "Pairs" }), { key: "Enter" });
-    expect(onSubmit, "the checkbox the selector names submits").toHaveBeenCalledOnce();
-    fireEvent.keyDown(screen.getByRole("radio", { name: "Off" }), { key: "Enter" });
-    expect(onSubmit, "a radio the selector does not name keeps Enter").toHaveBeenCalledOnce();
-    fireEvent.keyDown(screen.getByRole("spinbutton", { name: "Share" }), { key: "Enter" });
-    expect(onSubmit, "a text-entry field keeps every key").toHaveBeenCalledOnce();
-  });
-
-  it("R3.30 registering a fromControls selector that does not parse throws a RangeError (PR #49 review round 1, finding 3)", () => {
-    const store = createHotkeyStore();
-    // "!" is no CSS token (an unclosed bracket would parse: CSS closes it at the end of the input).
-    expect(() => store.getState().register({ key: "Enter", fromControls: "!option", description: "Submit", scope: "Quiz", handler: vi.fn() })).toThrow(RangeError);
-    expect(store.getState().bindings).toHaveLength(0);
+    for (const field of [screen.getByRole("checkbox", { name: "Pairs" }), screen.getByRole("radio", { name: "Off" })]) {
+      fireEvent.keyDown(field, { key: "1" });
+      fireEvent.keyDown(field, { key: "f" });
+      fireEvent.keyDown(field, { key: "Enter" });
+    }
+    expect(onDigit).not.toHaveBeenCalled();
+    expect(onLetter).not.toHaveBeenCalled();
   });
 
   it("R3.30 a plain binding answers with Shift held unless a Shift chord of that key is registered (PR #45 review rounds 1 and 3)", () => {
