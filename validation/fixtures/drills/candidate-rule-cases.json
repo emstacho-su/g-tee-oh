@@ -39,7 +39,7 @@
       "expected": { "config_ids": ["cfg_6_online_100"], "pairs": ["BB-BTN"] }
     },
     {
-      "name": "five opening seats reach every pair but one of a 6-max table, each once",
+      "name": "reach every pair of a 6-max table, each once",
       "filter": { "game_config": { "format": "online", "table_size": 6, "depths_bb": [100] }, "stake": "online", "hero_positions": ["UTG", "HJ", "CO", "BTN", "SB"], "villain_positions": [] },
       "expected": { "config_ids": ["cfg_6_online_100"], "pairs": ["BB-BTN", "BB-CO", "BB-HJ", "BB-UTG", "CO-BTN", "HJ-BTN", "HJ-CO", "SB-BB", "SB-BTN", "SB-CO", "SB-HJ", "SB-UTG", "UTG-BTN", "UTG-CO", "UTG-HJ"] }
     },
