@@ -79,3 +79,13 @@ describe("R3.34 the study search and link for a graded decision", () => {
     expect(validateStudySearch(parseSearchAsStrings(href.slice("/study".length)))).toEqual(search);
   });
 });
+
+describe("R3.34 PR #50 review: a failed refresh keeps a cached configuration list", () => {
+  it("R3.34 the list when it is there, null only when a read failed with nothing cached, undefined while loading", async () => {
+    const { studyConfigsOf } = await import("../../src/trainer/use-study-configs.js");
+    expect(studyConfigsOf({ data: fixtureConfigs, isError: true }), "a failed background refresh keeps the cached list").toBe(fixtureConfigs);
+    expect(studyConfigsOf({ data: fixtureConfigs, isError: false })).toBe(fixtureConfigs);
+    expect(studyConfigsOf({ data: undefined, isError: true })).toBeNull();
+    expect(studyConfigsOf({ data: undefined, isError: false })).toBeUndefined();
+  });
+});

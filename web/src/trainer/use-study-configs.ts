@@ -13,7 +13,15 @@ import { allConfigsQuery } from "../routes/settings/configs-query.js";
 
 export type StudyConfigs = readonly GameConfig[] | null | undefined;
 
+/**
+ * The query's list for the link: a cached list stays usable when a background refresh fails
+ * (PR #50 review); null only when a read failed with nothing cached.
+ */
+export function studyConfigsOf(query: { readonly data: readonly GameConfig[] | undefined; readonly isError: boolean }): StudyConfigs {
+  if (query.data !== undefined) return query.data;
+  return query.isError ? null : undefined;
+}
+
 export function useStudyConfigs(revealed: boolean): StudyConfigs {
-  const configs = useQuery({ ...allConfigsQuery(useAppApi()), enabled: revealed });
-  return configs.isError ? null : configs.data;
+  return studyConfigsOf(useQuery({ ...allConfigsQuery(useAppApi()), enabled: revealed }));
 }
