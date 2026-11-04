@@ -23,8 +23,10 @@ export function useDrillReach(filter: ReachFilter): DrillReach {
   const configs = useQuery(allConfigsQuery(api));
   const reached = configs.data === undefined ? [] : configsReached(filter, configs.data);
   const pairReads = useQueries({ queries: reached.map((config) => practicePairsQuery(api, config.config_id)) });
-  if (configs.isError || pairReads.some((read) => read.isError)) return { failed: true };
-  if (configs.data === undefined) return undefined;
+  // Data before errors (PR #48 review round 3 MEDIUM 3): a failed background refetch keeps the
+  // cached reads, so only a read with no data counts as failed.
+  if (configs.data === undefined) return configs.isError ? { failed: true } : undefined;
+  if (pairReads.some((read) => read.data === undefined && read.isError)) return { failed: true };
   const pairsByConfig: Record<string, readonly PositionPairEntry[] | undefined> = Object.fromEntries(
     reached.map((config, index) => [config.config_id, pairReads[index]?.data]),
   );

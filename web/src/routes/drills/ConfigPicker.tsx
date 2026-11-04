@@ -67,8 +67,10 @@ export function ConfigPicker({ draft, onChange }: ConfigPickerProps) {
   const api = useAppApi();
   const stakes = useQuery(stakesQuery(api));
   const configs = useQuery(allConfigsQuery(api));
-  if (stakes.isError || configs.isError) return <p className="text-sm text-muted">{PICKER_TEXT.failed}</p>;
-  if (stakes.data === undefined || configs.data === undefined) return <LoadingNote text={PICKER_TEXT.loading} />;
+  // Data before errors (round 3 MEDIUM 3): a failed background refetch keeps the cached catalog.
+  if (stakes.data === undefined || configs.data === undefined) {
+    return stakes.isError || configs.isError ? <p className="text-sm text-muted">{PICKER_TEXT.failed}</p> : <LoadingNote text={PICKER_TEXT.loading} />;
+  }
   const catalog = pickerCatalog(stakes.data, configs.data);
   const facet = pickerDraft(draft, stakes.data);
   const choices = pickerChoices(catalog, facet);
