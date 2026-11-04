@@ -15,6 +15,7 @@
  */
 import { CBB_PER_BB } from "../poker/format.js";
 import type { PositionPairEntry } from "../practice/catalog-spot.js";
+import { parsePair } from "../progress/spot-words.js";
 import type { GameConfig } from "../progress/types.js";
 import { seatedPositions } from "./limits.js";
 import type { Position, SpotFilter } from "./types.js";
@@ -68,6 +69,12 @@ export function configsReached(filter: ReachFilter, configs: readonly GameConfig
 /** The seat set of a pair as one key, the same whichever seat comes first. */
 export function pairKeyOf(first: string, second: string): string {
   return [first, second].sort().join(KEY_SEPARATOR);
+}
+
+/** The seat-set key of a pair as the api writes it ("BB-BTN"), or null when it is not two seats. */
+export function pairKeyOfText(pair: string): string | null {
+  const seats = parsePair(pair);
+  return seats === null ? null : pairKeyOf(seats[0], seats[1]);
 }
 
 /** The pair keys a drill reaches at a table size (the api's pairsAt rule), sorted, without repeats. */

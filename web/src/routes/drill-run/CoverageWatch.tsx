@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
-import { configsReached, pairKeyOf, pairKeys } from "../../drills/reach-model.js";
+import { configsReached, pairKeyOf, pairKeyOfText, pairKeys } from "../../drills/reach-model.js";
 import type { CoverageAddedEvent } from "../../library/events.js";
 import { useServerEvents } from "../../library/use-server-events.js";
 import { practicePairsQuery } from "../../practice/catalog-spot.js";
@@ -36,8 +36,6 @@ export const COVERAGE_WATCH_TEXT = {
     `The library just added ${capitalize(pairWords(pair))} at ${configurationWords(config)}. Start again.`,
 } as const;
 
-const PAIR_SEPARATOR = "-";
-
 export interface CoverageWatchProps {
   drill: Drill;
   /** A spot the drill reaches is now covered; the screen clears the refusal and shows the text. */
@@ -46,9 +44,7 @@ export interface CoverageWatchProps {
 
 /** The event's pair as a seat-set key, or null when it is not two seats. */
 function eventPairKey(event: CoverageAddedEvent): string | null {
-  const seats = event.pair.split(PAIR_SEPARATOR);
-  const [first, second] = seats;
-  return seats.length === 2 && first !== undefined && second !== undefined ? pairKeyOf(first, second) : null;
+  return pairKeyOfText(event.pair);
 }
 
 export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {

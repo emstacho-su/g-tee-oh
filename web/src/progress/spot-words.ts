@@ -76,12 +76,24 @@ export function positionWords(seat: string): string {
   return (POSITION_WORDS as Readonly<Record<string, string>>)[seat] ?? seat;
 }
 
-/** "BB-BTN" reads "big blind versus button"; anything that is not two seats keeps its text. */
-export function pairWords(pair: string): string {
+/**
+ * A pair as the api writes it ("BB-BTN", out of position first) split into its two seats, or null
+ * when it is not two non-empty parts (PR #48 review round 2 LOW 9: the one split the web uses).
+ * It reads the seats only; it never orders or checks them, so the web applies no rule of its own.
+ */
+export function parsePair(pair: string): readonly [string, string] | null {
   const seats = pair.split(PAIR_SEPARATOR);
-  if (seats.length !== PAIR_SEATS) return pair;
   const [first, second] = seats;
-  if (first === undefined || second === undefined || positionWords(first) === first || positionWords(second) === second) return pair;
+  if (seats.length !== PAIR_SEATS || first === undefined || second === undefined || first === "" || second === "") return null;
+  return [first, second];
+}
+
+/** "BB-BTN" reads "big blind versus button"; anything that is not two known seats keeps its text. */
+export function pairWords(pair: string): string {
+  const seats = parsePair(pair);
+  if (seats === null) return pair;
+  const [first, second] = seats;
+  if (positionWords(first) === first || positionWords(second) === second) return pair;
   return `${positionWords(first)} versus ${positionWords(second)}`;
 }
 

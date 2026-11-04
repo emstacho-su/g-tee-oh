@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import { fixtureHeatmap, fixtureLeaks } from "../../src/fixtures/progress.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
-import { leakDrillName } from "../../src/progress/drill-family.js";
+import { pairKeyOfText } from "../../src/drills/reach-model.js";
+import { leakDrillName, pairSeats } from "../../src/progress/drill-family.js";
 import { familyWords as frequencyFamilyWords } from "../../src/progress/frequency-model.js";
 import { classLabel, columnLabel, rowLabel } from "../../src/progress/heatmap-model.js";
 import { joinLeaksToCells } from "../../src/progress/leak-model.js";
@@ -22,6 +23,7 @@ import {
   FAMILY_WORDS,
   familyWords,
   pairWords,
+  parsePair,
   POSITION_WORDS,
   positionWords,
 } from "../../src/progress/spot-words.js";
@@ -90,5 +92,16 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(configurationWords(undefined, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
     expect(configurationWords(undefined, "cfg_6_online_999", true)).toBe("configuration loading");
     expect(configurationWords(undefined, "not-a-config")).toBe("not-a-config");
+  });
+
+  it("R4.12 one pair split serves the words, the reach keys and the coverage events (PR #48 review round 2 LOW 9)", () => {
+    expect(parsePair("BB-BTN")).toEqual(["BB", "BTN"]);
+    expect(parsePair("SB-BB-BTN")).toBeNull();
+    expect(parsePair("BB-")).toBeNull();
+    expect(parsePair("not a pair")).toBeNull();
+    expect(pairKeyOfText("BTN-BB")).toBe(pairKeyOfText("BB-BTN"));
+    expect(pairKeyOfText("BB")).toBeNull();
+    expect(pairSeats("BB-BTN")).toEqual(["BB", "BTN"]);
+    expect(pairSeats("BB-BB")).toBeNull();
   });
 });

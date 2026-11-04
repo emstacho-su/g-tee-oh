@@ -29,7 +29,8 @@
 import { DEFAULT_TRAINER } from "../drills/draft.js";
 import { MAX_DEPTHS, seatedPositions } from "../drills/limits.js";
 import type { DrillCreate, Position, PreflopAction, SpotFilter } from "../drills/types.js";
-import { classWords } from "./spot-words.js";
+import { CBB_PER_BB } from "../poker/format.js";
+import { classWords, parsePair } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
 /** gto-model's action family (ActionFamily::as_str) to the drill family that trains it. */
@@ -52,8 +53,6 @@ export type DepthBand = (typeof DEPTH_BANDS)[number];
 
 /** The largest table, whose seats include every position. */
 const FULL_RING = 9;
-const PAIR_SEPARATOR = "-";
-const CBB_PER_BB = 100;
 const FORMATS: readonly GameConfig["format"][] = ["online", "live"];
 
 /** The coordinates of a class, as the heat map row and column give them. */
@@ -79,9 +78,10 @@ export function isDrillFormat(value: string): value is GameConfig["format"] {
 
 /** The two seats of a pair written "OOP-IP", or null when it is not two known, different seats. */
 export function pairSeats(pair: string): readonly [Position, Position] | null {
-  const parts = pair.split(PAIR_SEPARATOR);
-  const [oop, ip] = parts;
-  if (parts.length !== 2 || oop === undefined || ip === undefined || oop === ip) return null;
+  const seats = parsePair(pair);
+  if (seats === null) return null;
+  const [oop, ip] = seats;
+  if (oop === ip) return null;
   return isPosition(oop) && isPosition(ip) ? [oop, ip] : null;
 }
 
