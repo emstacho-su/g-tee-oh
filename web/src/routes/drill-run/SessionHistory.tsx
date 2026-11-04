@@ -9,7 +9,7 @@
  */
 import { useState, type ReactNode } from "react";
 
-import { FeedbackPanel, gradeWithMark, lossText, sectionsFromPanels, SUMMARY_TEXT } from "../../components/trainer/index.js";
+import { FeedbackPanel, gradeWithMark, lossText, sectionsFromPanels, SUMMARY_TEXT, type FeedbackSectionsControl } from "../../components/trainer/index.js";
 import { Disclosure } from "../../components/ui/index.js";
 import { handCounterText } from "../../trainer/hand-progress.js";
 import type { DecisionEntry } from "../../trainer/session-log.js";
@@ -35,6 +35,8 @@ export interface SessionHistoryProps {
   /** Name the decision within the hand (street and full-hand modes). */
   decisions: boolean;
   slotsFor: (entry: DecisionEntry) => HistorySlots;
+  /** The session's own section choices (useFeedbackSections, O-387), so a reopened decision shows what the user chose. */
+  sections?: FeedbackSectionsControl;
 }
 
 function rowHint(entry: DecisionEntry): string {
@@ -49,9 +51,10 @@ interface HistoryRowProps {
   onOpenChange: (open: boolean) => void;
   /** Builds the row's section bodies, called only while the row is open (PR #50 review). */
   slotsFor: (entry: DecisionEntry) => HistorySlots;
+  sections: FeedbackSectionsControl | undefined;
 }
 
-function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor }: HistoryRowProps) {
+function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor, sections }: HistoryRowProps) {
   return (
     <li data-testid="history-row" data-label={entry.feedback.label}>
       <Disclosure
@@ -70,6 +73,7 @@ function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor }: HistoryR
             unratedReason={unratedReason(entry.feedback, entry.prompt, entry.session)}
             workedExample={entry.prompt.worked_example}
             defaultOpen={sectionsFromPanels(entry.prompt.visible_panels)}
+            {...(sections === undefined ? {} : { sections })}
             {...slotsFor(entry)}
           />
         ) : null}
@@ -78,7 +82,7 @@ function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor }: HistoryR
   );
 }
 
-export function SessionHistory({ entries, decisions, slotsFor }: SessionHistoryProps) {
+export function SessionHistory({ entries, decisions, slotsFor, sections }: SessionHistoryProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   return (
     <Disclosure title={HISTORY_TEXT.title} hint={HISTORY_TEXT.count(entries.length)} testId="session-history" className="max-w-md">
@@ -94,6 +98,7 @@ export function SessionHistory({ entries, decisions, slotsFor }: SessionHistoryP
               open={openKey === entry.key}
               onOpenChange={(open) => setOpenKey(open ? entry.key : null)}
               slotsFor={slotsFor}
+              sections={sections}
             />
           ))}
         </ol>

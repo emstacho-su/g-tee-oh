@@ -149,7 +149,7 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
         </Button>
       ) : null}
       {/* Every decision of the session, reopened in place (S46, R3.32). */}
-      {context === null ? null : <SessionHistoryList log={session.log} decisions={streetModes} onExplain={onExplain} />}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={streetModes} onExplain={onExplain} sections={feedbackSections} />}
     </div>
   );
 }

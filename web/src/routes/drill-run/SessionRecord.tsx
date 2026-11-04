@@ -4,6 +4,7 @@
  * run and /train. Shown from the first prompt; the run tile follows the prompt's panels.
  */
 import { showsRun, tallyOf, type SessionLog } from "../../trainer/session-log.js";
+import type { FeedbackSectionsControl } from "../../components/trainer/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { historySlotsFor } from "./feedback-slots.js";
 import { SessionHistory } from "./SessionHistory.js";
@@ -25,8 +26,10 @@ export interface SessionHistoryListProps {
   /** Street and full-hand modes name the decision within the hand. */
   decisions: boolean;
   onExplain: () => void;
+  /** The session's own section choices, shared with the live reveal (O-387). */
+  sections?: FeedbackSectionsControl;
 }
 
-export function SessionHistoryList({ log, decisions, onExplain }: SessionHistoryListProps) {
-  return <SessionHistory entries={log.entries} decisions={decisions} slotsFor={historySlotsFor(onExplain)} />;
+export function SessionHistoryList({ log, decisions, onExplain, sections }: SessionHistoryListProps) {
+  return <SessionHistory entries={log.entries} decisions={decisions} slotsFor={historySlotsFor(onExplain)} {...(sections === undefined ? {} : { sections })} />;
 }

@@ -126,7 +126,7 @@ export function AutomatedSession(props: AutomatedSessionProps) {
         </Button>
       ) : null}
       {/* Every decision of the session, reopened in place (S46, R3.32); one decision per hand here. */}
-      {context === null ? null : <SessionHistoryList log={session.log} decisions={false} onExplain={onExplain} />}
+      {context === null ? null : <SessionHistoryList log={session.log} decisions={false} onExplain={onExplain} sections={feedbackSections} />}
     </div>
   );
 }

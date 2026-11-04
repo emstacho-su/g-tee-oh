@@ -113,3 +113,19 @@ describe("R3.33 PR #50 review: a reopened decision opens the sections its reveal
     expect(within(first).getByText("range view")).toBeInTheDocument();
   });
 });
+
+describe("R3.33 PR #50 review: a reopened decision keeps the session's own section choices (O-387)", () => {
+  it("R3.33 a section the user closed at a reveal stays closed in the history, whatever the panels' default", async () => {
+    const withRange = ENTRIES.map((entry) => ({ ...entry, prompt: { ...entry.prompt, visible_panels: ["hero_range_matrix"] } }));
+    const sections = { open: { range: false }, setOpen: vi.fn() };
+    render(<SessionHistory entries={withRange} decisions={false} slotsFor={() => ({ rangeView: <p>range view</p> })} sections={sections} />);
+    const history = await openList();
+    const [first] = within(history).getAllByTestId("history-row");
+    if (first === undefined) throw new Error("no history row");
+    await userEvent.click(within(first).getByRole("button", { name: /Hand 1/ }));
+    const range = within(first).getByRole("button", { name: /Range/ });
+    expect(range).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(range);
+    expect(sections.setOpen).toHaveBeenCalledWith("range", true);
+  });
+});
