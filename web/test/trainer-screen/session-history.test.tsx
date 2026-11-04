@@ -98,3 +98,18 @@ describe("R3.32 session history", () => {
     expect(vi.fn()).not.toHaveBeenCalled();
   });
 });
+
+describe("R3.33 PR #50 review: a reopened decision opens the sections its reveal opened", () => {
+  it("R3.33 a row of a prompt that names the hero range opens its Range section, as the live reveal did, and builds its sections only when opened", async () => {
+    const withRange = ENTRIES.map((entry) => ({ ...entry, prompt: { ...entry.prompt, visible_panels: ["hero_range_matrix"] } }));
+    const slotsFor = vi.fn(() => ({ rangeView: <p>range view</p> }));
+    render(<SessionHistory entries={withRange} decisions={false} slotsFor={slotsFor} />);
+    const history = await openList();
+    expect(slotsFor, "a closed row builds no section").not.toHaveBeenCalled();
+    const [first] = within(history).getAllByTestId("history-row");
+    if (first === undefined) throw new Error("no history row");
+    await userEvent.click(within(first).getByRole("button", { name: /Hand 1/ }));
+    expect(within(first).getByRole("button", { name: /Range/ })).toHaveAttribute("aria-expanded", "true");
+    expect(within(first).getByText("range view")).toBeInTheDocument();
+  });
+});

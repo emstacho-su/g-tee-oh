@@ -9,7 +9,7 @@
  */
 import { useState, type ReactNode } from "react";
 
-import { FeedbackPanel, gradeWithMark, lossText, SUMMARY_TEXT } from "../../components/trainer/index.js";
+import { FeedbackPanel, gradeWithMark, lossText, sectionsFromPanels, SUMMARY_TEXT } from "../../components/trainer/index.js";
 import { Disclosure } from "../../components/ui/index.js";
 import { handCounterText } from "../../trainer/hand-progress.js";
 import type { DecisionEntry } from "../../trainer/session-log.js";
@@ -47,10 +47,11 @@ interface HistoryRowProps {
   decisions: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  slots: HistorySlots;
+  /** Builds the row's section bodies, called only while the row is open (PR #50 review). */
+  slotsFor: (entry: DecisionEntry) => HistorySlots;
 }
 
-function HistoryRow({ entry, decisions, open, onOpenChange, slots }: HistoryRowProps) {
+function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor }: HistoryRowProps) {
   return (
     <li data-testid="history-row" data-label={entry.feedback.label}>
       <Disclosure
@@ -68,7 +69,8 @@ function HistoryRow({ entry, decisions, open, onOpenChange, slots }: HistoryRowP
             chosenIndex={entry.actionIndex}
             unratedReason={unratedReason(entry.feedback, entry.prompt, entry.session)}
             workedExample={entry.prompt.worked_example}
-            {...slots}
+            defaultOpen={sectionsFromPanels(entry.prompt.visible_panels)}
+            {...slotsFor(entry)}
           />
         ) : null}
       </Disclosure>
@@ -91,7 +93,7 @@ export function SessionHistory({ entries, decisions, slotsFor }: SessionHistoryP
               decisions={decisions}
               open={openKey === entry.key}
               onOpenChange={(open) => setOpenKey(open ? entry.key : null)}
-              slots={slotsFor(entry)}
+              slotsFor={slotsFor}
             />
           ))}
         </ol>
