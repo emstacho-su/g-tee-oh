@@ -319,6 +319,21 @@ describe("R4.19 MasteryHeatMap Show choice", () => {
   });
 });
 
+describe("R4.19 the heat map's scroll cues", () => {
+  it("R4.19 the grid frame shows an edge cue toward the depth columns beyond its edge, following the scroll (round 5 verifier on progress-heatmap)", () => {
+    render(<MasteryHeatMap heatmap={fixtureHeatmap} onDrill={vi.fn()} />);
+    const frame = screen.getByTestId("heat-grid");
+    for (const [name, value] of Object.entries({ clientWidth: 358, scrollWidth: 720, scrollLeft: 0 })) Object.defineProperty(frame, name, { value, configurable: true, writable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "false");
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    frame.scrollLeft = 362;
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "true");
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
+});
+
 describe("R4.19 heat map rows without a cell", () => {
   it("R4.19 All keeps a row the api lists even when it has no cell; a narrowed view leaves it out (PR 51 review round 2)", () => {
     const withoutFirstRow = { ...fixtureHeatmap, cells: fixtureHeatmap.cells.filter((each) => each.row !== 0) };

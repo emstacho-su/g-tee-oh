@@ -36,7 +36,10 @@ import {
 import { drillTargetOf, type DrillTarget } from "../../progress/open-drill.js";
 import { capitalize, familyWords, pairWords } from "../../progress/spot-words.js";
 import type { ProgressHeatmap } from "../../progress/types.js";
-import { cn, STICKY_LAYER_CLASS, ToggleGroup } from "../ui/index.js";
+import { cn, EdgeCue, STICKY_LAYER_CLASS, ToggleGroup, useEdgeCues } from "../ui/index.js";
+
+/** The grid frame's edge cues: "heat-start-fade" and "heat-end-fade". */
+const CUE_PREFIX = "heat";
 import { ChartTooltip, useTooltipAnchor } from "./ChartTooltip.js";
 import { DrillAlert } from "./DrillAlert.js";
 import { ProgressCard } from "./ProgressCard.js";
@@ -144,6 +147,7 @@ interface HeatGridProps {
 function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
   const lookup = cellLookup(heatmap);
   const tooltip = useTooltipAnchor();
+  const frame = useEdgeCues<HTMLDivElement>();
   const [active, setActive] = useState<HeatCellView | null>(null);
   const show = (view: HeatCellView, element: Element) => {
     setActive(view);
@@ -164,7 +168,9 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
     .map((group) => ({ ...group, rows: narrowed ? group.rows.filter((entry) => rowsShown.has(entry.index)) : group.rows }))
     .filter((group) => group.rows.length > 0);
   return (
-    <div className="max-w-full overflow-x-auto" data-testid="heat-grid">
+    <div className="relative">
+      {/* The frame scrolls sideways at phone width; the shared edge cues say the depth columns continue (S48 round 5 verifier). */}
+      <div ref={frame.ref} onScroll={frame.measure} className="max-w-full overflow-x-auto" data-testid="heat-grid">
       <table className="border-separate border-spacing-1 text-left text-sm">
         <caption className="sr-only">Mastery by spot class. {OPEN_DRILL_HINT}</caption>
         <thead>
@@ -218,6 +224,9 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
           </>
         )}
       </ChartTooltip>
+      </div>
+      <EdgeCue side="start" shown={frame.cues.start} prefix={CUE_PREFIX} />
+      <EdgeCue side="end" shown={frame.cues.end} prefix={CUE_PREFIX} />
     </div>
   );
 }
