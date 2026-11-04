@@ -160,7 +160,7 @@ export function unopenedText(result: Exclude<OpenDrillResult, { kind: "opened" }
 }
 
 /** Which card asked, so only that card shows the message. */
-export type DrillOrigin = "leaks" | "heatmap";
+export type DrillOrigin = "leaks" | "heatmap" | "queue";
 
 export interface DrillMessage {
   readonly origin: DrillOrigin;
