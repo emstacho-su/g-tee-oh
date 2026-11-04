@@ -33,6 +33,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAppApi } from "../../auth/index.js";
 import { RngExplainer, useFeedbackSections, useRngExplainer } from "../../components/trainer/index.js";
+import { useStudyConfigs } from "../../trainer/use-study-configs.js";
 import { Button, LoadingNote, PageHeader } from "../../components/ui/index.js";
 import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
@@ -110,6 +111,8 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
   const context = "context" in state ? state.context : null;
   // The feedback sections the user opened or closed stay that way for the session (O-387).
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
+  // The configurations for the reveal's Study this spot link (S46, R3.34).
+  const studyConfigs = useStudyConfigs(state.kind === "feedback");
   const streetModes = (drill.trainer.stop_rule ?? "after_action") !== "after_action";
   return (
     <div className="flex flex-col gap-4">
@@ -127,6 +130,7 @@ function InSession({ drill, session, interactive, onAskEnd, onExplain, onExplain
             interactive={interactive}
             replaying={replay.replaying}
             feedbackSections={feedbackSections}
+            {...(studyConfigs === undefined ? {} : { studyConfigs })}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}

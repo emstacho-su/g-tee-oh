@@ -30,15 +30,18 @@ import { ExplainControls } from "../../components/explain/ExplainControls.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import type { GameConfig } from "../../progress/types.js";
 import { replayKey } from "../../trainer/action-replay.js";
 import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
+import { studyLinkFor } from "../../trainer/study-link.js";
 import { unratedReason } from "../../trainer/unrated-reason.js";
 import { feedbackSlots } from "./feedback-slots.js";
-import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT, decisionAreaName } from "./labels.js";
+import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT, STUDY_SPOT_BINDING, decisionAreaName } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
 import { RevealNotice } from "./RevealNotice.js";
+import { STUDY_TAB_FEATURES, STUDY_TAB_TARGET, StudySpotLink } from "./StudySpotLink.js";
 
 export interface DecisionAreaProps {
   state: SpotState;
@@ -64,6 +67,11 @@ export interface DecisionAreaProps {
    * because this area unmounts between hands; without it each panel starts from the defaults.
    */
   feedbackSections?: FeedbackSectionsControl;
+  /**
+   * The configuration list (settings/configs-query.ts) for the reveal's Study this spot link
+   * (S46, R3.34); absent while it loads, and then no link shows.
+   */
+  studyConfigs?: readonly GameConfig[];
 }
 
 /** The Next hand button, the focus target once a reveal mounts (PR #45 review round 4, finding f). */
@@ -91,13 +99,19 @@ function chosenIndexOf(state: SpotState): number | null {
   }
 }
 
-function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections }: DecisionAreaProps) {
+function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDialog, feedbackSections, studyConfigs }: DecisionAreaProps) {
   const enabled = state.kind === "feedback" && interactive;
   // On the last planned hand's reveal Next finishes the session (S46, R3.31).
   const nextLabel = atSessionLimit(state) ? SESSION_TEXT.finishSession : SESSION_TEXT.nextHand;
   // N and Enter both go on (S46, R3.30, design rule 9).
   useHotkey({ key: NEXT_HAND_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
   useHotkey({ key: NEXT_HAND_ENTER_KEY, description: nextLabel, scope: SESSION_SCOPE, handler: onNext }, enabled);
+  // Study this spot: the link and Shift+S open the decision's node in Study in a new tab (R3.34).
+  const studyHref = state.kind === "feedback" && studyConfigs !== undefined ? studyLinkFor(state.feedback, prompt, studyConfigs) : null;
+  const openStudy = () => {
+    if (studyHref !== null) window.open(studyHref, STUDY_TAB_TARGET, STUDY_TAB_FEATURES);
+  };
+  useHotkey({ ...STUDY_SPOT_BINDING, description: SESSION_TEXT.studySpot, scope: SESSION_SCOPE, handler: openStudy }, enabled && studyHref !== null);
   if (state.kind !== "feedback") return null;
   const { feedback, decision, context } = state;
   // A reveal that does not pause shows the short result chip and continues by itself (S26, O-314).
@@ -132,7 +146,12 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           chosenIndex={decision.actionIndex}
           unratedReason={unratedReason(feedback, prompt, context.session)}
           {...slots}
-          explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
+          explain={
+            <div className="flex flex-wrap items-center gap-2">
+              <ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />
+              {studyHref === null ? null : <StudySpotLink href={studyHref} />}
+            </div>
+          }
           workedExample={prompt.worked_example}
           defaultOpen={sectionsFromPanels(prompt.visible_panels)}
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}

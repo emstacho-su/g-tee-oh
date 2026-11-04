@@ -21,6 +21,7 @@ import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { displayBinding } from "../../hotkeys/index.js";
 import type { TrackKey } from "../../progress/types.js";
 import { useFeedbackSections } from "../../components/trainer/index.js";
+import { useStudyConfigs } from "../../trainer/use-study-configs.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
 import type { SpotProblem } from "../../trainer/spot-problem.js";
 import type { SpotSession } from "../../trainer/use-spot-session.js";
@@ -86,6 +87,8 @@ export function AutomatedSession(props: AutomatedSessionProps) {
   const loading = state.kind === "loading_prompt" || state.kind === "stale";
   // The feedback sections the user opened or closed stay that way for the session (O-387).
   const feedbackSections = useFeedbackSections(context?.session.session_id ?? null);
+  // The configurations for the reveal's Study this spot link (S46, R3.34).
+  const studyConfigs = useStudyConfigs(state.kind === "feedback");
   return (
     <div className="flex flex-col gap-4">
       {context === null ? null : (
@@ -106,6 +109,7 @@ export function AutomatedSession(props: AutomatedSessionProps) {
             interactive={interactive}
             replaying={replay.replaying}
             feedbackSections={feedbackSections}
+            {...(studyConfigs === undefined ? {} : { studyConfigs })}
             onChoose={session.chooseAction}
             onNext={session.next}
             onExplain={onExplain}
