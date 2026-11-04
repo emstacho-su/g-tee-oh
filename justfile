@@ -504,17 +504,15 @@ BENCH_PLATFORM := if arch() == "aarch64" { "linux/arm64" } else { "linux/amd64" 
 # run under emulation, so it is refused. estimate runs before the measured runs, so a broken spec
 # fails in seconds, not after an hour. mac-bench-clean removes what the run left (O-47).
 # Flop-line benchmark in the 5 GB container against O-50; the Mac bootstrap measurement (R0.9, S04)
-mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/reports":
+mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/reports": _bench-reset
     {{ if PLATFORM == BENCH_PLATFORM { 'echo "mac-bench: platform ' + PLATFORM + ' matches the host"' } else { 'echo "mac-bench: refused, platform ' + PLATFORM + ' differs from the host ' + BENCH_PLATFORM + ' and would run under emulation; run on that machine"; exit 1' } }}
-    -docker rm -f gto-bench gto-bench-16bit
-    -docker volume rm {{BENCH_SCRATCH}}
     node -e "require('node:fs').rmSync('{{BENCH_DIR}}', { recursive: true, force: true })"
     node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}', { recursive: true })"
     docker buildx build --load --platform {{PLATFORM}} -f infra/docker/library-builder.Dockerfile \
         -t {{BENCH_IMAGE}} .
     docker run --rm {{BENCH_ENV}} --entrypoint /bin/sh {{BENCH_IMAGE}} \
-        -c 'rm -rf /scratch/* && mkdir -p /scratch/library-judged /scratch/library-16bit && touch /out/writable'
-    docker run --rm {{BENCH_OUT}} {{BENCH_IMAGE}} estimate \
+        -c 'rm -rf /scratch/* && mkdir -p /scratch/library-judged /scratch/library-16bit && touch /out/writable && rm /out/writable'
+    {{SPIKE_RUN}} {{BENCH_OUT}} {{BENCH_IMAGE}} estimate \
         --job-spec /fixtures/builder/bench-bb-btn-srp.json --out /out/sweep.json
     -{{SPIKE_RUN}} --name gto-bench -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} \
         {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
@@ -527,10 +525,13 @@ mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/report
         --out {{OUT}}
 
 # Each line ignores a missing item, so the recipe also cleans a run that stopped early.
-# Remove the mac-bench containers, scratch volume and image, so nothing stays (O-47)
-mac-bench-clean:
+# The reset both recipes share; each line ignores a missing item.
+_bench-reset:
     -docker rm -f gto-bench gto-bench-16bit
     -docker volume rm {{BENCH_SCRATCH}}
+
+# Remove the mac-bench containers, scratch volume and image, so nothing stays (O-47)
+mac-bench-clean: _bench-reset
     -docker rmi {{BENCH_IMAGE}}
 
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"

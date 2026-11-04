@@ -3,7 +3,7 @@
 Written by S04 on 2026-11-04 from the tool-written `bench-flop-line-mac.md` and the owner's run sheet (O-506); the Mac part of the Phase 0 gate closes with it (O-20, O-47, O-50, O-67). Not edited after the gate closes.
 
 - Date: 2026-11-04 (the measured run finished at 2026-11-04T19:29:26Z)
-- Repository commit the Mac ran: 074d80c789dcf149095f1322f4b2f6108847347a (branch `p0/mac-bootstrap`, pull request 53)
+- Repository commit the Mac ran: 074d80c789dcf149095f1322f4b2f6108847347a (branch `p0/mac-bootstrap`, pull request 53). The branch's later commits changed only the recipe's guards (the resets, the platform refusal, the output probe, the order of `estimate`), not the measured method or the cap.
 - Engine commit: 5fc7ee3d92b823b6c58e4f58cbee7d50d5e9e6de (the vendored `postflop-engine`, `crates/vendor/UPSTREAM-postflop-engine.md`)
 - Docker virtual machine: 10 GB of memory and 10 logical cores, as the measured process read them inside the container (O-20: 10 GB and all but 2 cores)
 - Power setting: sleep prevented on the power adapter, confirmed by the owner on 2026-11-04; the `pmset -g custom` line was not pasted into the record (risk R-17)

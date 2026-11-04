@@ -79,7 +79,7 @@ Both throwaway branches were closed and deleted after the runs above were record
 
 ## Mac part
 
-Closed on 2026-11-04 by S04 (pull request #53): the Mac ran `just mac-bench` for linux/arm64 under the 5 GB cap and `validation/reports/mac-bootstrap.md` records the Docker memory and cores, the power setting, the peak RSS and seconds per iteration against O-50 (pass) and that nothing was left running (O-47). The numbers come from `bench-flop-line-mac.json` (O-506).
+Closed on 2026-11-04 by S04 (pull request #53): the Mac ran `just mac-bench` for linux/arm64 under the 5 GB cap and `validation/reports/mac-bootstrap.md` records the Docker memory and cores, the power setting, the peak RSS and seconds per line against O-50 (pass), with seconds per iteration derived and that nothing was left running (O-47). The numbers come from `bench-flop-line-mac.json` (O-506).
 
 ## Partial success criteria
 
