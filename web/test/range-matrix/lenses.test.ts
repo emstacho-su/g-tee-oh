@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MODE_NAMES, cellValueText, formatLossShort } from "../../src/components/range-matrix/cell-text.js";
+import { MISSING_MARK, MODE_NAMES, cellValueText, formatLossShort } from "../../src/components/range-matrix/cell-text.js";
 import { cellEdges, drawMatrix, type DrawOptions } from "../../src/components/range-matrix/draw.js";
 import { MATRIX_PALETTES, lossFill, lossInk } from "../../src/components/range-matrix/matrix-theme.js";
 import {
@@ -149,6 +149,18 @@ describe("R3.24 compare-to-best scale (O-464)", () => {
     const ticks = compareLegend(2).map((step) => step.short);
     expect(ticks[0]).toBe("best");
     expect(ticks.slice(1)).toEqual(["-0.4%", "-0.8%", "-1.2%", "-1.6%", "-2.0%"]);
+  });
+
+  it("R3.12 a cell with no loss for the compared action paints as missing on the canvas, never as the best (code review round 2, 1)", () => {
+    const withoutLoss = { ...model, cells: model.cells.map((cell) => (cell.hand === "AA" ? { ...cell, lossPctPot: [] } : cell)) };
+    const aa = cellOf(withoutLoss, "AA");
+    const ops = draw(withoutLoss, { mode: "compare", lensPosition: 2 });
+    const rect = cellRect(aa);
+    expect(fillsIn(ops, rect).some((op) => op.style === palette.missingFill)).toBe(true);
+    expect(fillsIn(ops, rect).some((op) => op.style === palette.evNeutral)).toBe(false);
+    const texts = textsIn(ops, rect);
+    expect(texts.map((op) => op.text)).toEqual([aa.hand, MISSING_MARK]);
+    expect(texts.every((op) => op.style === palette.labelText)).toBe(true);
   });
 
   it("R3.12 a missing or non-numeric loss reads unavailable in the table text, never the best action (code review round 1, 4)", () => {

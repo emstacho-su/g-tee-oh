@@ -150,7 +150,9 @@ export function drawCellFill(frame: FrameContext, cell: MatrixCell, rect: Rect):
   if (isBarMode(frame.mode)) drawFrequencyCell(frame, cell, rect);
   else if (frame.mode === "ev") fillWith(ctx, evFill(palette, cell.evBestBb ?? 0, frame.model.evScaleBb), rect.x, rect.y, rect.w, rect.h);
   else if (frame.mode === "compare") {
-    const fill = lens === null ? palette.missingFill : lossFill(palette, cell.lossPctPot[lens.position] ?? 0, lens.scalePctPot);
+    // No lens, or no loss for the action: the missing fill, never the best colour (code review round 2, 1).
+    const loss = lens === null ? null : lossOf(cell, lens.position);
+    const fill = lens === null || loss === null ? palette.missingFill : lossFill(palette, loss, lens.scalePctPot);
     fillWith(ctx, fill, rect.x, rect.y, rect.w, rect.h);
   } else fillWith(ctx, weightFill(palette, cell.weight) ?? palette.missingFill, rect.x, rect.y, rect.w, rect.h);
 }
@@ -170,7 +172,9 @@ export function cellInk(frame: FrameContext, cell: MatrixCell): string {
   if (usesChip(frame, cell)) return frame.palette.labelText;
   if (frame.mode === "ev") return evInk(frame.palette, cell.evBestBb ?? 0, frame.model.evScaleBb);
   if (frame.mode === "compare") {
-    return frame.lens === null ? frame.palette.labelText : lossInk(frame.palette, cell.lossPctPot[frame.lens.position] ?? 0, frame.lens.scalePctPot);
+    const { lens } = frame;
+    const loss = lens === null ? null : lossOf(cell, lens.position);
+    return lens === null || loss === null ? frame.palette.labelText : lossInk(frame.palette, loss, lens.scalePctPot);
   }
   return weightInk(frame.palette, cell.weight);
 }
