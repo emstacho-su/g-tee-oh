@@ -39,6 +39,9 @@ function report(p95: number) {
   });
 }
 
+/** The fake clock's step per read. */
+const CLOCK_TICK_MS = 1.5;
+
 describe("R3.26 node-switch budget", () => {
   it("R3.26 the budget is 50 ms at p95, judged strictly", () => {
     expect(NODE_SWITCH_BUDGET_MS).toBe(50);
@@ -76,7 +79,7 @@ describe("R3.26 node-switch budget", () => {
       container,
       switches: 4,
       warmupSwitches: 2,
-      now: () => (clock += 1.5),
+      now: () => (clock += CLOCK_TICK_MS),
       nextFrame: (callback) => {
         setTimeout(callback, 0);
       },
@@ -84,6 +87,9 @@ describe("R3.26 node-switch budget", () => {
     expect(outcome.n).toBe(4);
     expect(outcome.switchesMs).toHaveLength(4);
     expect(outcome.switchesMs.every((ms) => ms > 0)).toBe(true);
+    // The metric reads the clock at markRequest and in the frame after complete: one 1.5 ms tick
+    // apart. Each recorded switch is that measured duration, not a second clock around it (PR 52 review 1).
+    expect(outcome.switchesMs).toEqual([CLOCK_TICK_MS, CLOCK_TICK_MS, CLOCK_TICK_MS, CLOCK_TICK_MS]);
     expect(outcome.p95).toBeGreaterThanOrEqual(outcome.p50);
     expect(outcome.nodes).toBe(benchNodes().length);
     // The loop unmounts its root when it is done, leaving the container empty.

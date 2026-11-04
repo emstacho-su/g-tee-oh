@@ -7,7 +7,8 @@
  * bench's variants, so every switch draws different data). Each switch marks a request on the
  * study screen's own node-switch metrics (node-switch-metrics.ts), renders the next node, and the
  * harness completes the switch in an effect after the commit, exactly as NodeView does; the metrics
- * log one frame later, and that log ends the timing. Warm-up switches are not recorded. The clock
+ * measure one frame later, and the duration they measure is the one recorded, never a second clock
+ * around it (PR 52 review 1). Warm-up switches are not recorded. The clock
  * and the frame scheduler are injected, so the loop runs in jsdom for the unit tests; the bench
  * page passes performance.now and requestAnimationFrame. Synthetic numbers only (O-26).
  */
@@ -79,11 +80,12 @@ function NodeSwitchHarness({ node, metrics }: HarnessProps) {
 export async function runNodeSwitchBench(input: NodeSwitchRunInput): Promise<NodeSwitchTimings> {
   const nodes = benchNodes();
   const root = createRoot(input.container);
-  let finish: (() => void) | null = null;
+  let finish: ((ms: number) => void) | null = null;
   const metrics = createNodeSwitchMetrics({
     now: input.now,
     nextFrame: input.nextFrame,
-    log: () => finish?.(),
+    measure: (ms) => finish?.(ms),
+    log: () => undefined,
   });
   const recorded: number[] = [];
   try {
@@ -91,14 +93,12 @@ export async function runNodeSwitchBench(input: NodeSwitchRunInput): Promise<Nod
     for (let index = 0; index < total; index += 1) {
       const node = nodes[index % nodes.length];
       if (node === undefined) throw new RangeError("node-switch bench: no synthetic nodes");
-      const done = new Promise<void>((resolve) => {
+      const measured = new Promise<number>((resolve) => {
         finish = resolve;
       });
-      const start = input.now();
       metrics.markRequest();
       flushSync(() => root.render(<NodeSwitchHarness node={node} metrics={metrics} />));
-      await done;
-      const elapsed = input.now() - start;
+      const elapsed = await measured;
       if (index >= input.warmupSwitches) recorded.push(elapsed);
     }
   } finally {
