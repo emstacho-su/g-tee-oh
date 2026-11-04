@@ -54,6 +54,27 @@ test("R3.23 tallyByLane: No before and after per lane with the transition counts
   ]);
 });
 
+test("R3.23 a screen that moved lanes between rounds counts under its old lane before and its new lane after (code review round 1, 7)", () => {
+  const moved = {
+    before: { round: "3", generated: "a", records: [record("moved", "S46", "no"), record("stays", "S47", "yes")] },
+    after: { round: "4", generated: "b", records: [record("moved", "S47", "no", "still"), record("stays", "S47", "yes")] },
+  };
+  const rows = transitions(moved.before, moved.after);
+  const row = rows.find((r) => r.screen === "moved");
+  assert.equal(row.lane, "S47");
+  assert.equal(row.laneBefore, "S46");
+  assert.equal(row.kind, "still-no");
+  const tally = tallyByLane(rows);
+  assert.deepEqual(tally.map((t) => [t.lane, t.before_screens, t.before_no, t.after_screens, t.after_no, t["still-no"], t["still-yes"]]), [
+    ["S46", 1, 1, 0, 0, 0, 0],
+    ["S47", 1, 0, 2, 1, 1, 1],
+  ]);
+  const digest = renderDelta(moved.before, moved.after, rows);
+  assert.match(digest, /\| S46 \| 1 \| 1 \| 0 \| 0 \| 0 \| 0 \| 0 \| 0 \| 0 \|/);
+  assert.match(digest, /\| S47 \| 1 \| 0 \| 2 \| 1 \| 0 \| 0 \| 0 \| 0 \| 0 \|/);
+  assert.match(digest, /\| All \| 2 \| 1 \| 2 \| 1 \| 0 \| 0 \| 0 \| 0 \| 0 \|/);
+});
+
 test("R3.23 renderDelta: the lane table carries the totals and every regression is listed with its reason", () => {
   const digest = renderDelta(previous, current, transitions(previous, current));
   assert.match(digest, /^# Critic delta: round 3 \(2026-10-29T14:55:44.524Z\) to round 4/);
