@@ -23,7 +23,8 @@
  * useOpenDrill wraps it for the screens: one open at a time, the clicked target's key as pending
  * (its button is disabled), navigation to /drills/$id/run on success, and an inline message for
  * the card that asked when no config matches or a request fails. The failure text is the api
- * problem's title (fixed text per problem type), never its detail (A9 section 3).
+ * problem's title (fixed text per problem type), never its detail (A9 section 3). Since the S47
+ * follow-up (R4.12) the navigation carries from=leak-created or from=leak-reused.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -194,7 +195,8 @@ export function useOpenDrill(): OpenDrillControl {
             return;
           }
           if (result.created) await invalidateDrills(queryClient);
-          await navigate({ to: "/drills/$id/run", params: { id: result.drillId } });
+          // The run screen says whether the drill was made or found (R4.12).
+          await navigate({ to: "/drills/$id/run", params: { id: result.drillId }, search: { from: result.created ? "leak-created" : "leak-reused" } });
         })
         .catch((error: unknown) => setMessage({ origin, text: openFailureText(error) }))
         .finally(() => setPendingKey(null));

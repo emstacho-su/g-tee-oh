@@ -158,10 +158,16 @@ describe("R4.12 /progress", () => {
   });
 
   it("R4.12 a heat map cell opens the class's existing auto drill (O-321)", async () => {
-    const { router, fake } = renderApp("/progress", { ...PROGRESS, "GET /api/v1/drills": [jsonResponse(200, { items: [fixtureDrill], next_cursor: null })] });
+    const { router, fake } = renderApp("/progress", {
+      ...PROGRESS,
+      "GET /api/v1/drills": [jsonResponse(200, { items: [fixtureDrill], next_cursor: null })],
+      [`GET /api/v1/drills/${fixtureDrill.id}`]: [jsonResponse(200, fixtureDrill)],
+    });
     fireEvent.click(await screen.findByRole("button", { name: /^Open or fold, big blind versus under the gun, live 100bb:/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/drills/${fixtureDrill.id}/run`));
     expect(fake.keys()).not.toContain("POST /api/v1/drills");
+    // The run screen is told the drill was found, not made (R4.12).
+    expect(await screen.findByTestId("opened-note")).toHaveTextContent("already in your drills.");
   });
 
   it("R4.12 a leak row creates the class's drill when none exists, then opens it and drops the cached drill lists", async () => {

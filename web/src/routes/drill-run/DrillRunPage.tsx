@@ -38,7 +38,7 @@ import type { TrainerPrompt } from "../../contracts.js";
 import { displayBinding, useHotkey } from "../../hotkeys/index.js";
 import { useSessionDefaultsStore } from "../../store/session-defaults.js";
 import { runSettingsOf } from "../../trainer/pause-rule.js";
-import { validateDrillRunSearch } from "../../trainer/run-search.js";
+import { validateDrillRunSearch, type LeakOpen } from "../../trainer/run-search.js";
 import { drillQuery } from "../../trainer/session-api.js";
 import type { Drill } from "../../trainer/session-types.js";
 import { canEnd, type SpotState } from "../../trainer/spot-machine.js";
@@ -53,12 +53,15 @@ import { EndSessionDialog, SessionAlert, SessionRecapView } from "./SessionParts
 import { SpotTable } from "./SpotTable.js";
 import { StartPanel } from "./StartPanel.js";
 import { useAutostart } from "./use-autostart.js";
+import { OpenedNote, useOpenedNote } from "./OpenedNote.js";
 
 export interface DrillRunPageProps {
   drillId: string;
   seed?: string;
   /** The address carried start=1 (S47, R3.36, O-484): the session starts once the drill is read. */
   autostart?: boolean;
+  /** The address carried from= (S47 follow-up, R4.12): a leak's drill was just created or found. */
+  openedFrom?: LeakOpen;
 }
 
 /** The prompt on screen in a state, if any. */
@@ -236,15 +239,17 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
   );
 }
 
-export function DrillRunPage({ drillId, seed: rawSeed, autostart = false }: DrillRunPageProps) {
+export function DrillRunPage({ drillId, seed: rawSeed, autostart = false, openedFrom }: DrillRunPageProps) {
   const api = useAppApi();
   const drill = useQuery(drillQuery(api, drillId));
+  const opened = useOpenedNote(openedFrom);
   // The route validates the seed, but TanStack Router merges the parent route's unvalidated search
   // into the child's, so a malformed seed can still arrive here; check it again at this boundary.
   const { seed } = validateDrillRunSearch(rawSeed === undefined ? {} : { seed: rawSeed });
   return (
     <section className="flex flex-col gap-4" data-drill-id={drillId}>
       <PageHeader title={SESSION_TEXT.heading} />
+      {opened === null || drill.data === undefined ? null : <OpenedNote open={opened} name={drill.data.name} />}
       {drill.isPending ? <LoadingNote text={SESSION_TEXT.loadingDrill} /> : null}
       {/* A failed background refetch keeps the cached drill, so a running session stays on screen. */}
       {drill.isError && drill.data === undefined ? <p role="alert" className="text-danger">This drill could not be loaded. Check the link, or open it again from the drill library.</p> : null}

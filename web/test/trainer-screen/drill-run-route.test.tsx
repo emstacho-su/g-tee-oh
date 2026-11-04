@@ -7,6 +7,7 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { FIXTURE_DRILL_ID, FIXTURE_SEED, fixtureDrill, fixturePlainPrompt, fixturePracticeSession } from "../../src/fixtures/trainer.js";
+import { validateDrillRunSearch } from "../../src/trainer/run-search.js";
 import { drillQuery } from "../../src/trainer/session-api.js";
 import { jsonResponse } from "../api/fake-fetch.js";
 import { SIGNED_IN, renderApp } from "../app/render-app.js";
@@ -44,6 +45,22 @@ describe("R3.13 drill run route", () => {
     expect(drillRead).toBeGreaterThanOrEqual(0);
     expect(drillRead).toBeLessThan(app.fake.calls.findIndex(isStart));
     await waitFor(() => expect(app.router.state.location.search).not.toHaveProperty("start"));
+  });
+
+  it("R4.12 from=leak-created says Opened Leak drill, created", async () => {
+    const leakDrill = { ...fixtureDrill, name: "Leak drill: open or fold, big blind versus under the gun, live 100bb" };
+    const app = renderApp(`/drills/${FIXTURE_DRILL_ID}/run?from=leak-created`, { ...SCRIPT, [`GET /api/v1/drills/${FIXTURE_DRILL_ID}`]: [jsonResponse(200, leakDrill)] });
+    expect(await screen.findByTestId("opened-note")).toHaveTextContent("Opened Leak drill: open or fold, big blind versus under the gun, live 100bb, created for this spot.");
+    // Said once: the flag leaves the address, so a reload or a copied link does not say it again.
+    await waitFor(() => expect(app.router.state.location.search).not.toHaveProperty("from"));
+    expect(screen.getByTestId("opened-note")).toBeInTheDocument();
+  });
+
+  it("R4.12 from=leak-reused says the drill was already there, and an unknown from says nothing", async () => {
+    renderApp(`/drills/${FIXTURE_DRILL_ID}/run?from=leak-reused`, SCRIPT);
+    expect(await screen.findByTestId("opened-note")).toHaveTextContent(`Opened ${fixtureDrill.name}, already in your drills.`);
+    expect(validateDrillRunSearch({ from: "leak-created" })).toEqual({ from: "leak-created" });
+    expect(validateDrillRunSearch({ from: "elsewhere" })).toEqual({});
   });
 
   it("R3.36 start=yes is not an autostart", async () => {
