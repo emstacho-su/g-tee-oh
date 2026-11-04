@@ -14,7 +14,8 @@
  * representation: each name states the class and every value (S36 review, O-347; no table). Family
  * headings, pair headers and the tooltip title read in words (spot-words.ts, S47). A Show choice
  * (R4.19) narrows the grid to the due, new or ten weakest classes; a row with no class left is not
- * drawn, nor, in a narrowed view, a column with none (PR #51 review 8).
+ * drawn, nor a column with none (PR #51 review 8); the All view keeps every row and column the
+ * api lists, cells or not (PR #51 review round 2).
  */
 import { useLayoutEffect, useState, type CSSProperties } from "react";
 
@@ -168,13 +169,14 @@ function HeatGrid({ heatmap, narrowed, pendingKey, onDrill }: HeatGridProps) {
     .map((group) => ({ ...group, rows: narrowed ? group.rows.filter((entry) => rowsShown.has(entry.index)) : group.rows }))
     .filter((group) => group.rows.length > 0);
   // A Show choice changes the table's width inside an unchanged frame, which no scroll or resize
-  // reports, so the cues are measured again after each change of what is drawn (code review round 2, 2).
+  // reports, so the cues are measured again after each change of what is drawn (code review round
+  // 2, 2), keyed on which rows and columns show, not how many: a view that swaps one row for another
+  // of the same count changes the widths too (round 3, 3).
   const { measure } = frame;
-  const shownColumns = columns.length;
-  const shownRows = groups.reduce((count, group) => count + group.rows.length, 0);
+  const shownKey = [columns.map((entry) => entry.index).join(","), groups.flatMap((group) => group.rows.map((entry) => entry.index)).join(",")].join("|");
   useLayoutEffect(() => {
     measure();
-  }, [measure, shownColumns, shownRows]);
+  }, [measure, shownKey]);
   return (
     <div className="relative">
       {/* The frame scrolls sideways at phone width; the shared edge cues say the depth columns continue (S48 round 5 verifier). */}

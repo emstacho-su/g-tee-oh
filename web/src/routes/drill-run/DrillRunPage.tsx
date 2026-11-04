@@ -202,9 +202,13 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
   // the recap's history too (S48 round 5 verifier on trainer-recap, R3.32).
   const feedbackSections = useFeedbackSections(sessionIdOf(state));
   // The context the api served, kept past the end so the recap's history reads the same stop rule
-  // the live list did, not a value derived again from the drill and the overrides (code review round 2, 6).
+  // the live list did, not a value derived again from the drill and the overrides (code review round
+  // 2, 6). Written in an effect, never during render (round 3, 2): the ended render reads the context
+  // the last live state's effect stored.
   const lastContext = useRef<SessionContext | null>(null);
-  if ("context" in state && state.context !== null) lastContext.current = state.context;
+  useEffect(() => {
+    if ("context" in state && state.context !== null) lastContext.current = state.context;
+  }, [state]);
   useAutostart({ enabled: autostart, ready: state.kind === "idle" && drillSettled, start: () => session.start(rng) });
   const noCoverage = state.kind === "error" && state.problem.kind === "no_coverage";
   // The machine's state when an answer lands, read through a ref so a late answer sees the present.

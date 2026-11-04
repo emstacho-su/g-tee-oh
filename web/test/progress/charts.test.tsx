@@ -26,6 +26,7 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { STICKY_LAYER_CLASS } from "../../src/components/ui/index.js";
+import { isDue } from "../../src/progress/heatmap-model.js";
 import { NOT_ON_HEATMAP_REASON } from "../../src/progress/leak-model.js";
 import type { LeakItem, LeakWeeks } from "../../src/progress/types.js";
 
@@ -330,6 +331,29 @@ describe("R4.19 the heat map's scroll cues", () => {
     frame.scrollLeft = 362;
     fireEvent.scroll(frame);
     expect(screen.getByTestId("heat-start-fade")).toHaveAttribute("data-shown", "true");
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
+  });
+
+  it("R4.19 a Show change that swaps the rows but keeps their count still re-measures the cues (code review round 3, 3)", () => {
+    const due = fixtureHeatmap.cells.find(isDue);
+    const fresh = fixtureHeatmap.cells.find((each) => each.p_known === null);
+    const [firstRow, secondRow] = fixtureHeatmap.rows;
+    const [column] = fixtureHeatmap.columns;
+    if (due === undefined || fresh === undefined || firstRow === undefined || secondRow === undefined || column === undefined) throw new Error("the fixture lacks a due and a new cell");
+    // Due shows the first row alone and New the second alone: one row and one column either way.
+    const twoRows = { rows: [firstRow, secondRow], columns: [column], cells: [{ ...due, row: 0, column: 0 }, { ...fresh, row: 1, column: 0 }] };
+    render(<MasteryHeatMap heatmap={twoRows} onDrill={vi.fn()} />);
+    const show = screen.getByRole("radiogroup", { name: "Show" });
+    fireEvent.click(within(show).getByRole("radio", { name: "Due" }));
+    const frame = screen.getByTestId("heat-grid");
+    let scrollWidth = 720;
+    Object.defineProperty(frame, "clientWidth", { value: 358, configurable: true });
+    Object.defineProperty(frame, "scrollWidth", { get: () => scrollWidth, configurable: true });
+    fireEvent.scroll(frame);
+    expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "true");
+    scrollWidth = 358;
+    fireEvent.click(within(show).getByRole("radio", { name: "New" }));
+    expect(within(frame).getAllByRole("rowheader")).toHaveLength(1);
     expect(screen.getByTestId("heat-end-fade")).toHaveAttribute("data-shown", "false");
   });
 
