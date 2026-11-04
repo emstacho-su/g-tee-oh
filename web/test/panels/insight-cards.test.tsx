@@ -51,6 +51,21 @@ describe("R3.12 RangeAdvantageCard", () => {
     expect(card).toHaveTextContent("BTN holds 5.0 points less of its range in nut hands than BB.");
   });
 
+  it("R3.12 a figure that rounds to zero points reads as neither ahead, never as 0.0 points above (code review 2)", () => {
+    render(
+      <RangeAdvantageCard
+        rangeAdvantage={{ oop_mean_equity: 0.5, ip_mean_equity: 0.500004, to_act_advantage_pct_points: 0.0004 }}
+        nutAdvantage={{ threshold_equity: 0.8, oop_share: 0.1, ip_share: 0.100004, to_act_advantage: 0.000004 }}
+        seats={SEATS}
+        toAct="BTN"
+      />,
+    );
+    const card = screen.getByRole("region", { name: "Range and nut advantage" });
+    expect(card).toHaveTextContent("Neither range is ahead.");
+    expect(card).toHaveTextContent("Both ranges hold the same share of nut hands.");
+    expect(card).not.toHaveTextContent("0.0 points");
+  });
+
   it("R3.12 an even split and equal nut shares say neither range is ahead (code review)", () => {
     render(
       <RangeAdvantageCard
