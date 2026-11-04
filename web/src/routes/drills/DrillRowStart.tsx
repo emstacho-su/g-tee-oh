@@ -20,7 +20,7 @@ export const ROW_START_TEXT = {
 
 export function DrillRowStart({ drill }: { drill: Drill }) {
   const badge = useCoverageBadge(drill.spot_filter);
-  const dead = badge?.kind === "none" || badge?.kind === "no-config";
+  const dead = badge?.kind === "none" || badge?.kind === "no-config" || badge?.kind === "no-seat";
   return (
     <div className="flex flex-col items-start gap-1 md:items-end">
       <div className="flex flex-wrap items-center gap-2">

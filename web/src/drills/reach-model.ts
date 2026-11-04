@@ -30,7 +30,7 @@ export interface Reach {
   readonly configIds: readonly string[];
 }
 
-export type CoverageBadgeKind = "covered" | "partly" | "none" | "no-config";
+export type CoverageBadgeKind = "covered" | "partly" | "none" | "no-config" | "no-seat";
 
 export interface CoverageBadge {
   readonly kind: CoverageBadgeKind;
@@ -42,6 +42,8 @@ const KEY_SEPARATOR = "-";
 
 export const REACH_TEXT = {
   noConfig: "Names no configuration in the catalog.",
+  /** A configuration is reached but no hero seat pairs with anyone (round 3 LOW 9). */
+  noSeat: "Names no seat to train.",
   counting: "Counting the spots this drill reaches.",
 } as const;
 
@@ -49,6 +51,7 @@ export const BADGE_TEXT = {
   covered: "Covered",
   none: "Not built yet",
   noConfig: "Not in the catalog",
+  noSeat: "No seat to train",
   partly: (missing: number) => `Partly covered: ${missing} not built`,
 } as const;
 
@@ -121,12 +124,14 @@ function spotsWord(count: number): string {
 /** "Reaches N spots; K covered, M not built yet." */
 export function reachText(reach: Reach): string {
   if (reach.configIds.length === 0) return REACH_TEXT.noConfig;
+  if (reach.spots === 0) return REACH_TEXT.noSeat;
   return `Reaches ${reach.spots} ${spotsWord(reach.spots)}; ${reach.covered} covered, ${reach.missing} not built yet.`;
 }
 
 /** The row badge (O-482): Covered, Partly covered: M not built, Not built yet, or Not in the catalog. */
 export function badgeOf(reach: Reach): CoverageBadge {
   if (reach.configIds.length === 0) return { kind: "no-config", text: BADGE_TEXT.noConfig };
+  if (reach.spots === 0) return { kind: "no-seat", text: BADGE_TEXT.noSeat };
   if (reach.covered === 0) return { kind: "none", text: BADGE_TEXT.none };
   if (reach.covered < reach.spots) return { kind: "partly", text: BADGE_TEXT.partly(reach.missing) };
   return { kind: "covered", text: BADGE_TEXT.covered };

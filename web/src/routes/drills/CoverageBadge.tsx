@@ -15,6 +15,7 @@ const BADGE_CLASSES: Readonly<Record<CoverageBadgeKind, string>> = {
   partly: "border-warning text-text",
   none: "border-dashed border-warning text-muted",
   "no-config": "border-dashed border-border-strong text-muted",
+  "no-seat": "border-dashed border-border-strong text-muted",
 };
 
 export interface CoverageBadgeProps {

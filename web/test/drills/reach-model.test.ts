@@ -77,4 +77,12 @@ describe("R3.37 the reach model follows the api's candidate rule", () => {
     const heroes: Position[] = ["BTN"];
     expect(configsReached({ ...BTN_FILTER, stake: "1/3", hero_positions: heroes }, withAnte)).toEqual([]);
   });
+
+  it("R3.37 a draft reaching zero pairs says it names no seat to train, not Not built yet (PR #48 review round 3 LOW 9)", () => {
+    const noSeat = { spots: 0, covered: 0, missing: 0, configIds: ["cfg_6_online_100"] };
+    expect(badgeOf(noSeat)).toEqual({ kind: "no-seat", text: "No seat to train" });
+    expect(reachText(noSeat)).toBe("Names no seat to train.");
+    const noHero = { ...BTN_FILTER, hero_positions: [] };
+    expect(reachOf(noHero, fixtureConfigs, fixturePairsByConfig)).toEqual<Reach>({ spots: 0, covered: 0, missing: 0, configIds: ["cfg_6_online_100"] });
+  });
 });
