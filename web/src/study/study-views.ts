@@ -4,7 +4,7 @@
  * Mechanism: three views, Overview (the range by action, the hand row and the range and nut
  * advantage), Hands (the selected hand's threshold card, blockers and role) and Compare (each
  * action's served loss against the best for the hand). A tab exists only when it has data at the
- * node: Hands needs hand rows; Compare needs hand rows and an action other than fold. A
+ * node: Hands needs hand rows; Compare needs hand rows and at least two actions to compare. A
  * street-specific tab, Hands (the threshold card and role come from equity, which solver-query
  * computes preflop only in v1, O-32), carries the node's street as a badge instead of an empty
  * body. The tab that shows is the address's view, else the browser's last tab, else Overview,
@@ -24,13 +24,15 @@ export const VIEW_LABELS: Readonly<Record<StudyView, string>> = {
 
 const DEFAULT_VIEW: StudyView = "overview";
 const STREET_SPECIFIC: ReadonlySet<StudyView> = new Set<StudyView>(["hands"]);
+/** Compare sets each action against the best, so it needs a second action (PR 52 review 1). */
+const MIN_COMPARE_ACTIONS = 2;
 
 type ViewNode = Pick<StudyNode, "actions" | "hands">;
 
 function hasData(view: StudyView, node: ViewNode): boolean {
   if (view === "overview") return true;
   if (node.hands.length === 0) return false;
-  return view === "hands" || node.actions.some((action) => action.kind !== "fold");
+  return view === "hands" || node.actions.length >= MIN_COMPARE_ACTIONS;
 }
 
 /** The views this node has data for, in tab order. */

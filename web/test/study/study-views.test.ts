@@ -15,13 +15,20 @@ import { memoryStorage, throwingStorage } from "../support/storage.js";
 
 const FOLD_ONLY = { ...fixtureStudyNode, actions: fixtureStudyNode.actions.slice(0, 1), hands: fixtureStudyNode.hands.map((row) => ({ ...row, strategy: [1], ev_bb: [0], loss_pct_pot: [0] })) };
 const NO_ROWS = { ...fixtureStudyNode, hands: [] };
+const ONE_BET = { ...fixtureStudyNode, actions: fixtureStudyNode.actions.slice(-1), hands: fixtureStudyNode.hands.map((row) => ({ ...row, strategy: [1], ev_bb: [0], loss_pct_pot: [0] })) };
 
 describe("R3.26 which tabs a node has", () => {
   it("R3.26 the three views in order", () => {
     expect(STUDY_VIEWS).toEqual(["overview", "hands", "compare"]);
   });
 
-  it("R3.26 a node with hand rows and an action other than fold has all three", () => {
+  it("R3.26 a node with a single action, even one other than fold, has no Compare tab: there is nothing to compare (PR 52 review 1)", () => {
+    expect(ONE_BET.actions).toHaveLength(1);
+    expect(ONE_BET.actions[0]?.kind).not.toBe("fold");
+    expect(availableViews(ONE_BET)).toEqual(["overview", "hands"]);
+  });
+
+  it("R3.26 a node with hand rows and at least two actions has all three", () => {
     expect(availableViews(fixtureStudyNode)).toEqual(["overview", "hands", "compare"]);
   });
 
