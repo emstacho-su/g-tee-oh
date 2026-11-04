@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s26-drills'
 title: 'S26 drills'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 30 merged'
 created: 2026-10-19
 public: true
 phase: 3

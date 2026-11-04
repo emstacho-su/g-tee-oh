@@ -60,12 +60,12 @@
     {
       "path": "docs/handoffs/S18-builder.md",
       "source": "vault/handoffs/S18-builder.md",
-      "sha256": "a34e096af0a494ed1cb153698f017c421a0df5c670a8ce71830d4d06158c0b2e"
+      "sha256": "a363e4a9ac28994777838f1d87bbd33820ddd653460d97fa354cd8128506a338"
     },
     {
       "path": "docs/handoffs/S19-g6a-fixtures.md",
       "source": "vault/handoffs/S19-g6a-fixtures.md",
-      "sha256": "82fb7aa309353a20e3c808c8e30c7e09b8613151711047b04875581509e66321"
+      "sha256": "a6274ee12a38de8335d8b6dedd6e56c7045078e58d673bcaa5d7cc237f2e30ad"
     },
     {
       "path": "docs/handoffs/S20-deploy-1.md",
@@ -75,42 +75,42 @@
     {
       "path": "docs/handoffs/S21-api-foundation.md",
       "source": "vault/handoffs/S21-api-foundation.md",
-      "sha256": "5131a885d4b5af6269f65728e5e97eba84504ad06066660c6b5dff64415b10d0"
+      "sha256": "bf9030b0690013aa33ff97c566221e85046bdd49ff81f9ea869cf92ff52dfa0d"
     },
     {
       "path": "docs/handoffs/S22-grading-policy.md",
       "source": "vault/handoffs/S22-grading-policy.md",
-      "sha256": "a4164c156174449dfb2c15d4a897aab00ac5ba35a957c8943e0041d2407d1a14"
+      "sha256": "9c372cc51cded7a202b8bf1e3f912de0603d46eb006c9ed05c282f735448f654"
     },
     {
       "path": "docs/handoffs/S23-api-trainer.md",
       "source": "vault/handoffs/S23-api-trainer.md",
-      "sha256": "33ef71acc83f769f50b948087cf51dc6c88b873e4e714b674951b0f2bb9f1f11"
+      "sha256": "ae1b65b1bb15b1b94cd4fa7278bd7a6a34a62878a648ddb7c81dddf7f0781e75"
     },
     {
       "path": "docs/handoffs/S24-web-foundation.md",
       "source": "vault/handoffs/S24-web-foundation.md",
-      "sha256": "e221427f818e8a5cd6189d83883c9ef492424b1a2b1363d6369f835153bd5f71"
+      "sha256": "40edda8a6c274c6eee0385b4cc53fda8c7d1dc374d568e8ca80ccc6db357bde6"
     },
     {
       "path": "docs/handoffs/S25-web-study-trainer.md",
       "source": "vault/handoffs/S25-web-study-trainer.md",
-      "sha256": "654933c7d3860a5f18364f5970bb2ad766aa25a59f07c220afc2bab5775f6368"
+      "sha256": "24330e3dd74faf3ddb35d807e5d0441903647862ef5482380617aa0a0be6f12e"
     },
     {
       "path": "docs/handoffs/S26-drills.md",
       "source": "vault/handoffs/S26-drills.md",
-      "sha256": "3337816c6dce2ef8f43e9f1e5c49bd587c9887679750ea23b87419a9d7ed31e3"
+      "sha256": "d689e51c19beb75b32283208898175fa16be2137c608dd548ef240b0e3167681"
     },
     {
       "path": "docs/handoffs/S27-insights-explanations.md",
       "source": "vault/handoffs/S27-insights-explanations.md",
-      "sha256": "b3682399ce39a629d24665e8377befd9ad4d376af5769c2338ab3fe61faa35a6"
+      "sha256": "869193955500c7b1920aef91aa6c45ffee8e421985f0fd1767509ea28a476628"
     },
     {
       "path": "docs/handoffs/S28-coverage-admin.md",
       "source": "vault/handoffs/S28-coverage-admin.md",
-      "sha256": "088dcc52e4f0292785ae07ec551c8f927495bb662bf4e5512db07fdc5c263f79"
+      "sha256": "3b0b1b694454b8d8f0666d0610cb66d8fa9fc413d05739012970ad4f277ba4a9"
     },
     {
       "path": "docs/handoffs/S29-phase-3-gate.md",
@@ -120,17 +120,17 @@
     {
       "path": "docs/handoffs/S30-learning-core.md",
       "source": "vault/handoffs/S30-learning-core.md",
-      "sha256": "213cd6f8e20656c5ef399c3ccf93b8c56cd021691bafaa58fddd2476e9e678a0"
+      "sha256": "827f0f87ddde6031fa127820ea574bf302775b966f85ea996c069dd5b10abac8"
     },
     {
       "path": "docs/handoffs/S31-api-learning.md",
       "source": "vault/handoffs/S31-api-learning.md",
-      "sha256": "912ab8bc3b216cdc4fb5c9273717babbc60ed465136c47d1bc42a70209d37afc"
+      "sha256": "d7e9e717c9c2fd9dfeb1b97fa0a724e10a0e232d59eb87cfbf760c33e2213843"
     },
     {
       "path": "docs/handoffs/S32-web-progress.md",
       "source": "vault/handoffs/S32-web-progress.md",
-      "sha256": "50efada70712395a758b5d9a03176ba963b12ebbdd7485108f405f04e722d691"
+      "sha256": "04052b31d5cf25a5c2a959f1bab53e70eecc634d40407c070099e5a008eaa14f"
     },
     {
       "path": "docs/handoffs/S33-phase-4-gate.md",
@@ -170,12 +170,12 @@
     {
       "path": "docs/planning/phases/phase-3-preflop-trainer.md",
       "source": "vault/planning/phases/phase-3-preflop-trainer.md",
-      "sha256": "45f7294f0111739bb271fafbde166fccd8ecb5f7234be5d66608d872ed51b96c"
+      "sha256": "25d67ce24f903e6a0996d541975c8bcc0a4c44e977207edaf06877fb5da21dea"
     },
     {
       "path": "docs/planning/phases/phase-4-rating-and-release.md",
       "source": "vault/planning/phases/phase-4-rating-and-release.md",
-      "sha256": "defc71a033e76469fbc78744dc36f97f12b1d8bfd23fff5f6e12c38ebdf8993e"
+      "sha256": "e150861c4d9e725b25237df8b706096ff60b8401409f50d00f6d21f1d5dd557c"
     }
   ]
 }

@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s24-web-foundation'
 title: 'S24 web foundation'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-27, PR 23 merged'
 created: 2026-10-19
 public: true
 phase: 3

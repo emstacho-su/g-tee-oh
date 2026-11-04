@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s25-web-study-trainer'
 title: 'S25 web study and trainer'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 26 merged'
 created: 2026-10-19
 public: true
 phase: 3

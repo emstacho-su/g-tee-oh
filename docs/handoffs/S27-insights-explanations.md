@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s27-insights-explanations'
 title: 'S27 insights and explanations'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 29 merged'
 created: 2026-10-19
 public: true
 phase: 3

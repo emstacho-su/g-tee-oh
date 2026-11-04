@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s30-learning-core'
 title: 'S30 Learning core'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-27, PR 21 merged'
 created: 2026-10-19
 public: true
 phase: 4

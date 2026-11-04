@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s28-coverage-admin'
 title: 'S28 coverage and admin'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'done 2026-10-28, PR 28 merged'
 created: 2026-10-19
 public: true
 phase: 3
