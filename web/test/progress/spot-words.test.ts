@@ -18,6 +18,7 @@ import {
   capitalize,
   classWords,
   configurationWords,
+  configurationWordsIn,
   depthBandLabel,
   drillActionWords,
   FAMILY_WORDS,
@@ -92,6 +93,13 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(configurationWords(undefined, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
     expect(configurationWords(undefined, "cfg_6_online_999", true)).toBe("configuration loading");
     expect(configurationWords(undefined, "not-a-config")).toBe("not-a-config");
+  });
+
+  it("R4.12 a configuration id reads through the list it is looked up in: its label, loading while the list is, its own facets when unlisted (PR #48 review 4 finding 4)", () => {
+    const config = fixtureConfigs[0] as GameConfig;
+    expect(configurationWordsIn(fixtureConfigs, config.config_id)).toBe("Online, 6 players, 100bb deep");
+    expect(configurationWordsIn(undefined, config.config_id)).toBe("configuration loading");
+    expect(configurationWordsIn(fixtureConfigs, "cfg_6_online_999")).toBe("Online, 6 players, 999bb deep, not in the catalog");
   });
 
   it("R4.12 one pair split serves the words, the reach keys and the coverage events (PR #48 review round 2 LOW 9)", () => {

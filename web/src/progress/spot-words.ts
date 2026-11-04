@@ -159,3 +159,8 @@ export function configurationWords(config: GameConfig | undefined, id?: string, 
   if (loading) return LOADING_CONFIGURATION;
   return id === undefined ? UNLISTED_CONFIGURATION : unlistedWords(id);
 }
+
+/** A configuration id in words through the list it is looked up in; undefined is a list still loading. */
+export function configurationWordsIn(configs: readonly GameConfig[] | undefined, id: string): string {
+  return configurationWords(configs?.find((config) => config.config_id === id), id, configs === undefined);
+}

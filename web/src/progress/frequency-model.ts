@@ -12,7 +12,7 @@
  */
 import type { ApiComponents } from "@g-tee-oh/contracts";
 
-import { capitalize, configurationWords, familyWords, pairWords, positionWords } from "./spot-words.js";
+import { capitalize, configurationWordsIn, familyWords, pairWords, positionWords } from "./spot-words.js";
 import type { GameConfig } from "./types.js";
 
 type Schemas = ApiComponents["schemas"];
@@ -37,9 +37,8 @@ const SPOT_KEY_SEPARATOR = "|";
 export { familyWords };
 
 function spotName(spot: SpotFrequency, configs: readonly GameConfig[] | undefined): string {
-  const config = configs?.find((entry) => entry.config_id === spot.config_id);
   // A loading phrase until the list lands; an unlisted id by its own facets, never the bare key (round 2 MEDIUM 4).
-  const table = configurationWords(config, spot.config_id, configs === undefined);
+  const table = configurationWordsIn(configs, spot.config_id);
   return `${capitalize(familyWords(spot.action_family))} as ${positionWords(spot.hero_position)} (${pairWords(spot.pair)}), ${table}`;
 }
 
