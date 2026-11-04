@@ -13,7 +13,9 @@
  * change of selection while one runs never drops its result; a failure shows with the drill it
  * acted on whenever that drill is selected (PR #42 review round 1 C). Auto drills, the ones /progress
  * makes for a leak, are hidden behind "Show auto drills" (S47 follow-up, O-489, page state), unless
- * the tag filter names an auto tag.
+ * the tag filter names an auto tag; a drill just imported or the selected one is never hidden, the
+ * count is of the drills loaded so far, and a library of auto drills only keeps the empty state
+ * (PR #51 review 4).
  */
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -49,19 +51,27 @@ export const LIBRARY_TEXT = {
   emptyTagged: "No drill carries this tag.",
   more: "Load more drills",
   showAuto: "Show auto drills",
-  autoHidden: (count: number) => `${count} auto ${count === 1 ? "drill" : "drills"} from your leaks ${count === 1 ? "is" : "are"} hidden.`,
+  autoHidden: (hidden: number, loaded: number) =>
+    `${hidden} of the ${loaded} ${loaded === 1 ? "drill" : "drills"} loaded ${hidden === 1 ? "is an auto drill" : "are auto drills"} from your leaks, hidden.`,
 } as const;
 
-function AutoDrillsToggle({ checked, hidden, onChange }: { checked: boolean; hidden: number; onChange: (checked: boolean) => void }) {
+interface AutoDrillsToggleProps {
+  checked: boolean;
+  hidden: number;
+  loaded: number;
+  onChange: (checked: boolean) => void;
+}
+
+function AutoDrillsToggle({ checked, hidden, loaded, onChange }: AutoDrillsToggleProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <label className="flex items-center gap-2">
         <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
         {LIBRARY_TEXT.showAuto}
       </label>
-      {checked ? null : (
+      {checked || hidden === 0 ? null : (
         <span data-testid="auto-drills-hidden" className="text-muted">
-          {LIBRARY_TEXT.autoHidden(hidden)}
+          {LIBRARY_TEXT.autoHidden(hidden, loaded)}
         </span>
       )}
     </div>
@@ -115,11 +125,14 @@ export function DrillsPage({ search }: DrillsPageProps) {
   const [announcement, setAnnouncement] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [showAuto, setShowAuto] = useState(false);
+  // Drills imported on this page: shown whatever the auto toggle says (PR #51 review 4).
+  const [importedIds, setImportedIds] = useState<ReadonlySet<string>>(new Set());
   const listed = list.data?.pages.flatMap((page) => page.items) ?? [];
   // Auto drills stay hidden until asked for, or when the filter names an auto tag (O-489).
-  const autoShown = showAuto || (search.tag !== undefined && isAutoTag(search.tag));
+  const autoTagFilter = search.tag !== undefined && isAutoTag(search.tag);
+  const autoShown = showAuto || autoTagFilter;
   const autoCount = listed.filter(isAutoDrill).length;
-  const drills = autoShown ? listed : listed.filter((drill) => !isAutoDrill(drill));
+  const drills = autoShown ? listed : listed.filter((drill) => !isAutoDrill(drill) || importedIds.has(drill.id) || drill.id === selectedId);
   const selected = drills.find((drill) => drill.id === selectedId);
   // The requests live here, not in the toolbar, so a change of selection never drops their result.
   const duplicate = useDuplicateDrill(api, (copy) => setAnnouncement(`Duplicated as ${copy.name}.`));
@@ -136,11 +149,12 @@ export function DrillsPage({ search }: DrillsPageProps) {
   };
   // One intent for the page (review HIGH 2): every button over it shares one key set.
   const pack = useImportStarterPack(api, starterAdded);
-  const emptyUntagged = list.isSuccess && listed.length === 0 && search.tag === undefined;
+  const emptyUntagged = list.isSuccess && drills.length === 0 && search.tag === undefined;
   const offerInHeader = starterMarks.data !== undefined && missing.length > 0;
 
   function imported(drill: Drill): void {
     setImporting(false);
+    setImportedIds((current) => new Set([...current, drill.id]));
     setAnnouncement(`Imported ${drill.name}.`);
     if (search.tag !== undefined && !drill.tags.includes(search.tag)) setTag(undefined);
   }
@@ -172,8 +186,8 @@ export function DrillsPage({ search }: DrillsPageProps) {
           </div>
         ) : null}
         {list.isPending ? <LoadingNote text={LIBRARY_TEXT.loading} /> : null}
-        {list.isSuccess && listed.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} missing={missing} /> : null}
-        {autoCount > 0 && !(search.tag !== undefined && isAutoTag(search.tag)) ? <AutoDrillsToggle checked={showAuto} hidden={autoCount} onChange={setShowAuto} /> : null}
+        {list.isSuccess && drills.length === 0 ? <EmptyState tagged={search.tag !== undefined} pack={pack} missing={missing} /> : null}
+        {autoCount > 0 && !autoTagFilter ? <AutoDrillsToggle checked={showAuto} hidden={listed.length - drills.length} loaded={listed.length} onChange={setShowAuto} /> : null}
         {drills.length === 0 ? null : (
           <>
             <DrillToolbar
