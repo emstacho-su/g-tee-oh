@@ -2,10 +2,12 @@
 // per-card error with Try again, the weeks selector, and click to drill from the heat map and
 // the leak trend (find by tag, create when missing, no matching configuration). S41 scripts the
 // frequency card's read too; the card itself is tested in frequency.test.tsx.
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { drillListKey } from "../../src/drills/queries.js";
+import { spotKey } from "../../src/progress/frequency-model.js";
+import { validateProgressSearch } from "../../src/progress/progress-search.js";
 import { fixtureFreshFrequencies, fixtureFrequencies } from "../../src/fixtures/frequencies.js";
 import { fixtureDrill } from "../../src/fixtures/trainer.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
@@ -203,5 +205,39 @@ describe("R4.12 /progress", () => {
     const card = screen.getByTestId("leak-trend");
     expect(await within(card).findByRole("alert")).toHaveTextContent("Could not open a drill: title of internal.");
     expect(within(card).getByRole("button", { name: "Drill this spot: Open or fold, big blind versus under the gun, live 100bb" })).toBeEnabled();
+  });
+});
+
+describe("R4.19 the progress address", { timeout: 20_000 }, () => {
+  const second = fixtureFrequencies.spots[1];
+  if (second === undefined) throw new Error("the fixture has one spot");
+  const secondKey = spotKey(second);
+
+  it("R4.19 weeks and the spot are written to the address with replace and restored on load", async () => {
+    const { router, history } = renderApp("/progress", PROGRESS);
+    await screen.findAllByTestId("leak-row");
+    const entries = history.length;
+    fireEvent.click(screen.getByRole("radio", { name: "26 weeks" }));
+    // The router keeps search values as text (app/search-serialization.ts); validateProgressSearch reads them back.
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ weeks: "26" }));
+    const select = await within(screen.getByTestId("frequency-card")).findByRole("combobox", { name: "Spot" });
+    fireEvent.change(select, { target: { value: secondKey } });
+    await waitFor(() => expect(router.state.location.search).toEqual({ weeks: "26", spot: secondKey }));
+    // Replaced, never pushed: Back leaves /progress instead of stepping through each choice.
+    expect(history.length).toBe(entries);
+    const address = router.state.location.href;
+    cleanup();
+    renderApp(address, PROGRESS);
+    await screen.findAllByTestId("leak-row");
+    expect(screen.getByRole("radio", { name: "26 weeks" })).toHaveAttribute("aria-checked", "true");
+    await waitFor(() => expect(within(screen.getByTestId("frequency-card")).getByRole("combobox", { name: "Spot" })).toHaveValue(secondKey));
+  });
+
+  it("R4.19 a weeks or spot the page does not offer is dropped from the search", () => {
+    expect(validateProgressSearch({ weeks: 26, spot: secondKey })).toEqual({ weeks: 26, spot: secondKey });
+    expect(validateProgressSearch({ weeks: "26" })).toEqual({ weeks: 26 });
+    expect(validateProgressSearch({ weeks: 5, spot: 7 })).toEqual({});
+    expect(validateProgressSearch({ spot: "not a spot" })).toEqual({});
+    expect(validateProgressSearch({ spot: `${secondKey}${"x".repeat(600)}` })).toEqual({});
   });
 });

@@ -34,6 +34,7 @@ import { JoinPage } from "./routes/join.js";
 import { LoginPage } from "./routes/login.js";
 import { PaintPage } from "./routes/paint/PaintPage.js";
 import { QuizPage } from "./routes/quiz/QuizPage.js";
+import { validateProgressSearch } from "./progress/progress-search.js";
 import { ProgressPage } from "./routes/progress/ProgressPage.js";
 import { DrillRunPage } from "./routes/drill-run/DrillRunPage.js";
 import { DEFAULT_BUILDER_SECTION, isBuilderSection } from "./drills/builder-sections.js";
@@ -244,8 +245,16 @@ export const paintRoute = createRoute({
     return <PaintPage search={validatePaintSearch(paintRoute.useSearch())} />;
   },
 });
-// /progress is a real screen (S32, R4.12); it takes no search, so it needs no re-validation.
-export const progressRoute = createRoute({ getParentRoute: () => appLayoutRoute, path: "/progress", component: ProgressPage });
+// /progress is a real screen (S32, R4.12). Since the S47 follow-up (R4.19) its weeks and frequency
+// spot live in the search, re-validated in the component for the parent-merge reason given for /study.
+export const progressRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/progress",
+  validateSearch: validateProgressSearch,
+  component: function ProgressRouteScreen() {
+    return <ProgressPage search={validateProgressSearch(progressRoute.useSearch())} />;
+  },
+});
 // /library and /settings are real screens (S28, R3.4, R3.5); /library re-validates its search in
 // the route component for the same parent-merge reason as /study above. Since S40 (O-406) /library
 // is one container with a page per section: /library itself and any section not in the list
