@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BET_CHIP_HALF_HEIGHT_PERCENT,
+  BET_CHIP_HALF_WIDTH_PERCENT,
   PORTRAIT_BOARD_BAND,
   FELT_BOXES,
   PORTRAIT_BELOW_PX,
@@ -128,6 +129,15 @@ describe("R3.13 seatLayout", () => {
   });
 });
 
+function chipRect(slot: SeatSlot): Rect {
+  return {
+    left: slot.bet.leftPercent - BET_CHIP_HALF_WIDTH_PERCENT,
+    right: slot.bet.leftPercent + BET_CHIP_HALF_WIDTH_PERCENT,
+    top: slot.bet.topPercent - BET_CHIP_HALF_HEIGHT_PERCENT,
+    bottom: slot.bet.topPercent + BET_CHIP_HALF_HEIGHT_PERCENT,
+  };
+}
+
 describe("R3.13 critic round 3: portrait bet chips never cover the board", () => {
   const band = PORTRAIT_BOARD_BAND;
   const felt = FELT_BOXES.portrait;
@@ -143,10 +153,13 @@ describe("R3.13 critic round 3: portrait bet chips never cover the board", () =>
       }
     });
 
-    it(`R3.13 portrait, ${count} seats: each bet spot sits on the felt, on its seat's side of the board, between the seat and the centre across`, () => {
+    it(`R3.13 portrait, ${count} seats: each bet chip stays on the table, on its seat's side of the board, between the seat and the centre across`, () => {
       for (const slot of seatLayout(count, 0, "portrait")) {
-        expect(slot.bet.topPercent - BET_CHIP_HALF_HEIGHT_PERCENT).toBeGreaterThanOrEqual(felt.topPercent);
-        expect(slot.bet.topPercent + BET_CHIP_HALF_HEIGHT_PERCENT).toBeLessThanOrEqual(100 - felt.bottomPercent);
+        const chip = chipRect(slot);
+        expect(chip.left).toBeGreaterThanOrEqual(felt.leftPercent - EPSILON);
+        expect(chip.right).toBeLessThanOrEqual(100 - felt.rightPercent + EPSILON);
+        expect(chip.top).toBeGreaterThanOrEqual(felt.topPercent - EPSILON);
+        expect(chip.bottom).toBeLessThanOrEqual(100);
         expect(slot.bet.topPercent < centre.topPercent).toBe(slot.seat.topPercent < centre.topPercent);
         const dx = centre.leftPercent - slot.seat.leftPercent;
         if (Math.abs(dx) > EPSILON) {
@@ -154,6 +167,19 @@ describe("R3.13 critic round 3: portrait bet chips never cover the board", () =>
           expect(along).toBeGreaterThan(0);
           expect(along).toBeLessThan(1);
         }
+      }
+    });
+  }
+});
+
+describe("R3.13 PR #50 review: portrait bet chips never cover each other or a card", () => {
+  for (const count of COUNTS) {
+    it(`R3.13 portrait, ${count} seats: no two bet chips overlap, and no chip covers a seat card`, () => {
+      const layout = seatLayout(count, 0, "portrait");
+      const chips = layout.map(chipRect);
+      for (let a = 0; a < chips.length; a += 1) {
+        for (let b = a + 1; b < chips.length; b += 1) expect(overlaps(chips[a]!, chips[b]!), `chips ${a} and ${b}`).toBe(false);
+        for (const slot of layout) expect(overlaps(chips[a]!, rectOf(slot)), `chip ${a} on a card`).toBe(false);
       }
     });
   }
