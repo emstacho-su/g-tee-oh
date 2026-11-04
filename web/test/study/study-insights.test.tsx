@@ -59,6 +59,13 @@ describe("R3.12 insights on the study screen", () => {
     expect(screen.getByRole("heading", { name: /^AKs/ })).toBeInTheDocument();
   });
 
+  it("R3.12 with a hand selected the advantage card reads with that hand: one insights request, not two (code review 2)", async () => {
+    const { requests } = renderStudy(`${BASE}&hand=AKs`);
+    await screen.findByTestId("threshold-card");
+    await screen.findByRole("region", { name: "Range and nut advantage" });
+    expect(insightHands(requests)).toEqual(["AKs"]);
+  });
+
   it("R3.12 a failed stand-in read names no hand the user never picked (code review)", async () => {
     renderStudy(BASE, (request) => (request.path === "/api/v1/study/insights" ? problemOf(503, "unavailable") : undefined));
     const alert = await screen.findByRole("alert");

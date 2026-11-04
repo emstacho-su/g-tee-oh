@@ -150,7 +150,9 @@ describe("R3.12 study node errors", () => {
       failed = true;
       return problemOf(503, "unavailable");
     });
-    const alert = await screen.findByRole("alert");
+    // The advantage card and the hand tiles share the selected hand's read (code review 2), so both alert.
+    const [alert] = await screen.findAllByRole("alert");
+    if (alert === undefined) throw new Error("no alert");
     fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
     expect(await screen.findByTestId("threshold-card")).toHaveTextContent("Your hand: AKs");
   });
