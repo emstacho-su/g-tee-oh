@@ -8,7 +8,9 @@
  * is loaded the configuration takes its label, else a plain sentence (never its key); two spots that would share a name are numbered. A spot is keyed by
  * its solution and node (spotKey), since a rebuilt node keeps its node_key under a new solution
  * (PR #39 review finding 6). The api already sorts the hand rows by their largest gap, so the card
- * keeps the api's order; shares are written with the progress format's formatPercent.
+ * keeps the api's order; shares are written with the progress format's formatPercent. Since the
+ * S47 follow-up (R4.12) each action's gap reads in points (gapSentence): the difference of the two
+ * shares the api served, rounded to a whole point, and nothing else.
  */
 import type { ApiComponents } from "@g-tee-oh/contracts";
 
@@ -58,6 +60,16 @@ export function spotOptions(spots: readonly SpotFrequency[], configs: readonly G
     const earlier = names.slice(0, index).filter((other) => other === name).length;
     return { value: spotKey(spot), label: earlier === 0 ? name : `${name} (${earlier + FIRST_DUPLICATE_NUMBER - 1})`, title: spot.config_id };
   });
+}
+
+const POINTS_PER_SHARE = 100;
+
+/** "Fold: 5 points more than the solver", "Call: matches the solver" when the shares round to the same point. */
+export function gapSentence(label: string, yours: number, solver: number): string {
+  const points = Math.round((yours - solver) * POINTS_PER_SHARE);
+  if (points === 0) return `${label}: matches the solver`;
+  const size = Math.abs(points);
+  return `${label}: ${size} ${size === 1 ? "point" : "points"} ${points > 0 ? "more" : "less"} than the solver`;
 }
 
 /** "12 of 30 decisions at this spot". */

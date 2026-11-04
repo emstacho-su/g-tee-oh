@@ -20,7 +20,7 @@ import {
   fixtureTracks,
 } from "../../src/fixtures/progress.js";
 import { fixtureConfigs } from "../../src/fixtures/study.js";
-import { familyWords, sampleText, spotKey, spotOptions } from "../../src/progress/frequency-model.js";
+import { familyWords, gapSentence, sampleText, spotKey, spotOptions } from "../../src/progress/frequency-model.js";
 import * as frequencyModel from "../../src/progress/frequency-model.js";
 import { frequencyQuery } from "../../src/progress/frequency-query.js";
 import { createAppApi } from "../../src/api/index.js";
@@ -128,6 +128,15 @@ describe("R4.12 the frequency model", () => {
     expect(Object.keys(frequencyModel)).not.toContain("percentText");
   });
 
+  it("R4.12 the gap reads in points with a direction word from two served shares", () => {
+    expect(gapSentence("Fold", 0.4, 0.35)).toBe("Fold: 5 points more than the solver");
+    expect(gapSentence("Raise to 10bb", 0.15, 0.23)).toBe("Raise to 10bb: 8 points less than the solver");
+    expect(gapSentence("Call", 0.3, 0.29)).toBe("Call: 1 point more than the solver");
+    expect(gapSentence("Call", 0.5, 0.5)).toBe("Call: matches the solver");
+    // Under half a point rounds to no gap.
+    expect(gapSentence("Call", 0.502, 0.5)).toBe("Call: matches the solver");
+  });
+
   it("R4.12 the query reads GET /progress/frequencies under the progress root", async () => {
     const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch: () => Promise.resolve(new Response(JSON.stringify(fixtureFrequencies), { status: 200, headers: { "content-type": "application/json" } })) });
     const options = frequencyQuery(api);
@@ -151,6 +160,18 @@ describe("R4.12 the frequency card on /progress", APP_SUITE, () => {
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("Fold");
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("You 40%");
     expect(within(bars).getAllByTestId("frequency-action")[0]).toHaveTextContent("Solver 35%");
+  });
+
+  it("R4.12 the card says each action's gap in points, readable by screen readers too", async () => {
+    renderApp("/progress", progress([jsonResponse(200, fixtureFrequencies)]));
+    const card = await loadedCard();
+    const gaps = await within(card).findByRole("list", { name: "Your gap to the solver" });
+    expect(gaps).not.toHaveAttribute("aria-hidden");
+    expect(within(gaps).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Fold: 5 points more than the solver",
+      "Call: 3 points more than the solver",
+      "Raise to 10bb: 8 points less than the solver",
+    ]);
   });
 
   it("R4.12 lists the hand rows in the api's order, the largest gap first", async () => {
