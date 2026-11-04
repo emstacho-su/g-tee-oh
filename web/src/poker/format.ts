@@ -34,17 +34,13 @@ export function formatShare(share: number, decimals = 1): string {
 }
 
 /**
- * A share in 0..1 rounded to a whole percent (S40, PR #42 review round 1 I): the one rounding for
- * every share the web shows as a whole percent, so a wording chosen from the number and the number
- * printed beside it never disagree. wholePercent(0.996) is 100.
+ * A share in 0..1 rounded to a whole percent (S40, PR #42 review round 1 I): the one rounding the
+ * threshold card's rank sentence chooses its words from (O-408), so the words and the number never
+ * disagree. wholePercent(0.996) is 100. Every printed share is one decimal (formatShare, S46); the
+ * whole-percent formatter went with its last caller (PR #45 review round 3, finding 8).
  */
 export function wholePercent(share: number): number {
   return Math.round(share * PERCENT);
-}
-
-/** A share as a whole percent: formatWholePercent(0.613) is "61%". */
-export function formatWholePercent(share: number): string {
-  return `${wholePercent(share)}%`;
 }
 
 /** A value already in percent: formatPercent(1.25) is "1.25%". */
