@@ -483,7 +483,7 @@ spike-preflop MACHINE="zenbook" PLATFORM="linux/amd64":
         --commit $(git rev-parse HEAD) --allow-dirty
 
 BENCH_IMAGE := "g-tee-oh/library-builder:bench"
-BENCH_RUN := SPIKE_RUN + " --name gto-bench"
+BENCH_RUN := SPIKE_RUN
 BENCH_SCRATCH := "gto-bench-scratch"
 BENCH_DIR := "target/bench"
 BENCH_OUT := '--mount "type=bind,source=' + justfile_directory() + '/' + BENCH_DIR + ',target=/out"'
@@ -497,11 +497,15 @@ BENCH_PLATFORM := if arch() == "aarch64" { "linux/arm64" } else { "linux/amd64" 
 # bind-mounted out to target/bench, then bench-report from the checkout, since it reads git. The
 # scratch volume and target/bench are reset first, and a measured run that fails does not stop
 # the recipe (the - prefix), so a miss reaches bench-report, which records it and exits 1
-# (O-178); a run killed before its summary makes bench-report fail on the missing file.
+# (O-178); a run killed before its summary makes bench-report fail on the missing file, and
+# mac-bootstrap.md then records the kill as the miss. Needs Docker Desktop (the Zenbook through
+# WSL2, the Mac), whose file sharing lets the image's user write the bind mount (O-23). A
+# PLATFORM other than the host's runs under emulation and is warned about, not refused.
 # mac-bench-clean removes what the run left (O-47).
 # Flop-line benchmark in the 5 GB container against O-50; the Mac bootstrap measurement (R0.9, S04)
 mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/reports":
-    -docker rm -f gto-bench
+    {{ if PLATFORM == BENCH_PLATFORM { "echo mac-bench: platform " + PLATFORM + " matches the host" } else { "echo mac-bench: WARNING, platform " + PLATFORM + " differs from the host " + BENCH_PLATFORM + ", the image runs under emulation and the numbers are not a measurement" } }}
+    -docker rm -f gto-bench gto-bench-16bit
     -docker volume rm {{BENCH_SCRATCH}}
     node -e "require('node:fs').rmSync('{{BENCH_DIR}}', { recursive: true, force: true })"
     node -e "require('node:fs').mkdirSync('{{BENCH_DIR}}', { recursive: true })"
@@ -509,10 +513,11 @@ mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/report
         -t {{BENCH_IMAGE}} .
     docker run --rm -v {{BENCH_SCRATCH}}:/scratch --entrypoint /bin/mkdir {{BENCH_IMAGE}} \
         -p /scratch/library-judged /scratch/library-16bit
-    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} {{BENCH_IMAGE}} \
-        --once --job-spec /fixtures/builder/bench-bb-btn-srp.json --summary-out /out/judged.json
-    -{{BENCH_RUN}} -e LIBRARY_ROOT=/scratch/library-16bit {{BENCH_ENV}} {{BENCH_IMAGE}} \
-        --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
+    -{{BENCH_RUN}} --name gto-bench -e LIBRARY_ROOT=/scratch/library-judged {{BENCH_ENV}} \
+        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.json \
+        --summary-out /out/judged.json
+    -{{BENCH_RUN}} --name gto-bench-16bit -e LIBRARY_ROOT=/scratch/library-16bit {{BENCH_ENV}} \
+        {{BENCH_IMAGE}} --once --job-spec /fixtures/builder/bench-bb-btn-srp.16bit.json \
         --summary-out /out/informational.json
     docker run --rm {{BENCH_OUT}} {{BENCH_IMAGE}} estimate \
         --job-spec /fixtures/builder/bench-bb-btn-srp.json --out /out/sweep.json
@@ -521,9 +526,9 @@ mac-bench $VALIDATE_MACHINE="mac" PLATFORM=BENCH_PLATFORM OUT="validation/report
         --out {{OUT}}
 
 # Each line ignores a missing item, so the recipe also cleans a run that stopped early.
-# Remove the mac-bench container, scratch volume and image, so nothing stays (O-47)
+# Remove the mac-bench containers, scratch volume and image, so nothing stays (O-47)
 mac-bench-clean:
-    -docker rm -f gto-bench
+    -docker rm -f gto-bench gto-bench-16bit
     -docker volume rm {{BENCH_SCRATCH}}
     -docker rmi {{BENCH_IMAGE}}
 
