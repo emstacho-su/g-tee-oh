@@ -28,10 +28,13 @@ export function parseConfigLabels(value: unknown): ConfigLabels {
   return Object.fromEntries(entries.slice(0, MAX_SCOPE_CONFIGS));
 }
 
-/** The map with these labels remembered, newest kept when the cap is reached. */
+/**
+ * The map with these labels remembered, newest kept when the cap is reached. The keys of `next`
+ * leave the old map first, so a refreshed label counts as the newest (PR #48 review round 2 LOW 8).
+ */
 export function withConfigLabels(labels: ConfigLabels, next: ConfigLabels): ConfigLabels {
-  const merged = { ...labels, ...next };
-  const entries = Object.entries(merged);
+  const older = Object.entries(labels).filter(([id]) => !(id in next));
+  const entries = [...older, ...Object.entries(next)];
   return Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_SCOPE_CONFIGS)));
 }
 
