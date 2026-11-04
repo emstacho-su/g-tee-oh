@@ -108,6 +108,19 @@ test("R3.23 renderDelta: the lane table carries the totals and every regression 
   assert.match(digest, /## Still No \(2\)/);
 });
 
+test("R3.23 readVerdicts: two records for one screen fail naming the file and the screen (code review round 3, 5)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "delta-"));
+  const twice = join(dir, "twice.json");
+  writeFileSync(twice, JSON.stringify({ round: "4", records: [record("study-ev", "S45", "no"), record("study-ev", "S45", "yes")] }));
+  assert.throws(() => readVerdicts(twice), (error) => error instanceof DeltaError && error.message.includes("twice.json") && error.message.includes("study-ev"));
+});
+
+test("R3.23 transitions rows carry no family field, which nothing reads (code review round 3, 6)", () => {
+  const rows = transitions(previous, current);
+  assert.ok(rows.length > 0);
+  for (const row of rows) assert.equal("family" in row, false);
+});
+
 test("R3.23 readVerdicts: a file without records or with a malformed record fails naming the file", () => {
   const dir = mkdtempSync(join(tmpdir(), "delta-"));
   const empty = join(dir, "empty.json");

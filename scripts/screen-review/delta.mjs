@@ -16,7 +16,7 @@ export class DeltaError extends Error {}
 /** The transition kinds, in the order the digest lists them. */
 export const KINDS = ["regressed", "fixed", "new", "gone", "still-no", "still-yes"];
 
-/** An auto-verdicts file, validated at the boundary: round, generated and records with screen, lane and verdict. */
+/** An auto-verdicts file, validated at the boundary: round, generated and records with screen, lane and verdict, one record per screen. */
 export function readVerdicts(path) {
   let parsed;
   try {
@@ -25,10 +25,14 @@ export function readVerdicts(path) {
     throw new DeltaError(`${path} is not readable JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!Array.isArray(parsed?.records) || parsed.records.length === 0) throw new DeltaError(`${path} has no records`);
+  const seen = new Set();
   parsed.records.forEach((r, index) => {
     if (typeof r?.screen !== "string" || typeof r?.lane !== "string" || !VERDICTS.has(r?.verdict)) {
       throw new DeltaError(`${path} record ${index} needs screen, lane and a yes or no verdict`);
     }
+    // One record per screen, or two verdicts would collapse silently in the transition map (code review round 3, 5).
+    if (seen.has(r.screen)) throw new DeltaError(`${path} lists the screen ${r.screen} twice`);
+    seen.add(r.screen);
   });
   return { round: String(parsed.round ?? ""), generated: String(parsed.generated ?? ""), records: parsed.records };
 }
@@ -64,7 +68,6 @@ export function transitions(previous, current) {
       screen,
       lane: (c ?? p).lane,
       laneBefore: p?.lane ?? null,
-      family: (c ?? p).family ?? "",
       before: p?.verdict ?? null,
       after: c?.verdict ?? null,
       kind: kindOf(p?.verdict ?? null, c?.verdict ?? null),
