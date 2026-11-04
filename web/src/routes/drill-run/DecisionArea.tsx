@@ -13,11 +13,13 @@
  * followed-the-roll mark (FeedbackRoller, O-281, O-344, O-371), the insights and More info as the
  * inline Explanation section (S38, O-388), each in a section that expands and collapses, with the
  * prompt's worked-example flag and the session's remembered choices (O-387). All action indexes are
- * NodeAction.index (O-198). In street and full-hand modes a reveal that does not pause (O-314)
+ * NodeAction.index (O-198). Choosing an action, and every new prompt, moves the focus off the
+ * action bar onto the area itself (tabindex -1), so a clicked button never takes a later Enter or
+ * Space (S46, PR #45 review round 3, finding 1). In street and full-hand modes a reveal that does not pause (O-314)
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
  * available (S26).
  */
-import type { ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 
 import {
   ActionBar,
@@ -34,6 +36,7 @@ import { FeedbackInsights } from "../../components/insights/FeedbackInsights.js"
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
 import { useHotkey } from "../../hotkeys/index.js";
+import { replayKey } from "../../trainer/action-replay.js";
 import { atSessionLimit } from "../../trainer/session-length.js";
 import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js";
 import { problemMessage } from "../../trainer/spot-problem.js";
@@ -66,6 +69,9 @@ export interface DecisionAreaProps {
    */
   feedbackSections?: FeedbackSectionsControl;
 }
+
+/** The action bar inside the area, whose buttons must not keep the focus across prompts. */
+const ACTION_BAR_SELECTOR = "[data-testid=\"action-bar\"]";
 
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
@@ -148,8 +154,22 @@ export function DecisionArea(props: DecisionAreaProps) {
   const { state, prompt, grouping, interactive, replaying = false, table, onChoose, onExplain } = props;
   const choosing = state.kind === "await_action" && !replaying;
   const roll = BEFORE_DECISION.has(state.kind) ? prompt.rng_roll : null;
+  const areaRef = useRef<HTMLDivElement>(null);
+  const focusOffBar = useCallback(() => areaRef.current?.focus({ preventScroll: true }), []);
+  // A new prompt can render into the same buttons (same NodeAction.index), enabled again; a
+  // button that kept the focus would then take the next Enter or Space (PR #45 review round 3, 1).
+  const promptKey = replayKey(prompt);
+  useLayoutEffect(() => {
+    const bar = areaRef.current?.querySelector(ACTION_BAR_SELECTOR);
+    if (bar?.contains(document.activeElement) === true) focusOffBar();
+  }, [promptKey, focusOffBar]);
+  const choose = (actionIndex: number) => {
+    focusOffBar();
+    onChoose(actionIndex);
+  };
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-testid="decision-area">
+    // tabindex -1: a focus target for the code above, never a tab stop.
+    <div ref={areaRef} tabIndex={-1} className="flex min-w-0 flex-col gap-3 outline-none" data-testid="decision-area">
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
@@ -159,7 +179,7 @@ export function DecisionArea(props: DecisionAreaProps) {
         street={prompt.street}
         disabled={!choosing || !interactive}
         chosenIndex={chosenIndexOf(state)}
-        onAction={onChoose}
+        onAction={choose}
       />
       {state.kind === "submitting" ? <LoadingNote text={SESSION_TEXT.grading} /> : null}
       <Feedback {...props} />
