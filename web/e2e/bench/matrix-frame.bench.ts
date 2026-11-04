@@ -11,6 +11,11 @@
  * is asserted, so a frame over budget still leaves its evidence, and then the test fails when a
  * mode's p95 is 16 ms or more. The real measurement runs under the bench lock (`just
  * bench-web`); hosted continuous integration never runs it and only checks the committed file.
+ *
+ * S45 follow-up (R3.26, item 10): a second test times node switches (window.__runNodeSwitchBench:
+ * the matrix and the right column's Overview, measured with the study screen's node-switch metrics)
+ * and writes node-switch-<machine>.json, failing when the p95 is 50 ms or more. Same lock, same rule:
+ * `just bench-web` only, never `just ci`.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,6 +26,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test } from "@playwright/test";
 
+import { NODE_SWITCH_BUDGET_MS, NODE_SWITCH_REPORT_ID, buildNodeSwitchReport } from "./node-switch-report.js";
 import {
   FRAME_BUDGET_MS,
   REPORT_ID,
@@ -93,4 +99,35 @@ test("R3.12 matrix frame p95 stays under 16 ms per mode at device pixel ratio 2"
     expect(mode.n, `${mode.mode} recorded frames`).toBe(frames);
     expect(mode.p95, `${mode.mode} p95 in ms`).toBeLessThan(FRAME_BUDGET_MS);
   }
+});
+
+test("R3.26 a node switch p95 stays under 50 ms: matrix and Overview redrawn, the next frame shown", async ({ page, browser }) => {
+  const machine = parseMachineName(process.env.BENCH_MACHINE);
+  const reportDir = resolve(process.env.BENCH_REPORT_DIR?.trim() || DEFAULT_REPORT_DIR);
+
+  await page.goto("/bench.html");
+  await page.waitForFunction(() => typeof window.__runNodeSwitchBench === "function");
+  const result = await page.evaluate(async () => {
+    const run = window.__runNodeSwitchBench;
+    if (run === undefined) throw new Error("bench page has no __runNodeSwitchBench");
+    return run({});
+  });
+
+  const report = buildNodeSwitchReport({
+    result,
+    machine: machineInfo(machine),
+    commit: gitHead(),
+    date: new Date().toISOString(),
+    browserVersion: browser.version(),
+    playwrightVersion: playwrightVersion(),
+    concurrentWork: concurrentWork(),
+  });
+  mkdirSync(reportDir, { recursive: true });
+  const file = join(reportDir, `${NODE_SWITCH_REPORT_ID}-${machine}.json`);
+  writeFileSync(file, `${JSON.stringify(report, null, 2)}
+`, "utf8");
+  test.info().annotations.push({ type: "report", description: file });
+
+  expect(result.n, "recorded node switches").toBeGreaterThan(0);
+  expect(result.p95, "node switch p95 in ms").toBeLessThan(NODE_SWITCH_BUDGET_MS);
 });
