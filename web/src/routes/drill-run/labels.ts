@@ -15,7 +15,8 @@
 
 export const LIBRARY_PATH = "/library";
 
-export const SESSION_SCOPE = "Session";
+/** The trainer session's scope, defined once beside the reserved keys (PR #45 review round 3, finding 4). */
+export { SESSION_SCOPE } from "../../hotkeys/index.js";
 export const NEXT_HAND_KEY = "N";
 /** Enter does what N does (R3.30). */
 export const NEXT_HAND_ENTER_KEY = "Enter";

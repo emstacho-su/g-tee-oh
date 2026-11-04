@@ -371,3 +371,14 @@ describe("R3.30 PR #45 review round 2, finding 6: reserved keys only beside thei
     expect(within(overlay).getByRole("region", { name: "Painter" })).toBeInTheDocument();
   });
 });
+
+describe("R3.30 PR #45 review round 3, finding 9: Space is listed as the replay skip", () => {
+  it("R3.30 the overlay lists Space, Skip the replay, beside the session's live keys", async () => {
+    renderWithRoot(<Probe hotkey="n" description="Next hand" scope="Session" onPress={vi.fn()} />);
+    await userEvent.keyboard("?");
+    const overlay = within(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).getByTestId("shortcuts-overlay");
+    const session = within(overlay).getByRole("region", { name: "Session" });
+    expect(within(session).getByText("Space")).toBeInTheDocument();
+    expect(within(session).getByText("Skip the replay")).toBeInTheDocument();
+  });
+});

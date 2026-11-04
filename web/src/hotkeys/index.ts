@@ -5,7 +5,15 @@ export { ShortcutsOverlay, displayBinding, displayKey } from "./ShortcutsOverlay
 export { useHotkey } from "./use-hotkey.js";
 export { HotkeyStoreContext, useHotkeyStore } from "./context.js";
 export { handleKeydown, isActivatableTarget, isEditableTarget } from "./dispatch.js";
-export { REPEAT_HAND_DESCRIPTION, REPEAT_HAND_KEY, RESERVED_KEYS } from "./reserved.js";
+export {
+  LISTENER_KEYS,
+  REPEAT_HAND_DESCRIPTION,
+  REPEAT_HAND_KEY,
+  REPLAY_SKIP_DESCRIPTION,
+  REPLAY_SKIP_KEY,
+  RESERVED_KEYS,
+  SESSION_SCOPE,
+} from "./reserved.js";
 export type { ReservedKey } from "./reserved.js";
 export {
   GENERAL_SCOPE,
