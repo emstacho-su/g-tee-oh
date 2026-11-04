@@ -22,7 +22,6 @@ import { NEXT_KEY, PREDICTION_SCOPE, PREDICTION_TEXT, SUBMIT_KEY, isNoQuizQuesti
 import { noQuestionsText, quizDifficultyName } from "../../prediction/quiz-text.js";
 import { useEndQuiz } from "../../prediction/use-end-quiz.js";
 import { usePredictionRun } from "../../prediction/use-prediction-run.js";
-import { QUIZ_OPTION_SELECTOR } from "./AnswerInput.js";
 import { PromptCard } from "./PromptCard.js";
 import { ResultCard } from "./ResultCard.js";
 import { ReviewCard } from "./ReviewCard.js";
@@ -72,13 +71,10 @@ export function QuizRun({ source, seed, onEnded }: QuizRunProps) {
   const flavor = source.kind === "quiz" ? "quiz" : "drill";
   const difficulty = source.kind === "quiz" ? { difficulty: quizDifficultyName(source.choice.difficulty) } : {};
   const noQuestions = isNoQuizQuestions(run.error);
-  // Enter on the chosen option or a region checkbox, or from the page, submits; Enter on an
-  // unchosen option picks it, and on any other focused control (End quiz, Previous, a link) does
-  // that control's own action (S46, R3.16, PR #45 review round 4 b, PR #49 review round 1).
-  useHotkey(
-    { key: SUBMIT_KEY, fromControls: QUIZ_OPTION_SELECTOR, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit },
-    run.canSubmit && reviewing === null,
-  );
+  // Enter from the page submits a complete answer. A focused control keeps its own Enter
+  // (dispatch.ts); the answer form handles Enter on its options and region checkboxes itself
+  // (PromptCard, PR #49 review round 2), so End quiz, Previous and links do their own action.
+  useHotkey({ key: SUBMIT_KEY, description: PREDICTION_TEXT.submit, scope: PREDICTION_SCOPE, handler: run.submit }, run.canSubmit && reviewing === null);
   useHotkey({ key: NEXT_KEY, description: PREDICTION_TEXT.next, scope: PREDICTION_SCOPE, handler: run.next }, result !== undefined && reviewing === null);
   const reviewed = reviewing === null ? undefined : answered[reviewing];
 
