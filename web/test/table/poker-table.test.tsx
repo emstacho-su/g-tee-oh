@@ -180,3 +180,31 @@ describe("R3.13 PokerTable", () => {
     expect(moving).toHaveAttribute("aria-hidden", "true");
   });
 });
+
+describe("R3.13 critic round 3 and PR #50 review: no bet chip covers the board on a phone", () => {
+  /** The rules inside the portrait container query of styles.css (the table's own width under 600 px). */
+  function portraitBlock(): string {
+    const styles = readFileSync(STYLES_PATH, "utf8");
+    const start = styles.indexOf("@container poker-table");
+    if (start < 0) throw new Error("no portrait container query in styles.css");
+    let depth = 0;
+    for (let index = styles.indexOf("{", start); index < styles.length; index += 1) {
+      if (styles[index] === "{") depth += 1;
+      if (styles[index] === "}") depth -= 1;
+      if (depth === 0) return styles.slice(start, index + 1);
+    }
+    throw new Error("unclosed portrait container query");
+  }
+
+  it("R3.13 the portrait table shows no action chips: its board wraps to two rows and leaves no row clear of it, and each seat's badge already names its action and size", () => {
+    expect(portraitBlock()).toMatch(/\.table-chip\s*\{[^}]*display:\s*none/);
+  });
+
+  it("R3.13 the seat's badge still names the action with its size on every table", () => {
+    const seats: TableSeat[] = sixSeats().map((seat) =>
+      seat.position === "BTN" ? { ...seat, hasFolded: false, lastAction: "Raise to 2.5bb", chip: { label: "Raise to 2.5bb", moving: false, durationMs: 0 } } : seat,
+    );
+    render(<PokerTable seats={seats} potCbb={150} />);
+    expect(within(screen.getByTestId("seat-BTN")).getByTestId("seat-action")).toHaveTextContent("Raise to 2.5bb");
+  });
+});
