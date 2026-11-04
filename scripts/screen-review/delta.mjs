@@ -43,9 +43,10 @@ export function kindOf(previous, current) {
   return current === "no" ? "still-no" : "still-yes";
 }
 
+/** "G3: the text" of a record's first reason, or empty when it has none or its rule or text is not a string (code review round 2, 7). */
 const firstReason = (record) => {
-  const reason = record?.reasons?.[0];
-  return reason ? `${reason.rule}: ${reason.text}` : "";
+  const reason = Array.isArray(record?.reasons) ? record.reasons[0] : undefined;
+  return typeof reason?.rule === "string" && typeof reason?.text === "string" ? `${reason.rule}: ${reason.text}` : "";
 };
 
 /**
@@ -72,7 +73,7 @@ export function transitions(previous, current) {
   });
 }
 
-const emptyTally = (lane) => ({ lane, before_no: 0, after_no: 0, before_screens: 0, after_screens: 0, regressed: 0, fixed: 0, new: 0, gone: 0, "still-no": 0, "still-yes": 0 });
+const emptyTally = (lane) => ({ lane, before_no: 0, after_no: 0, before_screens: 0, after_screens: 0, new_no: 0, new_yes: 0, regressed: 0, fixed: 0, new: 0, gone: 0, "still-no": 0, "still-yes": 0 });
 
 /**
  * The No count per lane before and after, with the transition counts; lanes sorted by name. The
@@ -98,37 +99,44 @@ export function tallyByLane(rows) {
       t.after_screens += 1;
       if (row.after === "no") t.after_no += 1;
     }
-    tallyOf(row.lane)[row.kind] += 1;
+    const t = tallyOf(row.lane);
+    t[row.kind] += 1;
+    // New screens split by their verdict in the same pass, so the digest never re-filters the rows (code review round 2, 8).
+    if (row.kind === "new") t[row.after === "no" ? "new_no" : "new_yes"] += 1;
   }
   return [...lanes.values()].sort((a, b) => a.lane.localeCompare(b.lane));
 }
 
+/** A table cell: pipes escaped and whitespace collapsed, for every column (code review round 2, 7). */
 const cell = (text) => String(text ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+
+const TOTAL_KEYS = ["before_screens", "before_no", "after_screens", "after_no", "fixed", "regressed", "new_no", "new_yes", "gone"];
+
+/** The lane table's row from a tally (a lane's, or the All total's). */
+const laneLine = (name, t) => `| ${cell(name)} | ${TOTAL_KEYS.map((key) => t[key]).join(" | ")} |`;
 
 /** The Markdown digest: the per-lane table, then the regressed, fixed, new and gone screens with their reasons. */
 export function renderDelta(previous, current, rows) {
   const tally = tallyByLane(rows);
-  const total = tally.reduce((sum, t) => ({ before_no: sum.before_no + t.before_no, after_no: sum.after_no + t.after_no, before_screens: sum.before_screens + t.before_screens, after_screens: sum.after_screens + t.after_screens, regressed: sum.regressed + t.regressed, fixed: sum.fixed + t.fixed, new: sum.new + t.new, gone: sum.gone + t.gone }), { before_no: 0, after_no: 0, before_screens: 0, after_screens: 0, regressed: 0, fixed: 0, new: 0, gone: 0 });
+  const total = Object.fromEntries(TOTAL_KEYS.map((key) => [key, tally.reduce((sum, t) => sum + t[key], 0)]));
   const lines = [
-    `# Critic delta: round ${previous.round} (${previous.generated}) to round ${current.round} (${current.generated})`,
+    `# Critic delta: round ${cell(previous.round)} (${cell(previous.generated)}) to round ${cell(current.round)} (${cell(current.generated)})`,
     "",
     "| Lane | Screens before | No before | Screens after | No after | Fixed | Regressed | New No | New Yes | Gone |",
     "|---|---|---|---|---|---|---|---|---|---|",
   ];
-  const newNo = (lane) => rows.filter((r) => r.lane === lane && r.kind === "new" && r.after === "no").length;
-  const newYes = (lane) => rows.filter((r) => r.lane === lane && r.kind === "new" && r.after === "yes").length;
-  for (const t of tally) lines.push(`| ${t.lane} | ${t.before_screens} | ${t.before_no} | ${t.after_screens} | ${t.after_no} | ${t.fixed} | ${t.regressed} | ${newNo(t.lane)} | ${newYes(t.lane)} | ${t.gone} |`);
-  lines.push(`| All | ${total.before_screens} | ${total.before_no} | ${total.after_screens} | ${total.after_no} | ${total.fixed} | ${total.regressed} | ${rows.filter((r) => r.kind === "new" && r.after === "no").length} | ${rows.filter((r) => r.kind === "new" && r.after === "yes").length} | ${total.gone} |`);
+  for (const t of tally) lines.push(laneLine(t.lane, t));
+  lines.push(laneLine("All", total));
   for (const kind of ["regressed", "fixed", "new", "gone"]) {
     const list = rows.filter((r) => r.kind === kind);
     if (list.length === 0) continue;
     lines.push("", `## ${kind[0].toUpperCase()}${kind.slice(1)} (${list.length})`, "", "| Screen | Lane | Before | After | Reason now |", "|---|---|---|---|---|");
-    for (const r of list) lines.push(`| ${r.screen} | ${r.lane} | ${r.before ?? "absent"} | ${r.after ?? "absent"} | ${cell(r.reason)} |`);
+    for (const r of list) lines.push(`| ${cell(r.screen)} | ${cell(r.lane)} | ${cell(r.before ?? "absent")} | ${cell(r.after ?? "absent")} | ${cell(r.reason)} |`);
   }
   const stillNo = rows.filter((r) => r.kind === "still-no");
   if (stillNo.length > 0) {
     lines.push("", `## Still No (${stillNo.length})`, "", "| Screen | Lane | Reason now |", "|---|---|---|");
-    for (const r of stillNo) lines.push(`| ${r.screen} | ${r.lane} | ${cell(r.reason)} |`);
+    for (const r of stillNo) lines.push(`| ${cell(r.screen)} | ${cell(r.lane)} | ${cell(r.reason)} |`);
   }
   return `${lines.join("\n")}\n`;
 }

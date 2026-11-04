@@ -75,6 +75,28 @@ test("R3.23 a screen that moved lanes between rounds counts under its old lane b
   assert.match(digest, /\| All \| 2 \| 1 \| 2 \| 1 \| 0 \| 0 \| 0 \| 0 \| 0 \|/);
 });
 
+test("R3.23 every digest column is escaped and a reason missing its rule or text falls back to empty (code review round 2, 7)", () => {
+  const odd = {
+    before: { round: "3", generated: "a", records: [record("pipe|screen", "S4|5", "no")] },
+    after: { round: "4", generated: "b", records: [{ screen: "pipe|screen", family: "f|am", lane: "S4|5", verdict: "no", reasons: [{ rule: "G1" }] }] },
+  };
+  const rows = transitions(odd.before, odd.after);
+  assert.equal(rows[0].reason, "");
+  const digest = renderDelta(odd.before, odd.after, rows);
+  assert.match(digest, /\| S4\\\|5 \| 1 \| 1 \| 1 \| 1 \|/);
+  assert.match(digest, /\| pipe\\\|screen \| S4\\\|5 \| {2}\|/);
+  assert.doesNotMatch(digest, /\| pipe\|screen \|/);
+});
+
+test("R3.23 tallyByLane counts new_no and new_yes in its one pass, and the digest reads them from the tally (code review round 2, 8)", () => {
+  const tally = tallyByLane(transitions(previous, current));
+  assert.deepEqual(tally.map((t) => [t.lane, t.new_no, t.new_yes]), [
+    ["S45", 0, 0],
+    ["S46", 0, 0],
+    ["S47", 1, 1],
+  ]);
+});
+
 test("R3.23 renderDelta: the lane table carries the totals and every regression is listed with its reason", () => {
   const digest = renderDelta(previous, current, transitions(previous, current));
   assert.match(digest, /^# Critic delta: round 3 \(2026-10-29T14:55:44.524Z\) to round 4/);
