@@ -15,7 +15,7 @@
     {
       "path": "docs/handoffs/S04-mac-bootstrap.md",
       "source": "vault/handoffs/S04-mac-bootstrap.md",
-      "sha256": "18a2b98ea4425355e6cc030c22fd9027fe3e8f6f8c64c7e8b5554598b5d047c7"
+      "sha256": "f43922c866b4d84c6f4d84c03cb3153be6b1107d368085260b66432b8e2474a2"
     },
     {
       "path": "docs/handoffs/S05-test-vectors.md",
@@ -160,7 +160,7 @@
     {
       "path": "docs/planning/phases/phase-0-foundations.md",
       "source": "vault/planning/phases/phase-0-foundations.md",
-      "sha256": "d889ece59232eb525c8e4d15980db89268d3a9f051c09fabc39946a9aebf8cb5"
+      "sha256": "59856370b39efe1e5d139b443b325906983662a48de7443f383cdfd74d00f4c8"
     },
     {
       "path": "docs/planning/phases/phase-2-engine-and-pipeline.md",

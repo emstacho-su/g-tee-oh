@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s04-mac-bootstrap'
 title: 'S04 Mac bootstrap'
 collection: 'g-tee-oh'
 type: handoff
-status: 'in progress 2026-11-04: p0/mac-bootstrap branched, just mac-bench replaces the engine-bench container (O-506); waiting on the Mac run'
+status: 'done 2026-11-04: Mac run passed O-50, mac-bootstrap.md written, pull request 53 open for the owner to merge'
 created: 2026-10-19
 public: true
 phase: 0
@@ -124,3 +124,7 @@ Mac run sheet, one item at a time, outputs pasted back into the Zenbook session 
 9. `just mac-bench-clean`, then `docker ps -a` shows no container and `docker volume ls` no `gto-bench-scratch`; `docker images` shows no `g-tee-oh/library-builder:bench` (the two base images it pulled, rust and debian, may remain; O-47 is about nothing running).
 
 The Zenbook session then pulls, writes `validation/reports/mac-bootstrap.md` from items 1, 2, 7 and the Mac report, updates the Mac rows of `phase-0-gate.md`, runs the checks and the code review, and opens the pull request into `sprint/1-v1` for the owner to merge.
+
+## Done (2026-11-04, evening)
+
+The owner ran the sheet on the Mac the same evening. `bench-flop-line-mac.md`: verdict pass against O-50, peak RSS 1,489,641,472 bytes under the 5 GB cap, the judged line to 0.3 percent of the pot in 232 seconds (the Zenbook took 358). `validation/reports/mac-bootstrap.md` summarises it; the Docker virtual machine reads 10 GB and 10 cores; the power setting and Claude Code on the Mac are owner-confirmed without a pasted line. `just mac-bench-clean` left nothing of the run (O-47). Pull request 53 carries the recipe, four code-review rounds of fixes, the report and the 2026-11-04 replan mirror; the owner merges it with `gh pr merge 53 --merge`. The Phase 0 gate then closes in full. Follow-ups for the next builder session: a `--commit` flag on `bench-report` so the report step runs inside the image, and a failed report from a missing judged summary.
