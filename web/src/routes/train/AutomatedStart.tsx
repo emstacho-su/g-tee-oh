@@ -3,7 +3,8 @@
  * does, then what the session will use, all from the session defaults (lane C's
  * store/session-defaults.ts): the configuration scope (all covered configurations, or the ones
  * chosen in /settings, named from GET /configs), the grouping and Mixed-frequency mode, with a link to
- * /settings to change them, and Start. No seed is ever offered (a client seed makes the session
+ * /settings to change them, the session length chooser written straight to the defaults (S46,
+ * R3.31), and Start. No seed is ever offered (a client seed makes the session
  * unrated). The names read has its own loading and error states with Try again; a failed read
  * still lets the session start, since the scope's ids are known. An id /configs does not list is
  * shown as the id.
@@ -19,14 +20,18 @@ import { Link } from "@tanstack/react-router";
 
 import { useAppApi } from "../../auth/index.js";
 import { Button, Card, LoadingNote } from "../../components/ui/index.js";
+import { SessionLengthField } from "../drill-run/SessionLengthField.js";
 import type { GameConfig } from "../../progress/types.js";
 import { ALL_CONFIGS, type ConfigScope, type SessionDefaults } from "../../store/session-defaults.js";
+import type { SessionLength } from "../../trainer/session-length.js";
 import { allConfigsQuery, configLabel } from "../settings/configs-query.js";
 import { SessionDefaultsFields } from "../settings/SessionDefaultsFields.js";
 import { SCOPE_SETTINGS_SECTION, TRAIN_TEXT } from "./train-text.js";
 
 export interface AutomatedStartProps {
   defaults: SessionDefaults;
+  /** Writes the planned session length to the session defaults (S46, R3.31). */
+  onSessionLengthChange: (length: SessionLength) => void;
   onStart: () => void;
   starting: boolean;
 }
@@ -77,7 +82,7 @@ function StartRow({ label, starting, onStart }: { label: string; starting: boole
   );
 }
 
-export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartProps) {
+export function AutomatedStart({ defaults, onSessionLengthChange, onStart, starting }: AutomatedStartProps) {
   return (
     <Card title={TRAIN_TEXT.automatedCardTitle} description={TRAIN_TEXT.automatedIntro} testId="automated-start" className="max-w-xl">
       <div className="flex flex-col gap-1 rounded-xl bg-surface-sunken px-3 py-2 text-sm">
@@ -87,9 +92,10 @@ export function AutomatedStart({ defaults, onStart, starting }: AutomatedStartPr
           {TRAIN_TEXT.changeScope}
         </Link>
       </div>
-      {/* The grouping and the roll are set here, where the session starts (S47, R4.10); they write the session defaults store. */}
+      {/* The grouping, the roll and the planned length are set here, where the session starts (S47, R4.10); they write the session defaults store. */}
       <div className="flex flex-col gap-3" role="group" aria-label={TRAIN_TEXT.sessionSettings} data-testid="start-defaults">
         <SessionDefaultsFields idPrefix="automated-start" />
+        <SessionLengthField value={defaults.sessionLength} onChange={onSessionLengthChange} />
       </div>
       <StartRow label={TRAIN_TEXT.startAutomated} starting={starting} onStart={onStart} />
     </Card>

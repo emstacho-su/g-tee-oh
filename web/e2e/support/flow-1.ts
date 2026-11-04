@@ -6,7 +6,8 @@
  * and read the rating card again.
  *
  * Mechanism: every step drives the app through its visible controls and accessible names, as a
- * player would. Decisions alternate a click and the 1 key so both ways of choosing are exercised;
+ * player would. Decisions alternate a click and the button's own key (S46 R3.30: a letter by
+ * kind or a digit by size) so both ways of choosing are exercised; End is Shift+E;
  * nothing is revealed before the choice, and each decision request is checked to carry no
  * confidence field (the tap was retired, O-345, O-373).
  */
@@ -16,8 +17,8 @@ import { expect, type Page } from "@playwright/test";
 export const FLOW_1_DECISIONS = 5;
 /** A decision is graded from the library; a cold CI runner gets a generous bound. */
 const FEEDBACK_TIMEOUT_MS = 15_000;
-/** The action bar's first hotkey. */
-const FIRST_ACTION_KEY = "1";
+/** The fallback key when a button prints none (S46: buttons print their own key, see playOne). */
+const FIRST_ACTION_KEY = "F";
 const DECISION_PATH = /\/api\/v1\/sessions\/[^/]+\/decisions$/;
 const UNRATED_TEXT = "Unrated";
 const WHOLE_NUMBER = /^\d+$/;
@@ -64,7 +65,12 @@ async function playOne(page: Page, step: number): Promise<void> {
   await expect(firstAction, "the action bar goes live after the replay").toBeEnabled({ timeout: FEEDBACK_TIMEOUT_MS });
   const sent = page.waitForRequest((request) => request.method() === "POST" && DECISION_PATH.test(new URL(request.url()).pathname));
   if (step % 2 === 0) await firstAction.click();
-  else await page.keyboard.press(FIRST_ACTION_KEY);
+  else {
+    // The button prints its own key (a letter by kind or a digit by size, S46 R3.30), so the flow presses that.
+    const key = await firstAction.getAttribute("aria-keyshortcuts");
+    expect(key, "the first action button names its key").not.toBeNull();
+    await page.keyboard.press(key ?? FIRST_ACTION_KEY);
+  }
   // The browser may send the body as a stream Playwright cannot read back (null); the screen tests cover that case.
   const body: unknown = (await sent).postDataJSON();
   if (body !== null && typeof body === "object") expect(body, "the decision body carries no confidence field (O-373)").not.toHaveProperty("confidence");
@@ -83,7 +89,7 @@ export async function playDecisions(page: Page, count: number, shot: Flow1Shoote
 
 /** Ends the session through E and the confirm, and returns the recap's rated decisions. */
 export async function endAndReadRecap(page: Page): Promise<number> {
-  await page.keyboard.press("e");
+  await page.keyboard.press("Shift+E");
   await page.getByRole("dialog", { name: "End this session?" }).getByRole("button", { name: "End session" }).click();
   const recap = page.getByTestId("training-recap");
   await expect(recap.getByRole("heading", { name: "Session recap" })).toBeVisible();
