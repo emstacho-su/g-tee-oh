@@ -34,15 +34,14 @@ import { HTTP_STATUS, isApiProblem } from "../api/index.js";
 import type { AppApi } from "../api/index.js";
 import type { DrillCreate } from "../drills/types.js";
 import { useAppApi } from "../auth/index.js";
-import { AUTO_TAG_PREFIX } from "../drills/auto-drills.js";
+import { AUTO_TAG_HASH_CHARS, AUTO_TAG_PREFIX } from "../drills/auto-drills.js";
 import { checkDrillBody } from "../drills/body-rules.js";
 import { createDrill, fetchDrill, fetchDrillPage, invalidateDrills } from "../drills/queries.js";
 import { formatConfigsQuery } from "../study/queries.js";
 import { isDrillFormat, leakDrillBody, type DrillSpot } from "./drill-family.js";
 import type { GameConfig, HeatmapCell, HeatmapColumn, HeatmapRow } from "./types.js";
 
-export { AUTO_TAG_PREFIX };
-export const AUTO_TAG_HASH_CHARS = 26;
+export { AUTO_TAG_HASH_CHARS, AUTO_TAG_PREFIX };
 export const AUTO_IDEMPOTENCY_PREFIX = "auto-drill-";
 export const NO_CONFIG_TEXT = "No covered configuration matches this spot";
 export const OPEN_FAILED_PREFIX = "Could not open a drill";
