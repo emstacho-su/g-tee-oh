@@ -51,6 +51,7 @@ export function FeedbackThreshold({ feedback, actions }: FeedbackThresholdProps)
         error={query.error}
         retryLabel="Retry the threshold card"
         onRetry={() => void query.refetch()}
+        spot={{ configId: feedback.config_id, pair: feedback.pair }}
       />
     );
   }
