@@ -1,84 +1,66 @@
 /**
- * What Enter means on the quiz's answer controls (R3.16, PR #49 review rounds 2 and 3): only an
- * option button (aria-pressed) or a checkbox inside the answer area is an answer control, and it is
- * read from the element alone, aria-pressed on an option and checked on a region checkbox.
+ * The quiz answer form's submit gate and the meaning of Enter on its answer controls (R3.16, PR #49
+ * review rounds 2 to 4): the form sends only from the Submit button or a plain Enter in a text
+ * entry field, and a plain Enter on an option or region submits the chosen one or picks it.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { answerControlOf, answerEnterAction, isCheckbox } from "../../src/routes/quiz/answer-enter.js";
+import { answerEnterAction, isPlainEnter, submitAccepted } from "../../src/routes/quiz/answer-enter.js";
 
-function option(pressed: boolean): HTMLButtonElement {
+const BARE_ENTER = { key: "Enter", shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, repeat: false };
+
+function submitButton(): HTMLButtonElement {
   const button = document.createElement("button");
-  button.type = "button";
-  button.setAttribute("aria-pressed", String(pressed));
+  button.type = "submit";
   return button;
 }
 
-function region(checked: boolean): HTMLInputElement {
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.checked = checked;
-  return input;
+function input(type: string): HTMLInputElement {
+  const element = document.createElement("input");
+  element.type = type;
+  return element;
 }
-
-/** An answer area holding the given elements, beside a form area outside it. */
-function areas(...inside: Element[]): { answerArea: HTMLDivElement; outside: HTMLDivElement } {
-  const answerArea = document.createElement("div");
-  const outside = document.createElement("div");
-  answerArea.append(...inside);
-  document.body.append(answerArea, outside);
-  return { answerArea, outside };
-}
-
-afterEach(() => document.body.replaceChildren());
 
 describe("R3.16 Enter on the quiz's answer controls", () => {
   it("R3.16 the chosen option or a ticked region submits a complete answer and holds an incomplete one", () => {
-    for (const chosen of [option(true), region(true)]) {
-      expect(answerEnterAction(chosen, true)).toBe("submit");
-      expect(answerEnterAction(chosen, false)).toBe("hold");
-    }
+    expect(answerEnterAction(true, true)).toBe("submit");
+    expect(answerEnterAction(true, false)).toBe("hold");
   });
 
   it("R3.16 an unchosen option or an unticked region is picked, complete answer or not", () => {
-    for (const unchosen of [option(false), region(false)]) {
-      expect(answerEnterAction(unchosen, true)).toBe("pick");
-      expect(answerEnterAction(unchosen, false)).toBe("pick");
-    }
+    expect(answerEnterAction(false, true)).toBe("pick");
+    expect(answerEnterAction(false, false)).toBe("pick");
   });
 
-  it("R3.16 an option or a region checkbox inside the answer area is an answer control", () => {
-    const chosen = option(true);
-    const unticked = region(false);
-    const { answerArea } = areas(chosen, unticked);
-    expect(answerControlOf(chosen, answerArea)).toBe(chosen);
-    expect(answerControlOf(unticked, answerArea)).toBe(unticked);
+  it("R3.16 only Enter with no Shift, Ctrl, Alt or Meta and no auto-repeat is a plain Enter", () => {
+    expect(isPlainEnter(BARE_ENTER)).toBe(true);
+    expect(isPlainEnter({ ...BARE_ENTER, key: "n" })).toBe(false);
+    for (const flag of ["shiftKey", "ctrlKey", "altKey", "metaKey", "repeat"] as const) expect(isPlainEnter({ ...BARE_ENTER, [flag]: true }), flag).toBe(false);
   });
+});
 
-  it("R3.16 an aria-pressed button or a checkbox outside the answer area is none (PR #49 round 3)", () => {
-    const { answerArea, outside } = areas();
-    const toggle = option(false);
-    const stray = region(false);
-    outside.append(toggle, stray);
-    expect(answerControlOf(toggle, answerArea)).toBeNull();
-    expect(answerControlOf(stray, answerArea)).toBeNull();
-    expect(answerControlOf(option(true), null), "no answer area, no answer control").toBeNull();
-  });
-
-  it("R3.16 every other element in the answer area keeps its own Enter: a plain button, the percent field, a link, nothing", () => {
+describe("R3.16 the answer form's submit gate (PR #49 review round 4)", () => {
+  it("R3.16 with no Enter under way, only the Submit button sends", () => {
+    expect(submitAccepted(null, submitButton())).toBe(true);
     const plain = document.createElement("button");
-    const percent = document.createElement("input");
-    percent.type = "number";
-    const link = document.createElement("a");
-    link.href = "#home";
-    const { answerArea } = areas(plain, percent, link);
-    for (const other of [plain, percent, link, null, answerArea]) expect(answerControlOf(other, answerArea)).toBeNull();
+    plain.type = "button";
+    for (const other of [plain, input("checkbox"), null]) expect(submitAccepted(null, other)).toBe(false);
   });
 
-  it("R3.16 isCheckbox names a checkbox input only", () => {
-    expect(isCheckbox(region(false))).toBe(true);
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    for (const other of [radio, option(false), null]) expect(isCheckbox(other)).toBe(false);
+  it("R3.16 a plain Enter in a text entry field or on the Submit button itself sends", () => {
+    const submit = submitButton();
+    for (const field of [input("number"), input("text")]) expect(submitAccepted({ target: field, plain: true }, submit)).toBe(true);
+    expect(submitAccepted({ target: submit, plain: true }, submit)).toBe(true);
+  });
+
+  it("R3.16 a modified or held Enter never sends, wherever it is", () => {
+    const submit = submitButton();
+    for (const target of [input("number"), submit, input("checkbox")]) expect(submitAccepted({ target, plain: false }, submit)).toBe(false);
+  });
+
+  it("R3.16 a plain Enter on any other control never sends: a checkbox, a radio, an option button", () => {
+    const option = document.createElement("button");
+    option.setAttribute("aria-pressed", "true");
+    for (const target of [input("checkbox"), input("radio"), option, null]) expect(submitAccepted({ target, plain: true }, submitButton())).toBe(false);
   });
 });

@@ -1,38 +1,62 @@
 /**
- * What Enter means on the quiz's own answer controls (R3.16, PR #49 review rounds 2 and 3). The
- * shared hotkey dispatch leaves Enter on any focused control to that control, so the answer form
- * decides here. An answer control is an option button (aria-pressed) or a region checkbox inside
- * the prompt's answer area, the element AnswerInput renders into; an aria-pressed button or a
- * checkbox anywhere else in the form is none (round 3). On a plain Enter:
- * - the chosen option or a ticked region submits a complete answer (canSubmit), and holds Enter
- *   while the answer is incomplete;
- * - an unchosen option or an unticked region is picked (clicked), and nothing is sent.
- * Every other element (the reason field, the percent field, the Submit button, End quiz, a link)
- * keeps its own Enter. Pure: these read the elements and return the decision; the form acts on it.
+ * When the quiz's answer form may submit, and what Enter means on its own answer controls (R3.16,
+ * PR #49 review rounds 2 to 4). Pure: these read a key press, an element or a recorded press and
+ * return the decision; PromptCard and AnswerInput act on it.
+ *
+ * The submit gate (round 4) is the root cause fix for implicit submission. The form accepts a
+ * submit only when it came from the Submit button (a click, or its own Space or plain Enter) or
+ * from a plain Enter in a text entry field (the percent field), recorded by the form's keydown
+ * for that same press. Every other submit is rejected: a modified or held Enter anywhere, and Enter
+ * on any other control, such as a checkbox, so the browser's implicit submit never sends an answer
+ * past these rules and no target needs its default blocked to stop it.
+ *
+ * On an answer control's own plain Enter (an option button or a region checkbox, AnswerInput):
+ * the chosen option or a ticked region submits a complete answer (canSubmit) and holds an
+ * incomplete one; an unchosen option or an unticked region is picked, and nothing is sent. A
+ * modified or held Enter there keeps its default, so Ctrl, Alt and Meta stay the browser's and
+ * assistive technology's; the gate rejects any submit it would cause.
  */
-export type AnswerControl = HTMLButtonElement | HTMLInputElement;
+import { isPlainKey } from "../../hotkeys/index.js";
+import { SUBMIT_KEY } from "../../prediction/labels.js";
+
 export type AnswerEnterAction = "submit" | "hold" | "pick";
 
-export function isCheckbox(target: EventTarget | null): target is HTMLInputElement {
-  return target instanceof HTMLInputElement && target.type === "checkbox";
+/** The Enter press the form's keydown saw, kept until its keyup, the submit it causes, or the end of its task. */
+export interface RecordedEnter {
+  target: EventTarget | null;
+  plain: boolean;
 }
 
-function isOption(target: EventTarget | null): target is HTMLButtonElement {
-  return target instanceof HTMLButtonElement && target.hasAttribute("aria-pressed");
+/** The text entry fields whose plain Enter submits the form, as a browser's implicit submit does. */
+const TEXT_ENTRY_TYPES: ReadonlySet<string> = new Set(["number", "text"]);
+
+type KeyPress = Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "altKey" | "metaKey" | "repeat">;
+
+/** Enter with no Shift, Ctrl, Alt or Meta, and not an auto-repeat. */
+export function isPlainEnter(event: KeyPress): boolean {
+  return event.key === SUBMIT_KEY && isPlainKey(event) && !event.shiftKey;
 }
 
-/** The focused answer control, or null when the target is not one of the answer area's own controls. */
-export function answerControlOf(target: EventTarget | null, answerArea: Element | null): AnswerControl | null {
-  if (answerArea === null || !(target instanceof Node) || !answerArea.contains(target)) return null;
-  return isOption(target) || isCheckbox(target) ? target : null;
+function isTextEntry(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement && TEXT_ENTRY_TYPES.has(target.type);
 }
 
-/** Whether the answer control is already the chosen one: checked, or aria-pressed. */
-function isChosen(control: AnswerControl): boolean {
-  return isCheckbox(control) ? control.checked : control.getAttribute("aria-pressed") === "true";
+function isSubmitButton(element: Element | null): boolean {
+  return element instanceof HTMLButtonElement && element.type === "submit";
 }
 
-export function answerEnterAction(control: AnswerControl, canSubmit: boolean): AnswerEnterAction {
-  if (!isChosen(control)) return "pick";
+/**
+ * Whether the form may send this submit. With an Enter press recorded, only a plain Enter on the
+ * submitter itself or in a text entry field sends; without one, only the Submit button does.
+ */
+export function submitAccepted(enter: RecordedEnter | null, submitter: Element | null): boolean {
+  if (enter === null) return isSubmitButton(submitter);
+  if (!enter.plain) return false;
+  return isTextEntry(enter.target) || (isSubmitButton(submitter) && enter.target === submitter);
+}
+
+/** What a plain Enter on an answer control does, from whether it is the chosen one. */
+export function answerEnterAction(chosen: boolean, canSubmit: boolean): AnswerEnterAction {
+  if (!chosen) return "pick";
   return canSubmit ? "submit" : "hold";
 }
