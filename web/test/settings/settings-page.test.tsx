@@ -204,7 +204,8 @@ describe("R4.12 /settings hotkeys and layout", () => {
       "R",
       "I",
       "?",
-      ...["ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape"],
+      // The arrow keys print as words, never as the raw key codes (S48 round 5 verifier on settings-hotkeys).
+      ...["Left arrow", "Right arrow", "R", "]", "[", "M", "S", "Escape"],
     ]);
     expect(rows[0]).toHaveTextContent("Fold");
     expect(rows[5]).toHaveTextContent("bet or raise size");
