@@ -204,7 +204,7 @@ function DrillRun({ drill, seed, autostart, drillSettled }: DrillRunProps) {
       {state.kind === "ended" ? <SessionRecapView recap={state.recap} onStartAnother={session.reset} /> : null}
       {startPanel ? (
         <StartPanel
-          drill={drill}
+          drill={{ ...drill, trainer: { ...drill.trainer, ...overrides } }}
           rng={rng}
           onRngChange={changeRng}
           onStart={() => {

@@ -26,6 +26,8 @@ describe("R3.13 the start panel's Options", () => {
     expect(within(pause).getByRole("radio", { name: "After a mistake" })).toHaveAttribute("aria-checked", "true");
     await userEvent.click(within(pause).getByRole("radio", { name: "Never" }));
     expect(within(pause).getByRole("radio", { name: "Never" })).toHaveAttribute("aria-checked", "true");
+    // The Pause chip shows the session's override (PR #48 review round 3 MEDIUM 4).
+    expect(screen.getByTestId("pause-rule")).toHaveTextContent("Never");
     const speed = within(overrides).getByRole("radiogroup", { name: "Speed this session" });
     await userEvent.click(within(speed).getByRole("radio", { name: "Slow" }));
     expect(within(speed).getByRole("radio", { name: "Slow" })).toHaveAttribute("aria-checked", "true");
