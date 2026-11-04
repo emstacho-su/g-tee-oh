@@ -105,3 +105,15 @@ describe("R3.32 PR #50 review: the recap's label counts agree with the api's dec
     expect(recapTallyOf({ ...fixtureRecap, decisions: 3 }, log.entries)).toBeUndefined();
   });
 });
+
+describe("R3.31 R3.32 PR #50 review: a history row names its hand as the counter did", () => {
+  it("R3.32 an entry keeps the played-hand number of its reveal, not the hands seen, so a stale reload's unplayed hand never shifts it", () => {
+    const state = reveal("d1", "best", 0, false, 5);
+    if (state.kind !== "feedback") throw new Error("not a reveal");
+    // Hand 5 of those seen, but only the third hand played: one dealt hand was never graded.
+    const context: SessionContext = { ...state.context, played: { count: 3, lastHandNo: 4 } };
+    const [entry] = logOf({ ...state, context }).entries;
+    expect(entry?.hand.ordinal).toBe(5);
+    expect(entry?.ordinal).toBe(3);
+  });
+});

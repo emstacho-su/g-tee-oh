@@ -17,6 +17,7 @@
  */
 import type { DecisionFeedback, FeedbackLabel, PanelKey, TrainerPrompt } from "../contracts.js";
 import type { HandProgress } from "./hand-progress.js";
+import { playedOrdinal } from "./session-length.js";
 import type { PracticeSession } from "./session-types.js";
 import type { SpotState } from "./spot-machine.js";
 
@@ -25,6 +26,8 @@ export interface DecisionEntry {
   /** The decision's Idempotency-Key: one entry per decision. */
   readonly key: string;
   readonly hand: HandProgress;
+  /** The hand's played-hand number at the reveal, the number the hand counter showed (PR #50 review). */
+  readonly ordinal: number;
   readonly prompt: TrainerPrompt;
   /** The NodeAction.index the hero chose (O-198). */
   readonly actionIndex: number;
@@ -53,6 +56,7 @@ export function logAfter(log: SessionLog, state: SpotState): SessionLog {
   const entry: DecisionEntry = {
     key,
     hand,
+    ordinal: playedOrdinal(state.context) ?? hand.ordinal,
     prompt: state.prompt,
     actionIndex: state.decision.actionIndex,
     feedback: state.feedback,

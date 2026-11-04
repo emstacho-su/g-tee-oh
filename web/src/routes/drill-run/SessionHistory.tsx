@@ -54,7 +54,7 @@ function HistoryRow({ entry, decisions, open, onOpenChange, slots }: HistoryRowP
   return (
     <li data-testid="history-row" data-label={entry.feedback.label}>
       <Disclosure
-        title={handCounterText(entry.hand, { decision: decisions })}
+        title={handCounterText(entry.hand, { decision: decisions, ordinal: entry.ordinal })}
         hint={rowHint(entry)}
         headingLevel={4}
         open={open}

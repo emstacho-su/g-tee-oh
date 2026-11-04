@@ -16,7 +16,13 @@ import type { SessionContext, SpotState } from "../../src/trainer/spot-machine.j
 
 function reveal(key: string, label: FeedbackLabel, evLoss: number, ordinal: number, chosen: number): SpotState {
   const feedback: DecisionFeedback = { ...fixtureFeedback, label, ev_loss_bb: evLoss, rated: false, rng_roll: null };
-  const context: SessionContext = { session: fixturePracticeSession, rng: false, hand: { handNo: ordinal - 1, ordinal, decision: 1, stateVersion: 3, heroPosition: "BB" } };
+  // A reveal counts its hand as played, as the spot machine does (withGradedHand).
+  const context: SessionContext = {
+    session: fixturePracticeSession,
+    rng: false,
+    hand: { handNo: ordinal - 1, ordinal, decision: 1, stateVersion: 3, heroPosition: "BB" },
+    played: { count: ordinal, lastHandNo: ordinal - 1 },
+  };
   return { kind: "feedback", context, prompt: fixturePrompt, decision: { actionIndex: chosen, responseMs: 50, idempotencyKey: key, stateVersion: 3 }, feedback };
 }
 
