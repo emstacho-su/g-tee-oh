@@ -7,7 +7,10 @@
  * (the selected hand's threshold card, blockers and role) and Compare (each action's served loss
  * for the hand). A tab exists only when it has data at the node, and a street-specific one carries
  * its street as a badge. The open tab is the address's view, else this browser's last tab, else
- * Overview (shownView); choosing a tab writes the view with replace and remembers it. Radix mounts
+ * Overview (shownView); choosing a tab writes the view to the address with replace and remembers
+ * it, so the address alone says which tab is open (PR 52 review 1). Compare follows the hovered
+ * hand; between hovers it shows the selected hand, else the last hovered one, pinned until another
+ * cell is hovered or selected, so its buttons stay to be clicked (PR 52 review 1). Radix mounts
  * only the open tab, so a closed tab's reads never start. Each body is memoised and gets stable
  * callbacks, so a re-render of the screen (a hover, a mode change) re-renders a body only when its
  * own inputs change; the reads inside are TanStack queries keyed on the node, so returning to a
@@ -80,21 +83,38 @@ interface FollowingCompareProps {
   onCompare: (index: number) => void;
 }
 
-/** Compare for the hovered hand, else the selected one; a hover re-renders only this. */
+/** The last hovered hand, with the node and selection it was hovered under. */
+interface PinnedHover {
+  readonly nodeKey: StudyNode["node_key"];
+  readonly selected: string | undefined;
+  readonly hand: string;
+}
+
+/**
+ * Compare for the hovered hand, else the selected one, else the last hovered hand under this node
+ * and selection: the hover clears when the pointer leaves the matrix, and without the pin the
+ * buttons would vanish before they could be clicked (PR 52 review 1). A new node or selection drops
+ * the pin. A hover re-renders only this.
+ */
 const FollowingCompare = memo(function FollowingCompare({ node, hover, selectedHand, onCompare }: FollowingCompareProps) {
-  return <CompareTab node={node} hand={useHoveredHand(hover) ?? selectedHand} onCompare={onCompare} />;
+  const hovered = useHoveredHand(hover);
+  const [pinned, setPinned] = useState<PinnedHover | null>(null);
+  const current = pinned !== null && pinned.nodeKey === node.node_key && pinned.selected === selectedHand;
+  if (hovered !== null && !(current && pinned.hand === hovered)) {
+    // Adjusting state while rendering, as React documents for state derived from a changing input.
+    setPinned({ nodeKey: node.node_key, selected: selectedHand, hand: hovered });
+  }
+  return <CompareTab node={node} hand={hovered ?? selectedHand ?? (current ? pinned.hand : undefined)} onCompare={onCompare} />;
 });
 
 export function StudyTabs(props: StudyTabsProps) {
   const { api, node, hover, selectedHand, filters, view } = props;
   const [stored] = useState(readStudyView);
-  const [chosen, setChosen] = useState<StudyView | null>(null);
   const onToggleFilter = useStableCallback(props.onToggleFilter);
   const onCompare = useStableCallback(props.onCompare);
-  const open = shownView(node, view ?? chosen ?? undefined, stored);
+  const open = shownView(node, view, stored);
 
   const choose = (next: StudyView) => {
-    setChosen(next);
     writeStudyView(next);
     props.onViewChange(next);
   };
