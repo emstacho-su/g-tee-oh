@@ -7,13 +7,14 @@
  * benchApi), for a rotation of synthetic study nodes (the frame
  * bench's variants, so every switch draws different data). Each switch marks a request on the
  * study screen's own node-switch metrics (node-switch-metrics.ts), renders the next node, and the
- * harness completes the switch in an effect after the commit, exactly as NodeView does; the metrics
+ * harness completes the switch in an effect after the commit in which the advantage card has its
+ * data (its first visit of a node includes the offline read, a later visit is a cache hit); the metrics
  * measure one frame later, and the duration they measure is the one recorded, never a second clock
  * around it (PR 52 review 1). Warm-up switches are not recorded. The clock
  * and the frame scheduler are injected, so the loop runs in jsdom for the unit tests; the bench
  * page passes performance.now and requestAnimationFrame. Synthetic numbers only (O-26).
  */
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -22,9 +23,10 @@ import { createAppApi, type AppApi } from "../api/index.js";
 import { RangeMatrix } from "../components/range-matrix/RangeMatrix.js";
 import type { StudyNode } from "../contracts.js";
 import { fixtureInsights, fixtureStudyNode } from "../fixtures/index.js";
-import { AdvantageInsights } from "../routes/study/HandInsights.js";
+import { AdvantageInsights, standInHand } from "../routes/study/HandInsights.js";
 import { NodeActionsPanel } from "../routes/study/NodeActionsPanel.js";
 import { createNodeSwitchMetrics, type NodeSwitchMetrics } from "../study/node-switch-metrics.js";
+import { studyInsightsQuery } from "../study/queries.js";
 import { nearestRank } from "./stats.js";
 import { benchVariants } from "./variants.js";
 
@@ -84,11 +86,25 @@ interface HarnessProps {
   metrics: NodeSwitchMetrics;
 }
 
-/** What a node switch redraws on the study screen: the matrix and the Overview (the actions and the advantage card), completing the switch after its commit. */
+/**
+ * What a node switch redraws on the study screen: the matrix and the Overview (the actions and the
+ * advantage card). The switch completes on the commit in which the advantage card has its data,
+ * not on the first commit with its loading note, so the measured switch covers the card's render:
+ * the harness subscribes to the same insights read the card makes (the stand-in hand, one request,
+ * a cache hit on a later visit of the node) and completes once it has succeeded (code review
+ * round 1, 3).
+ */
 function NodeSwitchHarness({ api, node, metrics }: HarnessProps) {
+  const standIn = standInHand(node);
+  const insights = useQuery({
+    ...studyInsightsQuery(api, { solutionId: node.solution_id, nodeKey: node.node_key, hand: standIn ?? "" }),
+    enabled: standIn !== undefined,
+  });
+  // A node with no hands has no card to wait for.
+  const settled = standIn === undefined || insights.isSuccess;
   useEffect(() => {
-    metrics.complete(node.node_key);
-  }, [metrics, node.node_key]);
+    if (settled) metrics.complete(node.node_key);
+  }, [settled, metrics, node.node_key]);
   return (
     <div>
       <RangeMatrix node={node} mode="frequency" theme="light" sizePx={BENCH_SIZE_PX} onSelectHand={() => undefined} popOut={false} />
