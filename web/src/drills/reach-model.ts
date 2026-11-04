@@ -37,7 +37,7 @@ export interface CoverageBadge {
   readonly text: string;
 }
 
-const NO_ANTE_CBB = 0;
+export const NO_ANTE_CBB = 0;
 const KEY_SEPARATOR = "-";
 
 export const REACH_TEXT = {

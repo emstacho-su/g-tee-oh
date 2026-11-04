@@ -15,6 +15,7 @@ import { CBB_PER_BB, formatCbb } from "../poker/format.js";
 import type { GameConfig, PositionPairEntry, Stake } from "../study/queries.js";
 import { fieldStates, type FieldState, type SettingsCatalog, type SettingsDraft } from "../study/settings-fields.js";
 import { listOf, type DrillDraft } from "./draft.js";
+import { NO_ANTE_CBB } from "./reach-model.js";
 
 const DEPTH_SEPARATOR = ", ";
 const NO_PAIRS = (): readonly PositionPairEntry[] | undefined => undefined;
@@ -22,9 +23,13 @@ const NO_PAIRS = (): readonly PositionPairEntry[] | undefined => undefined;
 export type PickerKey = "format" | "table_size" | "stake" | "depth";
 export type PickerChoices = Readonly<Record<PickerKey, FieldState>>;
 
-/** Study's catalog over the two reads the picker makes; it never needs a configuration's seats. */
+/**
+ * Study's catalog over the two reads the picker makes; it never needs a configuration's seats.
+ * Only configurations without an ante are offered: the api's candidate rule (configRowMatches)
+ * reaches no other, so a picked depth always reaches a configuration (review 4 finding 2).
+ */
 export function pickerCatalog(stakes: readonly Stake[], configs: readonly GameConfig[]): SettingsCatalog {
-  return { stakes, configs, pairsOf: NO_PAIRS };
+  return { stakes, configs: configs.filter((config) => config.ante_cbb === NO_ANTE_CBB), pairsOf: NO_PAIRS };
 }
 
 /** The whole-number depths typed in the draft, in the order typed; anything else is dropped. */

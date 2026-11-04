@@ -63,4 +63,13 @@ describe("R3.37 the configuration picker model", () => {
     const choices = pickerChoices(catalog, pickerDraft(draft, fixtureStakes));
     expect(choices.stake).toEqual({ kind: "waiting", cause: "upper", reason: "Choose an available table size first." });
   });
+
+  it("R3.37 a configuration with an ante is never offered, the same rule as the api candidate rule (PR #48 review 4 finding 2)", () => {
+    const [online] = fixtureConfigs;
+    if (online === undefined) throw new Error("the fixture catalog is empty");
+    const anted = { ...online, config_id: "cfg_6_online_150_ante", depth_cbb: 15_000, ante_cbb: 50 };
+    const choices = pickerChoices(pickerCatalog(fixtureStakes, [...fixtureConfigs, anted]), pickerDraft(newDrillDraft(), fixtureStakes));
+    if (choices.depth.kind !== "choices") throw new Error("no depth choices");
+    expect(choices.depth.choices.map((choice) => choice.value)).toEqual(["10000", "20000"]);
+  });
 });
