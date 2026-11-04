@@ -5,27 +5,28 @@
  * the drill now reaches a covered spot, so nothing polls and Start is offered the moment it can
  * succeed.
  *
- * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7): an event counts when its pair is
- * one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so the web applies
- * no ordering rule); its configuration is queued. Every configuration the drill reaches is also
- * queued once on mount, so an event that arrived between the refusal and the subscription is not
- * lost. Once the configuration list has loaded (events that came earlier wait in the queue), the
- * queued configurations the drill reaches are read again, one read per configuration however many
- * events named it; only when a read marks one of the drill's pairs preflop_available is the screen
- * told, and the refusal cleared. Otherwise it keeps watching. It tells the screen once, and never
- * after it has left the screen (a cancelled re-read).
+ * Mechanism (PR #48 review MEDIUM 4, round 3 MEDIUM 2, 6 and 7, review 4 finding 6): once the
+ * configuration list has loaded, each configuration the drill reaches is read once; that read is
+ * its baseline, the drill's pairs already covered when the watch opened, and it announces nothing
+ * (a pair covered then was not just added: the refusal had another cause). An event counts when its
+ * pair is one of the drill's pairs (matched by the unordered seat set, reach-model.ts, so the web
+ * applies no ordering rule); its configuration waits until that configuration's baseline is in,
+ * then is read again, one read per configuration however many events named it. Only a drill pair
+ * covered now and not in the baseline tells the screen, and clears the refusal; otherwise the read
+ * becomes the new baseline and it keeps watching. It tells the screen once, and never after it has
+ * left the screen (a cancelled re-read).
  *
  * It is mounted only while the refusal is on screen: the api allows four streams per user, so a
  * drill screen holds one only when it is waiting on the builder.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { describeFailureForLog } from "../../api/http-status.js";
 import { useAppApi } from "../../auth/index.js";
 import { configsReached, coveredKeys, pairKeyOf, pairKeyOfText, pairKeys } from "../../drills/reach-model.js";
 import { useServerEvents } from "../../library/use-server-events.js";
-import { practicePairsQuery } from "../../practice/catalog-spot.js";
+import { practicePairsQuery, type PositionPairEntry } from "../../practice/catalog-spot.js";
 import { capitalize, configurationWords, pairWords } from "../../progress/spot-words.js";
 import type { GameConfig } from "../../progress/types.js";
 import type { Drill } from "../../trainer/session-types.js";
@@ -48,10 +49,21 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
   const queryClient = useQueryClient();
   const configs = useQuery(allConfigsQuery(api));
   const filter = drill.spot_filter;
-  const drillPairs = new Set(pairKeys(filter.game_config.table_size, filter.hero_positions, filter.villain_positions));
-  // Configuration ids waiting for a re-read; the mount check queues every reached one once.
+  const { table_size: tableSize } = filter.game_config;
+  // The drill's pair keys, computed once per seat choice (review 4 finding 6).
+  const drillPairs = useMemo(
+    () => new Set(pairKeys(tableSize, filter.hero_positions, filter.villain_positions)),
+    [tableSize, filter.hero_positions, filter.villain_positions],
+  );
+  // The screen's latest callback, so a new function each render never re-runs the reads.
+  const onCoverageRef = useRef(onCoverage);
+  onCoverageRef.current = onCoverage;
+  // Configuration ids an event named, waiting for their baseline or their re-read.
   const [queued, setQueued] = useState<readonly string[]>([]);
-  const mountChecked = useRef(false);
+  // Each reached configuration's drill pairs covered at its last read; set by the first read.
+  const baselines = useRef<ReadonlyMap<string, ReadonlySet<string>>>(new Map());
+  const [baselineCount, setBaselineCount] = useState(0);
+  const baselineStarted = useRef(false);
   useServerEvents({
     onCoverageAdded: (event) => {
       const key = pairKeyOfText(event.pair);
@@ -69,39 +81,65 @@ export function CoverageWatch({ drill, onCoverage }: CoverageWatchProps) {
     };
   }, []);
 
+  const drillCoveredIn = useCallback(
+    (pairs: readonly PositionPairEntry[]): Set<string> => new Set([...coveredKeys(pairs)].filter((key) => drillPairs.has(key))),
+    [drillPairs],
+  );
+  const setBaseline = useCallback((configId: string, covered: ReadonlySet<string>): void => {
+    baselines.current = new Map([...baselines.current, [configId, covered]]);
+    setBaselineCount((count) => count + 1);
+  }, []);
+  const readPairs = useCallback(
+    (configId: string) => queryClient.fetchQuery({ ...practicePairsQuery(api, configId), staleTime: 0 }),
+    [api, queryClient],
+  );
+
+  // The baseline: one read of each reached configuration, announcing nothing.
   useEffect(() => {
-    if (configs.data === undefined) return;
-    const reached = configsReached(filter, configs.data);
-    if (!mountChecked.current) {
-      mountChecked.current = true;
-      setQueued((current) => [...current, ...reached.map((config) => config.config_id)]);
-      return;
+    if (configs.data === undefined || baselineStarted.current) return;
+    baselineStarted.current = true;
+    for (const config of configsReached(filter, configs.data)) {
+      readPairs(config.config_id)
+        .then((pairs) => setBaseline(config.config_id, drillCoveredIn(pairs)))
+        .catch((error: unknown) => {
+          // Without a first read, every drill pair counts as uncovered, so the next event can still offer Start.
+          console.error(`g-tee-oh: reading the pairs for the coverage baseline failed (${describeFailureForLog(error)})`);
+          setBaseline(config.config_id, new Set());
+        });
     }
-    if (queued.length === 0) return;
-    const batch = queued;
-    setQueued((current) => current.slice(batch.length));
-    const keys = new Set(pairKeys(filter.game_config.table_size, filter.hero_positions, filter.villain_positions));
-    // One read per configuration, however many events named it (round 3 MEDIUM 6).
-    for (const config of reached.filter((entry) => batch.includes(entry.config_id))) {
-      queryClient
-        .fetchQuery({ ...practicePairsQuery(api, config.config_id), staleTime: 0 })
+  }, [configs.data, filter, readPairs, setBaseline, drillCoveredIn]);
+
+  // The events: a configuration with its baseline in is read again, once per batch.
+  useEffect(() => {
+    if (configs.data === undefined || queued.length === 0) return;
+    const ready = configsReached(filter, configs.data).filter((config) => queued.includes(config.config_id) && baselines.current.has(config.config_id));
+    if (ready.length === 0) return;
+    const readyIds = new Set(ready.map((config) => config.config_id));
+    setQueued((current) => current.filter((id) => !readyIds.has(id)));
+    for (const config of ready) {
+      readPairs(config.config_id)
         .then((pairs) => {
-          // reach-model's own rule for a covered pair (round 3 MEDIUM 7), limited to the drill's pairs.
-          const covered = coveredKeys(pairs);
-          const pair = pairs.find((entry) => {
+          const before = baselines.current.get(config.config_id) ?? new Set<string>();
+          const covered = drillCoveredIn(pairs);
+          // reach-model's own rule for a covered pair (round 3 MEDIUM 7), counted only when it is new.
+          const added = pairs.find((entry) => {
             const key = pairKeyOf(entry.oop, entry.ip);
-            return covered.has(key) && keys.has(key);
+            return covered.has(key) && !before.has(key);
           });
-          if (pair === undefined || !mounted.current || fired.current) return;
+          if (added === undefined) {
+            setBaseline(config.config_id, covered);
+            return;
+          }
+          if (!mounted.current || fired.current) return;
           fired.current = true;
-          onCoverage(COVERAGE_WATCH_TEXT.added(pair.pair, config));
+          onCoverageRef.current(COVERAGE_WATCH_TEXT.added(added.pair, config));
         })
         .catch((error: unknown) => {
           // A failed re-read keeps the watch running; the next event tries again.
           console.error(`g-tee-oh: re-reading the pairs after coverage_added failed (${describeFailureForLog(error)})`);
         });
     }
-  }, [queued, configs.data, filter, api, queryClient, onCoverage]);
+  }, [queued, baselineCount, configs.data, filter, readPairs, setBaseline, drillCoveredIn]);
 
   return (
     <p role="status" data-testid="coverage-watch" className="text-sm text-muted">
