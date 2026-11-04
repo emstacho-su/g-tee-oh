@@ -1,28 +1,34 @@
 /**
- * Where the quiz's Enter submits from (R3.16, R3.30, PR #45 review round 4, finding b). PR 45 let
- * the quiz's Enter binding answer from any focused control, so Enter on a focused End quiz button
- * or a link submitted the answer and the control's own action never ran. Enter now submits from
- * the page body or a quiz option only (the yes and no, action and band buttons); every other
- * focused control keeps its own Enter.
+ * Where the quiz's Enter submits from (R3.16, R3.30, PR #45 review round 4 finding b, PR #49
+ * review round 1). PR 45 let the quiz's Enter binding answer from any focused control, so Enter on
+ * a focused End quiz button or a link submitted the answer and the control's own action never ran.
+ * Enter now submits from the page body, the chosen option, or a region checkbox; Enter on an
+ * unchosen option picks it (its own click), and every other focused control keeps its own Enter.
  */
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { fixturePredictionResult, fixturePredictions } from "../../src/fixtures/prediction.js";
+import { QUIZ_OPTION_SELECTOR } from "../../src/routes/quiz/AnswerInput.js";
 import { jsonResponse } from "../api/fake-fetch.js";
 import { ANSWER_PATH, END_PATH, NEXT_PATH, renderStartedQuiz, typeReason, type QuizView } from "./render-quiz.js";
 import { APP_SUITE } from "./app-suite-timeout.js";
 
 const RUN_PATH = "/quiz?config=cfg_6_online_100&positions=BB&spots=vs_open&kinds=range,hand&difficulty=easy";
 
-function yesNoEntry(): (typeof fixturePredictions)[number] {
-  const entry = fixturePredictions.find((item) => item.prompt.answer_kind === "yes_no");
-  if (entry === undefined) throw new Error("no yes_no fixture prediction");
+type Entry = (typeof fixturePredictions)[number];
+type PredictionAnswer = Parameters<typeof fixturePredictionResult>[1];
+
+function entryOf(kind: Entry["prompt"]["answer_kind"]): Entry {
+  const entry = fixturePredictions.find((item) => item.prompt.answer_kind === kind);
+  if (entry === undefined) throw new Error(`no ${kind} fixture prediction`);
   return entry;
 }
 
-const YES_NO = yesNoEntry();
+const YES_NO = entryOf("yes_no");
+const ACTION = entryOf("action");
+const REGIONS = entryOf("regions");
 
 const RECAP = {
   session_id: YES_NO.prompt.session_id,
@@ -36,23 +42,29 @@ const RECAP = {
   unlocks: [],
 };
 
-/** A started quiz on the yes or no question, with a complete answer: a reason and No chosen. */
-async function readyToSubmit(): Promise<QuizView> {
+async function startOn(entry: Entry, answer: PredictionAnswer): Promise<QuizView> {
   const view = await renderStartedQuiz(RUN_PATH, {
-    [NEXT_PATH]: [jsonResponse(200, YES_NO.prompt)],
-    [ANSWER_PATH]: [jsonResponse(200, fixturePredictionResult(YES_NO, { kind: "yes_no", value: false }, 0))],
+    [NEXT_PATH]: [jsonResponse(200, entry.prompt)],
+    [ANSWER_PATH]: [jsonResponse(200, fixturePredictionResult(entry, answer, 0))],
     [END_PATH]: [jsonResponse(200, RECAP)],
   });
-  await screen.findByRole("heading", { name: YES_NO.prompt.question });
+  await screen.findByRole("heading", { name: entry.prompt.question });
   await typeReason();
+  return view;
+}
+
+/** A started quiz on the yes or no question, with a complete answer: a reason and No chosen. */
+async function readyToSubmit(): Promise<QuizView> {
+  const view = await startOn(YES_NO, { kind: "yes_no", value: false });
   await userEvent.click(screen.getByRole("button", { name: "No" }));
   return view;
 }
 
-describe("R3.16 the quiz's Enter submits from an option or the page only (PR #45 review round 4, finding b)", APP_SUITE, () => {
+describe("R3.16 the quiz's Enter submits from the chosen option or the page only (PR #45 round 4 b, PR #49 round 1)", APP_SUITE, () => {
   it("R3.16 Enter right after choosing an option, with the focus on that option, still submits", async () => {
     const view = await readyToSubmit();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "No" }));
+    expect(document.activeElement?.matches(QUIZ_OPTION_SELECTOR)).toBe(true);
     await userEvent.keyboard("{Enter}");
     await screen.findByTestId("prediction-result");
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
@@ -66,6 +78,33 @@ describe("R3.16 the quiz's Enter submits from an option or the page only (PR #45
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
   });
 
+  it("R3.16 Enter on an unchosen option picks it and sends nothing; a second Enter on it sends the new choice (PR #49 round 1, finding 1)", async () => {
+    const view = await startOn(ACTION, { kind: "action", action_index: 2 });
+    await userEvent.click(screen.getByRole("button", { name: "Call" }));
+    const raise = screen.getByRole("button", { name: "Raise to 10bb" });
+    expect(raise).toHaveAttribute("aria-pressed", "false");
+    raise.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Raise to 10bb" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Call" })).toHaveAttribute("aria-pressed", "false");
+    expect(view.sentTo(ANSWER_PATH), "the first Enter only picks the focused option").toHaveLength(0);
+    await userEvent.keyboard("{Enter}");
+    await screen.findByTestId("prediction-result");
+    expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
+    expect(view.sentTo(ANSWER_PATH)[0]?.body).toMatchObject({ answer: { kind: "action", action_index: 2 } });
+  });
+
+  it("R3.16 R3.30 Enter right after ticking a region checkbox submits (PR #49 round 1, finding 2)", async () => {
+    const view = await startOn(REGIONS, { kind: "regions", value: ["pairs"] });
+    const pairs = screen.getByRole("checkbox", { name: "Pairs" });
+    await userEvent.click(pairs);
+    expect(pairs).toBeChecked();
+    expect(document.activeElement).toBe(pairs);
+    await userEvent.keyboard("{Enter}");
+    await screen.findByTestId("prediction-result");
+    expect(view.sentTo(ANSWER_PATH)).toHaveLength(1);
+  });
+
   it("R3.16 R3.30 Enter on the focused End quiz button ends the quiz and submits nothing", async () => {
     const view = await readyToSubmit();
     screen.getByRole("button", { name: "End quiz" }).focus();
@@ -74,12 +113,12 @@ describe("R3.16 the quiz's Enter submits from an option or the page only (PR #45
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
   });
 
-  it("R3.16 R3.30 Enter on a focused link follows it and submits nothing", async () => {
+  it("R3.16 R3.30 Enter on the focused Home link follows it and submits nothing (PR #49 round 1, finding 5)", async () => {
     const view = await readyToSubmit();
-    const [link] = screen.getAllByRole("link");
-    if (link === undefined) throw new Error("the quiz page has no link");
-    link.focus();
+    const home = within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Home" });
+    home.focus();
     await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
   });
 });
