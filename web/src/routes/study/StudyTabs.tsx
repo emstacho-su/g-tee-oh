@@ -20,6 +20,7 @@ import { Tabs, type TabItem } from "../../components/ui/Tabs.js";
 import type { StudyNode } from "../../contracts.js";
 import { readStudyView, writeStudyView } from "../../store/study-view.js";
 import { VIEW_LABELS, availableViews, shownView, viewBadge, type StudyView } from "../../study/study-views.js";
+import { useHoveredHand, type HoverStore } from "../../study/hover-store.js";
 import { CompareTab } from "./CompareTab.js";
 import { AdvantageInsights, HandDetails } from "./HandInsights.js";
 import { NodeActionsPanel } from "./NodeActionsPanel.js";
@@ -29,8 +30,8 @@ export const STUDY_TABS_LABEL = "Study panels";
 export interface StudyTabsProps {
   api: AppApi;
   node: StudyNode;
-  /** The hovered hand, else the selected one: the hand row and Compare follow it (R3.25). */
-  rowHand: string | undefined;
+  /** The hovered hand (R3.25): the hand row and Compare follow it, each subscribing alone (code review 3). */
+  hover: HoverStore;
   /** The selected hand: the Hands tab's reads stay on it, never on a hover. */
   selectedHand: string | undefined;
   /** The filters that name an action here (knownFilters). */
@@ -54,18 +55,17 @@ function useStableCallback<A extends unknown[]>(callback: (...args: A) => void):
 interface OverviewProps {
   api: AppApi;
   node: StudyNode;
-  /** The hovered or selected hand, for the hand row. */
-  hand: string | undefined;
-  /** The selected hand, for the advantage read (never a hover). */
+  hover: HoverStore;
+  /** The selected hand: the advantage read and, between hovers, the hand row. */
   selectedHand: string | undefined;
   filters: readonly number[];
   onToggleFilter: (index: number) => void;
 }
 
-const OverviewTab = memo(function OverviewTab({ api, node, hand, selectedHand, filters, onToggleFilter }: OverviewProps) {
+const OverviewTab = memo(function OverviewTab({ api, node, hover, selectedHand, filters, onToggleFilter }: OverviewProps) {
   return (
     <>
-      <NodeActionsPanel node={node} hand={hand} filters={filters} onToggleFilter={onToggleFilter} />
+      <NodeActionsPanel node={node} hand={selectedHand} hover={hover} filters={filters} onToggleFilter={onToggleFilter} />
       <AdvantageInsights api={api} node={node} hand={selectedHand} />
     </>
   );
@@ -73,8 +73,20 @@ const OverviewTab = memo(function OverviewTab({ api, node, hand, selectedHand, f
 
 const HandsTab = memo(HandDetails);
 
+interface FollowingCompareProps {
+  node: StudyNode;
+  hover: HoverStore;
+  selectedHand: string | undefined;
+  onCompare: (index: number) => void;
+}
+
+/** Compare for the hovered hand, else the selected one; a hover re-renders only this. */
+const FollowingCompare = memo(function FollowingCompare({ node, hover, selectedHand, onCompare }: FollowingCompareProps) {
+  return <CompareTab node={node} hand={useHoveredHand(hover) ?? selectedHand} onCompare={onCompare} />;
+});
+
 export function StudyTabs(props: StudyTabsProps) {
-  const { api, node, rowHand, selectedHand, filters, view } = props;
+  const { api, node, hover, selectedHand, filters, view } = props;
   const [stored] = useState(readStudyView);
   const [chosen, setChosen] = useState<StudyView | null>(null);
   const onToggleFilter = useStableCallback(props.onToggleFilter);
@@ -89,15 +101,15 @@ export function StudyTabs(props: StudyTabsProps) {
 
   const tabs = useMemo<TabItem<StudyView>[]>(() => {
     const content: Record<StudyView, TabItem<StudyView>["content"]> = {
-      overview: <OverviewTab api={api} node={node} hand={rowHand} selectedHand={selectedHand} filters={filters} onToggleFilter={onToggleFilter} />,
+      overview: <OverviewTab api={api} node={node} hover={hover} selectedHand={selectedHand} filters={filters} onToggleFilter={onToggleFilter} />,
       hands: <HandsTab api={api} node={node} hand={selectedHand} />,
-      compare: <CompareTab node={node} hand={rowHand} onCompare={onCompare} />,
+      compare: <FollowingCompare node={node} hover={hover} selectedHand={selectedHand} onCompare={onCompare} />,
     };
     return availableViews(node).map((entry) => {
       const badge = viewBadge(entry, node.street);
       return { value: entry, label: VIEW_LABELS[entry], content: content[entry], ...(badge === undefined ? {} : { badge }) };
     });
-  }, [api, node, rowHand, selectedHand, filters, onToggleFilter, onCompare]);
+  }, [api, node, hover, selectedHand, filters, onToggleFilter, onCompare]);
 
   return <Tabs label={STUDY_TABS_LABEL} value={open} tabs={tabs} onValueChange={choose} />;
 }
