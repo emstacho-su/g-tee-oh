@@ -1,7 +1,17 @@
 /** Tests for tokenActionLabel, the plain name of an action token (S38, R3.12, ADR 0004). */
 import { describe, expect, it } from "vitest";
 
+import { exactActionLabel, sizedActionLabel } from "../../src/poker/format.js";
 import { tokenActionLabel } from "../../src/poker/token-label.js";
+
+describe("R3.12 sizedActionLabel and exactActionLabel", () => {
+  it("R3.12 the sized label keeps an all-in's size; only the exact (legend) label drops it, as the api's own label does (PR 52 review round 2)", () => {
+    expect(sizedActionLabel("all_in", 10000)).toBe("All-in 100bb");
+    expect(sizedActionLabel("all_in", null)).toBe("All-in");
+    expect(exactActionLabel({ index: 3, kind: "all_in", token: "r10000", label: "All-in", size_cbb: 10000, bucket: "all-in", next_node_key: null })).toBe("All-in");
+    expect(exactActionLabel({ index: 2, kind: "raise", token: "r250", label: "Raise to 2.5bb", size_cbb: 250, bucket: "pot", next_node_key: null })).toBe("Raise to 2.5bb");
+  });
+});
 
 describe("R3.12 tokenActionLabel", () => {
   it("R3.12 names the unsized tokens", () => {

@@ -97,4 +97,39 @@ describe("R3.26 node-switch budget", () => {
     container.remove();
     vi.restoreAllMocks();
   });
+
+  it("R3.26 a switch renders the Overview's advantage card too, so the budget covers a real switch (PR 52 review round 2)", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const seen: boolean[] = [];
+    await runNodeSwitchBench({
+      container,
+      switches: 1,
+      warmupSwitches: 0,
+      now: () => 1,
+      nextFrame: (callback) => {
+        // The frame after the commit: the advantage card's area is mounted beside the matrix and the actions.
+        seen.push(container.textContent?.includes("Loading the range advantage.") === true || container.querySelector('[data-testid="range-advantage-card"]') !== null);
+        setTimeout(callback, 0);
+      },
+    });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it("R3.26 a switch whose frame never comes times out instead of hanging the bench (PR 52 review round 2)", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const container = document.createElement("div");
+    document.body.append(container);
+    await expect(
+      runNodeSwitchBench({ container, switches: 1, warmupSwitches: 0, now: () => 1, nextFrame: () => undefined, switchTimeoutMs: 20 }),
+    ).rejects.toThrow(/timed out/);
+    expect(container.childElementCount).toBe(0);
+    container.remove();
+    vi.restoreAllMocks();
+  });
 });

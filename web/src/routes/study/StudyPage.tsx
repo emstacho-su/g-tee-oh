@@ -241,8 +241,8 @@ function StudyScreen({ api, search, reopened, onStartOver }: StudyScreenProps) {
   );
 }
 
-/** The address's own presentation choices, which win over the stored spot's when it reopens (code review 2). */
-const PRESENTATION_KEYS: readonly (keyof StudySearch)[] = ["mode"];
+/** The address's own presentation choices, which win over the stored spot's when it reopens (code review 2; the view since PR 52 review round 2). */
+const PRESENTATION_KEYS: readonly (keyof StudySearch)[] = ["mode", "view"];
 
 export const REOPEN_TEXT = {
   opening: "Opening your last spot.",

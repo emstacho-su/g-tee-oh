@@ -17,11 +17,10 @@
 import { useQuery, type Query } from "@tanstack/react-query";
 
 import { isHandNotInRange, type AppApi } from "../../api/index.js";
-import type { StudyInsights } from "../../contracts.js";
 import { BlockersCard, HandRoleChip, RangeAdvantageCard, ThresholdCard } from "../../components/panels/index.js";
-import type { StudyNode } from "../../contracts.js";
+import type { StudyInsights, StudyNode } from "../../contracts.js";
 import { advantageFailure, insightsFailure } from "../../study/problem-text.js";
-import { studyInsightsQuery } from "../../study/queries.js";
+import { studyInsightsNodeKey, studyInsightsQuery } from "../../study/queries.js";
 import { LoadingNote } from "../../components/ui/index.js";
 import { parsePair } from "../../poker/pair.js";
 import { FailureAlert } from "./StudyNotices.js";
@@ -45,19 +44,18 @@ function insightsParams(node: InsightsNode, hand: string) {
   return { solutionId: node.solution_id, nodeKey: node.node_key, hand };
 }
 
-/** Where the solution id and node key sit in studyInsightsQuery's key. */
-const KEY_SOLUTION_INDEX = 2;
-const KEY_NODE_INDEX = 3;
-
 /**
  * The previous read's data, kept as a placeholder only while the node and solution are the same:
  * a new hand at the same node keeps the card (code review 3), but a node switch shows the loading
- * note, never the previous node's numbers as current (PR 52 review 1).
+ * note, never the previous node's numbers as current (PR 52 review 1). The previous key is matched
+ * against the node part the query factory itself builds (studyInsightsNodeKey), not by fixed
+ * indexes into it (PR 52 review round 2).
  */
-function sameNodePlaceholder(node: Pick<InsightsNode, "solution_id" | "node_key">) {
+export function sameNodePlaceholder(node: Pick<InsightsNode, "solution_id" | "node_key">) {
+  const nodePart: readonly unknown[] = studyInsightsNodeKey(node.solution_id, node.node_key);
   return (previous: StudyInsights | undefined, previousQuery: Pick<Query<StudyInsights>, "queryKey"> | undefined): StudyInsights | undefined => {
     const key = previousQuery?.queryKey;
-    const sameNode = key?.[KEY_SOLUTION_INDEX] === node.solution_id && key[KEY_NODE_INDEX] === node.node_key;
+    const sameNode = key !== undefined && nodePart.every((part, index) => key[index] === part);
     return sameNode ? previous : undefined;
   };
 }
