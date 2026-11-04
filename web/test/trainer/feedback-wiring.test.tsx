@@ -131,7 +131,9 @@ describe("R3.13 FeedbackRangeView", () => {
       <FeedbackRangeView feedback={fixtureFeedback} />,
     );
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The range at this decision could not load (status 503)");
+    // The cause in words, never an HTTP status (S48 critic G4 on ask-disabled-cap).
+    expect(alert).toHaveTextContent("The range at this decision could not load: the solver data is busy, so try again in a moment.");
+    expect(alert).not.toHaveTextContent("status");
     expect(alert).not.toHaveTextContent("server detail text");
     await userEvent.click(screen.getByRole("button", { name: "Retry the range" }));
     expect(await screen.findByTestId("feedback-range-view")).toBeInTheDocument();
@@ -140,7 +142,7 @@ describe("R3.13 FeedbackRangeView", () => {
 
   it("R3.13 a network failure is explicit too", async () => {
     setup({ [NODE_PATH]: [networkFailure()] }, <FeedbackRangeView feedback={fixtureFeedback} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("The range at this decision could not load (network error)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The range at this decision could not load: the network did not answer");
   });
 });
 
@@ -206,7 +208,7 @@ describe("R3.13 FeedbackThreshold", () => {
       <FeedbackThreshold feedback={fixtureFeedback} />,
     );
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("The threshold card could not load (status 502)");
+    expect(alert).toHaveTextContent("The threshold card could not load: the solver data did not answer.");
     expect(alert).not.toHaveTextContent("server detail text");
     await userEvent.click(screen.getByRole("button", { name: "Retry the threshold card" }));
     await waitFor(() => expect(screen.getByTestId("threshold-card")).toBeInTheDocument());
@@ -215,6 +217,6 @@ describe("R3.13 FeedbackThreshold", () => {
 
   it("R3.13 a 404 of another kind is an error, not the out-of-range note", async () => {
     setup({ [INSIGHTS_PATH]: [problemResponse(404, "not-found")] }, <FeedbackThreshold feedback={fixtureFeedback} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("The threshold card could not load (status 404)");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The threshold card could not load: the library has nothing for this spot.");
   });
 });
