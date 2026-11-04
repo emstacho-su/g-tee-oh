@@ -87,3 +87,11 @@ describe("R3.31 hand counter with a session length", () => {
     expect(handCounterText(progress)).toBe("Hand 1, decision 1");
   });
 });
+
+describe("R3.31 PR #45 review round 3, finding 5: the planned-length counter names graded hands", () => {
+  it("R3.31 the counter can name the hand by the graded-hand number instead of the prompts seen", () => {
+    const progress = play(FIRST);
+    expect(handCounterText(progress, { length: 20, decision: false, ordinal: 2 })).toBe("Hand 2 of 20");
+    expect(handCounterText(progress, { length: 20, ordinal: 2 })).toBe("Hand 2 of 20, decision 1");
+  });
+});

@@ -19,7 +19,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import { usePrefersReducedMotion } from "../components/table/reduced-motion.js";
 import type { Position, TrainerPrompt } from "../contracts.js";
-import { isActivatableTarget } from "../hotkeys/index.js";
+// The space bar skips the replay (hotkeys/reserved.ts REPLAY_SKIP_KEY, S46 R3.30); a field or a
+// focused control keeps it, by the same rules the hotkey dispatch uses (PR #45 review round 3, 6).
+import { REPLAY_SKIP_KEY, isActivatableTarget, isEditableTarget } from "../hotkeys/index.js";
 import {
   LOG_TEXT,
   logLines,
@@ -68,13 +70,6 @@ export interface ActionReplay {
   readonly skip: () => void;
 }
 
-/** The key that finishes a replay: the space bar (S46, R3.30, O-475; the digits were S38's). */
-const SKIP_KEY = " ";
-/** A field the user types into: Space there is text, never a skip (review round 1, 6). */
-function isEditable(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || target.matches("input, textarea, select, [contenteditable='true']");
-}
 
 /**
  * Space with no modifier, pressed outside a field and a focused control (dispatch.ts: a button,
@@ -85,9 +80,9 @@ function isEditable(target: EventTarget | null): boolean {
 function isSkipKey(event: KeyboardEvent): boolean {
   if (event.defaultPrevented) return false;
   if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
-  if (event.key !== SKIP_KEY) return false;
+  if (event.key !== REPLAY_SKIP_KEY) return false;
   const { target } = event;
-  return !isEditable(target) && !isActivatableTarget(target);
+  return !isEditableTarget(target) && !isActivatableTarget(target);
 }
 
 interface Track {

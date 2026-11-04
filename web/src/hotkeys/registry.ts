@@ -4,13 +4,13 @@
  * Mechanism: a Zustand vanilla store holds the list of mounted bindings (key, shift, description,
  * scope label, handler) in registration order, plus whether the shortcuts overlay is open. Every
  * update returns a new list, never a mutated one. Keys compare case-insensitively ("s" and "S" are
- * the same key). A binding may ask for Shift (shift: true): it answers only while Shift is held,
- * and a plain letter binding answers only while Shift is not held, so "E" and "Shift+E" are two
- * bindings (S46, O-474; before S46 a plain binding also answered with Shift held). A plain digit or
- * symbol binding still answers with Shift held, for layouts that need Shift to type a digit (PR #45
- * review round 1, finding 6). Duplicate policy: the later binding for a key and shift state wins while it is mounted, and the earlier
- * one becomes active again when the later unregisters, so a dialog or a nested panel can take
- * over a key for as long as it is on screen. The "?" key is reserved for the overlay and an empty
+ * the same key). A binding may ask for Shift (shift: true): it answers only while Shift is held.
+ * A plain binding answers without Shift, and with Shift held too unless a chord of the same key is
+ * registered, so "E" and "Shift+E" are two bindings while Shift+F still folds and an AZERTY digit
+ * typed with Shift still chooses a size (S46, O-474 as amended in PR #45 review rounds 1 and 3).
+ * Duplicate policy: the later binding for a key and shift state wins while it is mounted, and the
+ * earlier one becomes active again when the later unregisters, so a dialog or a nested panel can
+ * take over a key for as long as it is on screen. The "?" key is reserved for the overlay and an empty
  * key is meaningless, so registering either throws a RangeError.
  */
 import { createStore, type StoreApi } from "zustand/vanilla";
@@ -80,23 +80,27 @@ export function createHotkeyStore(): HotkeyStore {
   }));
 }
 
-const LETTER = /^[a-z]$/i;
-
-/**
- * Whether a binding answers this key in this shift state. A chord (shift: true) needs Shift held.
- * A plain letter binding answers only without Shift, since its Shift variant can be another
- * binding (E and Shift+E); a plain digit or symbol answers either way, since some layouts need
- * Shift to type a digit (AZERTY) and none has a second binding there (PR #45 review round 1, 6).
- */
-export function bindingMatches(binding: HotkeyBinding, key: string, shift: boolean): boolean {
-  if (normalizeKey(binding.key) !== normalizeKey(key)) return false;
-  if (binding.shift === true) return shift;
-  return !shift || !LETTER.test(binding.key);
+/** Whether a binding is for this key, whatever its Shift flag. */
+function sameKey(binding: HotkeyBinding, key: string): boolean {
+  return normalizeKey(binding.key) === normalizeKey(key);
 }
 
-/** The binding that answers a key: the latest registered one with that key and shift state. */
+/**
+ * Whether a binding answers this key in this shift state, among the bindings registered. A chord
+ * (shift: true) needs Shift held. A plain binding answers without Shift, and with Shift held too
+ * unless a chord of the same key is registered (E and Shift+E): so Shift+F still folds, Shift+I
+ * still opens the explainer, and AZERTY digits typed with Shift still choose a size (PR #45 review
+ * rounds 1 and 3, O-474).
+ */
+export function bindingMatches(binding: HotkeyBinding, key: string, shift: boolean, bindings: readonly HotkeyBinding[] = []): boolean {
+  if (!sameKey(binding, key)) return false;
+  if (binding.shift === true) return shift;
+  return !shift || !bindings.some((other) => other.shift === true && sameKey(other, key));
+}
+
+/** The binding that answers a key: the latest registered one that matches it in this shift state. */
 export function findBinding(bindings: readonly RegisteredBinding[], key: string, shift = false): RegisteredBinding | undefined {
-  return bindings.findLast((binding) => bindingMatches(binding, key, shift));
+  return bindings.findLast((binding) => bindingMatches(binding, key, shift, bindings));
 }
 
 /** The bindings that currently answer a key, one per key and shift state, in registration order of the winners. */

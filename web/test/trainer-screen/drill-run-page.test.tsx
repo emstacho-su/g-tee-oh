@@ -550,3 +550,31 @@ describe("R3.32 tally and history on the drill run", () => {
     expect(counts).toHaveTextContent("Best0");
   });
 });
+
+describe("R3.30 PR #45 review round 3, finding 1: a clicked action button never keeps the focus", () => {
+  function actionButtons(): HTMLElement[] {
+    return within(screen.getByRole("group", { name: "Actions" })).getAllByRole("button");
+  }
+
+  it("R3.30 click an action, then Enter twice: the first Enter deals the next hand, the second submits nothing", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    await chooseRaise(view);
+    await screen.findByTestId("feedback-panel");
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("img", { name: "King of spades" })).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(view.sentTo(DECIDE_PATH), "the second Enter never submits an action the user did not choose").toHaveLength(1);
+  });
+
+  it("R3.30 the focus is off the action bar after the choice and after a new prompt", async () => {
+    const view = renderRun({ script: PLAY_SCRIPT });
+    await startSession(view);
+    await chooseRaise(view);
+    await screen.findByTestId("feedback-panel");
+    expect(actionButtons()).not.toContain(document.activeElement);
+    await userEvent.keyboard("{Enter}");
+    await screen.findByRole("img", { name: "King of spades" });
+    expect(actionButtons()).not.toContain(document.activeElement);
+  });
+});

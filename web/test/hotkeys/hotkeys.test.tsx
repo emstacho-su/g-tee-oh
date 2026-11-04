@@ -260,14 +260,34 @@ describe("R3.13 useHotkey and HotkeyRoot", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
-  it("R3.30 a plain digit or symbol binding answers with Shift held (AZERTY digits), a plain letter does not (PR #45 review round 1, finding 6)", () => {
+  it("R3.30 a plain binding answers with Shift held unless a Shift chord of that key is registered (PR #45 review rounds 1 and 3)", () => {
     const store = createHotkeyStore();
     store.getState().register({ key: "1", description: "Size 1", scope: "S", handler: vi.fn() });
+    store.getState().register({ key: "f", description: "Fold", scope: "S", handler: vi.fn() });
     store.getState().register({ key: "e", description: "Plain e", scope: "S", handler: vi.fn() });
+    store.getState().register({ key: "e", shift: true, description: "End", scope: "S", handler: vi.fn() });
+    // AZERTY digits and caps-lock letters: Shift held, no chord of that key, the plain binding answers.
     expect(findBinding(store.getState().bindings, "1", true)?.description).toBe("Size 1");
-    expect(findBinding(store.getState().bindings, "1", false)?.description).toBe("Size 1");
-    expect(findBinding(store.getState().bindings, "E", true)).toBeUndefined();
+    expect(findBinding(store.getState().bindings, "F", true)?.description).toBe("Fold");
+    // A chord of the letter exists: Shift goes to it, never to the plain letter.
+    expect(findBinding(store.getState().bindings, "E", true)?.description).toBe("End");
     expect(findBinding(store.getState().bindings, "e", false)?.description).toBe("Plain e");
+  });
+
+  it("R3.30 Shift+F folds and Shift+I opens the explainer when no chord of those letters exists (review round 3, finding 2)", () => {
+    const fold = vi.fn();
+    const explain = vi.fn();
+    renderWithRoot(
+      <>
+        <Probe hotkey="f" description="Choose Fold" onPress={fold} />
+        <Probe hotkey="i" description="How Mixed-frequency mode works" onPress={explain} />
+        <ShiftProbe hotkey="e" description="End session" onPress={vi.fn()} />
+      </>,
+    );
+    fireEvent.keyDown(window, { key: "F", shiftKey: true });
+    fireEvent.keyDown(window, { key: "I", shiftKey: true });
+    expect(fold).toHaveBeenCalledOnce();
+    expect(explain).toHaveBeenCalledOnce();
   });
 
   it("R3.13 handleKeydown reports whether it handled the key", () => {
@@ -349,5 +369,16 @@ describe("R3.30 PR #45 review round 2, finding 6: reserved keys only beside thei
     expect(within(overlay).queryByRole("region", { name: "Session" })).not.toBeInTheDocument();
     expect(within(overlay).queryByText(/Repeat hand/)).not.toBeInTheDocument();
     expect(within(overlay).getByRole("region", { name: "Painter" })).toBeInTheDocument();
+  });
+});
+
+describe("R3.30 PR #45 review round 3, finding 9: Space is listed as the replay skip", () => {
+  it("R3.30 the overlay lists Space, Skip the replay, beside the session's live keys", async () => {
+    renderWithRoot(<Probe hotkey="n" description="Next hand" scope="Session" onPress={vi.fn()} />);
+    await userEvent.keyboard("?");
+    const overlay = within(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).getByTestId("shortcuts-overlay");
+    const session = within(overlay).getByRole("region", { name: "Session" });
+    expect(within(session).getByText("Space")).toBeInTheDocument();
+    expect(within(session).getByText("Skip the replay")).toBeInTheDocument();
   });
 });

@@ -20,7 +20,7 @@ import {
   type HotkeyBinding,
   type RegisteredBinding,
 } from "./registry.js";
-import { RESERVED_KEYS } from "./reserved.js";
+import { LISTENER_KEYS, RESERVED_KEYS } from "./reserved.js";
 
 interface ShortcutRow {
   readonly key: string;
@@ -61,7 +61,7 @@ function groupByScope(bindings: readonly RegisteredBinding[]): ShortcutGroup[] {
   );
   // A reserved key shows only beside its scope's live keys, so a page without a trainer session
   // has no lone Session group (PR #45 review round 2, finding 6).
-  return RESERVED_KEYS.reduce<ShortcutGroup[]>(
+  return [...LISTENER_KEYS, ...RESERVED_KEYS].reduce<ShortcutGroup[]>(
     (groups, reserved) =>
       groups.some((group) => group.scope === reserved.scope)
         ? addRow(groups, reserved.scope, { key: displayKey(reserved.key), description: reserved.description })

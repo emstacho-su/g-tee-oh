@@ -48,11 +48,13 @@ export interface HandCounterOptions {
   readonly length?: SessionLength;
   /** Whether the decision within the hand is named (street and full-hand modes); true by default. */
   readonly decision?: boolean;
+  /** The hand number to print instead of the ordinal: the played-hand number of a planned length (R3.31). */
+  readonly ordinal?: number;
 }
 
 /** "Hand 3, decision 2"; with a length "Hand 3 of 20, decision 2"; without the decision "Hand 3 of 20". */
 export function handCounterText(progress: HandProgress, options: HandCounterOptions = {}): string {
-  const { length = null, decision = true } = options;
-  const hand = length === null ? `Hand ${progress.ordinal}` : `Hand ${progress.ordinal} of ${length}`;
+  const { length = null, decision = true, ordinal = progress.ordinal } = options;
+  const hand = length === null ? `Hand ${ordinal}` : `Hand ${ordinal} of ${length}`;
   return decision ? `${hand}, decision ${progress.decision}` : hand;
 }

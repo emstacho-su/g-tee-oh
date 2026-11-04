@@ -47,7 +47,7 @@ import type { DecisionFeedback, TrainerPrompt } from "../contracts.js";
 import { advanceHand, type HandProgress } from "./hand-progress.js";
 import { autoContinueMs } from "./pause-rule.js";
 import { activeMs, pauseTimer, resumeTimer, startTimer, type ResponseTimer } from "./response-timer.js";
-import { atSessionLimit, pastSessionLimit, type SessionLength } from "./session-length.js";
+import { atSessionLimit, pastSessionLimit, withGradedHand, type PlayedHands, type SessionLength } from "./session-length.js";
 import type { PracticeSession, RunSettings, SessionRecap } from "./session-types.js";
 import { isRetryable, type SpotProblem } from "./spot-problem.js";
 
@@ -64,6 +64,8 @@ export interface SessionContext {
   readonly hand?: HandProgress;
   /** The planned length in hands (S46, R3.31); absent or null means no limit. */
   readonly length?: SessionLength;
+  /** The hands with a graded decision, which the planned length counts (PR #45 review round 3, finding 5). */
+  readonly played?: PlayedHands;
 }
 
 export interface PendingDecision {
@@ -187,7 +189,7 @@ function promptLoaded(state: SpotState, event: Extract<SpotEvent, { type: "promp
   // A prompt that opens a hand past the planned length ends the session instead of showing it
   // (R3.31), on the context of the last played hand, so the counter never reads "Hand 21 of 20"
   // while the recap loads (PR #45 review round 2, finding 3).
-  if (event.endKey !== undefined && pastSessionLimit(context, hand.ordinal)) return { kind: "ending", context: state.context, key: event.endKey };
+  if (event.endKey !== undefined && pastSessionLimit(state.context, event.prompt)) return { kind: "ending", context: state.context, key: event.endKey };
   return { kind: "await_action", context, prompt: event.prompt, timer: startTimer(event.at), notice };
 }
 
@@ -205,7 +207,9 @@ function sessionStarted(state: SpotState, session: PracticeSession): SpotState {
 
 function decisionSucceeded(state: SpotState, feedback: DecisionFeedback): SpotState {
   if (state.kind !== "submitting") return state;
-  const { context, prompt, decision } = state;
+  const { prompt, decision } = state;
+  // The graded decision counts its hand toward the planned length (R3.31).
+  const context = withGradedHand(state.context);
   return { kind: "feedback", context, prompt, decision, feedback, autoContinueMs: autoContinueMs(context.trainer, feedback.label) };
 }
 

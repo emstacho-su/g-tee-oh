@@ -12,7 +12,16 @@
 import { ACTION_SCOPE, MAX_HOTKEY_ACTIONS } from "../../components/trainer/index.js";
 import { KIND_KEYS, KIND_KEY_NAMES, type LetteredKind } from "../../components/trainer/action-keys.js";
 import { RNG_EXPLAINER_KEY, RNG_EXPLAINER_SCOPE, RNG_EXPLAINER_TITLE } from "../../components/trainer/use-rng-explainer.js";
-import { displayBinding, displayKey, GENERAL_SCOPE, RESERVED_KEYS, SHORTCUTS_DESCRIPTION, SHORTCUTS_KEY } from "../../hotkeys/index.js";
+import {
+  displayBinding,
+  displayKey,
+  GENERAL_SCOPE,
+  REPLAY_SKIP_DESCRIPTION,
+  REPLAY_SKIP_KEY,
+  RESERVED_KEYS,
+  SHORTCUTS_DESCRIPTION,
+  SHORTCUTS_KEY,
+} from "../../hotkeys/index.js";
 import { END_SESSION_BINDING, NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "../drill-run/labels.js";
 
 const FIRST_SIZE_KEY = 1;
@@ -44,6 +53,7 @@ export const HOTKEY_ROWS: readonly HotkeyRow[] = [
   },
   { key: `${NEXT_HAND_KEY} or ${NEXT_HAND_ENTER_KEY}`, action: SESSION_TEXT.nextHand, scope: SESSION_SCOPE },
   { key: displayBinding(END_SESSION_BINDING), action: SESSION_TEXT.endSession, scope: SESSION_SCOPE },
+  { key: displayKey(REPLAY_SKIP_KEY), action: `${REPLAY_SKIP_DESCRIPTION} of the actions before your turn`, scope: SESSION_SCOPE },
   ...RESERVED_ROWS,
   { key: displayKey(RNG_EXPLAINER_KEY), action: RNG_EXPLAINER_TITLE, scope: RNG_EXPLAINER_SCOPE },
   { key: SHORTCUTS_KEY, action: SHORTCUTS_DESCRIPTION, scope: GENERAL_SCOPE },
