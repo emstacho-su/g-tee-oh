@@ -13,7 +13,7 @@
  */
 import { formatLeak } from "./format.js";
 import { isDue, isPracticed } from "./heatmap-model.js";
-import { capitalize, depthBandLabel, familyWords, pairWords } from "./spot-words.js";
+import { capitalize, columnPhrase, familyWords, pairWords } from "./spot-words.js";
 import type { HeatmapCell, LeakItem, ProgressHeatmap, ProgressLeaks } from "./types.js";
 
 export const TOP_LEAK_COUNT = 3;
@@ -39,7 +39,7 @@ function whereOf(heatmap: ProgressHeatmap, cell: HeatmapCell | undefined): strin
   const row = heatmap.rows[cell.row];
   const column = heatmap.columns[cell.column];
   if (row === undefined || column === undefined) return null;
-  return `${pairWords(row.pair)}, ${column.format} ${depthBandLabel(column.depth_band)}`;
+  return `${pairWords(row.pair)}, ${columnPhrase(column)}`;
 }
 
 function queueLeak(heatmap: ProgressHeatmap, item: LeakItem): QueueLeak {

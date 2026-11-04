@@ -17,6 +17,8 @@ import { buildHomeQueue } from "../../src/progress/queue-model.js";
 import {
   capitalize,
   classWords,
+  columnPhrase,
+  columnWords,
   configurationWords,
   configurationWordsIn,
   depthBandLabel,
@@ -68,6 +70,20 @@ describe("R4.12 one spot-vocabulary formatter serves classLabel, leak rows, heat
     expect(rowLabel(row)).toBe("Open or fold, big blind versus under the gun");
     expect(columnLabel(column)).toBe("Live 100bb");
     expect(classWords({ family: "facing-3bet", pair: "SB-BTN" }, { format: "online", depth_band: "short" })).toBe("Facing a 3-bet, small blind versus button, online short");
+  });
+
+  it("R4.12 one column phrase serves the class words, the queue's where and the heat map column (PR #48 review 4 finding 7)", () => {
+    const column = { format: "live", depth_band: "100" };
+    expect(columnPhrase(column)).toBe("live 100bb");
+    expect(columnWords(column)).toBe(capitalize(columnPhrase(column)));
+    expect(classWords({ family: "rfi", pair: "BB-UTG" }, column).endsWith(`, ${columnPhrase(column)}`)).toBe(true);
+    const queue = buildHomeQueue(fixtureHeatmap, fixtureLeaks);
+    for (const leak of queue.leaks) {
+      const cell = fixtureHeatmap.cells.find((each) => each.spot_class_key === leak.spotClassKey);
+      const leakColumn = cell === undefined ? undefined : fixtureHeatmap.columns[cell.column];
+      if (leakColumn === undefined) throw new Error("a queued leak has no heat map column");
+      expect(leak.where?.endsWith(`, ${columnPhrase(leakColumn)}`)).toBe(true);
+    }
   });
 
   it("R4.12 leak rows, the queue card and the auto drill's name print no raw token", () => {
