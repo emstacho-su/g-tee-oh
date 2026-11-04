@@ -26,7 +26,7 @@ function useInvalidate(): () => Promise<void> {
   return () => invalidateDrills(queryClient);
 }
 
-export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInput) => void): IntentMutation<SaveInput, Drill> {
+export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInput) => void, onFailed?: () => void): IntentMutation<SaveInput, Drill> {
   const invalidate = useInvalidate();
   const queryClient = useQueryClient();
   return useIntentMutation<SaveInput, Drill>({
@@ -38,6 +38,7 @@ export function useSaveDrill(api: AppApi, onSaved: (drill: Drill, input: SaveInp
       queryClient.setQueryData(drillQuery(api, drill.id).queryKey, drill);
       onSaved(drill, input);
     },
+    ...(onFailed === undefined ? {} : { onError: onFailed }),
   });
 }
 
