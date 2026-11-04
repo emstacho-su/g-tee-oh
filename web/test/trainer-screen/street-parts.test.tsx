@@ -72,7 +72,7 @@ describe("R3.31 PR #45 review round 4, finding g: every counter names the hand b
       session: fixturePracticeSession,
       rng: false,
       trainer: { ...SPOT_MODE_SETTINGS, stop_rule: "end_of_street" },
-      hand: { handNo: 5, ordinal: 4, decision: 2, stateVersion: 9 },
+      hand: { handNo: 5, ordinal: 4, decision: 2, stateVersion: 9, heroPosition: "BB" },
       played: { count: 2, lastHandNo: 3 },
     };
     render(<SessionHandCounter context={context} />);
