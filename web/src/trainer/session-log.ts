@@ -37,7 +37,7 @@ export interface SessionLog {
   readonly entries: readonly DecisionEntry[];
 }
 
-export const EMPTY_LOG: SessionLog = Object.freeze({ entries: Object.freeze([]) as readonly DecisionEntry[] });
+export const EMPTY_LOG: SessionLog = Object.freeze({ entries: Object.freeze<DecisionEntry[]>([]) });
 
 /** The states that start a session afresh: the log clears. */
 const CLEARING: ReadonlySet<SpotState["kind"]> = new Set(["idle", "starting"]);
