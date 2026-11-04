@@ -35,7 +35,11 @@ export interface SessionHistoryProps {
   /** Name the decision within the hand (street and full-hand modes). */
   decisions: boolean;
   slotsFor: (entry: DecisionEntry) => HistorySlots;
-  /** The session's own section choices (useFeedbackSections, O-387), so a reopened decision shows what the user chose. */
+  /**
+   * The session's own section choices (useFeedbackSections, O-387): a reopened decision starts from
+   * them, over the panels' defaults, and keeps its own toggles, so a click in a row never opens or
+   * closes a section of the live reveal (PR #50 review).
+   */
   sections?: FeedbackSectionsControl;
 }
 
@@ -72,8 +76,7 @@ function HistoryRow({ entry, decisions, open, onOpenChange, slotsFor, sections }
             chosenIndex={entry.actionIndex}
             unratedReason={unratedReason(entry.feedback, entry.prompt, entry.session)}
             workedExample={entry.prompt.worked_example}
-            defaultOpen={sectionsFromPanels(entry.prompt.visible_panels)}
-            {...(sections === undefined ? {} : { sections })}
+            defaultOpen={{ ...sectionsFromPanels(entry.prompt.visible_panels), ...sections?.open }}
             {...slotsFor(entry)}
           />
         ) : null}

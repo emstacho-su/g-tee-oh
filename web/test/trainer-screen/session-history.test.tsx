@@ -126,6 +126,8 @@ describe("R3.33 PR #50 review: a reopened decision keeps the session's own secti
     const range = within(first).getByRole("button", { name: /Range/ });
     expect(range).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(range);
-    expect(sections.setOpen).toHaveBeenCalledWith("range", true);
+    // The row keeps its own toggle: a click there never opens or closes the live reveal's section.
+    expect(within(first).getByRole("button", { name: /Range/ })).toHaveAttribute("aria-expanded", "true");
+    expect(sections.setOpen).not.toHaveBeenCalled();
   });
 });

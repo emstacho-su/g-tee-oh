@@ -61,8 +61,9 @@ const SEAT_BOXES: Readonly<Record<TableOrientation, { readonly bottom: SeatBox; 
 };
 
 /**
- * How far along the line from a card to the felt's centre its bet spot sits. Portrait cards sit
- * close to the narrow felt, so a chip goes further in there to clear the side seats.
+ * How far along the line from a card to the felt's centre its bet spot sits. The portrait spots are
+ * kept for the layout's shape, but the portrait table shows no chips (styles.css, S46 PR #50
+ * review): its wrapped board leaves no row clear of it.
  */
 const BET_SPOT_SHARE: Readonly<Record<TableOrientation, number>> = { landscape: 0.55, portrait: 0.7 };
 
