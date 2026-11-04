@@ -97,7 +97,7 @@ const BB_VERSUS_OPEN_ACTIONS: readonly NodeAction[] = [
   { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
   { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
   { index: 2, token: "r900", kind: "raise", size_cbb: 900, bucket: "pot", label: "Raise to 9bb", next_node_key: null },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 export interface FixtureHand {
@@ -268,7 +268,7 @@ const FACING_THREE_BET_ACTIONS: readonly NodeAction[] = [
   { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
   { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
   { index: 2, token: "r2200", kind: "raise", size_cbb: 2200, bucket: "pot", label: "Raise to 22bb", next_node_key: null },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 const BIG_BLIND_THREE_BET: FixtureHistoryEntry = { position: "BB", token: "r900", label: "Raise to 9bb" };

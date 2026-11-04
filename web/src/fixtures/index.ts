@@ -49,7 +49,7 @@ export const fixtureActions: readonly NodeAction[] = [
   { index: 0, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
   { index: 1, token: "c", kind: "call", size_cbb: null, bucket: null, label: "Call", next_node_key: null },
   { index: 2, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "Raise to 2.5bb", next_node_key: null },
-  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 3, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 const STRENGTH_SCALE = 2 * (GRID_SIZE - 1);

@@ -75,7 +75,8 @@ function formatNumber(value: number, maxDecimals: number): string {
 }
 
 /**
- * "Raise to 2.5bb", "Call", "All-in 100bb": the exact-size label of a tree action (Standard mode). A raise
+ * "Raise to 2.5bb", "Call", "All-in": the exact-size label of a tree action (Standard mode). An all-in
+ * prints "All-in" with no size, as the api's own label does (code review 3). A raise
  * names the total it raises to, the one form the api's own label uses (S45, screen critic: one name per
  * action on a screen), so a legend naming the api label and a table naming this agree.
  */
@@ -86,6 +87,6 @@ export function exactActionLabel(action: NodeAction): string {
 /** The label of an action kind at a size in cbb (null for an unsized kind); shared with tokenActionLabel. */
 export function sizedActionLabel(kind: NodeAction["kind"], sizeCbb: number | null): string {
   const name = actionStyle(kind).name;
-  if (sizeCbb === null) return name;
+  if (sizeCbb === null || kind === "all_in") return name;
   return kind === "raise" ? `${name} to ${formatCbb(sizeCbb)}` : `${name} ${formatCbb(sizeCbb)}`;
 }

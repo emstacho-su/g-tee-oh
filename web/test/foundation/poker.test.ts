@@ -57,6 +57,8 @@ describe("R3.13 cards and formatting", () => {
     expect(formatPercent(1.25)).toBe("1.25%");
     expect(exactActionLabel(fixtureActions[2]!)).toBe("Raise to 2.5bb");
     expect(exactActionLabel(fixtureActions[0]!)).toBe("Fold");
+    // An all-in prints "All-in", the label the api serves (solver-query exact_label; code review 3).
+    expect(exactActionLabel(fixtureActions[3]!)).toBe("All-in");
   });
 
   it("R3.12 one whole-percent rounding for the rank wording (PR #42 review round 1, I; O-408)", () => {

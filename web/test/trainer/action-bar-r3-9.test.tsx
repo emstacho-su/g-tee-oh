@@ -19,7 +19,7 @@ import { HotkeyRoot, createHotkeyStore } from "../../src/hotkeys/index.js";
 const PREFLOP_OPEN: readonly NodeAction[] = [
   { index: 20, token: "f", kind: "fold", size_cbb: null, bucket: null, label: "Fold", next_node_key: null },
   { index: 21, token: "r250", kind: "raise", size_cbb: 250, bucket: "pot", label: "Raise to 2.5bb", next_node_key: "k/r250" },
-  { index: 22, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in 100bb", next_node_key: null },
+  { index: 22, token: "r10000", kind: "all_in", size_cbb: 10000, bucket: "all-in", label: "All-in", next_node_key: null },
 ];
 
 /** A flop node whose tree offers a small and a pot bet and nothing in the medium bucket. */
@@ -64,7 +64,7 @@ describe("R3.9 action buttons come from the node's tree actions", () => {
     expect(barButtons().map((button) => button.getAttribute("aria-label"))).toEqual([
       "Fold",
       "Raise to 2.5bb",
-      "All-in 100bb",
+      "All-in",
     ]);
     const raise = screen.getByRole("button", { name: "Raise to 2.5bb" });
     expect(raise).toHaveTextContent("Raise to 2.5bb");
@@ -79,7 +79,7 @@ describe("R3.9 action buttons come from the node's tree actions", () => {
     unmount();
     withRoot(<ActionBar actions={PREFLOP_OPEN} grouping="standard" street="preflop" onAction={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Raise to 2.5bb" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All-in 100bb" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All-in" })).toBeInTheDocument();
   });
 
   it("R3.9 Grouped postflop shows the bucket label with the exact size underneath", () => {
