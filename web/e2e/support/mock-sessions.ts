@@ -46,6 +46,7 @@ import {
   fixtureStreetHands,
   fixtureFollowedRoll,
   fixtureTrainerHands,
+  fixtureUncoveredDrill,
   heroEntry,
   type FixtureHand,
   type FixtureHistoryEntry,
@@ -94,7 +95,7 @@ function isTrainingStart(body: unknown): boolean {
 
 const FIXTURE_DRILLS: readonly Drill[] = [
   fixtureDrill,
-  { ...fixtureDrill, id: FIXTURE_UNCOVERED_DRILL_ID, name: "A drill the library does not cover" },
+  fixtureUncoveredDrill,
   fixtureStreetDrill,
   fixtureFullHandDrill,
   fixturePartCoveredDrill,

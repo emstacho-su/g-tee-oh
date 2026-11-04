@@ -67,6 +67,10 @@ export async function capture(
   const file = join(directory, `${shot.screen}-${shot.theme}-${shot.viewport.label}.png`);
   if ("goto" in target) await target.screenshot({ path: file, fullPage: true });
   else await target.screenshot({ path: file });
+  // A full-page shot resizes the viewport for the capture and back; two more frames let the layout
+  // (a canvas matrix sized from its slot) settle before the next step reads or shoots the page (S48
+  // verifier: a transient 1x1 viewport showed in a study shot taken right after one).
+  await settle(page);
   return {
     screen: shot.screen,
     theme: shot.theme,

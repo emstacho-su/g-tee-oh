@@ -9,7 +9,9 @@ import type { MockProgress } from "../../e2e/support/mock-progress.js";
 import { createMockSessionRoute, mockSessionRoute } from "../../e2e/support/mock-sessions.js";
 import { FIXTURE_BLOCK_SIZE, fixtureHoldoutProgress, fixtureRatedBlock, fixtureWorkedBlock } from "../../src/fixtures/automated.js";
 import { FIXTURE_CSRF_TOKEN, FIXTURE_USER_EMAIL } from "../../src/fixtures/index.js";
-import type { SessionRecap } from "../../src/trainer/session-types.js";
+import { reachOf } from "../../src/drills/reach-model.js";
+import { fixtureConfigs, fixturePairsByConfig } from "../../src/fixtures/study.js";
+import type { Drill, SessionRecap } from "../../src/trainer/session-types.js";
 import {
   FIXTURE_DRILL_ID,
   FIXTURE_FULL_HAND_DRILL_ID,
@@ -24,6 +26,7 @@ import {
   fixtureStreetDrill,
   fixtureStreetHands,
   fixtureTrainerHands,
+  fixtureUncoveredDrill,
 } from "../../src/fixtures/trainer.js";
 
 const SIGNED = { [CSRF_HEADER]: FIXTURE_CSRF_TOKEN };
@@ -198,6 +201,14 @@ describe("R3.13 R3.14 mocked session routes in street and full-hand modes (S26)"
     const refused = startDrill(signedInApi(), FIXTURE_UNCOVERED_DRILL_ID);
     expect(refused.status).toBe(422);
     expect(refused.body).toMatchObject({ type: "urn:g-tee-oh:problem:no-coverage", pairs_total: 1, pairs_queued: 1 });
+  });
+
+  it("R3.23 the uncovered drill reaches a pair the mock catalog does not cover, so CoverageWatch leaves the refusal on screen for its shot", () => {
+    const served = signedInApi().handle(request("GET", `/api/v1/drills/${FIXTURE_UNCOVERED_DRILL_ID}`)).body as Drill;
+    expect(served).toEqual(fixtureUncoveredDrill);
+    const reach = reachOf(fixtureUncoveredDrill.spot_filter, fixtureConfigs, fixturePairsByConfig);
+    expect(reach?.spots).toBe(1);
+    expect(reach?.covered).toBe(0);
   });
 
   it("R3.13 drillOf supplies drills from another mocked route; the fixtures stay the fallback", () => {

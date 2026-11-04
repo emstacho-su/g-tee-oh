@@ -30,11 +30,11 @@ import { FIXTURE_CSRF_TOKEN } from "../../src/fixtures/index.js";
 import { fixturePaintDrill } from "../../src/fixtures/paint.js";
 import {
   FIXTURE_DRILL_ID,
-  FIXTURE_UNCOVERED_DRILL_ID,
   fixtureDrill,
   fixtureFullHandDrill,
   fixturePartCoveredDrill,
   fixtureStreetDrill,
+  fixtureUncoveredDrill,
 } from "../../src/fixtures/trainer.js";
 import { CSRF_HEADER, UNAUTHENTICATED, json, problem, type MockRequest, type MockResponse, type MockRoute, type ProblemSpec } from "./mock-api.js";
 
@@ -82,13 +82,6 @@ export interface MockDrillRoute extends MockRoute {
   /** The drill the store holds under this id, if any. */
   readonly drillOf: (id: string) => Drill | undefined;
 }
-
-export const fixtureUncoveredDrill: Drill = {
-  ...fixtureDrill,
-  id: FIXTURE_UNCOVERED_DRILL_ID,
-  name: "A drill the library does not cover",
-  tags: ["synthetic", "uncovered"],
-};
 
 /**
  * The default store, oldest first: every synthetic fixture drill the trainer screens use, and the

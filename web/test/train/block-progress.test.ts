@@ -14,8 +14,10 @@ import {
   fixtureRatedBlock,
   fixtureWorkedBlock,
 } from "../../src/fixtures/automated.js";
+import { PANEL_KEYS } from "../../src/drills/limits.js";
 import { fixtureHeatmap } from "../../src/fixtures/progress.js";
 import { blockView, familyLookup, holdoutView, latestPromptDecided, withMark, type PromptMark } from "../../src/routes/train/block-progress.js";
+import { REVEALING_PANELS, revealsAnswer } from "../../src/trainer/revealing-panels.js";
 import type { SessionContext } from "../../src/trainer/spot-machine.js";
 import type { TrainerPrompt } from "../../src/contracts.js";
 
@@ -39,6 +41,17 @@ describe("R4.10 block progress", () => {
       size: FIXTURE_BLOCK_SIZE,
       workedExample: false,
     });
+  });
+
+  it("R3.23 a rated block's fixture prompt carries the panels the api would: every panel but the answer-revealing ones; a worked example carries them all", () => {
+    const rated = fixtureBlockPrompt(fixtureRatedBlock, 0, FIXTURE_AUTOMATED_SESSION_ID, 1);
+    const worked = fixtureBlockPrompt(fixtureWorkedBlock, 0, FIXTURE_AUTOMATED_SESSION_ID, 1);
+    // The real api turns the revealing panels off for a rated block (services/api/src/automated/settings.ts), so the
+    // shot of a rated prompt must not show a "not rated" notice the api could never produce (S48 verifier).
+    expect(revealsAnswer(rated.visible_panels)).toBe(false);
+    expect(rated.visible_panels).toEqual(PANEL_KEYS.filter((panel) => !REVEALING_PANELS.includes(panel)));
+    expect(rated.visible_panels).toContain("hero_range_matrix");
+    expect(worked.visible_panels).toEqual([...PANEL_KEYS]);
   });
 
   it("R4.10 no block at all (not an automated session) gives null", () => {

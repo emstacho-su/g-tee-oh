@@ -11,8 +11,10 @@
  * - Two recaps: one with rated decisions, a rating change per track (one track new), a tier held
  *   below its band and an unlock; one with nothing rated.
  */
+import type { PanelKey, TrainerPrompt } from "../contracts.js";
+import { PANEL_KEYS } from "../drills/limits.js";
+import { REVEALING_PANELS } from "../trainer/revealing-panels.js";
 import type { AutomatedBlock, HoldoutProgress, PracticeSession, SessionRecap } from "../trainer/session-types.js";
-import type { TrainerPrompt } from "../contracts.js";
 import { FIXTURE_HEATMAP_COLUMNS, FIXTURE_HEATMAP_ROWS, fixtureClassKey } from "./progress.js";
 import { fixtureTrainerHands, type FixtureHand } from "./trainer.js";
 
@@ -87,7 +89,17 @@ export const fixtureHoldoutSession: PracticeSession = {
   holdout: fixtureHoldoutProgress,
 };
 
-/** The trainer fixture hand at `index` (cycled) served in a block, with its class fields. */
+/**
+ * The panels an automated prompt carries, as the api builds them (services/api/src/automated/settings.ts,
+ * sessions/prompt.ts): every panel but the answer-revealing ones on a rated block, every panel on a
+ * worked example. The trainer fixture hand's own panels are a drill's, not an automated session's,
+ * so a rated block never shows a "not rated" notice the real api could not produce (S48 verifier).
+ */
+export function fixtureBlockPanels(block: Pick<AutomatedBlock, "worked_example">): PanelKey[] {
+  return block.worked_example ? [...PANEL_KEYS] : PANEL_KEYS.filter((panel) => !REVEALING_PANELS.includes(panel));
+}
+
+/** The trainer fixture hand at `index` (cycled) served in a block, with its class fields and the block's panels. */
 export function fixtureBlockPrompt(block: AutomatedBlock, index: number, sessionId: string, stateVersion: number): TrainerPrompt {
   const hand = fixtureTrainerHands[index % fixtureTrainerHands.length] as FixtureHand;
   return {
@@ -95,6 +107,7 @@ export function fixtureBlockPrompt(block: AutomatedBlock, index: number, session
     session_id: sessionId,
     state_version: stateVersion,
     hand_no: index,
+    visible_panels: fixtureBlockPanels(block),
     spot_class_key: block.spot_class_key,
     track_key: block.track_key,
     worked_example: block.worked_example,

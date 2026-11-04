@@ -248,6 +248,21 @@ export const fixtureFullHandDrill: Drill = {
   trainer: { ...fixtureTrainerSettings, stop_rule: "end_of_hand", pause: "every_action" },
 };
 
+/**
+ * A drill the library does not cover: POST /sessions answers 422 no-coverage, and its one pair,
+ * the cutoff against the button, is one the fixture catalog (fixtures/study.ts) marks as not built,
+ * so CoverageWatch's first read finds nothing covered and the refusal stays on screen (S48 verifier
+ * on coverage-note-uncovered: with the button drill's pair, which the catalog covers, the watch
+ * cleared the refusal before the shot).
+ */
+export const fixtureUncoveredDrill: Drill = {
+  ...fixtureDrill,
+  id: FIXTURE_UNCOVERED_DRILL_ID,
+  name: "A drill the library does not cover",
+  tags: ["synthetic", "uncovered"],
+  spot_filter: { ...fixtureDrill.spot_filter, hero_positions: ["CO"], villain_positions: ["BTN"] },
+};
+
 /** Spot mode over a filter the library covers in part (O-312). */
 export const fixturePartCoveredDrill: Drill = {
   ...fixtureDrill,
