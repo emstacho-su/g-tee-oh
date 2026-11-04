@@ -370,4 +370,18 @@ describe("R3.14 drill builder", { timeout: BUILDER_TEST_TIMEOUT_MS }, () => {
     await user.click(within(within(pickerAgain).getByRole("group", { name: "Depths" })).getByRole("button", { name: /^100bb/ }));
     expect(advanced()).toHaveAttribute("aria-expanded", "true");
   });
+
+  it("R3.14 a failed Save on the Game page with Advanced closed focuses the typed field once it opens (PR #48 review round 3 MEDIUM 1)", async () => {
+    renderDrills("/drills/new");
+    const user = await openNew();
+    await user.type(screen.getByLabelText("Name"), "Live drill");
+    await openSection(user, "Seats");
+    await user.click(within(group("Hero positions")).getByRole("checkbox", { name: "BTN" }));
+    await openSection(user, "Game");
+    const picker = await screen.findByTestId("config-picker");
+    await user.click(within(within(picker).getByRole("radiogroup", { name: "Format" })).getByRole("radio", { name: "Live" }));
+    expect(screen.getByRole("button", { name: "Advanced: custom game" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Save drill" }));
+    await waitFor(() => expect(screen.getByLabelText("Custom stake")).toHaveFocus());
+  });
 });

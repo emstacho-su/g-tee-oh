@@ -40,10 +40,19 @@ export function useFocusFirstError(section: BuilderSectionSlug, drillId: string 
   useEffect(() => {
     // Wait until the pending page is the open one: the page left behind may hold an invalid field too.
     if (pending === null || pending !== section) return;
-    // One try per request: the request is cleared whatever is found, so it never fires later.
-    setPending(null);
-    const root = form.current;
-    if (root !== null) firstErrorTarget(root)?.focus();
+    // The focus waits for the next commit: a section that opens itself on an error (GameSection's
+    // Advanced) mounts its fields in the render after this one (PR #48 review round 3 MEDIUM 1).
+    // One try per request: the request is cleared when the try runs, whatever it finds, so it never
+    // fires later; leaving the page first cancels the request too, so it never steals focus later.
+    const timer = setTimeout(() => {
+      setPending(null);
+      const root = form.current;
+      if (root !== null) firstErrorTarget(root)?.focus();
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      setPending(null);
+    };
   }, [pending, section, form]);
 
   return (counts) => {
