@@ -17,6 +17,7 @@ import {
   fixtureTrainingRecap,
   fixtureUnratedRecap,
 } from "../../src/fixtures/automated.js";
+import { RATING_TIPS } from "../../src/components/progress/index.js";
 import { fixtureRating } from "../../src/fixtures/progress.js";
 import { progressKeys } from "../../src/progress/queries.js";
 import { changeText } from "../../src/routes/train/TrainingRecap.js";
@@ -58,6 +59,9 @@ describe("R4.10 training recap", () => {
     expect(within(recap).queryByTestId("nothing-rated")).not.toBeInTheDocument();
     // S46 (critic round 3 G8): the statistics carry a one-line definition each.
     expect(within(summary).getByRole("button", { name: "About mean score" })).toBeInTheDocument();
+    // S48 (round 5 verifier on train-recap): the rating cards and the tier reuse the progress card's definitions.
+    expect(within(recap).getByRole("button", { name: "About the rating" })).toHaveAccessibleDescription(RATING_TIPS.rating);
+    expect(within(recap).getByRole("button", { name: "About the tier" })).toHaveAccessibleDescription(RATING_TIPS.tier);
     expect(within(summary).getByRole("button", { name: "About rated decisions" })).toBeInTheDocument();
     expect(within(summary).getByRole("button", { name: "About EV loss" })).toBeInTheDocument();
     // S46 (R3.32, PR #50 review): the api counted 5 decisions this page never saw (the session ends

@@ -16,7 +16,8 @@ import { Link } from "@tanstack/react-router";
 import { useId } from "react";
 
 import { describeCosmetic } from "../../cosmetics/catalog.js";
-import { Button, Card, cn } from "../../components/ui/index.js";
+import { RATING_TIPS } from "../../components/progress/index.js";
+import { Button, Card, cn, InfoTip } from "../../components/ui/index.js";
 import { formatDeviation, formatPercent, formatRating, tierLabel, trackName } from "../../progress/format.js";
 import type { TrackKey } from "../../progress/types.js";
 import { formatBb } from "../../poker/format.js";
@@ -95,9 +96,13 @@ function RatingCards({ changes, trackNames }: { changes: readonly RatingChange[]
   if (changes.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
-      <h3 id={headingId} className="font-semibold">
-        {TRAIN_TEXT.ratingTable}
-      </h3>
+      {/* The same definitions the progress rating card carries (RATING_TIPS, S48 round 5 verifier on train-recap). */}
+      <div className="flex items-center gap-2">
+        <h3 id={headingId} className="font-semibold">
+          {TRAIN_TEXT.ratingTable}
+        </h3>
+        <InfoTip subject="the rating">{RATING_TIPS.rating}</InfoTip>
+      </div>
       <ul aria-labelledby={headingId} data-testid="rating-changes" className="grid gap-2 sm:grid-cols-2">
         {changes.map((change) => (
           <RatingCard key={change.track_key} change={change} trackNames={trackNames} />
@@ -112,7 +117,10 @@ function TierNote({ tier, trackNames }: { tier: SessionRecap["tier"]; trackNames
   const held = tier.band_tier !== tier.tier && tier.blocked_by.length > 0;
   return (
     <div className="flex flex-col gap-1" data-testid="recap-tier">
-      <h3 className="font-semibold">{TRAIN_TEXT.tierHeading}</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="font-semibold">{TRAIN_TEXT.tierHeading}</h3>
+        <InfoTip subject="the tier">{RATING_TIPS.tier}</InfoTip>
+      </div>
       <p>
         <span className="inline-block rounded-full bg-accent px-3 py-0.5 text-sm font-bold text-accent-text">{tierLabel(tier.tier)}</span>
       </p>

@@ -415,6 +415,13 @@ describe("R3.13 recap after end", () => {
     expect(recap, "the mean score is a percent on both recaps (S46 item 1)").toHaveTextContent("Mean score75%");
     expect(recap).toHaveTextContent("EV loss0.19bb");
     expect(view.sentTo(END_PATH)[0]?.body).toEqual({});
+    // The session's decisions stay reviewable under the totals (R3.32, round 5 verifier on trainer-recap).
+    const history = screen.getByTestId("session-history");
+    expect(recap.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The disclosure opens on its summary; every decision this client played is a row that reopens its
+    // feedback (one here: the recap's figures are the api fixture's, the history is the session's own log).
+    await userEvent.click(within(history).getAllByRole("button")[0] as HTMLElement);
+    expect(within(history).getAllByTestId("history-row")).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: "Start another session" }));
     expect(screen.getByRole("button", { name: "Start session" })).toBeInTheDocument();
   });
