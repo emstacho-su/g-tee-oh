@@ -183,7 +183,7 @@ describe("R3.13 FeedbackThreshold", () => {
     setup({ [INSIGHTS_PATH]: [jsonResponse(200, fixtureInsights)] }, <FeedbackThreshold feedback={fixtureFeedback} actions={fixtureActions} />);
     const card = await screen.findByTestId("threshold-card");
     expect(within(card).getAllByTestId("action-swatch").length).toBeGreaterThan(0);
-    expect(card).toHaveTextContent("Raise 2.5bb");
+    expect(card).toHaveTextContent("Raise to 2.5bb");
     expect(card).not.toHaveTextContent("r250");
   });
 

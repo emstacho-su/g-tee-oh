@@ -189,6 +189,7 @@ describe("R4.12 /settings hotkeys and layout", () => {
     const hotkeys = await screen.findByRole("region", { name: "Hotkeys" });
     const rows = within(within(hotkeys).getByRole("table", { name: "Keyboard shortcuts" })).getAllByRole("row").slice(1);
     // S46 (R3.30, R3.34): letters by action kind, digits for the sizes, Enter, Shift chords, R reserved.
+    // S45 (O-466): the Study scope's rows follow the trainer and app rows.
     expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual([
       "F",
       "C",
@@ -202,6 +203,7 @@ describe("R4.12 /settings hotkeys and layout", () => {
       "R",
       "I",
       "?",
+      ...["ArrowLeft", "ArrowRight", "R", "]", "[", "M", "S", "Escape"],
     ]);
     expect(rows[0]).toHaveTextContent("Fold");
     expect(rows[5]).toHaveTextContent("bet or raise size");

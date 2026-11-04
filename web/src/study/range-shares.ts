@@ -17,6 +17,16 @@ export type ShareResult =
   | { readonly kind: "ok"; readonly shares: readonly number[] }
   | { readonly kind: "mismatch"; readonly problem: string };
 
+/**
+ * The served combos per action by position (S45, O-469), or null when the api serves none; a list
+ * where only some entries carry combos reads as none, so a row never prints a number its neighbour
+ * lacks. Call after sharesByPosition said ok, so every action has its entry.
+ */
+export function combosByPosition(actions: NodeActions, rangeByAction: RangeByAction): readonly number[] | null {
+  const combos = actions.map((action) => rangeByAction.find((entry) => entry.index === action.index)?.combos);
+  return combos.every((value): value is number => typeof value === "number") ? combos : null;
+}
+
 export function sharesByPosition(actions: NodeActions, rangeByAction: RangeByAction): ShareResult {
   if (rangeByAction.length !== actions.length) {
     return { kind: "mismatch", problem: `${actions.length} actions but ${rangeByAction.length} range shares` };

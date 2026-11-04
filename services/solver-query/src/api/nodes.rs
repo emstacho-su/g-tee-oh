@@ -114,6 +114,10 @@ pub struct ActionShare {
     pub index: u8,
     /// The share of the acting seat's range taking it, 0 to 1.
     pub share: f32,
+    /// The reach-weighted combos of the acting seat's range taking it (the share times the
+    /// seat's `reach_weighted_combos`), so a client prints "17.5%, 232 combos" without
+    /// multiplying anything itself (S45, R3.12, O-469, ADR 0004); additive.
+    pub combos: f32,
 }
 
 /// Both ranges and how the acting seat's range splits over the actions.

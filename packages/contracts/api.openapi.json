@@ -157,6 +157,11 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1
+          },
+          "combos": {
+            "description": "The reach-weighted combos taking the action, from solver-query (S45, O-469, ADR 0004); absent until the solver answers it",
+            "type": "number",
+            "minimum": 0
           }
         },
         "required": [
@@ -348,6 +353,25 @@
               "$ref": "#/components/schemas/ActionShareInput"
             },
             "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
+          },
+          "range_combos": {
+            "description": "The acting seat's range at this node: its combos and reach-weighted combos, from solver-query's range summary (S45, O-469, ADR 0004)",
+            "type": "object",
+            "properties": {
+              "combos": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reach_weighted_combos": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "combos",
+              "reach_weighted_combos"
+            ]
           }
         },
         "required": [
@@ -5163,6 +5187,11 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1
+          },
+          "combos": {
+            "description": "The reach-weighted combos taking the action, from solver-query (S45, O-469, ADR 0004); absent until the solver answers it",
+            "type": "number",
+            "minimum": 0
           }
         },
         "required": [
@@ -5356,6 +5385,26 @@
               "$ref": "#/components/schemas/ActionShare"
             },
             "description": "Each action's share of the acting seat's range, from solver-query's range summary (O-281, ADR 0004)"
+          },
+          "range_combos": {
+            "description": "The acting seat's range at this node: its combos and reach-weighted combos, from solver-query's range summary (S45, O-469, ADR 0004)",
+            "type": "object",
+            "properties": {
+              "combos": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "reach_weighted_combos": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "combos",
+              "reach_weighted_combos"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

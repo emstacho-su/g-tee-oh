@@ -72,7 +72,7 @@ describe("R3.13 ActionBar", () => {
 
   it("R3.30 each button shows its key (a letter by kind, a digit by size) and the action's short letter", () => {
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" onAction={vi.fn()} />);
-    const raise = screen.getByRole("button", { name: "Raise 2.5bb" });
+    const raise = screen.getByRole("button", { name: "Raise to 2.5bb" });
     expect(raise).toHaveAttribute("aria-keyshortcuts", "1");
     expect(within(raise).getByText("1")).toBeInTheDocument();
     expect(within(raise).getByText("R")).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("R3.13 ActionBar", () => {
 
   it("R3.13 the chosen action is marked pressed on the disabled bar, the others are not (critic round 3 G10)", () => {
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" disabled chosenIndex={2} onAction={vi.fn()} />);
-    const raise = screen.getByRole("button", { name: "Raise 2.5bb" });
+    const raise = screen.getByRole("button", { name: "Raise to 2.5bb" });
     expect(raise).toHaveAttribute("aria-pressed", "true");
     expect(raise).toHaveAttribute("data-chosen", "true");
     expect(screen.getByRole("button", { name: "Fold" })).not.toHaveAttribute("aria-pressed");

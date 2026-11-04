@@ -6,8 +6,11 @@
  * contract, and a note says so instead of showing an empty library. A synthetic preflop solution
  * carries the shared synthetic banner. Since S40 (O-406) it is the body of the "Flops and queue"
  * card, under an h3 naming the pair and configuration in words (S47 critic: never the key), with
- * the Scenarios and Priority columns defined once under the tables.
+ * the Scenarios and Priority columns defined once under the tables. Since S45 (R3.27) the heading
+ * can carry a star for the spot (the caller's slot), the same star the study summary shows.
  */
+import type { ReactNode } from "react";
+
 import { familyRows, type Coverage } from "../../library/texture-families.js";
 import { capitalize, pairWords } from "../../progress/spot-words.js";
 import { Button, SyntheticBanner } from "../ui/index.js";
@@ -25,6 +28,8 @@ export interface CoverageDetailProps {
   /** Requests a queued flop; undefined hides the row buttons. */
   onRequestFlop?: (flop: string) => void;
   requestPending: boolean;
+  /** A star for the spot beside the heading (S45, R3.27). */
+  star?: ReactNode;
 }
 
 /** One-line definitions of the two statistics the tables carry (S47 critic, G8). */
@@ -99,11 +104,14 @@ function QueueTable({ coverage, onRequestFlop, requestPending }: CoverageDetailP
   );
 }
 
-export function CoverageDetail({ coverage, configurationLabel, onRequestFlop, requestPending }: CoverageDetailProps) {
+export function CoverageDetail({ coverage, configurationLabel, onRequestFlop, requestPending, star }: CoverageDetailProps) {
   const note = DATABASE_NOTES[coverage.database];
   return (
     <section aria-labelledby="coverage-detail-heading" className="flex flex-col gap-3">
-      <h3 id="coverage-detail-heading" className="text-base font-semibold" title={coverage.pair}>{`${capitalize(pairWords(coverage.pair))} at ${configurationLabel}`}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 id="coverage-detail-heading" className="text-base font-semibold" title={coverage.pair}>{`${capitalize(pairWords(coverage.pair))} at ${configurationLabel}`}</h3>
+        {star}
+      </div>
       {coverage.synthetic ? <SyntheticBanner /> : null}
       <p className="text-sm">{coverage.preflop_available ? "The preflop solution is in the library." : "The preflop solution is not in the library."}</p>
       {note === null ? (

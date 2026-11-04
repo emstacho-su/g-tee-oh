@@ -21,6 +21,7 @@ import { configurationWords } from "../../progress/spot-words.js";
 import { useStudyCatalog, type StudyCatalog } from "../../study/use-study-catalog.js";
 import { FailureAlert } from "../study/StudyNotices.js";
 import { StudyFilters } from "../study/StudyFilters.js";
+import { SpotShortcuts } from "../study/SpotShortcuts.js";
 import { CoveragePanel } from "./CoveragePanel.js";
 import { LiveStatus } from "./LiveStatus.js";
 import { useLibraryEvents } from "./use-library-events.js";
@@ -84,6 +85,7 @@ function CoverageArea({ api, search, catalog, onSelectPair }: CoverageAreaProps)
           configurationLabel={configurationWords(catalog.configs?.find((config) => config.config_id === configId))}
           pair={selected.pair}
           preflopAvailable={selected.preflop_available}
+          spot={{ ...search, pair: selected.pair }}
         />
       )}
     </>
@@ -103,6 +105,7 @@ export function CoveragePage({ api, search }: CoveragePageProps) {
     <>
       <LiveStatus status={events.status} onReconnect={events.reconnect} latest={events.latestCoverage} />
       <Card title={COVERAGE_PAGE_TEXT.configuration} description={COVERAGE_PAGE_TEXT.configurationDescription}>
+        <SpotShortcuts stakes={catalog.stakes ?? []} recent={false} />
         <StudyFilters search={search} catalog={catalog} onFilterChange={navigation.setFilter} hidePair label="Library filters" />
       </Card>
       {catalog.error === null ? null : <FailureAlert failure={catalogFailure()} onRetry={catalog.retry} />}

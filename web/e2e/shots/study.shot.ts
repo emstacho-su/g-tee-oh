@@ -61,15 +61,15 @@ async function solutionScreens(page: Page, shot: (screen: string, criterion: str
   await expect(page.getByRole("region", { name: "BTN's actions" })).toBeVisible();
   await shot("study-frequency", CRITERIA.frequency);
 
-  await page.getByRole("radio", { name: "EV" }).click();
+  await page.getByRole("radio", { name: "EV", exact: true }).click();
   await expect(page.getByRole("img", { name: /expected value mode/ })).toBeVisible();
   await shot("study-ev", CRITERIA.ev);
 
-  await page.getByRole("radio", { name: "Range weight" }).click();
+  await page.getByRole("radio", { name: "Range weight", exact: true }).click();
   await expect(page.getByRole("img", { name: /range weight mode/ })).toBeVisible();
   await shot("study-weight", CRITERIA.weight);
 
-  await page.getByRole("radio", { name: "Frequency" }).click();
+  await page.getByRole("radio", { name: "Frequency", exact: true }).click();
   await page.getByRole("group", { name: /Range matrix cells/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("threshold-card")).toBeVisible();

@@ -59,6 +59,8 @@ function drawFrame({ context, node, mode, frame, patterns }: FrameInput): void {
     theme: "light",
     focusedIndex: frame % CELL_COUNT,
     selectedHand: model.cells[(frame * SELECTION_STRIDE) % CELL_COUNT]?.hand ?? null,
+    // The heavier bar path (R3.24): strategy with EV measures the weight-scaled bars; compare takes the default lens.
+    scaleByWeight: mode === "strategy_ev",
     patterns,
   });
   context.getImageData(0, 0, 1, 1);

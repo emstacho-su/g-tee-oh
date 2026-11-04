@@ -13,6 +13,8 @@ import { GapRequest } from "../../components/library/GapRequest.js";
 import { Button, Card, LoadingNote } from "../../components/ui/index.js";
 import { coverageQuery } from "../../library/queries.js";
 import { useGapRequest } from "../../library/use-gap-request.js";
+import type { StudySearch } from "../../study/search.js";
+import { StarButton } from "../study/SpotShortcuts.js";
 
 export const FLOPS_CARD_TITLE = "Flops and queue";
 
@@ -23,9 +25,11 @@ export interface CoveragePanelProps {
   configurationLabel: string;
   pair: string;
   preflopAvailable: boolean;
+  /** The spot the selection names, for the heading's star (S45, R3.27); absent, no star. */
+  spot?: StudySearch;
 }
 
-export function CoveragePanel({ api, configId, configurationLabel, pair, preflopAvailable }: CoveragePanelProps) {
+export function CoveragePanel({ api, configId, configurationLabel, pair, preflopAvailable, spot }: CoveragePanelProps) {
   const coverage = useQuery(coverageQuery(api, configId, pair));
   const request = useGapRequest(api, configId, pair);
   return (
@@ -41,7 +45,13 @@ export function CoveragePanel({ api, configId, configurationLabel, pair, preflop
         ) : null}
         {coverage.data === undefined && !coverage.isError ? <LoadingNote text="Loading the coverage." /> : null}
         {coverage.data === undefined ? null : (
-          <CoverageDetail coverage={coverage.data} configurationLabel={configurationLabel} requestPending={request.pending} onRequestFlop={(flop) => request.send({ flop })} />
+          <CoverageDetail
+            coverage={coverage.data}
+            configurationLabel={configurationLabel}
+            requestPending={request.pending}
+            onRequestFlop={(flop) => request.send({ flop })}
+            {...(spot === undefined ? {} : { star: <StarButton spot={spot} /> })}
+          />
         )}
       </Card>
       <GapRequest pair={pair} preflopAvailable={preflopAvailable} request={request} />

@@ -126,9 +126,9 @@ describe("R3.12 matrix frame bench data and renderer", () => {
       frames: 5,
       warmupFrames: 2,
     });
-    expect(outcome.modes.map((mode) => mode.mode)).toEqual(["frequency", "ev", "weight"]);
+    expect(outcome.modes.map((mode) => mode.mode)).toEqual(["frequency", "ev", "weight", "strategy_ev", "compare"]);
     expect(outcome.modes.every((mode) => mode.n === 5 && mode.framesMs.length === 5)).toBe(true);
-    expect(reads).toBe(3 * (5 + 2));
+    expect(reads).toBe(5 * (5 + 2));
     expect(ops.some((op) => op.op === "fillRect" && op.w === 1040)).toBe(true);
     expect(outcome.modes[0]?.p95).toBeGreaterThan(0);
   });
