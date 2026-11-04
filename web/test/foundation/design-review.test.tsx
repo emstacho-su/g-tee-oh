@@ -25,6 +25,7 @@ import {
   TACTILE_CLASS,
   ToggleGroup,
 } from "../../src/components/ui/index.js";
+import { overflowOf } from "../../src/components/ui/PillNav.js";
 
 // vitest runs from web/ (the package root), as the other source-reading tests assume.
 const SRC = join(process.cwd(), "src");
@@ -207,13 +208,19 @@ describe("R3.13 the shared nav pill list", () => {
     for (const [name, value] of Object.entries(values)) Object.defineProperty(element, name, { value, configurable: true });
   }
 
-  function rowOf(current: string) {
+  interface Pill {
+    readonly name: string;
+    /** The link text, the name unless a marker is appended (BuilderNav's ", needs a fix"). */
+    readonly label?: string;
+  }
+
+  function rowOf(current: string, pills: readonly Pill[] = [{ name: "A" }, { name: "B" }, { name: "C" }]) {
     return (
       <PillNav label="Sections">
-        {["A", "B", "C"].map((name) => (
-          <li key={name}>
-            <a href={`/${name}`} {...(name === current ? { "aria-current": "page" as const } : {})}>
-              {name}
+        {pills.map((pill) => (
+          <li key={pill.name}>
+            <a href={`/${pill.name}`} {...(pill.name === current ? { "aria-current": "page" as const } : {})}>
+              {pill.label ?? pill.name}
             </a>
           </li>
         ))}
@@ -221,11 +228,16 @@ describe("R3.13 the shared nav pill list", () => {
     );
   }
 
+  /** Lays the pills out 250 px apart, 80 px wide, in a 300 px row with 600 px of content. */
+  function layOut(list: Element, names: readonly string[], width = 80): void {
+    measure(list, { clientWidth: 300, scrollWidth: 600, offsetLeft: 0 });
+    for (const [index, name] of names.entries()) measure(screen.getByRole("link", { name: new RegExp(`^${name}`) }), { offsetLeft: index * 250, offsetWidth: width });
+  }
+
   function renderRow(current: string) {
     const view = render(rowOf(current));
     const list = screen.getByRole("list");
-    measure(list, { clientWidth: 300, scrollWidth: 600, offsetLeft: 0 });
-    for (const [index, name] of ["A", "B", "C"].entries()) measure(screen.getByRole("link", { name }), { offsetLeft: index * 250, offsetWidth: 80 });
+    layOut(list, ["A", "B", "C"]);
     // The measures landed after the mount, so the row is told to look again.
     fireEvent.scroll(list);
     return { ...view, list };
@@ -253,5 +265,30 @@ describe("R3.13 the shared nav pill list", () => {
     await waitFor(() => expect(list.scrollLeft).toBe(296));
     rerender(rowOf("A"));
     await waitFor(() => expect(list.scrollLeft).toBe(0));
+  });
+
+  it("R3.13 the cues and the reveal follow a change of the pills themselves: one added, one widened (code review round 1, 1)", async () => {
+    const { rerender } = render(rowOf("B", [{ name: "A" }, { name: "B" }]));
+    const list = screen.getByRole("list");
+    // Two pills fit the row: no cue either way.
+    measure(list, { clientWidth: 300, scrollWidth: 300, offsetLeft: 0 });
+    fireEvent.scroll(list);
+    expect(screen.getByTestId("nav-end-fade")).toHaveAttribute("data-shown", "false");
+    // A third pill arrives (the admin pills once the session resolves) and is the current one, beyond the edge.
+    rerender(rowOf("C", [{ name: "A" }, { name: "B" }, { name: "C" }]));
+    layOut(list, ["A", "B", "C"]);
+    await waitFor(() => expect(list.scrollLeft).toBe(296));
+    expect(screen.getByTestId("nav-start-fade")).toHaveAttribute("data-shown", "true");
+    // The current pill widens (", needs a fix"): the reveal follows its new right edge.
+    rerender(rowOf("C", [{ name: "A" }, { name: "B" }, { name: "C", label: "C, needs a fix" }]));
+    layOut(list, ["A", "B", "C"], 160);
+    await waitFor(() => expect(list.scrollLeft).toBe(376));
+  });
+
+  it("R3.13 overflowOf ignores a sub-pixel scroll at either edge, so a fractional reveal shows no start chevron at rest (code review round 1, 2)", () => {
+    expect(overflowOf({ scrollLeft: 0.5, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: false, end: true });
+    expect(overflowOf({ scrollLeft: 2, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: true, end: true });
+    expect(overflowOf({ scrollLeft: 299.5, clientWidth: 300, scrollWidth: 600 })).toEqual({ start: true, end: false });
+    expect(overflowOf({ scrollLeft: 0, clientWidth: 300, scrollWidth: 300 })).toEqual({ start: false, end: false });
   });
 });

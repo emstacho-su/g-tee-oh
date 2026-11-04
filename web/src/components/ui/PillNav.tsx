@@ -10,8 +10,9 @@
  * end, a chevron on a fade, shown only while pills lie beyond that edge, read from the row's own
  * scroll position on mount, on scroll and on resize, so the cue never depends on a pill
  * straddling the edge. The aria-current pill is brought into the row on mount and whenever it
- * moves (the router sets the attribute, a MutationObserver sees it), by scrolling the row alone:
- * the window never moves, so a direct load at 390 shows the open page's pill.
+ * moves, a pill is added or a pill's text changes (the router sets the attribute, callers add or
+ * relabel pills; one MutationObserver sees all three), by scrolling the row alone: the window
+ * never moves, so a direct load at 390 shows the open page's pill.
  */
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -53,14 +54,14 @@ export interface RowOverflow {
 
 /** The room kept between a revealed pill and the row's edge, the row's own side padding. */
 export const REVEAL_PAD_PX = 16;
-/** Sub-pixel scroll positions count as the end. */
-const END_TOLERANCE_PX = 1;
+/** A sub-pixel scroll position counts as the edge it is at, on either side (code review round 1, 2). */
+const EDGE_TOLERANCE_PX = 1;
 const CURRENT_SELECTOR = '[aria-current="page"]';
 
 /** Which ends of the row still have pills beyond them. */
 export function overflowOf(row: RowMeasure): RowOverflow {
   const max = row.scrollWidth - row.clientWidth;
-  return { start: row.scrollLeft > 0, end: max > END_TOLERANCE_PX && row.scrollLeft < max - END_TOLERANCE_PX };
+  return { start: row.scrollLeft > EDGE_TOLERANCE_PX, end: max > EDGE_TOLERANCE_PX && row.scrollLeft < max - EDGE_TOLERANCE_PX };
 }
 
 /**
@@ -121,12 +122,13 @@ export function PillNav({ label, className, children }: PillNavProps) {
     if (list === null) return undefined;
     revealCurrent(list);
     measure();
-    // The router moves aria-current on a navigation; the row follows it.
+    // The router moves aria-current on a navigation; pills arrive (the admin pills once the session
+    // resolves) or widen (", needs a fix"); the row follows each (code review round 1, 1).
     const moved = new MutationObserver(() => {
       revealCurrent(list);
       measure();
     });
-    moved.observe(list, { subtree: true, attributes: true, attributeFilter: ["aria-current"] });
+    moved.observe(list, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-current"] });
     // A resize (a rotation, a wider window) changes what lies beyond the edges; jsdom has no ResizeObserver.
     const resized = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
     resized?.observe(list);
