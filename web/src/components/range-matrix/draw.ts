@@ -225,12 +225,17 @@ function drawMarks(frame: FrameContext, rects: readonly Rect[], options: DrawOpt
     const inset = markCell(frame, rects[options.focusedIndex], frame.palette.focus, Math.round(FOCUS_LINE_CSS_PX * ratio), ratio);
     marks.set(options.focusedIndex, Math.max(inset, marks.get(options.focusedIndex) ?? 0));
   }
-  const hovered = options.hoveredIndex ?? null;
-  // The hover outline is drawn only where no heavier mark already names the cell; it moves no text.
-  if (hovered !== null && !marks.has(hovered) && rects[hovered] !== undefined) {
-    outline(frame.ctx, rects[hovered], frame.palette.focus, Math.max(1, Math.round(HOVER_LINE_CSS_PX * ratio)));
-  }
   return marks;
+}
+
+/**
+ * The hover outline (R3.25), drawn last so no label chip or text covers it (code review 3), and only
+ * where no heavier mark already names the cell; it moves no text.
+ */
+function drawHover(frame: FrameContext, rects: readonly Rect[], options: DrawOptions, marks: Marks): void {
+  const hovered = options.hoveredIndex ?? null;
+  if (hovered === null || marks.has(hovered) || rects[hovered] === undefined) return;
+  outline(frame.ctx, rects[hovered], frame.palette.focus, Math.max(1, Math.round(HOVER_LINE_CSS_PX * options.pixelRatio)));
 }
 
 /** The compared action and its scale end, or null outside compare mode or when no action can be compared. */
@@ -272,4 +277,5 @@ export function drawMatrix(ctx: MatrixCanvasContext, model: MatrixModel, options
   const layout = textLayout(edgeAt(1, size), options.pixelRatio);
   drawChips(frame, rects, layout, marks);
   drawTexts(frame, rects, layout, marks);
+  drawHover(frame, rects, options, marks);
 }
