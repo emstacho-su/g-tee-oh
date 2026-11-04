@@ -21,7 +21,7 @@ import { formatDeviation, formatPercent, formatRating, tierLabel, trackName } fr
 import type { TrackKey } from "../../progress/types.js";
 import { formatBb } from "../../poker/format.js";
 import type { RatingChange, SessionRecap } from "../../trainer/session-types.js";
-import { StatTiles, type StatTile } from "../drill-run/SessionLook.js";
+import { RECAP_TIPS, StatTiles, type StatTile } from "../drill-run/SessionLook.js";
 import { PROGRESS_PATH, TRAIN_TEXT } from "./train-text.js";
 
 type TrackNames = Readonly<Partial<Record<TrackKey, string>>>;
@@ -50,9 +50,9 @@ export function changeText(change: RatingChange): string {
 function summaryTiles(recap: SessionRecap): StatTile[] {
   return [
     { term: TRAIN_TEXT.decisions, value: String(recap.decisions) },
-    { term: TRAIN_TEXT.ratedDecisions, value: String(recap.rated_decisions) },
-    { term: TRAIN_TEXT.meanScore, value: recap.mean_score === null ? TRAIN_TEXT.noneRated : formatPercent(recap.mean_score) },
-    { term: TRAIN_TEXT.evLoss, value: formatBb(recap.ev_loss_bb_total) },
+    { term: TRAIN_TEXT.ratedDecisions, value: String(recap.rated_decisions), tip: RECAP_TIPS.ratedDecisions },
+    { term: TRAIN_TEXT.meanScore, value: recap.mean_score === null ? TRAIN_TEXT.noneRated : formatPercent(recap.mean_score), tip: RECAP_TIPS.meanScore },
+    { term: TRAIN_TEXT.evLoss, value: formatBb(recap.ev_loss_bb_total), tip: RECAP_TIPS.evLoss },
   ];
 }
 

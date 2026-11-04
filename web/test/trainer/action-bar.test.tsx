@@ -70,23 +70,30 @@ describe("R3.13 ActionBar", () => {
     expect(screen.getByRole("button", { name: "Pot" })).toBeInTheDocument();
   });
 
-  it("R3.13 each button shows its hotkey number and the action's short letter", () => {
+  it("R3.30 each button shows its key (a letter by kind, a digit by size) and the action's short letter", () => {
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" onAction={vi.fn()} />);
     const raise = screen.getByRole("button", { name: "Raise 2.5bb" });
-    expect(raise).toHaveAttribute("aria-keyshortcuts", "3");
-    expect(within(raise).getByText("3")).toBeInTheDocument();
+    expect(raise).toHaveAttribute("aria-keyshortcuts", "1");
+    expect(within(raise).getByText("1")).toBeInTheDocument();
     expect(within(raise).getByText("R")).toBeInTheDocument();
     expect(within(raise).getByTestId("action-swatch")).toHaveAttribute("data-pattern", "diagonal");
+    expect(screen.getByRole("button", { name: "Fold" })).toHaveAttribute("aria-keyshortcuts", "F");
+    expect(screen.getByRole("button", { name: "Call" })).toHaveAttribute("aria-keyshortcuts", "C");
+    expect(screen.getByRole("button", { name: "All-in 100bb" })).toHaveAttribute("aria-keyshortcuts", "A");
   });
 
-  it("R3.13 clicking or pressing the number calls onAction with the record index", async () => {
+  it("R3.30 clicking, a letter or a digit calls onAction with the record index", async () => {
     const onAction = vi.fn();
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" onAction={onAction} />);
     await userEvent.click(screen.getByRole("button", { name: "Call" }));
     expect(onAction).toHaveBeenLastCalledWith(1);
-    await userEvent.keyboard("4");
+    await userEvent.keyboard("a");
     expect(onAction).toHaveBeenLastCalledWith(3);
-    expect(onAction).toHaveBeenCalledTimes(2);
+    await userEvent.keyboard("1");
+    expect(onAction).toHaveBeenLastCalledWith(2);
+    await userEvent.keyboard("f");
+    expect(onAction).toHaveBeenLastCalledWith(0);
+    expect(onAction).toHaveBeenCalledTimes(4);
   });
 
   it("R3.13 onAction receives NodeAction.index, not the button's position, when they differ (O-198)", async () => {
@@ -94,7 +101,7 @@ describe("R3.13 ActionBar", () => {
     withRoot(<ActionBar actions={OFFSET_ACTIONS} grouping="standard" street="preflop" onAction={onAction} />);
     await userEvent.click(screen.getByRole("button", { name: "Call" }));
     expect(onAction).toHaveBeenLastCalledWith(11);
-    await userEvent.keyboard("3");
+    await userEvent.keyboard("1");
     expect(onAction).toHaveBeenLastCalledWith(12);
   });
 
@@ -102,11 +109,27 @@ describe("R3.13 ActionBar", () => {
     const onAction = vi.fn();
     withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" disabled onAction={onAction} />);
     expect(screen.getByRole("button", { name: "Fold" })).toBeDisabled();
-    await userEvent.keyboard("1");
+    await userEvent.keyboard("f1");
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("R3.13 only the first nine actions get a hotkey", () => {
+  it("R3.13 the chosen action is marked pressed on the disabled bar, the others are not (critic round 3 G10)", () => {
+    withRoot(<ActionBar actions={fixtureActions} grouping="standard" street="preflop" disabled chosenIndex={2} onAction={vi.fn()} />);
+    const raise = screen.getByRole("button", { name: "Raise 2.5bb" });
+    expect(raise).toHaveAttribute("aria-pressed", "true");
+    expect(raise).toHaveAttribute("data-chosen", "true");
+    expect(screen.getByRole("button", { name: "Fold" })).not.toHaveAttribute("aria-pressed");
+    expect(screen.getByRole("button", { name: "Fold" })).not.toHaveAttribute("data-chosen");
+  });
+
+  it("R3.30 a check reads X and the digits start at the first size after it", () => {
+    withRoot(<ActionBar actions={FLOP_ACTIONS} grouping="standard" street="flop" onAction={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Check" })).toHaveAttribute("aria-keyshortcuts", "X");
+    expect(screen.getByRole("button", { name: "Bet 3.3bb" })).toHaveAttribute("aria-keyshortcuts", "1");
+    expect(screen.getByRole("button", { name: "Bet 10bb" })).toHaveAttribute("aria-keyshortcuts", "2");
+  });
+
+  it("R3.13 only the first nine sizes get a digit", () => {
     const many: NodeAction[] = Array.from({ length: 10 }, (_, index) => ({
       index,
       token: `b${index}`,

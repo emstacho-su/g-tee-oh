@@ -41,7 +41,7 @@ const CONFIG_B = "cfg_9_live_13_150";
 describe("R4.12 session defaults store", () => {
   it("R4.12 starts at standard grouping, RNG off and every covered configuration", () => {
     const store = createSessionDefaultsStore({ storage: memoryStorage() });
-    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: false, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: false, configScope: ALL_CONFIGS, sessionLength: null });
   });
 
   it("R4.12 each change is written and a fresh store reads it back", () => {
@@ -50,7 +50,7 @@ describe("R4.12 session defaults store", () => {
     store.getState().setGrouping("simple");
     store.getState().setRng(true);
     store.getState().setConfigScope([CONFIG_A, CONFIG_B]);
-    expect(createSessionDefaultsStore({ storage }).getState().defaults).toEqual({ grouping: "simple", rng: true, configScope: [CONFIG_A, CONFIG_B] });
+    expect(createSessionDefaultsStore({ storage }).getState().defaults).toEqual({ grouping: "simple", rng: true, configScope: [CONFIG_A, CONFIG_B], sessionLength: null });
     store.getState().setConfigScope(ALL_CONFIGS);
     expect(createSessionDefaultsStore({ storage }).getState().defaults.configScope).toBe(ALL_CONFIGS);
   });
@@ -58,7 +58,7 @@ describe("R4.12 session defaults store", () => {
   it("R4.12 a tampered field falls back to its default and the other fields are kept", () => {
     const stored = JSON.stringify({ grouping: "fancy", rng: true, configScope: [CONFIG_A, "drop table"] });
     const store = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: stored }) });
-    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: true, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "standard", rng: true, configScope: ALL_CONFIGS, sessionLength: null });
     expect(parseSessionDefaults({ grouping: "grouped", rng: "yes", configScope: [] })).toEqual({ ...DEFAULT_SESSION_DEFAULTS, grouping: "grouped" });
     expect(parseSessionDefaults("standard")).toEqual(DEFAULT_SESSION_DEFAULTS);
     const broken = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: "{" }) });
@@ -83,7 +83,7 @@ describe("R4.12 session defaults store", () => {
     const storedOver = JSON.stringify({ grouping: "grouped", rng: false, configScope: over });
     const store = createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: storedOver }) });
     expect(MAX_SCOPE_CONFIGS).toBe(32);
-    expect(store.getState().defaults).toEqual({ grouping: "grouped", rng: false, configScope: ALL_CONFIGS });
+    expect(store.getState().defaults).toEqual({ grouping: "grouped", rng: false, configScope: ALL_CONFIGS, sessionLength: null });
     const storedAtCap = JSON.stringify({ configScope: atCap });
     expect(createSessionDefaultsStore({ storage: memoryStorage({ [SESSION_DEFAULTS_STORAGE_KEY]: storedAtCap }) }).getState().defaults.configScope).toEqual(atCap);
   });
@@ -111,5 +111,22 @@ describe("R4.12 session defaults store", () => {
     expect(configIds["minItems"]).toBe(MIN_SCOPE_CONFIGS);
     expect(configIds["maxItems"]).toBe(MAX_SCOPE_CONFIGS);
     expect(at(configIds, "items")["pattern"]).toBe(CONFIG_ID_PATTERN.source);
+  });
+});
+
+describe("R3.31 session length default", () => {
+  it("R3.31 starts off, remembers 10, 20 or 50 hands and refuses anything else", () => {
+    const storage = memoryStorage();
+    const store = createSessionDefaultsStore({ storage });
+    expect(store.getState().defaults.sessionLength).toBeNull();
+    store.getState().setSessionLength(20);
+    expect(createSessionDefaultsStore({ storage }).getState().defaults.sessionLength).toBe(20);
+    store.getState().setSessionLength(null);
+    expect(createSessionDefaultsStore({ storage }).getState().defaults.sessionLength).toBeNull();
+    expect(() => store.getState().setSessionLength(15 as never)).toThrow(RangeError);
+    expect(parseSessionDefaults({ sessionLength: 15 }).sessionLength).toBeNull();
+    expect(parseSessionDefaults({ sessionLength: "20" }).sessionLength).toBeNull();
+    expect(parseSessionDefaults({ sessionLength: 50 }).sessionLength).toBe(50);
+    expect(parseSessionDefaults({ sessionLength: 50, rng: "yes" })).toEqual({ ...DEFAULT_SESSION_DEFAULTS, sessionLength: 50 });
   });
 });
