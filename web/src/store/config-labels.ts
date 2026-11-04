@@ -25,7 +25,8 @@ export function parseConfigLabels(value: unknown): ConfigLabels {
       return CONFIG_ID_PATTERN.test(id) && typeof label === "string" && label !== "" && label.length <= MAX_LABEL_LENGTH;
     },
   );
-  return Object.fromEntries(entries.slice(0, MAX_SCOPE_CONFIGS));
+  // The newest entries win at the cap, as withConfigLabels keeps them (PR #48 review round 3 LOW 8).
+  return Object.fromEntries(entries.slice(Math.max(0, entries.length - MAX_SCOPE_CONFIGS)));
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MAX_SCOPE_CONFIGS, withConfigLabels } from "../../src/store/index.js";
+import { MAX_SCOPE_CONFIGS, parseConfigLabels, withConfigLabels } from "../../src/store/index.js";
 
 const ids = Array.from({ length: MAX_SCOPE_CONFIGS }, (_, index) => `cfg_6_online_${index + 1}`);
 const full = Object.fromEntries(ids.map((id) => [id, `label ${id}`]));
@@ -24,5 +24,13 @@ describe("R4.12 the config label map at its cap", () => {
     const before = { ...full };
     withConfigLabels(full, { cfg_9_live_13_100: "x" });
     expect(full).toEqual(before);
+  });
+
+  it("R4.12 a stored map over the cap keeps its newest entries, as withConfigLabels does (PR #48 review round 3 LOW 8)", () => {
+    const over = Object.fromEntries([...ids, "cfg_9_live_13_100"].map((id) => [id, `label ${id}`]));
+    const parsed = parseConfigLabels(over);
+    expect(Object.keys(parsed)).toHaveLength(MAX_SCOPE_CONFIGS);
+    expect(parsed["cfg_9_live_13_100"]).toBe("label cfg_9_live_13_100");
+    expect(parsed[ids[0] as string]).toBeUndefined();
   });
 });
