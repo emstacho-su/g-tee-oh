@@ -82,13 +82,17 @@ function formatNumber(value: number, maxDecimals: number): string {
  * action on a screen), so a legend naming the api label and a table naming this agree.
  */
 export function exactActionLabel(action: NodeAction): string {
-  // The all-in rule is the legend's, not sizedActionLabel's, so a caller naming a sized all-in keeps its size (PR 52 review round 2).
-  return action.kind === "all_in" ? actionStyle(action.kind).name : sizedActionLabel(action.kind, action.size_cbb);
+  return sizedActionLabel(action.kind, action.size_cbb);
 }
 
-/** The label of an action kind at a size in cbb (null for an unsized kind), the size kept for every kind; shared with tokenActionLabel. */
+/**
+ * The label of an action kind at a size in cbb (null for an unsized kind); shared with
+ * tokenActionLabel. The all-in rule lives here, the one place every label passes through: no
+ * caller names a sized all-in by any other route (tokenActionLabel's sized tokens are s, b and r),
+ * so one rule is the whole story (PR 52 review round 2, settled in code review round 1, 9).
+ */
 export function sizedActionLabel(kind: NodeAction["kind"], sizeCbb: number | null): string {
   const name = actionStyle(kind).name;
-  if (sizeCbb === null) return name;
+  if (sizeCbb === null || kind === "all_in") return name;
   return kind === "raise" ? `${name} to ${formatCbb(sizeCbb)}` : `${name} ${formatCbb(sizeCbb)}`;
 }

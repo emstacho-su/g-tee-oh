@@ -12,7 +12,7 @@
 import type { NodeAction } from "../../contracts.js";
 import { actionColor, actionStyle, sizeRank, type ActionStyle, type ThemeName } from "../../theme/action-style.js";
 import { isDarkFill } from "../../theme/color-contrast.js";
-import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatLossShort, formatWeightShort } from "./cell-text.js";
+import { MISSING_MARK, UNKNOWN_WEIGHT_MARK, formatEvShort, formatLossShort, formatWeightShort, lossOf } from "./cell-text.js";
 import { evFill, evInk, lossFill, lossInk, weightFill, weightInk, type ResolvedPalette } from "./matrix-theme.js";
 import { BAR_MODES, type MatrixCell, type MatrixMode, type MatrixModel } from "./model.js";
 import { patternKey, type PatternSource } from "./patterns.js";
@@ -185,8 +185,11 @@ export function valueText(frame: FrameContext, cell: MatrixCell): string | null 
       return formatEvShort(cell.evBestBb ?? 0);
     case "weight":
       return cell.weight === null ? UNKNOWN_WEIGHT_MARK : formatWeightShort(cell.weight);
-    case "compare":
-      return frame.lens === null ? MISSING_MARK : formatLossShort(cell.lossPctPot[frame.lens.position] ?? 0);
+    case "compare": {
+      // No lens, or a row with no loss for the action: the missing mark, never a made-up best (code review round 1, 4).
+      const loss = frame.lens === null ? null : lossOf(cell, frame.lens.position);
+      return loss === null ? MISSING_MARK : formatLossShort(loss);
+    }
     case "frequency":
       return null;
   }

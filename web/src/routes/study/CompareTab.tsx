@@ -13,6 +13,7 @@ import { ActionSwatch } from "../../components/trainer/ActionSwatch.js";
 import { Button } from "../../components/ui/index.js";
 import type { StudyNode } from "../../contracts.js";
 import { exactActionLabel, formatPercent } from "../../poker/format.js";
+import { LOSS_UNAVAILABLE_TEXT } from "../../components/range-matrix/cell-text.js";
 import { atBest } from "../../components/range-matrix/scales.js";
 
 export const COMPARE_TEXT = {
@@ -20,8 +21,8 @@ export const COMPARE_TEXT = {
   list: (hand: string) => `${hand} against the best action`,
   best: "the best action",
   behind: (loss: string) => `${loss} of the pot behind the best`,
-  /** The row carries no loss for this action (a short list, or not a number): never a made-up zero (PR 52 review round 2). */
-  unavailable: "loss unavailable",
+  /** The row carries no loss for this action (a short list, or not a number): never a made-up zero (PR 52 review round 2); the matrix's own words. */
+  unavailable: LOSS_UNAVAILABLE_TEXT,
   show: (name: string) => `Compare ${name} on the matrix`,
   notInRange: (hand: string) => `${hand} is not in the range at this node.`,
 } as const;

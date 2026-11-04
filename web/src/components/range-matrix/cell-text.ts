@@ -36,6 +36,14 @@ export const MISSING_MARK = "-";
 export const UNKNOWN_WEIGHT_MARK = "?";
 /** What a compare cell prints when the chosen action is the best there (within the neutral band). */
 export const BEST_MARK = "best";
+/** A row that carries no loss for an action (a short list, or not a number): never a made-up zero that reads as the best (code review round 1, 4). */
+export const LOSS_UNAVAILABLE_TEXT = "loss unavailable";
+
+/** The served loss of a cell for an action position, or null when the row carries none. */
+export function lossOf(cell: Pick<MatrixCell, "lossPctPot">, position: number): number | null {
+  const loss = cell.lossPctPot[position];
+  return loss !== undefined && Number.isFinite(loss) ? loss : null;
+}
 
 /** "F", "C", "R 2.5bb": the short letter, with the size for sized actions. */
 export function actionShortLabel(action: NodeAction): string {
@@ -78,13 +86,14 @@ function frequencyText(cell: MatrixCell, actions: readonly NodeAction[]): string
   return parts.length === 0 ? "no action" : parts.join(", ");
 }
 
-/** "Raise to 2.5bb is the best action" or "Raise to 2.5bb is 1.20% of the pot behind the best". */
+/** "Raise to 2.5bb is the best action", "Raise to 2.5bb is 1.20% of the pot behind the best" or "Raise to 2.5bb: loss unavailable". */
 function compareText(cell: MatrixCell, actions: readonly NodeAction[], lens: number | undefined): string {
   const position = lens ?? defaultLensPosition(actions);
   const action = position === null ? undefined : actions[position];
   if (action === undefined || position === null) return "no action to compare";
-  const loss = cell.lossPctPot[position] ?? 0;
+  const loss = lossOf(cell, position);
   const name = exactActionLabel(action);
+  if (loss === null) return `${name}: ${LOSS_UNAVAILABLE_TEXT}`;
   if (atBest(loss)) return `${name} is the best action`;
   return `${name} is ${formatPercent(loss, LOSS_TABLE_DECIMALS)} of the pot behind the best`;
 }
