@@ -62,3 +62,16 @@ export const SESSION_TEXT = {
   /** The start panel's chip list (S38). */
   drillSettings: "Drill settings",
 } as const;
+
+/**
+ * The reveal notice before the decision (S46, R3.33, item 14, O-471): a panel that shows the answer,
+ * or a worked example, leaves the decision unrated. The panels themselves wait on O-471 (the
+ * prompt carries no node identity yet), so the notice names them and says so.
+ */
+export const REVEAL_TEXT = {
+  notRated: "Revealed: this decision is not rated.",
+  show: "Show the revealed panels",
+  hide: "Hide the revealed panels",
+  workedExample: "This is a worked example: the answer is part of the lesson.",
+  later: "These panels show here before the decision in a later version; for now they open on the reveal.",
+} as const;

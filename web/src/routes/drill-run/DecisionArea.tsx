@@ -19,11 +19,13 @@
  * focus always sits on a named target with the app's focus ring (S46, PR #45 review rounds 3 and
  * 4, findings 1 and f). In street and full-hand modes a reveal that does not pause (O-314)
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
- * available (S26).
+ * available (S26). Before the decision, a prompt that names a panel revealing the answer, or a
+ * worked example, shows the reveal notice above the action bar (RevealNotice, S46, R3.33); on the
+ * reveal the prompt's visible panels open their feedback sections (sectionsFromPanels).
  */
 import { useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 
-import { ActionBar, FeedbackPanel, RngRoller, type FeedbackSectionsControl } from "../../components/trainer/index.js";
+import { ActionBar, FeedbackPanel, RngRoller, sectionsFromPanels, type FeedbackSectionsControl } from "../../components/trainer/index.js";
 import { ExplainControls } from "../../components/explain/ExplainControls.js";
 import { Button, LoadingNote } from "../../components/ui/index.js";
 import type { Grouping, TrainerPrompt } from "../../contracts.js";
@@ -36,6 +38,7 @@ import { unratedReason } from "../../trainer/unrated-reason.js";
 import { feedbackSlots } from "./feedback-slots.js";
 import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT, decisionAreaName } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
+import { RevealNotice } from "./RevealNotice.js";
 
 export interface DecisionAreaProps {
   state: SpotState;
@@ -131,6 +134,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
           {...slots}
           explain={<ExplainControls feedback={feedback} {...(onExplainDialog === undefined ? {} : { onDialogOpenChange: onExplainDialog })} />}
           workedExample={prompt.worked_example}
+          defaultOpen={sectionsFromPanels(prompt.visible_panels)}
           {...(feedbackSections === undefined ? {} : { sections: feedbackSections })}
         />
       )}
@@ -181,6 +185,7 @@ export function DecisionArea(props: DecisionAreaProps) {
     >
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
+      {BEFORE_DECISION.has(state.kind) ? <RevealNotice key={promptKey} prompt={prompt} /> : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
       <ActionBar
         actions={prompt.buttons}

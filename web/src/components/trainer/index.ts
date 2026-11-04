@@ -26,6 +26,7 @@ export {
   FEEDBACK_SECTION_TITLES,
   defaultSectionOpen,
   resolveSectionOpen,
+  sectionsFromPanels,
   useFeedbackSections,
 } from "./feedback-sections.js";
 export type { FeedbackOpenState, FeedbackSectionKey, FeedbackSectionsControl } from "./feedback-sections.js";

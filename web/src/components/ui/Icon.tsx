@@ -28,3 +28,23 @@ export function GearIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** An eye: panels shown before the decision, behind a button (S46, R3.33). */
+export function EyeIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("size-5 shrink-0", className)}
+    >
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
