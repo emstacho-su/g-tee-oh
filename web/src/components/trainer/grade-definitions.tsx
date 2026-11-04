@@ -8,7 +8,9 @@
  * node (ties within the tolerance all Best) and Correct otherwise; above the floor the raw loss
  * in percent of the pot alone decides Inaccuracy (under MISTAKE_FROM_PCT_POT), Mistake (up to
  * BLUNDER_ABOVE_PCT_POT inclusive) or Blunder. The words follow the code: the bands are read on
- * the loss itself, not on the loss above the floor. The roll never changes the label (rule 2).
+ * the loss itself, not on the loss above the floor, and every band says it sits above the floor, so
+ * a 1.5% loss on a 2% floor reads as Correct (PR #45 review round 4, finding a). The roll never
+ * changes the label (rule 2).
  */
 import { BLUNDER_ABOVE_PCT_POT, MISTAKE_FROM_PCT_POT } from "@g-tee-oh/learning";
 
@@ -44,9 +46,9 @@ export const GRADE_ORDER: readonly FeedbackLabel[] = ["best", "correct", "inaccu
 export const GRADE_DEFINITIONS: Readonly<Record<FeedbackLabel, string>> = {
   best: "The highest-EV action group at or below the solver's floor; groups tied for the lowest loss are all Best.",
   correct: "Any other action at or below the solver's floor.",
-  inaccuracy: `Above the floor, with under ${MISTAKE_FROM_PCT_POT}% of the pot lost.`,
-  mistake: `${MISTAKE_FROM_PCT_POT}% to ${BLUNDER_ABOVE_PCT_POT}% of the pot lost.`,
-  blunder: `More than ${BLUNDER_ABOVE_PCT_POT}% of the pot lost.`,
+  inaccuracy: `Above the solver's floor, with under ${MISTAKE_FROM_PCT_POT}% of the pot lost.`,
+  mistake: `Above the solver's floor, with ${MISTAKE_FROM_PCT_POT}% to ${BLUNDER_ABOVE_PCT_POT}% of the pot lost.`,
+  blunder: `Above the solver's floor, with more than ${BLUNDER_ABOVE_PCT_POT}% of the pot lost.`,
 };
 
 export const GRADE_ROLL_NOTE = "The roll of Mixed-frequency mode never changes the label.";

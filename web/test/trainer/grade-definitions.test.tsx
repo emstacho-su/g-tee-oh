@@ -56,3 +56,9 @@ describe("R3.13 PR #45 review round 1, finding 9b: one source of label names and
     expect(gradeWithMark("blunder")).toBe("?? Blunder");
   });
 });
+
+describe("R3.8 PR #45 review round 4, finding a: every loss band sits above the solver's floor", () => {
+  it("R3.8 Inaccuracy, Mistake and Blunder each say above the solver's floor, as labelFor applies it (a 1.5% loss on a 2% floor is Correct)", () => {
+    for (const label of ["inaccuracy", "mistake", "blunder"] as const) expect(GRADE_DEFINITIONS[label], label).toMatch(/^Above the solver's floor/);
+  });
+});
