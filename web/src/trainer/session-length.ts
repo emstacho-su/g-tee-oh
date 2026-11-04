@@ -43,8 +43,41 @@ export function sessionLengthOf(context: SessionContext): SessionLength {
 }
 
 /** One decision per hand: spot mode (stop rule after_action) and the automated and holdout sessions, which carry no run settings. */
-function oneDecisionPerHand(context: SessionContext): boolean {
+export function oneDecisionPerHand(context: Pick<SessionContext, "trainer">): boolean {
   return (context.trainer?.stop_rule ?? SPOT_STOP_RULE) === SPOT_STOP_RULE;
+}
+
+/** The hands of the session with at least one graded decision, and the last of them (its hand_no). */
+export interface PlayedHands {
+  readonly count: number;
+  readonly lastHandNo: number | null;
+}
+
+const NO_PLAYED_HANDS: PlayedHands = { count: 0, lastHandNo: null };
+
+/** The context's played hands; none before the first graded decision. */
+export function playedHandsOf(context: SessionContext): PlayedHands {
+  return context.played ?? NO_PLAYED_HANDS;
+}
+
+/**
+ * The context after a graded decision: its hand counts once, however many decisions it holds. A
+ * prompt seen but never graded (a 409 stale reload into a new hand) never counts, so the planned
+ * length is a number of played hands (PR #45 review round 3, finding 5).
+ */
+export function withGradedHand(context: SessionContext): SessionContext {
+  const hand = context.hand;
+  const played = playedHandsOf(context);
+  if (hand === undefined || played.lastHandNo === hand.handNo) return context;
+  return { ...context, played: { count: played.count + 1, lastHandNo: hand.handNo } };
+}
+
+/** The number the counter gives the hand on screen: the played hands, plus this one when not yet graded. */
+export function playedOrdinal(context: SessionContext): number | null {
+  const hand = context.hand;
+  if (hand === undefined) return null;
+  const played = playedHandsOf(context);
+  return played.lastHandNo === hand.handNo ? played.count : played.count + 1;
 }
 
 /**
@@ -56,12 +89,15 @@ function oneDecisionPerHand(context: SessionContext): boolean {
 export function atSessionLimit(state: SpotState): boolean {
   if (state.kind !== "feedback" || !oneDecisionPerHand(state.context)) return false;
   const length = sessionLengthOf(state.context);
-  const hand = state.context.hand;
-  return length !== null && hand !== undefined && hand.ordinal >= length;
+  return length !== null && playedHandsOf(state.context).count >= length;
 }
 
-/** A prompt that opens a hand past the planned length (street and full-hand modes). */
-export function pastSessionLimit(context: SessionContext, ordinal: number): boolean {
-  const length = sessionLengthOf(context);
-  return length !== null && ordinal > length;
+/**
+ * A prompt that opens a new hand once the planned hands are played (street and full-hand modes; a
+ * spot-mode session already ended at its last reveal). previous is the context before the prompt.
+ */
+export function pastSessionLimit(previous: SessionContext, prompt: { readonly hand_no: number }): boolean {
+  const length = sessionLengthOf(previous);
+  const opensNewHand = previous.hand === undefined || previous.hand.handNo !== prompt.hand_no;
+  return length !== null && opensNewHand && playedHandsOf(previous).count >= length;
 }

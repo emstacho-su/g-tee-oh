@@ -16,6 +16,8 @@ function feedbackAt(ordinal: number, length: SessionContext["length"]): SpotStat
     session: fixturePracticeSession,
     rng: false,
     hand: { handNo: ordinal - 1, ordinal, decision: 1, stateVersion: 3, heroPosition: "BB" },
+    // A reveal follows its graded decision, which counted the hand (PR #45 review round 3, finding 5).
+    played: { count: ordinal, lastHandNo: ordinal - 1 },
     ...(length === undefined ? {} : { length }),
   };
   return { kind: "feedback", context, prompt: fixtureRngPrompt, decision: DECISION, feedback: fixtureFeedback };

@@ -9,7 +9,7 @@
  * S40 (O-352): how the last hand ended is no longer shown; the api logs each finished hand under the
  * user's account (hand_record) instead.
  */
-import { sessionLengthOf } from "../../trainer/session-length.js";
+import { oneDecisionPerHand, playedOrdinal, sessionLengthOf } from "../../trainer/session-length.js";
 import type { SessionContext } from "../../trainer/spot-machine.js";
 import { CoverageNote } from "./CoverageNote.js";
 import { HandCounter } from "./HandCounter.js";
@@ -18,13 +18,18 @@ export interface RunProgressProps {
   context: SessionContext;
 }
 
-/** The hand counter by the one rule: street modes always, one-decision modes only with a length. */
+/**
+ * The hand counter by the one rule: street modes always, one-decision modes only with a length.
+ * With a length it names the hand by the played hands (session-length.ts playedOrdinal), the
+ * number the limit counts (PR #45 review round 3, findings 3 and 5).
+ */
 export function SessionHandCounter({ context }: RunProgressProps) {
-  const spotMode = (context.trainer?.stop_rule ?? "after_action") === "after_action";
+  const oneDecision = oneDecisionPerHand(context);
   const length = sessionLengthOf(context);
   const hand = context.hand;
-  if (hand === undefined || (spotMode && length === null)) return null;
-  return <HandCounter progress={hand} length={length} decision={!spotMode} />;
+  if (hand === undefined || (oneDecision && length === null)) return null;
+  const ordinal = length === null ? null : playedOrdinal(context);
+  return <HandCounter progress={hand} length={length} decision={!oneDecision} {...(ordinal === null ? {} : { ordinal })} />;
 }
 
 export function RunProgress({ context }: RunProgressProps) {
