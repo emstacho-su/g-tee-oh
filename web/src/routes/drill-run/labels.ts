@@ -24,6 +24,14 @@ export const NEXT_HAND_ENTER_KEY = "Enter";
 export const END_SESSION_KEY = "E";
 export const END_SESSION_BINDING = { key: END_SESSION_KEY, shift: true } as const;
 
+/**
+ * The decision area's name, which the focus lands on when a new prompt arrives (PR #45 review round 4,
+ * finding f): the hero's seat and the street, read from the served prompt.
+ */
+export function decisionAreaName(prompt: { readonly hero_position: string; readonly street: string }): string {
+  return `Your decision: ${prompt.hero_position} on the ${prompt.street}`;
+}
+
 export const SESSION_TEXT = {
   heading: "Drill session",
   start: "Start session",

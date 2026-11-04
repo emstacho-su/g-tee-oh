@@ -577,4 +577,5 @@ describe("R3.30 PR #45 review round 3, finding 1: a clicked action button never 
     await screen.findByRole("img", { name: "King of spades" });
     expect(actionButtons()).not.toContain(document.activeElement);
   });
+it("R3.30 the focus lands on a labelled target: the Next hand button once the reveal mounts, the decision area named by the prompt when a new prompt arrives (PR #45 review round 4, finding f)", async () => {    const view = renderRun({ script: PLAY_SCRIPT });    await startSession(view);    await chooseRaise(view);    await screen.findByTestId("feedback-panel");    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /Next hand/ })));    await userEvent.keyboard("{Enter}");    await screen.findByRole("img", { name: "King of spades" });    const decisionArea = screen.getByTestId("decision-area");    expect(document.activeElement).toBe(decisionArea);    expect(decisionArea).toHaveAccessibleName(/^Your decision: /);    expect(view.sentTo(DECIDE_PATH)).toHaveLength(1);  });
 });

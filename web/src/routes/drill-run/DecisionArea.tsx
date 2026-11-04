@@ -14,8 +14,10 @@
  * inline Explanation section (S38, O-388), each in a section that expands and collapses, with the
  * prompt's worked-example flag and the session's remembered choices (O-387). All action indexes are
  * NodeAction.index (O-198). Choosing an action, and every new prompt, moves the focus off the
- * action bar onto the area itself (tabindex -1), so a clicked button never takes a later Enter or
- * Space (S46, PR #45 review round 3, finding 1). In street and full-hand modes a reveal that does not pause (O-314)
+ * action bar onto the area itself (tabindex -1, a group named by the prompt), and a reveal moves
+ * it on to the Next hand button, so a clicked button never takes a later Enter or Space and the
+ * focus always sits on a named target with the app's focus ring (S46, PR #45 review rounds 3 and
+ * 4, findings 1 and f). In street and full-hand modes a reveal that does not pause (O-314)
  * shows the result chip instead of the panel while the screen continues by itself; Next stays
  * available (S26).
  */
@@ -32,7 +34,7 @@ import { autoContinueDelay, type SpotState } from "../../trainer/spot-machine.js
 import { problemMessage } from "../../trainer/spot-problem.js";
 import { unratedReason } from "../../trainer/unrated-reason.js";
 import { feedbackSlots } from "./feedback-slots.js";
-import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT } from "./labels.js";
+import { NEXT_HAND_ENTER_KEY, NEXT_HAND_KEY, SESSION_SCOPE, SESSION_TEXT, decisionAreaName } from "./labels.js";
 import { ResultChip } from "./ResultChip.js";
 
 export interface DecisionAreaProps {
@@ -61,8 +63,14 @@ export interface DecisionAreaProps {
   feedbackSections?: FeedbackSectionsControl;
 }
 
-/** The action bar inside the area, whose buttons must not keep the focus across prompts. */
-const ACTION_BAR_SELECTOR = "[data-testid=\"action-bar\"]";
+/** The Next hand button, the focus target once a reveal mounts (PR #45 review round 4, finding f). */
+const NEXT_HAND_SELECTOR = "[data-next-hand]";
+
+/** Whether the focus is the page's or the area's own, so moving it takes nothing from the user. */
+function focusIsOurs(area: HTMLElement | null): boolean {
+  const active = document.activeElement;
+  return area !== null && (active === null || active === document.body || area.contains(active));
+}
 
 /** The states in which the hidden roll scale stands above the action bar. */
 const BEFORE_DECISION: ReadonlySet<SpotState["kind"]> = new Set(["await_action", "submitting", "error"]);
@@ -106,7 +114,7 @@ function Feedback({ state, prompt, interactive, onNext, onExplain, onExplainDial
   // (S46, critic round 3 R10); the row inside the panel holds Ask.
   return (
     <div className="flex flex-col gap-3">
-      <Button variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
+      <Button data-next-hand="" variant="primary" size="lg" aria-keyshortcuts={`${NEXT_HAND_KEY} ${NEXT_HAND_ENTER_KEY}`} disabled={!interactive} onClick={onNext} className="self-start">
         <kbd aria-hidden="true" className="font-mono text-xs">
           {NEXT_HAND_KEY}
         </kbd>
@@ -147,16 +155,30 @@ export function DecisionArea(props: DecisionAreaProps) {
   // button that kept the focus would then take the next Enter or Space (PR #45 review round 3, 1).
   const promptKey = replayKey(prompt);
   useLayoutEffect(() => {
-    const bar = areaRef.current?.querySelector(ACTION_BAR_SELECTOR);
-    if (bar?.contains(document.activeElement) === true) focusOffBar();
+    if (focusIsOurs(areaRef.current)) focusOffBar();
   }, [promptKey, focusOffBar]);
+  // Once the reveal mounts, the focus goes on to Next hand, a named button whose own Enter goes on
+  // (PR #45 review round 4, finding f), unless the user has put it somewhere else.
+  const revealed = state.kind === "feedback";
+  useLayoutEffect(() => {
+    if (!revealed || !focusIsOurs(areaRef.current)) return;
+    areaRef.current?.querySelector<HTMLElement>(NEXT_HAND_SELECTOR)?.focus({ preventScroll: true });
+  }, [revealed, promptKey]);
   const choose = (actionIndex: number) => {
     focusOffBar();
     onChoose(actionIndex);
   };
   return (
-    // tabindex -1: a focus target for the code above, never a tab stop.
-    <div ref={areaRef} tabIndex={-1} className="flex min-w-0 flex-col gap-3 outline-none" data-testid="decision-area">
+    // tabindex -1: a focus target for the code above, never a tab stop. Named by the prompt, and it
+    // keeps the app's focus ring (PR #45 review round 4, finding f).
+    <div
+      ref={areaRef}
+      role="group"
+      aria-label={decisionAreaName(prompt)}
+      tabIndex={-1}
+      className="flex min-w-0 flex-col gap-3 rounded-xl"
+      data-testid="decision-area"
+    >
       {table}
       {state.kind === "await_action" && state.notice !== null ? <p role="status">{problemMessage({ kind: state.notice, status: null })}</p> : null}
       {roll === null ? null : <RngRoller hidden roll={roll} onExplain={onExplain} />}
