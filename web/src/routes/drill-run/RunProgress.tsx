@@ -20,15 +20,15 @@ export interface RunProgressProps {
 
 /**
  * The hand counter by the one rule: street modes always, one-decision modes only with a length.
- * With a length it names the hand by the played hands (session-length.ts playedOrdinal), the
- * number the limit counts (PR #45 review round 3, findings 3 and 5).
+ * Every counter, with or without a length, names the hand by the played hands (session-length.ts
+ * playedOrdinal), the number the limit counts (PR #45 review rounds 3 and 4, findings 3, 5 and g).
  */
 export function SessionHandCounter({ context }: RunProgressProps) {
   const oneDecision = oneDecisionPerHand(context);
   const length = sessionLengthOf(context);
   const hand = context.hand;
   if (hand === undefined || (oneDecision && length === null)) return null;
-  const ordinal = length === null ? null : playedOrdinal(context);
+  const ordinal = playedOrdinal(context);
   return <HandCounter progress={hand} length={length} decision={!oneDecision} {...(ordinal === null ? {} : { ordinal })} />;
 }
 
