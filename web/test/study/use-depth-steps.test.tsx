@@ -16,6 +16,20 @@ import { fixtureConfigs, fixtureOnlineStake } from "./depth-fixtures.js";
 
 const SEARCH = { format: "online", table_size: 6, stake: fixtureOnlineStake, depth: 10000, pair: "BB-BTN" } as const;
 
+const PROBLEM_500 = JSON.stringify({ type: "urn:g-tee-oh:problem:internal", title: "t", status: 500 });
+
+/** A fetch that fails every read of the named configs' pairs with a 500 and never answers any other. */
+function failingFor(...configIds: string[]): (input: Request) => Promise<Response> {
+  return (input) =>
+    configIds.some((configId) => input.url.includes(`/configs/${configId}/pairs`))
+      ? Promise.resolve(new Response(PROBLEM_500, { status: 500, headers: { "content-type": "application/problem+json" } }))
+      : new Promise<Response>(() => undefined);
+}
+
+function depthLogs(errors: { mock: { calls: unknown[][] } }): unknown[][] {
+  return errors.mock.calls.filter((call) => String(call[0]).includes("could not be read for the depth keys"));
+}
+
 function pairs(available: boolean): PositionPairEntry[] {
   return [
     { pair: "BB-BTN", oop: "BB", ip: "BTN", preflop_available: available },
@@ -45,6 +59,49 @@ describe("R3.12 useDepthSteps reports a failed sibling read (code review 3)", ()
     const logged = errors.mock.calls.filter((call) => String(call[0]).includes("could not be read for the depth keys"));
     expect(logged).toHaveLength(1);
     expect(String(logged[0]?.[0])).toContain("cfg_6_online_200");
+    errors.mockRestore();
+  });
+});
+
+describe("R3.12 useDepthSteps lists only depths it truly could not check (PR 52 review 1)", () => {
+  function setUp(fetch: (input: Request) => Promise<Response>, seeded: readonly string[]) {
+    const api = createAppApi({ baseUrl: TEST_ORIGIN, fetch });
+    const client = new QueryClient();
+    const key = (configId: string) => pairsQuery(api, configId).queryKey;
+    for (const configId of seeded) client.setQueryData(key(configId), pairs(true));
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    return { client, key, ...renderHook(() => useDepthSteps(api, fixtureConfigs, SEARCH), { wrapper }) };
+  }
+
+  it("R3.12 the current depth is never listed as unchecked, even when its read fails", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result } = setUp(failingFor("cfg_6_online_100"), ["cfg_6_online_200", "cfg_6_online_300"]);
+    await waitFor(() => expect(depthLogs(errors)).toHaveLength(1));
+    expect(result.current).toEqual({ deeper: 20000, shallower: undefined, unchecked: [] });
+    errors.mockRestore();
+  });
+
+  it("R3.12 a failed refetch that keeps its cached seats still counts as checked", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result, client, key } = setUp(failingFor("cfg_6_online_200"), ["cfg_6_online_100", "cfg_6_online_200", "cfg_6_online_300"]);
+    await act(async () => {
+      await client.refetchQueries({ queryKey: key("cfg_6_online_200") });
+    });
+    await waitFor(() => expect(depthLogs(errors)).toHaveLength(1));
+    expect(result.current).toEqual({ deeper: 20000, shallower: undefined, unchecked: [] });
+    errors.mockRestore();
+  });
+
+  it("R3.12 each distinct failure is logged, not only the first per configuration", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result, client, key, rerender } = setUp(failingFor("cfg_6_online_200"), ["cfg_6_online_100", "cfg_6_online_300"]);
+    await waitFor(() => expect(result.current.unchecked).toEqual([20000]));
+    await act(async () => {
+      await client.refetchQueries({ queryKey: key("cfg_6_online_200") });
+    });
+    await waitFor(() => expect(depthLogs(errors)).toHaveLength(2));
+    rerender();
+    expect(depthLogs(errors)).toHaveLength(2);
     errors.mockRestore();
   });
 });
