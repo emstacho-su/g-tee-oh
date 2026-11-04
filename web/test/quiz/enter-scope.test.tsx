@@ -5,7 +5,7 @@
  * Enter now submits from the page body, the chosen option, or a region checkbox; Enter on an
  * unchosen option picks it (its own click), and every other focused control keeps its own Enter.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -132,5 +132,58 @@ describe("R3.16 the quiz's Enter submits from the chosen option or the page only
     await userEvent.keyboard("{Enter}");
     expect(await screen.findByRole("heading", { level: 1, name: "Home" })).toBeInTheDocument();
     expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
+  });
+});
+
+/** The Enter presses that are not a plain Enter: a Shift or Ctrl chord, or an auto-repeat while Enter is held. */
+const UNPLAIN_ENTERS = [
+  { name: "Shift+Enter", init: { shiftKey: true } },
+  { name: "Ctrl+Enter", init: { ctrlKey: true } },
+  { name: "a held Enter", init: { repeat: true } },
+] as const;
+
+/** Whether the answer form blocked the browser's own Enter (its implicit submit or the button's click). */
+function enterBlocked(target: HTMLElement, init: KeyboardEventInit): boolean {
+  return !fireEvent.keyDown(target, { key: "Enter", ...init });
+}
+
+describe("R3.16 a modified or held Enter on an answer control sends nothing (PR #49 round 3)", APP_SUITE, () => {
+  it("R3.16 Shift+Enter, Ctrl+Enter and a held Enter on an unticked region neither tick it nor submit the form", async () => {
+    const view = await startOn(REGIONS, { kind: "regions", value: ["pairs", "suited_aces"] });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Pairs" }));
+    const suited = screen.getByRole("checkbox", { name: "Suited aces" });
+    suited.focus();
+    for (const { name, init } of UNPLAIN_ENTERS) expect(enterBlocked(suited, init), name).toBe(true);
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(screen.getByRole("checkbox", { name: "Suited aces" })).not.toBeChecked();
+    await userEvent.keyboard("{Enter>3/}");
+    expect(screen.getByRole("checkbox", { name: "Suited aces" }), "the first press ticks it, the repeats do nothing").toBeChecked();
+    expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
+    expect(screen.queryByTestId("prediction-result")).not.toBeInTheDocument();
+  });
+
+  it("R3.16 Shift+Enter, Ctrl+Enter and a held Enter on an unchosen option neither pick it twice nor submit", async () => {
+    const view = await startOn(ACTION, { kind: "action", action_index: 2 });
+    await userEvent.click(screen.getByRole("button", { name: "Call" }));
+    const raise = screen.getByRole("button", { name: "Raise to 10bb" });
+    raise.focus();
+    for (const { name, init } of UNPLAIN_ENTERS) expect(enterBlocked(raise, init), name).toBe(true);
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(screen.getByRole("button", { name: "Raise to 10bb" })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.keyboard("{Enter>3/}");
+    expect(screen.getByRole("button", { name: "Raise to 10bb" }), "the first press picks it, the repeats do nothing").toHaveAttribute("aria-pressed", "true");
+    expect(view.sentTo(ANSWER_PATH)).toHaveLength(0);
+    expect(screen.queryByTestId("prediction-result")).not.toBeInTheDocument();
+  });
+
+  it("R3.16 a checkbox outside the answer area never submits the form on Enter either", async () => {
+    await startOn(REGIONS, { kind: "regions", value: ["pairs"] });
+    const form = screen.getByRole("heading", { name: REGIONS.prompt.question }).closest("form");
+    if (form === null) throw new Error("the prompt has no form");
+    const stray = document.createElement("input");
+    stray.type = "checkbox";
+    form.append(stray);
+    for (const init of [{}, ...UNPLAIN_ENTERS.map((entry) => entry.init)]) expect(enterBlocked(stray, init)).toBe(true);
+    stray.remove();
   });
 });

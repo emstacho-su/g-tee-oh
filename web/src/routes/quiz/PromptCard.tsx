@@ -3,19 +3,21 @@
  * ("Range level 2 of 3", with the difficulty's name beside it for a quiz session), the spot (the hero's seat, the action so far, the hand on the hand
  * ladder), the question, the synthetic banner when the solution is a fixture, the answer input and
  * the required reason inside a form whose submit is the Submit button or Enter outside the reason.
- * Enter on the answer's own controls is the form's to decide (answer-enter.ts): the chosen option
- * or a ticked region submits a complete answer, an unchosen one is picked (PR #49 review round 2).
+ * Enter on the answer area's own controls is the form's to decide (answer-enter.ts): the chosen option
+ * or a ticked region submits a complete answer, an unchosen one is picked, and a modified or held
+ * Enter there, or Enter on any checkbox, never submits (PR #49 review rounds 2 and 3).
  * No strategy number is shown before the answer (predict before peek, O-302): the prompt carries
  * none. In review (readOnly) the same card shows an earlier answer: every input disabled with the
  * answer filled, the reason as text, no Submit.
  */
-import type { FormEvent, KeyboardEvent } from "react";
+import { useRef, type FormEvent, type KeyboardEvent } from "react";
 
 import { Button, Panel, SyntheticBanner } from "../../components/ui/index.js";
 import type { PredictionPrompt } from "../../contracts.js";
 import type { AnswerDraft } from "../../prediction/draft.js";
 import { PREDICTION_TEXT, SUBMIT_KEY, levelBadge } from "../../prediction/labels.js";
-import { answerEnterAction } from "./answer-enter.js";
+import { isPlainKey } from "../../hotkeys/index.js";
+import { answerControlOf, answerEnterAction, isCheckbox } from "./answer-enter.js";
 import { AnswerInput } from "./AnswerInput.js";
 import { ReasonField } from "./ReasonField.js";
 
@@ -83,20 +85,26 @@ function Badges({ prompt, difficulty }: { prompt: PredictionPrompt; difficulty: 
 export function PromptCard(props: PromptCardProps) {
   const { prompt, draft, reason, answered, canSubmit, submitting, readOnly = false, difficulty, reasonRefused = false, onDraft, onReason, onSubmit } = props;
   const locked = readOnly || answered || submitting;
+  const answerAreaRef = useRef<HTMLDivElement>(null);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!readOnly) onSubmit();
   };
-  // Enter on the answer's own controls (answer-enter.ts, PR #49 review round 2): the chosen option
-  // or a ticked region submits, an unchosen one is picked; the default is prevented, so neither
-  // the form's implicit submit nor the page's Enter hotkey runs as well.
+  // Enter on the answer's own controls (answer-enter.ts, PR #49 review rounds 2 and 3). The target
+  // is classified first. Enter on an answer control, or on any checkbox in the form, always has its
+  // default prevented, whatever the modifiers: the browser's implicit submit never sends the form
+  // past these rules, and the page's Enter hotkey never runs as well. Only a plain Enter (no Shift,
+  // Ctrl, Alt or Meta, not held) on an answer control then acts: the chosen option or a ticked
+  // region submits, an unchosen one is picked.
   const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
-    if (locked || event.key !== SUBMIT_KEY || event.repeat || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
-    const action = answerEnterAction(event.target, canSubmit);
-    if (action === "pass") return;
+    if (event.key !== SUBMIT_KEY) return;
+    const control = answerControlOf(event.target, answerAreaRef.current);
+    if (control === null && !isCheckbox(event.target)) return;
     event.preventDefault();
+    if (control === null || locked || !isPlainKey(event) || event.shiftKey) return;
+    const action = answerEnterAction(control, canSubmit);
     if (action === "submit") onSubmit();
-    else if (action === "pick" && event.target instanceof HTMLElement) event.target.click();
+    else if (action === "pick") control.click();
   };
   const questionId = `prediction-question-${readOnly ? "review" : "current"}`;
   return (
@@ -108,7 +116,9 @@ export function PromptCard(props: PromptCardProps) {
         <h2 id={questionId} className="text-lg font-semibold">
           {prompt.question}
         </h2>
-        <AnswerInput prompt={prompt} draft={draft} disabled={locked} onChange={onDraft} />
+        <div ref={answerAreaRef} className="contents">
+          <AnswerInput prompt={prompt} draft={draft} disabled={locked} onChange={onDraft} />
+        </div>
         {readOnly ? <ReasonText reason={reason} /> : <ReasonField value={reason} disabled={locked} refused={reasonRefused} onChange={onReason} />}
         {answered || readOnly ? null : (
           <Button type="submit" variant="primary" className="self-start" disabled={!canSubmit} aria-keyshortcuts={SUBMIT_KEY}>

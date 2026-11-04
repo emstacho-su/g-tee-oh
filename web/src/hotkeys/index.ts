@@ -4,7 +4,7 @@ export type { HotkeyRootProps } from "./HotkeyRoot.js";
 export { ShortcutsOverlay, displayBinding, displayKey } from "./ShortcutsOverlay.js";
 export { useHotkey } from "./use-hotkey.js";
 export { HotkeyStoreContext, useHotkeyStore } from "./context.js";
-export { handleKeydown, isActivatableTarget, isEditableTarget } from "./dispatch.js";
+export { handleKeydown, isActivatableTarget, isEditableTarget, isPlainKey } from "./dispatch.js";
 export {
   LISTENER_KEYS,
   REPEAT_HAND_DESCRIPTION,

@@ -15,6 +15,7 @@ import {
   displayBinding,
   findBinding,
   handleKeydown,
+  isPlainKey,
   useHotkey,
   type HotkeyStore,
 } from "../../src/hotkeys/index.js";
@@ -405,5 +406,18 @@ describe("R3.30 PR #45 review round 3, finding 9: Space is listed as the replay 
     const session = within(overlay).getByRole("region", { name: "Session" });
     expect(within(session).getByText("Space")).toBeInTheDocument();
     expect(within(session).getByText("Skip the replay")).toBeInTheDocument();
+  });
+});
+
+describe("R3.30 PR #49 review round 3: one plain-key rule for the dispatch and the quiz's answer form", () => {
+  const BARE = { ctrlKey: false, altKey: false, metaKey: false, repeat: false };
+
+  it("R3.30 a key with no Ctrl, Alt or Meta and no auto-repeat is plain; Shift leaves it plain", () => {
+    expect(isPlainKey(BARE)).toBe(true);
+    expect(isPlainKey({ ...BARE, shiftKey: true } as typeof BARE)).toBe(true);
+  });
+
+  it("R3.30 Ctrl, Alt, Meta or a held key makes it not plain", () => {
+    for (const flag of ["ctrlKey", "altKey", "metaKey", "repeat"] as const) expect(isPlainKey({ ...BARE, [flag]: true }), flag).toBe(false);
   });
 });

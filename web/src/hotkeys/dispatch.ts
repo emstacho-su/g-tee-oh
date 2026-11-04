@@ -59,13 +59,23 @@ export function isActivatableTarget(target: EventTarget | null): boolean {
   return control !== null && control !== document.body && !control.matches(DISABLED_SELECTOR);
 }
 
+/**
+ * A plain key press: no Ctrl, Alt or Meta (the browser's and the system's shortcuts stay theirs) and
+ * not an auto-repeat (holding a key never answers twice). Shift is part of the key, since a Shift
+ * chord is a binding of its own (registry.ts, O-474); a caller that wants the bare key checks
+ * shiftKey as well, as the quiz's answer form does (PR #49 review round 3).
+ */
+export function isPlainKey(event: Pick<KeyboardEvent, "ctrlKey" | "altKey" | "metaKey" | "repeat">): boolean {
+  return !(event.ctrlKey || event.altKey || event.metaKey || event.repeat);
+}
+
 /** Returns true when the event opened the overlay or ran a binding. */
 export function handleKeydown(store: HotkeyStore, event: KeyboardEvent): boolean {
   // A widget that handled its own key wins: the range matrix selects a cell on Enter and prevents
   // the default. React handles the element's keydown at the root before this window listener
   // (bubble phase), so the flag is already set here (PR #45 review round 2, finding 1).
   if (event.defaultPrevented) return false;
-  if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return false;
+  if (!isPlainKey(event)) return false;
   if (isEditableTarget(event.target)) return false;
   const state = store.getState();
   if (state.overlayOpen) return false;
