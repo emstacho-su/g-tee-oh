@@ -7,12 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fixturePrompt } from "../../src/fixtures/index.js";
 import {
   applyThemeClass,
-  createPanelStore,
   createThemeStore,
   createTrainerTableStore,
-  PANEL_KEYS,
   THEME_STORAGE_KEY,
-  usePanelStore,
   useThemeStore,
   useTrainerTableStore,
 } from "../../src/store/index.js";
@@ -60,37 +57,6 @@ describe("trainer table store", () => {
 
   it("R3.13 the app singleton exists", () => {
     expect(useTrainerTableStore.getState().prompt).toBeNull();
-  });
-});
-
-describe("panel store", () => {
-  it("R3.13 every panel starts off", () => {
-    const store = createPanelStore();
-    expect(Object.keys(store.getState().panels).sort()).toEqual([...PANEL_KEYS].sort());
-    expect(Object.values(store.getState().panels).every((on) => !on)).toBe(true);
-    expect(usePanelStore.getState().panels.rng_roller).toBe(false);
-  });
-
-  it("R3.13 togglePanel flips one key with a new panels object", () => {
-    const store = createPanelStore();
-    const before = store.getState().panels;
-    store.getState().togglePanel("hero_range_matrix");
-    const after = store.getState().panels;
-    expect(after.hero_range_matrix).toBe(true);
-    expect(before.hero_range_matrix).toBe(false);
-    expect(after).not.toBe(before);
-    store.getState().togglePanel("hero_range_matrix");
-    expect(store.getState().panels.hero_range_matrix).toBe(false);
-  });
-
-  it("R3.13 setPanels takes the settings panels, an absent key meaning off", () => {
-    const store = createPanelStore();
-    store.getState().togglePanel("rng_roller");
-    store.getState().setPanels({ threshold_card: true, draw_breakdown: false });
-    const panels = store.getState().panels;
-    expect(panels.threshold_card).toBe(true);
-    expect(panels.draw_breakdown).toBe(false);
-    expect(panels.rng_roller).toBe(false);
   });
 });
 
