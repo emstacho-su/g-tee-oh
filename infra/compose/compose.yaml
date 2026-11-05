@@ -408,7 +408,10 @@ services:
   # a remote configured from the environment (RCLONE_CONFIG_<REMOTE>_*, nothing on disk) under that
   # bucket's own credentials, so the mirror has no new S3 identity and the admin keys never reach it.
   # The drive path comes from .env (BACKUP_DRIVE_PATH, never committed) and its g-tee-oh/s3 directory is
-  # the one writable mount. No default command: "just mac-backup" runs "sync library:library
+  # the one writable mount. It is not required (:?) because compose interpolates every service for every
+  # profile, so a required variable outside .env.example would break dev-up and CI; the placeholder
+  # default names the problem if the mirror ever runs without it, and scripts/mac/backup.mjs refuses a
+  # missing or unwritable drive before the mirror starts. No default command: "just mac-backup" runs "sync library:library
   # /backup/library" and the same for reference, "just mac-smoke-clean" runs "purge" on one build's
   # prefix. depends_on uses required: false like the builder's, so the one-off runs under dev or mac.
   backup-mirror:
@@ -427,7 +430,7 @@ services:
       RCLONE_CONFIG_REFERENCE_ACCESS_KEY_ID: ${S3_REFERENCE_ACCESS_KEY:?set S3_REFERENCE_ACCESS_KEY in .env}
       RCLONE_CONFIG_REFERENCE_SECRET_ACCESS_KEY: ${S3_REFERENCE_SECRET_KEY:?set S3_REFERENCE_SECRET_KEY in .env}
     volumes:
-      - ${BACKUP_DRIVE_PATH:?set BACKUP_DRIVE_PATH in .env}/g-tee-oh/s3:/backup
+      - ${BACKUP_DRIVE_PATH:-/backup-drive-path-unset}/g-tee-oh/s3:/backup
     read_only: true
     tmpfs:
       - /tmp:size=64m

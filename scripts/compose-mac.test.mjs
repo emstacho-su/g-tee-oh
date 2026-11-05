@@ -30,6 +30,12 @@ function mountsOf(body) {
 const PINNED_IMAGE = /^\s+image: \S+:\d+\.\d+\.\d+$/m;
 const HARDENED = [/read_only: true/, /cap_drop: \[ALL\]/, /security_opt: \[no-new-privileges:true\]/, /user: "10001:10001"/, /restart: "no"/];
 
+describe('the file interpolates for every profile', () => {
+  it('r2_22 no variable outside .env.example is required, so dev-up and CI run without BACKUP_DRIVE_PATH', () => {
+    assert.doesNotMatch(COMPOSE, /\$\{BACKUP_DRIVE_PATH:\?/, 'BACKUP_DRIVE_PATH is required for every profile');
+  });
+});
+
 describe('the mac profile Deploy 1 runs (02 section 6.2, 6.4)', () => {
   it('r2_22 postgres-mac, seaweedfs-mac and the builder carry their limits and restart policy and publish no port', () => {
     const limits = { 'postgres-mac': '1g', 'seaweedfs-mac': '512m' };
@@ -97,7 +103,7 @@ describe('backup-mirror, the one-shot mirror (O-512)', () => {
   });
 
   it('r2_22 writes only under the drive path from .env and is hardened like the built services', () => {
-    assert.deepEqual(mountsOf(body), [['${BACKUP_DRIVE_PATH:?set BACKUP_DRIVE_PATH in .env}/g-tee-oh/s3', '/backup']]);
+    assert.deepEqual(mountsOf(body), [['${BACKUP_DRIVE_PATH:-/backup-drive-path-unset}/g-tee-oh/s3', '/backup']]);
     for (const rule of HARDENED) assert.match(body, rule);
     assert.match(body, /tmpfs:\n\s+- \/tmp:size=64m/);
     assert.doesNotMatch(body, /^\s+ports:/m);
