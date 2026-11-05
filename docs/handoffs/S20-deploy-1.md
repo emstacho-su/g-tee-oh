@@ -3,7 +3,7 @@ id: 'g-tee-oh-handoff-s20-deploy-1'
 title: 'S20 Deploy 1'
 collection: 'g-tee-oh'
 type: handoff
-status: 'ready'
+status: 'sitting 1 done 2026-11-05 (smoke build, recipes, report section); sitting 2 at the next Mac evening'
 created: 2026-10-19
 public: true
 phase: 2
@@ -125,3 +125,54 @@ Your final message lists: R2.21 and R2.22 with the commands run and their result
 | `K` in `builder_setting`, one `solution` row, `scenario` rows, a coverage row | the Mac's Postgres |
 | Pull request into `sprint/1-v1` | GitHub |
 | Any new O-ID | `planning/00-open-questions-and-risks.md` in the vault, from the Zenbook |
+
+## Status (2026-11-04)
+
+Started the evening S48 merged (sprint/1-v1 at ecb1790), under O-507: no configuration is packed, so S20 runs under O-61 and S20b follows S10. Preconditions checked from the Zenbook: S04 merged (`validation/reports/mac-bootstrap.md` passes O-50); every p2 branch is in `sprint/1-v1` (p2/g6a-fixtures was squash-merged as pull request 24, its head 76670e6 equals the merged head, so the stale branch holds nothing); the G4 report is in the private capture repo under `validation/reports/g4/` (oracle and engine dumps, raked and rake-free, with the two Markdown reports); G6a runs in every CI run; the S19 spike report and the fixture library exist; the compose `mac` profile exists (postgres-mac 1 GB, seaweedfs-mac 512 MB, caddy-mac 256 MB, library-builder 5 GB under profiles builder and mac, O-189). No open pull request.
+
+Gap found: the justfile has no `mac-up` or `mac-down` recipe, no backup recipe or nightly job, and no restore step, although the phase doc's instruments table and A9 section 5 name `just mac-up` and the nightly pg_dump plus SeaweedFS mirror. The Mac deploy sitting cannot run until they exist, so sitting 1 on the Zenbook grows by that much: the recipes over the existing `mac` profile, the backup and restore recipes with the launchd job file, their tests, the code and security reviews, then the O-61 smoke build in the compose dev plus builder profiles (the queue path on the O-52 line with the hand-made ranges fixture the image carries, O-181, O-201, so the publish, scenario rows, coverage row and notify are exercised, which the no-database `--once --job-spec` path of the benchmark would not). The `smoke/` prefix of O-61 is then the build's own prefix and rows, deleted after the report.
+
+Reordered for the evening at hand: the Mac spike rerun (step 7 of sitting 2, R2.21 Mac part) needs only the merged `spike-preflop` recipe and leaves nothing running (the container is `--rm`; the image is removed after), so it runs tonight as an owner-run measurement on the same pattern as the S04 sheet, and creates `p2/deploy-1` from the Mac; sitting 1 then switches to the branch instead of creating it. The run sheet, one item at a time, outputs pasted into the Zenbook session:
+
+1. `cd ~/projects/g-tee-oh && git fetch origin && git switch sprint/1-v1 && git pull --ff-only`, head ecb1790; then `git switch -c p2/deploy-1`.
+2. `docker ps --format '{{.Names}} {{.Status}}'`: only idle containers (harness-postgres), no other build or bench (O-228).
+3. `SPIKE_CONCURRENT="harness-postgres idle; nothing else" just spike-preflop mac linux/arm64`. The image builds natively on the arm64 virtual machine (minutes, the first time); the measurement itself takes seconds. Expect exit 0 and `validation/reports/spike-preflop-mac.json` plus its Markdown twin with verdict pass; paste the Markdown's header and measurement table.
+4. `git status --short` shows only the two report files. `git add validation/reports/spike-preflop-mac.json validation/reports/spike-preflop-mac.md && git commit -m "test(validate): R2.21 Mac preflop spike rerun against O-49" && git push -u origin p2/deploy-1`. The owner's own commit needs no trailer.
+5. `docker rmi g-tee-oh/spike-preflop:dev`, then `docker ps -a` shows nothing new (O-47 spirit: nothing left running or stored).
+6. Preparation for the deploy sitting, no output needed in chat: confirm the external drive is mounted and writable (`touch` and remove a file on it); its mount path goes into the gitignored `.env` as `BACKUP_DRIVE_PATH` at the deploy sitting, never into a report.
+
+Then, from the Zenbook: sitting 1 in plan mode (the recipes, the smoke build, the sitting 1 section of `phase-2-gate.md`, reviews, push); the deploy sitting at the next Mac evening per the prompt above, with the explicit yes (O-20) before `just mac-up`. Under O-61 nothing is imported into `reference-private` (no pack exists); the report says so and S20b imports the first pack.
+
+Deviation at step 3 of the sheet (2026-11-04, night): the Mac run exited 2 before measuring. The Linux arm64 virtual machine of the Mac's Docker reports a CPU with no brand string (the implementer is listed, the part number hidden, so sysinfo has no name for it), and validate's machine block refused the host. The builder's own block had already fallen back to "aarch64" in bench-flop-line-mac, so the fix (`fix(validate): R2.21 the machine block names a CPU with no brand by its architecture`, on p2/deploy-1 from the Zenbook, with a unit test) does the same: the cpu field reads "aarch64 (Apple, no CPU brand reported)" or the like, and a host with no CPU at all is still an error. The Mac pulls the branch and reruns step 3.
+
+Mac spike rerun done (2026-11-05, 15:20Z): `spike-preflop-mac` verdict pass. Push/fold over the 15 depths 0.125 s and 3,840 iterations (the Zenbook took 0.298 s), certificate gain 3.6e-17 bb, judged peak 7,802,880 bytes (the cgroup reading; VmHWM 5,431,296, accounted 1,301,354) against the 5 GiB cap; the 100bb placeholder run 0.150 s, 175 iterations, gain 0.258 percent of the pot against 0.3, peak 7,802,880 bytes against 4 GiB. The machine block reads "aarch64 (Apple, no CPU brand reported), 10 cores, 8 GB, Debian GNU/Linux 12": the kernel inside the Docker virtual machine reports less memory than the 10 GB the VM is given, an observation, not a finding. R2.21 is closed for both machines. Image removed, only harness-postgres left running.
+
+Deviation: the two commits (the cpu-field fix c917041 and the spike report 4059b23) landed on `sprint/1-v1` directly, pushed from the Mac, because the shell was on the sprint branch when it pulled `p2/deploy-1` (a fast-forward) and committed. Left as they are: they are the first commits the S20 pull request would have carried, the push triggered CI on `sprint/1-v1`, and rewriting the branch is not allowed (hard rules). `p2/deploy-1` is fast-forwarded to 4059b23 and carries sitting 1 from there; the pull request covers everything after.
+
+## Sitting 1 done (2026-11-05)
+
+On `p2/deploy-1`: `library-builder queue` (O-510), the `migrate-mac` and `backup-mirror` one-shots (O-511, O-512), the Mac recipes and their Node scripts under `scripts/mac/` (each with `--profile dev` for a rehearsal), a fix so the compose file interpolates without `BACKUP_DRIVE_PATH`, and the sitting 1 section of `validation/reports/phase-2-gate.md`. The smoke build on the Zenbook published at 0.253 and 0.284 percent of the pot in 253 seconds with a judged peak of 1,491,238,912 bytes; 20 scenario rows and the `coverage_added` notification were observed; the O-51 projection is at most 120.1 GB against 650 GB. The whole Mac sequence after the deploy (peaks, backup, restore check, smoke cleanup) was rehearsed on the dev stack and passed after one fix to the cleanup's guard. Open questions O-509 to O-513 in planning/00.
+
+## Sitting 2 run order (the Mac, Claude Code, default permission mode)
+
+Preparation, no yes needed:
+
+1. `cd ~/projects/g-tee-oh && git fetch origin && git switch p2/deploy-1 && git pull --ff-only`; `just hooks`.
+2. `.env` from `.env.example` with the owner (A9 section 3), plus one line the example does not carry yet: `BACKUP_DRIVE_PATH=/Volumes/<drive>` (the drive's mount path; never committed, never in a report). `POSTGRES_PASSWORD` and the S3 keys use letters, digits, `-` and `_` only. `chmod 600 .env`.
+3. `docker ps` shows only idle containers; `just mac-build` pulls the images and builds the builder for linux/arm64 (minutes).
+4. `/security-review` on the branch (compose mac profile, the one-shots, the scripts, `.env` handling). `just mac-up` checks first that `POSTGRES_PASSWORD` is URL-safe.
+
+Then stop and ask exactly: "Deploy 1 now? Reply yes to proceed." Continue only on the literal reply "yes", and record its time.
+
+Deploy actions, one at a time, each checked before the next:
+
+5. `just mac-up` (Postgres and SeaweedFS healthy, `migrate-mac` and `bucket-init-mac` exit 0).
+6. `just mac-setting plan_configs '[]'`, `just mac-setting k_runouts 20`, `just mac-setting k_runouts_rare 10`.
+7. `just mac-queue cfg_6_online_100 BB-BTN Kh7d2c r250.c 20` (K = 20 explicitly: the planner ranks another pair first and would give BB-BTN K = 10, while the Zenbook smoke build and the O-51 top-pair figure use 20); note the job id from `build_job`.
+8. In a second terminal, a listener: `docker compose --project-directory . -f infra/compose/compose.yaml --profile mac exec -T postgres-mac psql -U postgres -d gto`, then `LISTEN coverage_added;` and `select pg_sleep(600);` until the notification prints.
+9. `just mac-builder-up`; the loop claims the queued head. Wait for the publish (about four minutes by the S04 benchmark); `just mac-status`.
+10. Read the build's numbers from the builder's log (`docker compose ... --profile mac logs library-builder`) and the rows (solution, scenario count, job status, `builder_setting`, `storage_ledger`).
+11. `just mac-peaks` while everything is still up.
+12. `just mac-backup-install`, then `just mac-backup` once by hand; `just mac-restore-check` (verdict restored).
+13. `just mac-smoke-clean <job id>` prints a preview (solution, status, bytes, scenario count, prefix) and deletes nothing; show it to the owner, and only on their go run `just mac-smoke-clean <job id> --yes`.
+14. Finish `validation/reports/phase-2-gate.md` (sitting 2 section: the yes and its time, the Mac numbers against O-50, peaks against 02 section 6.2, the projection from the Mac bytes, the backup and restore, the cleanup, every Phase 2 Definition of Done item with pass or fail); leave the builder running; commit, push, mark the draft pull request ready. The owner merges.

@@ -4,14 +4,19 @@
 // attaches, which a fast one-shot does on a quick machine: on the e2e job of PR #12 the
 // buckets were created and the container exited 0, yet the wait failed. Reading the state
 // from compose ps instead works whether the container finished before or after this starts.
+// The profile is the optional second argument, dev by default; mac-up passes mac for migrate-mac
+// and bucket-init-mac (S20, R2.22).
 
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-const COMPOSE_ARGS = [
-  'compose', '--project-directory', '.', '-f', 'infra/compose/compose.yaml', '--profile', 'dev',
-];
+export const DEFAULT_PROFILE = 'dev';
+export const PROFILES = ['dev', 'mac'];
+
+export function composeArgs(profile) {
+  return ['compose', '--project-directory', '.', '-f', 'infra/compose/compose.yaml', '--profile', profile];
+}
 const POLL_INTERVAL_MS = 500;
 const TIMEOUT_MS = 120_000;
 const EXIT_USAGE = 2;
@@ -27,8 +32,8 @@ export function findRow(stdout, service) {
   return rows.find((row) => row.Service === service) ?? null;
 }
 
-function compose(args, stdio = 'pipe') {
-  return spawnSync('docker', [...COMPOSE_ARGS, ...args], {
+function compose(profile, args, stdio = 'pipe') {
+  return spawnSync('docker', [...composeArgs(profile), ...args], {
     encoding: 'utf8', shell: false, windowsHide: true, stdio,
   });
 }
@@ -37,23 +42,23 @@ function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function report(service, exitCode) {
+function report(profile, service, exitCode) {
   if (exitCode === 0) {
     console.log(`wait-one-shot: ${service} exited 0`);
     return;
   }
   console.error(`wait-one-shot: ${service} exited ${exitCode}; its log follows`);
-  compose(['logs', '--no-color', service], 'inherit');
+  compose(profile, ['logs', '--no-color', service], 'inherit');
 }
 
-export function main(service) {
-  if (!service) {
-    console.error('usage: node infra/compose/wait-one-shot.mjs <service>');
+export function main(service, profile = DEFAULT_PROFILE) {
+  if (!service || !PROFILES.includes(profile)) {
+    console.error(`usage: node infra/compose/wait-one-shot.mjs <service> [${PROFILES.join('|')}]`);
     return EXIT_USAGE;
   }
   const deadline = Date.now() + TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const result = compose(['ps', '-a', '--format', 'json', service]);
+    const result = compose(profile, ['ps', '-a', '--format', 'json', service]);
     if (result.error || result.status !== 0) {
       const reason = result.error?.message ?? result.stderr.trim();
       console.error(`wait-one-shot: docker compose ps failed: ${reason}`);
@@ -61,7 +66,7 @@ export function main(service) {
     }
     const row = findRow(result.stdout, service);
     if (row?.State === 'exited') {
-      report(service, row.ExitCode);
+      report(profile, service, row.ExitCode);
       return row.ExitCode;
     }
     sleep(POLL_INTERVAL_MS);
@@ -71,5 +76,5 @@ export function main(service) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = main(process.argv[2]);
+  process.exitCode = main(process.argv[2], process.argv[3]);
 }

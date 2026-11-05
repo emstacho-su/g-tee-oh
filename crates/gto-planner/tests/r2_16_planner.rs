@@ -323,3 +323,20 @@ fn r2_16_library_reach_is_the_product_of_the_line_frequencies() {
         reach.line_reach(&"cfg_6_online_150".parse().expect("an id"), &tree.flop_lines()[0]);
     assert!(missing.is_err(), "a configuration without a solution has no reach");
 }
+
+/// R2.22, O-51: the counts the Deploy 1 storage projection multiplies by. The S20 report
+/// projects the measured bytes per flop tree and per runout over these pairs and lines, with the
+/// top pair at K = 20 over every canonical flop and the rest at K = 10 over a 184-flop subset.
+#[test]
+fn r2_22_projection_counts_for_the_6max_100bb_configuration() {
+    let pairs = pair_lines(&scope()).expect("the pairs");
+    let counts: Vec<(String, usize)> =
+        pairs.iter().map(|(pair, lines)| (pair.to_string(), lines.len())).collect();
+    assert_eq!(counts.len(), 15, "every seated pair of 6-max has a flop line");
+    for (pair, lines) in &counts {
+        let expected = if pair == "SB-BB" { 7 } else { 3 };
+        assert_eq!(*lines, expected, "{pair}");
+    }
+    assert_eq!(counts.iter().map(|(_, lines)| lines).sum::<usize>(), 49);
+    assert_eq!(canonical_flops().len(), 1_755);
+}
