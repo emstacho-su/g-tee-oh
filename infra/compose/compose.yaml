@@ -29,6 +29,14 @@
 # profiles builder and mac only, so "just dev-up" and the e2e job never start it (O-189): on the Zenbook it
 # runs with --profile dev --profile builder, on the Mac with --profile mac. Its operations port 7071
 # (/healthz and /metrics) stays inside the network gto, unpublished and unauthenticated (O-207).
+#
+# Two one-shot services serve Deploy 1 on the Mac (S20, R2.22): migrate-mac (profile mac, the dbmate
+# image, MIT) applies the migrations and the catalog seed over the network gto, since the mac profile
+# publishes no Postgres port (02 section 6.4, O-511); backup-mirror (profile backup, the rclone image,
+# MIT) mirrors each bucket to the external drive under that bucket's own credentials for
+# "just mac-backup", purges one prefix for "just mac-smoke-clean" and is never started by "up"
+# (A9 section 5, O-512). Both run non-root on a read-only root filesystem with every capability
+# dropped, like the built services.
 
 x-postgres: &postgres
   image: postgres:18-alpine
@@ -367,6 +375,73 @@ services:
         condition: service_healthy
         required: false
     # No ports: 7071 is never published (O-207)
+    networks:
+      gto: {}
+
+  # Migrations on the Mac (S20, O-511): dbmate as a one-shot on the network gto, reading the migrations
+  # read-only and connecting as the postgres superuser the way "just db-migrate" does on the Zenbook (the
+  # dev profile keeps the host dbmate). POSTGRES_PASSWORD sits inside a URL here, so it must be
+  # URL-safe: letters, digits, - and _ (the S3 keys have the same rule in seaweedfs/start.sh). "just
+  # mac-up" runs it once postgres-mac is healthy and waits for it through wait-one-shot.mjs before the
+  # builder starts; --wait retries the connection, --no-dump-schema keeps the root filesystem read-only.
+  migrate-mac:
+    image: ghcr.io/amacneil/dbmate:2.29.0
+    profiles: [mac]
+    command: ["--wait", "--no-dump-schema", "up"]
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/gto?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: /db/migrations
+    volumes:
+      - ./db/migrations:/db/migrations:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    restart: "no"
+    depends_on:
+      postgres-mac:
+        condition: service_healthy
+    networks:
+      gto: {}
+
+  # The backup mirror (S20, O-512, A9 section 5): rclone as a one-shot on the network gto. Each bucket is
+  # a remote configured from the environment (RCLONE_CONFIG_<REMOTE>_*, nothing on disk) under that
+  # bucket's own credentials, so the mirror has no new S3 identity and the admin keys never reach it.
+  # The drive path comes from .env (BACKUP_DRIVE_PATH, never committed) and its g-tee-oh/s3 directory is
+  # the one writable mount. No default command: "just mac-backup" runs "sync library:library
+  # /backup/library" and the same for reference, "just mac-smoke-clean" runs "purge" on one build's
+  # prefix. depends_on uses required: false like the builder's, so the one-off runs under dev or mac.
+  backup-mirror:
+    image: rclone/rclone:1.72.0
+    profiles: [backup]
+    environment:
+      RCLONE_CONFIG: /tmp/rclone.conf
+      RCLONE_CONFIG_LIBRARY_TYPE: s3
+      RCLONE_CONFIG_LIBRARY_PROVIDER: SeaweedFS
+      RCLONE_CONFIG_LIBRARY_ENDPOINT: http://seaweedfs:8333
+      RCLONE_CONFIG_LIBRARY_ACCESS_KEY_ID: ${S3_LIBRARY_ACCESS_KEY:?set S3_LIBRARY_ACCESS_KEY in .env}
+      RCLONE_CONFIG_LIBRARY_SECRET_ACCESS_KEY: ${S3_LIBRARY_SECRET_KEY:?set S3_LIBRARY_SECRET_KEY in .env}
+      RCLONE_CONFIG_REFERENCE_TYPE: s3
+      RCLONE_CONFIG_REFERENCE_PROVIDER: SeaweedFS
+      RCLONE_CONFIG_REFERENCE_ENDPOINT: http://seaweedfs:8333
+      RCLONE_CONFIG_REFERENCE_ACCESS_KEY_ID: ${S3_REFERENCE_ACCESS_KEY:?set S3_REFERENCE_ACCESS_KEY in .env}
+      RCLONE_CONFIG_REFERENCE_SECRET_ACCESS_KEY: ${S3_REFERENCE_SECRET_KEY:?set S3_REFERENCE_SECRET_KEY in .env}
+    volumes:
+      - ${BACKUP_DRIVE_PATH:?set BACKUP_DRIVE_PATH in .env}/g-tee-oh/s3:/backup
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    restart: "no"
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+        required: false
+      seaweedfs-mac:
+        condition: service_healthy
+        required: false
     networks:
       gto: {}
 
