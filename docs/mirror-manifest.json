@@ -70,7 +70,7 @@
     {
       "path": "docs/handoffs/S20-deploy-1.md",
       "source": "vault/handoffs/S20-deploy-1.md",
-      "sha256": "3ef26897bb6e0cb17c5154a792776b0bbcaf4802c24baa497f60759a9ac07276"
+      "sha256": "7fa625a110a498998101421a4c225eb7086c40ca1b2cdd1492d248800661f721"
     },
     {
       "path": "docs/handoffs/S21-api-foundation.md",
@@ -140,7 +140,7 @@
     {
       "path": "docs/handoffs/S34-deploy-2.md",
       "source": "vault/handoffs/S34-deploy-2.md",
-      "sha256": "b3f5cb041d7339f9c3c16f2a69d82b97d6fdb870fa77475382b0a947383ce064"
+      "sha256": "8ab6b486a30467fb09e3f7a90f1850e4d65223e013e81439211c1009f2b58ce2"
     },
     {
       "path": "docs/handoffs/S35-docs-release.md",
@@ -150,7 +150,7 @@
     {
       "path": "docs/planning/09-v1-sprint-roadmap.md",
       "source": "vault/planning/09-v1-sprint-roadmap.md",
-      "sha256": "3bb17cfc3bfa099fda7a14456b81fa2525b513526da76bb3ce437907b7a56877"
+      "sha256": "26943f9c95a8874f421a75f5be14287984e3272fc644de221f8023f709a02fa5"
     },
     {
       "path": "docs/planning/10-traceability.md",
@@ -165,7 +165,7 @@
     {
       "path": "docs/planning/phases/phase-2-engine-and-pipeline.md",
       "source": "vault/planning/phases/phase-2-engine-and-pipeline.md",
-      "sha256": "ce7ac5beda0dce8d1eda8030264ca979ea68de8d5da6ccb516823156b0ff1b57"
+      "sha256": "4459b988fad286515175970096f219afe409bb4bfe893e81682522aba5b6019b"
     },
     {
       "path": "docs/planning/phases/phase-3-preflop-trainer.md",
@@ -175,7 +175,7 @@
     {
       "path": "docs/planning/phases/phase-4-rating-and-release.md",
       "source": "vault/planning/phases/phase-4-rating-and-release.md",
-      "sha256": "dbc9fd617ff3ba122f86ad186b03391d86aa49c26b187dab448e50203e3f877c"
+      "sha256": "fb6b2cf65bf66031a6f650d992ad76401a2a4592e721d34cafb0bed794f373c5"
     }
   ]
 }
