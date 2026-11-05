@@ -4,9 +4,11 @@
 //! the toolchain. Owner: the G1 agent (R2.4).
 //!
 //! Mechanism. [`detect`] refreshes a `sysinfo::System` once for the CPU list and the
-//! memory, takes the brand string of the first CPU, the logical core count and the
-//! total memory rounded to gibibytes, and `System::name` with `System::os_version` for
-//! the operating system. [`machine_name`] picks the name: `--machine`, else
+//! memory, takes the brand string of the first CPU (or, when the host reports a CPU with
+//! no brand, as the Linux arm64 virtual machine of the Mac's Docker does, the architecture
+//! with the vendor when one is reported, through [`cpu_field`]), the logical core count
+//! and the total memory rounded to gibibytes, and `System::name` with `System::os_version`
+//! for the operating system. [`machine_name`] picks the name: `--machine`, else
 //! `VALIDATE_MACHINE`, else the host name lowercased with every character outside the
 //! schema's pattern `^[a-z][a-z0-9-]*$` turned into a dash, else an error.
 //! [`resolve_commit`] runs `git status --porcelain` in the repository root and refuses a
@@ -213,8 +215,9 @@ pub fn check_commit(commit: &str) -> Result<(), MachineError> {
 /// # Errors
 ///
 /// `MachineError::BadName` when `name` fails [`check_name`]; `MachineError::Unexpected`
-/// under the program name `sysinfo` when the host reports no CPU, no memory, or a core
-/// count or memory size that does not fit the schema's integer.
+/// under the program name `sysinfo` when the host reports no CPU at all, no memory, or a
+/// core count or memory size that does not fit the schema's integer. A CPU with no brand
+/// string is not an error: [`cpu_field`] names it by its architecture.
 pub fn detect(name: &str) -> Result<Machine, MachineError> {
     check_name(name)?;
     let mut system = System::new();
@@ -223,9 +226,8 @@ pub fn detect(name: &str) -> Result<Machine, MachineError> {
     let cpu = system
         .cpus()
         .first()
-        .map(|cpu| cpu.brand().trim().to_owned())
-        .filter(|brand| !brand.is_empty())
-        .ok_or_else(|| unexpected("no CPU brand reported"))?;
+        .map(|cpu| cpu_field(cpu.brand(), cpu.vendor_id(), std::env::consts::ARCH))
+        .ok_or_else(|| unexpected("no CPU reported"))?;
     let cores = u32::try_from(system.cpus().len())
         .ok()
         .filter(|cores| *cores >= 1)
@@ -237,6 +239,23 @@ pub fn detect(name: &str) -> Result<Machine, MachineError> {
             unexpected(&format!("{} bytes of memory reported", system.total_memory()))
         })?;
     Ok(Machine { name: name.to_owned(), os: os_name_and_version(), cpu, cores, memory_gb })
+}
+
+/// The `cpu` field: the brand string when the host reports one, else the architecture
+/// (the compile-time `std::env::consts::ARCH`) with the vendor when one is reported, and a
+/// note that no brand was. A Linux arm64 virtual machine on Apple silicon (the Mac's Docker,
+/// where the S20 spike rerun runs) lists the implementer but hides the part number, so
+/// sysinfo has no brand for it; the field then says what was read instead of failing the
+/// run, and the schema's one-character minimum holds since the architecture is never empty.
+fn cpu_field(brand: &str, vendor: &str, arch: &str) -> String {
+    let brand = brand.trim();
+    if !brand.is_empty() {
+        return brand.to_owned();
+    }
+    match vendor.trim() {
+        "" => format!("{arch} (no CPU brand reported)"),
+        vendor => format!("{arch} ({vendor}, no CPU brand reported)"),
+    }
 }
 
 /// `bytes` in gibibytes, rounded to the nearest whole number.

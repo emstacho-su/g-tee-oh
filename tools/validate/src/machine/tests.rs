@@ -3,7 +3,7 @@
 //! so a dirty or clean tree is tested without touching the checkout.
 
 use super::{
-    MachineError, TreeState, check_commit, check_name, detect, judge_tree, machine_name,
+    MachineError, TreeState, check_commit, check_name, cpu_field, detect, judge_tree, machine_name,
     name_from_host, parse_porcelain, resolve_commit, round_to_gib, rustc_version,
 };
 use crate::toolchain;
@@ -90,6 +90,17 @@ fn r2_4_dirty_tree_is_refused_unless_allowed() {
     let error = judge_tree(dirty(), false).expect_err("refused");
     assert!(matches!(&error, MachineError::DirtyTree { path } if path == "justfile"), "{error}");
     assert!(error.to_string().contains("--allow-dirty"), "{error}");
+}
+
+/// R2.21: a CPU that reports no brand string (the Linux arm64 virtual machine of the Mac's
+/// Docker, whose /proc/cpuinfo carries no part number sysinfo knows) is named by its
+/// architecture and vendor instead of failing the run, so the Mac spike rerun writes its
+/// report; a reported brand is taken as is, trimmed.
+#[test]
+fn r2_21_cpu_field_names_the_architecture_when_no_brand_is_reported() {
+    assert_eq!(cpu_field(" Apple M2 Pro ", "Apple", "aarch64"), "Apple M2 Pro");
+    assert_eq!(cpu_field("", "Apple", "aarch64"), "aarch64 (Apple, no CPU brand reported)");
+    assert_eq!(cpu_field("  ", " ", "aarch64"), "aarch64 (no CPU brand reported)");
 }
 
 /// R2.4: the probes answer on the host that runs the tests, with every field inside the
