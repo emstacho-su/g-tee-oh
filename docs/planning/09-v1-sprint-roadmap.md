@@ -438,7 +438,7 @@ The bridge sprint, 2026-10-28 to 2026-11-04: S36 to S43 reworked the screens aft
 | 4 | S07 sittings 1 and 2 | step 3 | the owner at the keyboard, two evenings | high |
 | 5 | S08 | S07 | agent | high |
 | 6 | S09 first run, then one short check-in a day | S08 | the owner for the first run | low per sitting |
-| 7 | S20 Deploy 1 under O-61 (O-507); sitting 1 done 2026-11-05 on the Zenbook (the Mac spike, the recipes, the smoke build, the report section), sitting 2 next | S04 merged and a Mac evening | the owner at the Mac | medium |
+| 7 | S20 Deploy 1 under O-61 (O-507); done 2026-11-05 (sitting 1 on the Zenbook, sitting 2 Deploy 1 on the Mac, pull request 55); the backup and the smoke cleanup deferred until a drive is bought (O-515, O-517) | S04 merged and a Mac evening | the owner at the Mac | medium |
 | 8 | The build card export (O-24) | none | the owner, under an hour | none |
 | 9 | S29 Phase 3 gate | step 8 and the visual pass; S48 first, so the pass sees the re-shot screens | agent, then the owner for the visual pass | high |
 | 10 | S10 first pack, then S20b first real build (O-507) | S09's first configuration | agent; a short Mac sitting for S20b | high, then low |
