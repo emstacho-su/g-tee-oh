@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       # The pnpm version comes from the packageManager field of package.json.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
