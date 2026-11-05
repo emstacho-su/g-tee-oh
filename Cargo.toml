@@ -68,7 +68,7 @@ proptest = "1"
 # zstd 0.14.3 (zstd-safe 8.2) is the floor for RUSTSEC-2026-0391, 0398 and 0403. Its license is
 # BSD-3-Clause, inside the deny.toml allow list; the bundled C library (zstd-sys) is unchanged.
 zstd = { version = "0.14.3", default-features = false }
-sha2 = "0.10"
+sha2 = "0.11"
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 lru = "0.19"
 # The query-role connection of solver-query (S16, O-28, O-146, O-147): runtime-checked
