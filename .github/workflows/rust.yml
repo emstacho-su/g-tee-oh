@@ -72,7 +72,7 @@ jobs:
       # so the artifact holds only what this run wrote.
       - name: Upload gate reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gate-reports
           path: |
