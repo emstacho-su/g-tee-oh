@@ -102,8 +102,6 @@ fn r2_18_malformed_forms_are_usage_errors() {
     for words in [
         &["bogus"][..],
         &["queue"],
-        &["queue", "--config", "cfg_6_online_100", "--pair", "BB-BTN", "--flop", "Kh7d2c"],
-        &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--line", "l"],
         &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "0"],
         &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "x"],
         &[

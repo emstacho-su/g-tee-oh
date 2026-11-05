@@ -14,14 +14,26 @@ import { DEFAULT_PROFILE, checkProfile, composeArgs, parseFlags, run, runMain } 
 const GIB = 1024 ** 3;
 const MIB = 1024 ** 2;
 
-/** The 02 section 6.2 budget per service, the compose limit each one runs under. */
+/**
+ * The 02 section 6.2 budget per service, the compose limit each one runs under. The dev profile's
+ * Postgres and SeaweedFS run without limits, so none is claimed for them; the builder carries its
+ * 5 GB cap under both profiles.
+ */
 export const BUDGETS = {
   'postgres-mac': GIB,
   'seaweedfs-mac': 512 * MIB,
   'library-builder': 5 * GIB,
-  postgres: GIB,
-  seaweedfs: 512 * MIB,
 };
+
+/** The budget of a service under a profile, or null when it runs without a limit there. */
+export function budgetOf(_profile, service) {
+  return BUDGETS[service] ?? null;
+}
+
+/** The profiles whose running containers are measured: dev adds builder, where the builder lives on the Zenbook. */
+function profilesOf(profile) {
+  return profile === 'dev' ? ['dev', 'builder'] : [profile];
+}
 
 /** Running containers from `compose ps --format json` (one object per line, or an array). */
 export function runningContainers(stdout) {
@@ -50,7 +62,7 @@ export function renderTable(rows) {
 export function main(argv, { runner = run } = {}) {
   const flags = parseFlags(argv, { values: ['profile'] });
   const profile = checkProfile(flags.profile ?? DEFAULT_PROFILE);
-  const containers = runningContainers(runner('docker', composeArgs([profile], ['ps', '--format', 'json'])));
+  const containers = runningContainers(runner('docker', composeArgs(profilesOf(profile), ['ps', '--format', 'json'])));
   const rows = containers.map(({ service, container }) => {
     let peak = null;
     try {
@@ -58,7 +70,7 @@ export function main(argv, { runner = run } = {}) {
     } catch {
       peak = null;
     }
-    return { service, container, peak, budget: BUDGETS[service] ?? null };
+    return { service, container, peak, budget: budgetOf(profile, service) };
   });
   console.log(renderTable(rows));
   console.log(JSON.stringify({ profile, peaks: rows }));

@@ -548,6 +548,7 @@ mac-build:
 
 # Deploy action: Postgres and SeaweedFS up under their limits, the migrations and catalog seed, the two buckets (O-511)
 mac-up:
+    node scripts/mac/check-env.mjs
     {{COMPOSE}} --profile mac up -d --wait postgres-mac seaweedfs-mac
     {{COMPOSE}} --profile mac up -d migrate-mac bucket-init-mac
     node infra/compose/wait-one-shot.mjs migrate-mac mac
@@ -570,9 +571,9 @@ mac-status:
 mac-setting KEY VALUE:
     node scripts/mac/setting.mjs {{KEY}} {{quote(VALUE)}}
 
-# Queue one flop build at the head of the queue, for example the O-52 line: cfg_6_online_100 BB-BTN Kh7d2c r250.c (O-510)
-mac-queue CONFIG PAIR FLOP LINE:
-    {{COMPOSE}} --profile mac run --rm --no-deps library-builder queue --config {{CONFIG}} --pair {{PAIR}} --flop {{FLOP}} --line {{LINE}}
+# Queue one flop build at the head of the queue, K by the pair's rank unless given; Deploy 1: cfg_6_online_100 BB-BTN Kh7d2c r250.c 20 (O-510)
+mac-queue CONFIG PAIR FLOP LINE K="":
+    {{COMPOSE}} --profile mac run --rm --no-deps library-builder queue --config {{CONFIG}} --pair {{PAIR}} --flop {{FLOP}} --line {{LINE}} {{ if K != "" { "--k " + K } else { "" } }}
 
 # Per-container peak memory from cgroup memory.peak against the 02 section 6.2 budget
 mac-peaks:
@@ -590,9 +591,9 @@ mac-backup-install:
 mac-restore-check:
     node scripts/mac/restore-check.mjs
 
-# Delete the O-61 smoke build's rows and purge its prefix after the report (O-61)
-mac-smoke-clean JOB:
-    node scripts/mac/smoke-clean.mjs --job {{JOB}} --yes
+# Preview the O-61 smoke build's rows and prefix; pass --yes to delete them and purge the prefix (O-61)
+mac-smoke-clean JOB *FLAGS:
+    node scripts/mac/smoke-clean.mjs --job {{JOB}} {{FLAGS}}
 
 EQUITY_TABLE := "validation/fixtures/equity/preflop-169.json"
 

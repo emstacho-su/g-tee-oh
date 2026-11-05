@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import * as backup from './backup.mjs';
+import * as checkEnv from './check-env.mjs';
 import * as launchd from './launchd.mjs';
 import { MacScriptError, composeArgs, envValue, mirrorArgs, parseFlags, postgresService, psqlArgs, utcStamp } from './lib.mjs';
 import * as peaks from './peaks.mjs';
@@ -266,6 +267,15 @@ describe('peaks: per-container cgroup peaks against the budget', () => {
     assert.match(table, /\| postgres-mac \| 100 \| 1073741824 \| yes \|/);
     assert.match(table, /\| library-builder \| unavailable \| 5368709120 \| n\/a \|/);
   });
+
+  it('r2_22 lists the builder under the dev profile too, and claims no budget for the unlimited dev services', () => {
+    const { calls, runner } = recorder({ ps: '' });
+    quiet(() => peaks.main(['--profile', 'dev'], { runner }));
+    assert.deepEqual(calls[0].args.slice(5, 9), ['--profile', 'dev', '--profile', 'builder']);
+    assert.equal(peaks.budgetOf('dev', 'postgres'), null);
+    assert.equal(peaks.budgetOf('dev', 'library-builder'), 5 * 1024 ** 3);
+    assert.equal(peaks.budgetOf('mac', 'postgres-mac'), 1024 ** 3);
+  });
 });
 
 describe('launchd: the nightly LaunchAgent', () => {
@@ -297,25 +307,68 @@ describe('launchd: the nightly LaunchAgent', () => {
 
 describe('smoke-clean: the O-61 smoke build goes after the report', () => {
   const JOB = '0192f000-0000-7000-8000-000000000001';
+  const PREVIEW = 'sol-1|published|7429888|20|builds/cfg_6_online_100/BB-BTN/Kc7d2h/b1/manifest.json\n';
 
-  it('r2_22 refuses without --yes or a job id, and checks the purged prefix', () => {
-    assert.throws(() => smoke.main(['--job', JOB]), /--yes/);
+  it('r2_22 refuses a bad job id and checks the prefix and the preview', () => {
     assert.throws(() => smoke.main(['--yes']), /UUID/);
     assert.throws(() => smoke.main(['--job', 'nope', '--yes']), /UUID/);
-    assert.equal(smoke.prefixOf('1\nbuilds/cfg_6_online_100/BB-BTN/abc/manifest.json\n'), 'builds/cfg_6_online_100/BB-BTN/abc');
-    assert.throws(() => smoke.prefixOf('1\nother/x/manifest.json'), /unexpected manifest_uri/);
-    assert.throws(() => smoke.prefixOf('1\nbuilds/../x/manifest.json'), /unexpected manifest_uri/);
+    assert.equal(smoke.prefixOf('builds/cfg_6_online_100/BB-BTN/abc/manifest.json'), 'builds/cfg_6_online_100/BB-BTN/abc');
+    for (const uri of ['other/x/manifest.json', 'builds/../x/manifest.json', 'builds/./manifest.json', 'builds//x/manifest.json']) {
+      assert.throws(() => smoke.prefixOf(uri), /unexpected manifest_uri/, uri);
+    }
+    assert.deepEqual(smoke.parsePreview(PREVIEW), { solution: 'sol-1', status: 'published', bytes: 7429888, scenarios: 20, prefix: 'builds/cfg_6_online_100/BB-BTN/Kc7d2h/b1' });
+    assert.throws(() => smoke.parsePreview(''), /0 solutions/);
+    assert.throws(() => smoke.parsePreview(`${PREVIEW}${PREVIEW}`), /2 solutions/);
   });
 
-  it('r2_22 deletes the rows in one transaction through a psql variable, then purges the prefix', () => {
-    const { calls, runner } = recorder({ psql: '1\nbuilds/x/abc/manifest.json\n' });
-    quiet(() => smoke.main(['--job', JOB, '--yes', '--profile', 'dev'], { runner }));
-    assert.ok(calls[0].args.includes(`job=${JOB}`));
+  it('r2_22 without --yes only previews and deletes nothing', () => {
+    const { calls, runner } = recorder({ psql: PREVIEW });
+    const error = console.error;
+    console.error = () => {};
+    try {
+      const { result, out } = quiet(() => smoke.main(['--job', JOB, '--profile', 'dev'], { runner }));
+      assert.equal(result, smoke.EXIT_PREVIEW);
+      assert.match(out[0], /"deletes":false/);
+    } finally {
+      console.error = error;
+    }
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.input, smoke.PREVIEW_SQL);
+  });
+
+  it('r2_22 with --yes previews, deletes in one transaction through a psql variable, then purges', () => {
+    const { calls, runner } = recorder({ psql: (options) => (options.input === smoke.PREVIEW_SQL ? PREVIEW : '') });
+    const { out } = quiet(() => smoke.main(['--job', JOB, '--yes', '--profile', 'dev'], { runner }));
+    assert.match(out[0], /"prefix":"builds\/cfg_6_online_100\/BB-BTN\/Kc7d2h\/b1"/);
+    assert.equal(calls[1].options.input, smoke.DELETE_SQL);
+    assert.ok(calls[1].args.includes(`job=${JOB}`));
     assert.ok(!smoke.DELETE_SQL.includes(JOB));
     assert.match(smoke.DELETE_SQL, /^begin;[\s\S]*commit;\n$/);
     // Postgres folds a constant 1 / 0 at plan time, so the guard must divide by the row count's case.
     assert.doesNotMatch(smoke.DELETE_SQL, /\b1 \/ 0\b/);
     assert.match(smoke.DELETE_SQL, /1 \/ \(case when \(select count\(\*\) from smoke\) = 1 then 1 else 0 end\)/);
-    assert.deepEqual(calls[1].args.slice(-2), ['purge', 'library:library/builds/x/abc']);
+    assert.deepEqual(calls[2].args.slice(-2), ['purge', 'library:library/builds/cfg_6_online_100/BB-BTN/Kc7d2h/b1']);
+  });
+
+  it('r2_22 gives the bytes back to today\'s ledger row only for a published build', () => {
+    assert.match(smoke.DELETE_SQL, /insert into storage_ledger \(day, library_bytes, reference_bytes\)/);
+    assert.match(smoke.DELETE_SQL, /\(now\(\) at time zone 'utc'\)::date/);
+    assert.match(smoke.DELETE_SQL, /where \(select status from smoke\) = 'published'/);
+    assert.doesNotMatch(smoke.DELETE_SQL, /max\(day\)/);
+  });
+
+  it('r2_22 names the prefix and the command when the purge fails after the delete', () => {
+    const { runner } = recorder({ psql: (options) => (options.input === smoke.PREVIEW_SQL ? PREVIEW : ''), purge: new MacScriptError('rclone exited 1') });
+    assert.throws(() => quiet(() => smoke.main(['--job', JOB, '--yes'], { runner })), /rows are deleted but the purge of builds\/cfg_6_online_100\/BB-BTN\/Kc7d2h\/b1 failed[\s\S]*run: docker compose/);
+  });
+});
+
+describe('check-env: mac-up refuses a password migrate-mac cannot put in a URL (O-511)', () => {
+  it('r2_22 accepts letters, digits, - and _ and refuses anything else without printing it', () => {
+    assert.equal(checkEnv.checkPostgresPassword('Abc-123_x'), true);
+    assert.throws(() => checkEnv.checkPostgresPassword(''), /not set/);
+    for (const bad of ['a@b', 'a/b', 'a#b', 'a%b', 'a b']) {
+      assert.throws(() => checkEnv.checkPostgresPassword(bad), (error) => /letters, digits/.test(error.message) && !error.message.includes(bad));
+    }
   });
 });

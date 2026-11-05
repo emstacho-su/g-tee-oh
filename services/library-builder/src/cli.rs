@@ -217,8 +217,8 @@ fn is_uuid(text: &str) -> bool {
 }
 
 /// `queue --config <id> --pair <PAIR> --flop <flop> --line <text>... [--k <n>] [--priority <f>]`:
-/// every flag but `--line` at most once, at least one line, K a count from 1, the priority
-/// a finite number.
+/// every flag but `--line` at most once, K a count from 1, the priority a finite number. The
+/// lines (at least one, none twice) are checked once, by `enqueue::queue_one`.
 fn parse_queue(rest: &[String]) -> Result<Command, BuilderError> {
     let command = "queue";
     let mut single: BTreeMap<&'static str, String> = BTreeMap::new();
@@ -233,16 +233,10 @@ fn parse_queue(rest: &[String]) -> Result<Command, BuilderError> {
             _ => return Err(usage(format!("{command} {flag} needs a value"))),
         };
         if flag == LINE_FLAG {
-            if lines.contains(&value) {
-                return Err(usage(format!("{command} {flag} {value:?} is given twice")));
-            }
             lines.push(value);
         } else if single.insert(flag, value).is_some() {
             return Err(usage(format!("{command} {flag} is given twice")));
         }
-    }
-    if lines.is_empty() {
-        return Err(usage(format!("{command} needs at least one {LINE_FLAG} <text>")));
     }
     let text = |flag: &str| {
         single.get(flag).cloned().ok_or_else(|| usage(format!("{command} needs {flag} <value>")))
@@ -320,9 +314,6 @@ mod tests {
         assert!(message(&["estimate", "--job-spec", "a", "--job-spec", "b"]).contains("twice"));
         assert!(message(&["bench-report", "--out", "x"]).contains("--judged"));
         assert!(message(&["--once", "--job", "--job-spec"]).contains("needs a value"));
-        assert!(
-            message(&["queue", "--config", "c", "--pair", "p", "--flop", "f"]).contains("--line")
-        );
         assert!(
             message(&[
                 "queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "0"

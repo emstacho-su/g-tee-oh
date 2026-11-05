@@ -4,17 +4,22 @@
 //! ([`crate::job::resolve`] refuses any other), so a job cannot be inserted by SQL. This
 //! module builds one [`JobSpec`] the way the planner does (the configuration from the v1
 //! catalog, the sizing convention from the database, `gto_tree::tree_hash` of the
-//! postflop tree, the lines checked against the pair's preflop tree and against the range
-//! source, K from the settings, the planner's size estimate) and writes it through
-//! [`JobQueue::write_plan`] as a one-job plan, so an existing key is reported, never
-//! duplicated. The job's priority is [`HEAD_PRIORITY`] unless given: above anything the
-//! planner writes (its priorities are shares of one), so the loop claims it next. Deploy 1
-//! under O-61 queues the O-52 line this way with planning off; S20b and gap requests use
-//! the same command.
+//! postflop tree, the pair and its lines from `gto_planner::rank_pairs`, the lines checked
+//! against the range source, K by the pair's rank (`k_runouts` for the first
+//! `k_frequent_pairs` pairs, `k_runouts_rare` for the rest, O-191) unless given, the planner's
+//! size estimate) and writes it through [`JobQueue::write_plan`] as a one-job plan, so an
+//! existing key is never duplicated. The job's priority is [`HEAD_PRIORITY`] unless given:
+//! above anything the planner writes (its priorities are shares of one), so the loop claims it
+//! next. When the key already exists, nothing is inserted and the command reports it and exits
+//! 1; a `blocked_budget` row of that key is promoted to `queued` by `write_plan` but keeps its
+//! planner priority, K and lines, so it is reported as promoted, not as queued at the head. A
+//! hand-queued job is the operator's decision and is not cut by the storage budget (the
+//! planner's O-204 cut applies to planned jobs). Deploy 1 under O-61 queues the O-52 line this
+//! way with planning off; S20b and gap requests use the same command.
 
 use gto_model::{Flop, PositionPair, canonical_flop};
-use gto_planner::{JobSpec, Plan, estimated_bytes};
-use gto_tree::{PreflopLine, PreflopTree, SizingConventionSpec, TreeConfig, tree_hash};
+use gto_planner::{ConfigScope, JobSpec, Plan, estimated_bytes, rank_pairs};
+use gto_tree::{PreflopLine, SizingConventionSpec, TreeConfig, tree_hash, tree_hash_hex};
 use serde::Serialize;
 
 use crate::error::BuilderError;
@@ -37,7 +42,7 @@ pub struct QueueRequest {
     pub flop: String,
     /// The flop lines as text, for example `r250.c`; at least one, none twice.
     pub lines: Vec<String>,
-    /// Runouts to keep, else the settings' `k_runouts`.
+    /// Runouts to keep, else the K the planner gives the pair's rank.
     pub k_runouts: Option<u16>,
     /// The priority, else [`HEAD_PRIORITY`].
     pub priority: Option<f64>,
@@ -71,10 +76,11 @@ pub struct QueueWrite {
 }
 
 impl QueueWrite {
-    /// True when a row was inserted or promoted; false when the key already exists.
+    /// True when the row was inserted as asked; false when the key already exists (a promoted
+    /// `blocked_budget` row keeps its planner priority, K and lines, so it is not what was asked).
     #[must_use]
     pub fn wrote(&self) -> bool {
-        self.queued.saturating_add(self.promoted) > 0
+        self.queued > 0
     }
 }
 
@@ -101,8 +107,12 @@ pub async fn queue_one<Q: JobQueue>(
     let (flop, _) = canonical_flop(given);
     let tree = TreeConfig::from_spec(&spec)?;
     let hash = tree_hash(&tree);
-    let preflop = PreflopTree::build(&spec, &config, pair)?;
-    let known: Vec<String> = preflop.flop_lines().iter().map(PreflopLine::text).collect();
+    let scope = ConfigScope { config: config.clone(), convention: spec };
+    let ranked = rank_pairs(&scope, env.reach.as_ref(), &settings.planner)?;
+    let ranked_pair = ranked.iter().find(|ranked| ranked.pair == pair);
+    let known: Vec<String> = ranked_pair
+        .map(|ranked| ranked.lines.iter().map(PreflopLine::text).collect())
+        .unwrap_or_default();
     let pair_text = pair.to_string();
     for line in &request.lines {
         if !known.contains(line) {
@@ -115,7 +125,11 @@ pub async fn queue_one<Q: JobQueue>(
         // Refused here rather than parked after three failed claims (O-176, O-181).
         env.ranges.ranges(&request.config_id, &pair_text, line)?;
     }
-    let k_runouts = request.k_runouts.unwrap_or(settings.planner.k_runouts);
+    // The lines are known, so the pair is ranked; its K is the planner's for that rank.
+    let k_runouts = request
+        .k_runouts
+        .or_else(|| ranked_pair.map(|ranked| ranked.k_runouts))
+        .unwrap_or(settings.planner.k_runouts_rare);
     let priority = request.priority.unwrap_or(HEAD_PRIORITY);
     let estimated = estimated_bytes(request.lines.len(), k_runouts, &settings.planner);
     let job = JobSpec {
@@ -136,7 +150,7 @@ pub async fn queue_one<Q: JobQueue>(
         flop: flop.to_string(),
         given_flop: request.flop.clone(),
         preflop_lines: request.lines.clone(),
-        tree_config_hash: hex(&hash),
+        tree_config_hash: tree_hash_hex(&tree),
         k_runouts,
         priority,
         estimated_bytes: estimated,
@@ -158,19 +172,9 @@ fn check_lines(lines: &[String]) -> Result<(), BuilderError> {
     Ok(())
 }
 
-/// Bytes as lowercase hexadecimal.
-fn hex(bytes: &[u8]) -> String {
-    use std::fmt::Write as _;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut text, byte| {
-        // Writing to a String cannot fail.
-        let _ = write!(text, "{byte:02x}");
-        text
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{check_lines, hex};
+    use super::check_lines;
 
     #[test]
     fn r2_22_lines_are_at_least_one_and_never_twice() {
@@ -178,11 +182,5 @@ mod tests {
         assert!(check_lines(&["r250.c".to_owned()]).is_ok());
         assert!(check_lines(&["r250.c".to_owned(), "r250.r1000.c".to_owned()]).is_ok());
         assert!(check_lines(&["r250.c".to_owned(), "r250.c".to_owned()]).is_err());
-    }
-
-    #[test]
-    fn r2_22_the_hash_prints_as_lowercase_hexadecimal() {
-        assert_eq!(hex(&[0, 15, 255]), "000fff");
-        assert_eq!(hex(&[]), "");
     }
 }

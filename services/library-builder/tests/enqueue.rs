@@ -47,7 +47,9 @@ async fn r2_22_queue_one_writes_the_head_job_with_the_planners_hash() {
     assert_eq!(write.tree_config_hash, hex(&placeholder_tree_hash()));
     assert_eq!(write.given_flop, FLOP);
     assert_eq!(write.flop, canonical.to_string());
-    assert_eq!(write.k_runouts, settings.planner.k_runouts);
+    // Without --k the pair takes the K of its rank; BB-BTN is not the top pair under the prior
+    // reach (another pair ranks first), so it takes k_runouts_rare.
+    assert_eq!(write.k_runouts, settings.planner.k_runouts_rare);
     assert!(write.estimated_bytes > 0);
 
     let jobs = env.queue.snapshot().jobs;
@@ -58,7 +60,7 @@ async fn r2_22_queue_one_writes_the_head_job_with_the_planners_hash() {
     assert_eq!(job.flop, canonical.to_string());
     assert_eq!(job.preflop_lines, vec![LINE.to_owned()]);
     assert_eq!(job.tree_config_hash, placeholder_tree_hash().to_vec());
-    assert_eq!(job.k_runouts, i16::try_from(settings.planner.k_runouts).expect("fits"));
+    assert_eq!(job.k_runouts, i16::try_from(settings.planner.k_runouts_rare).expect("fits"));
     assert_eq!(job.status, "queued");
     assert!((f64::from(job.priority) - HEAD_PRIORITY).abs() < 1.0, "{}", job.priority);
 
@@ -87,6 +89,36 @@ async fn r2_22_queue_one_canonicalizes_the_flop_and_takes_k_and_priority() {
     let job = &env.queue.snapshot().jobs[0];
     assert_eq!(job.flop, canonical.to_string());
     assert_eq!(job.k_runouts, 5);
+}
+
+/// R2.22, O-191, code review: without --k a pair gets the K the planner gives its rank, so a
+/// rare pair gets `k_runouts_rare`; and a key that already exists is not reported as queued.
+#[tokio::test]
+async fn r2_22_queue_one_takes_k_by_the_pairs_rank_and_reports_an_existing_key() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let env = env_with(queue_with(Vec::new()), fake([0.1, 0.1]), dir.path());
+    let mut settings = BuilderSettings::default();
+    settings.planner.k_runouts = 20;
+    settings.planner.k_runouts_rare = 7;
+    settings.planner.k_frequent_pairs = 1;
+
+    let spec = SizingConventionSpec::from_json(&common::placeholder_convention().to_string())
+        .expect("the seed spec parses");
+    let config = catalog_config(CONFIG_ID).expect("the v1 configuration");
+    let scope = gto_planner::ConfigScope { config, convention: spec };
+    let ranked = gto_planner::rank_pairs(&scope, &gto_planner::PriorReach, &settings.planner)
+        .expect("the ranking");
+    let expected = ranked
+        .iter()
+        .find(|pair| pair.pair.to_string() == PAIR)
+        .map(|pair| pair.k_runouts)
+        .expect("BB-BTN is ranked");
+    assert!(ranked.iter().any(|pair| pair.k_runouts == 7), "some pair is rare");
+
+    let write = queue_one(&env, &request(FLOP, &[LINE]), &settings).await.expect("queued");
+    assert_eq!(write.k_runouts, expected);
+    let again = queue_one(&env, &request(FLOP, &[LINE]), &settings).await.expect("answers");
+    assert_eq!((again.queued, again.promoted, again.wrote()), (0, 0, false));
 }
 
 #[tokio::test]
@@ -120,5 +152,7 @@ async fn r2_22_queue_one_refuses_an_unknown_line_and_a_line_without_ranges() {
 
     let none = queue_one(&env, &request(FLOP, &[]), &settings).await;
     assert!(matches!(none, Err(BuilderError::Usage(_))), "{none:?}");
+    let twice = queue_one(&env, &request(FLOP, &[LINE, LINE]), &settings).await;
+    assert!(matches!(twice, Err(BuilderError::Usage(_))), "{twice:?}");
     assert_eq!(env.queue.snapshot().jobs, Vec::new());
 }
