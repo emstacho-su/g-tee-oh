@@ -4,16 +4,18 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use crate::enqueue::QueueRequest;
 use crate::error::BuilderError;
 
 /// The usage line.
 pub const USAGE: &str = "usage: library-builder [run | --version | plan | verify [--full] | healthz \
 | --once [--job <uuid>] | --once --job-spec <file> [--summary-out <file>] \
+| queue --config <id> --pair <PAIR> --flop <flop> --line <text>... [--k <n>] [--priority <f>] \
 | estimate --job-spec <file> [--out <file>] \
 | bench-report --judged <summary> [--informational <summary>] [--sweep <file>] --out <dir>]";
 
 /// A parsed command.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     /// The claim loop and the operations surface (the default with no argument).
     Run,
@@ -33,6 +35,11 @@ pub enum Command {
     Once {
         /// The job to claim, else the queue head.
         job: Option<String>,
+    },
+    /// Queue one flop build by hand at the head of the queue (O-510).
+    Queue {
+        /// What to queue.
+        request: QueueRequest,
     },
     /// Run one job spec without a database (O-205).
     OnceSpec {
@@ -85,6 +92,7 @@ pub fn parse(args: &[OsString]) -> Result<Command, BuilderError> {
         "verify" => parse_verify(rest),
         "healthz" => bare("healthz", rest, Command::Healthz),
         "--once" => parse_once(rest),
+        "queue" => parse_queue(rest),
         "estimate" => parse_estimate(rest),
         "bench-report" => parse_bench_report(rest),
         other => Err(usage(format!("unknown command {other:?}"))),
@@ -101,6 +109,16 @@ const JUDGED_FLAG: &str = "--judged";
 const INFORMATIONAL_FLAG: &str = "--informational";
 const SWEEP_FLAG: &str = "--sweep";
 const FULL_FLAG: &str = "--full";
+
+/// The flags of `queue`; `--line` may repeat.
+const QUEUE_FLAGS: [&str; 6] =
+    [CONFIG_FLAG, PAIR_FLAG, FLOP_FLAG, LINE_FLAG, K_FLAG, PRIORITY_FLAG];
+const CONFIG_FLAG: &str = "--config";
+const PAIR_FLAG: &str = "--pair";
+const FLOP_FLAG: &str = "--flop";
+const LINE_FLAG: &str = "--line";
+const K_FLAG: &str = "--k";
+const PRIORITY_FLAG: &str = "--priority";
 
 /// The length of a job id in its hyphenated form, and where its hyphens sit.
 const UUID_LEN: usize = 36;
@@ -198,6 +216,66 @@ fn is_uuid(text: &str) -> bool {
         })
 }
 
+/// `queue --config <id> --pair <PAIR> --flop <flop> --line <text>... [--k <n>] [--priority <f>]`:
+/// every flag but `--line` at most once, at least one line, K a count from 1, the priority
+/// a finite number.
+fn parse_queue(rest: &[String]) -> Result<Command, BuilderError> {
+    let command = "queue";
+    let mut single: BTreeMap<&'static str, String> = BTreeMap::new();
+    let mut lines: Vec<String> = Vec::new();
+    let mut words = rest.iter();
+    while let Some(word) = words.next() {
+        let Some(flag) = QUEUE_FLAGS.iter().copied().find(|flag| flag == word) else {
+            return Err(usage(format!("{command} does not take {word:?}")));
+        };
+        let value = match words.next() {
+            Some(value) if !value.starts_with("--") => value.clone(),
+            _ => return Err(usage(format!("{command} {flag} needs a value"))),
+        };
+        if flag == LINE_FLAG {
+            if lines.contains(&value) {
+                return Err(usage(format!("{command} {flag} {value:?} is given twice")));
+            }
+            lines.push(value);
+        } else if single.insert(flag, value).is_some() {
+            return Err(usage(format!("{command} {flag} is given twice")));
+        }
+    }
+    if lines.is_empty() {
+        return Err(usage(format!("{command} needs at least one {LINE_FLAG} <text>")));
+    }
+    let text = |flag: &str| {
+        single.get(flag).cloned().ok_or_else(|| usage(format!("{command} needs {flag} <value>")))
+    };
+    let k_runouts =
+        single
+            .get(K_FLAG)
+            .map(|value| {
+                value.parse::<u16>().ok().filter(|k| *k >= 1).ok_or_else(|| {
+                    usage(format!("{command} {K_FLAG} {value:?} is not a count from 1"))
+                })
+            })
+            .transpose()?;
+    let priority = single
+        .get(PRIORITY_FLAG)
+        .map(|value| {
+            value.parse::<f64>().ok().filter(|p| p.is_finite()).ok_or_else(|| {
+                usage(format!("{command} {PRIORITY_FLAG} {value:?} is not a finite number"))
+            })
+        })
+        .transpose()?;
+    Ok(Command::Queue {
+        request: QueueRequest {
+            config_id: text(CONFIG_FLAG)?,
+            pair: text(PAIR_FLAG)?,
+            flop: text(FLOP_FLAG)?,
+            lines,
+            k_runouts,
+            priority,
+        },
+    })
+}
+
 /// `estimate --job-spec <file> [--out <file>]`.
 fn parse_estimate(rest: &[String]) -> Result<Command, BuilderError> {
     let values = flags("estimate", rest, &[JOB_SPEC_FLAG, OUT_FLAG])?;
@@ -242,6 +320,16 @@ mod tests {
         assert!(message(&["estimate", "--job-spec", "a", "--job-spec", "b"]).contains("twice"));
         assert!(message(&["bench-report", "--out", "x"]).contains("--judged"));
         assert!(message(&["--once", "--job", "--job-spec"]).contains("needs a value"));
+        assert!(
+            message(&["queue", "--config", "c", "--pair", "p", "--flop", "f"]).contains("--line")
+        );
+        assert!(
+            message(&[
+                "queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "0"
+            ])
+            .contains("count from 1")
+        );
+        assert!(message(&["queue", "--flop", "f", "--line", "l"]).contains("--config"));
     }
 
     #[test]

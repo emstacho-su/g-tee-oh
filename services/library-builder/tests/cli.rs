@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use library_builder::cli::{Command, parse};
+use library_builder::enqueue::QueueRequest;
 use library_builder::error::BuilderError;
 
 fn args(words: &[&str]) -> Vec<OsString> {
@@ -69,10 +70,58 @@ fn r2_18_every_form_parses() {
     );
 }
 
+/// R2.22: `queue` takes the configuration, the pair, the flop, one or more lines, and the
+/// optional K and priority (O-510).
+#[test]
+fn r2_22_queue_form_parses() {
+    let base = ["queue", "--config", "cfg_6_online_100", "--pair", "BB-BTN", "--flop", "Kh7d2c"];
+    let request = |lines: &[&str], k_runouts: Option<u16>, priority: Option<f64>| QueueRequest {
+        config_id: "cfg_6_online_100".to_owned(),
+        pair: "BB-BTN".to_owned(),
+        flop: "Kh7d2c".to_owned(),
+        lines: lines.iter().map(|line| (*line).to_owned()).collect(),
+        k_runouts,
+        priority,
+    };
+    let mut one = base.to_vec();
+    one.extend(["--line", "r250.c"]);
+    assert_eq!(
+        parse(&args(&one)).expect("one line"),
+        Command::Queue { request: request(&["r250.c"], None, None) }
+    );
+    let mut full = base.to_vec();
+    full.extend(["--line", "r250.c", "--k", "10", "--line", "r250.r1000.c", "--priority", "2.5"]);
+    assert_eq!(
+        parse(&args(&full)).expect("two lines, k and priority"),
+        Command::Queue { request: request(&["r250.c", "r250.r1000.c"], Some(10), Some(2.5)) }
+    );
+}
+
 #[test]
 fn r2_18_malformed_forms_are_usage_errors() {
     for words in [
         &["bogus"][..],
+        &["queue"],
+        &["queue", "--config", "cfg_6_online_100", "--pair", "BB-BTN", "--flop", "Kh7d2c"],
+        &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--line", "l"],
+        &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "0"],
+        &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line", "l", "--k", "x"],
+        &[
+            "queue",
+            "--config",
+            "c",
+            "--pair",
+            "p",
+            "--flop",
+            "f",
+            "--line",
+            "l",
+            "--priority",
+            "nan",
+        ],
+        &["queue", "--config", "c", "--config", "d", "--pair", "p", "--flop", "f", "--line", "l"],
+        &["queue", "--pair", "p", "--flop", "f", "--line", "l"],
+        &["queue", "--config", "c", "--pair", "p", "--flop", "f", "--line"],
         &["--once", "--job"],
         &["--once", "--job", "a", "--job-spec", "b"],
         &["--once", "--surprise"],

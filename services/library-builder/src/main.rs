@@ -9,7 +9,7 @@
 //! so a script can read it. Logs go to stderr through `tracing` (`RUST_LOG`, default
 //! `info`).
 //!
-//! The commands that touch the database (`run`, `plan`, `verify`, `--once`) need
+//! The commands that touch the database (`run`, `plan`, `verify`, `--once`, `queue`) need
 //! `BUILDER_DB_PASSWORD`; the ranges come from `BUILDER_RANGES_FIXTURE` until a preflop
 //! solution is packed (O-181: `LibraryRanges` joins the chain then), and the planner's reach
 //! is `PriorReach` for the same reason (ADR 0013 asks for equilibrium reach, which needs that
@@ -28,6 +28,7 @@ use gto_planner::PriorReach;
 use library_builder::bench::{self, DEFAULT_MACHINE, REPORT_ID};
 use library_builder::cli::{self, Command, USAGE};
 use library_builder::config::Config;
+use library_builder::enqueue::{self, QueueRequest};
 use library_builder::error::BuilderError;
 use library_builder::job::{self, Env, RunSummary};
 use library_builder::ops::{self, OpsState, Status};
@@ -105,6 +106,7 @@ fn dispatch(command: Command) -> Result<ExitCode, BuilderError> {
         Command::Plan => block_on(plan()),
         Command::Verify { full } => block_on(verify(full)),
         Command::Once { job } => block_on(once(job)),
+        Command::Queue { request } => block_on(queue(request)),
         Command::OnceSpec { spec, summary_out } => block_on(once_spec(spec, summary_out)),
     }
 }
@@ -408,6 +410,16 @@ async fn once(job: Option<String>) -> Result<ExitCode, BuilderError> {
     let summary = run::run_once(&env, job.as_deref()).await?;
     emit(&summary, None)?;
     Ok(exit_code(summary.outcome == OUTCOME_PUBLISHED))
+}
+
+/// `queue ...`: one flop build queued by hand at the head of the queue (O-510); prints what
+/// was written; exit 0 when a row was inserted or promoted, 1 when its key already exists.
+async fn queue(request: QueueRequest) -> Result<ExitCode, BuilderError> {
+    let env = database_env(&config()?)?;
+    let settings = current_settings(&env).await?;
+    let write = enqueue::queue_one(&env, &request, &settings).await?;
+    emit(&write, None)?;
+    Ok(exit_code(write.wrote()))
 }
 
 /// `--once --job-spec FILE [--summary-out FILE]` (O-205): one spec through the engine to
