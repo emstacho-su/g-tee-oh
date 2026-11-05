@@ -89,7 +89,7 @@ clap = { version = "4", features = ["derive"] }
 # Seeded generators for synthetic library data (the gto-library "synthetic" feature) and the size
 # estimate; the same majors proptest already brings into the lock.
 rand = "0.9"
-rand_chacha = "0.9"
+rand_chacha = "0.10"
 # Snapshot tests (S14 and S15, one shared line): json for assert_json_snapshot, redactions so the
 # sha256 fields of a manifest do not churn on a zstd upgrade. Dev-dependency only.
 insta = { version = "1", features = ["json", "redactions"] }
