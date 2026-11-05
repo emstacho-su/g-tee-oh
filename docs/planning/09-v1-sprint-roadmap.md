@@ -487,3 +487,35 @@ Appended to planning/00 under "Phase 0 close-out and Phase 1 start (2026-11-04)"
 |---|---|---|
 | O-507 | Deploy 1 before the first pack | S20 runs at the next Mac evening after S04 merges, under O-61 (a smoke build on the synthetic 6-max ranges); the first real build is a short follow-up sitting S20b after S10, recorded as an addendum to the Deploy 1 report; the Phase 2 gate closes at S20 on the smoke build's memory and storage numbers and S20b replaces them with the real build's |
 | O-508 | The v1 date, now that owner evenings pace the plan | Day 40 to 42 (2026-11-28 to 2026-11-30) at three evenings a week, about 2026-12-12 at two; the date is reset at each weekly check-in from the evenings actually available, and units are no longer the pacing variable (replaces the O-39 date; the O-39 rule "never defer a gate" stands) |
+
+### 11.8 Phase 1 replan, 2026-11-05
+
+Written on day 17. Sections 11.2 to 11.4 stay as the record of 2026-11-04; this subsection supersedes them for Phase 1 and for the calendar. What changed: the recordings of the reference tool made on 2026-11-05 showed that one view returns a whole preflop node and that the shape of a tree can be read separately, so the preflop nodes the v1 trainer serves can be counted exactly before capture. The owner then narrowed Phase 1 ([[projects/g-tee-oh/decisions/0025-phase-1-captures-structure-and-trainer-preflop-flops-are-computed|ADR 0025]], O-523 to O-527): it captures the structure, fields, metadata and interactions of the features plus the preflop values the v1 trainer serves; flop solutions are computed by library-builder (ADR 0018) and no reference flops are captured. The reasoning: a poker tree has the same structure in every scenario and the cards are the variable, drawn from a fixed deck. Postflop training is v1.5, so the captured flop tiers and the background campaign leave the plan (O-524), and R1.10 moves to v1.5 with G5 (O-526).
+
+State as of 2026-11-05:
+
+- S20 Deploy 1 is done (sittings 1 and 2, pull request 55); the backup is deferred until a drive is bought (O-515, O-517).
+- The build card has landed (O-24) and its translation is accepted (O-518 to O-522).
+- Pull requests 55 and 56 are merged; `sprint/1-v1` and `main` were fast-forwarded to the same head in both repositories on the owner's instruction.
+- S29 is unblocked: the build card is in, and S48 has re-shot the screens.
+- Phase 1: every pre-S07 owner step is done (the S07 handoff, Update 2026-11-05).
+
+Remaining Phase 1 path:
+
+| Order | Session | Who is present | What it does |
+|---|---|---|---|
+| 1 | S07, one sitting | agent; the owner only for a re-login | The feature map is already done (O-440, the UX recon of 2026-10-28). Remaining: the data delivery map from the 2026-11-05 recordings, the availability map, the exact node count per v1 configuration from the tree walk, and the drill schema confirmation. Stops before any capture |
+| 2 | S08 capture tooling | agent | Tooling for the O-523 set at the daily limit; no flop capture paths |
+| 3 | S09 capture days | agent; the owner only for a re-login | Online 6-max 100bb first, one to two days, then the other v1 depths at about the same each (the private Phase 1 doc holds the counts and the pace) |
+| 4 | S10 normalize and pack | agent | The first pack (online 6-max 100bb) as soon as its nodes pass QA; this unblocks S20b on the Mac (O-507) |
+| 5 | S11 Phase 1 exit | agent | The exit gate as amended by ADR 0025; criterion 2 measured on the new set |
+
+Revised calendar, at three owner evenings a week:
+
+| Week | Dates | Owner evenings | Agent sessions | Milestones |
+|---|---|---|---|---|
+| 1 | 2026-11-05 to 2026-11-09 | a re-login for S07 if needed | S07, S08 | S20 done; node counts known |
+| 2 | 2026-11-10 to 2026-11-16 | the S29 visual pass; S20b, a short Mac sitting after the first pack | S09 capture days, S10, S29, S33 | the first pack and the first real build; Phase 3 and Phase 4 gates |
+| 3 | 2026-11-17 to 2026-11-23 | S34 at the Mac | the remaining S09 days, S11, S35 | Phase 1 exit; the v1 gate |
+
+Phase 1 can now finish within about a week of S07, and the v1 gate moves from day 40 to 42 (2026-11-28 to 2026-11-30) into week 3, if the online 6-max 100bb node count fits in one or two capture days. The count decides it and is not known until S07 has walked the tree: a larger count adds capture days one for one to S11, and S34 waits for S11 as before, with the date reset at the weekly check-in (O-508).
