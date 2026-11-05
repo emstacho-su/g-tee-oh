@@ -313,6 +313,9 @@ describe('smoke-clean: the O-61 smoke build goes after the report', () => {
     assert.ok(calls[0].args.includes(`job=${JOB}`));
     assert.ok(!smoke.DELETE_SQL.includes(JOB));
     assert.match(smoke.DELETE_SQL, /^begin;[\s\S]*commit;\n$/);
+    // Postgres folds a constant 1 / 0 at plan time, so the guard must divide by the row count's case.
+    assert.doesNotMatch(smoke.DELETE_SQL, /\b1 \/ 0\b/);
+    assert.match(smoke.DELETE_SQL, /1 \/ \(case when \(select count\(\*\) from smoke\) = 1 then 1 else 0 end\)/);
     assert.deepEqual(calls[1].args.slice(-2), ['purge', 'library:library/builds/x/abc']);
   });
 });

@@ -6,8 +6,9 @@
 // deleted, and the bytes its publish added are given back to today's storage_ledger row (the
 // recorded solution.bytes), so the ledger does not keep counting a build that is gone. The SQL
 // refuses when anything else references the solution (an attempt or an explanation; Deploy 1 runs no
-// api, so none should). Then the build's prefix is purged from the library bucket through the
-// backup-mirror one-shot. The job id reaches psql as a variable, never spliced into the SQL.
+// api, so none should), and when the job did not publish exactly one solution: the guard divides by a
+// case over the row count, since Postgres folds a constant 1 / 0 at plan time and would always fail.
+// Then the build's prefix is purged from the library bucket through the backup-mirror one-shot. The job id reaches psql as a variable, never spliced into the SQL.
 // `--yes` is required, since this deletes data.
 // Usage: node scripts/mac/smoke-clean.mjs --job <uuid> --yes [--profile mac|dev]
 import { pathToFileURL } from 'node:url';
@@ -19,8 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const DELETE_SQL = `begin;
 create temp table smoke on commit drop as
   select id, manifest_uri, coalesce(bytes, 0) as bytes from solution where build_job_id = :'job'::uuid;
-select case when (select count(*) from smoke) = 1 then 1
-  else 1 / 0 end as one_smoke_solution;
+select 1 / (case when (select count(*) from smoke) = 1 then 1 else 0 end) as one_smoke_solution;
 delete from scenario where solution_id in (select id from smoke);
 delete from solution where id in (select id from smoke);
 delete from build_job where id = :'job'::uuid;
