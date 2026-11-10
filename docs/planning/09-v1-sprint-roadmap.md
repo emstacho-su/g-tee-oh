@@ -474,6 +474,7 @@ Work that needs no owner evening. It runs only when no session in 11.2 is runnab
 | S48's fix pass: the MEDIUM and LOW leftovers of the S45 and S47 follow-up reviews | the S45 and S47 handoffs |
 | Api reads proposed by the bridge sprint: the acting seat's range from solver-query (O-490), recap attempt ids (O-492), the explanation template spacing (O-448), the shared revealing-panel list (O-449) | planning/00 |
 | Owner questions still open: the matrix pop-out default (O-386); whether the commit hook accepts other Claude models | planning/00, the S45 and S46 handoffs |
+| S49: an 8-max configuration in gto-model and the game_config seed, with rake like any other configuration (the engine solves it, O-544); it gates S10's pack row insert and S20b (O-539, O-546 to O-549) | handoffs/S49 |
 
 ### 11.6 Trims, revised
 
@@ -506,8 +507,8 @@ Remaining Phase 1 path:
 |---|---|---|---|
 | 1 | S07, one sitting | agent; the owner only for a re-login | The feature map is already done (O-440, the UX recon of 2026-10-28). Remaining: the data delivery map from the 2026-11-05 recordings, the availability map, the exact node count per v1 configuration from the tree walk, and the drill schema confirmation. Stops before any capture |
 | 2 | S08 capture tooling | agent | Tooling for the O-523 set at the daily limit; no flop capture paths |
-| 3 | S09 capture days | agent; the owner only for a re-login | Online 6-max 100bb first, one to two days, then the other v1 depths at about the same each (the private Phase 1 doc holds the counts and the pace) |
-| 4 | S10 normalize and pack | agent | The first pack (online 6-max 100bb) as soon as its nodes pass QA; this unblocks S20b on the Mac (O-507) |
+| 3 | S09 capture days | agent; the owner only for a re-login | Since 2026-11-09 (O-537 to O-539): 8-max 100bb first, then 8-max 150 and 200bb, then online 6-max at its v1 depths (the private Phase 1 doc holds the counts and the pace) |
+| 4 | S10 normalize and pack | agent | The first pack (8-max 100bb since 2026-11-09, O-539) as soon as its nodes pass QA; this unblocks S20b on the Mac (O-507) |
 | 5 | S11 Phase 1 exit | agent | The exit gate as amended by ADR 0025; criterion 2 measured on the new set |
 
 Revised calendar, at three owner evenings a week:
@@ -519,3 +520,7 @@ Revised calendar, at three owner evenings a week:
 | 3 | 2026-11-17 to 2026-11-23 | S34 at the Mac | the remaining S09 days, S11, S35 | Phase 1 exit; the v1 gate |
 
 Phase 1 can now finish within about a week of S07, and the v1 gate moves from day 40 to 42 (2026-11-28 to 2026-11-30) into week 3, if the online 6-max 100bb node count fits in one or two capture days. The count decides it and is not known until S07 has walked the tree: a larger count adds capture days one for one to S11, and S34 waits for S11 as before, with the date reset at the weekly check-in (O-508).
+
+### 11.9 8-max first, 2026-11-09
+
+The owner moved 8-max ahead of 6-max (O-537 to O-539 in planning/00). Capture order: 8-max at 100, 150 and 200bb (300bb dropped, O-545), then online 6-max. 8-max becomes a v1 configuration and the first pack is 8-max 100bb. The capture is the structural and functional reference; rake and other variants are solved by our engine and appended to the library that scenarios read from (O-544, ADR 0018). S20b's first real build uses the 8-max 100bb BTN versus BB single-raised pot line; O-52 stays the record of the Deploy 1 smoke line. The Phase 1 exit set grows by the 8-max depths, so the week 2 and week 3 milestones above move by the extra capture days; the date is reset at the weekly check-in once the first 8-max node count is in (O-508).
