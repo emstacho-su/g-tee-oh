@@ -182,3 +182,7 @@ Deploy actions, one at a time, each checked before the next:
 On the Mac. The owner's yes at 2026-11-05T17:54:16Z (O-20). `just mac-up`, the settings (K 20 and 10, planning off), the O-52 line queued and published at 0.253 and 0.284 percent of the pot in 292.0 seconds, 20 scenario rows and `coverage_added` observed, peaks inside 02 section 6.2 (builder 1,487,368,192 bytes, postgres-mac 123,723,776, seaweedfs-mac 351,866,880), the O-51 projection inside 650 GB with K kept at 20 and 10. Pull request 55 merged into `sprint/1-v1` as b33ba3e. The builder is left running, idle, planning off.
 
 Deferred by the owner until a drive is bought (O-515, O-517), in this order: `just mac-backup-install`, `just mac-backup`, `just mac-restore-check`, then `just mac-smoke-clean 01a1acd9-7ae3-72f8-abd5-c13146fbe7b2 --yes` after the owner reads its preview. At the latest before S20b imports the first pack. O-4 accepted as Off the same day.
+
+## S20b line, 2026-11-09 (O-539)
+
+S20b's first real build runs from the first pack, which is now 8-max 100bb (O-539). Its line is the 8-max 100bb BTN versus BB single-raised pot in place of O-52's online 6-max line; O-52 stays the record of the Deploy 1 smoke line. S20b needs the 8-max configuration in gto-model (09 section 11.5) and S10's pack.

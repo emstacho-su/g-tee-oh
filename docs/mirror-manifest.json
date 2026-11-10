@@ -70,7 +70,7 @@
     {
       "path": "docs/handoffs/S20-deploy-1.md",
       "source": "vault/handoffs/S20-deploy-1.md",
-      "sha256": "7fa625a110a498998101421a4c225eb7086c40ca1b2cdd1492d248800661f721"
+      "sha256": "5cf11e2efe3d0be93f481cd11ac110be93aea44f8d50171ff0f04d8a21957b8b"
     },
     {
       "path": "docs/handoffs/S21-api-foundation.md",
@@ -148,9 +148,14 @@
       "sha256": "2a2f39a806285506705d52614e40c57b8b5a0a98d6759fa1b99c7d91c70383ef"
     },
     {
+      "path": "docs/handoffs/S49-eight-handed-config.md",
+      "source": "vault/handoffs/S49-eight-handed-config.md",
+      "sha256": "afd159c279f48905aa19d4c47c45998e4ebbb559e8046a13ffdeb6ebb67c6d57"
+    },
+    {
       "path": "docs/planning/09-v1-sprint-roadmap.md",
       "source": "vault/planning/09-v1-sprint-roadmap.md",
-      "sha256": "36625f371ab071a89c1a2978b314f06f5f338d09afc2320f1302d525e7fe765c"
+      "sha256": "2ea342330d691f4b88ccad83c8333f9719e789d6faac7b9fe6990a3267504fea"
     },
     {
       "path": "docs/planning/10-traceability.md",
