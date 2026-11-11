@@ -24,7 +24,7 @@
     "@fastify/cors": "^11.3.1",
     "@fastify/helmet": "^13.2.0",
     "@fastify/rate-limit": "^11.2.1",
-    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger": "^9.9.3",
     "@g-tee-oh/contracts": "workspace:*",
     "@g-tee-oh/learning": "workspace:*",
     "fastify": "^5.12.7",
