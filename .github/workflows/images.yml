@@ -37,7 +37,7 @@ jobs:
       count: ${{ steps.matrix.outputs.count }}
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       # The justfile recipe prints whether Dockerfiles are present; CI calls just recipes
       # wherever one exists (CLAUDE.md, task surface).
       - name: Notice

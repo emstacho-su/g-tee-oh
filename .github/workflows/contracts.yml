@@ -40,7 +40,7 @@ jobs:
       DATABASE_URL: postgres://postgres:contracts@localhost:5432/gto?sslmode=disable
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       # Step 1 of just contracts is cargo run -p solver-query, which writes the utoipa document
       # (O-116); sqlx-check needs cargo once a crate carries a query (S16 or S18).
       - uses: dtolnay/rust-toolchain@stable
